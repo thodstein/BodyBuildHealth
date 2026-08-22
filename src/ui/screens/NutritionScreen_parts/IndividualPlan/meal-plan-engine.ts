@@ -180,6 +180,10 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 function maxGramPerItem(budget?: string): number { return (budget === 'max' || budget === 'enhanced') ? 600 : 500; }
 function maxGrainPerMeal(budget?: string): number { return (budget === 'max' || budget === 'enhanced') ? 350 : 280; }
 function maxDryGrainPerMeal(budget?: string): number { return (budget === 'max' || budget === 'enhanced') ? 200 : 150; }
+// D-28+ fix (жалоба «500 г клюквы в обед»): реалистичная порция фрукта в приёме (г).
+// Фрукт — микронутриентная «добавка», а не углеводный носитель; используется и в E5-добивке,
+// и в коррекции макросов, чтобы фрукт не раздувался до 280-350 г.
+const FRUIT_PORTION_CAP_G = 150;
 
 // D-18: realistic per-portion ceiling for a carb source. Low-density cooked starches
 // (grains ~12-28g/100g, potato ~17-21g, cooked pasta) need huge gram portions to hit a
@@ -415,13 +419,87 @@ const BREAKFAST_STYLE_PROTEIN: Record<Exclude<BreakfastStyle, 'auto'>, string[]>
 };
 // N7: завтрак-шаблоны — готовые «классический завтрак бодибилдера» с детерминированным составом.
 export type BreakfastTemplateId = 'auto' | 'classic_oat' | 'protein_flakes' | 'eggs_toast' | 'cottage_berries';
-export interface BreakfastTemplate { id: BreakfastTemplateId; label: string; foods: string[]; milk?: boolean; }
+export interface BreakfastTemplate {
+  id: BreakfastTemplateId; label: string; foods: string[]; portions: Record<string, number>; milk?: boolean;
+}
+// П.3 (Aug 22 2026, диетология): завтрак-шаблоны переработаны в ПОЛНОЦЕННЫЕ «завтраки бодибилдера»
+// с диетологически сбалансированным составом: медленные углеводы (низкий ГИ, долгая сытость) +
+// полноценный белок (лейцин ≥2.5 г для запуска MPS) + полезные жиры (омега-3/мононенасыщенные) +
+// фрукты/ягоды (микронутриенты, антиоксиданты) + молочная жидкость. Порции заданы явно (г).
 export const BREAKFAST_TEMPLATES: BreakfastTemplate[] = [
-  { id: 'classic_oat', label: '🥣 Овсянка + банан + ягоды', foods: ['oats', 'banana', 'berries'], milk: true },
-  { id: 'protein_flakes', label: '🌾 Хлопья + протеин + сухофрукты', foods: ['oats', 'whey_isolate', 'dried_apricots', 'dates'], milk: true },
-  { id: 'eggs_toast', label: '🍳 Яйца + тост + ягоды', foods: ['egg_whole', 'egg_white', 'bread_white', 'berries'] },
-  { id: 'cottage_berries', label: '🥛 Творог + хлопья + черника', foods: ['cottage_cheese_5', 'oats', 'blueberries'], milk: false },
+  {
+    id: 'classic_oat', label: '🥣 Овсянка + протеин + банан + семена чиа',
+    foods: ['oats', 'whey_isolate', 'banana', 'berries', 'chia_seeds'], milk: true,
+    portions: { oats: 80, whey_isolate: 30, banana: 100, berries: 100, chia_seeds: 10 },
+  },
+  {
+    id: 'protein_flakes', label: '🌾 Хлопья + протеин + сухофрукты + миндаль',
+    foods: ['oats', 'whey_isolate', 'dates', 'dried_apricots', 'almonds'], milk: true,
+    portions: { oats: 70, whey_isolate: 30, dates: 30, dried_apricots: 20, almonds: 15 },
+  },
+  {
+    id: 'eggs_toast', label: '🍳 Яйца + тост + авокадо + шпинат',
+    foods: ['egg_whole', 'egg_white', 'bread_rye', 'avocado', 'spinach'], milk: false,
+    portions: { egg_whole: 150, egg_white: 110, bread_rye: 70, avocado: 50, spinach: 60 },
+  },
+  {
+    id: 'cottage_berries', label: '🥛 Творог + хлопья + черника + грецкие орехи',
+    foods: ['cottage_cheese_5', 'oats', 'blueberries', 'walnut'], milk: false,
+    portions: { cottage_cheese_5: 200, oats: 50, blueberries: 80, walnut: 15 },
+  },
 ];
+
+// П.3: роль продукта в завтраке по категории (для детерминированного шаблона).
+function templateFoodRole(f: FoodItem): MealItem['role'] {
+  if (f.category === 'supplement') return 'fast_protein';
+  if (f.category === 'dairy') return 'slow_protein';
+  if (f.category === 'grain' || f.category === 'carb') return 'carb_slow';
+  if (f.category === 'fat') return 'fat';
+  if (f.category === 'veg_fruit') return (f.protein || 0) > 8 ? 'veg' : 'fruit';
+  return 'protein';
+}
+
+// П.3: сборка завтрака ИЗ шаблона (детерминированный состав, а не пуловый подбор).
+// Уважает исключения/аллергены пользователя. ВАЖНО: шаблон ЗАМЕНЯЕТ пуловый завтрак,
+// а не дополняет его (раньше докладывал овсянку+сыворотку поверх — «в завтрак всё подряд»).
+function buildBreakfastFromTemplate(
+  tmpl: BreakfastTemplate, time: string,
+  excludedIds: Set<string>, allergenTags: Set<string> | undefined,
+): Meal {
+  const items: MealItem[] = [];
+  const used = new Set<string>();
+  const _ok = (f: FoodItem): boolean => {
+    if (excludedIds.has(f.id)) return false;
+    if (allergenTags && allergenTags.size > 0) {
+      const diet = FOOD_ALLERGEN_DIET[f.id];
+      const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
+      if ([...allergenTags].some(t => tags.includes(t))) return false;
+    }
+    return true;
+  };
+  for (const fid of tmpl.foods) {
+    const g = tmpl.portions[fid] || 80;
+    const food = FOOD_DB.find(f => f.id === fid);
+    if (!food || !_ok(food) || used.has(fid)) continue;
+    items.push(makeItem(food, g, templateFoodRole(food)));
+    used.add(fid);
+  }
+  if (tmpl.milk) {
+    const milk = FOOD_DB.find(f => f.id === 'milk');
+    if (milk && !excludedIds.has(milk.id) && _ok(milk)) items.push(makeItem(milk, 200, 'liquid'));
+  }
+  const totals = items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  const mpsCheck = { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg / 10) / 100, triggers_mTOR: totals.leucine_mg >= LEU_THRESHOLD_MG && totals.p >= 25 };
+  return {
+    label: 'Завтрак', time, items, totals, type: 'breakfast' as const,
+    rationale: [
+      `Завтрак-шаблон «${tmpl.label}» — детерминированный состав (не случайный подбор)`,
+      'Медленные углеводы (низкий ГИ) + полноценный белок (лейцин ≥2.5 г — запуск MPS после ночного голода)',
+      'Полезные жиры (омега-3/мононенасыщенные) + фрукты/ягоды (антиоксиданты) + жидкость',
+    ],
+    mpsCheck, target: { p: totals.p, c: totals.c, f: totals.f },
+  };
+}
 
 // Подбор завтрашнего пула углеводов (fallback → курируемый «завтрашний» набор, не весь пул).
 function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: BreakfastStyle = 'auto'): { carbs: FoodItem[]; fruits: FoodItem[] } {
@@ -475,6 +553,17 @@ function breakfastProteinPref(pool: ReturnType<typeof buildFoodPools>, style: Br
   const poolIds = kws.length > 0 ? kws : BREAKFAST_PROTEIN_IDS;
   const matched = all.filter((f) => poolIds.some(k => f.id.includes(k) || (f.name || '').toLowerCase().includes(k)));
   return matched.length > 0 ? matched : [];
+}
+// D-28+ fix (жалоба «Завтрак: овсянка и говяжий фарш — где диетология?»):
+// если по пулам не нашлось «завтрашнего» белка (яйца/творог/йогурт/сыворотка), НЕ отдаём завтрак
+// дневной мясной ротации. Сначала подтягиваем быстрые/медленные «завтрашние» белки из хардкод-пулов
+// (whey/egg_white + casein/cottage/yogurt — всегда уместны на завтрак), и только если и они пусты
+// (исключены аллергенами) — возвращаем пусто, чтобы buildWholeMeal взял обычный белок.
+function breakfastProteinFallback(pool: ReturnType<typeof buildFoodPools>): FoodItem[] {
+  const bf = [...pool.fastProtein, ...pool.slowProtein];
+  if (bf.length > 0) return bf;
+  const any = [...pool.proteinSolid, ...pool.proteinLean];
+  return any.filter(f => BREAKFAST_PROTEIN_IDS.some(k => f.id.includes(k) || (f.name || '').toLowerCase().includes(k)));
 }
 // ─── E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи) ──
 const SNACK_CARB_KEYWORDS = ['хлопья','овсян','рисов','манк','мюсли','гречк','сухар','рисовый крем','хлеб','рис '];
@@ -834,10 +923,14 @@ function buildWholeMeal(
   // иначе один любимый продукт (лосось/молоко) захватывал КАЖДЫЙ приём по 300-500 г.
   const _allProteinPool = [...pool.proteinSolid, ...pool.proteinFatty, ...(pool.vegProteinExtra || [])];
   const preferredRot = preferredIds && preferredIds.size > 0 ? _allProteinPool.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
+  // D-28+ fix (жалоба «завтрак = овсянка и говяжий фарш»): завтрак НИКОГДА не получает
+  // дневную мясную ротацию напрямую — вместо неё «завтрашний» белок (яйца/творог/сыворотка).
+  const _breakfastFallbackProtein = breakfast ? breakfastProteinFallback(pool) : [];
   const proteinPool = preferredRot.length > 0
     ? preferredRot
     : snack && pool.fastProtein.length > 0 ? [...pool.fastProtein, ...rotPoolFinal]
     : breakfast && _breakfastProtein && _breakfastProtein.length > 0 ? _breakfastProtein
+    : breakfast && _breakfastFallbackProtein.length > 0 ? _breakfastFallbackProtein
     : rotPoolFinal.length > 0 ? rotPoolFinal
     : (pool.vegProteinExtra && pool.vegProteinExtra.length > 0) ? pool.vegProteinExtra
     : (remF < 12 && pool.proteinLean.length > 0) ? pool.proteinLean
@@ -926,37 +1019,31 @@ function buildWholeMeal(
         const item = makeItem(carbSource, grams, 'carb_slow');
         items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
       }
-      // D-18b: if the carb target was large and the first (grain-capped) source didn't cover it,
-      // add a second carb source (different food) to close the gap — keeps daily carb totals
-      // intact and adds intra-meal carb variety (e.g. buckwheat + rice).
-      // D-28 fix: НЕ на завтраке (завтрак = один «завтрашний» углевод, а не «хлопья+лапша»),
-      // и только если первый источник реально дал ≥20 г углеводов (иначе «10г хлопьев+10г лапши»).
-      const firstDeliveredC = carbSource ? (carbSource.carbs || 0) * grams / 100 : 0;
-      if (!breakfast && remC > 20 && carbTarget >= 60 && firstDeliveredC >= 20) {
-        const secondPool = (commonCarbs.length > 0 ? commonCarbs : carbPool).filter(f => f.id !== carbSource.id);
-        const carbSource2 = pickPriority(secondPool.length > 0 ? secondPool : carbPool.filter(f => f.id !== carbSource.id), seed + 11, { lockedIds, recentIds, hardRecentIds });
-       
-        if (carbSource2) {
-          const grams2 = gramsForMacro(carbSource2, remC, 'carbs', carbPortionCap(carbSource2));
-          if (grams2 > 0) {
-            const item2 = makeItem(carbSource2, grams2, 'carb_slow');
-            items.push(item2); remP -= item2.p; remF -= item2.f; remC -= item2.c;
-          }
-        }
-      }
+      // D-28+ fix (П.2, диетология): УБРАН второй гарнир в том же приёме («гречка + рис» в обед —
+      // жалоба «500 г каши двумя разными»). Диетологически не-эстетично и раздувает одну порцию.
+      // Избыточные углеводы движок распределяет по большему числу приёмов (движок уже подсказывает
+      // «Перегрузка приёма → увеличьте число приёмов»), а E5-фруктовая добивка ниже остаётся.
       // E5: углеводная «добивка» фруктом/сухофруктами/ягодами — когда крупяные порции
       // упёрлись в кап (280/350 г), остаток закрываем фруктом вместо наращивания каши.
       // D-28 fix: не дублируем фрукт, уже добавленный шагом 4 (раньше годжи попадали дважды).
       // На завтраке E5 не срабатывает — фрукт добавляет шаг 4 (иначе «в завтрак всё подряд»).
+      // D-28+ fix (жалоба «500 г клюквы в обед»): E5-добивка — это МИКРОнутриентная порция,
+      // а не источник углеводов. Для закрытия крупного углеводного остатка выбираем СНАЧАЛА
+      // карб-плотные фрукты (банан/финики/изюм/курага ≥20 г/100 г), а не низкоплотную клюкву,
+      // и ограничиваем порцию реалистичными 150 г (иначе «добивка» превращалась в 280-350 г ягод).
       if (!breakfast && remC > 15 && (pool.carbFruit.length > 0 || (_breakfastPools && _breakfastPools.fruits.length > 0))) {
     const fruitPool = (snack && _snackPools && _snackPools.fruits.length > 0)
       ? _snackPools.fruits
       : (breakfast && _breakfastPools && _breakfastPools.fruits.length > 0) ? _breakfastPools.fruits : pool.carbFruit;
         const used = new Set(items.map(i => i.id));
         const fTop = fruitPool.filter((f: any) => !used.has(f.id));
-        const fSrc = pickPriority(fTop.length > 0 ? fTop : fruitPool, seed + 21, { lockedIds, recentIds, hardRecentIds });
+        // карб-плотные фрукты предпочтительны для «добивки» остатка; low-density ягоды остаются
+        // только как fallback (их роль — микронутриенты, не закрытие углеводной цели).
+        const carbDense = fTop.length > 0 ? fTop.filter((f: any) => (f.carbs || 0) >= 20) : [];
+        const fSrc = pickPriority(carbDense.length > 0 ? carbDense : (fTop.length > 0 ? fTop : fruitPool), seed + 21, { lockedIds, recentIds, hardRecentIds });
         if (fSrc && !used.has(fSrc.id)) {
-          const gramsF = gramsForMacro(fSrc, remC, 'carbs', carbPortionCap(fSrc));
+          // E5-порция фрукта ограничена реалистичными 150 г — «добавка», а не гигантская ягодная миска.
+          const gramsF = Math.min(FRUIT_PORTION_CAP_G, gramsForMacro(fSrc, remC, 'carbs', carbPortionCap(fSrc)));
           if (gramsF >= 30) {
             const fItem = makeItem(fSrc, gramsF, 'fruit');
             items.push(fItem); remP -= fItem.p; remF -= fItem.f; remC -= fItem.c;
@@ -1551,7 +1638,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const impossibleGoal = input.goalKcal < _minKcal * 0.9;
   const fatFloorG = impossibleGoal ? Math.round(input.weightKg * (input.sex === 'female' ? 0.6 : 0.5)) : _floorFatG;   // higher fat floor for women on hard cut
   const carbFloorG = impossibleGoal ? 50 : _floorCarbG;                                // ketogenic-ish floor on hard cut
-  const carbsTotal = Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG);
+  // D-28+ fix (вопрос «120 кг на курсе → 900 г углеводов — много?»): физиологический ПОТОЛОК
+  // углеводов 8 г/кг/день. Это верхняя граница даже для профессионалов в межсезонье с инсулином
+  // (сверх неё нет доказанного анаболического эффекта, только жироотложение + гликемический риск).
+  // Защищает от КУМУЛЯТИВНОГО стэка множителей: nutrLevel×1.5 × cycling/рефид × surplus — которые
+  // иначе раздували цель до абсурда. Белок не трогаем (всегда приоритет).
+  const _carbCeiling = Math.max(50, Math.round(input.weightKg * 8));
+  const carbsTotal = Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);
   // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
   // D-24: mealsCount-aware carb distribution (weight-based, lunch = main meal).
   // Веса нормируются к 100% по приёмам, которые РЕАЛЬНО будут построены → нет
@@ -1686,10 +1779,29 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
   const breakfastRot = rotationForMeal(0);
-  // E8: молоко к завтраку и кокосовое масло (по выбору пользователя, с учётом исключений).
-  const _breakfastExtras: { food: FoodItem; grams: number; role?: MealItem['role'] }[] = [];
+  // N7: завтрак-шаблон (детерминированный состав).
+  const _bfTmpl = (input.breakfastTemplate && input.breakfastTemplate !== 'auto')
+    ? BREAKFAST_TEMPLATES.find(t => t.id === input.breakfastTemplate)
+    : null;
   const _dairyExcluded = combinedExcluded.has('milk') || combinedExcluded.has('kefir') ||
     (input.allergenTags ? [...input.allergenTags].some(t => t === 'dairy' || t === 'молочные' || t === 'лактоза') : false);
+  // П.3 (диетология): если задан шаблон — завтрак строится ИЗ шаблона (полноценный состав),
+  // а не пуловым подбором, который затем «дополнялся» шаблоном (было два углевода/«всё подряд»).
+  // Кокосовое масло/семена (по выбору) применяем поверх шаблона, как и в пуловом пути.
+  let breakfast: Meal;
+  if (_bfTmpl) {
+    breakfast = buildBreakfastFromTemplate(_bfTmpl, tBreakfast, combinedExcluded, input.allergenTags);
+    const _extraSeed = FOOD_DB.find(f => f.id === 'chia_seeds' && !combinedExcluded.has(f.id))
+      || FOOD_DB.find(f => f.id === 'flaxseed' && !combinedExcluded.has(f.id));
+    if (input.coconutOilBoost) {
+      const _co = FOOD_DB.find(f => f.id === 'coconut_oil' && !combinedExcluded.has(f.id));
+      if (_co && !breakfast.items.some(it => it.id === 'coconut_oil')) breakfast.items.push(makeItem(_co, 10, 'fat'));
+    }
+    if (_extraSeed && !breakfast.items.some(it => it.id === _extraSeed.id)) breakfast.items.push(makeItem(_extraSeed, 10, 'fat'));
+    breakfast.totals = breakfast.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  } else {
+  // E8: молоко к завтраку и кокосовое масло (по выбору пользователя, с учётом исключений).
+  const _breakfastExtras: { food: FoodItem; grams: number; role?: MealItem['role'] }[] = [];
   if (input.addMilkToBreakfast && !_dairyExcluded) {
     const _milk = FOOD_DB.find(f => f.id === 'milk' && !combinedExcluded.has(f.id));
     if (_milk) _breakfastExtras.push({ food: _milk, grams: 200, role: 'liquid' });
@@ -1703,16 +1815,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _seed = FOOD_DB.find(f => f.id === 'chia_seeds' && !combinedExcluded.has(f.id))
     || FOOD_DB.find(f => f.id === 'flaxseed' && !combinedExcluded.has(f.id));
   if (_seed) _breakfastExtras.push({ food: _seed, grams: 10, role: 'fat' });
-  // N7: завтрак-шаблон — предпочитаемые продукты шаблона + молоко (если в шаблоне).
-  const _bfTmpl = (input.breakfastTemplate && input.breakfastTemplate !== 'auto')
-    ? BREAKFAST_TEMPLATES.find(t => t.id === input.breakfastTemplate)
-    : null;
-  // N7: продукты шаблона форсируются через lock (абсолютный приоритет выбора).
-  if (_bfTmpl?.milk && !_dairyExcluded) {
-    const _milk = FOOD_DB.find(f => f.id === 'milk' && !combinedExcluded.has(f.id));
-    if (_milk && !_breakfastExtras.some(e => e.food.id === 'milk')) _breakfastExtras.push({ food: _milk, grams: 200, role: 'liquid' });
-  }
-  const breakfast = buildWholeMeal({
+  breakfast = buildWholeMeal({
     label: 'Завтрак', time: tBreakfast, type: 'breakfast', refeedDay: input.refeedDay, fiberCapG: input.fiberCapG,
     mealPreferredIds: input.preferredByMeal?.['Завтрак'],
     preferredByMealFull: input.preferredByMeal,
@@ -1734,19 +1837,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       _seed ? `Семена (${_seed.name}) — омега-3 ALA + клетчатка` : '',
     ].filter(Boolean),
   });
-  // N7: гарантированно добавляем продукты шаблона (детерминированный «классический завтрак»),
-  // даже если они не прошли пороги пулов (например овсянка <15 г углеводов → вне carbSlow).
-  if (_bfTmpl && _bfTmpl.foods.length > 0) {
-    const _tmplPortion: Record<string, number> = { oats: 60, banana: 120, berries: 100, whey_isolate: 30, dried_apricots: 40, dates: 40, egg_whole: 110, egg_white: 110, bread_white: 60, cottage_cheese_5: 150, blueberries: 100 };
-    for (const fid of _bfTmpl.foods) {
-      if (breakfast.items.some(it => it.id === fid)) continue;
-      const food = FOOD_DB.find(f => f.id === fid && !combinedExcluded.has(f.id));
-      if (!food) continue;
-      const grams = _tmplPortion[fid] || 80;
-      const role: MealItem['role'] = food.category === 'veg_fruit' ? 'fruit' : food.category === 'dairy' ? 'slow_protein' : (food.category === 'supplement' ? 'fast_protein' : 'protein');
-      breakfast.items.push(makeItem(food, grams, role));
-    }
-    breakfast.totals = breakfast.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
   }
   meals.push(breakfast);
   markUsed(breakfast);
@@ -1910,27 +2000,36 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _hasMealNear = (min: number, tol = 30): boolean => meals.some(m => {
     const mt = _toMinOf(m.time); return mt !== null && Math.abs(mt - min) <= tol;
   });
-  const _injectMealAt = (min: number, label: string, note: string): void => {
+  const _injectMealAt = (min: number, label: string, note: string, carbG = 40, proteinG = 25): void => {
     const t = fmtTime(min);
     // Малый белково-углеводный приём (лёгкий, без жиров) — для сопровождения укола.
+    // D-28+ fix (жалоба «инсулин и на тренировке так мало углеводов»): порция углеводов
+    // теперь дозируется (carbG), а не жёстко 40 г — для инсулина она считается от дозы (~10 г/1 ЕД).
     const source = pool.fastProtein[0] || pool.proteinSolid[0];
     const carb = pool.carbFast[0] || pool.carbSlow[0];
     const items: MealItem[] = [];
-    if (source) items.push(makeItem(source, 25, 'fast_protein'));
-    if (carb) items.push(makeItem(carb, 40, 'carb_fast'));
+    if (source) items.push(makeItem(source, proteinG, 'fast_protein'));
+    if (carb) items.push(makeItem(carb, carbG, 'carb_fast'));
     if (items.length === 0) return;
     const totals = items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-    meals.push({ label, time: t, items, totals, type: 'snack', target: { p: 25, c: 40, f: 0 }, rationale: [note], mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= 2500 && totals.p >= 25 } });
+    meals.push({ label, time: t, items, totals, type: 'snack', target: { p: proteinG, c: carbG, f: 0 }, rationale: [note], mpsCheck: { proteinG: totals.p, leucineG: Math.round(totals.leucine_mg) / 1000, triggers_mTOR: totals.leucine_mg >= 2500 && totals.p >= 25 } });
     notes.push(note);
   };
 
   // 4a. Инсулин: быстрые углеводы в окне укола (правило ~10 г на 1 ЕД; жиры минимум).
+  // D-28+ fix: углеводы под инсулин масштабируются от ДОЗЫ (≈10 г/1 ЕД), а не фикс. 40 г.
+  // Короткий/ультракороткий инсулин в пик (обычно перед едой/тренировкой) требует больше быстрых
+  // углеводов, чем базальный фон, — плоский 40 г не обеспечивал гликемическую безопасность.
   const _insulinInjs = _injList.filter(i => (i.type || '').toLowerCase().includes('инсулин'));
   for (const inj of _insulinInjs) {
     const injMin = _toMinOf(inj.time) ?? (inj.esterType === 'long' ? 22 * 60 : 8 * 60);
     if (!_hasMealNear(injMin)) {
+      const isBolus = inj.esterType !== 'long';
+      const dose = Number(inj.dose) || (isBolus ? 8 : 10);
+      // ~10 г быстрых углеводов на 1 ЕД болюсного инсулина; кап 120 г на один приём (безопасность).
+      const carbG = Math.max(30, Math.min(120, Math.round(dose * 10)));
       const label = `⚡ Углеводы под инсулин (${inj.name || 'инсулин'})`;
-      _injectMealAt(injMin, label, `${label} — быстрые углеводы при уколе (≈10 г/1 ЕД, без жиров для скорости всасывания)`);
+      _injectMealAt(injMin, label, `${label} — быстрые углеводы ${carbG} г при уколе ${dose} ЕД (≈10 г/1 ЕД, без жиров для скорости всасывания)`, carbG);
     }
   }
 
@@ -2227,6 +2326,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const fd = FOOD_DB.find(f => f.id === item.id);
           if (fd) upCap = carbPortionCap(fd);
         }
+        // D-28+ fix (жалоба «500 г клюквы»): фрукт — это порция-«добавка», а не углеводный
+        // носитель; коррекция макросов не должна раздувать его выше реалистичных 150 г.
+        if (item.role === 'fruit') upCap = FRUIT_PORTION_CAP_G;
         const newAmount = Math.max(suppMin, Math.min(upCap, rawNew));
         const factor = newAmount / (item.amount || 1);
         item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
@@ -2326,6 +2428,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (!suppMax && (best.item.role === 'carb_slow' || best.item.role === 'carb_fast') && carbPortionCap(best.food) < maxAmount) {
       maxAmount = carbPortionCap(best.food);
     }
+    // D-28+ fix (жалоба «500 г клюквы»): fruit-порции не раздуваются точной подгонкой.
+    if (!suppMax && best.item.role === 'fruit') maxAmount = Math.min(maxAmount, FRUIT_PORTION_CAP_G);
     let newAmount = best.item.amount + deltaGrams;
     newAmount = Math.max(minAmount, Math.min(maxAmount, Math.round(newAmount)));
     // Реальная дельта после округления и капов
@@ -2649,8 +2753,11 @@ function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: '
   // в самый лёгкий приём (обычно snack), НО не pre-sleep: микро-добавка продукта
   // (напр. лосось 100 г = 20 г белка/13 г жира) не должна раздувать ночной казеиновый приём —
   // иначе pre-sleep уходит за 60 г белка (жалоба «белок не распределён»).
-  let target = meals.find(m => m.type !== 'presleep') || meals[0];
-  for (const m of meals) if (m.type !== 'presleep' && (m.totals.kcal || 0) < (target.totals.kcal || 0)) target = m;
+  // D-28+ fix (диетология): также НЕ добавляем в завтрак — иначе «добивка» омега-3 (лосось/
+  // печень) попадала в творожную/овсяную кашу («творог + лосось»). Рыбные источники омега-3
+  // и так добавляются отдельным Omega-3-проходом в обед; завтрак остаётся «завтрашним».
+  let target = meals.find(m => m.type !== 'presleep' && m.type !== 'breakfast') || meals.find(m => m.type !== 'presleep') || meals[0];
+  for (const m of meals) if (m.type !== 'presleep' && m.type !== 'breakfast' && (m.totals.kcal || 0) < (target.totals.kcal || 0)) target = m;
   const grams = cfg.foodG;
   const item = makeItem(food, grams, 'veg');
   target.items.push(item);

@@ -181,12 +181,18 @@ describe('Этап 6: бюджет-зависимые порционные ли�
     // D-28: допуск на шум округления целых граммов + инцидентные углеводы pre-sleep
     // (оба плана сходятся в пределах точной подгонки ≤2%; строгое maxDev<=medDev
     // ломалось на ±8г из-за целочисленных порций).
+    // П.2 (Aug 22 2026, диетология): второй гарнир в одном приёме убран («гречка+рис» —
+    // жалоба «500 г каши двумя разными»), поэтому очень высокая углеводная цель 500 г/день
+    // добирается по большему числу приёмов и может остаться на ~3-4% ниже — это намеренная
+    // диетологическая цена (не раздуваем одну порцию каши), допуск расширен до 5%.
     const base = { weightKg: 90, lbmKg: 74, bodyFatPct: 18, sex: 'male' as const, mealsCount: 5, isTrainingDay: false, budget: 'medium' as const, dayOffset: 0, cyclePhase: 'maintenance' as const, variety: 'max' as const, eveningLowCarb: false, quality: 'full' as const, randomSalt: 3, wakeTime: '07:00', bedTime: '23:00', dinnerTime: '19:00' };
     const med = buildDayPlan({ ...base, goalKcal: 3600, goalProteinG: 190, goalFatG: 90, goalCarbsG: 500 } as MealPlanInput);
     const maxP = buildDayPlan({ ...base, budget: 'max' as const, goalKcal: 3600, goalProteinG: 190, goalFatG: 90, goalCarbsG: 500 } as MealPlanInput);
     const medDev = Math.abs(med.totals.c - 500) / 500;
     const maxDev = Math.abs(maxP.totals.c - 500) / 500;
-    expect(maxDev).toBeLessThanOrEqual(0.03);
-    expect(maxDev).toBeLessThanOrEqual(medDev + 0.02);
+    expect(maxDev).toBeLessThanOrEqual(0.05);
+    // П.2: оба плана без «второго гарнира» в приёме сходятся в пределах ±5%; допуск на то,
+    // какой именно приём упёрся в порционный кап (дробный шум ~3%), а не на качество рациона.
+    expect(maxDev).toBeLessThanOrEqual(medDev + 0.05);
   });
 });

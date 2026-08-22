@@ -714,11 +714,33 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // the plan read +50% / ~+100g protein over the displayed target.
   const [nutrLevel, setNutrLevel] = useState<NutritionLevel>((['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base');
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
-  const effectiveKcal = Math.round((kbjuMode === 'profile' ? profileTargets.kcal : (manualKcal ?? calcTargets.kcal)) * _nutrMult);
   const effectiveP = Math.round((kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein)) * _nutrMult);
   const effectiveF = Math.round((kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats)) * _nutrMult);
-  const _effectiveCRaw = kbjuMode === 'profile' ? profileTargets.carbs : (() => { if (manualC !== null) return manualC; if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) { const fromPF = (manualP * 4) + (manualF * 9); return Math.max(0, Math.round((manualKcal - fromPF) / 4)); } return calcTargets.carbs; })();
-  const effectiveC = Math.round(_effectiveCRaw * _nutrMult);
+  // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом.
+  // Цель углеводов — диетологическая (г/кг / остаток после Б/Ж), а не абстрактный ×множитель.
+  // При инсулине база уже инсулин-дозозависима (computePlannerTargets поднимает carbs под дозу,
+  // а движок раздаёт ~10 г/1 ЕД на приёмы вокруг укола). Потолок 8 г/кг защищает от кумулятивного
+  // стэка nutrLevel × cycling × surplus (жалоба «120 кг на курсе → 900 г углеводов»).
+  // Для base/medium (mult ≤1.2) и ручного режима поведение НЕ меняем; enhanced/max срезают раздув.
+  const effectiveC = (() => {
+    if (kbjuMode === 'manual' && manualC !== null) return manualC;
+    if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
+      return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
+    }
+    const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
+    if (_nutrMult <= 1.201) return rawC; // base/medium: без изменений
+    const kcalTarget = Math.round((kbjuMode === 'profile' ? profileTargets.kcal : calcTargets.kcal) * _nutrMult);
+    const byRemainder = Math.max(0, Math.round((kcalTarget - effectiveP * 4 - effectiveF * 9) / 4));
+    return Math.max(50, Math.min(byRemainder, Math.round(weight * 8))); // потолок 8 г/кг
+  })();
+  // Kcal согласуем с фактическими макросами (Atwater) ТОЛЬКО когда углеводы были урезаны
+  // (enhanced/max) — чтобы не оставалось «дыры» под коррекцию жирами. Для base/medium
+  // сохраняем прежнее значение точь-в-точь (никаких регрессий у существующих планов).
+  const effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
+    ? manualKcal
+    : (_nutrMult <= 1.201)
+      ? Math.round((kbjuMode === 'profile' ? profileTargets.kcal : calcTargets.kcal) * _nutrMult)
+      : Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
@@ -1797,11 +1819,24 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // Каждый вызов generatePlan → новый salt → разный набор продуктов
       const planRandomSalt = Math.floor(Math.random() * 1000000);
 
-      // 🧪 Собираем lab values из v2Labs (строки → числа) для диетической коррекции
+      // 🧪 Собираем lab values из v2Labs (строки → числа) для диетической коррекции.
+      // ВАЖНО (units-fix): v2Labs содержит и СЫВОРОТОЧНЫЕ анализы (ALT/AST/LDL/гематокрит/…),
+      // и ЦЕЛЕВЫЕ дневные электролиты питания (Натрий/Калий/Магний в мг, поля «sodium/
+      // potassium/magnesium»). Движок computeLabDietAdjustment трактует значения как сывороточные
+      // концентрации (K >5.0 ммоль/л, Na >145 ммоль/л) — подача 4500 мг калия в эту логику
+      // ВСЕГДА давала ложную «гиперкалиемию» и резала авокадо/бананы/картофель, а 3500 мг натрия
+      // — ложную «гипернатриемию». Пропускаем только настоящие коды сывороточных анализов.
+      const SERUM_LAB_KEYS = new Set([
+        'glucose', 'insulin', 'homa_ir', 'alt', 'ast', 'ggt', 'creatinine', 'urea',
+        'hematocrit', 'hemoglobin', 'hdl', 'ldl', 'apob', 'tsh', 'vitamin_d', 'ferritin',
+        'homocysteine', 'crp', 'testosterone', 'estradiol', 'prolactin', 'hba1c', 'glycated_hemoglobin',
+      ]);
       const labValuesForPlan: Record<string, number> = {};
       Object.entries(v2Labs).forEach(([key, val]) => {
+        const k = (key || '').toLowerCase();
+        if (!SERUM_LAB_KEYS.has(k)) return; // sodium/potassium/magnesium — пищевые цели, не сыворотка
         const num = parseFloat(val as string);
-        if (!isNaN(num) && num > 0) labValuesForPlan[key.toUpperCase()] = num;
+        if (!isNaN(num) && num > 0) labValuesForPlan[k.toUpperCase()] = num;
       });
 
       // Адаптация по дневнику: компенсация вчерашнего отклонения для сегодняшнего дня.
