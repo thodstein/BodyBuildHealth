@@ -17,7 +17,7 @@ import {
 } from '../../../../../engines/lms/cardio-diary.engine';
 import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../../../engines/profile-store';
-import { buildWeeklyHistogram, escapeHtml } from '../../diary-helpers';
+import { buildWeeklyHistogram, computeDistribution, computeExtremes, computeStreak, escapeHtml } from '../../diary-helpers';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const ACCENT = '#4ade80';
@@ -135,6 +135,13 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   }, [activeCycle, log]);
 
   const weeklyHistogram = useMemo(() => buildWeeklyHistogram(log.map(e => ({ date: e.date, value: e.durationMin }))), [log]);
+  const distribution = useMemo(() => computeDistribution(log.filter(e => e.completed).map(e => e.durationMin)), [log]);
+  const extremes = useMemo(() => {
+    const entries = log.map(e => ({ date: e.date, fields: [{ label: 'Минуты', value: String(e.durationMin), unit: 'мин' }] }));
+    // @ts-ignore — DiaryEntryLike compat
+    return computeExtremes('sleep' as any, entries as any);
+  }, [log]);
+  const streak = useMemo(() => computeStreak(log.filter(e => e.completed).map(e => ({ date: e.date }))), [log]);
 
   const add = () => {
     const w = validateCardioLogFields({ rpe, hr, km, minutes });
@@ -324,6 +331,29 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
               </div>
             ))}
           </div>
+        </div>
+      )}
+      {(distribution || streak.current > 0) && (
+        <div style={{ ...glassCard, padding: 12, marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {distribution && (
+            <div style={{ flex: '1 1 140px' }}>
+              <div style={labelStyle}>Распределение (мин)</div>
+              <div style={{ fontSize: 12, color: colors.textMuted }}>ср {distribution.mean.toFixed(0)} · мед {distribution.median.toFixed(0)} · σ {distribution.stdDev.toFixed(1)}</div>
+              <div style={{ fontSize: 11, color: colors.textMuted }}>мин {distribution.min} · макс {distribution.max}</div>
+            </div>
+          )}
+          <div style={{ flex: '1 1 100px' }}>
+            <div style={labelStyle}>Серия</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: streak.current >= 3 ? ACCENT : colors.textMuted }}>{streak.current} дн. подряд</div>
+            <div style={{ fontSize: 11, color: colors.textMuted }}>лучшая {streak.best} · всего {streak.totalDays}д</div>
+          </div>
+          {extremes && extremes.min && extremes.max && (
+            <div style={{ flex: '1 1 140px' }}>
+              <div style={labelStyle}>Экстремумы</div>
+              <div style={{ fontSize: 11, color: colors.textMuted }}>мин {extremes.min.value} ({extremes.min.date.slice(5)})</div>
+              <div style={{ fontSize: 11, color: colors.textMuted }}>макс {extremes.max.value} ({extremes.max.date.slice(5)})</div>
+            </div>
+          )}
         </div>
       )}
 

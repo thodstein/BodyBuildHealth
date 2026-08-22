@@ -30,6 +30,7 @@ import {
   todayIso,
   weeklySummaries,
   weightHeatmap,
+  escapeHtml,
   type DiaryEntryLike,
   type SortState,
 } from '../../diary-helpers';
@@ -216,11 +217,7 @@ const UNIT: Record<Field, string> = {
   muscleMass: 'кг',
   waterMass: '%',
 };
-const esc = (value: unknown) =>
-  String(value ?? '').replace(
-    /[&<>"']/g,
-    (x) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[x] || x,
-  );
+const esc = escapeHtml;
 
 /** Колонки по умолчанию: без «средних» дублей L/R. */
 const DEFAULT_VISIBLE: Field[] = FIELDS.filter((f) => !['bicepCm', 'thighCm', 'calfCm'].includes(f));

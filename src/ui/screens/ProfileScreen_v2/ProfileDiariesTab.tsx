@@ -13,6 +13,8 @@ import {
   computePace,
   currentStreak,
   todayIso,
+  buildWeeklyHistogram,
+  crossCorrelation,
   type DiaryKey,
 } from './diary-helpers';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
@@ -1445,6 +1447,48 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
                     ));
                   })()}
                 </div>
+              </div>
+            );
+          })()}
+          {/* 🔗 Кросс-дневниковая сводка — недельный объём + корреляции */}
+          {(() => {
+            const sleepPoints = sleepEntries.map(e => ({ date: e.date, value: Number(e.hours) })).filter(p => Number.isFinite(p.value));
+            const bpPoints = bpEntries.map(e => ({ date: e.date, value: Number(e.systolic) })).filter(p => Number.isFinite(p.value));
+            const weightPoints = weights.map(e => ({ date: e.date, value: Number(e.weight) })).filter(p => Number.isFinite(p.value));
+            const painPoints = healthEntries.map(e => ({ date: e.date, value: Number(e.pain?.totalScore ?? 0) })).filter(p => p.value > 0);
+            const corrs = [
+              { label: 'Сон↔АД', r: crossCorrelation(sleepPoints as any, bpPoints as any) },
+              { label: 'Сон↔Вес', r: crossCorrelation(sleepPoints as any, weightPoints as any) },
+              { label: 'Сон↔Боль', r: crossCorrelation(sleepPoints as any, painPoints as any) },
+            ].filter(c => c.r && c.r.n >= 3) as { label: string; r: { r: number; n: number; strength: string } }[];
+            const hist = buildWeeklyHistogram(sleepPoints);
+            const hasData = sleepPoints.length + bpPoints.length + weightPoints.length > 0;
+            if (!hasData) return null;
+            return (
+              <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>🔗 Кросс-аналитика (последние записи)</div>
+                {hist.length > 0 && (
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
+                    {hist.slice(-6).map(h => (
+                      <div key={h.weekStart} style={{ flex: '1 1 60px', textAlign: 'center', padding: 4, borderRadius: 6, background: 'rgba(167,139,250,0.08)', fontSize: 10 }}>
+                        <div style={{ color: colors.textMuted }}>{h.weekStart.slice(5)}</div>
+                        <div style={{ fontWeight: 700, color: '#a78bfa' }}>{h.mean.toFixed(1)}</div>
+                        <div style={{ color: colors.textMuted }}>{h.count}д</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {corrs.length > 0 ? (
+                  <div style={{ fontSize: 11, color: colors.textMuted }}>
+                    {corrs.slice(0, 3).map(c => (
+                      <span key={c.label} style={{ marginRight: 10 }}>
+                        {c.label}: <b style={{ color: Math.abs(c.r.r) >= 0.5 ? '#f59e0b' : colors.text }}>{c.r.r.toFixed(2)} (n={c.r.n})</b>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: colors.textMuted }}>Недостаточно парных дат для корреляций (нужно ≥3 общих дня).</div>
+                )}
               </div>
             );
           })()}

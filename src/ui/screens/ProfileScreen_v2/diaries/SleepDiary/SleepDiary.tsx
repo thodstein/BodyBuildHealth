@@ -47,6 +47,7 @@ import {
   type SortState,
 } from '../../diary-helpers';
 import { DiaryHeader } from '../DiaryHeader';
+import { readDiaryEntries, saveDiaryEntries } from '../../../../../engines/diary-storage';
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const KEY = 'he_sleep_diary';
@@ -166,12 +167,10 @@ const safeSet = (key: string, value: unknown, fallbackMsg: string) => {
     if ((window as any).showToast) (window as any).showToast(`⚠️ ${fallbackMsg}`);
   }
 };
-const save = (entries: RichSleepEntry[]) =>
-  safeSet(
-    KEY,
-    [...entries].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 365),
-    'Не удалось сохранить дневник (хранилище переполнено)',
-  );
+const save = (entries: RichSleepEntry[]) => {
+  const ok = saveDiaryEntries<RichSleepEntry>(KEY, entries, 365);
+  if (!ok && (window as any).showToast) (window as any).showToast('⚠️ Не удалось сохранить дневник (хранилище переполнено)');
+};
 const escapeHtml = (value: unknown) =>
   String(value ?? '').replace(
     /[&<>"']/g,

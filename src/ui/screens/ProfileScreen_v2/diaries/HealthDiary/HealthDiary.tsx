@@ -50,6 +50,7 @@ import {
   computeStreak,
   crossCorrelation,
   detectAnomalies,
+  escapeHtml,
   exportSvgAsFile,
   exportSvgAsPng,
   fitLinearTrend,
@@ -883,13 +884,11 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     (window as any).showToast?.('📥 CSV экспортирован');
   };
   const printPdf = () => {
-    const escape = (s: string) =>
-      s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
-    const zoneCols = PAIN_ZONES.map((z) => `<th>${escape(z.label)}</th>`).join('');
+    const zoneCols = PAIN_ZONES.map((z) => `<th>${escapeHtml(z.label)}</th>`).join('');
     const rowsHtml = rows.map((e) => {
       const zones = PAIN_ZONES.map((z) => `<td>${e.pain?.zones[z.id] || 0}</td>`).join('');
-      const symptoms = e.symptoms.map((s) => `${escape(s.name)} ${s.severity}/5`).join('<br>');
-      return `<tr><td>${escape(e.date)}</td><td>${e.pain?.totalScore || 0}/70</td>${zones}<td>${symptoms}</td><td>${e.neuro?.totalScore || 0}/10</td><td>${e.acne?.totalScore || 0}/12</td><td>${e.hemato?.totalScore || 0}/8</td><td>${escape(e.notes || '')}</td></tr>`;
+      const symptoms = e.symptoms.map((s) => `${escapeHtml(s.name)} ${s.severity}/5`).join('<br>');
+      return `<tr><td>${escapeHtml(e.date)}</td><td>${e.pain?.totalScore || 0}/70</td>${zones}<td>${symptoms}</td><td>${e.neuro?.totalScore || 0}/10</td><td>${e.acne?.totalScore || 0}/12</td><td>${e.hemato?.totalScore || 0}/8</td><td>${escapeHtml(e.notes || '')}</td></tr>`;
     }).join('');
     const w = window.open('', '_blank');
     if (!w) return;

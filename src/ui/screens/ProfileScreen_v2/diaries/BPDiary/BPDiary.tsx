@@ -21,6 +21,7 @@ import {
   computeExtremes,
   computeStreak,
   detectAnomalies,
+  escapeHtml,
   exportSvgAsFile,
   exportSvgAsPng,
   filterByRange,
@@ -103,8 +104,7 @@ const card: React.CSSProperties = { ...glassSection };
 const infoCard: React.CSSProperties = tintCard('rgba(59,130,246,.12)', 'rgba(59,130,246,.25)');
 const goodCard: React.CSSProperties = tintCard('rgba(34,197,94,.12)', 'rgba(34,197,94,.25)');
 const warnCard: React.CSSProperties = tintCard('rgba(245,158,11,.12)', 'rgba(245,158,11,.25)');
-const esc = (v: unknown) =>
-  String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
+const esc = escapeHtml;
 
 const defaultDraft = (): BPForm => ({
   date: todayIso(), systolic: '120', diastolic: '80', pulse: '70',
