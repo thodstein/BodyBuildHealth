@@ -1136,16 +1136,20 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
 }
 
 /** Маппинг целевой группы сессии → разминочное лёгкое движение (RESEARCH: лёгкая активация 25% 3×12, Schoenfeld warm-up, Helms). */
-const WARMUP_ACTIVATOR: Record<string, RegExp> = {  back: /тяга.*верхн.*блок|pulldown|тяга.*блок/i,
-  chest: /жим.*гантел.*лёж|жим.*тренаж|сведен.*тренаж|машин.*груд/i,
-  quads: /жим.*ног|leg.?press|разгибан.*ног/i,
-  hamstrings: /сгибан.*ног|leg.?curl/i,
-  glutes: /отведен.*бедр|abduction|ягодичн.*мост/i,
+// Разминка — ЛЁГКИЕ КОМПАУНД-движения (светлая версия основного паттерна дня),
+// а НЕ изолированные активации (кроссовер/разгибание/махи/сгибание — бессмысленная
+// «разминка» и жалоба: «в начале делается разминка изолированной работы мышцы»).
+const WARMUP_ACTIVATOR: Record<string, RegExp> = {
+  back: /тяга|подтягиван|pull.?up|lat.?pull/i,
+  chest: /жим.*(лёжа|лежа|штанг|тренажёр|тренажер)/i,
+  quads: /присед|жим.*ног|leg.?press/i,
+  hamstrings: /румын|тяга.*прям|rdl/i,
+  glutes: /ягодичн.*мост|hip.?thrust|разгибан.*таз/i,
   calves: /подъём.*носк|подъем.*носк|calf.?raise/i,
-  shoulders: /мах.*сторон|lateral.*raise|отведен.*сторон/i,
+  shoulders: /жим.*(стоя|сидя|армей)|overhead.?press/i,
   traps: /шраг|shrug/i,
-  biceps: /сгибан.*блок|cable.*curl/i,
-  triceps: /разгибан.*блок|pushdown/i,
+  biceps: /подъём.*штанг|сгибан.*штанг|barbell.*curl/i,
+  triceps: /жим.*узк|француз|close.?grip/i,
   abs: /скручиван|crunch/i,
   forearms: /сгибан.*запяст|wrist.?curl/i,
 };
@@ -1164,16 +1168,30 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
   if (!lead || excludedMuscles.has(lead)) return;
   const pattern = WARMUP_ACTIVATOR[lead];
   if (!pattern) return;
+  const inSession = new Set(session.exercises.map((e: any) => (e.name || '').toLowerCase()));
   const candidate = EXERCISE_CATALOG.find((x: any) => {
     const tm = trueMuscleOf(x);
     if (tm === null || tm !== lead) return false;
     if (!pattern.test(x.name || '')) return false;
+    // Разминка не должна дублировать рабочее упражнение по имени (иначе на грудь
+    // не находилась разминка — первый кандидат «Жим штанги лёжа» совпадал с рабочим).
+    if (inSession.has((x.name || '').toLowerCase())) return false;
     // Уважаем equipment-ограничения пользователя.
     if (options.equipment?.length) {
       const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
       if (eq.length > 0 && !eq.some((e: string) => options.equipment!.includes(e))) return false;
     }
     if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    // Разминка уважает «без осевой»: не берём присед/жим стоя при avoidAxialLoad
+    // (иначе лёгкий присед-разминка получал ошибку валидатора «осевая запрещена»).
+    if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
+    // Разминка уважает bodyweight-способность: не берём подтягивания без возможности
+    // (иначе лёгкий подтяг-разминка попадал в план без bodyweightCapability).
+    if (/подтяг|pull.?up|chin.?up/i.test(x.name || '')) {
+      const cap = options.bodyweightCapability;
+      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+      if (!canPullUp) return false;
+    }
     return true;
   });
   if (!candidate) return;

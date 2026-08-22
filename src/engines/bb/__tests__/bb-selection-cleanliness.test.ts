@@ -50,22 +50,29 @@ describe('BB: порядок/схемы объёма и адекватность
     expect(giants.length % 3).toBe(0);
   });
 
-  it('разминка: Push начинается с разминки ГРУДИ (не МАХИ-плеч), Pull — спины, Legs — квадрицепса', () => {
+  it('разминка: Push — грудь, Pull — спина, Legs — квадрицепс, и это КОМПАУНД (не изоляция)', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
     const byTag = (tag: string) => plan.weeks[0].sessions.filter(s => (s.sessionTag || '').toLowerCase().includes(tag));
-    const firstWarmupMuscle = (sessions: typeof plan.weeks[0].sessions) => {
+    const firstWarmup = (sessions: typeof plan.weeks[0].sessions) => {
       const s = sessions.find(ss => (ss.exercises[0] as any).warmupActivator);
-      return s ? (s.exercises[0] as any).muscle : null;
+      return s ? (s.exercises[0] as any) : null;
     };
-    // Push → разминка ГРУДИ, не shoulders
-    const pushWarm = firstWarmupMuscle(byTag('push'));
-    expect(pushWarm).toBe('chest');
+    const isoRe = /мах|разводк|кроссовер|сгибан.*ног|разгибан.*ног|leg.?curl|leg.?ext|пулловер|pullover|разгибан.*блок|сведен|cable.*curl|скручиван/i;
+    // Push → разминка ГРУДИ, не shoulders; компаунд
+    const pushW = firstWarmup(byTag('push'));
+    expect(pushW).not.toBeNull();
+    expect(pushW.muscle).toBe('chest');
+    expect(isoRe.test(pushW.name)).toBe(false);
     // Pull → спина
-    const pullWarm = firstWarmupMuscle(byTag('pull'));
-    expect(pullWarm).toBe('back');
-    // Legs → квадрицепс (или другая ножная мышца, но НЕ верх тела)
-    const legsWarm = firstWarmupMuscle(byTag('legs'));
-    expect(['quads', 'hamstrings', 'glutes', 'calves']).toContain(legsWarm);
+    const pullW = firstWarmup(byTag('pull'));
+    expect(pullW).not.toBeNull();
+    expect(pullW.muscle).toBe('back');
+    expect(isoRe.test(pullW.name)).toBe(false);
+    // Legs → квадрицепс
+    const legsW = firstWarmup(byTag('legs'));
+    expect(legsW).not.toBeNull();
+    expect(legsW.muscle).toBe('quads');
+    expect(isoRe.test(legsW.name)).toBe(false);
   });
 
   it('decline-жимы отсутствуют в generic-планах', () => {
