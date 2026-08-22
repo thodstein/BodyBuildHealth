@@ -294,7 +294,7 @@ describe('OCR endpoint routing', () => {
     }) as typeof fetch;
     try {
       const result = await source.processUploadedFile(file);
-      expect(requestedUrl).toMatch(/\/api\/ocr-image$/);
+      expect(requestedUrl).toMatch(/\/api\/ocr-scanned-pdf$/);
       expect(result.meals.length).toBeGreaterThan(0);
     } finally {
       globalThis.fetch = originalFetch;

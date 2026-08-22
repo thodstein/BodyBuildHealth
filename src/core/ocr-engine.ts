@@ -395,9 +395,13 @@ async function serverOcrImage(file: File): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), 90_000);
   let response: Response;
   try {
+    // Reuse the server OCR route already used successfully for scanned lab
+    // PDFs. Its Vercel bundle has the proven Node/Tesseract setup; passing an
+    // image kind avoids the separate image function that can be unavailable
+    // in Telegram deployments.
     const endpoint = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
-      ? `${window.location.origin}/api/ocr-image`
-      : './api/ocr-image';
+      ? `${window.location.origin}/api/ocr-scanned-pdf`
+      : './api/ocr-scanned-pdf';
     response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -405,7 +409,7 @@ async function serverOcrImage(file: File): Promise<string> {
         data: btoa(binary),
         filename: file.name || 'nutrition-screenshot',
         mimeType: file.type || 'application/octet-stream',
-        mode: 'fatsecret',
+        kind: 'image',
       }),
       signal: controller.signal,
     });
