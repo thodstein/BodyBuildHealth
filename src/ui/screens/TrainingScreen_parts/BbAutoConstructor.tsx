@@ -519,6 +519,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
   const [autoRegOn, setAutoRegOn] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
+  const [expandedMuscles, setExpandedMuscles] = useState<Set<string>>(new Set());
   // specializationMode больше не выбирается в UI: специализация включается
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
@@ -1499,6 +1500,8 @@ export const BbAutoConstructor: React.FC = () => {
           previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
           supersetMode,
           volumeScheme: effectiveVolumeScheme,
+          trainingVolumeMode,
+          dupMode,
         }, pedAdapt);
     }
 
@@ -1534,9 +1537,22 @@ export const BbAutoConstructor: React.FC = () => {
 
     setBuiltPlan({
       ...plan,
+      // Слепок всех кнопок — чтобы отчёт соответствовал реальным настройкам, а не «от новичка»
+      trainingVolumeMode,
+      volumeGoal: (plan as any).volumeGoal || effectiveVolGoal,
+      goal: bbGoal,
+      trainingFocus: bbTrainingFocus,
+      methodology: bbMethodology,
+      supersetMode,
+      volumeScheme: (plan as any).volumeScheme || effectiveVolumeScheme,
+      dupMode,
+      trainingYears: bbTrainingYears,
+      courseIntensity,
+      level: bbLevel,
       rationale: [...plan.rationale,
         `📌 Источник: ${modeLabel}`,
         `📈 Стратегия: ${loadStrategy}`,
+        `📦 Объём: ${trainingVolumeMode === 'high' ? 'Объёмный (MRV, кап 5)' : 'Обычный (' + effectiveVolGoal + ')'} · капы ${plan.maxWorkingSets}/${plan.maxExercises} (от уровня)`,
         deloadNote,
         `💪 Слабые группы: ${weakPoints.length > 0 ? weakPoints.join(', ') : 'нет'}`,
       ],
@@ -3031,21 +3047,46 @@ export const BbAutoConstructor: React.FC = () => {
               short={`${entries.length} групп · ${sum.totalWorkingSets} раб. сетов/нед`}
               full={
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {entries.map(([m, v]) => (
-                    <div key={m} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
-                        {MUSCLE_RU[m] || m} — {v.sessionsPerWeek} тренировок/нед · {v.workingSets} раб. · {v.warmupSets} разм.
+                  {entries.map(([m, v]) => {
+                    const isExpanded = expandedMuscles.has(m);
+                    const byEx = (v as any).byExercise as Record<string, number> | undefined;
+                    const subGroups = (v as any).subGroups as Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number> }> | undefined;
+                    const subRu: Record<string, string> = { back_width: 'широчайшая (ширина)', back_thickness: 'толщина (ромб/середина)', upper_back: 'верх спины', rear_delts: 'задняя дельта', traps: 'трапеции', erectors: 'разгибатели', other: 'прочее' };
+                    return (
+                    <div key={m} onClick={() => setExpandedMuscles(prev => { const n = new Set(prev); if (n.has(m)) n.delete(m); else n.add(m); return n; })} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span>{MUSCLE_RU[m] || m} — {v.sessionsPerWeek} тр/нед · {v.workingSets} раб. · {v.warmupSets} разм.</span>
+                        <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>{isExpanded ? '▲' : '▼'}</span>
                       </div>
-                      {v.bySession.map((sess, idx) => (
-                        <div key={idx} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
-                          тренировка: {sess.working} раб., {sess.warmup} разм.
-                        </div>
-                      ))}
                       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
                         паттерн: {Object.entries(v.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'} · direct {v.directSets} · косв. {Math.round(v.indirectSets)}
                       </div>
+                      {isExpanded && (
+                        <>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                            упражнения: {byEx ? Object.entries(byEx).map(([e, n]) => `${e} ${n}`).join(', ') : '—'}
+                          </div>
+                          {subGroups && Object.keys(subGroups).length > 0 && (
+                            <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
+                              {Object.entries(subGroups).map(([subId, sub]) => (
+                                <div key={subId} style={{ fontSize:10, color:'rgba(255,255,255,0.65)', padding:'4px 6px', borderRadius:6, background:'rgba(255,255,255,0.04)' }}>
+                                  <b>{subRu[subId] || subId}</b>: {sub.workingSets} сетов
+                                  <div style={{ color:'rgba(255,255,255,0.5)' }}>паттерн: {Object.entries(sub.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'}</div>
+                                  <div style={{ color:'rgba(255,255,255,0.5)' }}>упражнения: {Object.entries(sub.byExercise).map(([e, n]) => `${e} ${n}`).join(', ') || '—'}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:4 }}>
+                            {v.bySession.map((sess, idx) => `тр${sess.day || idx+1}: ${sess.working}р/${sess.warmup}р`).join(' · ')}
+                          </div>
+                        </>
+                      )}
+                      {!isExpanded && v.bySession.length > 0 && (
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>нажмите для развертки — сеты/паттерны/упражнения по подгруппам</div>
+                      )}
                     </div>
-                  ))}
+                  );})}
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>Итого: {sum.totalWorkingSets} рабочих сетов/нед</div>
                 </div>
               }
@@ -3103,6 +3144,13 @@ export const BbAutoConstructor: React.FC = () => {
               short={`${report.weeks} нед · ${report.totalDirectSets} direct-сетов · пик Н${report.peakWeek}`}
               full={
                 <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'rgba(255,255,255,0.8)', lineHeight:1.4 }}>
+                    <b>Настройки:</b> Уровень {(builtPlan as any).level || '—'} · Цель {(builtPlan as any).goal || '—'} · Объём {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (MRV + ' + ((builtPlan as any).volumeScheme || 'gvt') + ', кап 5)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'mav') + ')'} · Фокус {(builtPlan as any).trainingFocus || '—'} · Методика {(builtPlan as any).methodology || '—'}
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.15)', color:'rgba(255,255,255,0.75)', lineHeight:1.4 }}>
+                    Сплит <b>{(builtPlan as any).pattern?.name}</b> · Стаж {(builtPlan as any).trainingYears ?? '—'} лет · Капы {(builtPlan as any).maxWorkingSets}/{ (builtPlan as any).maxExercises} · PED {(builtPlan as any).pedAdaptation?.activePEDs?.length ? (builtPlan as any).pedAdaptation.activePEDs.join(', ') + ' ×' + (builtPlan as any).pedAdaptation.combinedMrvMultiplier?.toFixed(2) : 'нет'} · Суперсеты {(builtPlan as any).supersetMode || 'нет'} · DUP {(builtPlan as any).dupMode || 'нет'}
+                    {(builtPlan as any).priorityMuscles?.length ? ` · Спец: ${(builtPlan as any).priorityMuscles.slice(0,3).join(', ')}` : ''}
+                  </div>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
                     <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация<br/><b>{report.sessionsPerWeek} сессий</b></div>
                     <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Пик объёма<br/><b>неделя {report.peakWeek}</b></div>

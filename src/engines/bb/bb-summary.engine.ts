@@ -22,6 +22,8 @@ export interface BBMuscleSummary {
   indirectSets: number;
   byPattern: Record<string, number>;
   bySession: Array<{ day: number; working: number; warmup: number }>;
+  byExercise: Record<string, number>;
+  subGroups?: Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number> }>;
 }
 
 export interface BBExpandedSummary {
@@ -40,7 +42,7 @@ export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
         const isWarmup = !!(ex as any).warmupActivator;
         const muscle = ex.muscle;
         if (!muscle) continue;
-        if (!byMuscle[muscle]) byMuscle[muscle] = { muscle, sessionsPerWeek: 0, workingSets: 0, warmupSets: 0, directSets: 0, indirectSets: 0, byPattern: {}, bySession: [] };
+        if (!byMuscle[muscle]) byMuscle[muscle] = { muscle, sessionsPerWeek: 0, workingSets: 0, warmupSets: 0, directSets: 0, indirectSets: 0, byPattern: {}, bySession: [], byExercise: {} };
         const m = byMuscle[muscle];
         if (isWarmup) {
           m.warmupSets += ex.sets || 0;
@@ -58,6 +60,18 @@ export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
         totalWorkingSets += ex.sets || 0;
         const pattern = ex.movementPattern || 'other';
         m.byPattern[pattern] = (m.byPattern[pattern] || 0) + (ex.sets || 0);
+        const exName = ex.exerciseName || ex.name || 'unknown';
+        m.byExercise[exName] = (m.byExercise[exName] || 0) + (ex.sets || 0);
+        // Подгруппы спины: широчайшие vs толщина (ромб/трапеции) и т.д.
+        if (muscle === 'back') {
+          const sub = (ex as any).backSubgroup || (pattern.includes('vertical') ? 'back_width' : pattern.includes('horizontal') ? 'back_thickness' : 'other');
+          if (!m.subGroups) m.subGroups = {};
+          if (!m.subGroups[sub]) m.subGroups[sub] = { workingSets: 0, byPattern: {}, byExercise: {} };
+          const sg = m.subGroups[sub];
+          sg.workingSets += ex.sets || 0;
+          sg.byPattern[pattern] = (sg.byPattern[pattern] || 0) + (ex.sets || 0);
+          sg.byExercise[exName] = (sg.byExercise[exName] || 0) + (ex.sets || 0);
+        }
         if (!seenMuscles.has(muscle)) { seenMuscles.add(muscle); m.sessionsPerWeek += 1; }
       }
     }

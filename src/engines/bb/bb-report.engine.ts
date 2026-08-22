@@ -64,7 +64,31 @@ const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спин
 export function buildBBPlanReportText(plan: BBPlan): string {
   const lines: string[] = [];
   lines.push(`План: ${plan.pattern.name} · ${plan.weeks.length} нед · ${plan.pattern.sessionsPerRotation} сессий/нед`);
-  lines.push('');
+  // Настройки — все выбранные кнопки, чтобы отчёт не был «от новичка» для объёмного плана
+  const p: any = plan as any;
+  const settings: string[] = [];
+  if (p.level) settings.push(`Уровень: ${p.level}`);
+  if (p.goal) settings.push(`Цель: ${p.goal}`);
+  if (p.trainingVolumeMode) settings.push(`Режим объёма: ${p.trainingVolumeMode === 'high' ? 'Объёмный (MRV+GVT/FST-7, кап 5)' : 'Обычный (MAV)'}`);
+  if (p.volumeGoal) settings.push(`Цель объёма: ${p.volumeGoal}`);
+  if (p.trainingFocus) settings.push(`Фокус: ${p.trainingFocus}`);
+  if (p.methodology) settings.push(`Методика: ${p.methodology}`);
+  if (p.supersetMode) settings.push(`Суперсеты: ${p.supersetMode}`);
+  if (p.volumeScheme) settings.push(`Схема объёма: ${p.volumeScheme}`);
+  if (p.dupMode) settings.push(`DUP: ${p.dupMode}`);
+  if (p.trainingYears != null) settings.push(`Стаж: ${p.trainingYears} лет`);
+  if (p.courseIntensity) settings.push(`Курс: ${p.courseIntensity}`);
+  if (p.pedAdaptation?.activePEDs?.length) settings.push(`PED: ${p.pedAdaptation.activePEDs.join(', ')} ×${p.pedAdaptation.combinedMrvMultiplier?.toFixed(2)}`);
+  if (p.mrvMultiplier) settings.push(`MRV×: ${p.mrvMultiplier.toFixed(2)}`);
+  if (p.maxWorkingSets) settings.push(`Капы: ${p.maxWorkingSets} сетов / ${p.maxExercises} упр.`);
+  if (p.specializationSchedule?.active) {
+    const t = p.priorityMuscles?.join(', ') || '';
+    settings.push(`Специализация: ${t}`);
+  }
+  if (settings.length) {
+    lines.push(`Настройки: ${settings.join(' · ')}`);
+    lines.push('');
+  }
   lines.push('📋 Недельная сводка сетов:');
   if (plan.expandedSummary) {
     for (const [muscle, m] of Object.entries(plan.expandedSummary.byMuscle)) {
@@ -72,8 +96,22 @@ export function buildBBPlanReportText(plan: BBPlan): string {
       if (m.bySession.length > 0) {
         lines.push(`    ${m.bySession.map((s, i) => `тр${i + 1}: ${s.working}р/${s.warmup}р`).join(', ')}`);
       }
-      const patterns = Object.entries(m.byPattern).map(([p, v]) => `${p} ${v}`).join(', ');
+      const patterns = Object.entries((m as any).byPattern || {}).map(([p, v]) => `${p} ${v}`).join(', ');
       if (patterns) lines.push(`    паттерн: ${patterns}`);
+      const byEx = Object.entries((m as any).byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
+      if (byEx) lines.push(`    упражнения: ${byEx}`);
+      // Спина — развернуто: ширина (широчайшие) vs толщина (ромб/трапеции) — паттерны и упражнения
+      const sg = (m as any).subGroups as Record<string, any> | undefined;
+      if (sg && Object.keys(sg).length) {
+        const subRu: Record<string, string> = { back_width: 'широчайшая (ширина)', back_thickness: 'толщина (ромб/середина)', upper_back: 'верх спины', rear_delts: 'задняя дельта', traps: 'трапеции', erectors: 'разгибатели', other: 'прочее' };
+        for (const [subId, sub] of Object.entries(sg)) {
+          lines.push(`    └ ${subRu[subId] || subId}: ${sub.workingSets} сетов`);
+          const subPat = Object.entries(sub.byPattern || {}).map(([p, v]) => `${p} ${v}`).join(', ');
+          if (subPat) lines.push(`       паттерн: ${subPat}`);
+          const subEx = Object.entries(sub.byExercise || {}).map(([e, v]) => `${e} ${v}`).join(', ');
+          if (subEx) lines.push(`       упражнения: ${subEx}`);
+        }
+      }
     }
     lines.push(`  Итого: ${plan.expandedSummary.totalWorkingSets} рабочих сетов/нед`);
   }

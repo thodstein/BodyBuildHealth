@@ -181,6 +181,8 @@ export interface BBBuilderInput {
   supersetMode?: 'none' | 'antagonist';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+  /** Объёмный vs обычный — кнопка с пояснением, капы от уровня */
+  trainingVolumeMode?: 'standard' | 'high';
 }
 
 /**
@@ -329,6 +331,17 @@ export interface BBPlan {
   mobilityRestrictions?: string[];
   /** Расширенная недельная сводка сетов (по мышцам: сессии/рабочие/разминочные/паттерны). */
   expandedSummary?: import('./bb-summary.engine').BBExpandedSummary;
+  // Полный слепок выбранных кнопок — чтобы отчёт соответствовал реальным настройкам (а не «от новичка»)
+  trainingVolumeMode?: 'standard' | 'high';
+  volumeGoal?: string;
+  goal?: string;
+  trainingFocus?: string;
+  methodology?: string;
+  supersetMode?: string;
+  volumeScheme?: string;
+  dupMode?: string;
+  trainingYears?: number;
+  courseIntensity?: string;
 }
 
 /**
