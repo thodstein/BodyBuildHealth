@@ -38,14 +38,16 @@
    при следующем крупном рефакторе `buildSession` — перевести на них (снятие inline-дубля).
 3. **Каталог**: добавить недостающие конкретные упражнения (тяга широким хватом, вариации наклонного
    жима), чтобы «общий стиль» не заменял специфичные движения.
+4. **На каждую мышцу — подмышца + паттерн + пояснения** (`docs/BB-AUTO-QUALITY-PLAN.md:21.2`): расширить `bb-summary.subGroups` на все мышцы (сейчас только back), каноническая таксономия `SUBGROUP_MAP` (chest: upper/mid/lower/stretch, back: width/thickness/upper_back/rear_delts/traps/erectors, shoulders: front/mid/rear, quads: rectus/vastus, hamstrings: hip/knee, glutes: max/med, biceps: long/short/brachialis, triceps: long/lateral_medial, calves: gastro/soleus), единый агрегатор `muscleSubgroupExplanation` из `exercise-biomechanics-db + TARGET_MUSCLE_DB + EXERCISE_CATALOG.targetMuscle` («Чем хорошо: … Как работает: … Ключ: хват/угол/пауза»), рендер в сводке/тултипе/PDF (подмышцы/паттерны/пояснения на каждую мышцу, 100% покрытие directSets, инвариант-тесты).
+5. **Консолидация отчётов качества — убрать дубли и расхождения** (`docs/BB-AUTO-QUALITY-PLAN.md:21.3`): 6 дублей (`expandedSummary`/`balanceReport`/`fatigueReport`/`rotationReport`/`validation`/`safetyScore`/`report`) → один `BBQualityReport` с контрактом: `weeklyVolume` — единственный подсчёт direct/effective, `mrvByMuscle` — единственный кап (толеранс `×1.15` в константе `BB_MRV_TOLERANCE`), `balance` — только геометрия паттернов (не объём), `safetyScore` принимает `balance/validation` без пересчёта `analyzeBBBalance`, порядок в `bb-finalize: weeklyVolume → expandedSummary → balance → validation → safetyScore → report`, UI — 2 карточки вместо 6, golden-тесты на консистентность.
 
 **UI-полировка:**
-4. Полный рендер целевых капов (MEV/MAV/MRV ×режим) в карточке muscle volume уже сделан; показать
+6. Полный рендер целевых капов (MEV/MAV/MRV ×режим) в карточке muscle volume уже сделан; показать
    и недельный бюджет восстановления.
-5. Бейджи фич (FST-7/GVT/дроп/optional/паттерн) в PDF/CSV-экспорте.
+7. Бейджи фич (FST-7/GVT/дроп/optional/паттерн) в PDF/CSV-экспорте — дополнить колонками `Подмышца | Паттерн | Пояснение`.
 
 **Архитектура:**
-6. Разбить `bb-builder.engine.ts` (3600+ строк): selection/loading/volume уже извлечены в слои;
+8. Разбить `bb-builder.engine.ts` (3600+ строк): selection/loading/volume уже извлечены в слои;
    следующий шаг — вынести budget-fitting из buildSession.
 
 ## 4. Итог

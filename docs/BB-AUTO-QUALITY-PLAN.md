@@ -341,4 +341,107 @@ perMuscleTarget = натуральная_база(level) × стаж-бэнд ×
 - Тесты: bb-область 1360 зелёные; полный прогон 6844/6845 (единственное падение —
   пред-существующее `bb-macrocycle.test.ts` v7, чужой WIP).
 
+---
+
+## 21. Дополнение 2026-08-22: детализация на каждую мышцу (подмышца + паттерн + пояснения) + консолидация отчётов качества
+
+> Запрос: «в плане на каждую мышцу дополнительно подмышца, паттерн и объяснения чем оно хорошо и как работает. отчёты качества дублей много и они не соответствуют» — фиксируется как обязательный этап 21.
+
+### 21.1 Проблема (аудит 2026-08-22)
+
+**Детализация по мышцам — неполная:**
+- `bb-summary.engine.ts:65-74` строит `subGroups` только для `muscle === 'back'` (ширина/толщина/верх спины/задняя дельта). Остальные мышцы — только `byPattern` / `byExercise`, без подгрупп. Пользователь видит «Грудь — 12 сетов, паттерн horizontal_push 8, isolation_chest 4», но НЕ видит разбивку «верх (ключица, incline_push, 4 сета) / середина (horizontal_push, 6) / низ (decline/dip_push, 2) + растянутая позиция (fly, 2)».
+- `bb-report.engine.ts:115-126` рендерит `subGroups` только для спины; для других мышц — плоский список.
+- `bb-exercise-instructions.engine.ts` / `exercise-biomechanics-db` дают богатые `executionProfile` (паттерн, cues, stretch/peak/MMC, темп, progression, ошибки) — но они попадают только в `comment`/`executionProfile` отдельного упражнения, не агрегируются на уровень мышцы/подмышцы в сводке/отчёте.
+- `TARGET_MUSCLE_DB` / `EXERCISE_CATALOG.targetMuscle` содержат точные русскоязычные мишени («Большая грудная (верх)», «Широчайшие, ромбовидные»), но не сводятся в подмышечную таксономию плана.
+- Итог: нельзя проверить «все ли функции мышцы закрыты», нельзя объяснить выбор.
+
+**Отчёты качества — дубли и расхождения:**
+- Сейчас существует 6 независимых источников «качества», считающих одно и то же по-разному:
+  1. `expandedSummary` (`bb-summary.engine.ts`) — `workingSets/warmup/direct/indirect/byPattern/byExercise/subGroups`.
+  2. `balanceReport` (`bb-balance.engine.ts`) — `press/pull/raise, compound/isolation, lengthened/mid/shortened, patterns, byMuscle.coverage, issues`.
+  3. `fatigueReport` (`bb-fatigue.engine.ts`) — `systemic/axial/joint/local/timeSeconds` per session/week.
+  4. `rotationReport` (`bb-rotation.engine.ts`) — `primaryByMuscle / accessoryPatternsByMuscle / issues`.
+  5. `validation` (`bb-validator.engine.ts`) — `empty/sets_mismatch/single_set/muscle_attribution/effective_mrv_overflow/target_volume_deficit/session_muscle_leak/deload/taper`.
+  6. `safetyScore` (`bb-safety-score.engine.ts`) — 0-100, агрегирует jointStress + acwr + recovery + injury + volumeCompliance + frequency + **balance** (пересчитывает `analyzeBBBalance` заново, дублируя `balanceReport.issues`).
+  7. `report` (`bb-report.engine.ts:28-57`, `buildBBPlanReportText`) — агрегирует `weeklyVolume/fatigue/rotation/balance/validation/expandedSummary` в один `BBPlanReport`, но часть полей считается повторно (peakVolume из `weeklyVolume`, а не из `expandedSummary` → расхождения peakDirect/expandedSummary.totalWorkingSets, см. `bb-balance.test` vs `bb-summary.test`).
+- Расхождения: `weeklyVolume` (direct/effective из `bb-volume.aggregateBBVolume`) vs `expandedSummary.byMuscle.directSets` (считает `exerciseVolumeContributions` + fallback `ex.sets`) — дают разные `directSets` при наличии `warmupActivator`/`indirect`. `balanceReport` считает `lengthened/mid/shortened` по `name + catalog.stretchPhase/peakContraction`, а `expandedSummary` не считает позиции вообще. `validation.effective_mrv_overflow` использует `mrvByMuscle ?? landmarks`, а `safetyScore.volumeCompliance` — только `mrvByMuscle/landmarks` с другим допуском (×1.1 vs ×1.15) → один и тот же план даёт warning в одном отчёте и «safe» в другом.
+- UI (`BbAutoConstructor.tsx:3078-3721`) рендерит 4 отдельных карточки: сводка + ротация + fatigue + баланс + SafetyScore + report — пользователь видит 3-4 разных «качества» без единой точки правды. PDF/CSV (`BbAutoConstructor:3390-3450`, `bb-report:64-149`) экспортируют `report + balance + fatigue`, но не `expandedSummary.byPattern`.
+
+### 21.2 Цель — на каждую мышцу: подмышца + паттерн + пояснение «чем хорошо и как работает»
+
+**Требование:** в плане и в UI на каждую каноническую мышцу (`chest/back/shoulders/quads/hamstrings/glutes/calves/biceps/triceps/forearms/traps/abs`) дополнительно показать:
+- **подмышцы** (анатомически обоснованные доли) — см. таблицу ниже;
+- **паттерны** по каждой подмышце — канонические `movementPattern` из каталога + fallback `derivePattern`;
+- **пояснение «чем хорошо и как работает»** — 1-2 предложения на подмышцу/паттерн из единого источника (не «так можно / так можно»): механика, угол/хват, где растяжение/пик, почему этот выбор закрывает функцию.
+
+**Каноническая таксономия подмышц (источник: TARGET_MUSCLE_DB + EXERCISE_CATALOG.targetMuscle + WEAK_TO_MUSCLE):**
+- `chest`: `chest_upper` (ключичная, incline_push, 30°, stretchPhase) / `chest_mid` (стернальная центр, horizontal_push) / `chest_lower` (нижняя, decline_push/dip_push) / `chest_stretch` (изоляция, isolation_chest, fly/crossover в растянутой).
+- `back`: `back_width` (широчайшая, vertical_pull, wide/neutral) / `back_thickness` (ромб/середина, horizontal_pull, row) / `upper_back` (трапеции верх/середина, shrug/row) / `rear_delts` (задняя дельта, isolation_shoulders/face_pull) / `traps` (трапеции, отдельно, фикс.бэнд) / `erectors` (разгибатели, hinge). — уже есть в `bb-summary.subGroups`, расширяется на все планы.
+- `shoulders`: `delt_front` (передняя, vertical_push) / `delt_mid` (средняя, lateral raise/abduction) / `delt_rear` (задняя, rear_delt_fly/face_pull — уже `armSubgroup/backSubgroup`).
+- `quads`: `quads_rectus` (прямая, leg_ext/sissy, stretch) / `quads_vastus` (латеральная/медиальная, squat/leg_press/hack).
+- `hamstrings`: `hamstrings_hip` (тазобедренный шарнир, hinge: RDL/good_morning, lengthened) / `hamstrings_knee` (сгибание колена, knee_flexion: leg_curl, shortened).
+- `glutes`: `glutes_max` (большая, hip_extension: hip_thrust/glute_bridge) / `glutes_med` (средняя, abduction: kickback/cable_abduction).
+- `biceps`: `biceps_long` (длинная, incline_db_curl, lengthened+stretch) / `biceps_short` (короткая, preacher/spider, peak) / `brachialis` (плечевая, hammer_curl, neutral).
+- `triceps`: `triceps_long` (длинная, overhead: tricep_push/overhead_ext, lengthened) / `triceps_lateral_medial` (латеральная+медиальная, pushdown/rope, peak).
+- `calves`: `calves_gastro` (икроножная, standing calf_raise, straight knee) / `calves_soleus` (камбаловидная, seated calf_raise, bent knee).
+- `traps/forearms/abs`: без деления (одна подгруппа = мышца), но с паттерном и пояснением; входят как secondary/ignore-бюджет, но показываются.
+
+**Источник пояснений (единый, без дублей):**
+- `exercise-biomechanics-db` + `target-muscle-db` → `buildExerciseInstructions` (`pattern RU`, `cues`, `stretch/peak/MMC`, `tempo/rest`, `mistakes`, `progression`, `level`-адаптация).
+- `EXERCISE_CATALOG` → `targetMuscle`, `technique`, `comments`, `movementPattern`, `stretchPhase/peakContraction`.
+- Новый агрегатор `muscleSubgroupExplanation(muscle, subId, patterns, exercises)`: берёт `targetMuscle` + `bio` топ-упражнения подгруппы, формирует строку «Чем хорошо: … Как работает: … Ключ: …» (хват/угол/пауза/амплитуда). Используется в сводке, тултипе упражнения и PDF.
+
+**Реализация (engine):**
+- Расширить `BBExpandedSummary.BBMuscleSummary` (`bb-summary.engine.ts:16-27`): `subGroups` — для ВСЕХ мышц (не только back), `patternsRu` и `explanations: Record<subId, { pattern: string; sets: number; why: string; how: string }>`; завести `SUBGROUP_MAP: Record<canonical, SubgroupDef[]>` (подмышцы + ожидаемые `movementPattern` + `isCompound`).
+- При построении `buildBBExpandedSummary`: `sub = resolveSubgroup(ex.muscle, ex.movementPattern, ex.backSubgroup/armSubgroup, ex.targetMuscle)` → `byMuscle[canonical].subGroups[subId].byPattern/byExercise/sets` + `explanations[subId] = buildSubgroupExplanation(...)` (кэшируется на первое упражнение подгруппы).
+- `bb-report.engine.ts:115-126` рендерит `subGroups` для каждой мышцы (сейчас только back) + строки пояснений; `buildBBPlanReportText` добавляет блок «Подмышцы/паттерны/пояснения» на каждую мышцу.
+- `bb-labels.ts`: расширить `targetLabelFor`/`exerciseTargetNote` — пробрасывать `subGroupId` и `explanation` в `comment`/`executionProfile` (совместимо с существующим `backSubgroupLabel`/`armHeadLabel`).
+
+**UI (BbAutoConstructor.tsx):**
+- Карточка «📋 Недельная сводка» (`3078`): под каждой мышцей — сворачиваемый блок подмышц: `subId RU — N сетов · паттерн RU — упражнения — пояснение` (иконка ⓘ с тултипом «Чем хорошо / Как работает»). Сохраняет `bySession (рабочие/разминочные)`, добавляет `bySubgroup`.
+- Детальная карточка упражнения (`BBExercise.executionProfile`): чип подмышцы (`📐 верх груди / широчайшая / длинная головка`) + паттерн (`🧠 incline_push`) + explanation в title/expand.
+- PDF/CSV (`3390-3450`): колонки `Подмышца | Паттерн | Упражнения | Сеты | Пояснение`.
+- Сохранение `BBPlan.expandedSummary` — единый источник для сводки/отчёта/экспорта (не пересчитывать в рендере).
+
+**Инварианты:**
+- Каждая мышца с `workingSets > 0` имеет ≥1 подгруппу с ≥1 паттерном; `subGroups` покрывают 100% `directSets` мышцы.
+- Паттерны подгруппы — подмножество `movementPattern` каталога (валидация: неизвестный паттерн → warning, не silent).
+- Пояснения — из `exercise-lab/catalog` (source `'exercise-lab'|'catalog'`), generic-фолбэк только если нет `bio/target` — помечается «generic» и не считается покрытием.
+
+### 21.3 Консолидация отчётов качества — один источник правды, без дублей и расхождений
+
+**Цель:** один `BBQualityReport` (или расширение `BBPlanReport` с жёстким контрактом), который заменяет 6 дублей и гарантирует консистентность `weeklyVolume ↔ expandedSummary ↔ balance ↔ validation ↔ safetyScore`.
+
+**Контракт:**
+- `weeklyVolume` (`bb-volume.aggregateBBVolume`) — **единственный** подсчёт `direct/effective/fatigueWeighted` по неделям. `expandedSummary.byMuscle.directSets` и `balanceReport.byMuscle.*` не пересчитывают объём, а агрегируют из `weeklyVolume` (или из `expandedSummary`, который сам построен из `weeklyVolume`). Запрет на второй независимый подсчёт сетов в `bb-balance`/`bb-safety-score`.
+- `mrvByMuscle` + `volumeLandmarks` — единственный кап; `validation` и `safetyScore.volumeCompliance` используют одну функцию `checkMrvOverflow(muscle, effectiveSets, mrvByMuscle/landmarks, tolerance)` с единым допуском `×1.15` (см. `bb-validator:192`). Дублирующий `×1.1` в `safetyScore` удаляется.
+- `balance` — только геометрия паттернов (press/pull/raise, lengthened/mid/shortened, coverage byMuscle), не дублирует объём; `issues` баланса — только про дисбаланс паттернов, объёмные issues — из `validation`.
+- `rotation`/`fatigue` остаются отдельными тех-репортами, но их `issues` не дублируются в `safetyScore.issues` — `safetyScore` агрегирует `validation.issues + balance.issues` без пересчёта `analyzeBBBalance`.
+- `BBPlanReport` расширяется полями `quality: { expandedSummary, balance, fatigue, rotation, validation, safetyScore }` или вводится `BBQualityReport`; `buildBBPlanReport(plan)` — единственная точка сборки отчёта (все UI/экспорт/валидация читают `plan.report.quality`, не вызывают `analyzeBBBalance`/`calculatePlanSafetyScore` повторно).
+
+**Рефактор по файлам:**
+- `bb-summary.engine.ts`: сделать `buildBBExpandedSummary(plan, weeklyVolume?)` — принимать готовый `weeklyVolume`; убрать второй подсчёт `directSets` через `exerciseVolumeContributions` в отчёте качества (оставить для `buildSession`, но не для сводки).
+- `bb-balance.engine.ts:33-82`: принимать `weeklyVolume`/`expandedSummary` на вход, считать только `patterns/positions/issues` по `derivePattern` + `catalog.type/movementPattern`, не суммировать `sets` заново; удалить `report.press/pull` дубли объёма (или считать как `sum(weeklyVolume[upper])`).
+- `bb-validator.engine.ts`: вынести `mrvOverflowTolerance = 1.15` в константу `BB_MRV_TOLERANCE`, использовать и в `bb-safety-score.engine.ts`.
+- `bb-safety-score.engine.ts:45-202`: не вызывать `analyzeBBBalance(plan)` внутри — принимать `balanceReport`; не вызывать `analyzePlanStress` дважды — принимать `stressAnalysis`; `factors.volumeCompliance` считать вызовом `validation.effective_mrv_overflow` (не своей копией); убрать `acwr||1.0` маскировку (уже исправлено на `hasAcwr`).
+- `bb-finalize.engine.ts:2485/2634/2771`: порядок — `weeklyVolume → expandedSummary → balance → validation → safetyScore → report` (каждый следующий принимает предыдущий, не пересчитывает).
+- `BbAutoConstructor.tsx:1123/3078/3134/3159/3239/3718`: заменить 6 карточек на 2: «📋 Сводка по мышцам (подмышцы/паттерны/пояснения)» + «🛡 Качество плана (единый репорт: баланс/усталость/ротация/валидация/safetyScore)» с секциями; убрать повторный `analyzeBBBalance` в UI.
+
+**Валидация / тесты:**
+- Инвариант-тест: `expandedSummary.totalWorkingSets === sum(weeklyVolume.directSets)` и `sum(balance.press+pull+raise)` не используется как объём — баланс только про ratio/coverage; `validation.effective_mrv_overflow` и `safetyScore.factors.volumeCompliance` дают одинаковый `violations` на одном плане (снапшот 5 профилей × 25 сплитов × 2 режима).
+- Golden-тест отчётов: `buildBBPlanReport(plan).peakDirectSets === expandedSummary.totalWorkingSets` (peak-неделя) и `report.balance.pullPressRatio` не расходится с `balanceReport.pullPressRatio` (один объект).
+- Regression: `bb-report.test.ts:9`, `bb-balance.test.ts:7`, `bb-warning-report.test.ts:6/12` — обновить снапшоты после консолидации (ожидается снижение issues-дублей: было 3-4 повтора «нет растянутой позиции», станет 1).
+
+**Документация:**
+- Обновить `docs/BB-AUTO-GENERATION-MAX-PLAN.md` Этап 9-11: «Metrics и UI» — единый `BBQualityReport`; отметить `weeklyVolume` как источник.
+- AGENTS.md — добавить статус этапа 21 в список (не дублировать в вехе 20).
+
+### 21.4 Связь с существующим планом
+
+- П.9 «Пояснения к упражнениям» расширяется подмышцами/паттернами/пояснениями (этот раздел — детализация п.9).
+- П.13 «Локализация + отчёт + сводка» — сводка становится источником для отчёта (контракт выше).
+- П.16 «Убрать стэкинг / дед-код» — `SUBGROUP_MAP` не вводит новый стэкинг, только распределение уже рассчитанного `targetSets` по подмышцам.
+- Веха 20 (статус) остаётся «готово по 1-19», новый этап 21 — следующий, с отдельными тестами и приёмкой.
+
 
