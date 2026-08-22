@@ -5,9 +5,10 @@ interface WeekViewProps {
   diaryData: Record<string, any>;
   targets: { kcal: number; protein: number; fats: number; carbs: number };
   selectedDate: string;
+  onSelectDate?: (date: string) => void;
 }
 
-export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selectedDate }) => {
+export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selectedDate, onSelectDate }) => {
   const weekStart = useMemo(() => {
     const d = new Date(selectedDate);
     const day = d.getDay();
@@ -87,9 +88,9 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
         </div>
       </div>
 
-      {/* Day-by-day breakdown */}
+      {/* Day-by-day breakdown — клик → день */}
       <div style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.15)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 10, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:8, height:8, borderRadius:4, background:'#a78bfa' }} />📅 По дням</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 10, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:8, height:8, borderRadius:4, background:'#a78bfa' }} />📅 По дням <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)', fontWeight:400, marginLeft:4 }}>нажмите чтобы открыть</span></div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {daysData.map(d => {
             const isToday = d.date === today;
@@ -97,17 +98,19 @@ export const WeekView: React.FC<WeekViewProps> = ({ diaryData, targets, selected
             const pct = targets.kcal > 0 ? Math.min(100, Math.round(d.kcal / targets.kcal * 100)) : 0;
             const isOver = pct > 100;
             
+            const isSelected = d.date === selectedDate;
             return (
-              <div key={d.date} style={{ 
-                padding: '10px 12px', borderRadius: 12, 
-                background: isToday ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.02))' : isEmpty ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${isToday ? 'rgba(0,230,138,0.2)' : isEmpty ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.04)'}`,
-                borderLeft: isToday ? '3px solid #00e68a' : isEmpty ? '3px solid transparent' : '3px solid rgba(255,255,255,0.06)',
+              <div key={d.date} onClick={() => onSelectDate?.(d.date)} role="button" tabIndex={0} onKeyDown={e=>{ if(e.key==='Enter') onSelectDate?.(d.date); }}
+                style={{ 
+                padding: '10px 12px', borderRadius: 12, cursor: onSelectDate ? 'pointer' : 'default',
+                background: isSelected ? 'rgba(0,230,138,0.1)' : isToday ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.02))' : isEmpty ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.02)',
+                border: `1px solid ${isSelected ? 'rgba(0,230,138,0.35)' : isToday ? 'rgba(0,230,138,0.2)' : isEmpty ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.04)'}`,
+                borderLeft: isSelected ? '3px solid #00e68a' : isToday ? '3px solid #00e68a' : isEmpty ? '3px solid transparent' : '3px solid rgba(255,255,255,0.06)',
                 opacity: isEmpty ? 0.65 : 1,
-                transition:'transform 0.12s, background 0.12s',
+                transition:'transform 0.12s, background 0.12s, border-color 0.12s',
               }}
-                onMouseEnter={e=>{ if(!isEmpty) e.currentTarget.style.transform='translateX(2px)'; }}
-                onMouseLeave={e=>e.currentTarget.style.transform='translateX(0)'}>
+                onMouseEnter={e=>{ if(!isEmpty) e.currentTarget.style.transform='translateX(2px)'; e.currentTarget.style.borderColor = isSelected ? 'rgba(0,230,138,0.45)' : 'rgba(255,255,255,0.08)'; }}
+                onMouseLeave={e=>{ e.currentTarget.style.transform='translateX(0)'; e.currentTarget.style.borderColor = isSelected ? 'rgba(0,230,138,0.35)' : isToday ? 'rgba(0,230,138,0.2)' : 'rgba(255,255,255,0.04)'; }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: isToday ? '#00e68a' : '#fff' }}>

@@ -702,7 +702,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       )}
 
       {tab === 'week' && (
-        <WeekView diaryData={diaryData} targets={targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 }} selectedDate={selectedDate} />
+        <WeekView diaryData={diaryData} targets={targets || { kcal: 2500, protein: 160, fats: 70, carbs: 300 }} selectedDate={selectedDate} onSelectDate={(d)=>{ setSelectedDate(d); setTab('day'); }} />
       )}
 
       {/* Edit modal */}
