@@ -715,7 +715,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [nutrLevel, setNutrLevel] = useState<NutritionLevel>((['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base');
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
   const effectiveP = Math.round((kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein)) * _nutrMult);
-  const effectiveF = Math.round((kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats)) * _nutrMult);
+  // D-28+ fix (КБЖУ-соответствие, Aug 22 2026): ЖИРЫ НЕ ниже физиологического пола 0.8 г/кг —
+  // движок (FAT_FLOOR_PER_KG) никогда не спускается ниже, а раньше цель в карточке (60 г для
+  // 120 кг = 0.5 г/кг) была ниже пола → «разбег» жиров до 60%+. Поднимаем отображаемую цель до пола.
+  const effectiveF = Math.max(Math.round(weight * 0.8), Math.round((kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats)) * _nutrMult));
   // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом и ограничены
   // ДИЕТОЛОГИЧЕСКИМ потолком (computeDieteticCarbTarget). Цель углеводов — г/кг (межсезонье
   // 4-6 г/кг), а не абстрактный ×множитель (жалоба «120 кг на курсе → 900/814 г углеводов»).

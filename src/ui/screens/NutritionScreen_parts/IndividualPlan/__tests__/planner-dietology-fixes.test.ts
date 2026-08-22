@@ -10,7 +10,19 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildDayPlan, type MealPlanInput } from '../meal-plan-engine';
-import { computeDieteticCarbTarget } from '../planner-targets';
+import { computeDieteticCarbTarget, computePlannerTargets } from '../planner-targets';
+
+function computePlannerTargetsFor(weightKg: number, insulinUnits: number) {
+  return computePlannerTargets({
+    weightKg, heightCm: 185, age: 30, sex: 'male' as const, goal: 'mass', phase: 'course',
+    bodyFatPct: 20, workoutsPerWeek: 5, avgWorkoutMinutes: 75, dailySteps: 8000,
+    householdActivity: 'moderate', trainType: 'mixed', trainIntensity: 'high', surplusPct: 10,
+    injections: insulinUnits > 0 ? [{ type: 'инсулин', dose: insulinUnits, esterType: 'short' }] : [],
+    weightAdaptMode: false, weightLogWeek: [], expectedLossKgWeek: 0,
+    metabolicAdaptEnabled: false, metabolicAdaptPct: 0,
+    manualGPerKg: { protein: 0, fat: 0, carbs: 0 },
+  });
+}
 
 const base = (overrides: any = {}): MealPlanInput => ({
   weightKg: 90, lbmKg: 74, bodyFatPct: 18, sex: 'male' as const,
@@ -195,6 +207,45 @@ describe('D4/D5: диетологический потолок углеводо�
     const plan = buildDayPlan(base({ weightKg: 120, lbmKg: 100, goalCarbsG: target, goalKcal: 5000, goalProteinG: 360, goalFatG: 135, mealsCount: 6 }));
     expect(plan.totals.c).toBeLessThanOrEqual(target * 1.06); // в пределах ~6% (без абсурда 814+)
     expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.88);
+  });
+});
+
+describe('КБЖУ-соответствие: план = цель (жалоба «разбег в карточке»)', () => {
+  it('жиры НЕ ниже пола 0.8 г/кг — план совпадает с целью, а не «60 → 96» (был разбег до 60%)', () => {
+    const w = 120;
+    const fatFloor = Math.round(w * 0.8); // 96
+    // цель ЖИРОВ уже приведена к полу в контексте (effectiveF = max(0.8*вес, target))
+    const plan = buildDayPlan(base({ weightKg: w, lbmKg: 100, goalFatG: fatFloor, goalKcal: 5000, goalProteinG: 360, goalCarbsG: 500, mealsCount: 6 }));
+    expect(plan.totals.f).toBeGreaterThanOrEqual(fatFloor * 0.9);
+    expect(plan.totals.f).toBeLessThanOrEqual(fatFloor * 1.1);
+  });
+
+  it('по всем комбо 120/90кг × инсулин × уровни: Б/Ж/У/ккал в пределах ~10% от цели', () => {
+    // репликация контекста: effectiveF с полом, effectiveC с потолком, kcal=Atwater
+    const scenarios: any[] = [];
+    for (const w of [120, 90]) {
+      for (const insulinUnits of [0, 20]) {
+        const raw = computePlannerTargetsFor(w, insulinUnits);
+        for (const mult of [1.0, 1.15, 1.3, 1.5]) {
+          const effP = Math.round(raw.protein * mult);
+          const effF = Math.max(Math.round(w * 0.8), Math.round(raw.fats * mult));
+          const effC = computeDieteticCarbTarget({ weightKg: w, rawCarbsG: raw.carbs, insulinTotalUnits: insulinUnits });
+          const effK = Math.round(effP * 4 + effF * 9 + effC * 4);
+          for (const isTrain of [true, false]) {
+            const p = buildDayPlan(base({ weightKg: w, lbmKg: Math.round(w * 0.83), goalKcal: effK, goalProteinG: effP, goalFatG: effF, goalCarbsG: effC, mealsCount: 6, isTrainingDay: isTrain, trainStartMin: isTrain ? 17 * 60 : undefined, trainDurationMin: 75, allowIntraWorkout: isTrain, cyclePhase: 'course' as const }));
+            const dP = Math.abs(p.totals.p - effP) / effP;
+            const dF = Math.abs(p.totals.f - effF) / effF;
+            const dC = Math.abs(p.totals.c - effC) / effC;
+            const dK = Math.abs(p.totals.kcal - effK) / effK;
+            expect(dP, `P w=${w} ins=${insulinUnits} mult=${mult}`).toBeLessThanOrEqual(0.10);
+            expect(dF, `F w=${w} ins=${insulinUnits} mult=${mult}`).toBeLessThanOrEqual(0.10);
+            expect(dC, `C w=${w} ins=${insulinUnits} mult=${mult}`).toBeLessThanOrEqual(0.10);
+            expect(dK, `K w=${w} ins=${insulinUnits} mult=${mult}`).toBeLessThanOrEqual(0.10);
+          }
+        }
+      }
+    }
+    void scenarios;
   });
 });
 
