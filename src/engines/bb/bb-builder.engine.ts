@@ -504,6 +504,8 @@ const PREFERRED_BB_EXERCISES = new Set([
 
 // Слишком специфические упражнения (исключать для generic плана, если нет weak point).
 // "Жим обратным хватом" — пример из запроса: мало эффективен для общего развития груди.
+// Жимы в негативном/отрицательном наклоне (decline) — низкая практическая ценность для
+// гипертрофии груди: горизонталь + наклон 30° уже покрывают весь объём.
 const BLACKLIST_GENERIC = new Set([
   'bench_press_reverse_grip', 'reverse_grip_bench_press',
   'underhand_grip_lat_pulldown',
@@ -511,6 +513,10 @@ const BLACKLIST_GENERIC = new Set([
   'smith_machine_squat',
   'leg_press_machine_close_stance',
   'machine preacher_curl',
+  // decline-жимы (компаунды): низкая ценность для generic-массы
+  'decline_bar', 'decline_db', 'machine_decline_press', 'smith_decline',
+  // пуловеры (грудь-группа, но движение — тяга широчайших): не в грудь
+  'dumbbell_pullover', 'db_pullover_cross_bench',
 ]);
 
 // Детальные инструкции по выполнению (углы, хват, техника).
@@ -1659,6 +1665,9 @@ function buildSession(
         const isBlacklisted = Array.from(BLACKLIST_GENERIC).some(bid =>
           id.includes(bid) || n.includes(bid.replace(/_/g, ' ')));
         if (isBlacklisted) return false;
+        // Пуловер — это тяга (широчайшие), а не грудная изоляция: не ставим в грудь.
+        // (каталог-group 'chest', но по движению — lat-упражнение; дублирует грудные изоляции)
+        if (muscle === 'chest' && /пуловер|pullover/.test(n)) return false;
         // Грудь: брусья не приоритет (трицепс-доминантны, перегружают плечо).
         // Для растяжки приоритетны разводки и кроссовер.
         if (muscle === 'chest' && /брус|dip/i.test(n)) return false;

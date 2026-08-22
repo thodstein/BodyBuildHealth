@@ -89,12 +89,15 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     else if (avgFreq > 3) { score += 8; rationale.push(`высокая частота ${avgFreq.toFixed(1)}×/нед`); }
     else { score += 3; rationale.push(`классическая частота ${avgFreq.toFixed(1)}×/нед`); }
 
-    // массонабор: частота 2+×/нед + высокообъёмные сплиты
+    // массонабор: частота 2+×/нед + высокообъёмные сплиты.
+    // Дифференцируем PPL-семейство, чтобы рекомендация была ОДНОЙ ясной PPL,
+    // а не «пять почти одинаковых PPL-вариантов» (жалоба: tpt_o_ttp/arnold_6/
+    // rolling_3_1_3_1 выглядели как одно и то же).
     if (input.goal === 'mass' || input.goal === 'strength_mass') {
       if (avgFreq >= 2) score += 12;
-      // P1-2 (audit 2026-07): bro_5 убран из mass-бонуса (1×/нед — недостимул для натуралов,
-      // Schoenfeld 2016/2018: ≥2×/нед превосходит 1×/нед для гипертрофии).
-      if (['ppl_6','rolling_3_1_3_1','arnold_6','fullbody_4','tpt_o_ttp'].includes(p.id)) score += 10;
+      if (p.id === 'ppl_6') score += 12;                    // канонический PPL — главная рекомендация
+      else if (p.id === 'arnold_6') score += 8;             // Арнольд — альтернатива (акцент на плечи/руки)
+      else if (['fullbody_4', 'tpt_o_ttp', 'rolling_3_1_3_1'].includes(p.id)) score += 4;
     }
     // P1-2: bro_5 penalty — низкая частота 1×/нед
     if (p.id === 'bro_5') {
@@ -160,8 +163,10 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       }
     }
 
-    if (lvl === 'enhanced' && ['ppl_6','rolling_3_1_3_1','tpt_o_ttp','fullbody_4','arnold_6'].includes(p.id)) {
-      score += 10;
+    if (lvl === 'enhanced') {
+      if (p.id === 'ppl_6') score += 12;
+      else if (['arnold_6', 'fullbody_4'].includes(p.id)) score += 8;
+      else if (['rolling_3_1_3_1', 'tpt_o_ttp'].includes(p.id)) score += 4;
     }
 
     out.push({ pattern: p, score, rationale, warnings });

@@ -164,9 +164,22 @@ export function formatExerciseInstructions(input: ExerciseInstructionInput): str
   if (p.stretch) parts.push(`Растяжение: ${p.stretch}`);
   if (p.peak) parts.push(`Пиковое напряжение: ${p.peak}`);
   if (p.mmc) parts.push(`Связь мышца-мозг: ${p.mmc}`);
-  parts.push(`Темп: ${p.tempo}${p.restSeconds ? `, отдых ${p.restSeconds} сек` : ''}`);
+  parts.push(`Темп: ${p.tempo}${tempoExplain(p.tempo) ? ` (${tempoExplain(p.tempo)})` : ''}${p.restSeconds ? `, отдых ${p.restSeconds} сек` : ''}`);
   if (p.intensityTechnique) parts.push(`Техника интенсивности: ${p.intensityTechnique}`);
   parts.push(`Прогрессия: ${p.progression}`);
   if (p.mistakes.length) parts.push(`Ошибки: ${p.mistakes.slice(0, 3).join('; ')}`);
   return cleanInstructionsText(parts.join('. '));
+}
+
+/** Человекочитаемое пояснение темпа: «2-0-1-0» → «опуск 2с, подъём 1с». */
+export function tempoExplain(tempo: string): string {
+  const parts = (tempo || '').split('-').map(s => s.trim());
+  if (parts.length !== 4 || parts.some(p => p === '' || isNaN(Number(p)))) return '';
+  const n = parts.map(Number);
+  const seg: string[] = [];
+  if (n[0] > 0) seg.push(`опуск ${n[0]}с`);
+  if (n[1] > 0) seg.push(`пауза внизу ${n[1]}с`);
+  if (n[2] > 0) seg.push(`подъём ${n[2]}с`);
+  if (n[3] > 0) seg.push(`пауза вверху ${n[3]}с`);
+  return seg.join(', ');
 }

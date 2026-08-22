@@ -1156,6 +1156,8 @@ const WARMUP_ACTIVATOR: Record<string, RegExp> = {  back: /тяга.*верхн.
 function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   if (session.exercises.some((e: any) => e.warmupActivator)) return;
+  // Ведущая мышца дня — из карты (исправлено: Push→грудь, Pull→спина, Legs→квадрицепс,
+  // чтобы «день груди» не начинался с МАХИ-плеч), иначе — первая primary.
   const lead = WARMUP_LEAD[session.sessionTag || ''] || session.exercises.find((e: any) => e.role === 'primary')?.muscle;
   // BUG-FIX: не добавлять разминку для мышцы, исключённой травмой (exclude=true).
   const excludedMuscles = new Set(options.excludedMuscles || []);
@@ -1175,14 +1177,10 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
     return true;
   });
   if (!candidate) return;
-  // Не добавляем разминку, если в сессии уже есть упражнение того же паттерна (3 пуловера/3 разгибания из-за дублирования)
-  const candPat = derivePattern(candidate);
-  const hasSamePattern = session.exercises.some((e: any) => {
-    if ((e.muscle || '') !== lead) return false;
-    const pat = derivePattern({ name: e.exerciseName || e.name, group: e.muscle, type: (e as any).exerciseType } as any);
-    return pat === candPat;
-  });
-  if (hasSamePattern) return;
+  // Не добавляем разминку, если ТОЧНО такое же упражнение уже в сессии (защита от дублей
+  // «две тяги/два жима подряд»). Разминка другим движением того же паттерна — допустима.
+  const hasSameName = session.exercises.some((e: any) => (e.name || '') === candidate.name || (e.exerciseName || '') === candidate.name);
+  if (hasSameName) return;
   const base = options.workMax?.[lead] || 50;
   const weight = Math.max(5, Math.round(base * 0.25 * 10) / 10);
   session.exercises.unshift({
@@ -1207,10 +1205,10 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
 /** Целевая группа дня (по sessionTag) — выбираем мышцу, где warmup не дублирует основной паттерн (чтобы не было 3 пуловера/3 разгибания). */
 const WARMUP_LEAD: Record<string, string> = {
   Chest: 'chest', Back: 'back', Shoulders: 'shoulders', Arms: 'biceps',
-  Push: 'shoulders', Pull: 'traps', ChestBack: 'shoulders', ShouldersArms: 'shoulders',
-  Upper: 'shoulders', UpperPower: 'shoulders', UpperHyp: 'shoulders',
-  Torso: 'chest', Legs: 'glutes', Lower: 'glutes', LowerPower: 'glutes', LowerHyp: 'glutes',
-  Glutes: 'glutes', GlutesHams: 'glutes', LegsBiceps: 'glutes', Limbs: 'glutes',
+  Push: 'chest', Pull: 'back', ChestBack: 'chest', ShouldersArms: 'shoulders',
+  Upper: 'chest', UpperPower: 'chest', UpperHyp: 'chest',
+  Torso: 'chest', Legs: 'quads', Lower: 'quads', LowerPower: 'quads', LowerHyp: 'quads',
+  Glutes: 'glutes', GlutesHams: 'glutes', LegsBiceps: 'quads', Limbs: 'quads',
 };
 
 /**
@@ -1603,6 +1601,21 @@ export function markPreExhaustPairs(plan: BBPlan): void {
       iso.comment = (iso.comment || '') + (iso.comment ? ' · ' : '') + `⚡ Пред-истощение: без отдыха → «${compound.name}»`;
       compound.comment = (compound.comment || '') + (compound.comment ? ' · ' : '') + `⚡ Сразу после «${iso.name}» (пред-истощение) — пробить группу`;
     }
+  }
+}
+
+/** Убрать точные дубли упражнений в сессии («две тяги подряд»): оставляем первое
+ *  (после упорядочивания — обычно primary/тяжелее). Разминка не трогается. */
+function dedupeExactExercises(plan: BBPlan): void {
+  for (const week of plan.weeks) for (const session of week.sessions) {
+    const seen = new Set<string>();
+    session.exercises = session.exercises.filter((e: any) => {
+      if ((e as any).warmupActivator) return true;
+      const key = `${e.muscle}:${e.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 }
 
@@ -2608,6 +2621,7 @@ for (const week of next.weeks) {
     else if (options.supersetMode === 'same_muscle') markSameMuscleSupersets(next);
     else if (options.supersetMode === 'giant') markGiantSets(next);
     if (options.methodology === 'pre_exhaust') markPreExhaustPairs(next);
+    dedupeExactExercises(next);
     if (options.volumeScheme && options.volumeScheme !== 'standard') applyVolumeScheme(next, options.volumeScheme);
   }
   if (!options.preserveSource && (next as any).pattern?.id) {
@@ -2817,8 +2831,11 @@ for (const week of next.weeks) {
     for (const week of next.weeks) for (const session of week.sessions) {
       const warmups = session.exercises.filter((e:any)=> e.warmupActivator);
       for (const w of warmups) {
-        const pat = derivePattern({ name: w.exerciseName || w.name, group: w.muscle, type: (w as any).exerciseType } as any);
-        const hasDup = session.exercises.some((e:any)=> !e.warmupActivator && (e.muscle||'')=== (w.muscle||'') && derivePattern({ name: e.exerciseName || e.name, group: e.muscle, type: (e as any).exerciseType } as any)===pat);
+        // Удаляем warmup ТОЛЬКО если рабочий сет имеет ТОЧНО такое же имя (защита от
+        // дубля «warmup + рабочий жим лёжа»). Раньше сравнивали по ПАТТЕРНУ — это
+        // удаляло разминку всякий раз, когда день уже тренировал целевую мышцу
+        // (Push-день → «Сведение» дублирует паттерн «Разводка» → разминки нет).
+        const hasDup = session.exercises.some((e:any)=> !e.warmupActivator && ((e.name || '') === (w.name || '') || (e.exerciseName || '') === (w.name || '')));
         if (hasDup) {
           session.exercises = session.exercises.filter((e:any)=> e!==w);
         }

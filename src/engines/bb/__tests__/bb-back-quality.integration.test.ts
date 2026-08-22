@@ -38,7 +38,7 @@ describe('experienced enhanced back prescription', () => {
     const pulls = plan.weeks[0].sessions.filter(s => s.sessionTag === 'Pull');
     expect(pulls.length).toBeGreaterThanOrEqual(2);
     for (const session of pulls) {
-      const back = session.exercises.filter(e => e.muscle === 'back');
+      const back = session.exercises.filter(e => e.muscle === 'back' && !(e as any).warmupActivator);
       expect(back.reduce((sum, e) => sum + e.sets, 0)).toBeGreaterThanOrEqual(15);
       expect(back.filter(e => classifyBackExercise(e.name).pattern === 'vertical_pull').length).toBeLessThanOrEqual(1);
     }

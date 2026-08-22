@@ -68,7 +68,7 @@ const PHASE_RU: Record<string, string> = { accumulation: 'Накопление',
 function phaseSummary(plan: BBPlan): string {
   const seq: Array<{ phase: string; from: number; to: number }> = [];
   for (const wk of plan.weeks) {
-    const phase = String((wk as any).phase || '').toLowerCase();
+    const phase = String((wk as any).phase || '').toLowerCase() || 'рабочая';
     const last = seq[seq.length - 1];
     if (last && last.phase === phase) last.to = wk.week;
     else seq.push({ phase, from: wk.week, to: wk.week });
@@ -77,47 +77,43 @@ function phaseSummary(plan: BBPlan): string {
 }
 
 /** Покрытие функций сложных мышц (evidence: разные функции требуют разных паттернов —
- *  спина ≥3 функций (ширина/толщина/задняя дельта), грудь (верх/середина/низ) и т.д.). */
-const FUNCTION_REQ: Record<string, { sub: string; labelRu: string }[]> = {
+ *  спина ≥3 функций (ширина/толщина/задняя дельта), грудь (верх/середина/низ) и т.д.).
+ *  Проверка по ПАТТЕРНУ упражнения (надёжнее подгрупп — наклонные жимы не всегда
+ *  попадают в подгруппу chest_upper). */
+const FUNCTION_REQ: Record<string, { labelRu: string; test: (n: string, m: string) => boolean }[]> = {
   back: [
-    { sub: 'back_width', labelRu: 'ширина (вертикальная тяга)' },
-    { sub: 'back_thickness', labelRu: 'толщина (горизонтальная тяга)' },
-    { sub: 'rear_delts', labelRu: 'задняя дельта' },
+    { labelRu: 'ширина (вертикальная тяга)', test: (n, m) => m === 'back' && /подтяг|верхн.*блок|lat.?pull|пулдаун|вертикальн|широчайш/i.test(n) },
+    { labelRu: 'толщина (горизонтальная тяга)', test: (n, m) => m === 'back' && /тяга|гребн|row/i.test(n) && !/верхн|вертик|подтяг|блок/i.test(n) },
+    { labelRu: 'задняя дельта', test: (n) => /задн.*дельт|обратн.*свед|face.?pull|тяга к лиц|rear.?delt/i.test(n) },
   ],
   chest: [
-    { sub: 'chest_upper', labelRu: 'верх (наклон 30°)' },
-    { sub: 'chest_mid', labelRu: 'середина (горизонтальный жим)' },
-    { sub: 'chest_lower', labelRu: 'низ (брусья)' },
+    { labelRu: 'верх (наклон 30°)', test: (n, m) => m === 'chest' && /наклон|incline/i.test(n) },
+    { labelRu: 'середина (горизонтальный жим)', test: (n, m) => m === 'chest' && /лёжа|лежа|гориз|bench/i.test(n) && !/наклон/i.test(n) },
+    { labelRu: 'низ (брусья)', test: (n, m) => m === 'chest' && /брус|dip/i.test(n) },
   ],
   hamstrings: [
-    { sub: 'ham_hip', labelRu: 'таз (RDL/шарнир)' },
-    { sub: 'ham_knee', labelRu: 'колено (сгибания)' },
+    { labelRu: 'таз (RDL/шарнир)', test: (n, m) => m === 'hamstrings' && /румын|rdl|гудморнинг|шарнир|наклон.*штанг/i.test(n) },
+    { labelRu: 'колено (сгибания)', test: (n, m) => m === 'hamstrings' && /сгибан.*ног|leg.?curl/i.test(n) },
   ],
   triceps: [
-    { sub: 'triceps_long', labelRu: 'длинная (overhead)' },
-    { sub: 'triceps_push', labelRu: 'латеральная (блок)' },
+    { labelRu: 'длинная (overhead)', test: (n, m) => m === 'triceps' && /француз|french|overhead|из.?за.*голов/i.test(n) },
+    { labelRu: 'латеральная (блок)', test: (n, m) => m === 'triceps' && /блок|pushdown|разгибан/i.test(n) && !/француз/i.test(n) },
   ],
 };
 
-/** Проверить покрытие функций сложных мышц по подгруппам сводки. Возвращает RU-issues. */
+const MUSCLE_RU_NAME: Record<string, string> = { back: 'Спина', chest: 'Грудь', hamstrings: 'Бицепс бедра', triceps: 'Трицепс' };
+
+/** Проверить покрытие функций сложных мышц по паттернам упражнений. Возвращает RU-issues. */
 export function checkBBFunctionCoverage(plan: BBPlan): string[] {
-  const sum = plan.expandedSummary;
-  if (!sum) return [];
-  // Задняя дельта технически живёт в группе shoulders, но в ББ-программировании
-  // относится к функции спины — проверяем её по паттерну упражнения (не по подгруппе).
-  const hasRearDelt = plan.weeks.some(w => (w.sessions || []).some(s => (s.exercises || []).some(e =>
-    !(e as any).warmupActivator && /задн.*дельт|обратн.*свед|face.?pull|тяга к лиц|rear.?delt/i.test(e.name || ''))));
+  const all = plan.weeks.flatMap(w => (w.sessions || [])).flatMap(s => (s.exercises || [])).filter((e: any) => !(e as any).warmupActivator);
+  if (!all.length) return [];
   const issues: string[] = [];
   for (const [muscle, reqs] of Object.entries(FUNCTION_REQ)) {
-    const m = sum.byMuscle[muscle];
-    if (!m || m.workingSets === 0) continue;
-    const covered = new Set(Object.keys(m.subGroups || {}).filter(k => (m.subGroups as any)[k].workingSets > 0));
-    const missing = reqs.filter(r => {
-      if (r.sub === 'rear_delts' && hasRearDelt) return false;
-      return !covered.has(r.sub);
-    });
+    const muscleExs = all.filter((e: any) => e.muscle === muscle);
+    if (!muscleExs.length) continue;
+    const missing = reqs.filter(r => !all.some((e: any) => r.test(e.name || '', e.muscle || '')));
     if (missing.length) {
-      issues.push(`${muscle === 'back' ? 'Спина' : muscle === 'chest' ? 'Грудь' : muscle === 'hamstrings' ? 'Бицепс бедра' : 'Трицепс'}: не покрыта функция — ${missing.map(r => r.labelRu).join(', ')}.`);
+      issues.push(`${MUSCLE_RU_NAME[muscle] || muscle}: не покрыта функция — ${missing.map(r => r.labelRu).join(', ')}.`);
     }
   }
   return issues;

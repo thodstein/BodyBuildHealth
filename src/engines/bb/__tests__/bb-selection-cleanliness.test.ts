@@ -50,10 +50,40 @@ describe('BB: порядок/схемы объёма и адекватность
     expect(giants.length % 3).toBe(0);
   });
 
-  it('отчёт выявляет низкоценные и кросс-мышечные упражнения (decline, пуловер в груди)', () => {
-    const plan = buildBBPlan({ patternId: 'fullbody_3', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
+  it('разминка: Push начинается с разминки ГРУДИ (не МАХИ-плеч), Pull — спины, Legs — квадрицепса', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
+    const byTag = (tag: string) => plan.weeks[0].sessions.filter(s => (s.sessionTag || '').toLowerCase().includes(tag));
+    const firstWarmupMuscle = (sessions: typeof plan.weeks[0].sessions) => {
+      const s = sessions.find(ss => (ss.exercises[0] as any).warmupActivator);
+      return s ? (s.exercises[0] as any).muscle : null;
+    };
+    // Push → разминка ГРУДИ, не shoulders
+    const pushWarm = firstWarmupMuscle(byTag('push'));
+    expect(pushWarm).toBe('chest');
+    // Pull → спина
+    const pullWarm = firstWarmupMuscle(byTag('pull'));
+    expect(pullWarm).toBe('back');
+    // Legs → квадрицепс (или другая ножная мышца, но НЕ верх тела)
+    const legsWarm = firstWarmupMuscle(byTag('legs'));
+    expect(['quads', 'hamstrings', 'glutes', 'calves']).toContain(legsWarm);
+  });
+
+  it('decline-жимы отсутствуют в generic-планах', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
+    const names = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).map(e => e.name);
+    expect(names.some(n => /отриц|decline|отрицательн|негативн/.test(n))).toBe(false);
+  });
+
+  it('комментарии содержат читаемый темп (опуск Nс, подъём Nс)', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
+    const comments = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).map((e: any) => e.comment || '');
+    const withReadable = comments.filter(c => /опуск \d+с/.test(c));
+    expect(withReadable.length).toBeGreaterThan(0);
+  });
+
+  it('адекватность: generic-план без decline-флагов', () => {
+    const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
     const issues = checkBBExerciseAppropriateness(plan);
-    // либо decline-жим, либо кросс-мышечное несоответствие должно быть отмечено в generic fullbody
-    expect(issues.some(i => /негативн|decline/.test(i)) || issues.some(i => /тренирует «/.test(i))).toBe(true);
+    expect(issues.filter(i => /негативн|decline/.test(i))).toEqual([]);
   });
 });
