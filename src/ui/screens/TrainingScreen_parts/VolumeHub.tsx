@@ -1,21 +1,21 @@
 /** VolumeHub.tsx — ЕДИНЫЙ хаб объёма без дублей.
- *  Объединяет VolumeOptimizerTab (MEV/MAV/MRV), TonnageCalcTab (тоннаж/КПШ/УОИ) и SplitGenCard (9 сплитов).
+ *  Объединяет VolumeOptimizerTab (MEV/MAV/MRV), TonnageCalcTab (тоннаж/КПШ/УОИ) и PlateCalcTab (блины).
  *  3 подкладки внутри, общий хедер с пояснениями. Полные инструменты сохранены, дубли убраны (объём считался в 3 местах).
  */
 import React, { useState } from 'react';
 import { VolumeOptimizerTab } from './VolumeOptimizerTab';
 import { TonnageCalcTab } from './TonnageCalcTab';
-import { SplitGenCard } from './SplitGenCard';
+import { PlateCalcTab } from './PlateCalcTab';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
 
-type HubMode = 'volume' | 'tonnage' | 'splits';
+type HubMode = 'volume' | 'tonnage' | 'plates';
 
 const MODE_DEFS: Array<{ m: HubMode; label: string; icon: string; desc: string }> = [
   { m: 'volume', label: 'Объём', icon: '📐', desc: 'MEV/MAV/MRV, оптимизация, SFR, прогрессия' },
   { m: 'tonnage', label: 'Тоннаж', icon: '⚖️', desc: 'Тоннаж/КПШ/УОИ, зоны интенсивности' },
-  { m: 'splits', label: 'Сплиты', icon: '🧩', desc: '9 сплитов, календарь, сравнение, объём' },
+  { m: 'plates', label: 'Блины', icon: '🥞', desc: 'Грифы 8 типов, блины, %1RM, разминка' },
 ];
 
 export const VolumeHub: React.FC<{ initialMode?: HubMode }> = ({ initialMode }) => {
@@ -25,10 +25,10 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode }> = ({ initialMode }) 
     <div style={{ padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>📐 Объём — единый хаб</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        Без дублей: <b style={{ color: '#fff' }}>объём</b> (MEV/MAV/MRV) + <b style={{ color: '#fff' }}>тоннаж</b> (КПШ/УОИ) + <b style={{ color: '#fff' }}>сплиты</b> (9 типов) — в одном месте. Ранее объём считался в 3 местах (Volume/Tonnage/SplitGen) с разными формулами — теперь единый расчёт. Источники: Israetel MEV/MAV/MRV, Helms 2019, Schoenfeld 2017, Prilepin 1974 (КПШ) — без выдумок.
+        Без дублей: <b style={{ color: '#fff' }}>объём</b> (MEV/MAV/MRV) + <b style={{ color: '#fff' }}>тоннаж</b> (КПШ/УОИ) + <b style={{ color: '#fff' }}>блины</b> (гриф/блины/1RM) — в одном месте. Ранее объём считался в 3 местах (Volume/Tonnage/SplitGen) с разными формулами — теперь единый расчёт. Источники: Israetel MEV/MAV/MRV, Helms 2019, Schoenfeld 2017, Prilepin 1974 (КПШ) — без выдумок.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
-        <b style={{ color: '#fff' }}>Как читать:</b> «Объём» — по мышцам (сеты vs MEV/MAV/MRV, % от MRV, частота). «Тоннаж» — вес×репы×сеты + КПШ (подъёмы) + УОИ (ср.вес/1RM) + зоны &lt;60/60-80/&gt;80%. «Сплиты» — календарь недели + объём по группам + сравнение A−B.
+        <b style={{ color: '#fff' }}>Как читать:</b> «Объём» — по мышцам (сеты vs MEV/MAV/MRV, % от MRV, частота). «Тоннаж» — вес×репы×сеты + КПШ (подъёмы) + УОИ (ср.вес/1RM) + зоны &lt;60/60-80/&gt;80%. «Блины» — подбор блинов под гриф/вес, 1RM-% пресеты, SVG.
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
@@ -50,7 +50,7 @@ export const VolumeHub: React.FC<{ initialMode?: HubMode }> = ({ initialMode }) 
 
       {mode === 'volume' && <VolumeOptimizerTab />}
       {mode === 'tonnage' && <TonnageCalcTab />}
-      {mode === 'splits' && <SplitGenCard />}
+      {mode === 'plates' && <PlateCalcTab />}
     </div>
   );
 };

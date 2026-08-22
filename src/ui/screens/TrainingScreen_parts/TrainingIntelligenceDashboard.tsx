@@ -61,15 +61,15 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '🛠', label: 'Инструменты сборки', color: '#22c55e',
       tools: [
-        { icon: '📐', label: 'Объём-хаб', desc: 'Единый: MEV/MAV/MRV + тоннаж/КПШ + 9 сплитов', tab: 'volume_hub' as any },
+        { icon: '📐', label: 'Объём-хаб', desc: 'Единый: MEV/MAV/MRV + тоннаж/КПШ + блины', tab: 'volume_hub' as any },
         { icon: '🏋️', label: 'Лаборатория упражнений', desc: 'Каталог, биомеханика, подбор по группе', tab: 'exercise_lab' },
-        { icon: '🛠', label: 'Инструменты', desc: 'Единый хаб: PRI/паттерн + блины + основа ББ (5 пилларов)', tab: 'tools_hub' as any },
+        { icon: '🧠', label: 'PRI / схема повторов', desc: 'PRI готовность → объём/RIR + схема повторов', tab: 'tools_hub' as any },
       ],
     },
     {
       icon: '⚕', label: 'Периодизация', color: '#f59e0b',
       tools: [
-        { icon: '🔄', label: 'Периодизация + Тейпер', desc: 'Единый хаб: дизайнер/прогрессия/трекер/микро/делод + тейпер/пик (ПЛ/ББ циклы, возраст, пол) — аналог Объём-хаба', tab: 'periodization_taper_hub' as any },
+        { icon: '🔄', label: 'Периодизация и тапер', desc: 'Единый: дизайнер/прогрессия/трекер/микро/делод + тейпер/пик + сплиты', tab: 'periodization_taper_hub' as any },
       ],
     },
     {

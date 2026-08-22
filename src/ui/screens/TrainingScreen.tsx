@@ -31,11 +31,6 @@ import { ProgramManagerPanelWithProvider as ProgramManagerPanel } from './Traini
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
 import { TrainingSafetyHub } from './TrainingScreen_parts/TrainingSafetyHub';
-import { SplitGenCard } from './TrainingScreen_parts/SplitGenCard';
-import { PriRepPatternCard } from './TrainingScreen_parts/PriRepPatternCard';
-import { TrainingMixTab } from './TrainingScreen_parts/TrainingMixTab';
-import { MixPresetsCard } from './TrainingScreen_parts/MixPresetsCard';
-import { BBFoundationCard } from './TrainingScreen_parts/BBFoundationCard';
 import { QualityDiagnosticsHub } from './TrainingScreen_parts/QualityDiagnosticsHub';
 import { VolumeHub } from './TrainingScreen_parts/VolumeHub';
 import { JointMasterCard } from './TrainingScreen_parts/JointMasterCard';
@@ -678,15 +673,15 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
         const CALC_TABS = new Set(['strength_analysis','load_safety','quality_joint_hub','periodization_taper_hub','exercise_lab','volume_hub','tools_hub','rir_forecast_hub','mix_hub']);
-        // алиасы депрекейтнутых дублей → единые хабы (9 хабов — аналоги VolumeHub, без дублей формул)
+        // алиасы депрекейтнутых дублей → единые хабы (аналоги VolumeHub, без дублей формул)
         const effectiveTab = tab === 'load_management' ? 'load_safety' as const
           : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_joint_hub' as const
           : tab === 'quality_diagnostics' || tab === 'joint_health' ? 'quality_joint_hub' as const
-          : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' || tab === 'calc_mrv' ? 'volume_hub' as const
-          : tab === 'periodization_hub' || tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'periodization_taper_hub' as const
+          : tab === 'volume' || tab === 'tonnage' || tab === 'calc_plates' || tab === 'calc_mrv' ? 'volume_hub' as const
+          : tab === 'periodization_hub' || tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' || tab === 'split_gen' ? 'periodization_taper_hub' as const
           : tab === 'training_mix_hub' || tab === 'mix_presets' ? 'mix_hub' as const
           : tab === 'rir_calibration' || tab === 'readiness_forecast' ? 'rir_forecast_hub' as const
-          : tab === 'pri_reppat' || tab === 'calc_plates' || tab === 'bb_foundation' ? 'tools_hub' as const
+          : tab === 'pri_reppat' ? 'tools_hub' as const
           : tab === 'calc_1rm' || tab === 'calc_vbt' || tab === 'rel_strength' || tab === 'pl_norms' || tab === 'strength' || tab === 'calc_fatigue' ? 'strength_analysis' as const
           : tab;
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
@@ -698,10 +693,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'relstr' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
             {effectiveTab === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {effectiveTab === 'quality_joint_hub' && <InfoErrorBoundary label="Качество + Суставы — единый хаб"><QualityJointHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} onBuildPlan={() => goPlannerManual()} initialMode={tab === 'joint_health' ? 'joints' : 'quality'} /></InfoErrorBoundary>}
-            {effectiveTab === 'periodization_taper_hub' && <InfoErrorBoundary label="Периодизация + Тейпер"><PeriodizationHub initialMode={tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'taper' : 'designer'} /></InfoErrorBoundary>}
+            {effectiveTab === 'periodization_taper_hub' && <InfoErrorBoundary label="Периодизация и тапер"><PeriodizationHub initialMode={tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'taper' : tab === 'split_gen' ? 'splits' : 'designer'} /></InfoErrorBoundary>}
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
-            {effectiveTab === 'volume_hub' && <InfoErrorBoundary label="Объём-хаб"><VolumeHub initialMode={tab === 'tonnage' ? 'tonnage' : tab === 'split_gen' ? 'splits' : 'volume'} /></InfoErrorBoundary>}
-            {effectiveTab === 'tools_hub' && <InfoErrorBoundary label="Инструменты — единый хаб"><ToolsHub initialMode={tab === 'calc_plates' ? 'plates' : tab === 'bb_foundation' ? 'foundation' : 'pri'} /></InfoErrorBoundary>}
+            {effectiveTab === 'volume_hub' && <InfoErrorBoundary label="Объём-хаб"><VolumeHub initialMode={tab === 'tonnage' ? 'tonnage' : tab === 'calc_plates' ? 'plates' : 'volume'} /></InfoErrorBoundary>}
+            {effectiveTab === 'tools_hub' && <InfoErrorBoundary label="PRI/схема повторов"><ToolsHub /></InfoErrorBoundary>}
             {effectiveTab === 'rir_forecast_hub' && <InfoErrorBoundary label="RIR + Прогноз — единый хаб"><RirForecastHub initialMode={tab === 'readiness_forecast' ? 'forecast' : 'rir'} /></InfoErrorBoundary>}
             {effectiveTab === 'mix_hub' && <InfoErrorBoundary label="Миксы — единый хаб"><MixHub initialMode={tab === 'mix_presets' ? 'health' : 'training'} /></InfoErrorBoundary>}
           </>);

@@ -118,7 +118,6 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 (TAB_TO_ZONE as Record<string, TrainingZone>)['rir_forecast_hub'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['pri_reppat'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['calc_plates'] = 'calculators';
-(TAB_TO_ZONE as Record<string, TrainingZone>)['bb_foundation'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['tools_hub'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['quality_diagnostics'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['joint_health'] = 'calculators';
