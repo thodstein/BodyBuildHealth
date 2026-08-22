@@ -1606,8 +1606,11 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
             {searchQuery.trim() &&
               builtInDiaries.filter((d) => DIARY_META[d.key].title.toLowerCase().includes(searchQuery.toLowerCase()))
                 .length === 0 && (
-                <div style={{ color: colors.textMuted, fontSize: 12, padding: 12, textAlign: 'center' }}>
-                  Дневников по запросу «{searchQuery}» не найдено.
+                <div style={{ marginTop: 12, padding: 20, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>🔍</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: colors.text }}>Ничего не найдено</div>
+                  <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>По запросу «{searchQuery}» дневников нет</div>
+                  <button onClick={() => setSearchQuery('')} style={{ marginTop: 10, padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', border: `1px solid ${colors.border}`, color: colors.text, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>Сбросить поиск</button>
                 </div>
               )}
           </AccordionSection>

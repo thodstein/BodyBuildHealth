@@ -480,8 +480,13 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <input style={{ ...input, width: 180 }} placeholder="🔍 Поиск" value={query}
-            onChange={e => { setQuery(e.target.value); setPage(1); }} />
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <input style={{ ...input, width: 180, paddingRight: query ? 30 : undefined }} placeholder="🔍 Поиск" value={query}
+              onChange={e => { setQuery(e.target.value); setPage(1); }} />
+            {query && (
+              <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: colors.textMuted, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+            )}
+          </div>
           <button style={chip(ACCENT)} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>↕ Дата</button>
           {(['journal', 'stats', 'analysis'] as const).map(t => (
             <button key={t} style={tab === t ? chipActive(ACCENT) : chip(ACCENT)} onClick={() => setTab(t)}>

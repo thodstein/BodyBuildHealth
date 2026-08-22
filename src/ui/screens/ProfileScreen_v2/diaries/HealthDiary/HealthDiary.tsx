@@ -1336,15 +1336,20 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 {r === 'all' ? 'Всё время' : `${r} дней`}
               </button>
             ))}
-            <input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(1);
-              }}
-              placeholder="🔍 Поиск по дате/показателю"
-              style={{ ...input, flex: 1, minWidth: 180 }}
-            />
+            <div style={{ position: 'relative', flex: 1, minWidth: 180, display: 'flex', alignItems: 'center' }}>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="🔍 Поиск по дате/показателю"
+                style={{ ...input, flex: 1, paddingRight: query ? 30 : undefined }}
+              />
+              {query && (
+                <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: colors.textMuted, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+              )}
+            </div>
             <button style={chip(ACCENT)} onClick={() => setSort({ key: 'date', dir: sort.dir === 'asc' ? 'desc' : 'asc' })}>
               ↕ Дата
             </button>

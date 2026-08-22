@@ -968,13 +968,18 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
               </button>
             ))}
           </div>
-          <input
-            style={{ ...input, flex: '1 1 140px', minWidth: 120 }}
-            placeholder="Поиск"
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            aria-label="Поиск по дате и полям"
-          />
+          <div style={{ position: 'relative', flex: '1 1 140px', minWidth: 120, display: 'flex', alignItems: 'center' }}>
+            <input
+              style={{ ...input, flex: 1, paddingRight: query ? 30 : undefined }}
+              placeholder="Поиск"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              aria-label="Поиск по дате и полям"
+            />
+            {query && (
+              <button onClick={() => { setQuery(''); setPage(1); }} aria-label="Очистить поиск" style={{ position: 'absolute', right: 6, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6, color: c.text3, cursor: 'pointer', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>✕</button>
+            )}
+          </div>
           <div style={segWrap} role="radiogroup" aria-label="Единицы измерения">
             {(['kg', 'lbs'] as const).map((u) => (
               <button
