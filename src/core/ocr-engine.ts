@@ -391,12 +391,17 @@ async function serverOcrImage(file: File): Promise<string> {
   for (let i = 0; i < bytes.length; i += chunk) {
     binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
   }
-  const origin = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null'
-    ? window.location.origin
+  const appBase = typeof document !== 'undefined' && document.baseURI
+    ? document.baseURI
     : '';
+  const resolveEndpoint = (path: string): string => {
+    // In Telegram WebView window.location.origin can belong to Telegram,
+    // while document.baseURI still points to the deployed Mini App.
+    try { return appBase ? new URL(path, appBase).toString() : path; } catch { return path; }
+  };
   const endpoints = [
-    origin ? `${origin}/api/ocr-scanned-pdf` : './api/ocr-scanned-pdf',
-    origin ? `${origin}/api/ocr-image` : './api/ocr-image',
+    resolveEndpoint('./api/ocr-scanned-pdf'),
+    resolveEndpoint('./api/ocr-image'),
   ];
   const errors: string[] = [];
 
