@@ -120,7 +120,7 @@ export function saveWeightLog(log: WeightEntry[]) {
     console.warn(`[profile-store] weight log size ${(estimatedSize / 1024 / 1024).toFixed(1)}MB — removing old photos`);
     // Автоочистка фото: убираем фото из СТАРЫХ записей (кроме 30 новейших),
     // пока размер не войдёт в лимит 4MB. Фото освобождают место быстрее всего.
-    const newest30 = new Set(trimmed.slice(0, 30).map((e) => e.date));
+    const newest30 = new Set(trimmed.slice(-30).map((e) => e.date));
     const stripped = trimmed.map((e) => {
       if (newest30.has(e.date) || !e.photos || e.photos.length === 0) return e;
       return { ...e, photos: undefined };

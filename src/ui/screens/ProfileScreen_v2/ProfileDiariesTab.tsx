@@ -857,11 +857,11 @@ export const ProfileDiariesTab: React.FC<{
       if (eveningPulse) overview.push({ label: 'ЧСС вечер', value: `${eveningPulse.hr ?? eveningPulse.pulse} уд/мин`, color: '#f472b6' });
     }
     if (weights.length) {
-      const e = weights[weights.length - 1];
+      const e = [...weights].sort((a, b) => b.date.localeCompare(a.date))[0];
       if (e.date === today) overview.push({ label: 'Вес', value: `${e.weight} кг`, color: '#22c55e' });
     }
     if (painEntries.length) {
-      const e = painEntries[painEntries.length - 1];
+      const e = [...painEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
       if (e.date === today)
         overview.push({
           label: 'Суставы Σ',
@@ -870,7 +870,7 @@ export const ProfileDiariesTab: React.FC<{
         });
     }
     if (neuroEntries.length) {
-      const e = neuroEntries[neuroEntries.length - 1];
+      const e = [...neuroEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
       if (e.date === today)
         overview.push({
           label: 'Нейро',
@@ -879,7 +879,7 @@ export const ProfileDiariesTab: React.FC<{
         });
     }
     if (acneEntries.length) {
-      const e = acneEntries[acneEntries.length - 1];
+      const e = [...acneEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
       if (e.date === today)
         overview.push({
           label: 'Акне Σ',
@@ -888,7 +888,7 @@ export const ProfileDiariesTab: React.FC<{
         });
     }
     if (hematoEntries.length) {
-      const e = hematoEntries[hematoEntries.length - 1];
+      const e = [...hematoEntries].sort((a, b) => b.date.localeCompare(a.date))[0];
       if (e.date === today)
         overview.push({ label: 'Гемат', value: `${e.totalScore}/8`, color: e.totalScore >= 2 ? '#ef4444' : '#22c55e' });
     }
@@ -905,9 +905,11 @@ export const ProfileDiariesTab: React.FC<{
     {
       key: 'bp',
       count: bpEntries.length,
-      last: bpEntries.length
-        ? `${bpEntries[bpEntries.length - 1].systolic}/${bpEntries[bpEntries.length - 1].diastolic}`
-        : '',
+      last: (() => {
+        if (!bpEntries.length) return '';
+        const latest = [...bpEntries].sort((a, b) => (b.timestamp ?? new Date(b.date).getTime()) - (a.timestamp ?? new Date(a.date).getTime()))[0];
+        return `${latest.systolic}/${latest.diastolic}`;
+      })(),
     },
     { key: 'weight', count: weights.length, last: lastDate(weights) },
     { key: 'injection', count: injectionEntries.length, last: lastDate(injectionEntries) },
@@ -1046,6 +1048,16 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
           saveWeightLog(diaries[WEIGHT_LOG_KEY]);
           setWeights(diaries[WEIGHT_LOG_KEY]);
         }
+        if (diaries['he_cardio_sessions'] && Array.isArray(diaries['he_cardio_sessions'])) {
+          try { localStorage.setItem('he_cardio_sessions', JSON.stringify(diaries['he_cardio_sessions'].slice(0, 500))); } catch {}
+          setCardioLog(diaries['he_cardio_sessions']);
+        }
+        if (diaries['he_injection_schedule'] && Array.isArray(diaries['he_injection_schedule'])) {
+          try { localStorage.setItem('he_injection_schedule', JSON.stringify(diaries['he_injection_schedule'])); } catch {}
+        }
+        if (diaries['he_sleep_goals'] && typeof diaries['he_sleep_goals'] === 'object') {
+          try { localStorage.setItem('he_sleep_goals', JSON.stringify(diaries['he_sleep_goals'])); } catch {}
+        }
         if (data.goals && typeof data.goals === 'object') {
           setGoals({ ...goals, ...data.goals });
           localStorage.setItem(GOALS_KEY, JSON.stringify({ ...goals, ...data.goals }));
@@ -1082,7 +1094,7 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
               return {
                 key: d.key,
                 hasEntry: arr.length > 0,
-                lastDate: arr.length > 0 ? arr[arr.length - 1].date : undefined,
+                lastDate: arr.length > 0 ? latestDiaryDate(arr) : undefined,
               };
             });
             const completion = dailyCompletion(completionKeys);

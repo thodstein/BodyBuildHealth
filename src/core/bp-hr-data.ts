@@ -180,7 +180,8 @@ export function getBpEntries(): BPEntry[] {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     if (!Array.isArray(raw)) return [];
-    return raw.map(normalizeBpEntry).filter(e => Number.isFinite(e.systolic) && Number.isFinite(e.diastolic) && Number.isFinite(e.hr));
+    const list = raw.map(normalizeBpEntry).filter(e => Number.isFinite(e.systolic) && Number.isFinite(e.diastolic) && Number.isFinite(e.hr));
+    return sortEntriesByTimestamp(list);
   } catch { return []; }
 }
 

@@ -12,6 +12,7 @@ import { DiaryHeader } from '../DiaryHeader';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
   cardioLogStats, cardioWeekAdherence, estimateCardioEntryKcal, cardioPaceMinPerKm,
+  validateCardioLogFields, cardioHrCompliance,
   type CardioLogEntry,
 } from '../../../../../engines/lms/cardio-diary.engine';
 import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDayForDate, CARDIO_PHASE_LABELS, type CardioType } from '../../../../../engines/lms/cardio.engine';
@@ -50,6 +51,9 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [undo, setUndo] = useState<CardioLogEntry[] | null>(null);
+  const [range, setRange] = useState<'all' | '7' | '30' | '90'>('all');
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -102,7 +106,40 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   }, [activeCycle, log]);
   const todayLegDay = useMemo(() => (activeCycle ? cardioLegDayForDate(activeCycle, todayIso()) : null), [activeCycle]);
 
+  const warnings = useMemo(() => validateCardioLogFields({ rpe, hr, km, minutes }), [rpe, hr, km, minutes]);
+
+  // Фильтр по периоду/поиску + пагинация (консистентно с остальными дневниками)
+  const filteredLog = useMemo(() => {
+    let out = log;
+    if (range !== 'all') {
+      const days = Number(range);
+      const cutoff = new Date();
+      cutoff.setHours(0, 0, 0, 0);
+      cutoff.setDate(cutoff.getDate() - (days - 1));
+      const cutoffIso = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
+      out = out.filter(e => e.date >= cutoffIso);
+    }
+    const q = query.trim().toLowerCase();
+    if (q) out = out.filter(e => e.date.includes(q) || e.type.toLowerCase().includes(q) || String(e.notes ?? '').toLowerCase().includes(q));
+    return out;
+  }, [log, range, query]);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredLog.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageItems = filteredLog.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const hrCompliance = useMemo(() => {
+    if (!activeCycle) return null;
+    try { return cardioHrCompliance(activeCycle, log, { days: 28 }); } catch { return null; }
+  }, [activeCycle, log]);
+
   const add = () => {
+    const w = validateCardioLogFields({ rpe, hr, km, minutes });
+    if (Object.keys(w).length) {
+      const msg = Object.values(w).join(' · ');
+      flashMsg(`⚠ ${msg}`);
+      // не блокируем — сохраняем клампнутые значения, но подсвечиваем проблему
+    }
     const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
     let weight: number | null = null;
     try {
@@ -247,6 +284,13 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           </div>
         </div>
       )}
+      {hrCompliance && hrCompliance.checks.length > 0 && hrCompliance.advice && (
+        <div style={{ ...glassCard, padding: 12, marginBottom: 12, borderColor: 'rgba(74,222,128,0.35)' }}>
+          <div style={{ ...labelStyle, marginBottom: 6 }}>🎯 Пульс по факту (28д, n={hrCompliance.checks.length}, в зоне {hrCompliance.inZonePct}%)</div>
+          <div style={{ fontSize: 12, color: colors.textMuted }}>{hrCompliance.advice}</div>
+          <div style={{ fontSize: 11, color: colors.textMuted, marginTop: 6 }}>Среднее отклонение: {hrCompliance.avgDelta != null ? `${hrCompliance.avgDelta > 0 ? '+' : ''}${hrCompliance.avgDelta} уд` : '—'}</div>
+        </div>
+      )}
 
       {/* Статистика */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
@@ -290,30 +334,47 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           </div>
           <label style={{ display: 'block' }}>
             <span style={labelStyle}>Минуты</span>
-            <input value={minutes} onChange={e => setMinutes(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70 }} aria-label="Минуты сессии" />
+            <input value={minutes} onChange={e => setMinutes(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70, borderColor: warnings.minutes ? '#f87171' : undefined }} aria-label="Минуты сессии" />
           </label>
           <label style={{ display: 'block' }}>
             <span style={labelStyle}>ЧСС ср.</span>
-            <input value={hr} onChange={e => setHr(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70 }} aria-label="ЧСС сессии" />
+            <input value={hr} onChange={e => setHr(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70, borderColor: warnings.hr ? '#f87171' : undefined }} aria-label="ЧСС сессии" />
           </label>
           <label style={{ display: 'block' }}>
             <span style={labelStyle}>RPE 1-10</span>
-            <input value={rpe} onChange={e => setRpe(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70 }} aria-label="RPE сессии" />
+            <input value={rpe} onChange={e => setRpe(e.target.value)} inputMode="numeric" style={{ ...inputStyle, width: 70, borderColor: warnings.rpe ? '#f87171' : undefined }} aria-label="RPE сессии" />
           </label>
           <label style={{ display: 'block' }}>
             <span style={labelStyle}>км</span>
-            <input value={km} onChange={e => setKm(e.target.value)} inputMode="decimal" style={{ ...inputStyle, width: 70 }} aria-label="Км сессии" title="Дистанция (для бега/езды)" />
+            <input value={km} onChange={e => setKm(e.target.value)} inputMode="decimal" style={{ ...inputStyle, width: 70, borderColor: warnings.km ? '#f87171' : undefined }} aria-label="Км сессии" title="Дистанция (для бега/езды)" />
           </label>
           <button style={btnPrimary(ACCENT)} onClick={add}>{editingId ? '💾 Обновить' : '💾 Записать'}</button>
         </div>
+        {Object.keys(warnings).length > 0 && (
+          <div role="alert" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.35)', color: '#fca5a5', fontSize: 12 }}>
+            {Object.entries(warnings).map(([k, v]) => <div key={k}>⚠ {v}</div>)}
+          </div>
+        )}
+        {todayLegDay?.isLegDay && (
+          <div role="status" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: '#fcd34d', fontSize: 12 }}>
+            🦵 Сегодня день тяжёлых ног — интенсивное кардио лучше перенести (recovery — можно)
+          </div>
+        )}
       </div>
 
-      {/* Журнал */}
+      {/* Журнал — фильтры как в остальных дневниках */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+        {(['all', '7', '30', '90'] as const).map(r => (
+          <button key={r} style={range === r ? chipActive(ACCENT) : chip(ACCENT)} onClick={() => { setRange(r); setPage(1); }}>{r === 'all' ? 'Всё' : `${r}д`}</button>
+        ))}
+        <div style={{ flex: 1 }} />
+        <input style={{ ...inputStyle, width: 180 }} placeholder="🔍 Поиск" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
+      </div>
       <div style={{ ...glassCard, padding: 14 }}>
-        <div style={sectionTitle}>📓 Журнал ({log.length})</div>
-        {log.length === 0 && <div style={{ fontSize: 13, color: colors.textMuted }}>Пока пусто — запишите первую кардио-сессию.</div>}
+        <div style={sectionTitle}>📓 Журнал ({filteredLog.length}/{log.length})</div>
+        {filteredLog.length === 0 && <div style={{ fontSize: 13, color: colors.textMuted }}>{log.length === 0 ? 'Пока пусто — запишите первую кардио-сессию.' : 'Нет записей по фильтру.'}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {log.slice(0, 40).map(e => {
+          {pageItems.map(e => {
             const t = TYPES.find(x => x.id === e.type);
             return (
               <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -349,7 +410,13 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
             );
           })}
         </div>
-        {log.length > 40 && <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 8 }}>Показаны последние 40 записей.</div>}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', marginTop: 10 }}>
+            <button style={btnBase(ACCENT)} disabled={safePage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>←</button>
+            <span style={{ fontSize: 12, color: colors.textMuted }}>{safePage} / {totalPages} · {filteredLog.length} зап.</span>
+            <button style={btnBase(ACCENT)} disabled={safePage >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>→</button>
+          </div>
+        )}
       </div>
     </div>
   );

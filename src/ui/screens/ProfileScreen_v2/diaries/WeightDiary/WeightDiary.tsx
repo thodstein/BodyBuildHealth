@@ -591,29 +591,33 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const streak = computeStreak(entries);
   const body = useMemo(() => {
     const latest = rows[0];
-    const first = rows.at(-1);
     if (!latest) return null;
+    // Δ за период и 30/90 дней — консистентно с трендом: когда есть достаточно утренних замеров,
+    // используем утренние (меньше шум), иначе — все.
+    const baseRows = trendNormalized ? trendRows : rows;
+    const first = baseRows.at(-1) ?? rows.at(-1);
+    const baseLatest = baseRows[0] ?? latest;
     const daysAgo = (n: number) => {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - n);
       const iso = cutoff.toISOString().split('T')[0];
-      const hit = rows.find(r => r.date <= iso);
-      return hit ? latest.weight - hit.weight : null;
+      const hit = baseRows.find(r => r.date <= iso);
+      return hit ? baseLatest.weight - hit.weight : null;
     };
     return {
       latest,
       bmi: profileHeight && profileHeight > 0 && latest.weight > 0 ? latest.weight / ((profileHeight / 100) ** 2) : null,
-      weightDelta: first ? latest.weight - first.weight : 0,
+      weightDelta: first ? baseLatest.weight - first.weight : 0,
       delta30: daysAgo(30),
       delta90: daysAgo(90),
-      fatDelta: latest.bodyFat !== undefined && first?.bodyFat !== undefined ? latest.bodyFat - first.bodyFat : null,
+      fatDelta: baseLatest.bodyFat !== undefined && first?.bodyFat !== undefined ? baseLatest.bodyFat - first.bodyFat : null,
       leanDelta:
-        latest.muscleMass !== undefined && first?.muscleMass !== undefined
-          ? latest.muscleMass - first.muscleMass
+        baseLatest.muscleMass !== undefined && first?.muscleMass !== undefined
+          ? baseLatest.muscleMass - first.muscleMass
           : null,
-      waistDelta: latest.waistCm !== undefined && first?.waistCm !== undefined ? latest.waistCm - first.waistCm : null,
+      waistDelta: baseLatest.waistCm !== undefined && first?.waistCm !== undefined ? baseLatest.waistCm - first.waistCm : null,
     };
-  }, [rows, profileHeight]);
+  }, [rows, trendRows, trendNormalized, profileHeight]);
 
   const weekSummaries = useMemo(() => weeklySummaries(rows.map((r) => ({ date: r.date, weight: r.weight })), 12), [rows]);
   const monthSummaries = useMemo(() => monthlySummaries(rows.map((r) => ({ date: r.date, weight: r.weight })), 6), [rows]);

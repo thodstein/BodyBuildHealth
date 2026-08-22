@@ -708,31 +708,9 @@ export const computePace = (
   };
 };
 
-// ─── Streak (серия дней подряд) ──────────────────────────────────────
-
-export const currentStreak = (
-  entries: { date: string }[]
-): number => {
-  if (entries.length === 0) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = new Set(entries.map(e => e.date));
-  let streak = 0;
-  const cursor = new Date(today);
-  while (days.has(localDateKey(cursor))) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-  // Если сегодня нет, проверяем вчера (если вчера есть, сегодня просто пропустили)
-  if (streak === 0) {
-    cursor.setDate(today.getDate() - 1);
-    while (days.has(localDateKey(cursor))) {
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    }
-  }
-  return streak;
-};
+// ─── Streak (серия дней подряд) — алиас для обратной совместимости ──────
+/** @deprecated используйте computeStreak(entries).current — единая реализация */
+export const currentStreak = (entries: { date: string }[]): number => computeStreak(entries).current;
 
 // ─── Статистика распределения ──────────────────────────────────────────────
 
@@ -1315,3 +1293,6 @@ export const exportAllDiariesPdf = (diaries: DiaryExportData[], filename = 'diar
   w.focus();
   setTimeout(() => w.print(), 100);
 };
+
+export const escapeHtml = (v: unknown): string =>
+  String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);

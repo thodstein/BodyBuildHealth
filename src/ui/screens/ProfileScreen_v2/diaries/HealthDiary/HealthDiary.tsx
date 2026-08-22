@@ -322,20 +322,25 @@ const EntryEditor: React.FC<{
   const [symptomName, setSymptomName] = useState('');
   const [symptomSeverity, setSymptomSeverity] = useState<1 | 2 | 3 | 4 | 5>(2);
   const [symptomDuration, setSymptomDuration] = useState('');
-  // Черновик редактирования (переживает случайное закрытие)
+  // Черновик редактирования (переживает случайное закрытие) — ключ привязан к дате записи,
+  // чтобы черновик одной даты не перетекал в другую.
+  const editDraftKey = `${EDIT_DRAFT_KEY}:${entry?.date ?? 'new'}`;
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(EDIT_DRAFT_KEY);
+      const raw = sessionStorage.getItem(editDraftKey);
       if (!raw) return;
       const d = JSON.parse(raw) as EntryDraft;
-      if (d && typeof d.date === 'string') setDraft(d);
+      if (!d || typeof d.date !== 'string') return;
+      // восстанавливаем только если даты совпадают — защита от leak между датами
+      if (d.date !== (entry?.date ?? d.date)) return;
+      setDraft(d);
     } catch {}
-  }, []);
+  }, [editDraftKey]);
   useEffect(() => {
-    try { sessionStorage.setItem(EDIT_DRAFT_KEY, JSON.stringify(draft)); } catch {}
-  }, [draft]);
+    try { sessionStorage.setItem(editDraftKey, JSON.stringify(draft)); } catch {}
+  }, [draft, editDraftKey]);
   const clearEditDraft = () => {
-    try { sessionStorage.removeItem(EDIT_DRAFT_KEY); } catch {}
+    try { sessionStorage.removeItem(editDraftKey); } catch {}
   };
   const painZones = draft.pain?.zones || {};
   const neuroValues = draft.neuro?.symptoms || {};
