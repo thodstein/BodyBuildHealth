@@ -63,7 +63,7 @@ export function derivePattern(ex: any): string {
     return 'core';
   }
 
-  if (/присед|квад|разгибани|выпрям.*ног| squat/i.test(hay)) return 'squat';
+  if (/присед|квад|разгибани.*(ног|квад|бедр|leg)|выпрям.*ног| squat/i.test(hay)) return 'squat';
   if (/шраг/.test(nm)) return 'isolation_back';
   // Горизонтальные тяги (штанга в наклоне, т-гриф, гантель в наклоне, горизонтальный блок) — ДО общего regex "тяга"
   if (/ тяга .*наклон|тяга .*т-?гриф|тяга .*гантел|тяга .*штанги| тяга .*блок .*горизонт| тяга горизонтальн|seated.?row| тяга блока/.test(hay) || /^row[ _]/.test(nm)) return 'horizontal_pull';

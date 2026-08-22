@@ -141,6 +141,22 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
   };
 }
 
+/** Очистить текст инструкции от «мусора» пунктуации: двойные точки/точка-пробел-точка,
+ *  «!./?», лишние пробелы и хвостовые разделители, остающиеся при склейке cue-строк
+ *  и отдельных частей комментария. Возвращает одну чистую фразу. */
+export function cleanInstructionsText(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/\.\s+\./g, '. ')      // ". ." → ". " (двойной период с пробелом)
+    .replace(/\.{2,}/g, '.')        // "..", "..." → "."
+    .replace(/([!?])\./g, '$1')     // "!." → "!", "?." → "?"
+    .replace(/,\s*,/g, ',')         // ", ," → ","
+    .replace(/\s{2,}/g, ' ')        // схлопнуть лишние пробелы
+    .replace(/\s+([.,!?])/g, '$1')  // убрать пробел перед знаком препинания
+    .replace(/[.,!?\s]+$/g, '')     // убрать хвостовые разделители
+    .trim();
+}
+
 export function formatExerciseInstructions(input: ExerciseInstructionInput): string {
   const p = buildExerciseInstructions(input);
   const parts = [`Паттерн: ${p.pattern}`, `Порядок: ${p.order}`];
@@ -152,5 +168,5 @@ export function formatExerciseInstructions(input: ExerciseInstructionInput): str
   if (p.intensityTechnique) parts.push(`Техника интенсивности: ${p.intensityTechnique}`);
   parts.push(`Прогрессия: ${p.progression}`);
   if (p.mistakes.length) parts.push(`Ошибки: ${p.mistakes.slice(0, 3).join('; ')}`);
-  return parts.join('. ') + '.';
+  return cleanInstructionsText(parts.join('. '));
 }

@@ -1666,7 +1666,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       // (builder-путь, до normalize) — finalize не дублирует свою добивку.
       const weekHasBuilderFeeder = week.sessions.some(s => s.exercises.some(e => e.muscle === muscle && /MEV coverage/.test(e.rationale || '')));
       if (weekHasBuilderFeeder) continue;
-      const session = week.sessions.find(item => item.exercises.some(exercise => (trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any) || exercise.muscle) === muscle));
+      const session = week.sessions.find(item => item.exercises.some(exercise => (trueMuscleOf({ name: exercise.name, muscle: exercise.muscle, type: (exercise as any).exerciseType } as any) || exercise.muscle) === muscle));
       if (!session || session.exercises.length >= 10) continue;
       // Feeder volume is capped by MEV deficit, not full target deficit,
       // to avoid overloading the session with isolation feeders.
@@ -2773,7 +2773,7 @@ for (const week of next.weeks) {
   for (const week of next.weeks) for (const session of week.sessions) for (const ex of session.exercises) {
     if (!(ex as any).executionProfile) {
       try {
-        (ex as any).executionProfile = buildExerciseInstructions({ exerciseName: ex.name, exerciseId: (ex as any).exerciseName, muscle: ex.muscle, role: ex.role, level: options.level, trainingFocus: (options as any).trainingFocus as any, tempo: (ex as any).tempoSpec, restSeconds: ex.restSeconds } as any);
+        (ex as any).executionProfile = buildExerciseInstructions({ exerciseName: ex.name, muscle: ex.muscle, role: ex.role, level: options.level, trainingFocus: (options as any).trainingFocus as any, tempo: (ex as any).tempoSpec, restSeconds: ex.restSeconds } as any);
       } catch {}
     }
     if (!ex.comment || ex.comment.trim().length < 10) {

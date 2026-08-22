@@ -24,7 +24,7 @@ import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR } from './bb-progression-feedback.engine';
 import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression, wasInPreviousMeso, type MesocycleProgression } from './bb-mesocycle-progression.engine';
-import { buildExerciseInstructions, formatExerciseInstructions } from './bb-exercise-instructions.engine';
+import { buildExerciseInstructions, formatExerciseInstructions, cleanInstructionsText } from './bb-exercise-instructions.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
@@ -948,18 +948,6 @@ function exerciseRiskWarning(name: string): string {
 }
 
 /** Построить тренерский комментарий к упражнению. */
-/** Форматирование темпа в понятные инструкции (2-0-X-0 -> "Опуск 2 сек..."). */
-function formatTempoUser(tempo: string): string {
-  if (!tempo || tempo === 'auto') return 'Контролируемый темп';
-  const parts = tempo.split('-').map(p => p.trim());
-  const desc = [];
-  if (parts[0]) desc.push(`Опуск ${parts[0]} сек`);
-  if (parts[1]) desc.push(`Низ ${parts[1]} сек`);
-  if (parts[2]) desc.push(`Вверх ${parts[2]}`);
-  if (parts[3]) desc.push(`Верх ${parts[3]}`);
-  return desc.join(', ');
-}
-
 function buildExComment(
   muscle: string, name: string, role: 'primary' | 'accessory',
   character: DayCharacter, sets: number, reps: number, weight: number, rir: number,
@@ -1000,9 +988,6 @@ function buildExComment(
     : EXECUTION_NOTES[name] || EXECUTION_NOTES[(name || '').toLowerCase()];
   if (execNote) parts.push(execNote);
   
-  // Понятный темп — с привязкой к фазе/характеру программы, не generic
-  parts.push(`Темп: ${formatTempoUser(tempo)} (${phase === 'accumulation' ? 'контроль растяжения' : phase === 'intensification' ? 'взрыв вверх' : 'восстановление'}). Отдых: ${restSec}с`);
-  
   const warn = exerciseRiskWarning(name);
   if (warn) parts.push(warn);
   parts.push(formatExerciseInstructions({
@@ -1015,7 +1000,7 @@ function buildExComment(
     tempo,
     restSeconds: restSec,
   }));
-  return parts.join('. ');
+  return cleanInstructionsText(parts.join('. '));
 }
 
 /** Разминочная пирамида для compound упражнений.
