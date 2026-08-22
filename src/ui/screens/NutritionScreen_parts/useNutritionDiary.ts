@@ -214,6 +214,27 @@ export function useNutritionDiary(options: UseNutritionDiaryOptions = {}): UseNu
 }
 
 // Helper hook for frequently used foods
+export function useRecentFoods(diary: DiaryData, topN: number = 10): DiaryMealItem[] {
+  return useMemo(() => {
+    const dates = Object.keys(diary).sort().reverse();
+    const seen = new Set<string>();
+    const out: DiaryMealItem[] = [];
+    for (const d of dates) {
+      const day = diary[d];
+      if (!day?.meals) continue;
+      // reverse meals to get most recent first within day
+      const meals = Object.values(day.meals).flat().reverse();
+      for (const it of meals) {
+        if (seen.has(it.name)) continue;
+        seen.add(it.name);
+        out.push(it);
+        if (out.length >= topN) return out;
+      }
+    }
+    return out;
+  }, [diary, topN]);
+}
+
 export function useFrequentFoods(diary: DiaryData, topN: number = 10): DiaryMealItem[] {
   return useMemo(() => {
     const counts = new Map<string, { item: DiaryMealItem; count: number }>();

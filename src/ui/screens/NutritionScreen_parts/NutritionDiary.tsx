@@ -11,6 +11,7 @@ import { readDiaryV2, writeDiaryV2, exportDiaryJSON, exportDiaryCSV, importDiary
 import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-quality.engine';
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
+import { useRecentFoods } from './useNutritionDiary';
 
 // Extracted components
 import { WeekDaySelector } from './diary/WeekDaySelector';
@@ -181,6 +182,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       return favs.map(id => FOOD_DB.find(f => f.id === id)).filter(Boolean) as typeof FOOD_DB; 
     } catch { return []; } 
   }, [refreshKey]);
+
+  const recentFoods = useRecentFoods(diaryData as any, 10);
 
   // Handlers
   const addFoodFromDB = useCallback((food: FoodItemLike) => {
@@ -552,6 +555,26 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           saveDiary(data);
           showToast(`⚡ ${food.name} → ${mealType}`);
         }} />
+        {recentFoods.length > 0 && (
+          <div style={{ padding:'10px 14px', borderRadius:14, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', marginTop:6 }}>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)', fontWeight:600, marginBottom:6 }}>🕒 Недавние (1-клик)</div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              {recentFoods.slice(0,8).map(f => (
+                <button key={f.name} onClick={() => {
+                  const data = { ...diaryData };
+                  if (!data[selectedDate]) data[selectedDate] = { meals: {} };
+                  const mt = mealType || 'Перекус';
+                  if (!data[selectedDate].meals[mt]) data[selectedDate].meals[mt] = [];
+                  data[selectedDate].meals[mt].push({ ...f });
+                  saveDiary(data);
+                  showToast(`🕒 ${f.name} → ${mt}`);
+                }} style={{ padding:'6px 10px', borderRadius:10, fontSize:10, cursor:'pointer', background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.2)', color:'#60a5fa', whiteSpace:'nowrap' }}>
+                  {f.name.length>14 ? f.name.slice(0,13)+'…' : f.name} · {Math.round(f.kcal)}ккал
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         </>
        )}
 
