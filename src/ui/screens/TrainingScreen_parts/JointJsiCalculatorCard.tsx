@@ -172,19 +172,19 @@ export const JointJsiCalculatorCard: React.FC = () => {
         {lift==='bench' || lift==='incline_press' ? (
           <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
             <span style={{fontSize:10,color:DIM}}>Хват:</span>
-            {(['narrow','medium','wide'] as const).map(v=>{ const on=grip===v; return <button key={v} onClick={()=>setGrip(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{v}</button>; })}
+            {(['narrow','medium','wide'] as const).map(v=>{ const on=grip===v; const ru = v==='narrow'?'Узкий': v==='wide'?'Широкий':'Средний'; return <button key={v} onClick={()=>setGrip(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{ru}</button>; })}
             <span style={{fontSize:10,color:DIM, marginLeft:6}}>Локти:</span>
             {([0,45,90] as const).map(v=>{ const on=elbow===v; return <button key={v} onClick={()=>setElbow(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{v}°</button>; })}
             <span style={{fontSize:10,color:DIM, marginLeft:6}}>Касание:</span>
-            {(['upper_chest','lower_chest','clavicles'] as const).map(v=>{ const on=touch===v; return <button key={v} onClick={()=>setTouch(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{v}</button>; })}
+            {(['upper_chest','lower_chest','clavicles'] as const).map(v=>{ const on=touch===v; const ru = v==='upper_chest'?'Верх груди': v==='lower_chest'?'Низ груди':'Ключицы'; return <button key={v} onClick={()=>setTouch(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{ru}</button>; })}
             <label style={{fontSize:10,color:DIM, display:'flex',alignItems:'center',gap:4, marginLeft:6}}><input type="checkbox" checked={wristStraight} onChange={e=>setWristStraight(e.target.checked)} /> Кисть прямая</label>
           </div>
         ) : lift==='squat' ? (
           <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
             <span style={{fontSize:10,color:DIM}}>Стойка:</span>
-            {(['narrow','medium','wide'] as const).map(v=>{ const on=stance===v; return <button key={v} onClick={()=>setStance(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{v}</button>; })}
+            {(['narrow','medium','wide'] as const).map(v=>{ const on=stance===v; const ru = v==='narrow'?'Узкая': v==='wide'?'Широкая':'Средняя'; return <button key={v} onClick={()=>setStance(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{ru}</button>; })}
             <span style={{fontSize:10,color:DIM, marginLeft:6}}>Глубина:</span>
-            {(['full','parallel','partial'] as const).map(v=>{ const on=depth===v; return <button key={v} onClick={()=>setDepth(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{v}</button>; })}
+            {(['full','parallel','partial'] as const).map(v=>{ const on=depth===v; const ru = v==='full'?'Глубоко': v==='parallel'?'Параллель':'Частично'; return <button key={v} onClick={()=>setDepth(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(56,189,248,0.12)':'transparent', color:on?'#38bdf8':DIM }}>{ru}</button>; })}
             <label style={{fontSize:10,color:DIM, display:'flex',alignItems:'center',gap:4}}><input type="checkbox" checked={heelLift} onChange={e=>setHeelLift(e.target.checked)} /> Штангетки</label>
             <label style={{fontSize:10,color:DIM, display:'flex',alignItems:'center',gap:4}}><input type="checkbox" checked={buttWink} onChange={e=>setButtWink(e.target.checked)} /> Кивок таза</label>
           </div>
@@ -204,7 +204,7 @@ export const JointJsiCalculatorCard: React.FC = () => {
         </div>
         <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <span style={{fontSize:10,color:DIM}}>Мёртвая точка:</span>
-          {(['bottom','middle','top','none'] as const).map(v=>{ const on=deadPoint===v; return <button key={v} onClick={()=>setDeadPoint(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #facc15':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(250,204,21,0.12)':'transparent', color:on?'#facc15':DIM }}>{v}</button>; })}
+          {(['bottom','middle','top','none'] as const).map(v=>{ const on=deadPoint===v; const ru = v==='bottom'?'Внизу': v==='middle'?'Середина': v==='top'?'Вверху':'Нет'; return <button key={v} onClick={()=>setDeadPoint(v)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border:on?'1px solid #facc15':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(250,204,21,0.12)':'transparent', color:on?'#facc15':DIM }}>{ru}</button>; })}
         </div>
       </div>
 

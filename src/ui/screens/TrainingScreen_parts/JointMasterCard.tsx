@@ -47,7 +47,7 @@ export const JointMasterCard: React.FC = () => {
       </div>
       <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
-        {(['squat','deadlift','bench','ohp','row'] as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>setLift(l)} style={{ minHeight:28, padding:'4px 9px', borderRadius:10, cursor:'pointer', fontSize:9, border: on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(56,189,248,0.15)':'transparent', color: on?'#38bdf8':DIM, fontWeight:700 }}>{l}</button>; })}
+        {(['squat','deadlift','bench','ohp','row'] as Lift[]).map(l=>{ const on=lift===l; const ru = l==='squat'?'Присед': l==='deadlift'?'Становая': l==='bench'?'Жим лёжа': l==='ohp'?'Жим стоя':'Тяга'; return <button key={l} onClick={()=>setLift(l)} style={{ minHeight:28, padding:'4px 9px', borderRadius:10, cursor:'pointer', fontSize:9, border: on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(56,189,248,0.15)':'transparent', color: on?'#38bdf8':DIM, fontWeight:700 }}>{ru}</button>; })}
         <label style={{ fontSize:10, color:DIM, marginLeft:8 }}>Боль сейчас: <input value={phasePain} onChange={e=>setPhasePain(e.target.value)} placeholder="напр. поясница" style={{ width:110, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:10 }} /></label>
       </div>
 
@@ -128,7 +128,7 @@ export const JointMasterCard: React.FC = () => {
         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
           <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>4b · Недельный план (нагрузка)</div>
           <div style={{ display:'flex', gap:4 }}>
-            {(['strength','hypertrophy','rehab'] as const).map(g=>{ const on=weekGoal===g; return <button key={g} onClick={()=>setWeekGoal(g)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?'#00e68a':DIM}}>{g}</button>; })}
+            {(['strength','hypertrophy','rehab'] as const).map(g=>{ const on=weekGoal===g; const ru = g==='strength'?'Сила': g==='hypertrophy'?'Масса':'Реабилитация'; return <button key={g} onClick={()=>setWeekGoal(g)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?'#00e68a':DIM}}>{ru}</button>; })}
           </div>
         </div>
         <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Фаза: <b style={{color:ACCENT}}>{diag.phase}</b> · Риск: {weekPlan.warnings.join(' · ') || 'нет'} · Hard дней: {weekPlan.hardDays}</div>
