@@ -18,6 +18,7 @@ import {
 import { applyToPlanner } from './planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
+import { LMS_CYCLES, getCyclesByTrainingDirection } from '../../../data/lms-cycles/lms-cycle-index';
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
@@ -48,6 +49,8 @@ const addDays = (n: number): string => { const d = new Date(); d.setDate(d.getDa
 
 export const TaperPlannerTab: React.FC = () => {
   const [kind, setKind] = useState<'pl' | 'bb'>('pl');
+  const [selectedPlCycle, setSelectedPlCycle] = useState<string>('');
+  const [selectedBbCycle, setSelectedBbCycle] = useState<string>('');
 
   // ── PL: taper + соревнование ──
   const [meetDate, setMeetDate] = useState<string>(addDays(28));
@@ -73,6 +76,11 @@ export const TaperPlannerTab: React.FC = () => {
   const [carbTol, setCarbTol] = useState(0.7);
 
   const fatigue = fatigueRaw === 'low' ? 8 : fatigueRaw === 'high' ? 9 : fatigueNum;
+
+  const plCycles = useMemo(() => getCyclesByTrainingDirection('strength').slice(0, 20), []);
+  const bbCycles = useMemo(() => getCyclesByTrainingDirection('bodybuilding').slice(0, 20), []);
+  const selectedPlCycleData = useMemo(() => plCycles.find(c => c.meta.id === selectedPlCycle), [plCycles, selectedPlCycle]);
+  const selectedBbCycleData = useMemo(() => bbCycles.find(c => c.meta.id === selectedBbCycle), [bbCycles, selectedBbCycle]);
 
   // ── Расчёты PL ──
   const plan: TaperPlan | null = useMemo(() => {
@@ -165,6 +173,33 @@ export const TaperPlannerTab: React.FC = () => {
         <button onClick={() => setKind('bb')} style={{ ...BTN_GHOST, flex: 1, border: kind === 'bb' ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)', background: kind === 'bb' ? 'rgba(0,230,138,0.12)' : 'transparent', color: kind === 'bb' ? ACCENT : DIM }}>
           🏆 BB: Шоу-пик
         </button>
+      </div>
+
+      {/* ── Выбор цикла по направлению (ПЛ vs ББ — учитываем разные циклы) ── */}
+      <div style={CARD}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔄 Цикл для тейпера (ПЛ и ББ отличаются)</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>
+          ПЛ-циклы — силовые (LMS, присед/жим/тяга, пикинг 3 нед, RIR→0). ББ-циклы — гипертрофийные (сплиты, памп, шоу-пик 4 нед, карб/вода). Выберите цикл — калькулятор подстроит подсказки и покажет длительность/направление.
+        </div>
+        {kind === 'pl' ? (
+          <>
+            <PopupSelect label="ПЛ-цикл (LMS)" value={selectedPlCycle} options={[{ id: '', label: '— без привязки к циклу —', desc: 'Ручной ввод 1RM' }, ...plCycles.map(c => ({ id: c.meta.id, label: `${c.meta.title} (${c.meta.level}, ${c.meta.weeks} нед)`, desc: `${c.meta.direction}` }))]} onChange={v => setSelectedPlCycle(v)} />
+            {selectedPlCycleData && (
+              <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.12)', fontSize: 10, color: DIM }}>
+                <b style={{ color: ACCENT }}>{selectedPlCycleData.meta.title}</b> · {selectedPlCycleData.meta.direction} · {selectedPlCycleData.meta.weeks} нед · {selectedPlCycleData.meta.level} · {selectedPlCycleData.meta.weeks} нед цикл → тейпер {taperWeeksForFatigue(fatigue * 10)} нед (по усталости) рекомендован.
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <PopupSelect label="ББ-цикл" value={selectedBbCycle} options={[{ id: '', label: '— без привязки —', desc: 'Ручной' }, ...bbCycles.map(c => ({ id: c.meta.id, label: `${c.meta.title} (${c.meta.weeks} нед)`, desc: `${c.meta.direction}` }))]} onChange={v => setSelectedBbCycle(v)} />
+            {selectedBbCycleData && (
+              <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.12)', fontSize: 10, color: DIM }}>
+                <b style={{ color: '#ec4899' }}>{selectedBbCycleData.meta.title}</b> · {selectedBbCycleData.meta.direction} · {selectedBbCycleData.meta.weeks} нед · шоу-пик 4 нед (углеводы/вода/памп) отличается от ПЛ-тейпера.
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* ════════════════ PL ════════════════ */}

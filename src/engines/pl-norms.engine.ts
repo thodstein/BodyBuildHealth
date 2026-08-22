@@ -12,6 +12,34 @@ export type Federation = 'fpr_ipf' | 'wrpf_untested' | 'wrpf_tested';
 export type Discipline = 'total' | 'bench' | 'deadlift' | 'squat';
 export type RankKey = 'kms' | 'ms' | 'msmk' | 'elite';
 export type Sex = 'male' | 'female';
+export type AgeGroup = 'open' | 'youth_12_13' | 'youth_14_18' | 'junior_19_23' | 'masters_40plus';
+
+export const AGE_GROUPS: { id: AgeGroup; label: string; desc: string }[] = [
+  { id: 'open', label: 'Открытая (12+ лет)', desc: 'Все разряды: КМС с 14, МС с 16, МСМК с 17' },
+  { id: 'youth_12_13', label: 'Юноши 12-13 лет', desc: 'Только юношеские и I-III, без КМС' },
+  { id: 'youth_14_18', label: 'Юноши/Девушки 14-18', desc: 'КМС с 14, I-III и юношеские' },
+  { id: 'junior_19_23', label: 'Юниоры 19-23', desc: 'Все взрослые разряды, МСМК на первенстве мира/Европы среди юниоров' },
+  { id: 'masters_40plus', label: 'Мастера 40+', desc: 'Ветераны — нормативы как в открытой, но с коэффициентом' },
+];
+
+export function eligibleRanksForAge(ageGroup: AgeGroup): RankKey[] {
+  switch (ageGroup) {
+    case 'youth_12_13': return [];
+    case 'youth_14_18': return ['kms'];
+    case 'junior_19_23': return ['kms', 'ms', 'msmk'];
+    case 'masters_40plus': return ['kms', 'ms', 'msmk', 'elite'];
+    default: return ['kms', 'ms', 'msmk', 'elite'];
+  }
+}
+
+export function ageEligibilityNote(ageGroup: AgeGroup, achieved: RankKey | null): string | null {
+  if (!achieved) return null;
+  const eligible = eligibleRanksForAge(ageGroup);
+  if (eligible.includes(achieved)) return null;
+  if (ageGroup === 'youth_12_13') return 'В 12-13 лет взрослые разряды не присваиваются — доступны только юношеские/I-III (вне таблиц).';
+  if (ageGroup === 'youth_14_18' && achieved !== 'kms') return `В 14-18 лет МС/МСМК ещё не присваиваются (МС с 16, МСМК с 17) — ваш результат соответствует взрослому нормативу ${RANK_LABELS[achieved]}, но зачесть можно только КМС.`;
+  return null;
+}
 
 export const RANK_LABELS: Record<RankKey, string> = { kms: 'КМС', ms: 'МС', msmk: 'МСМК', elite: 'ЭЛИТА' };
 export const RANK_ORDER: RankKey[] = ['kms', 'ms', 'msmk', 'elite'];

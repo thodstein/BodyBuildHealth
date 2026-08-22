@@ -10,9 +10,13 @@ import {
   RANK_DESCRIPTIONS,
   CATEGORY_EXPLANATION,
   RANK_LABELS,
+  AGE_GROUPS,
+  eligibleRanksForAge,
+  ageEligibilityNote,
   type Federation,
   type Discipline,
   type Sex,
+  type AgeGroup,
 } from '../../../engines/pl-norms.engine';
 import { wilksScore, dotsScore, ipfGLPoints, allometricScore, relativeStrength, liftRelativeStrength } from '../../../engines/pro/relative-strength.engine';
 import { calcGlossbrenner } from '../../../engines/pl-points.engine';
@@ -53,6 +57,7 @@ export const PlNormsCalcTab: React.FC = () => {
   const [sex, setSex] = useState<Sex>(initialSex);
   const [fed, setFed] = useState<Federation>('fpr_ipf');
   const [disc, setDisc] = useState<Discipline>('total');
+  const [ageGroup, setAgeGroup] = useState<AgeGroup>('open');
   const [bw, setBw] = useState<number>(() => { try { return Number((getProfile().settings as any)?.personal?.weight) || 83; } catch { return 83; } });
   const [total, setTotal] = useState<number>(520);
   const [manualCat, setManualCat] = useState<string>(''); // пусто = авто
@@ -138,6 +143,7 @@ export const PlNormsCalcTab: React.FC = () => {
           <PopupSelect label="Пол" value={sex} options={SEX_OPTS as any} onChange={v => { setSex(v as Sex); setManualCat(''); }} />
           <PopupSelect label="Федерация" value={fed} options={FEDS.map(f => ({ id: f.id, label: f.label }))} onChange={v => { const nf = v as Federation; setFed(nf); setManualCat(''); if (nf === 'fpr_ipf' && disc !== 'total' && sex === 'male') setDisc('total'); }} />
           <PopupSelect label="Дисциплина" value={disc} options={availDisc.map(d => ({ id: d.id, label: d.label }))} onChange={v => { setDisc(v as Discipline); setManualCat(''); }} />
+          <PopupSelect label="Возрастная группа" value={ageGroup} options={AGE_GROUPS.map(a => ({ id: a.id, label: a.label, desc: a.desc }))} onChange={v => setAgeGroup(v as AgeGroup)} />
           <PopupSelect
             label="Весовая категория (просмотр)"
             value={manualCat || '__auto'}
@@ -155,6 +161,14 @@ export const PlNormsCalcTab: React.FC = () => {
             ⚠️ Просмотр категории «{manualCat}» отличается от вашей авто-категории «{autoCat.label}» (по весу {bw} кг вы в «{autoCat.label}»). Разряд по авто-категории: <b>{autoResult.achievedLabel}</b> (до {autoResult.nextLabel}: {autoResult.kgToNext} кг). На помосте зачёт идёт по фактической категории взвешивания.
           </div>
         )}
+        {(() => {
+          const note = displayResult ? ageEligibilityNote(ageGroup, displayResult.achievedRank) : null;
+          return note ? (
+            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 11, color: '#ef4444' }}>
+              ⚠️ Возраст {AGE_GROUPS.find(a => a.id === ageGroup)?.label}: {note}
+            </div>
+          ) : null;
+        })()}
         {/* ── Единый калькулятор: режим по движениям (из относительной силы) ── */}
         {disc === 'total' && (
           <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.16)' }}>

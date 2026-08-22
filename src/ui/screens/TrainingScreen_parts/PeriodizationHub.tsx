@@ -7,11 +7,9 @@ import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { MesocycleTrackerTab } from './MesocycleTrackerTab';
 import { MicrocyclePlannerCard } from './MicrocyclePlannerCard';
 import { DeloadSchedulerTab } from './DeloadSchedulerTab';
-import PeakingProtocolTab from './PeakingProtocolTab';
-
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.5)';
-type PeriodizationHubMode = 'designer' | 'progression' | 'tracker' | 'micro' | 'deload' | 'peaking';
+type PeriodizationHubMode = 'designer' | 'progression' | 'tracker' | 'micro' | 'deload';
 
 const MODE_DEFS: Array<{ m: PeriodizationHubMode; label: string; icon: string }> = [
   { m: 'designer', label: 'Дизайнер', icon: '🏗️' },
@@ -19,7 +17,6 @@ const MODE_DEFS: Array<{ m: PeriodizationHubMode; label: string; icon: string }>
   { m: 'tracker', label: 'Трекер', icon: '📊' },
   { m: 'micro', label: 'Микроциклы', icon: '🗓️' },
   { m: 'deload', label: 'Делод', icon: '🧘' },
-  { m: 'peaking', label: 'Пик', icon: '⚡' },
 ];
 
 export const PeriodizationHub: React.FC = () => {
@@ -54,7 +51,9 @@ export const PeriodizationHub: React.FC = () => {
       {mode === 'tracker' && <MesocycleTrackerTab />}
       {mode === 'micro' && <MicrocyclePlannerCard />}
       {mode === 'deload' && <DeloadSchedulerTab />}
-      {mode === 'peaking' && <PeakingProtocolTab />}
+      <div style={{ marginTop: 12, padding: 10, borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', fontSize: 11, color: DIM, lineHeight: 1.4 }}>
+        <b style={{ color: '#f59e0b' }}>⚡ Пик/Тейпер — единый калькулятор:</b> пик-протоколы (PL 3 нед, BB 4 нед, Classic WF) теперь в <b style={{ color: '#fff' }}>Интеллект → Планировщик тейпера</b> (учёт ПЛ/ББ циклов, возраста, пола, федерации). Здесь — только периодизация, без дубля.
+      </div>
     </div>
   );
 };
