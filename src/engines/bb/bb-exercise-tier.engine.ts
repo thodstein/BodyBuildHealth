@@ -31,7 +31,7 @@ const EXOTIC_PATTERNS: RegExp = /гир[яеюи]|kettlebell|донышк|куб
 
 /* ───────────────────────── Категорически не для дефолта ───────────────────────── */
 // ИСКЛЮЧЕНО: `одной.*рук`/`one.?arm.?push` (раньше ошибочно ловил row_db, pulldown_single, lateral_raise_single, tricep_pushdown_single и т.д.).
-const INAPPROPRIATE_PATTERNS: RegExp = /донышк|bottom.?up|гильотин|guillotine|швунг|jerk|турецк.*подъём|tgu|прогулк.*фермер|farmer.?walk|прогулк.*гир|waiter.?s?.?walk|рывок.*гир|snatch|spiderman|человек.?паук|плиометр|plyo|мельниц.*гир|windmill|halo|ореол|жим.*цеп|bench.*chain|chain.*bench|доск|board|pin.?press|спот|spoto|горизонт.*групп|front.?lever|kb_snatch|kb_dead_snatch|kb_tgu|kb_halo|kb_windmill|bottom_up/i;
+const INAPPROPRIATE_PATTERNS: RegExp = /донышк|bottom.?up|гильотин|guillotine|швунг|jerk|турецк.*подъём|tgu|прогулк.*фермер|farmer.?walk|прогулк.*гир|waiter.?s?.?walk|рывок.*гир|snatch|spiderman|человек.?паук|плиометр|plyo|мельниц.*гир|windmill|halo|ореол|жим.*цеп|bench.*chain|chain.*bench|доск|board|pin.?press|спот|spoto|жим.*пола|floor.?press|горизонт.*групп|front.?lever|kb_snatch|kb_dead_snatch|kb_tgu|kb_halo|kb_windmill|bottom_up/i;
 
 /** substitutionGroup, помечающий ол./стронгмен/мобилити — не ББ-гипертрофия. */
 const EXOTIC_SUBGROUPS = new Set(['oly', 'strongman', 'mobility', 'core_stab']);
