@@ -346,6 +346,11 @@ export const PlNormsCalcTab: React.FC = () => {
               <span style={SECTION}>🗂️ Все категории федерации — полный обзор {showAllCats ? '▲' : '▼'}</span>
               <span style={{ fontSize: 11, color: ACCENT }}>{showAllCats ? 'Свернуть' : 'Развернуть все категории'}</span>
             </button>
+            {ageGroup !== 'open' && (
+              <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: ageGroup === 'youth_12_13' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: '1px solid ' + (ageGroup === 'youth_12_13' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)'), fontSize: 10, color: ageGroup === 'youth_12_13' ? '#f87171' : '#f59e0b', lineHeight: 1.4 }}>
+                {ageGroup === 'youth_12_13' ? '⛔ 12-13 лет: все взрослые разряды недоступны — таблица блекнет полностью (доступны только юношеские/I-III вне таблиц).' : `⚠️ Возраст ${AGE_GROUPS.find(a => a.id === ageGroup)?.label}: недоступные разряды в таблице затемнены (opacity 0.45, ⛔). Ваш текущий разряд: ${displayResult?.achievedLabel ?? 'нет'}${ageNoteForDisplay ? ' — ' + ageNoteForDisplay : ''}`}
+              </div>
+            )}
             {!showAllCats ? (
               <div style={{ fontSize: 11, color: DIM }}>Нажмите, чтобы увидеть пороги КМС/МС/МСМК во всех весовых категориях этой федерации — удобно выбирать, в какую категорию гнать вес.</div>
             ) : (
@@ -354,24 +359,31 @@ export const PlNormsCalcTab: React.FC = () => {
                   <thead>
                     <tr style={{ color: 'rgba(255,255,255,0.45)', textAlign: 'left', fontSize: 10 }}>
                       <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Категория</th>
-                      <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#60a5fa' }}>КМС</th>
-                      <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#a855f7' }}>МС</th>
-                      <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#f59e0b' }}>МСМК</th>
-                      {table.categories.some(c => c.ranks.elite !== undefined) && <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: '#ef4444' }}>ЭЛИТА</th>}
+                      <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: eligibleSet.has('kms') ? '#60a5fa' : 'rgba(96,165,250,0.35)', opacity: eligibleSet.has('kms') ? 1 : 0.45 }} title={eligibleSet.has('kms') ? '' : '⛔ недоступен для выбранного возраста'}>КМС {!eligibleSet.has('kms') ? '⛔' : ''}</th>
+                      <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: eligibleSet.has('ms') ? '#a855f7' : 'rgba(168,85,247,0.35)', opacity: eligibleSet.has('ms') ? 1 : 0.45 }} title={eligibleSet.has('ms') ? '' : '⛔ недоступен для выбранного возраста'}>МС {!eligibleSet.has('ms') ? '⛔' : ''}</th>
+                      <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: eligibleSet.has('msmk') ? '#f59e0b' : 'rgba(245,158,11,0.35)', opacity: eligibleSet.has('msmk') ? 1 : 0.45 }} title={eligibleSet.has('msmk') ? '' : '⛔ недоступен для выбранного возраста'}>МСМК {!eligibleSet.has('msmk') ? '⛔' : ''}</th>
+                      {table.categories.some(c => c.ranks.elite !== undefined) && <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: eligibleSet.has('elite') ? '#ef4444' : 'rgba(239,68,68,0.35)', opacity: eligibleSet.has('elite') ? 1 : 0.45 }} title={eligibleSet.has('elite') ? '' : '⛔ недоступен для выбранного возраста'}>ЭЛИТА {!eligibleSet.has('elite') ? '⛔' : ''}</th>}
                       <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Ваш тотал</th>
                     </tr>
                   </thead>
                   <tbody>
                     {table.categories.map(cat => {
                       const isCurrent = cat.label === effectiveCat.label;
-                      const clr = (v?: number) => (v !== undefined && displayTotal >= v ? '#22c55e' : 'rgba(255,255,255,0.7)');
+                      const clr = (v: number | undefined, rank: 'kms' | 'ms' | 'msmk' | 'elite') => {
+                        if (v === undefined) return 'rgba(255,255,255,0.25)';
+                        const eligible = eligibleSet.has(rank);
+                        if (!eligible) return 'rgba(255,255,255,0.28)';
+                        return displayTotal >= v ? '#22c55e' : 'rgba(255,255,255,0.7)';
+                      };
+                      const cellOpacity = (rank: 'kms' | 'ms' | 'msmk' | 'elite') => eligibleSet.has(rank) ? 1 : 0.45;
+                      const hasEliteCol = table.categories.some(c => c.ranks.elite !== undefined);
                       return (
-                        <tr key={cat.label} style={{ background: isCurrent ? 'rgba(0,230,138,0.06)' : 'transparent', borderLeft: isCurrent ? '2px solid #00e68a' : '2px solid transparent' }}>
+                        <tr key={cat.label} style={{ background: isCurrent ? 'rgba(0,230,138,0.06)' : 'transparent', borderLeft: isCurrent ? '2px solid #00e68a' : '2px solid transparent', opacity: ageGroup === 'youth_12_13' ? 0.55 : 1 }}>
                           <td style={{ padding: '6px 8px', fontWeight: isCurrent ? 800 : 600, color: isCurrent ? ACCENT : '#fff' }}>{cat.label} {isCurrent ? '← вы здесь' : ''}</td>
-                          <td style={{ padding: '6px 8px', color: clr(cat.ranks.kms) }}>{cat.ranks.kms ?? '—'}</td>
-                          <td style={{ padding: '6px 8px', color: clr(cat.ranks.ms) }}>{cat.ranks.ms ?? '—'}</td>
-                          <td style={{ padding: '6px 8px', color: clr(cat.ranks.msmk) }}>{cat.ranks.msmk ?? '—'}</td>
-                          {table.categories.some(c => c.ranks.elite !== undefined) && <td style={{ padding: '6px 8px', color: clr(cat.ranks.elite) }}>{cat.ranks.elite ?? '—'}</td>}
+                          <td style={{ padding: '6px 8px', color: clr(cat.ranks.kms, 'kms'), opacity: cellOpacity('kms') }} title={!eligibleSet.has('kms') ? '⛔ недоступен для возраста' : undefined}>{cat.ranks.kms !== undefined ? (eligibleSet.has('kms') ? cat.ranks.kms : `${cat.ranks.kms} ⛔`) : '—'}</td>
+                          <td style={{ padding: '6px 8px', color: clr(cat.ranks.ms, 'ms'), opacity: cellOpacity('ms') }} title={!eligibleSet.has('ms') ? '⛔ недоступен для возраста' : undefined}>{cat.ranks.ms !== undefined ? (eligibleSet.has('ms') ? cat.ranks.ms : `${cat.ranks.ms} ⛔`) : '—'}</td>
+                          <td style={{ padding: '6px 8px', color: clr(cat.ranks.msmk, 'msmk'), opacity: cellOpacity('msmk') }} title={!eligibleSet.has('msmk') ? '⛔ недоступен для возраста' : undefined}>{cat.ranks.msmk !== undefined ? (eligibleSet.has('msmk') ? cat.ranks.msmk : `${cat.ranks.msmk} ⛔`) : '—'}</td>
+                          {hasEliteCol && <td style={{ padding: '6px 8px', color: clr(cat.ranks.elite, 'elite'), opacity: cellOpacity('elite') }} title={!eligibleSet.has('elite') ? '⛔ недоступен для возраста' : undefined}>{cat.ranks.elite !== undefined ? (eligibleSet.has('elite') ? cat.ranks.elite : `${cat.ranks.elite} ⛔`) : '—'}</td>}
                           <td style={{ padding: '6px 8px', fontWeight: 700, color: isCurrent ? '#fff' : 'rgba(255,255,255,0.35)' }}>{isCurrent ? `${displayTotal} кг` : '—'}</td>
                         </tr>
                       );
@@ -379,12 +391,12 @@ export const PlNormsCalcTab: React.FC = () => {
                   </tbody>
                 </table>
                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 6, lineHeight: 1.4 }}>
-                  Каждая строка — одна весовая категория. Числа — пороги для разряда. Зелёный — ваш тотал выполняет порог в этой категории. « — » — разряд в этой категории не присваивается (нет нормы). Подсвеченная строка — выбранная для просмотра (авто или ручная).
+                  Каждая строка — одна весовая категория. Числа — пороги для разряда. Зелёный — ваш тотал выполняет порог в этой категории. <b style={{ color: 'rgba(255,255,255,0.55)' }}>⛔ затемнённые столбцы — недоступны для выбранного возраста</b> (opacity 0.45, кликните заголовок для подсказки). « — » — разряд в этой категории не присваивается (нет нормы). Подсвеченная строка — выбранная для просмотра (авто или ручная).
                 </div>
               </div>
             )}
             <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.32)', lineHeight: 1.4 }}>
-              Подсказка: если до МСМК не хватает 15 кг, но сгонка 4 кг переводит вас в категорию ниже, где порог ниже на 30 кг — переход выгоден. Сравните строку текущей и целевой категорий.
+              Подсказка: если до МСМК не хватает 15 кг, но сгонка 4 кг переводит вас в категорию ниже, где порог ниже на 30 кг — переход выгоден. Сравните строку текущей и целевой категорий. {ageGroup !== 'open' ? 'Фильтр возраста применён ко всей таблице — недоступные разряды блекнут во всех строках.' : ''}
             </div>
           </div>
 

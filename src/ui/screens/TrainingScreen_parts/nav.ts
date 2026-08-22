@@ -57,10 +57,11 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '⚡',
     color: '#3b82f6',
     subtitle: 'Персональный пульс-контроль: показатели, качество плана, инструменты сборки, периодизация',
+    // периодзационный тейпер-хаб — единый (аналог VolumeHub): PeriodizationHub 5 вкладок + TaperPlannerTab внутри как 6-я
     tabs: [
-      'strength_analysis', 'load_management', 'quality_diagnostics', 'periodization_hub',
+      'strength_analysis', 'load_management', 'quality_diagnostics', 'periodization_taper_hub',
       'exercise_lab', 'load_safety', 'volume_hub', 'pri_reppat',
-      'calc_plates', 'rir_calibration', 'readiness_forecast', 'taper_planner', 'joint_health',
+      'calc_plates', 'rir_calibration', 'readiness_forecast', 'joint_health',
       'training_mix_hub', 'mix_presets', 'bb_foundation',
     ],
   },
@@ -106,7 +107,10 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 (TAB_TO_ZONE as Record<string, TrainingZone>)['tonnage'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['split_gen'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['calc_taper'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['taper_planner'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['periodization_hub'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['peaking'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['periodization_taper_hub'] = 'calculators';
 
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';

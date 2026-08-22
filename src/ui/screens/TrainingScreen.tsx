@@ -677,9 +677,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','training_mix_hub','mix_presets','bb_foundation','rir_calibration','readiness_forecast','taper_planner','joint_health']);
-        // алиасы депрекейтнутых дублей → единые хабы
-        const effectiveTab = tab === 'load_management' ? 'load_safety' as const : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const : tab === 'calc_taper' ? 'taper_planner' as const : tab;
+        const CALC_TABS = new Set(['strength_analysis','load_safety','quality_diagnostics','periodization_taper_hub','exercise_lab','calc_plates','volume_hub','pri_reppat','training_mix_hub','mix_presets','bb_foundation','rir_calibration','readiness_forecast','joint_health']);
+        // алиасы депрекейтнутых дублей → единые хабы (периодизация+тейпер объединены как periodization_taper_hub, аналог VolumeHub)
+        const effectiveTab = tab === 'load_management' ? 'load_safety' as const
+          : tab === 'diagnostics' || tab === 'calc_quality' ? 'quality_diagnostics' as const
+          : tab === 'volume' || tab === 'tonnage' || tab === 'split_gen' ? 'volume_hub' as const
+          : tab === 'periodization_hub' || tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'periodization_taper_hub' as const
+          : tab;
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
         if (isCalcTab) {
           // Показываем конкретный инструмент с кнопкой назад
@@ -689,7 +693,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub /></InfoErrorBoundary>}
             {effectiveTab === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {effectiveTab === 'quality_diagnostics' && <InfoErrorBoundary label="Качество и диагностика"><QualityDiagnosticsHub sessions={historyWorkouts} tprofile={tprofile} readinessRecovery={readiness?.recovery ?? 70} readinessFatigue={readiness?.fatigue ?? 30} mesoWeeks={mesoLength} missedSessions={0} currentVolume={18} currentRir={2} onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}
-            {tab === 'periodization_hub' && <InfoErrorBoundary label="Периодизация"><PeriodizationHub /></InfoErrorBoundary>}
+            {effectiveTab === 'periodization_taper_hub' && <InfoErrorBoundary label="Периодизация + Тейпер"><PeriodizationHub initialMode={tab === 'taper_planner' || tab === 'calc_taper' || tab === 'peaking' ? 'taper' : 'designer'} /></InfoErrorBoundary>}
             {tab === 'exercise_lab' && <InfoErrorBoundary label="Лаборатория упражнений"><ExerciseLabMerged /></InfoErrorBoundary>}
             {tab === 'calc_plates' && <InfoErrorBoundary label="Калькулятор блинов"><PlateCalcTab /></InfoErrorBoundary>}
             {effectiveTab === 'volume_hub' && <InfoErrorBoundary label="Объём-хаб"><VolumeHub /></InfoErrorBoundary>}
@@ -697,7 +701,6 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {tab === 'bb_foundation' && <InfoErrorBoundary label="Основа ББ"><BBFoundationCard /></InfoErrorBoundary>}
             {effectiveTab === 'rir_calibration' && <InfoErrorBoundary label="RIR калибратор"><RIRCalibrationCard /></InfoErrorBoundary>}
             {effectiveTab === 'readiness_forecast' && <InfoErrorBoundary label="Прогноз готовности"><ReadinessForecastCard /></InfoErrorBoundary>}
-            {effectiveTab === 'taper_planner' && <InfoErrorBoundary label="Планировщик тейпера"><TaperPlannerTab /></InfoErrorBoundary>}
             {effectiveTab === 'joint_health' && <InfoErrorBoundary label="Суставы + AI"><JointMasterCard /></InfoErrorBoundary>}
             {tab === 'training_mix_hub' && <InfoErrorBoundary label="Тренировочные миксы"><TrainingMixTab /></InfoErrorBoundary>}
             {tab === 'mix_presets' && <InfoErrorBoundary label="Пресеты здоровья"><MixPresetsCard /></InfoErrorBoundary>}

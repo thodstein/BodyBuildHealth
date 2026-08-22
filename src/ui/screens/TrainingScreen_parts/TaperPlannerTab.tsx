@@ -47,6 +47,22 @@ const strategyOpts: { id: AttemptStrategy; label: string; desc: string }[] = [
 
 const addDays = (n: number): string => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 
+function getProfileStrengthBaselines(): { squat: number; bench: number; dead: number } | null {
+  try {
+    const s: any = (getProfile().settings as any)?.training;
+    if (s && typeof s.pmSquat === 'number' && typeof s.pmBench === 'number' && typeof s.pmDeadlift === 'number' && s.pmSquat > 20 && s.pmBench > 20 && s.pmDeadlift > 20) {
+      return { squat: Math.round(s.pmSquat), bench: Math.round(s.pmBench), dead: Math.round(s.pmDeadlift) };
+    }
+    // fallback: legacy he_training_profile already merged via getProfile, but check direct
+    const legacyRaw = localStorage.getItem('he_training_profile');
+    if (legacyRaw) {
+      const lp = JSON.parse(legacyRaw);
+      if (lp.pmSquat && lp.pmBench && lp.pmDead) return { squat: Math.round(lp.pmSquat), bench: Math.round(lp.pmBench), dead: Math.round(lp.pmDead) };
+    }
+  } catch {}
+  return null;
+}
+
 export const TaperPlannerTab: React.FC = () => {
   const [kind, setKind] = useState<'pl' | 'bb'>('pl');
   const [selectedPlCycle, setSelectedPlCycle] = useState<string>('');
@@ -81,6 +97,43 @@ export const TaperPlannerTab: React.FC = () => {
   const bbCycles = useMemo(() => getCyclesByTrainingDirection('bodybuilding').slice(0, 20), []);
   const selectedPlCycleData = useMemo(() => plCycles.find(c => c.meta.id === selectedPlCycle), [plCycles, selectedPlCycle]);
   const selectedBbCycleData = useMemo(() => bbCycles.find(c => c.meta.id === selectedBbCycle), [bbCycles, selectedBbCycle]);
+  const [pmAutoNote, setPmAutoNote] = useState<string | null>(null);
+
+  const applyProfilePMs = React.useCallback(() => {
+    const p = getProfileStrengthBaselines();
+    if (p) {
+      setSquat1RM(p.squat);
+      setBench1RM(p.bench);
+      setDeadlift1RM(p.dead);
+      setPmAutoNote(`✓ ПМ подставлены из профиля: ${p.squat}/${p.bench}/${p.dead} кг (тренировочный профиль → LMS цикл)`);
+      setTimeout(() => setPmAutoNote(null), 4000);
+      return true;
+    }
+    setPmAutoNote('⚠️ В профиле нет ПМ (заполните Профиль → Тренировки → Личные рекорды)');
+    setTimeout(() => setPmAutoNote(null), 3000);
+    return false;
+  }, []);
+
+  const handlePlCycleChange = React.useCallback((v: string) => {
+    setSelectedPlCycle(v);
+    if (v) {
+      const c = plCycles.find(x => x.meta.id === v);
+      const p = getProfileStrengthBaselines();
+      if (p && c) {
+        // Автоподстановка 1RM из профиля при выборе цикла (LMS_CYCLES.find → strengthBaselines)
+        setSquat1RM(p.squat);
+        setBench1RM(p.bench);
+        setDeadlift1RM(p.dead);
+        setPmAutoNote(`↗ Цикл «${c.meta.title}» (${c.meta.weeks} нед) — ПМ из профиля: ${p.squat}/${p.bench}/${p.dead} кг → taper ${taperWeeksForFatigue(fatigue * 10)} нед`);
+        setTimeout(() => setPmAutoNote(null), 4000);
+      } else if (c) {
+        setPmAutoNote(`Цикл «${c.meta.title}» (${c.meta.weeks} нед) — заполните ПМ вручную или из профиля`);
+        setTimeout(() => setPmAutoNote(null), 3000);
+      }
+    } else {
+      setPmAutoNote(null);
+    }
+  }, [plCycles, fatigue]);
 
   // ── Расчёты PL ──
   const plan: TaperPlan | null = useMemo(() => {
@@ -183,11 +236,22 @@ export const TaperPlannerTab: React.FC = () => {
         </div>
         {kind === 'pl' ? (
           <>
-            <PopupSelect label="ПЛ-цикл (LMS)" value={selectedPlCycle} options={[{ id: '', label: '— без привязки к циклу —', desc: 'Ручной ввод 1RM' }, ...plCycles.map(c => ({ id: c.meta.id, label: `${c.meta.title} (${c.meta.level}, ${c.meta.weeks} нед)`, desc: `${c.meta.direction}` }))]} onChange={v => setSelectedPlCycle(v)} />
+            <PopupSelect label="ПЛ-цикл (LMS)" value={selectedPlCycle} options={[{ id: '', label: '— без привязки к циклу —', desc: 'Ручной ввод 1RM' }, ...plCycles.map(c => ({ id: c.meta.id, label: `${c.meta.title} (${c.meta.level}, ${c.meta.weeks} нед)`, desc: `${c.meta.direction}` }))]} onChange={handlePlCycleChange} />
             {selectedPlCycleData && (
               <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.12)', fontSize: 10, color: DIM }}>
                 <b style={{ color: ACCENT }}>{selectedPlCycleData.meta.title}</b> · {selectedPlCycleData.meta.direction} · {selectedPlCycleData.meta.weeks} нед · {selectedPlCycleData.meta.level} · {selectedPlCycleData.meta.weeks} нед цикл → тейпер {taperWeeksForFatigue(fatigue * 10)} нед (по усталости) рекомендован.
+                <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                  <button onClick={applyProfilePMs} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.3)', color: ACCENT }}>📥 Подставить ПМ из профиля (LMS → taper)</button>
+                </div>
               </div>
+            )}
+            {!selectedPlCycleData && (
+              <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                <button onClick={applyProfilePMs} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: DIM }}>📥 Подставить ПМ из профиля</button>
+              </div>
+            )}
+            {pmAutoNote && (
+              <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: pmAutoNote.startsWith('⚠️') ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.08)', border: '1px solid ' + (pmAutoNote.startsWith('⚠️') ? 'rgba(239,68,68,0.18)' : 'rgba(0,230,138,0.18)'), fontSize: 10, color: pmAutoNote.startsWith('⚠️') ? '#f87171' : ACCENT, lineHeight: 1.4 }}>{pmAutoNote}</div>
             )}
           </>
         ) : (
