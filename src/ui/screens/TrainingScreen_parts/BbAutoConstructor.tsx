@@ -1131,6 +1131,7 @@ export const BbAutoConstructor: React.FC = () => {
       sleepHours: lifestyle?.sleepHours,
       stressLevel: lifestyle?.stressLevel,
       injuryCount: injuries.length,
+      balanceReport: (builtPlan as any).balanceReport || null,
     });
   }, [builtPlan, linked.profile, injuries.length]);
   // FIX-6: Единый источник качества — validatePlanQuality (канонический движок)
@@ -3087,8 +3088,7 @@ export const BbAutoConstructor: React.FC = () => {
                   {entries.map(([m, v]) => {
                     const isExpanded = expandedMuscles.has(m);
                     const byEx = (v as any).byExercise as Record<string, number> | undefined;
-                    const subGroups = (v as any).subGroups as Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number> }> | undefined;
-                    const subRu: Record<string, string> = { back_width: 'широчайшая (ширина)', back_thickness: 'толщина (ромб/середина)', upper_back: 'верх спины', rear_delts: 'задняя дельта', traps: 'трапеции', erectors: 'разгибатели', other: 'прочее' };
+                    const subGroups = (v as any).subGroups as Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number>; explanation?: { why: string; how: string; patternRu: string; labelRu: string } }> | undefined;
                     return (
                     <div key={m} onClick={() => setExpandedMuscles(prev => { const n = new Set(prev); if (n.has(m)) n.delete(m); else n.add(m); return n; })} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -3105,13 +3105,21 @@ export const BbAutoConstructor: React.FC = () => {
                           </div>
                           {subGroups && Object.keys(subGroups).length > 0 && (
                             <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
-                              {Object.entries(subGroups).map(([subId, sub]) => (
-                                <div key={subId} style={{ fontSize:10, color:'rgba(255,255,255,0.65)', padding:'4px 6px', borderRadius:6, background:'rgba(255,255,255,0.04)' }}>
-                                  <b>{subRu[subId] || subId}</b>: {sub.workingSets} сетов
-                                  <div style={{ color:'rgba(255,255,255,0.5)' }}>паттерн: {Object.entries(sub.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'}</div>
+                              {Object.entries(subGroups).map(([subId, sub]) => {
+                                const expl = (sub as any).explanation as { why?: string; how?: string; patternRu?: string; labelRu?: string } | undefined;
+                                const label = expl?.labelRu || subId;
+                                return (
+                                <div key={subId} style={{ fontSize:10, color:'rgba(255,255,255,0.65)', padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                                  <div style={{ display:'flex', justifyContent:'space-between', gap:6 }}>
+                                    <b style={{ color:'#e5e7eb' }}>{label}</b>
+                                    <span style={{ fontWeight:700, color:'#22c55e' }}>{sub.workingSets} сетов</span>
+                                  </div>
+                                  <div style={{ color:'rgba(255,255,255,0.5)', marginTop:2 }}>паттерн: {Object.entries(sub.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'}{expl?.patternRu ? ` · ${expl.patternRu}` : ''}</div>
                                   <div style={{ color:'rgba(255,255,255,0.5)' }}>упражнения: {Object.entries(sub.byExercise).map(([e, n]) => `${e} ${n}`).join(', ') || '—'}</div>
+                                  {expl?.why && <div style={{ color:'#fbbf24', marginTop:3, lineHeight:1.35 }}>▸ Чем хорошо: {expl.why}</div>}
+                                  {expl?.how && <div style={{ color:'#93c5fd', lineHeight:1.35 }}>▸ Как работает: {expl.how}</div>}
                                 </div>
-                              ))}
+                              );})}
                             </div>
                           )}
                           <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:4 }}>
@@ -3120,7 +3128,7 @@ export const BbAutoConstructor: React.FC = () => {
                         </>
                       )}
                       {!isExpanded && v.bySession.length > 0 && (
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>нажмите для развертки — сеты/паттерны/упражнения по подгруппам</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>нажмите для развертки — подгруппы/паттерны/пояснения (чем хорошо / как работает)</div>
                       )}
                     </div>
                   );})}
