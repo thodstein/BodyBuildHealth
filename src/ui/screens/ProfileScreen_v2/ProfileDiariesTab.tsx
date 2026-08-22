@@ -59,7 +59,8 @@ import {
   generateEntryId,
   type BPEntry as CoreBPEntry,
 } from '../../../core/bp-hr-data';
-import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
+import { loadCardioLog, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
+import { type WeightEntry } from '../../../engines/profile-store';
 
 /* ── Типы для встроенных дневников ── */
 
@@ -1042,67 +1043,106 @@ ${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 
     setTimeout(() => w.print(), 120);
   };
 
+  /** Валидация структуры импортируемых дневников — защита от битых данных. */
+  const validateDiaryImport = (data: unknown): { valid: boolean; diaries: Record<string, unknown[]>; goals?: Record<string, unknown>; error?: string } => {
+    if (!data || typeof data !== 'object') return { valid: false, diaries: {}, error: 'Корень не объект' };
+    const d = data as Record<string, unknown>;
+    if (!d.diaries || typeof d.diaries !== 'object') return { valid: false, diaries: {}, error: 'Отсутствует поле diaries' };
+    const diaries = d.diaries as Record<string, unknown>;
+    const validated: Record<string, unknown[]> = {};
+    const arrayKeys = [
+      SLEEP_DIARY_KEY, BP_DIARY_KEY, INJECTION_DIARY_KEY, HEALTH_DIARY_KEY,
+      SYMPTOMS_DIARY_KEY, PAIN_DIARY_KEY, NEURO_DIARY_KEY, ACNE_DIARY_KEY,
+      HEMATO_DIARY_KEY, WEIGHT_LOG_KEY, 'he_cardio_sessions', 'he_injection_schedule'
+    ];
+    for (const key of arrayKeys) {
+      const val = diaries[key];
+      if (val !== undefined && val !== null) {
+        if (!Array.isArray(val)) return { valid: false, diaries: {}, error: `Поле ${key} должно быть массивом` };
+        validated[key] = val;
+      }
+    }
+    if (diaries['he_sleep_goals'] !== undefined && diaries['he_sleep_goals'] !== null) {
+      if (typeof diaries['he_sleep_goals'] !== 'object') return { valid: false, diaries: {}, error: 'he_sleep_goals должен быть объектом' };
+      validated['he_sleep_goals'] = [diaries['he_sleep_goals'] as unknown] as unknown as unknown[];
+    }
+    let goals: Record<string, unknown> | undefined;
+    if (d.goals !== undefined && d.goals !== null) {
+      if (typeof d.goals !== 'object') return { valid: false, diaries: {}, error: 'goals должен быть объектом' };
+      goals = d.goals as Record<string, unknown>;
+    }
+    return { valid: true, diaries: validated, goals };
+  };
+
   const importAllDiaries = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(String(reader.result || ''));
-        const diaries = data.diaries || {};
+        const raw = JSON.parse(String(reader.result || ''));
+        const validation = validateDiaryImport(raw);
+        if (!validation.valid) throw new Error(validation.error || 'Неверная структура');
+        const diaries = validation.diaries;
+        const importedGoals = validation.goals;
         if (diaries[SLEEP_DIARY_KEY] && Array.isArray(diaries[SLEEP_DIARY_KEY])) {
           saveDiary(SLEEP_DIARY_KEY, diaries[SLEEP_DIARY_KEY]);
-          setSleepEntries(diaries[SLEEP_DIARY_KEY]);
+          setSleepEntries(diaries[SLEEP_DIARY_KEY] as SleepEntry[]);
         }
         if (diaries[BP_DIARY_KEY] && Array.isArray(diaries[BP_DIARY_KEY])) {
           saveDiary(BP_DIARY_KEY, diaries[BP_DIARY_KEY]);
-          setBpEntries(diaries[BP_DIARY_KEY]);
+          setBpEntries(diaries[BP_DIARY_KEY] as BPEntry[]);
         }
         if (diaries[INJECTION_DIARY_KEY] && Array.isArray(diaries[INJECTION_DIARY_KEY])) {
           saveDiary(INJECTION_DIARY_KEY, diaries[INJECTION_DIARY_KEY]);
-          setInjectionEntries(diaries[INJECTION_DIARY_KEY]);
+          setInjectionEntries(diaries[INJECTION_DIARY_KEY] as InjectionEntry[]);
         }
         if (diaries[HEALTH_DIARY_KEY] && Array.isArray(diaries[HEALTH_DIARY_KEY])) {
-          saveUnifiedHealthEntries(diaries[HEALTH_DIARY_KEY]);
+          saveUnifiedHealthEntries(diaries[HEALTH_DIARY_KEY] as UnifiedHealthEntry[]);
           setHealthEntries(
-            [...diaries[HEALTH_DIARY_KEY]].sort((a, b) => String(b.date).localeCompare(String(a.date))),
+            [...(diaries[HEALTH_DIARY_KEY] as UnifiedHealthEntry[])].sort((a, b) => String(b.date).localeCompare(String(a.date))),
           );
         }
         if (diaries[SYMPTOMS_DIARY_KEY] && Array.isArray(diaries[SYMPTOMS_DIARY_KEY])) {
           saveDiary(SYMPTOMS_DIARY_KEY, diaries[SYMPTOMS_DIARY_KEY]);
-          setSymptomEntries(diaries[SYMPTOMS_DIARY_KEY]);
+          setSymptomEntries(diaries[SYMPTOMS_DIARY_KEY] as SymptomEntry[]);
         }
         if (diaries[PAIN_DIARY_KEY] && Array.isArray(diaries[PAIN_DIARY_KEY])) {
           saveDiary(PAIN_DIARY_KEY, diaries[PAIN_DIARY_KEY]);
-          setPainEntries(diaries[PAIN_DIARY_KEY]);
+          setPainEntries(diaries[PAIN_DIARY_KEY] as PainEntry[]);
         }
         if (diaries[NEURO_DIARY_KEY] && Array.isArray(diaries[NEURO_DIARY_KEY])) {
           saveDiary(NEURO_DIARY_KEY, diaries[NEURO_DIARY_KEY]);
-          setNeuroEntries(diaries[NEURO_DIARY_KEY]);
+          setNeuroEntries(diaries[NEURO_DIARY_KEY] as NeuroEntry[]);
         }
         if (diaries[ACNE_DIARY_KEY] && Array.isArray(diaries[ACNE_DIARY_KEY])) {
           saveDiary(ACNE_DIARY_KEY, diaries[ACNE_DIARY_KEY]);
-          setAcneEntries(diaries[ACNE_DIARY_KEY]);
+          setAcneEntries(diaries[ACNE_DIARY_KEY] as AcneEntry[]);
         }
         if (diaries[HEMATO_DIARY_KEY] && Array.isArray(diaries[HEMATO_DIARY_KEY])) {
           saveDiary(HEMATO_DIARY_KEY, diaries[HEMATO_DIARY_KEY]);
-          setHematoEntries(diaries[HEMATO_DIARY_KEY]);
+          setHematoEntries(diaries[HEMATO_DIARY_KEY] as HematoEntry[]);
         }
         if (diaries[WEIGHT_LOG_KEY] && Array.isArray(diaries[WEIGHT_LOG_KEY])) {
-          saveWeightLog(diaries[WEIGHT_LOG_KEY]);
-          setWeights(diaries[WEIGHT_LOG_KEY]);
+          saveWeightLog(diaries[WEIGHT_LOG_KEY] as WeightEntry[]);
+          setWeights(diaries[WEIGHT_LOG_KEY] as WeightEntry[]);
         }
         if (diaries['he_cardio_sessions'] && Array.isArray(diaries['he_cardio_sessions'])) {
           try { localStorage.setItem('he_cardio_sessions', JSON.stringify(diaries['he_cardio_sessions'].slice(0, 500))); } catch {}
-          setCardioLog(diaries['he_cardio_sessions']);
+          setCardioLog(diaries['he_cardio_sessions'] as CardioLogEntry[]);
         }
         if (diaries['he_injection_schedule'] && Array.isArray(diaries['he_injection_schedule'])) {
           try { localStorage.setItem('he_injection_schedule', JSON.stringify(diaries['he_injection_schedule'])); } catch {}
         }
-        if (diaries['he_sleep_goals'] && typeof diaries['he_sleep_goals'] === 'object') {
-          try { localStorage.setItem('he_sleep_goals', JSON.stringify(diaries['he_sleep_goals'])); } catch {}
+        if (diaries['he_sleep_goals'] && Array.isArray(diaries['he_sleep_goals']) && diaries['he_sleep_goals'].length > 0) {
+          try { localStorage.setItem('he_sleep_goals', JSON.stringify(diaries['he_sleep_goals'][0])); } catch {}
         }
-        if (data.goals && typeof data.goals === 'object') {
+        if (importedGoals && typeof importedGoals === 'object') {
           const merge = window.confirm('Объединить цели с импортированными?\n• OK = объединить (сохранить свои, добавить недостающие)\n• Отмена = полностью заменить на импортированные');
-          const newGoals = merge ? { ...goals, ...data.goals } : data.goals;
+          const base = merge ? goals : { sleepHours: 8, weightKg: 80, systolicTarget: 120 };
+          const newGoals = {
+            sleepHours: typeof importedGoals.sleepHours === 'number' ? importedGoals.sleepHours : base.sleepHours,
+            weightKg: typeof importedGoals.weightKg === 'number' ? importedGoals.weightKg : base.weightKg,
+            systolicTarget: typeof importedGoals.systolicTarget === 'number' ? importedGoals.systolicTarget : base.systolicTarget,
+          };
           setGoals(newGoals);
           localStorage.setItem(GOALS_KEY, JSON.stringify(newGoals));
         }
