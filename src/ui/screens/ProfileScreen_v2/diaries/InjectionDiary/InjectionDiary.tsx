@@ -55,7 +55,7 @@ import {
 import type { DiaryWindowProps } from '../../DiaryWindow';
 
 type Draft = Omit<InjectionEntry, 'id'>;
-type ViewMode = 'journal' | 'stats' | 'chart';
+type ViewMode = 'journal' | 'stats' | 'chart' | 'schedule';
 type Range = 'all' | '7' | '30' | '90';
 type SortKey = 'date' | 'substance' | 'dose' | 'pain' | 'pip' | 'volume';
 
@@ -847,13 +847,13 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
       />
       <main style={{ ...pageMain, maxWidth: 1180, paddingBottom: 72 }}>
         <div style={{ display: 'flex', gap: 7, marginBottom: 12, flexWrap: 'wrap' }}>
-          {(['journal', 'stats', 'chart'] as ViewMode[]).map((value) => (
+          {(['journal', 'stats', 'chart', 'schedule'] as ViewMode[]).map((value) => (
             <button
               key={value}
               style={mode === value ? chipActive(ACCENT) : chip(ACCENT)}
               onClick={() => setMode(value)}
             >
-              {value === 'journal' ? '📋 Журнал' : value === 'stats' ? '📊 Статистика' : '📈 График боли / PIP'}
+              {value === 'journal' ? '📋 Журнал' : value === 'stats' ? '📊 Статистика' : value === 'chart' ? '📈 График боли / PIP' : '📅 Расписание'}
             </button>
           ))}
         </div>
@@ -1392,16 +1392,167 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
           </section>
         )}
 
+        {/* ========== SCHEDULE TAB ========== */}
+        {mode === 'schedule' && (
+          <section style={card}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+              <h3 style={{ margin: 0 }}>📅 Расписание инъекций</h3>
+              <button
+                style={{ ...button, background: colors.primaryDim, color: colors.primary }}
+                onClick={() => setScheduleEditor({ open: true })}
+              >
+                ➕ Добавить
+              </button>
+            </div>
+            {schedule.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 32, color: colors.textMuted }}>
+                Расписание пусто. Нажмите «➕ Добавить», чтобы создать план инъекций.
+              </div>
+            )}
+            {dueToday.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  padding: '9px 12px',
+                  borderRadius: 10,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                  background: 'rgba(245,158,11,0.10)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                }}
+              >
+                <span style={{ fontSize: 15 }}>📌</span>
+                <div style={{ flex: 1, minWidth: 160, fontSize: 12.5 }}>
+                  <b style={{ color: '#fbbf24' }}>Сегодня по плану:</b>{' '}
+                  {dueToday.map((s) => `${s.substance} ${s.dose}`).join(' · ')}
+                </div>
+                <button
+                  style={{ ...button, minHeight: 32, padding: '5px 12px', background: 'rgba(245,158,11,.2)', color: '#fbbf24' }}
+                  onClick={() => {
+                    const item = dueToday[0];
+                    setRepeatDraft({
+                      date: todayLocalStr(),
+                      substance: item.substance,
+                      dose: item.dose,
+                      zone: item.zone || 'glute_dorsal',
+                      side: item.side || 'left',
+                      volumeMl: item.volumeMl ?? 1,
+                      needleGauge: item.needleGauge || '23G',
+                      technique: item.technique || 'im',
+                      painLevel: 0,
+                      pipLevel: 0,
+                      swelling: 0,
+                      redness: false,
+                      lump: false,
+                      bruise: false,
+                      fever: false,
+                      notes: '',
+                    });
+                    setEditor({ open: true });
+                  }}
+                >
+                  ✍ Записать
+                </button>
+              </div>
+            )}
+            {missed.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  padding: '9px 12px',
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: '#fca5a5',
+                  background: 'rgba(239,68,68,0.08)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                }}
+              >
+                ⏭ Пропущено за 7 дней: {missed.map((m) => `${m.item.substance} (${m.date})`).join(', ')}
+              </div>
+            )}
+            {adherence.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                {adherence.map((row) => (
+                  <div key={row.item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700 }}>
+                        {row.item.substance}{' '}
+                        <span style={{ color: colors.textMuted, fontWeight: 400 }}>{row.item.dose}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 3, marginTop: 3, flexWrap: 'wrap' }}>
+                        {SCHEDULE_WEEKDAYS.map((label, day) => (
+                          <span
+                            key={label}
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: 6,
+                              color: row.item.daysOfWeek.includes(day) ? '#fbbf24' : colors.textMuted,
+                              background: row.item.daysOfWeek.includes(day) ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.03)',
+                            }}
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ flex: '1 1 160px', minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: colors.textMuted, marginBottom: 3 }}>
+                        <span>Соблюдение · {row.planned} по плану</span>
+                        <b style={{ color: row.pct !== null && row.pct < 60 ? colors.danger : row.pct !== null && row.pct < 85 ? colors.warning : colors.green }}>
+                          {row.pct !== null ? `${row.pct}%` : '—'}
+                        </b>
+                      </div>
+                      <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <div
+                          style={{
+                            height: '100%',
+                            width: `${row.pct ?? 0}%`,
+                            borderRadius: 999,
+                            background:
+                              row.pct !== null && row.pct < 60
+                                ? colors.danger
+                                : row.pct !== null && row.pct < 85
+                                  ? colors.warning
+                                  : colors.green,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        style={{ ...button, minHeight: 32, padding: '4px 10px' }}
+                        onClick={() => setScheduleEditor({ open: true, item: row.item })}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        style={{ ...button, minHeight: 32, padding: '4px 10px', background: colors.dangerDim, color: colors.danger }}
+                        onClick={() => {
+                          if (window.confirm(`Удалить пункт расписания «${row.item.substance}»?`)) {
+                            setSchedule(removeScheduleItem(row.item.id));
+                          }
+                        }}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {schedule.length > 0 && adherence.length === 0 && (
+              <div style={{ textAlign: 'center', padding: 16, color: colors.textMuted }}>
+                Инъекций по расписанию нет за последние 7 дней.
+              </div>
+            )}
+          </section>
+        )}
+
         <section style={{ ...card, marginTop: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            <h3 style={{ margin: 0 }}>📅 Расписание инъекций</h3>
-            <button
-              style={{ ...button, background: colors.primaryDim, color: colors.primary }}
-              onClick={() => setScheduleEditor({ open: true })}
-            >
-              ➕ Добавить
-            </button>
-          </div>
           {dueToday.length > 0 && (
             <div
               style={{
