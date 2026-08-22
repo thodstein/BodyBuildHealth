@@ -1,7 +1,7 @@
 /**
- * VBTCalcTab.tsx — Bar speed / VBT-калькулятор: целевая скорость по intent →
- * прогнозируемый %1RM и вес. Также: e1RM по скорости штанги, velocity-loss анализ,
- * пороги потери скорости по intent.
+ * VBTCalcTab.tsx — ВПТ-калькулятор (тренировка по скорости): целевая скорость по цели →
+ * прогнозируемый %1RM и вес. Также: e1RM по скорости штанги, анализ потери скорости,
+ * пороги потери по цели. Источники: Gonzalez-Badillo, Jovanovic — без выдумок.
  * Использует pro/vbt.engine.
  */
 import React, { useMemo, useState } from 'react';
@@ -44,7 +44,7 @@ const INTENT_RU: Record<VBTIntent, string> = {
   speed: 'Скорость (30-50%)',
 };
 
-const liftOpts: { id: VBTLift; label: string; desc: string }[] = (Object.keys(LOAD_VELOCITY_PROFILE) as VBTLift[]).map(k => ({ id: k, label: LIFT_RU[k], desc: `LVP: ${LOAD_VELOCITY_PROFILE[k].length} точек %[1RM]→v (м/с)` }));
+const liftOpts: { id: VBTLift; label: string; desc: string }[] = (Object.keys(LOAD_VELOCITY_PROFILE) as VBTLift[]).map(k => ({ id: k, label: LIFT_RU[k], desc: `Профиль: ${LOAD_VELOCITY_PROFILE[k].length} точек %[1RM]→скорость (м/с)` }));
 const intentOpts: { id: VBTIntent; label: string; desc: string }[] = (Object.keys(INTENT_ZONES) as VBTIntent[]).map(k => ({ id: k, label: INTENT_RU[k], desc: `Целевые %1RM: ${(INTENT_ZONES[k].pct[0] * 100).toFixed(0)}–${(INTENT_ZONES[k].pct[1] * 100).toFixed(0)}%` }));
 
 export const VBTCalcTab: React.FC = () => {
@@ -103,12 +103,12 @@ export const VBTCalcTab: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-      <div style={H}>⚡ VBT / Bar speed калькулятор (Velocity-Based Training)</div>
+      <div style={H}>⚡ ВПТ / Калькулятор скорости штанги (тренировка по скорости, VBT)</div>
       <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
-        Тренировка по скорости штанги: нагрузка связана с %1RM через load-velocity profile (Gonzalez-Badillo / Jovanovic).
-        <b>1.</b> Целевой intent → прогнозируемый %1RM, скорость, рабочий вес.<br />
-        <b>2.</b> e1RM по измеренной скорости и поднятому весу (через LVP).<br />
-        <b>3.</b> Velocity-loss анализ: порог потери скорости по intent для авторегулируемого окончания сета.
+        Тренировка по скорости штанги: нагрузка связана с %1RM через профиль «нагрузка–скорость» (load-velocity profile, Gonzalez-Badillo / Jovanovic).
+        <b>1.</b> Целевая установка (цель) → прогнозируемый %1RM, скорость, рабочий вес.<br />
+        <b>2.</b> e1RM по измеренной скорости и поднятому весу (через профиль нагрузка–скорость).<br />
+        <b>3.</b> Анализ потери скорости: порог по цели для авторегулируемого окончания сета.
       </div>
 
       {/* Параметры */}
@@ -116,28 +116,28 @@ export const VBTCalcTab: React.FC = () => {
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>⚙️ Параметры</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
           <PopupSelect label="Движение" value={lift} options={liftOpts} onChange={v => setLift(v as VBTLift)} />
-          <PopupSelect label="Intent (цель)" value={intent} options={intentOpts} onChange={v => setIntent(v as VBTIntent)} />
+          <PopupSelect label="Цель (намерение)" value={intent} options={intentOpts} onChange={v => setIntent(v as VBTIntent)} />
           <PopupNumber label="Оценочный 1RM" value={e1RM} min={20} max={600} suffix=" кг" onChange={setE1RM} />
         </div>
       </div>
 
-      {/* Целевые значения по intent */}
+      {/* Целевые значения по цели */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 12 }}>
         <MetricCard title="Целевой %1RM" icon="🎯" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{Math.round(tgt.tp * 100)}%</div>
-          <div style={SMALL}>по намерению</div>
+          <div style={SMALL}>по цели</div>
         </MetricCard>
         <MetricCard title="Рабочий вес" icon="🏋️" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{tgt.workWeight}</div>
           <div style={SMALL}>кг (при 1RM {e1RM})</div>
         </MetricCard>
-        <MetricCard title="Цел. скорость" icon="⚡" accent="#3b82f6">
+        <MetricCard title="Целевая скорость" icon="⚡" accent="#3b82f6">
           <div style={{ fontSize: 20, fontWeight: 800, color: '#3b82f6' }}>{tgt.tv.ideal}</div>
           <div style={SMALL}>м/с (диапазон {tgt.tv.min}–{tgt.tv.max})</div>
         </MetricCard>
         <MetricCard title="Прогноз скорости" icon="📈" accent={ACCENT}>
           <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT }}>{tgt.predictedVel}</div>
-          <div style={SMALL}>м/с из LVP для {Math.round(tgt.tp * 100)}%</div>
+          <div style={SMALL}>м/с из профиля для {Math.round(tgt.tp * 100)}%</div>
         </MetricCard>
       </div>
 
@@ -150,18 +150,18 @@ export const VBTCalcTab: React.FC = () => {
         </div>
         {velEst ? (
           <div style={ROWStyle(ACCENT)}>
-            <span style={{ color: 'rgba(255,255,255,0.7)' }}>Прогноз <b style={{ color: ACCENT }}>e1RM</b> (из LVP):</span>
+            <span style={{ color: 'rgba(255,255,255,0.7)' }}>Прогноз <b style={{ color: ACCENT }}>e1RM</b> (из профиля):</span>
             <span><b style={{ color: ACCENT }}>{velEst.e1RM} кг</b> · %1RM = <b>{Math.round(velEst.pct1RM * 100)}%</b></span>
           </div>
         ) : (
-          <div style={SMALL}>Введите скорость и вес → прогноз e1RM (через LVP для {LIFT_RU[lift]}).</div>
+          <div style={SMALL}>Введите скорость и вес → прогноз e1RM (через профиль «нагрузка–скорость» для {LIFT_RU[lift]}).</div>
         )}
       </div>
 
-      {/* Velocity-loss анализ */}
+      {/* Анализ потери скорости */}
       <div style={CARD}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📉 Потеря скорости в сете (velocity-loss)</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Массив скоростей повторов (через запятую): стоп сета при превышении порога {vlThreshold}% (для intent «{INTENT_RU[intent]}»).</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📉 Потеря скорости в сете</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Скорости повторов через запятую: стоп сета при превышении порога {vlThreshold}% (для цели «{INTENT_RU[intent]}»).</div>
         <input type="text" value={velocitiesStr} onChange={e => setVelocitiesStr(e.target.value)} style={{ ...IN, textAlign: 'left' as const, marginBottom: 8 }} placeholder="1.0, 0.94, 0.9, 0.86, 0.82" />
         {vlRes ? (
           <>
@@ -188,7 +188,7 @@ export const VBTCalcTab: React.FC = () => {
       {/* Корректирующие упражнения фазы срыва */}
       {vbtCorrections && vbtCorrections.items.length > 0 && (
         <div style={CARD}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🏋️ Корректировки фазы срыва (VBT)</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🏋️ Корректировки фазы срыва (по скорости)</div>
           <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>
             Скорость упала за порог {vlThreshold}% — вероятная слабая фаза «{vbtCorrections.phase}» (максимальный момент). Корректирующие упражнения:
           </div>
@@ -201,8 +201,8 @@ export const VBTCalcTab: React.FC = () => {
         </div>
       )}
 
-      {/* LVP таблица */}
-      <ExpandableCard title={`📊 Load-Velocity Profile: ${LIFT_RU[lift]}`} accent={ACCENT} short="Скорость по %1RM (Gonzalez-Badillo / Jovanovic)">
+      {/* Таблица профиля нагрузка-скорость */}
+      <ExpandableCard title={`📊 Профиль нагрузка–скорость: ${LIFT_RU[lift]}`} accent={ACCENT} short="Скорость по %1RM (Gonzalez-Badillo / Jovanovic)">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(60px, 1fr))', gap: 4 }}>
           {lvpTable.map(([pct, v], i) => (
             <div key={i} style={{ padding: 6, borderRadius: 6, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
@@ -213,8 +213,8 @@ export const VBTCalcTab: React.FC = () => {
         </div>
       </ExpandableCard>
 
-      {/* Intent zones */}
-      <ExpandableCard title="🎯 Зоны по intent (целевые)" accent={ACCENT} short="Целевые %1RM, скорость, повт. по intent">
+      {/* Зоны по цели */}
+      <ExpandableCard title="🎯 Зоны по цели" accent={ACCENT} short="Целевые %1RM, скорость, повторы по цели">
         {Object.entries(INTENT_ZONES).map(([k, z]) => (
           <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(64px,1.2fr) 1fr 1fr 1fr 0.8fr 0.8fr', gap: 4, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10, color: 'rgba(255,255,255,0.6)', minWidth: 340 }}>
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 11, overflowWrap: 'anywhere' }}>{INTENT_RU[k as VBTIntent]}</span>
