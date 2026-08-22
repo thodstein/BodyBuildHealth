@@ -490,6 +490,17 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     showToast(`✅ Шаблон "${preset.name}" добавлен`);
   }, [diaryData, selectedDate, saveDiary, showToast]);
 
+  const printDay = useCallback(() => {
+    const day = diaryData[selectedDate];
+    if (!day?.meals) { showToast('❌ День пуст — нечего печатать'); return; }
+    const esc = (s:string)=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    const rows = Object.entries(day.meals).flatMap(([meal, items]:any)=>
+      (items as any[]).map((it:any)=>`<tr><td>${esc(meal)}</td><td>${esc(it.name)}</td><td>${esc(it.qty||'')}</td><td>${it.kcal||0}</td><td>${it.p||0}</td><td>${it.f||0}</td><td>${it.c||0}</td></tr>` )
+    ).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Дневник ${selectedDate}</title><style>body{font-family:system-ui;padding:20px;color:#111}h2{margin:0 0 10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:6px;font-size:12px;text-align:left}th{background:#f5f5f5}tfoot td{font-weight:700;background:#f9f9f9}</style></head><body><h2>🍽 Дневник ${selectedDate} — ${Math.round(dayTotals.kcal)} ккал (Б${Math.round(dayTotals.p)} Ж${Math.round(dayTotals.f)} У${Math.round(dayTotals.c)})</h2><table><tr><th>Приём</th><th>Продукт</th><th>Кол-во</th><th>Ккал</th><th>Б</th><th>Ж</th><th>У</th></tr>${rows}<tr><td colspan="3"><b>Итого</b></td><td><b>${Math.round(dayTotals.kcal)}</b></td><td><b>${Math.round(dayTotals.p)}</b></td><td><b>${Math.round(dayTotals.f)}</b></td><td><b>${Math.round(dayTotals.c)}</b></td></tr></table><p style="font-size:10px;color:#666;margin-top:10px">Печать из BodyBuildHealth • ${new Date().toLocaleDateString('ru-RU')}</p></body></html>`;
+    const w = window.open('', '_blank', 'width=800,height=900'); if(!w) return; w.document.write(html); w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch{} }, 300);
+  }, [diaryData, selectedDate, dayTotals, showToast]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {toast && (
@@ -656,6 +667,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
             <button onClick={copyDay} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(0,230,138,0.2)', background:'rgba(0,230,138,0.06)', color:'#00e68a', fontSize:10, fontWeight:600, cursor:'pointer' }}>📋 Копировать день</button>
             {copiedDay && <button onClick={() => pasteDay(selectedDate)} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(139,92,246,0.2)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', fontSize:10, fontWeight:600, cursor:'pointer' }}>📋 Вставить {copiedDay} → сегодня</button>}
             <button onClick={saveDayPreset} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(245,158,11,0.2)', background:'rgba(245,158,11,0.06)', color:'#f59e0b', fontSize:10, fontWeight:600, cursor:'pointer' }}>💾 Шаблон дня</button>
+            <button onClick={printDay} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(59,130,246,0.2)', background:'rgba(59,130,246,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600, cursor:'pointer' }}>🖨 Печать</button>
           </div>
           {dayPresets.length>0 && (
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
