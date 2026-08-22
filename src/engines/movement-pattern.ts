@@ -74,7 +74,7 @@ export function derivePattern(ex: any): string {
   if (/выпад|лунг|болгар/.test(nm)) return 'lunge';
   // FIX: vertical_push ДО horizontal_push — иначе «Жим гантелей сидя/стоя» попадает в horizontal_push (грудь)
   if (/армейск|над голов|вертик|выталк|push.?up|жим.*стоя|жим.*сидя|жим.*смите.*сидя/i.test(nm)) return 'vertical_push';
-  if (/жим.*наклон|incline|наклонн/.test(nm)) return 'incline_push';
+  if (/отрицат|decline|опускан/.test(nm)) return 'decline_push';
   if (/отрицат|decline|опускан/.test(nm)) return 'decline_push';
   if (/жим|пресс.*груд| bench/i.test(nm)) return 'horizontal_push';
   if (/мах|разводк|fly|пек-дек|сведен/.test(nm)) return 'isolation_chest';
