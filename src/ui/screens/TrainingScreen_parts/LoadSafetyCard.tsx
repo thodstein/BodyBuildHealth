@@ -1,20 +1,16 @@
 /** LoadSafetyCard.tsx — ПОЛНЫЙ ПЕРЕПИСК: все вводы через PopupNumber/PopupSelect/PopupToggle.
- *  4 подвкладки: Кардио / Ортопедия / Неделя / Авторегуляция.
+ *  3 подвкладки: Ортопедия / Неделя / Авторегуляция.
  *  Каждый блок — кнопка-карточка с попапом, никаких raw <input>. */
 import React, { useState, useMemo } from 'react';
-import { buildCardioPlan, type CardioType } from '../../../engines/lms/cardio.engine';
 import { computeOrthopedicConstraints, distributeWeeklyLoad } from '../../../engines/orthopedic-load-engines';
 import { autoRegulate, loadForRPE, rpeFromLoad } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
-import { PopupNumber, PopupSelect, PopupToggle, CalcSection, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupNumber, PopupSelect, PopupToggle, CalcSection, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
 const APPLY_BOX: React.CSSProperties = { marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' };
 
-const TYPE_RU: Record<CardioType, string> = { zone2: 'Zone 2 (аэробная)', hiit: 'HIIT (интервалы)', miss: 'Умеренная', recovery: 'Восстановительная' };
-const GOAL_OPTS = ['mass','cut','recomp','maintenance','recovery'].map(g => ({ id: g, label: {mass:'Масса',cut:'Сушка',recomp:'Рекомп',maintenance:'Поддержание',recovery:'Восстановление'}[g] || g }));
-const TYPE_OPTS = (Object.keys(TYPE_RU) as CardioType[]).map(k => ({ id: k, label: TYPE_RU[k] }));
 const SEVERITY_LABELS: Record<string, string> = { none: 'Нет', mild: 'Лёгкая', moderate: 'Средняя', severe: 'Тяжёлая' };
 
 const INJURY_TO_GROUP: Record<string, string> = {
@@ -25,20 +21,16 @@ const INJURY_TO_GROUP: Record<string, string> = {
   chest:'chest',pec:'chest',
 };
 
-type SubTab = 'cardio' | 'ortho' | 'weekly' | 'autoreg';
+type SubTab = 'ortho' | 'weekly' | 'autoreg';
 const SUBTABS: { id: SubTab; label: string; icon: string }[] = [
-  { id:'cardio', label:'Кардио', icon:'🏃' },
   { id:'ortho', label:'Ортопедия', icon:'🦴' },
   { id:'weekly', label:'Неделя', icon:'📅' },
   { id:'autoreg', label:'Авторег', icon:'⚙️' },
 ];
 
-export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSubTab = 'cardio' }) => {
+export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSubTab = 'ortho' }) => {
   const prof = useMemo(() => loadTrainingProfile(), []);
   const [subTab, setSubTab] = useState<SubTab>(initialSubTab);
-  const [cardioGoal, setCardioGoal] = useState('cut');
-  const [cardioDays, setCardioDays] = useState(2);
-  const [cardioType, setCardioType] = useState<CardioType>('zone2');
   const [injuries, setInjuries] = useState('');
   const [currentPain, setCurrentPain] = useState('');
   const [techniqueIssues, setTechniqueIssues] = useState<string[]>([]);
@@ -51,12 +43,10 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
   const [repCount, setRepCount] = useState(5);
   const [readiness, setReadiness] = useState(75);
   const [acwr, setAcwr] = useState(1.0);
-  const [cardioOn, setCardioOn] = useState(false);
   const [orthoOn, setOrthoOn] = useState(false);
   const [weeklyOn, setWeeklyOn] = useState(false);
   const [autoregOn, setAutoregOn] = useState(false);
 
-  const cardioPlan = useMemo(() => buildCardioPlan({ goal: cardioGoal as any, bodyWeight: prof.bodyWeight, daysAvailable: cardioDays }), [cardioGoal, cardioDays, prof.bodyWeight]);
   const ortho = useMemo(() => computeOrthopedicConstraints({
     injuryHistory: injuries.split(',').map(s => s.trim()).filter(Boolean),
     jointLimitations, techniqueIssues,
@@ -71,7 +61,6 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
   const workWeight = useMemo(() => loadForRPE(e1rm, rpe, repCount), [e1rm, rpe, repCount]);
   const rpeBack = useMemo(() => rpeFromLoad(e1rm, workWeight, repCount), [e1rm, workWeight, repCount]);
 
-  const applyCardio = () => applyToPlanner({ kind:'pri', label:'Кардио: '+cardioPlan.totalKcalPerWeek+' ккал/нед', data: { volumeMult: cardioPlan.sessions.length >= 3 ? 0.9 : 0.95, rirShift: 0 } });
   const applyOrtho = () => {
     const groups = Array.from(new Set(injuries.split(',').map(s => s.trim().toLowerCase()).map(inj => INJURY_TO_GROUP[inj]).filter(Boolean)));
     applyToPlanner({ kind:'weakpoints', label:'Ортопедия: '+(ortho.phase === 'acute' ? 'острая фаза' : ortho.phase), data: {
@@ -86,30 +75,6 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
 
   const content = () => {
     switch (subTab) {
-      case 'cardio':
-        return (
-          <>
-          <CalcSection icon="🏃" title="Кардио-план" accent="#3b82f6" desc="Тип кардио, цель, дней/нед — подберётся план">
-            <PopupSelect label="Цель" value={cardioGoal} options={GOAL_OPTS} onChange={setCardioGoal} />
-            <PopupSelect label="Тип кардио" value={cardioType} options={TYPE_OPTS} onChange={v => setCardioType(v as CardioType)} />
-            <PopupNumber label="Дней/нед" value={cardioDays} min={1} max={7} onChange={setCardioDays} />
-            <PopupToggle label="Применить к плану" value={cardioOn} onChange={setCardioOn} icon="🔄" />
-            <div style={{ gridColumn: '1 / -1' }}>
-              <MetricCard title="Кардио-план" icon="📋" accent="#3b82f6">
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
-                  {cardioPlan.sessions.length > 0 ? (
-                    cardioPlan.sessions.map((s, i) => <div key={i}>• {s.type} · {s.durationMin} мин · ~{Math.round(s.kcalPerSession)} ккал</div>)
-                  ) : <div>Нет данных</div>}
-                  <div style={{ marginTop: 4, fontWeight: 700, color: '#60a5fa' }}>Итого: {Math.round(cardioPlan.totalKcalPerWeek)} ккал/нед</div>
-                </div>
-              </MetricCard>
-              {cardioOn && <div style={APPLY_BOX}>
-                <button onClick={applyCardio} style={{ width:'100%', padding:12, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>🛠 Применить к планировщику</button>
-              </div>}
-            </div>
-          </CalcSection>
-          </>
-        );
       case 'ortho':
         return (
           <CalcSection icon="🦴" title="Ортопедические ограничения" accent="#f59e0b" desc="Травмы → какие группы щадить">

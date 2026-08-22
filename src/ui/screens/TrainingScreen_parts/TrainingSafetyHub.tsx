@@ -20,7 +20,7 @@ import { PriRepPatternCard } from './PriRepPatternCard';
 import { JointMasterCard } from './JointMasterCard';
 import type { WorkoutLog } from '../../../core/types';
 
-type SectionId = 'safety' | 'joints' | 'load' | 'autoreg' | 'recovery' | 'cardio';
+type SectionId = 'safety' | 'joints' | 'load' | 'autoreg' | 'recovery';
 
 const SECTIONS: Array<{ id: SectionId; label: string; icon: string; desc: string }> = [
   { id: 'safety', label: 'Безопасность', icon: '🛡', desc: 'Общая оценка упражнения: паттерн/синергия/суставной стресс/противопоказания (быстрый чек)' },
@@ -28,7 +28,6 @@ const SECTIONS: Array<{ id: SectionId; label: string; icon: string; desc: string
   { id: 'load', label: 'Нагрузка', icon: '📊', desc: 'sRPE/ACWR/Banister, индекс усталости, монотонность' },
   { id: 'autoreg', label: 'Авторегуляция', icon: '⚙️', desc: 'RPE/e1RM, готовность, PRI, рабочий вес' },
   { id: 'recovery', label: 'Восстановление', icon: '🔋', desc: 'Сон, HRV, готовность, чек-ин, сценарий «что-если»' },
-  { id: 'cardio', label: 'Кардио', icon: '🏃', desc: 'Кардио-план по цели, весу и доступным дням' },
 ];
 
 export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?: WorkoutLog[] }> = ({ initialSection = 'safety', sessions = [] }) => {
@@ -38,7 +37,7 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
     <div style={{ color: '#fff', padding: 4 }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginBottom: 2 }}>🛡 Безопасность и нагрузка</div>
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 12, lineHeight: 1.4 }}>
-        Единый контейнер без дублей формул: безопасность (общая) + <b style={{ color: '#fff' }}>суставы (50% — 8 блоков + JSI)</b> + нагрузка + авторегуляция + восстановление + кардио. Объём → <b style={{ color: '#fff' }}>Объём-хаб</b> (MEV/MAV/MRV), разгрузка → <b style={{ color: '#fff' }}>Периодизация-хаб</b>. Источники: Foster/Banister/Helms/McGill + JSI (вес×темп×геометрия×фарма×боль).
+        Единый контейнер без дублей формул: безопасность (общая) + <b style={{ color: '#fff' }}>суставы (50% — 8 блоков + JSI)</b> + нагрузка + авторегуляция + восстановление. Кардио-цикл → <b style={{ color: '#fff' }}>Кардио-конструктор</b> (Планировщик), объём → <b style={{ color: '#fff' }}>Объём-хаб</b> (MEV/MAV/MRV). Источники: Foster/Banister/Helms/McGill + JSI (вес×темп×геометрия×фарма×боль).
       </div>
 
       <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -96,7 +95,6 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
           <WhatIfCard baseRisk={20} baseReadiness={75} />
         </>
       )}
-      {section === 'cardio' && <LoadSafetyCard initialSubTab="cardio" />}
     </div>
   );
 };
