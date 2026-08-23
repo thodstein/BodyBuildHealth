@@ -242,6 +242,30 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     } catch { return null; }
   }, [selectedProgram, division, analysis]);
 
+  // BB недельная прогрессия — тоннаж и эфф. сеты по неделям (для графика)
+  const bbWeeklyChart = useMemo(() => {
+    if (division !== 'bb' || !selectedProgram?.bb) return null;
+    try {
+      const weeks: any[] = (selectedProgram.bb as any).weeks || [];
+      if (!weeks.length) return null;
+      return weeks.map((w: any, wi: number) => {
+        let ton = 0, eff = 0, sets = 0;
+        for (const s of (w.sessions || [])) {
+          for (const b of (s.blocks || [])) {
+            for (const st of (b.sets || [])) {
+              const wgt = (st as any).weight || 60;
+              const reps = Number(st.reps) || 8;
+              ton += wgt * reps;
+              sets += 1;
+              if ((st.rir ?? 2) <= 3 && reps >= 5) eff += 1;
+            }
+          }
+        }
+        return { week: (w as any).week || wi + 1, tonnage: Math.round(ton), kpsh: sets, relInt: eff > 0 ? Math.round((eff / Math.max(1, sets)) * 1000) / 1000 : 0, uoi: 0, intFB: eff };
+      });
+    } catch { return null; }
+  }, [selectedProgram, division]);
+
   const bbExtra = useMemo(() => {
     if (division !== 'bb' || !selectedProgram?.bb) return null;
     try {
@@ -262,12 +286,10 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             }
             const sets = (b.sets?.length || 0);
             totalSets += sets;
-            // тоннаж и effective
             for (const st of (b.sets || [])) {
               const wgt = (st as any).weight || 60;
               const reps = Number(st.reps) || 8;
               tonnage += wgt * reps;
-              // effective sets: RIR<=3 и reps>5
               if ((st.rir ?? 2) <= 3 && reps >= 5) effectiveSets += 1;
             }
             const rir = b.sets?.[0]?.rir ?? 2;
@@ -464,7 +486,20 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             </div>
           )}
           {pedOn && pedAdapt && (
-            <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.3 }}>MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} · Восст ×{pedAdapt.combinedRecoveryMultiplier.toFixed(2)} · {pedAdapt.periWorkoutCarbs === 'high' ? 'Углеводы высокие' : 'Углеводы умеренные'}</div>
+            <>
+              <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.3 }}>MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} · Восст ×{pedAdapt.combinedRecoveryMultiplier.toFixed(2)} · {pedAdapt.periWorkoutCarbs === 'high' ? 'Углеводы высокие' : 'Углеводы умеренные'}</div>
+              {pedAdapt.perPED.length > 0 && (
+                <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {pedAdapt.perPED.map(p => (
+                    <div key={p.ped} style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+                      <span>{p.ped} {p.dose > 0 ? `${p.dose}${p.ped === 'AAS' ? 'мг' : p.ped === 'GH' || p.ped === 'insulin' ? 'МЕ' : 'мкг'}` : ''}</span>
+                      <span style={{ color: '#f87171' }}>×{p.mrvMult.toFixed(2)}/×{p.recMult.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {pedAdapt.rationale.slice(0, 2).map((r, i) => <div key={i} style={{ fontSize: 8, color: '#fff', lineHeight: 1.3 }}>• {r}</div>)}
+            </>
           )}
         </div>
       </div>
@@ -473,8 +508,18 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         <button onClick={() => setUseLab(v => !v)} style={{ flex: 1, minWidth: 140, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', fontWeight: 800, fontSize: 10, border: useLab ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: useLab ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.02)', color: useLab ? '#f59e0b' : '#fff' }}>{useLab ? `🧪 Лаборатория учтена ×${labMult.toFixed(2)}` : '🧪 Учитывать лабораторию'}</button>
         <button onClick={() => setShowDetails(v => !v)} style={{ padding: '8px 12px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', color: '#fff' }}>{showDetails ? 'Скрыть детали' : 'Показать детали'}</button>
       </div>
-      {useLab && labAdjust.warnings.length > 0 && (
+      {useLab && (
         <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
+          {linked.labAnalysis ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6, fontSize: 9 }}>
+              <span>Печень: <b style={{ color: linked.labAnalysis.liverStress > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.liverStress}</b></span>
+              <span>Почки: <b style={{ color: linked.labAnalysis.kidneyStress > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.kidneyStress}</b></span>
+              <span>Воспаление: <b style={{ color: linked.labAnalysis.inflammation > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.inflammation}</b></span>
+              <span>Гормоны: <b style={{ color: linked.labAnalysis.hormoneScore < 60 ? '#f59e0b' : '#22c55e' }}>{linked.labAnalysis.hormoneScore}</b></span>
+              <span>Кардио-риск: <b style={{ color: linked.labAnalysis.cardioRisk > 40 ? '#ef4444' : '#22c55e' }}>{linked.labAnalysis.cardioRisk}</b></span>
+              <span>MRV ×{labMult.toFixed(2)}</span>
+            </div>
+          ) : <div style={{ marginBottom: 6, color: '#f59e0b' }}>Нет данных лаборатории — сдайте анализы для точной коррекции.</div>}
           {labAdjust.warnings.map((w, i) => <div key={i}>• {w}</div>)}
           {labAdjust.intensityNote && <div style={{ marginTop: 4, color: '#f59e0b' }}>💡 {labAdjust.intensityNote}</div>}
         </div>
@@ -670,6 +715,12 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>📊 Графики объёма ББ — тяж/памп vs MRV (Israetel, Schoenfeld, Helms)</div>
           <TrainingMetricsChart bb={bbChart} />
+          {bbWeeklyChart && bbWeeklyChart.length > 1 && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Прогрессия ББ по неделям — тоннаж и эфф. сеты</div>
+              <TrainingMetricsChart lms={bbWeeklyChart as any} />
+            </div>
+          )}
           {bbExtra && (
             <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: '#fff' }}>
               <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Всего сетов/нед: <b>{bbExtra.totalSets}</b> · эфф. {bbExtra.effectiveSets}</div>
@@ -678,7 +729,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
               <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Частота ср.: <b>{bbExtra.avgFreq}×/нед</b> · {Object.entries(bbExtra.freqPerWeek).slice(0, 3).map(([k, v]) => `${ru(k)} ${v}×`).join(' · ')}</div>
             </div>
           )}
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.3 }}>Israetel: MEV/MAV/MRV по уровню; Schoenfeld: частота 2×/нед для гипертрофии; Helms: hard-cap по уровню (нач 3/ сред 6/ продв 10). Зелёный — тяж, голубой — памп, красный пунктир — MRV.</div>
+          <div style={{ fontSize: 9, color: '#fff', marginTop: 6, lineHeight: 1.3 }}>Israetel: MEV/MAV/MRV по уровню; Schoenfeld: частота 2×/нед для гипертрофии; Helms: hard-cap по уровню (нач 3/ сред 6/ продв 10). Зелёный — тяж, голубой — памп, красный пунктир — MRV.</div>
         </div>
       )}
 
@@ -687,8 +738,9 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
             <div style={{ marginBottom: 6 }}><b style={{ color: ACCENT }}>Методология:</b> MEV/MAV/MRV из <i>Israetel Hypertrophy Guide</i> по уровню ({effectiveLevel}) + PED-надбавка {pedOn ? `×${pedAdapt?.combinedMrvMultiplier.toFixed(2)}` : '×1.0'} + лаб-коррекция ×{labMult.toFixed(2)}. Пик — макс недельный объём, среднее — по мезоциклу.</div>
             <div style={{ marginBottom: 6 }}><b>Статусы:</b> <span style={{ color: '#3b82f6' }}>low</span> — ниже MEV (недогруз), <span style={{ color: '#22c55e' }}>ok</span> — оптимум, <span style={{ color: '#f59e0b' }}>high</span> — ≥MAV, <span style={{ color: '#ef4444' }}>over</span> — сверх MRV (перетрен).</div>
-            <div style={{ marginBottom: 6 }}><b>ПЛ vs ББ:</b> ББ — 15 групп, акцент на гипертрофию (объём сетов); ПЛ — те же 6 базовых групп, но интерпретация иная (частота приседа/жима/тяги, интенсивность %1RM). Переключатель вверху меняет интерпретацию без пересоздания программы.</div>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>Подсказка: для ББ держите пик 85-95% MRV, для ПЛ — 70-85% (больше интенсивности). PED поднимает MRV, но не отменяет технику/восстановление. Лаборатория снижает MRV при воспалении/печени/почках.</div>
+            <div style={{ marginBottom: 6 }}><b>ПЛ vs ББ:</b> ББ — 15 групп, акцент на гипертрофию (объём сетов, частота 2×/нед Schoenfeld 2016, hard-cap Helms); ПЛ — те же 6 групп, но акцент на интенсивность (Прилепин КПШ, Фунтиков k, Черняк Инт.отн, УОИ).</div>
+            <div style={{ marginBottom: 6 }}><b>Источники:</b> Israetel Hypertrophy Guide (MEV/MAV/MRV), Schoenfeld 2017 (volume/frequency), Helms 2018 (hard sets), Прилепин 1974 (КПШ зоны), Шейко 2005 (тоннаж), Фунтиков 1979 (k-таблица), Черняк 2003 (Инт.отн).</div>
+            <div style={{ fontSize: 9, color: '#fff' }}>Подсказка: для ББ держите пик 85-95% MRV, для ПЛ — 70-85% (больше интенсивности). PED поднимает MRV dose-aware (AAS/GH/инсулин), лаборатория снижает при воспалении/печени/почках.</div>
           </div>
         } />
       )}
@@ -714,8 +766,25 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         </button>
         <button
           onClick={() => {
+            const header = `Калькулятор качества — ${division === 'bb' ? 'ББ' : 'ПЛ'} — ${selectedProgram?.meta.title || ''}`;
+            const linesCsv = [
+              ['Программа', selectedProgram?.meta.title || '', selectedProgram?.meta.direction || '', effectiveLevel, division],
+              ['Оценка', String(analysis.score), analysis.grade, `PRO ${pro ? Math.max(0, Math.min(100, analysis.score + pro.scoreDelta)) : analysis.score}`],
+              ['Уровень', effectiveLevel, pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2)}` : 'Натурал', `Лаб ×${labMult.toFixed(2)}`],
+              [],
+              ['Мышца', 'Пик', 'MEV', 'MAV', 'MRV', 'Статус', '%MRV', 'Ср/нед'],
+              ...analysis.perMuscle.map(p => [ru(p.muscle), String(p.peakSets), String(p.mev), String(p.mav), String(p.mrv), p.status, String(p.mrv ? Math.round((p.peakSets / p.mrv) * 100) : 0), String(p.avgSets)]),
+            ];
+            const csv = linesCsv.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blobCsv = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const urlCsv = URL.createObjectURL(blobCsv);
+            const aCsv = document.createElement('a');
+            aCsv.href = urlCsv;
+            aCsv.download = `quality-${division}-${(selectedProgram?.meta.title || 'program').replace(/\s+/g, '_')}.csv`;
+            aCsv.click();
+            URL.revokeObjectURL(urlCsv);
             const lines = [
-              `Калькулятор качества — ${division === 'bb' ? 'ББ' : 'ПЛ'} — ${selectedProgram?.meta.title || ''}`,
+              header,
               `Уровень: ${effectiveLevel} · ${pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2)}` : 'Натурал'} · Лаб ×${labMult.toFixed(2)}`,
               `Оценка: ${analysis.score}/100 ${analysis.grade} · PRO: ${pro ? Math.max(0, Math.min(100, analysis.score + pro.scoreDelta)) : analysis.score}/100`,
               `--- Объём ---`,
