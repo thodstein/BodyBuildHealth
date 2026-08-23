@@ -58,7 +58,7 @@ const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: '
 
 const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', minHeight: 38 };
 
-export const PeriodizationDesignerTab: React.FC = () => {
+export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' | 'deload' | 'progression' | 'tracker' | 'taper'; initialActivePanel?: 'phases' | 'splits' }> = ({ initialUnifiedMode, initialActivePanel }) => {
   const [designs, setDesigns] = useState<MacrocycleDesign[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [editBlockId, setEditBlockId] = useState<string | null>(null);
@@ -80,11 +80,11 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
   const [showHelp, setShowHelp] = useState(false);
-  const [activePanel, setActivePanel] = useState<'phases' | 'splits'>('phases');
+  const [activePanel, setActivePanel] = useState<'phases' | 'splits'>(initialActivePanel ?? 'phases');
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [plShowCompare, setPlShowCompare] = useState(false);
   const [bbShowCompare, setBbShowCompare] = useState(false);
-  const [unifiedMode, setUnifiedMode] = useState<'micro' | 'deload' | 'progression' | 'tracker'>('micro');
+  const [unifiedMode, setUnifiedMode] = useState<'micro' | 'deload' | 'progression' | 'tracker' | 'taper'>(initialUnifiedMode ?? 'micro');
   // — подбор сплитов/циклов —
   const [plLevel, setPlLevel] = useState('intermediate');
   const [plDays, setPlDays] = useState(4);
@@ -891,14 +891,15 @@ export const PeriodizationDesignerTab: React.FC = () => {
               </span>
             </div>
             <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>
-              Микроциклы, делод, прогрессия и трекер работают на <b style={{ color: '#fff' }}>одних данных</b> — текущем дизайне. Изменение блока сразу отражается во всех четырёх представлениях. Не дубли, а единый поток.
+              Микро, делод, прогрессия, трекер и тейпер работают на <b style={{ color: '#fff' }}>одних данных</b> — текущем дизайне. Изменение блока сразу отражается во всех пяти представлениях. Не дубли, а единый поток.
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 6, marginBottom: 10 }}>
               {[
                 { id: 'micro', icon: '🗓️', label: 'Микро' },
                 { id: 'deload', icon: '🧘', label: 'Делод' },
-                { id: 'progression', icon: '📈', label: 'Прогрессия' },
+                { id: 'progression', icon: '📈', label: 'Прогр.' },
                 { id: 'tracker', icon: '📊', label: 'Трекер' },
+                { id: 'taper', icon: '🔻', label: 'Тейпер' },
               ].map(tab => (
                 <button key={tab.id} onClick={() => setUnifiedMode(tab.id as any)} style={{
                   padding: '8px 6px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', minHeight: 44,
@@ -1101,6 +1102,52 @@ export const PeriodizationDesignerTab: React.FC = () => {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {unifiedMode === 'taper' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>🔻 Тейпер / Пик — из дизайна (ПЛ 2-3 нед / ББ 1 нед)</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>
+                  Тейпер строится из <b style={{ color: '#fff' }}>пиковых/разгрузочных</b> блоков дизайна. {effectiveDiscipline === 'pl' ? 'ПЛ: объём 40-50%, RIR +2, прикиды.' : 'ББ: вода/соль/углеводы стабильны, шоу-пик 7 дней.'}
+                </div>
+                {(() => {
+                  const peaking = current ? current.blocks.filter(b => b.phaseKey === 'peaking') : [];
+                  const deload = current ? current.blocks.filter(b => b.phaseKey === 'deload') : [];
+                  if (!current || (peaking.length === 0 && deload.length === 0)) {
+                    return <div style={{ padding: 10, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>Добавьте «Пик» или «Разгрузка» в дизайн — тейпер появится здесь</div>;
+                  }
+                  const taperWeeks = [...peaking, ...deload].sort((a,b)=>a.startWeek-b.startWeek);
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
+                        {taperWeeks.map(b => (
+                          <span key={b.id} style={{ padding: '4px 8px', borderRadius: 6, background: b.phaseKey==='peaking' ? 'rgba(239,68,68,0.12)' : 'rgba(96,165,250,0.12)', border: `1px solid ${b.phaseKey==='peaking' ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.25)'}`, color: b.phaseKey==='peaking' ? '#ef4444' : '#60a5fa', fontSize: 10, fontWeight: 700 }}>
+                            {PHASE_ICONS[b.phaseKey]} {PHASE_LABELS_RU[b.phaseKey]} нед {b.startWeek}-{b.endWeek}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8, fontSize: 10 }}>
+                        <div style={{ padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.12)', textAlign: 'center' }}>
+                          <div style={{ color: '#ef4444', fontWeight: 700 }}>Объём в пик</div>
+                          <div style={{ color: '#fff', fontWeight: 800, fontSize: 12 }}>{effectiveDiscipline==='pl' ? '40-50%' : '—'}</div>
+                          <div style={{ color: DIM }}>тейпер по Bosquet</div>
+                        </div>
+                        <div style={{ padding: 8, borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)', textAlign: 'center' }}>
+                          <div style={{ color: '#22c55e', fontWeight: 700 }}>Интенсивность</div>
+                          <div style={{ color: '#fff', fontWeight: 800, fontSize: 12 }}>{effectiveDiscipline==='pl' ? 'сохр.' : 'RIR 2-4'}</div>
+                          <div style={{ color: DIM }}>{effectiveDiscipline==='pl' ? 'вес сохранён' : 'без отказа'}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => {
+                        const first = taperWeeks[0];
+                        const vol = first.phaseKey==='peaking' ? 0.45 : 0.5;
+                        const rir = first.phaseKey==='peaking' ? 0 : 3;
+                        applyToPlanner({ kind: first.phaseKey==='peaking' ? 'peak' : 'deload', label: `Тейпер из дизайна: нед ${first.startWeek}-${first.endWeek}`, data: first.phaseKey==='peaking' ? { volumeMult: vol, rirTarget: rir } : { volumeMult: vol, rirShift: rir, weeks: Array.from({length: first.endWeek-first.startWeek+1}, (_,i)=>first.startWeek+i) } } as any);
+                      }} style={{ ...btn, width: '100%', minHeight: 38, background: accent+'18', borderColor: accent+'33', color: accent }}>🛠 Применить тейпер из дизайна</button>
                     </div>
                   );
                 })()}

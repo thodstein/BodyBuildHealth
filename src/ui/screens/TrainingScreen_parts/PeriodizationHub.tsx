@@ -33,13 +33,14 @@ export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> 
         <b style={{ color: ACCENT }}>Дизайнер ★ Единый</b> — один инструмент: макро-блоки + <b style={{ color: '#fff' }}>микро</b> (понедельно) + <b style={{ color: '#fff' }}>делод</b> (ACWR/HRV) + <b style={{ color: '#fff' }}>прогрессия</b> (кривая объёма) + <b style={{ color: '#fff' }}>трекер</b> (мезо 1→2→3) — всё на одних данных, без дублей. Остальные вкладки — отдельные legacy-виды для справки.
       </div>
       <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', marginBottom: 10, fontSize: 10, color: DIM, lineHeight: 1.4 }}>
-        <b style={{ color: '#fff' }}>Как пользоваться единым:</b> соберите дизайн (ПЛ/ББ) на таймлайне → внизу переключайте <b>🗓️ Микро</b> / <b>🧘 Делод</b> / <b>📈 Прогрессия</b> / <b>📊 Трекер</b> — всё синхронизировано. Отдельные вкладки оставлены для совместимости.
+        <b style={{ color: '#fff' }}>Как пользоваться единым:</b> соберите дизайн (ПЛ/ББ) на таймлайне → внизу переключайте <b>🗓️ Микро</b> / <b>🧘 Делод</b> / <b>📈 Прогрессия</b> / <b>📊 Трекер</b> / <b>🔻 Тейпер</b> — всё на одних данных. Любая legacy-вкладка теперь открывает единый в нужном разделе — дублей нет.
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+      <style>{`@media (max-width: 560px) { .ph-hub-nav { flex-wrap: nowrap !important; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; } .ph-hub-nav::-webkit-scrollbar { display: none; } .ph-hub-nav button { flex: 0 0 auto; } }`}</style>
+      <div className="ph-hub-nav" style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         {MODE_DEFS.map(({ m, label, icon, desc }) => (
           <button key={m} onClick={() => setMode(m)} title={desc} style={{
-            padding: '8px 16px', borderRadius: 8,
+            padding: '8px 16px', borderRadius: 8, minHeight: 44,
             border: mode === m ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
             background: mode === m ? 'rgba(0,230,138,0.1)' : 'rgba(0,0,0,0.3)',
             color: mode === m ? ACCENT : DIM, cursor: 'pointer', fontSize: 12, fontWeight: 700,
@@ -51,12 +52,12 @@ export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> 
       </div>
 
       {mode === 'designer' && <PeriodizationDesignerTab />}
-      {mode === 'progression' && <MesocycleProgressionCard />}
-      {mode === 'tracker' && <MesocycleTrackerTab />}
-      {mode === 'micro' && <MicrocyclePlannerCard />}
-      {mode === 'deload' && <DeloadSchedulerTab />}
-      {mode === 'taper' && <TaperPlannerTab />}
-      {mode === 'splits' && <SplitGenCard />}
+      {mode === 'progression' && <PeriodizationDesignerTab initialUnifiedMode="progression" />}
+      {mode === 'tracker' && <PeriodizationDesignerTab initialUnifiedMode="tracker" />}
+      {mode === 'micro' && <PeriodizationDesignerTab initialUnifiedMode="micro" />}
+      {mode === 'deload' && <PeriodizationDesignerTab initialUnifiedMode="deload" />}
+      {mode === 'taper' && <PeriodizationDesignerTab initialUnifiedMode="taper" />}
+      {mode === 'splits' && <PeriodizationDesignerTab initialActivePanel="splits" />}
     </div>
   );
 };
