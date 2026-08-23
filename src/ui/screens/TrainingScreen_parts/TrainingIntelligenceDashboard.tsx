@@ -55,7 +55,8 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '🎯', label: 'Качество и диагностика', color: '#a855f7',
       tools: [
-        { icon: '🎯', label: 'Качество + Диагностика', desc: 'Единый хаб: 0-100 + MEV/MAV/MRV и мастер движения (9 лифтов)/срывы (дневник) — аналог Объём-хаба', tab: 'quality_joint_hub' as any },
+        { icon: '⭐', label: 'Качество программы', desc: 'PRO 0-100: ББ/ПЛ/Гибрид, MEV/MAV/MRV (Israetel), PED dose-aware, лаб 0.7-1.0, PRO паттерны/углы/растяжка/техника/цель ~ Schoenfeld, графики тоннаж/КПШ/UOI', tab: 'quality_hub' as any },
+        { icon: '🔬', label: 'Диагностика движения', desc: 'Мастер движения 9 лифтов × 10 блоков: слабые мышцы → точки → мёртвые точки → bar-path → геометрия → VBT → срывы RPE≥8 → RIR → мезо', tab: 'diagnostics_hub' as any },
       ],
     },
     {
