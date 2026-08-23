@@ -418,9 +418,10 @@ export function findFood(name: string, extraCatalog?: FoodItem[]): FoodItem | un
     .map(food => {
       const foodWords = normalizeFoodText(food.name).split(/\s+/);
       const score = words.reduce((total, word) => total + (foodWords.some(candidate => candidate.includes(word) || (candidate.length >= 3 && word.includes(candidate)) || (word.length >= 5 && candidate.length >= 5 && editDistance(word, candidate) <= 1)) ? 1 : 0), 0);
-      return { food, score };
+      const exactWord = words.some(word => foodWords.includes(word));
+      return { food, score, exactWord };
     })
-    .filter(result => result.score > 0)
+    .filter(result => result.score > 0 && (words.length <= 1 || result.exactWord || result.score >= 2))
     .sort((a, b) => b.score - a.score || a.food.name.length - b.food.name.length)[0]?.food;
   if (dbResult) return dbResult;
   // Fallback: search extra catalog (USDA_FOODS, etc.)
