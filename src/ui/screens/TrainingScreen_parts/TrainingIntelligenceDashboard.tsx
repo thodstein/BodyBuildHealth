@@ -56,7 +56,8 @@ export default function TrainingIntelligenceDashboard(p: Props) {
     {
       icon: '🎯', label: 'Качество и диагностика', color: '#a855f7',
       tools: [
-        { icon: '🎯', label: 'Качество + Диагностика', desc: 'Единый хаб: 0-100 + MEV/MAV/MRV и мастер движения (9 лифтов)/срывы (дневник) — аналог Объём-хаба', tab: 'quality_joint_hub' as any },
+        { icon: '⭐', label: 'Качество', desc: '0-100 + MEV/MAV/MRV, проверка программы', tab: 'quality_hub' as any },
+        { icon: '🔬', label: 'Диагностика', desc: 'Мастер движения 9 лифтов + видео + срывы (дневник)', tab: 'diagnostics_hub' as any },
       ],
     },
     {
