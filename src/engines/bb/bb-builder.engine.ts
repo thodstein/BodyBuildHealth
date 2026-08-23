@@ -33,7 +33,7 @@ import { computeVolumeLandmarks, type VolumeLandmarkRow } from '../volume-landma
 // Фазовая периодизация (distributePhases) — ЕДИНЫЙ источник RIR/фаз/deload для ББ-плана.
 // Импорт distributePhases/getPhaseVolumeMult из UI-модуля намеренный: это каноническая
 // реализация, которую использует и ручной конструктор (phase-periodization).
-import { distributePhases, PHASE_CONFIGS, getPhaseVolumeMult, type BBPhase } from '../periodization';
+import { distributePhases, PHASE_CONFIGS, getPhaseConfig, getPhaseVolumeMult, type BBPhase } from '../periodization';
 import { orderSessionExercises, type SessionMethodology } from './bb-session-order.engine';
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
@@ -628,6 +628,10 @@ const BB_JUNK_PATTERNS: RegExp = /паллоф|pallof|bird.?dog|птиц.*соб
 function isBBJunk(ex: any): boolean {
   const n = (ex.name || '').toLowerCase();
   const id = (ex.id || '').toLowerCase();
+  // Weighted push-ups — валидное ББ-упражнение (не мусор), даже если содержит pushup
+  if (/отжиман.*(?:вес|отягощ|пояс|блин|weight|belt)/i.test(n) || /push.?up.*(?:weight|вес|belt|отягощ)/i.test(n) || /weight.*push.?up|вес.*отжиман/i.test(n)) {
+    return false;
+  }
   if (BB_JUNK_PATTERNS.test(n) || BB_JUNK_PATTERNS.test(id)) {
     // Исключения: брусья/dips — это ББ-упражнения, не отжимания
     if (/брус|dip/.test(n) && !/отжим.*от пол|narrow|алмаз/i.test(n)) return false;
@@ -1403,9 +1407,9 @@ function buildSession(
     if (sets > 5) sets = 5;
     // MRV-кап: одна сессия не превышает недельный MRV мышцы (fix D)
     if (mrvRot > 0) sets = Math.max(1, Math.min(sets, mrvRot));
-    // P1: reps/tempo/rest берутся из PHASE_CONFIGS[phase] — единый источник правды.
+    // P1: reps/tempo/rest берутся из фазового конфига с учётом trainingFocus — единый источник.
     // (Ранее дубль: buildSession ставил charReps → applyPostPhaseProcessing перезаписывал).
-    const phaseCfg = PHASE_CONFIGS[phase];
+    const phaseCfg = getPhaseConfig(phase, trainingFocus);
     const isAccessory = role === 'accessory';
     const [baseMin, baseMax] = phaseCfg.repRange;
     // Базовые reps: primary = cfg.repRange; accessory = +2 к мин, +5 к макс (пампинг)
@@ -1993,7 +1997,7 @@ function buildSession(
 
   // Apply substitution for graded injuries: replace exercises and adjust loads
   for (const pl of plans) {
-    const phaseCfg = PHASE_CONFIGS[phase];
+    const phaseCfg = getPhaseConfig(phase, trainingFocus);
     const isGraded = gradedInjuries.some(inj => collapseKey(inj.muscle) === pl.muscle);
     const injuryFactor = gradedInjuries.find(inj => collapseKey(inj.muscle) === pl.muscle);
     if (isGraded && injuryFactor) {
@@ -2071,7 +2075,7 @@ function buildSession(
   }
   let armAllocatedBudget = 0;
   for (const pl of plans) {
-    const phaseCfg = PHASE_CONFIGS[phase];
+    const phaseCfg = getPhaseConfig(phase, trainingFocus);
     const [adjMin, adjMax] = phaseCfg.repRange;
     const isAcc = pl.role === 'accessory';
     const repMin = isAcc ? adjMin + 2 : adjMin;
@@ -2695,12 +2699,12 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   if (acwrDanger) {
     deloadFreq = Math.max(1, Math.min(deloadFreq || 3, 3));
   }
-  const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal || 'mass');
+  const phaseDist = distributePhases(input.weeks, deloadFreq, input.goal || 'mass', input.trainingFocus);
   // P2: принудительный финальный делод для 4-5 нед планов (через замену последней недели)
   if (forceFinalDeload && input.weeks >= 4) {
     const lastIdx = phaseDist.findIndex(pd => pd.startWeek === input.weeks);
     if (lastIdx >= 0) {
-      phaseDist[lastIdx] = { phase: 'deload', startWeek: input.weeks, endWeek: input.weeks, weeks: [input.weeks], config: PHASE_CONFIGS.deload };
+      phaseDist[lastIdx] = { phase: 'deload', startWeek: input.weeks, endWeek: input.weeks, weeks: [input.weeks], config: getPhaseConfig('deload', input.trainingFocus) };
     }
   }
   const phaseByWeek = new Map<number, BBPhase>();
@@ -2787,8 +2791,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
       // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
       // fix I: фазовая модуляция объёма — deload/peak реально снижают число сетов (не только RIR).
-      // Бюджет сессии масштабируется по volumeMultiplier фазы (PHASE_CONFIGS), MRV-потолок не трогаем.
-      const phaseVol = PHASE_CONFIGS[phase]?.volumeMultiplier ?? 1.0;
+      // Бюджет сессии масштабируется по volumeMultiplier фазы (focus-aware), MRV-потолок не трогаем.
+      const phaseVol = getPhaseVolumeMult(phase, input.trainingFocus) ?? 1.0;
       const sessDailyCap = Math.round((sessMuscles.length <= 2 ? dailyCap * 1.5 : dailyCap) * phaseVol);
       const mrvRot = Math.max(12, ...sessMuscles.map(m => mrvByMuscle[m] || 0));
       // fix F: per-week оценка травм относительно даты недели (а не только «сегодня»).
@@ -3270,7 +3274,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           const fName = fData.name || fData.id;
           const fBase = (workMax as any)[m] || DEFAULT_WORKMAX[m] || 50;
           const armSets = 3;
-          const pcfg = PHASE_CONFIGS[wPhase];
+          const pcfg = getPhaseConfig(wPhase as any, input.trainingFocus);
           const armReps = Math.round((pcfg.repRange[0] + pcfg.repRange[1]) / 2) + 2;
           const armWeight = Math.round(fBase * pcfg.intensityMultiplier * 0.88 * 10) / 10;
           s.exercises.push({

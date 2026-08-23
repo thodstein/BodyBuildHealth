@@ -201,6 +201,21 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       }
     }
   }
+  // P1-1: частота <2×/нед для основных групп — предупреждение (Schoenfeld 2016: 2× 6.8% vs 1× 3.7%)
+  const MAJOR_FOR_FREQ = new Set(['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'glutes', 'biceps', 'triceps']);
+  if (plan.volumeTargets) {
+    for (const [muscle, target] of Object.entries(plan.volumeTargets)) {
+      if (MAJOR_FOR_FREQ.has(muscle) && target.frequency === 1) {
+        issues.push({ level: 'warning', code: 'low_training_frequency', message: `${muscle}: частота 1×/нед — неоптимально для гипертрофии. Рекомендовано ≥2×/нед (Schoenfeld 2016: 2× ES 0.49 vs 1× 0.30). Рассмотрите сплит с 2× частотой.`, exercise: muscle });
+      }
+    }
+  } else if (plan.muscleFrequency) {
+    for (const [muscle, freq] of Object.entries(plan.muscleFrequency)) {
+      if (MAJOR_FOR_FREQ.has(muscle) && freq === 1) {
+        issues.push({ level: 'warning', code: 'low_training_frequency', message: `${muscle}: частота 1×/нед — неоптимально. Рекомендовано ≥2×/нед (Schoenfeld 2016).`, exercise: muscle });
+      }
+    }
+  }
   if (plan.volumeTargets) {
     for (const [muscle, target] of Object.entries(plan.volumeTargets)) {
       const peakVolume = plan.weeklyVolume

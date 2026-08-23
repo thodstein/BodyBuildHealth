@@ -20,16 +20,17 @@ import { TAG_MUSCLES } from './bb-day-types';
 import type { BBExercise } from './bb-builder.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
-/* ───────────────────────── Приоритет мышц ───────────────────────── */
-// Большие/compound-доминантные мышцы раньше в пределах одного тира.
-const MUSCLE_PRIORITY: Record<string, number> = {
+/* ───────────────────────── Приоритет мышц ───────────────────────── — каноника MUSCLE_ORDER (дедуп P2-1) */
+const MUSCLE_ORDER: Record<string, number> = {
   quads: 0, back: 1, chest: 2, hamstrings: 3, glutes: 4,
   legs: 4, shoulders: 5, delt_front: 5, delt_mid: 5, delt_rear: 5,
-  trapezius: 6, traps: 6, biceps: 7, triceps: 7, arms: 7,
-  calves: 8, forearms: 9, abs: 10, core: 10, lower_back: 10,
+  traps: 6, trapezius: 6, triceps: 7, biceps: 8, arms: 9,
+  calves: 10, forearms: 11, abs: 12, core: 12, lower_back: 12,
 };
+/** @deprecated alias — используйте MUSCLE_ORDER напрямую */
+const MUSCLE_PRIORITY: Record<string, number> = MUSCLE_ORDER;
 function musclePriority(muscle: string): number {
-  return MUSCLE_PRIORITY[muscle] ?? 12;
+  return MUSCLE_ORDER[muscle] ?? 12;
 }
 
 /* ───────────────────────── Классификаторы по имени ───────────────────────── */
@@ -155,15 +156,7 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
  *  [5] load:             тяжелее / меньше RIR — раньше
  */
 
-/** Порядок мышц в сессии: большие compound-мышцы → малые изолирующие → финишные.
- *  Гарантирует: все упражнения одной мышцы идут ПОДРЯД, без вкраплений других мышц.
- *  ★ triceps (7) раньше biceps (8) — triceps больше мышечная масса, compound-first. */
-const MUSCLE_ORDER: Record<string, number> = {
-  quads: 0, back: 1, chest: 2, hamstrings: 3, glutes: 4,
-  legs: 4, shoulders: 5, delt_front: 5, delt_mid: 5, delt_rear: 5,
-  traps: 6, trapezius: 6, triceps: 7, biceps: 8, arms: 9,
-  calves: 10, forearms: 11, abs: 12, core: 12, lower_back: 12,
-};
+/** Порядок мышц в сессии: см. MUSCLE_ORDER вверху файла (каноника). */
 function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string>, methodology: SessionMethodology = 'compound_first', priorityMuscles: Set<string> = new Set()): number[] {
   const exMuscle = collapseMuscle(ex.muscle || '');
   const isPrimaryMuscle = exMuscle === collapseMuscle(primaryMuscle);

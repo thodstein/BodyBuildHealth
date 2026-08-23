@@ -9,6 +9,8 @@
 import { RIR_WAVE_PATTERNS, PCT_FOR_RIR, type ManualExercise, type ManualDay } from './program-types';
 import { VOLUME_LANDMARKS_DB, type TrainingLevel, normLevel } from '../../../engines/volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
+import { FOCUS_PHASE_OVERRIDES } from '../../../engines/bb/bb-goal-types';
 
 /* ──────────── Типы фаз ──────────── */
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
@@ -60,7 +62,7 @@ export const PHASE_CONFIGS: Record<BBPhase, PhaseConfig> = {
     intensityMultiplier: 0.55,
     repRange: [12, 20],
     restBase: 60,
-    tempo: '4-2-2-1',
+    tempo: '3-1-1-0',
     description: 'Резкое снижение объёма и веса. Восстановление ЦНС и суставов.',
     exerciseMix: { compoundPct: 0.15, isolationPct: 0.30, machinePct: 0.20, cablePct: 0.25, feederPct: 0.10 },
   },
@@ -85,6 +87,18 @@ export const PHASE_LABELS: Record<BBPhase, string> = {
   peaking: 'Пик',
 };
 
+/**
+ * Focus-специфичный конфиг фазы: базовый PHASE_CONFIGS + оверрайд по BBTrainingFocus.
+ * Если focus не задан — инвариант (hypertrophy = базовые значения).
+ */
+export function getPhaseConfig(phase: BBPhase, focus?: BBTrainingFocus): PhaseConfig {
+  const base = PHASE_CONFIGS[phase];
+  if (!focus) return base;
+  const override = FOCUS_PHASE_OVERRIDES[focus]?.[phase];
+  if (!override) return base;
+  return { ...base, ...override } as PhaseConfig;
+}
+
 /* ──────────── Распределение недель по фазам ──────────── */
 export interface PhaseDistribution {
   phase: BBPhase;
@@ -104,8 +118,9 @@ export interface PhaseDistribution {
  * @param mesoLength — длина мезоцикла
  * @param deloadFreq — частота делода (0=нет)
  * @param goal — цель (strength/powerlifting → peaking)
+ * @param trainingFocus — фокус силы/гипертрофии/выносливости (оверрайд repRange/intensity)
  */
-export function distributePhases(mesoLength: number, deloadFreq: number, goal: string): PhaseDistribution[] {
+export function distributePhases(mesoLength: number, deloadFreq: number, goal: string, trainingFocus?: BBTrainingFocus): PhaseDistribution[] {
   const dist: PhaseDistribution[] = [];
   const deloadWeeks = new Set<number>();
   
@@ -132,20 +147,20 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
     // P1-2: peaking проверяется ПЕРЕД deload — финальные недели peaking
     // не должны перекрываться регулярным deload (taper → peak, не deload → peak).
     if (w > mesoLength - peakWeeks) {
-      dist.push({ phase: 'peaking', startWeek: w, endWeek: w, weeks: [w], config: PHASE_CONFIGS.peaking });
+      dist.push({ phase: 'peaking', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('peaking', trainingFocus) });
       continue;
     }
     if (deloadWeeks.has(w)) {
-      dist.push({ phase: 'deload', startWeek: w, endWeek: w, weeks: [w], config: PHASE_CONFIGS.deload });
+      dist.push({ phase: 'deload', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('deload', trainingFocus) });
       continue;
     }
     // Определяем позицию среди активных недель
     const activeIdx = activeWeeks.indexOf(w);
     if (activeIdx < 0) continue;
     if (activeIdx < accumEnd) {
-      dist.push({ phase: 'accumulation', startWeek: w, endWeek: w, weeks: [w], config: PHASE_CONFIGS.accumulation });
+      dist.push({ phase: 'accumulation', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('accumulation', trainingFocus) });
     } else {
-      dist.push({ phase: 'intensification', startWeek: w, endWeek: w, weeks: [w], config: PHASE_CONFIGS.intensification });
+      dist.push({ phase: 'intensification', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('intensification', trainingFocus) });
     }
   }
 
@@ -223,8 +238,8 @@ export function getPerMuscleMrv(muscle: string, level: string, onCourse: boolean
 }
 
 /* ──────────── Volume multiplier по фазе ──────────── */
-export function getPhaseVolumeMult(phase: BBPhase): number {
-  return PHASE_CONFIGS[phase]?.volumeMultiplier ?? 1.0;
+export function getPhaseVolumeMult(phase: BBPhase, focus?: BBTrainingFocus): number {
+  return getPhaseConfig(phase, focus).volumeMultiplier ?? 1.0;
 }
 
 /* ──────────── DUP: недельная вариация повторений ──────────── */

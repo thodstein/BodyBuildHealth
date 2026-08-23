@@ -59,3 +59,33 @@ export const LEVEL_REP_MOD: Record<string, number> = {
   advanced: 2,
   enhanced: 4,
 };
+
+/**
+ * Focus-специфичные оверрайды фаз.
+ * IUSCA 2021 + BJSM 2022 NMA: сила требует >80% 1RM (1-6 повт), гипертрофия 6-30 повт при RIR 0-3,
+ * выносливость 12-30 повт. Wolf 2023: long-length partials эффективны для гипертрофии.
+ * hypertrophy — инвариант текущих PHASE_CONFIGS (10-15/6-10/3-6/12-20).
+ * strength — сдвиг к низким повторам и высокой интенсивности.
+ * endurance — сдвиг к высоким повторам и метаболическому стрессу.
+ */
+export const FOCUS_PHASE_OVERRIDES: Record<BBTrainingFocus, Partial<Record<string, Partial<{ repRange: [number, number]; intensityMultiplier: number; volumeMultiplier: number }>>>> = {
+  strength: {
+    accumulation:    { repRange: [6, 10], intensityMultiplier: 0.85, volumeMultiplier: 0.90 },
+    intensification: { repRange: [3, 6],  intensityMultiplier: 0.95, volumeMultiplier: 0.80 },
+    peaking:         { repRange: [1, 3],  intensityMultiplier: 0.97, volumeMultiplier: 0.55 },
+    deload:          { repRange: [8, 12], intensityMultiplier: 0.60, volumeMultiplier: 0.50 },
+  },
+  hypertrophy: {
+    // инвариант — явные значения для прозрачности, совпадают с PHASE_CONFIGS
+    accumulation:    { repRange: [10, 15], intensityMultiplier: 0.75, volumeMultiplier: 1.00 },
+    intensification: { repRange: [6, 10],  intensityMultiplier: 0.85, volumeMultiplier: 0.85 },
+    peaking:         { repRange: [3, 6],   intensityMultiplier: 0.95, volumeMultiplier: 0.65 },
+    deload:          { repRange: [12, 20], intensityMultiplier: 0.55, volumeMultiplier: 0.50 },
+  },
+  endurance: {
+    accumulation:    { repRange: [12, 20], intensityMultiplier: 0.70, volumeMultiplier: 1.00 },
+    intensification: { repRange: [10, 15], intensityMultiplier: 0.75, volumeMultiplier: 0.85 },
+    peaking:         { repRange: [8, 12],  intensityMultiplier: 0.80, volumeMultiplier: 0.65 },
+    deload:          { repRange: [15, 25], intensityMultiplier: 0.50, volumeMultiplier: 0.50 },
+  },
+};

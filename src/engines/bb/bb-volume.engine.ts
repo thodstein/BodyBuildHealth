@@ -289,12 +289,34 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
 
   // Жимы рук/груди (НЕ «жим ногами» — это квадрицепс-движение и даёт
   // indirect на glutes/hamstrings, а не на triceps/shoulders!).
+  // Дифференциация P1-4: узкий хват сильнее грузит трицепс, вертикальный жим — плечи.
   if (hasAny(name, /жим|bench|press|dip|отжим.*брус/i) && !/ног|leg.?press|жим.*ног/i.test(name)) {
+    const isNarrow = /узк|close.?grip|narrow|алмаз.*отжим/i.test(name);
+    const isVertical = /стоя|сидя.*армей|overhead|ohp|военный|military|армейск/i.test(name) && !/лёж|лежа|bench|гориз/i.test(name);
+    const isDip = /брус|dip|отжим.*брус/i.test(name);
+    if (isNarrow) {
+      return [
+        { muscle: 'triceps', coefficient: 0.60 },
+        { muscle: 'shoulders', coefficient: 0.15 },
+      ];
+    }
+    if (isVertical) {
+      return [
+        { muscle: 'triceps', coefficient: 0.30 },
+        { muscle: 'shoulders', coefficient: 0.35 },
+      ];
+    }
+    if (isDip) {
+      return [
+        { muscle: 'triceps', coefficient: 0.50 },
+        { muscle: 'shoulders', coefficient: 0.25 },
+      ];
+    }
     return [
       // 0.45: трицепс получает ~45% косвенной работы от жимов (EMG-оценки);
       // 0.5 завышал effective — fullbody-сплиты 5x/нед уходили в MRV-overflow.
       { muscle: 'triceps', coefficient: 0.45 },
-      { muscle: 'shoulders', coefficient: 0.2 },
+      { muscle: 'shoulders', coefficient: 0.20 },
     ];
   }
   if (hasAny(name, /подтяг|pull.?up|pulldown|пуллдаун|тяга.*верх/i)) {

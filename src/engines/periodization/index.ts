@@ -8,6 +8,7 @@ export {
   PHASES,
   PHASE_CONFIGS,
   PHASE_LABELS,
+  getPhaseConfig,
   distributePhases,
   getRirForWeek,
   calcPhaseWeight,

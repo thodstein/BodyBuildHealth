@@ -101,13 +101,13 @@ export function tempoFor(character: DayCharacter, technique?: string, phase?: st
       }
     }
   }
-  // Phase-based eccentric emphasis (ACSM 2023: accumulation 3с, peaking 2с, deload 4с)
+  // Phase-based eccentric emphasis (ACSM 2023: accumulation 3с, peaking 2с, deload 3с)
   if (phase) {
     const phaseTempo: Record<string, string> = {
       accumulation: '3-1-1-0',
       intensification: '2-1-1-0',
       peaking: '2-0-1-0',
-      deload: '4-2-2-0',
+      deload: '3-1-1-0',
     };
     const pt = phaseTempo[phase];
     if (pt) {
