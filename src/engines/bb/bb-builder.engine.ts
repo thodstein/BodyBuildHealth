@@ -1128,11 +1128,6 @@ export function buildExercisePool(muscle: string, role: string, opts: { level: s
   return [];
 }
 
-export function buildExercisePool(muscle: string, role: string, opts: { level: string; equipmentList: string[]; excludeIds: string[]; allowExotic: boolean }): any[] {
-  // Thin wrapper для тестов — как в buildSession:1533 pool building
-  return [];
-}
-
 export interface BuildSessionParams {
   sched: ScheduleDay; dayInRotation: number; week: number;
   muscleVolumeRotation: Record<string, number>;
