@@ -2379,8 +2379,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // N1: track used food IDs across meals to avoid duplicates when budget=max
     const usedFoodIds = new Set<string>();
     const isTimeInWorkWindowLocal = (timeStr: string, ws: number, we: number) => { const toM = (t:string)=>{ const [h,m]=t.split(':').map(Number); return h*60+m; }; const tm=toM(timeStr); if(!Number.isFinite(tm)||!Number.isFinite(ws)||!Number.isFinite(we)) return false; if(ws===we) return false; if(we>ws) return tm>=ws&&tm<=we; return tm>=ws||tm<=we; };
-    const portableFilter = (pool: any[], mealTime?: string) => { if (workFood !== 'portable' || !isWorkDay) return pool; if (mealTime && Number.isFinite(workStartMin) && Number.isFinite(workEndMin) && !isTimeInWorkWindowLocal(mealTime, workStartMin, workEndMin)) return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_durum','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter(f => !nonPortableIds.has(f.id)); };
-    const applyFoodPrefs = (pool: any[], prefType: string, mealTime?: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool, mealTime).filter(f => !excludedIds.has(f.id) && [...allergenIds].every(a => !getFoodAllergenTags(f.id, FOOD_DB).includes(a) && !allergenTextMatches(a, f.name))); };
     const seedRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
     // ═══════════════════════════════════════════════════════════════════════
     // T1.1 — Smart breakfast templates by day type
@@ -2640,6 +2638,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         workStartMin = toMin(workStartTime);
         workEndMin = toMin(workEndTime);
       }
+      const portableFilter = (pool: any[], mealTime?: string) => { if (workFood !== 'portable' || !isWorkDay) return pool; if (mealTime && Number.isFinite(workStartMin) && Number.isFinite(workEndMin) && !isTimeInWorkWindowLocal(mealTime, workStartMin, workEndMin)) return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_durum','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter((f: any) => !nonPortableIds.has(f.id)); };
+      const applyFoodPrefs = (pool: any[], prefType: string, mealTime?: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool, mealTime).filter((f: any) => !excludedIds.has(f.id) && [...allergenIds].every((a: string) => !getFoodAllergenTags(f.id, FOOD_DB).includes(a) && !allergenTextMatches(a, f.name))); };
       const isNightShift = workScheduleEnabled && isWorkDay && (workEndMin < workStartMin);
       const effectiveWake = isNightShift ? Math.max(workStartMin - 300, 600) : wakeMin;
       const effectiveBed = isNightShift ? Math.min(workEndMin + 180, 600) : bedMin;
