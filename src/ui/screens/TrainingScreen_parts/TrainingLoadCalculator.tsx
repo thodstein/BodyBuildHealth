@@ -10,7 +10,7 @@ import { MetricCard, ExpandableCard, SaveButton, PopupNumber } from '../SRCBBScr
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.45 };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const, fontSize: 12 };
 
@@ -39,7 +39,7 @@ export const TrainingLoadCalculator: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>📊 Калькулятор тренировочной нагрузки (sRPE / ACWR / Banister)</div>
-      <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+      <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Нагрузка сессии = sRPE × длительность (AU). Острая — EWMA за 7 дней, хроническая — за 28 дней. ACWR — отношение острой к хронической. Монотонность — однообразие недели, strain — общий стресс.
       </div>
 
@@ -47,7 +47,7 @@ export const TrainingLoadCalculator: React.FC = () => {
       <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: 12, marginBottom: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>➕ Добавить тренировку</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8, alignItems: 'end' }}>
-          <div><div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 3 }}>Дата</div><input type="date" value={date} onChange={e => setDate(e.target.value)} style={IN} /></div>
+          <div><div style={{ fontSize: 11, color: '#fff', marginBottom: 3 }}>Дата</div><input type="date" value={date} onChange={e => setDate(e.target.value)} style={IN} /></div>
           <PopupNumber label="sRPE (1-10)" value={rpe} min={1} max={10} onChange={v => setRpe(v)} />
           <PopupNumber label="Длит., мин" value={dur} min={5} max={300} suffix=" мин" onChange={v => setDur(v)} />
         </div>
@@ -66,17 +66,17 @@ export const TrainingLoadCalculator: React.FC = () => {
           <MetricCard title="ACWR (острая / хроническая)" icon="⚖️" accent={ZONE_META[report.acwr.zone].color}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Острая (7д)</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Острая (7д)</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{Math.round(report.acwr.acute)}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>AU</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>AU</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Хроническая (28д)</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Хроническая (28д)</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{Math.round(report.acwr.chronic)}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>AU</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>AU</div>
               </div>
               <div style={{ background: ZONE_META[report.acwr.zone].color + '14', borderRadius: 8, padding: 8, textAlign: 'center', border: `1px solid ${ZONE_META[report.acwr.zone].color}44` }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>ACWR</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>ACWR</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: ZONE_META[report.acwr.zone].color }}>{report.acwr.ratio.toFixed(2)}</div>
                 <div style={{ fontSize: 10, color: ZONE_META[report.acwr.zone].color }}>{ZONE_META[report.acwr.zone].label}</div>
               </div>
@@ -85,7 +85,7 @@ export const TrainingLoadCalculator: React.FC = () => {
             <div style={{ marginTop: 10, position: 'relative', height: 8, borderRadius: 4, background: 'linear-gradient(90deg,#3b82f6 0-20%, #22c55e 20-60%, #eab308 60-80%, #ef4444 80-100%)' }}>
               <div style={{ position: 'absolute', top: -3, width: 3, height: 14, background: '#fff', borderRadius: 2, left: `${Math.min(100, Math.max(0, (report.acwr.ratio / 2) * 100))}%` }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}><span>0.0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 2 }}><span>0.0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0</span></div>
           </MetricCard>
 
           {/* Монотонность / Strain */}
@@ -102,9 +102,9 @@ export const TrainingLoadCalculator: React.FC = () => {
           {report.banister.current && (
             <MetricCard title="Fitness-Fatigue (Banister)" icon="🧬" accent="#60a5fa">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                <div style={{ background: 'rgba(96,165,250,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Форма</div><div style={{ fontSize: 16, fontWeight: 800, color: '#22c55e' }}>{Math.round(report.banister.current.fitness)}</div></div>
-                <div style={{ background: 'rgba(96,165,250,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Усталость</div><div style={{ fontSize: 16, fontWeight: 800, color: '#ef4444' }}>{Math.round(report.banister.current.fatigue)}</div></div>
-                <div style={{ background: 'rgba(96,165,250,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}><div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Работоспособность</div><div style={{ fontSize: 16, fontWeight: 800, color: report.banister.current.performance >= 0 ? ACCENT : '#ef4444' }}>{Math.round(report.banister.current.performance)}</div></div>
+                <div style={{ background: 'rgba(96,165,250,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}><div style={{ fontSize: 10, color: '#fff' }}>Форма</div><div style={{ fontSize: 16, fontWeight: 800, color: '#22c55e' }}>{Math.round(report.banister.current.fitness)}</div></div>
+                <div style={{ background: 'rgba(96,165,250,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}><div style={{ fontSize: 10, color: '#fff' }}>Усталость</div><div style={{ fontSize: 16, fontWeight: 800, color: '#ef4444' }}>{Math.round(report.banister.current.fatigue)}</div></div>
+                <div style={{ background: 'rgba(96,165,250,0.06)', borderRadius: 8, padding: 8, textAlign: 'center' }}><div style={{ fontSize: 10, color: '#fff' }}>Работоспособность</div><div style={{ fontSize: 16, fontWeight: 800, color: report.banister.current.performance >= 0 ? ACCENT : '#ef4444' }}>{Math.round(report.banister.current.performance)}</div></div>
               </div>
               {report.banister.peakPerformanceIdx >= 0 && report.banister.series[report.banister.peakPerformanceIdx] && <div style={{ ...SMALL, marginTop: 6 }}>Пик производительности: {Math.round(report.banister.series[report.banister.peakPerformanceIdx].performance)} ({report.banister.series[report.banister.peakPerformanceIdx].date})</div>}
             </MetricCard>
@@ -116,14 +116,14 @@ export const TrainingLoadCalculator: React.FC = () => {
               {last7.map((d, i) => (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (d.load / maxLoad) * 56), borderRadius: 4, background: d.load > 0 ? 'linear-gradient(180deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)' }} />
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{d.date.slice(5)}</span>
+                  <span style={{ fontSize: 10, color: '#fff' }}>{d.date.slice(5)}</span>
                 </div>
               ))}
             </div>
           </MetricCard>
 
           <div style={{ margin: '0 0 8px',  marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить нагрузку (ACWR {report.acwr.ratio.toFixed(2)} — {ZONE_META[report.acwr.zone].label}) к планировщику: при ACWR {">"}1.5 — объём ×0.8 (делод), {">"}1.3 — ×0.9, {"<"}0.8 — ×1.1.</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить нагрузку (ACWR {report.acwr.ratio.toFixed(2)} — {ZONE_META[report.acwr.zone].label}) к планировщику: при ACWR {">"}1.5 — объём ×0.8 (делод), {">"}1.3 — ×0.9, {"<"}0.8 — ×1.1.</div>
             <button onClick={() => { const r = report.acwr.ratio; const mult = r > 1.5 ? 0.8 : r > 1.3 ? 0.9 : r < 0.8 ? 1.1 : 1; const rsh = r > 1.5 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Нагрузка ACWR ' + r.toFixed(2) + ' → объём ×' + mult, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить ACWR к планировщику</button>
           </div>
           {/* Рекомендации */}
@@ -146,7 +146,7 @@ export const TrainingLoadCalculator: React.FC = () => {
                   {weeks.map((x, i) => (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                       <div style={{ width: '100%', maxWidth: 36, height: Math.max(2, (x.load / maxW) * 56), borderRadius: 4, background: i === weeks.length - 1 ? 'linear-gradient(180deg,#00e68a,#00c853)' : 'rgba(96,165,250,0.5)' }} />
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{x.label}</span>
+                      <span style={{ fontSize: 10, color: '#fff' }}>{x.label}</span>
                       <span style={{ fontSize: 10, color: '#fff', fontWeight: 700 }}>{x.load}</span>
                     </div>
                   ))}
@@ -156,7 +156,7 @@ export const TrainingLoadCalculator: React.FC = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8, alignItems: 'end' }}>
                   <PopupNumber label="Целевой хронич. (AU)" value={targetChronic} min={0} suffix=" AU" hint={'по умолч. ' + String(Math.round(report.acwr.chronic || 0))} onChange={v => setTargetChronic(v)} />
                   <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Рекоменд. острая</div>
+                    <div style={{ fontSize: 11, color: '#fff' }}>Рекоменд. острая</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>{Math.round(lo)}–{Math.round(hi)} AU</div>
                   </div>
                 </div>
@@ -171,7 +171,7 @@ export const TrainingLoadCalculator: React.FC = () => {
           <ExpandableCard title={`Журнал sRPE-сессий (${sessions.length})`} icon="📝" short="Нажмите, чтобы развернуть список записанных тренировок." full={
             <div>
               {sessions.slice().reverse().map((s, i) => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 0.6fr 0.6fr 0.6fr', gap: 4, fontSize: 10, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.85)' }}>
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 0.6fr 0.6fr 0.6fr', gap: 4, fontSize: 10, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#fff' }}>
                   <span>{s.date}</span><span>RPE {s.sRPE}</span><span>{s.durationMin} мин</span><span style={{ color: ACCENT, fontWeight: 700 }}>{sessionLoad(s.sRPE, s.durationMin)} AU</span>
                 </div>
               ))}

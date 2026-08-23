@@ -79,7 +79,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
     <div style={CARD}>
       <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>
         {isSourceCalendar ? '📅' : '📈'} {title || 'Прогрессия мезоцикла'}
-        <div style={{ marginLeft: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 400, marginTop: 2 }}>
+        <div style={{ marginLeft: 8, fontSize: 10, color: '#fff', fontWeight: 400, marginTop: 2 }}>
           {isSourceCalendar
             ? `Источник: ${progression.length} недель, без типовой фазовой генерации`
             : `Трек Мезо 1→2→3: ${interMeso.map((m, i) => `${m.mesoIndex}: ${m.startVolumeSets}с / ${Math.round(m.startIntensityPct * 100)}%`).join(' → ')}`}
@@ -93,7 +93,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             <div key={phase} style={{ gridColumn: '1 / -1', padding: 8, borderRadius: 8, background: `${ACCENT}10`, border: `1px solid ${ACCENT}25`, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: ACCENT, fontWeight: 700 }}>Оригинальная раскладка</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{progression.length}н</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>недели источника СРЦ</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>недели источника СРЦ</div>
             </div>
           );
           const count = dist[phase] || 0;
@@ -103,7 +103,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             <div key={phase} style={{ padding: 8, borderRadius: 8, background: `${color}10`, border: `1px solid ${color}25`, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color, fontWeight: 700 }}>{PHASE_RU[phase]}</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{count}н</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{pct}%</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>{pct}%</div>
               <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 4, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: pct + '%', borderRadius: 2, background: color }} />
               </div>
@@ -123,7 +123,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             const isDeload = phase === 'deload';
             return (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 22 }}>
-                <div style={{ fontSize: 10, color: p.intensityPct > 0.85 ? '#ef4444' : 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                <div style={{ fontSize: 10, color: p.intensityPct > 0.85 ? '#ef4444' : '#fff', fontWeight: 600 }}>
                   {Math.round(p.intensityPct * 100)}%
                 </div>
                 <div style={{
@@ -137,7 +137,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
           })}
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 4, fontSize: 10, color: '#fff' }}>
         <span>▮ Объём (сетов)</span>
         <span style={{ color: '#ef4444' }}>% 1RM</span>
         <span>— {isSourceCalendar ? 'оригинал' : 'разгрузка'}</span>
@@ -146,7 +146,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
       {/* Таблица прогрессии */}
       <div style={{ marginTop: 10 }}>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-         <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2, padding: '4px 8px', fontSize:10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', minWidth: 340 }}>
+         <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2, padding: '4px 8px', fontSize:10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', minWidth: 340 }}>
           <span>Нед</span><span>Фаза</span><span>Объём×</span><span>Сетов</span><span>%1RM</span><span>RIR</span>
         </div>
         {progression.map((p, i) => {
@@ -157,7 +157,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
           return (
             <div key={i} style={{
               display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2,
-              padding: '4px 8px', fontSize: 10, color: 'rgba(255,255,255,0.85)',
+              padding: '4px 8px', fontSize: 10, color: '#fff',
               borderTop: '1px solid rgba(255,255,255,0.04)',
               background: ov ? `${ov.color}12` : (!isSourceCalendar && isDeload ? 'rgba(96,165,250,0.06)' : !isSourceCalendar && (p as WeekProgression).fatigueAdjusted ? 'rgba(245,158,11,0.04)' : 'transparent'),
               borderLeft: `3px solid ${color}55`,
@@ -165,7 +165,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             }}>
               <span style={{ fontWeight: 700, color }}>{p.week}</span>
               <span style={{ color, fontWeight: 600, fontSize: 10 }}>{ov ? ov.label : isSourceCalendar ? `${SOURCE_PHASE_ORIGIN_LABEL[(p as SourceWeekSnapshot).phaseOrigin]} · ${SOURCE_PHASE_LABEL[(p as SourceWeekSnapshot).phase]}` : `${PHASE_RU[(p as WeekProgression).phase]}${(p as WeekProgression).fatigueAdjusted ? ' ⚡' : ''}`}</span>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{volumeMultiplierFor(p).toFixed(2)}</span>
+              <span style={{ color: '#fff' }}>{volumeMultiplierFor(p).toFixed(2)}</span>
               <span style={{ fontWeight: 600 }}>{p.volumeSets}</span>
               <span style={{ color: p.intensityPct > 0.85 ? '#ef4444' : '#f59e0b', fontWeight: 700 }}>{Math.round(p.intensityPct * 100)}%</span>
               <span style={{ color: p.rir <= 1 ? '#ef4444' : p.rir >= 4 ? '#60a5fa' : ACCENT, fontWeight: 700 }}>{p.rir}</span>
@@ -196,7 +196,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
                 {baseToBuild && (
                   <div style={{ padding: 8, borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', textAlign: 'center' }}>
                     <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>База → Накопление</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+                    <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
                       Объём: {baseToBuild.volStart} → {baseToBuild.vol} сет ({baseToBuild.vol > baseToBuild.volStart ? '+' : ''}{baseToBuild.vol - baseToBuild.volStart})<br />
                       Инт: {Math.round(baseToBuild.intStart * 100)}% → {Math.round(baseToBuild.int * 100)}%
                     </div>
@@ -205,7 +205,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
                 {buildToPeak && (
                   <div style={{ padding: 8, borderRadius: 8, background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)', textAlign: 'center' }}>
                     <div style={{ fontSize: 10, color: '#eab308', fontWeight: 700 }}>Накопление → Пик</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+                    <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
                       Объём: {buildToPeak.volStart} → {buildToPeak.vol} сет<br />
                       Инт: {Math.round(buildToPeak.intStart * 100)}% → {Math.round(buildToPeak.int * 100)}%
                     </div>
@@ -213,7 +213,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
                 )}
                 <div style={{ padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)', textAlign: 'center' }}>
                   <div style={{ fontSize: 10, color: '#60a5fa', fontWeight: 700 }}>Пик → Делод</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
                     Объём: −50% от пика<br />
                     Инт: 50-60% 1RM<br />
                     RIR 4 · 2-3 сессии
@@ -223,14 +223,14 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             );
           })()}
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 8, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 8, lineHeight: 1.4 }}>
           После делода — старт нового мезоцикла с возросшей работоспособностью.
           Объём и интенсивность сбрасываются к базовым значениям начала нового мезоцикла,
           но с поправкой на прогресс ПМ за предыдущий цикл.
         </div>
       </div>}
       {!isSourceCalendar && <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить стартовую прогрессию мезо к планировщику: {startVolumeSets} сет/нед, {Math.round(startIntensityPct * 100)}% интенсивность, RIR {startRIR}.</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить стартовую прогрессию мезо к планировщику: {startVolumeSets} сет/нед, {Math.round(startIntensityPct * 100)}% интенсивность, RIR {startRIR}.</div>
         <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Прогрессия мезо: старт ' + startVolumeSets + ' сет/нед, ' + Math.round(startIntensityPct * 100) + '%, RIR ' + startRIR, data: { mrv: startVolumeSets } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить прогрессию к планировщику</button>
       </div>}
     </div>

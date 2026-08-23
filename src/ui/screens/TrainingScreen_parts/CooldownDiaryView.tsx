@@ -118,7 +118,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
     } catch { /* SSR/блокировка — игнор */ }
   }, [log, adherence, quality, insights, skipCounts]);
 
-  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 10, minHeight: 36 };
+  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
@@ -128,7 +128,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           <div style={{ fontSize: 13, fontWeight: 800, color: COOLDOWN_COLOR }}>❄️ Заминка</div>
           <span style={{ fontSize: 9, color: DIM }}>Приверженность и качество заминки — из дневника и сессий</span>
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
           Заминка генерируется автоматически (дыхание + растяжка рабочих зон дня, + восстановление при усталости).
           Здесь — только факт: выполнена ли заминка, качество 1-5, причины пропуска. Вкладка только отображает — план не меняется.
         </div>
@@ -155,12 +155,12 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           });
           return (
             <div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>
                 🎯 {planDay.name || 'Тренировка'} · рабочие зоны: <b style={{ color: '#fff' }}>{prepGroupLabels(groups)}</b>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {stretch.slice(0, 6).map(s => (
-                  <span key={s.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(56,189,248,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(56,189,248,0.25)' }}>
+                  <span key={s.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(56,189,248,0.1)', color: '#fff', border: '1px solid rgba(56,189,248,0.25)' }}>
                     {cooldownLabel(s.id)}{s.note ? ` — ${s.note}` : ''}
                   </span>
                 ))}
@@ -198,9 +198,9 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           {STRETCH_FOCUSES.map(f => (
             <button key={f.id} type="button" onClick={() => { setStretchFocus(f.id); setStretchPlan(null); setStretchDone(new Set()); setStretchSaved(false); }}
               title={f.hint} style={{ padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 600, minHeight: 30,
-                border: stretchFocus === f.id ? '1px solid #38bdf8' : '1px solid var(--border)',
-                background: stretchFocus === f.id ? 'rgba(56,189,248,0.15)' : 'var(--bg-secondary)',
-                color: stretchFocus === f.id ? '#38bdf8' : 'var(--text-dim)' }}>
+                border: stretchFocus === f.id ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                background: stretchFocus === f.id ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.04)',
+                color: stretchFocus === f.id ? '#38bdf8' : '#fff' }}>
               {f.icon} {f.label}
             </button>
           ))}
@@ -210,9 +210,9 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           {[10, 15, 20].map(m => (
             <button key={m} type="button" onClick={() => { setStretchDur(m); setStretchPlan(null); setStretchDone(new Set()); setStretchSaved(false); }}
               style={{ padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 600, minHeight: 30,
-                border: stretchDur === m ? '1px solid #38bdf8' : '1px solid var(--border)',
-                background: stretchDur === m ? 'rgba(56,189,248,0.15)' : 'var(--bg-secondary)',
-                color: stretchDur === m ? '#38bdf8' : 'var(--text-dim)' }}>
+                border: stretchDur === m ? '1px solid #38bdf8' : '1px solid rgba(255,255,255,0.08)',
+                background: stretchDur === m ? 'rgba(56,189,248,0.15)' : 'rgba(255,255,255,0.04)',
+                color: stretchDur === m ? '#38bdf8' : '#fff' }}>
               {m} мин
             </button>
           ))}
@@ -237,7 +237,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
                 const isDone = stretchDone.has(ex.id);
                 const isActive = timer?.id === ex.id;
                 return (
-                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, padding: '5px 8px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+                  <div key={bi} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
                     <span style={{ fontWeight: 700, color: isDone ? '#22c55e' : '#fff', flex: 1 }}>{stretchExerciseLabel(ex.id)}</span>
                     {ex.note && <span style={{ fontSize: 8, color: DIM }}>{ex.note}</span>}
                     <span style={{ color: DIM, fontSize: 9 }}>{ex.sets}×{ex.durationSec}с</span>
@@ -261,11 +261,11 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               <button type="button" disabled={doneStretch < totalStretch || stretchSaved} onClick={saveStretchSession}
                 style={{ flex: 1, padding: '7px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700, minHeight: 38, border: 'none',
-                  background: doneStretch >= totalStretch && !stretchSaved ? 'linear-gradient(135deg,#38bdf8,#0284c7)' : 'rgba(255,255,255,0.08)', color: doneStretch >= totalStretch && !stretchSaved ? '#000' : 'var(--text-dim)' }}>
+                  background: doneStretch >= totalStretch && !stretchSaved ? 'linear-gradient(135deg,#38bdf8,#0284c7)' : 'rgba(255,255,255,0.08)', color: doneStretch >= totalStretch && !stretchSaved ? '#000' : '#fff' }}>
                 {stretchSaved ? '✓ Сессия сохранена' : doneStretch >= totalStretch ? '✓ Завершить и сохранить' : `Выполнено ${doneStretch}/${totalStretch}`}
               </button>
               <button type="button" onClick={() => { setStretchPlan(null); setStretchDone(new Set()); setTimer(null); }}
-                style={{ padding: '7px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 10, minHeight: 38, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-dim)' }}>
+                style={{ padding: '7px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 10, minHeight: 38, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}>
                 ✕
               </button>
             </div>
@@ -285,27 +285,27 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Записей</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: COOLDOWN_COLOR }}>{adherence.total}</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Приверженность</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: adherence.pct >= 80 ? '#22c55e' : adherence.pct >= 50 ? '#f59e0b' : '#ef4444' }}>
                   {adherence.total > 0 ? `${adherence.pct}%` : '—'}
                 </div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Ср. качество</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#a78bfa' }}>{quality.count > 0 ? quality.avg.toFixed(1) : '—'}</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Выполнено дней</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a' }}>{adherence.done}</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Серия</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: streak >= 3 ? '#22c55e' : streak > 0 ? '#f59e0b' : 'var(--text-dim)' }}>{streak > 0 ? `${streak} дн` : '—'}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: streak >= 3 ? '#22c55e' : streak > 0 ? '#f59e0b' : '#fff' }}>{streak > 0 ? `${streak} дн` : '—'}</div>
               </div>
             </div>
             {quality.count >= 2 && (
@@ -339,7 +339,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Заминка → готовность на следующий день (n={link.n}):</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {link.buckets.map(b => (
-                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: DIM }}>{b.range}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgRecovery}%` : '—'}</div>
                       <div style={{ fontSize: 8, color: DIM }}>{b.n} дней</div>
@@ -356,7 +356,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Причины пропуска:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {skipCounts.map(([reason, n]) => (
-                    <span key={reason} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                    <span key={reason} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#fff', border: '1px solid rgba(239,68,68,0.25)' }}>
                       {reason} · {n}×
                     </span>
                   ))}
@@ -373,7 +373,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           💡 Персональные инсайты
         </div>
         {insights.map((s, i) => (
-          <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, padding: '6px 8px', borderRadius: 8, background: 'rgba(56,189,248,0.04)', borderLeft: '2px solid rgba(56,189,248,0.4)', marginBottom: 4 }}>
+          <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, padding: '6px 8px', borderRadius: 8, background: 'rgba(56,189,248,0.04)', borderLeft: '2px solid rgba(56,189,248,0.4)', marginBottom: 4 }}>
             {s}
           </div>
         ))}
@@ -387,7 +387,7 @@ export const CooldownDiaryView: React.FC<{ planDay?: { name?: string; exercises?
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {[...log].reverse().slice(0, 10).map(e => (
-              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, padding: '5px 8px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
                 <span style={{ color: DIM, minWidth: 64 }}>{e.date.slice(5).replace('-', '.')}</span>
                 <span style={{ fontWeight: 700, color: e.done ? '#22c55e' : '#ef4444' }}>{e.done ? '✓ выполнена' : '✕ пропущена'}</span>
                 {e.quality !== null && <span style={{ color: '#a78bfa' }}>качество {e.quality}/5</span>}

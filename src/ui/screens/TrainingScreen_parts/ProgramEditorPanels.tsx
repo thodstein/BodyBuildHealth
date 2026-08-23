@@ -102,7 +102,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
         <div style={{ marginBottom: 8, padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>⚠ Превышение MRV — снизьте объём:</div>
           {overloaded.map(o => (
-            <div key={o.muscle} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {o.peakSets} сетов {'>'} MRV {o.mrv} (−{o.peakSets - o.mrv} сетов)</div>
+            <div key={o.muscle} style={{ fontSize: 10, color: '#fff' }}>{GROUP_RU[o.muscle] ?? o.muscle}: {o.peakSets} сетов {'>'} MRV {o.mrv} (−{o.peakSets - o.mrv} сетов)</div>
           ))}
         </div>
       )}
@@ -116,7 +116,7 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
 
       {/* Сводка issues */}
       {q.issues.length > 0 && (
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
+        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 4 }}>
           {q.issues.slice(0, 4).map((iss, i) => <div key={i} style={{ marginBottom: 2 }}>• {iss}</div>)}
         </div>
       )}
@@ -205,7 +205,7 @@ export const PlanSummaryTable: React.FC<{
                   <div key={exId}>
                     <div onClick={() => setExpandedEx(isExpanded ? null : exId)}
                       style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.03)', background: isExpanded ? 'rgba(0,230,138,0.06)' : 'transparent', fontSize: 12, transition: 'background 0.15s' }}>
-                      <span style={{ flex: 1, minWidth: 100, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ flex: 1, minWidth: 100, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 4 }}>
                         {block.exerciseName || <span style={{ color: DIM, fontStyle: 'italic' }}>Пусто</span>}
                         {block.role && block.role !== 'primary' && <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: DIM }}>{block.role === 'accessory' ? 'АКС' : block.role}</span>}
                       </span>

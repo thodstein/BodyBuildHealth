@@ -141,18 +141,18 @@ export const BBRecommendationsTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) =>
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button onClick={() => hub.setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)' }}>← В запись</button>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Вернуться к записи тренировки</span>
+        <button onClick={() => hub.setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>← В запись</button>
+        <span style={{ fontSize: 10, color: '#fff' }}>Вернуться к записи тренировки</span>
       </div>
       <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid ' + (hasAlerts ? 'rgba(245,158,11,0.3)' : 'rgba(0,230,138,0.2)') }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 800, color: hasAlerts ? '#f59e0b' : ACCENT }}>💡 Рекомендации по тренировкам · ББ</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 1 }}>
               Учитывают: план/цикл, фарму, питание, добавки, дневник · {summary.total} рекомендаций{summary.warns > 0 ? `, ⚠ ${summary.warns}` : ''}{summary.criticals > 0 ? `, 🔴 ${summary.criticals}` : ''}
             </div>
           </div>
-          <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(255,255,255,0.1)' }}>ПЛ — отдельно</span>
+          <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)' }}>ПЛ — отдельно</span>
         </div>
       </div>
 
@@ -165,7 +165,7 @@ export const BBRecommendationsTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) =>
               {sec.items.map(item => {
                 const s = SEV[item.severity];
                 return (
-                  <div key={item.id} style={{ padding: '8px 10px', borderRadius: 8, background: s.bg, border: '1px solid ' + s.border, fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+                  <div key={item.id} style={{ padding: '8px 10px', borderRadius: 8, background: s.bg, border: '1px solid ' + s.border, fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
                     <span style={{ fontWeight: 700, color: s.color }}>{s.icon} </span>{item.text}
                   </div>
                 );

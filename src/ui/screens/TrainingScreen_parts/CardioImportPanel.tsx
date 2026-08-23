@@ -136,7 +136,7 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
       </div>
       {preview && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.22)', borderRadius: 10, padding: 10 }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>
+          <div style={{ fontSize: 11, color: '#fff' }}>
             Предпросмотр: <b>{preview.durationMin} мин</b>{preview.distanceKm != null ? ` · ${preview.distanceKm} км` : ''}{preview.avgHr != null ? ` · HR ${preview.avgHr}` : ''} · {preview.fileName}
           </div>
           <div style={ROW}>

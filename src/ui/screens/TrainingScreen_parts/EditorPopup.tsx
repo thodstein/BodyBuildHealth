@@ -29,7 +29,7 @@ const editorSheet: React.CSSProperties = {
 const editorSheetCloseBtn: React.CSSProperties = {
   width: '100%', marginTop: 12, padding: '10px', minHeight: 44, borderRadius: 8,
   border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-  color:'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+  color:'#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 };
 
@@ -80,12 +80,12 @@ export const EditorPopupSelect: React.FC<{
                       style={{ ...editorOptionBtn, flexDirection: 'column', alignItems: 'stretch',
                         background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                         border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : 'rgba(255,255,255,0.85)', fontWeight: isSel ? 700 : 400 }}>
+                        color: isSel ? ACCENT : '#fff', fontWeight: isSel ? 700 : 400 }}>
                       <span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                         <span style={{ minWidth: 0 }}>{o.label}</span>
                         {isSel && <span style={{ fontSize: 10 }}>✓</span>}
                       </span>
-                      {o.desc && <span style={{ fontSize: 10, color: isSel ? 'rgba(0,230,138,0.75)' : 'rgba(255,255,255,0.85)', fontWeight: 400, marginTop: 2 }}>{o.desc}</span>}
+                      {o.desc && <span style={{ fontSize: 10, color: isSel ? 'rgba(0,230,138,0.75)' : '#fff', fontWeight: 400, marginTop: 2 }}>{o.desc}</span>}
                     </button>
                   );
                 })}
@@ -131,7 +131,7 @@ export const EditorPopupNumber: React.FC<{
                       style={{ ...editorOptionBtn,
                         background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                         border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : 'rgba(255,255,255,0.85)', fontWeight: isSel ? 700 : 400 }}>
+                        color: isSel ? ACCENT : '#fff', fontWeight: isSel ? 700 : 400 }}>
                       <span>{format(v)}</span>
                       {isSel && <span style={{ fontSize: 10 }}>✓</span>}
                     </button>

@@ -59,9 +59,9 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
     <div style={{ ...CARD, gap: 10 }}>
       <div style={ROW}>
         <span style={LABEL}>📍 Прогресс цикла</span>
-        <Badge bg={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '22') : 'rgba(255,255,255,0.06)'} border={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '44') : 'rgba(255,255,255,0.08)'} color={PHASE_COLOR[data.currentPhase ?? ''] ?? 'rgba(255,255,255,0.6)'}>{data.currentPhase ? CARDIO_PHASE_LABELS[data.currentPhase] : '—'}</Badge>
+        <Badge bg={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '22') : 'rgba(255,255,255,0.06)'} border={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '44') : 'rgba(255,255,255,0.08)'} color={PHASE_COLOR[data.currentPhase ?? ''] ?? '#fff'}>{data.currentPhase ? CARDIO_PHASE_LABELS[data.currentPhase] : '—'}</Badge>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>осталось {data.left} нед</span>
+        <span style={{ fontSize: 11, color: '#fff' }}>осталось {data.left} нед</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Неделя {data.current || '—'} из {data.totalWeeks}</span>
@@ -69,7 +69,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
       </div>
       <ProgressBar value={data.pct} color="#00e68a" height={8} />
       <div style={ROW}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{data.pct}% пройдено</span>
+        <span style={{ fontSize: 11, color: '#fff' }}>{data.pct}% пройдено</span>
         {data.adherence != null && (
           <span style={{ fontSize: 11, color: data.adherence >= 80 ? '#4ade80' : data.adherence >= 50 ? '#fbbf24' : '#f87171' }}>
             · выполнение прошлых недель: {data.adherence}%{data.factKcal > 0 ? ` · факт ${data.factKcal} ккал` : ''}{data.factKm > 0 ? ` · ${data.factKm} км` : ''}
@@ -77,7 +77,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
         )}
       </div>
       {data.hint && data.hint.kind !== 'work' && (
-        <div style={{ fontSize: 10, color: HINT_COLOR[data.hint.kind] ?? 'rgba(255,255,255,0.6)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '5px 8px' }}>
+        <div style={{ fontSize: 10, color: HINT_COLOR[data.hint.kind] ?? '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '5px 8px' }}>
           {HINT_ICON[data.hint.kind] ?? '💡'} Нед {data.hint.week}: {data.hint.text}
         </div>
       )}
@@ -89,9 +89,9 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
           <div style={{ fontSize: 11, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', borderRadius: 10, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 800 }}>⏭ Следующая:</span>
             <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[s.type] ?? '#4ade80', background: `${TYPE_COLOR[s.type] ?? '#4ade80'}14`, border: `1px solid ${TYPE_COLOR[s.type] ?? '#4ade80'}28`, borderRadius: 20, padding: '2px 8px' }}>{TYPE_LABEL[s.type]} {s.durationMin}м</span>
-            {s.equipment && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{cardioEquipmentLabel(s.equipment)}</span>}
+            {s.equipment && <span style={{ fontSize: 10, color: '#fff' }}>{cardioEquipmentLabel(s.equipment)}</span>}
             {s.targetHr?.max && <span style={{ fontSize: 10, color: '#60a5fa' }}>ЧСС {s.targetHr.min}-{s.targetHr.max}</span>}
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginLeft: 'auto' }}>{DAY_LABELS_RU[dow]} {data.nextSession!.date.slice(5)} · нед {data.nextSession!.week}</span>
+            <span style={{ fontSize: 10, color: '#fff', marginLeft: 'auto' }}>{DAY_LABELS_RU[dow]} {data.nextSession!.date.slice(5)} · нед {data.nextSession!.week}</span>
           </div>
         );
       })()}

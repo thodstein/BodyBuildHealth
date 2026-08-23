@@ -8,7 +8,7 @@ import { EQUIPMENT_OPTIONS, WEAK_GROUP_OPTIONS, type TrainingProfile } from './t
 
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 10, margin: '6px 0 4px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.3 };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 10, margin: '6px 0 4px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.3 };
 
 const INJ_GROUPS: [string, string][] = [['chest','Грудь'],['back','Спина'],['legs','Ноги'],['shoulders','Плечи'],['arms','Руки'],['core','Кор']];
 const INJ_GROUP_OPTIONS = INJ_GROUPS.map(([id, label]) => ({ id, label }));
@@ -33,7 +33,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
     <div style={{ background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(0,230,138,0.2)', padding: 12, margin: '0 0 10px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>🧬 Профиль тренированности</div>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>единый источник данных</span>
+        <span style={{ fontSize: 10, color: '#fff' }}>единый источник данных</span>
       </div>
 
       <div style={LABEL}>Цель и уровень</div>
@@ -71,13 +71,13 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       </div>
 
       <div style={LABEL}>🎯 Слабые группы мышц (ББ-акцент)</div>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+      <div style={{ fontSize: 11, color: '#fff', marginBottom: 4 }}>
         💪 Бодибилдинг: отстающие мышцы → +accessory добивка, pump-finisher,Compound-первым. Используется в ББ-авто и ручном конструкторе.
       </div>
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {WEAK_GROUP_OPTIONS.map(o => {
           const on = profile.weakPoints.includes(o.id);
-          return <button key={o.id} onClick={() => toggleArr('weakPoints', o.id)} style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>{o.label}{on ? ' ✓' : ''}</button>;
+          return <button key={o.id} onClick={() => toggleArr('weakPoints', o.id)} style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : '#fff' }}>{o.label}{on ? ' ✓' : ''}</button>;
         })}
       </div>
       <div style={{ fontSize: 11, color: '#a78bfa', marginTop: 4, padding: '4px 8px', borderRadius: 8, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.15)' }}>
@@ -88,31 +88,31 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
         {EQUIPMENT_OPTIONS.map(o => {
           const on = profile.equipment.includes(o.id);
-          return <button key={o.id} onClick={() => toggleArr('equipment', o.id)} style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>{o.label}{on ? ' ✓' : ''}</button>;
+          return <button key={o.id} onClick={() => toggleArr('equipment', o.id)} style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : '#fff' }}>{o.label}{on ? ' ✓' : ''}</button>;
         })}
       </div>
       <div style={LABEL}>🩹 Травмы / ограничения</div>
       {(() => {
         return (
           <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>Указанные группы исключаются из генерации плана на активный период.</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Указанные группы исключаются из генерации плана на активный период.</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr auto', gap: 6, marginBottom: 8, alignItems: 'end' }}>
               <div>
-                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Группа</label>
+                <label style={{ fontSize: 10, color: '#fff' }}>Группа</label>
                 <PopupSelect label="Группа травмы" value={injMuscle} onChange={v => setInjMuscle(v)} options={INJ_GROUP_OPTIONS} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>С</label>
+                <label style={{ fontSize: 10, color: '#fff' }}>С</label>
                 <input type="date" value={injFrom} onChange={e => setInjFrom(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>До (опц)</label>
+                <label style={{ fontSize: 10, color: '#fff' }}>До (опц)</label>
                 <input type="date" value={injTo} onChange={e => setInjTo(e.target.value)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '6px 8px', fontSize: 11 }} />
               </div>
               <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center', gridColumn: '1 / -1' }}>
-                <button onClick={() => { setInjGraded(!injGraded); setInjExclude(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: injGraded ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: injGraded ? 'rgba(245,158,11,0.1)' : 'transparent', color: injGraded ? '#f59e0b' : 'rgba(255,255,255,0.85)' }}>⚡ Щадящая</button>
-                <button onClick={() => { setInjExclude(!injExclude); setInjGraded(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: injExclude ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', background: injExclude ? 'rgba(239,68,68,0.1)' : 'transparent', color: injExclude ? '#ef4444' : 'rgba(255,255,255,0.85)' }}>⛔ Исключить</button>
-                {injGraded && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Вес {injWeightPct}% · Объём {injVolPct}% · Повт ≤{injRepsCap}</span>}
+                <button onClick={() => { setInjGraded(!injGraded); setInjExclude(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: injGraded ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: injGraded ? 'rgba(245,158,11,0.1)' : 'transparent', color: injGraded ? '#f59e0b' : '#fff' }}>⚡ Щадящая</button>
+                <button onClick={() => { setInjExclude(!injExclude); setInjGraded(false); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: injExclude ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.08)', background: injExclude ? 'rgba(239,68,68,0.1)' : 'transparent', color: injExclude ? '#ef4444' : '#fff' }}>⛔ Исключить</button>
+                {injGraded && <span style={{ fontSize: 10, color: '#fff' }}>Вес {injWeightPct}% · Объём {injVolPct}% · Повт ≤{injRepsCap}</span>}
               </div>
               {injGraded && (
                 <div style={{ display: 'flex', gap: 6, gridColumn: '1 / -1', alignItems: 'center' }}>
@@ -131,7 +131,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
                   const ru = INJ_GROUPS.find(([g]) => g === inj.muscle)?.[1] || inj.muscle;
                   return (
                     <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 8px', borderRadius: 6, background: active ? 'rgba(239,68,68,0.06)' : 'rgba(255,255,255,0.02)', border: '1px solid ' + (active ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.04)') }}>
-                      <span style={{ fontSize: 11, color: active ? '#fca5a5' : 'rgba(255,255,255,0.85)' }}>{ru} · {inj.from}–{inj.to || '…'}{active ? ' · активна' : ''}</span>
+                      <span style={{ fontSize: 11, color: active ? '#fca5a5' : '#fff' }}>{ru} · {inj.from}–{inj.to || '…'}{active ? ' · активна' : ''}</span>
                       <button onClick={() => update({ injuries: (profile.injuries || []).filter((_: any, j: number) => j !== i) })} style={{ padding: '2px 7px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: 10, cursor: 'pointer' }}>✕</button>
                     </div>
                   );
@@ -147,7 +147,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
         <PopupSelect label='На курсе' value={profile.onCourse ? 'yes' : 'no'} onChange={v => update({ onCourse: v === 'yes' })} options={[['no','Нет (натурал)'],['yes','Да (на курсе)']].map(([id,l]) => ({ id, label: l }))} />
         <PopupSelect label='Интенсивность курса' value={profile.courseIntensity} onChange={v => update({ courseIntensity: v as any })} options={[['mild','Лёгкая'],['moderate','Умеренная'],['heavy','Тяжёлая']].map(([id,l]) => ({ id, label: l }))} />
       </div>
-      {profile.onCourse && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>На курсе MRV повышается (~+20-30%), восстановление учитывается в готовности.</div>}
+      {profile.onCourse && <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>На курсе MRV повышается (~+20-30%), восстановление учитывается в готовности.</div>}
 
       {/* ⭐ Любимые и не любимые упражнения — карточки-кнопки с попапом */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
@@ -164,7 +164,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
           accent="#ef4444"
         />
       </div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
         Любимые получают приоритет при отборе упражнений. Не любимые полностью исключаются из генерации плана.
       </div>
 
@@ -184,7 +184,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
         <PopupNumber label="С последнего курса" value={profile.monthsSinceLastCourse} min={0} max={999} suffix=" мес" onChange={v => update({ monthsSinceLastCourse: v })} />
         <PopupNumber label="Лет на фарме" value={profile.totalYearsOnPharma} min={0} max={50} suffix=" лет" onChange={v => update({ totalYearsOnPharma: v })} />
       </div>
-      {compact !== true && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 8 }}>Эти данные используются ПЛ, ББ, ручным конструктором и калькуляторами для расчётов.</div>}
+      {compact !== true && <div style={{ fontSize: 10, color: '#fff', marginTop: 8 }}>Эти данные используются ПЛ, ББ, ручным конструктором и калькуляторами для расчётов.</div>}
     </div>
   );
 };

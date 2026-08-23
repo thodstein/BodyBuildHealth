@@ -25,11 +25,11 @@ const STATUS_RU: Record<BBMuscleVolume['status'], { label: string; color: string
   exceeding_mrv: { label: 'Перегруз', color: '#ef4444' },
 };
 
-const Tile: React.FC<{ label: string; value: string; color?: string; hint?: string }> = ({ label, value, color = 'rgba(255,255,255,0.9)', hint }) => (
+const Tile: React.FC<{ label: string; value: string; color?: string; hint?: string }> = ({ label, value, color = '#fff', hint }) => (
   <div style={{ padding: '8px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', minWidth: 0 }}>
-    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+    <div style={{ fontSize: 9, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
     <div style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1.2, marginTop: 2 }}>{value}</div>
-    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 9, color: '#fff', marginTop: 1 }}>{hint}</div>}
   </div>
 );
 
@@ -43,7 +43,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>📊 Сводка плана</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 1 }}>
             Метрики по пиковой неделе · {metrics.sessionsPerRotation} сессий/ротацию
           </div>
         </div>
@@ -59,7 +59,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
         <Tile label="Сетов/ротацию" value={String(metrics.totalSets)} color="#fff" hint="direct, пик-неделя" />
         <Tile label="Тяж" value={(metrics.тяжPct * 100).toFixed(0) + '%'} color="#ef4444" />
         <Tile label="Памп" value={(metrics.пампPct * 100).toFixed(0) + '%'} color="#60a5fa" />
-        <Tile label="Лёг" value={лёгPct.toFixed(0) + '%'} color="rgba(255,255,255,0.85)" />
+        <Tile label="Лёг" value={лёгPct.toFixed(0) + '%'} color="#fff" />
         <Tile label="Ср. RIR" value={metrics.avgRir.toFixed(1)} color="#f59e0b" />
         <Tile
           label="Hard-сеты"
@@ -77,7 +77,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
       )}
 
       {/* Разбивка по мышцам */}
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
         Объём на мышцу (vs MEV/MAV/MRV)
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -87,12 +87,12 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
           return (
             <div key={m.muscle} style={{ padding: '6px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', minWidth: 0 }}>{ru}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', minWidth: 0 }}>{ru}</span>
                 <span style={{ fontSize: 10, fontWeight: 800, color: st.color, background: st.color + '14', border: '1px solid ' + st.color + '30', padding: '1px 8px', borderRadius: 8, whiteSpace: 'nowrap' }}>
                   {st.label} · {m.effectiveSets}с
                 </span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', fontSize: 10, color: '#fff' }}>
                 <span>direct {m.directSets}</span>
                 <span style={{ opacity: 0.5 }}>·</span>
                 <span style={{ color: '#ef4444' }}>тяж {m.тяжSets}</span>

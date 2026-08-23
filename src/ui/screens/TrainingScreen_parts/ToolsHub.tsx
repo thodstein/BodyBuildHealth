@@ -4,7 +4,7 @@ import React from 'react';
 import { PriRepPatternCard } from './PriRepPatternCard';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 
 export const ToolsHub: React.FC = () => {
   return (

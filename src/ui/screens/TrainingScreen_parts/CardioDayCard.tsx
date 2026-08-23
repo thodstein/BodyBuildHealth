@@ -42,7 +42,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
     <div style={{ ...CARD, gap: 10 }}>
       <div style={ROW}>
         <span style={LABEL}>📅 Кардио и нагрузка дня</span>
-        <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="rgba(255,255,255,0.65)">{today.slice(5)}</Badge>
+        <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="#fff">{today.slice(5)}</Badge>
         <span style={{ flex: 1 }} />
         <button
           style={{ ...BTN_PRIMARY, minHeight: 30, padding: '5px 12px', fontSize: 11 }}
@@ -55,9 +55,9 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
 
       {cycle ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>План на сегодня</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>План на сегодня</div>
           {load.planned.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px' }}>Кардио не запланировано — отдых.</div>
+            <div style={{ fontSize: 12, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px' }}>Кардио не запланировано — отдых.</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {load.planned.map((s, i) => (
@@ -83,13 +83,13 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
       )}
 
       {weekHint && (
-        <div style={{ fontSize: 11, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.62)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '7px 10px', lineHeight: 1.45 }}>
+        <div style={{ fontSize: 11, color: HINT_COLOR[weekHint.kind] ?? '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '7px 10px', lineHeight: 1.45 }}>
           {HINT_ICON[weekHint.kind] ?? '💡'} <b>Нед {weekHint.week}:</b> {weekHint.text}
         </div>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>Факт:</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Факт:</div>
         {load.done.length === 0 ? (
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.38)' }}>кардио не записано.</div>
         ) : (
@@ -106,13 +106,13 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.14)', borderRadius: 10, padding: '8px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#fbbf24', fontWeight: 700 }}>
             <span>🔥 Нагрузка дня</span>
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)' }}>кардио {load.cardioLoad} · сила {load.strengthLoad} · итого {totalLoad}</span>
+            <span style={{ fontSize: 11, color: '#fff' }}>кардио {load.cardioLoad} · сила {load.strengthLoad} · итого {totalLoad}</span>
           </div>
           <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.08)' }}>
             <div style={{ width: cardioPct + '%', background: '#00e68a', transition: 'width 0.3s ease' }} title={`кардио ${cardioPct}%`} />
             <div style={{ width: strengthPct + '%', background: '#f59e0b', transition: 'width 0.3s ease' }} title={`сила ${strengthPct}%`} />
           </div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff' }}>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#00e68a', marginRight: 4 }} />кардио {load.cardioMinutes}м</span>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#f59e0b', marginRight: 4 }} />сила {load.strengthSessions} сесс</span>
           </div>

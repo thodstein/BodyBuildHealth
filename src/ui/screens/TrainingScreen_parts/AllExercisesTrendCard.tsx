@@ -36,19 +36,19 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
 
   return (
     <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: 'var(--text)' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: '#fff' }}>
         📊 Сводная таблица прогрессии e1RM по всем упражнениям
         {totalTrend !== null && (
-          <span style={{ fontSize: 10, marginLeft: 8, color: totalTrend > 0 ? '#22c55e' : totalTrend < 0 ? '#ef4444' : 'var(--text-dim)' }}>
+          <span style={{ fontSize: 10, marginLeft: 8, color: totalTrend > 0 ? '#22c55e' : totalTrend < 0 ? '#ef4444' : '#fff' }}>
             Общий тренд: {totalTrend > 0 ? '+' : ''}{totalTrend.toFixed(1)}%/нед
           </span>
         )}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{progressions.length} упражнений</div>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>{progressions.length} упражнений</div>
       <div style={{ maxHeight: 280, overflowY: 'auto' }}>
         <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <tr style={{ color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <th style={{ textAlign: 'left', padding: '3px 4px' }}>Упражнение</th>
               <th style={{ textAlign: 'right', padding: '3px 4px' }}>Текущий e1RM</th>
               <th style={{ textAlign: 'right', padding: '3px 4px' }}>Тренд</th>
@@ -59,10 +59,10 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
           <tbody>
             {progressions.map((p, i) => {
               const trendColor = p.trend === 'strongly_up' || p.trend === 'up' ? '#22c55e'
-                : p.trend === 'down' || p.trend === 'strongly_down' ? '#ef4444' : 'var(--text-dim)';
+                : p.trend === 'down' || p.trend === 'strongly_down' ? '#ef4444' : '#fff';
               return (
                 <tr key={p.exercise} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <td style={{ padding: '3px 4px', color: 'var(--text)' }}>
+                  <td style={{ padding: '3px 4px', color: '#fff' }}>
                     <span title={p.exercise}>{p.exercise.length > 22 ? p.exercise.slice(0, 20) + '…' : p.exercise}</span>
                   </td>
                   <td style={{ padding: '3px 4px', textAlign: 'right', fontWeight: 600, color: '#00e68a' }}>
@@ -71,10 +71,10 @@ const AllExercisesTrendCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions 
                   <td style={{ padding: '3px 4px', textAlign: 'right', color: trendColor }}>
                     {p.trend === 'strongly_up' ? '↑↑' : p.trend === 'up' ? '↑' : p.trend === 'down' ? '↓' : p.trend === 'strongly_down' ? '↓↓' : '→'}
                   </td>
-                  <td style={{ padding: '3px 4px', textAlign: 'right', color: p.progressPerWeek > 0 ? '#22c55e' : p.progressPerWeek < 0 ? '#ef4444' : 'var(--text-dim)' }}>
+                  <td style={{ padding: '3px 4px', textAlign: 'right', color: p.progressPerWeek > 0 ? '#22c55e' : p.progressPerWeek < 0 ? '#ef4444' : '#fff' }}>
                     {p.progressPerWeek > 0 ? '+' : ''}{p.progressPerWeek.toFixed(1)}
                   </td>
-                  <td style={{ padding: '3px 4px', textAlign: 'right', color: p.plateauWeeks >= 3 ? '#ef4444' : 'var(--text-dim)' }}>
+                  <td style={{ padding: '3px 4px', textAlign: 'right', color: p.plateauWeeks >= 3 ? '#ef4444' : '#fff' }}>
                     {p.plateauWeeks >= 3 ? `⚠ ${p.plateauWeeks}` : p.plateauWeeks}
                   </td>
                 </tr>

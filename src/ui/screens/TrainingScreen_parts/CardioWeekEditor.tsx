@@ -147,7 +147,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
         <span style={{ fontSize: 13, fontWeight: 850, minWidth: 30, textAlign: 'center' }}>{week.week}</span>
         <button style={BTN_SMALL} onClick={() => setWeekNo(Math.min(cycle.totalWeeks, weekNo + 1))} aria-label="Следующая неделя">+</button>
         <button style={BTN_SMALL} onClick={goCurrentWeek} title="К текущей неделе" aria-label="К текущей неделе">📍 Сегодня</button>
-        <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{CARDIO_PHASE_LABELS[week.phase]}{week.deload ? ' · делод' : ''}{week.taper ? ' · taper' : ''} · {week.totalMinutes} мин</span>
+        <span style={{ fontSize: 11, color: '#fff', fontWeight: 600 }}>{CARDIO_PHASE_LABELS[week.phase]}{week.deload ? ' · делод' : ''}{week.taper ? ' · taper' : ''} · {week.totalMinutes} мин</span>
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }} role="status">{flash}</div>}
       {safety.length > 0 && safety.map((s, i) => (
@@ -177,7 +177,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                 ...(isOver ? { background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.45)', boxShadow: '0 0 10px rgba(0,230,138,0.18)' } : {}),
               }}
             >
-              <div style={{ color: isLeg ? '#fbbf24' : 'rgba(255,255,255,0.55)', fontWeight: 800, fontSize: 11 }}>{d}{isLeg ? ' 🦵' : ''}</div>
+              <div style={{ color: isLeg ? '#fbbf24' : '#fff', fontWeight: 800, fontSize: 11 }}>{d}{isLeg ? ' 🦵' : ''}</div>
               {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.22)', fontSize: 11, marginTop: 4 }}>—</div> : sess.map((s, j) => (
                 <div key={j} style={{ color: isLeg && s.type !== 'recovery' ? '#f87171' : '#4ade80', fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap', background: `${isLeg && s.type !== 'recovery' ? 'rgba(239,68,68,0.12)' : 'rgba(0,230,138,0.08)'}`, border: `1px solid ${isLeg && s.type !== 'recovery' ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.18)'}`, borderRadius: 6, padding: '1px 4px' }}>{TYPE_SHORT[s.type]} {s.durationMin}м</div>
               ))}
@@ -200,7 +200,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
           <div style={HINT_SM}>Перетащите строку на день недели выше, или выберите день в селекте. DnD — быстрый перенос. Клавиатура: ←/→ перемещает день.</div>
           {week.sessions.map((s, idx) => (
             <div key={idx} role="listitem" aria-grabbed={dragIdx === idx} tabIndex={0} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const cur = s.dayOfWeek ?? 0; const next = (cur + (e.key === 'ArrowLeft' ? -1 : 1) + 7) % 7; updateSession(idx, { dayOfНеделя: next }); } }} style={{ ...ROW, opacity: dragIdx === idx ? 0.6 : 1, border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid transparent', borderRadius: 8, padding: '4px 0' }} draggable onDragStart={() => onDragStart(idx)} onDragEnd={() => setDragIdx(null)} title="Перетащите на день недели или используйте ←/→ для перемещения">
-              <span style={{ cursor: 'grab', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '0 4px', userSelect: 'none' }} aria-hidden>⋮⋮</span>
+              <span style={{ cursor: 'grab', fontSize: 12, color: '#fff', padding: '0 4px', userSelect: 'none' }} aria-hidden>⋮⋮</span>
               <select value={s.type} onChange={e => updateSession(idx, { type: e.target.value as CardioType })} style={SEL} aria-label={`Тип сессии ${idx + 1}`}>
                 {TYPES.map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
               </select>
@@ -212,11 +212,11 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
                 <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title="День тяжёлых ног — интенсивное кардио лучше перенести">⚠ ноги</span>
               )}
               <input type="number" value={s.durationMin} onChange={e => updateSession(idx, { durationMin: Math.max(5, Math.min(180, Number(e.target.value) || 30)) })} inputMode="numeric" style={NUM} aria-label={`Минуты сессии ${idx + 1}`} />
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>мин ×</span>
+              <span style={{ fontSize: 10, color: '#fff' }}>мин ×</span>
               <button style={{ ...BTN, minHeight: 30, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.max(1, s.weeklyFrequency - 1) })} aria-label="Меньше частоты">−</button>
               <span style={{ fontSize: 12, fontWeight: 800, minWidth: 16, textAlign: 'center' }}>{s.weeklyFrequency}</span>
               <button style={{ ...BTN, minHeight: 30, padding: '4px 8px' }} onClick={() => updateSession(idx, { weeklyFrequency: Math.min(7, s.weeklyFrequency + 1) })} aria-label="Больше частоты">+</button>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>в нед</span>
+              <span style={{ fontSize: 10, color: '#fff' }}>в нед</span>
               <button style={BTN_DANGER} onClick={() => removeSession(idx)} aria-label={`Удалить сессию ${idx + 1}`}>✕</button>
             </div>
           ))}
@@ -229,7 +229,7 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
         </div>
       )}
 
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+      <div style={{ fontSize: 10, color: '#fff' }}>
         {legDays.size > 0
           ? `🦵 Дни тяжёлых ног: ${DAY_LABELS_RU.filter((_, i) => legDays.has(i)).join(', ')} — интенсивное кардио на них не ставится (recovery — можно в любой день); точные дни задайте в дневнике.`
           : 'Раскладка по дням — ориентировочная (без учёта силовых тренировок); точные дни задайте в дневнике.'}

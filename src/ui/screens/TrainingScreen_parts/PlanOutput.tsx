@@ -81,7 +81,7 @@ function roleStyle(role?: string): { bg: string; fg: string } {
     case 'accessory':
       return { bg: 'rgba(168,85,247,0.12)', fg: '#a855f7' };
     default:
-      return { bg: 'rgba(255,255,255,0.08)', fg: 'rgba(255,255,255,0.6)' };
+      return { bg: 'rgba(255,255,255,0.08)', fg: '#fff' };
   }
 }
 
@@ -104,7 +104,7 @@ const Badge: React.FC<{ label: string; color: string }> = ({ label, color }) => 
   }}>{label}</span>
 );
 
-const charColor = (c?: string): string => c === 'тяж' ? '#ef4444' : c === 'памп' ? '#3b82f6' : c === 'лёг' ? '#6b7280' : 'rgba(255,255,255,0.85)';
+const charColor = (c?: string): string => c === 'тяж' ? '#ef4444' : c === 'памп' ? '#3b82f6' : c === 'лёг' ? '#6b7280' : '#fff';
 
 export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
   const rc = roleStyle(ex.role);
@@ -126,23 +126,23 @@ export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
       </div>
       {hasExtra && (
         <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
-          {ex.muscleTarget && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>🎯 {ex.muscleTarget}</span>}
-          {ex.equipment && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>🏋️ {ex.equipment}</span>}
+          {ex.muscleTarget && <span style={{ fontSize: 11, color: '#fff' }}>🎯 {ex.muscleTarget}</span>}
+          {ex.equipment && <span style={{ fontSize: 11, color: '#fff' }}>🏋️ {ex.equipment}</span>}
         </div>
       )}
       {hasMeta && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>{ex.detail}</span>
+          <span style={{ fontSize: 12, color: '#fff', flex: 1, minWidth: 0, overflowWrap: 'anywhere', fontVariantNumeric: 'tabular-nums' }}>{ex.detail}</span>
           <span style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
             {ex.rir !== undefined && ex.rir !== '' && <Badge label={'RIR ' + ex.rir} color="#a855f7" />}
             {ex.tempo && <Badge label={ex.tempo} color="#a855f7" />}
-            {ex.rest && <Badge label={ex.rest} color="rgba(255,255,255,0.85)" />}
+            {ex.rest && <Badge label={ex.rest} color="#fff" />}
           </span>
         </div>
       )}
       {ex.rationale && <div style={{ fontSize: 11, color: '#60a5fa', marginTop: 3, lineHeight: 1.4 }}>📝 {ex.rationale}</div>}
-      {ex.warmupSets && ex.warmupSets > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>🔥 Разминка: {ex.warmupSets} подх.</div>}
-      {ex.note && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>{ex.note}</div>}
+      {ex.warmupSets && ex.warmupSets > 0 && <div style={{ fontSize: 11, color: '#fff', marginTop: 2 }}>🔥 Разминка: {ex.warmupSets} подх.</div>}
+      {ex.note && <div style={{ fontSize: 11, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>{ex.note}</div>}
       {ex.actions && <div style={{ marginTop: 6 }}>{ex.actions}</div>}
     </div>
   );
@@ -166,7 +166,7 @@ export const DayCard: React.FC<{ day: PlanDayView }> = ({ day }) => {
         <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{day.title}</span>
         {day.volumeTag && <span style={{ fontSize: 11, fontWeight: 700, color: phaseColor, background: phaseColor + '22', padding: '4px 10px', borderRadius: 10, flexShrink: 0, minHeight: 28 }}>{day.volumeTag}</span>}
       </div>
-      {day.metaLine && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginBottom: 8, lineHeight: 1.4 }}>{day.metaLine}</div>}
+      {day.metaLine && <div style={{ fontSize: 11, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>{day.metaLine}</div>}
       {day.headerActions && <div style={{ marginBottom: 8 }}>{day.headerActions}</div>}
       {day.renderBody
         ? day.renderBody
@@ -183,7 +183,7 @@ export const PhaseBanner: React.FC<{ phase: PhaseKey; desc?: string }> = ({ phas
     background: PHASE_COLORS[phase] + '14', border: `1px solid ${PHASE_COLORS[phase]}33`, marginBottom: 8,
   }}>
     <span style={{ width: 10, height: 10, borderRadius: 5, background: PHASE_COLORS[phase], flexShrink: 0 }} />
-    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.4 }}>
+    <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.4 }}>
       <b style={{ color: PHASE_COLORS[phase] }}>{PHASE_LABELS[phase]}</b>{desc ? ' — ' + desc : ''}
     </div>
   </div>

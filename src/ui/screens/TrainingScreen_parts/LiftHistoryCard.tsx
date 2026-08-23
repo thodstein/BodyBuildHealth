@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color:'rgba(255,255,255,0.9)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color:'#fff', fontSize: 11, lineHeight: 1.4 };
 
 type Session = { date: string; exercises: { exerciseId: string; exerciseName: string; sets: { weight: number; reps: number }[]; totalVolume: number; estimated1RM: number }[] };
 
@@ -53,7 +53,7 @@ export const LiftHistoryCard: React.FC<{ sessions: Session[] }> = ({ sessions })
         <div style={{ ...SMALL, textAlign: 'center', padding: 16 }}>Нет данных по выбранному упражнению.</div>
       ) : (
         <>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>e1RM (Epley, зелёный) и тоннаж (синий) по датам сессий. 🏆 — новый PR.</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>e1RM (Epley, зелёный) и тоннаж (синий) по датам сессий. 🏆 — новый PR.</div>
           <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: W, margin: '0 auto', display: 'block' }}>
             <polyline points={tPts} fill="none" stroke="#60a5fa" strokeWidth={1.5} opacity={0.6} />
             <polyline points={e1Pts} fill="none" stroke={ACCENT} strokeWidth={2} />
@@ -63,9 +63,9 @@ export const LiftHistoryCard: React.FC<{ sessions: Session[] }> = ({ sessions })
                 {prDates.has(p.date) && <text x={x(i)} y={yE(p.e1rm) - 6} fontSize={7} fill="#f59e0b" textAnchor="middle">🏆</text>}
               </g>
             ))}
-            {series.map((p, i) => <text key={i} x={x(i)} y={H - 6} fontSize={6} fill="rgba(255,255,255,0.85)" textAnchor="middle">{p.date.slice(5)}</text>)}
+            {series.map((p, i) => <text key={i} x={x(i)} y={H - 6} fontSize={6} fill="#fff" textAnchor="middle">{p.date.slice(5)}</text>)}
           </svg>
-          <div style={{ display: 'flex', gap: 12, fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 4, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 12, fontSize: 10, color:'#fff', marginTop: 4, flexWrap: 'wrap' }}>
             <span>🟢 e1RM</span><span>🔵 тоннаж</span><span>🏆 PR</span>
             {last && <span>· последний: e1RM <b style={{ color: ACCENT }}>{last.e1rm}</b> кг, тоннаж <b style={{ color: '#60a5fa' }}>{Math.round(last.tonnage)}</b></span>}
           </div>

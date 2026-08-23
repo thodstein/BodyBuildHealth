@@ -82,7 +82,7 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
   return (
     <div style={CARD}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-dim)' }}>📈 Объём по неделям</span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>📈 Объём по неделям</span>
         <button style={metric === 'minutes' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' } : BTN_SMALL} onClick={() => setMetric('minutes')}>мин</button>
         <button style={metric === 'kcal' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' } : BTN_SMALL} onClick={() => setMetric('kcal')}>ккал</button>
         <button style={metric === 'trimp' ? { ...BTN_SMALL, borderColor: 'rgba(139,92,246,0.45)', color: '#a78bfa' } : BTN_SMALL} onClick={() => setMetric('trimp')} title="TRIMP = нагрузка (мин × интенсивность)">TRIMP</button>
@@ -117,15 +117,15 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
           </div>
           <div style={{ display: 'flex', gap: 2 }}>
             {series.map(s => (
-              <div key={s.week} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{s.week}</div>
+              <div key={s.week} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: '#fff' }}>{s.week}</div>
             ))}
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+          <div style={{ fontSize: 10, color: '#fff' }}>
             Пик: {peak} {label} (нед {peakWeek}) · Средняя: {avg} {label}
-            {fact && <span style={{ color: fact.pct != null && fact.pct < 60 ? '#f87171' : 'rgba(255,255,255,0.85)' }}> · Выполнение прошедших недель: {fact.pct}% (сессий {fact.doneS}/{fact.plannedS})</span>}
+            {fact && <span style={{ color: fact.pct != null && fact.pct < 60 ? '#f87171' : '#fff' }}> · Выполнение прошедших недель: {fact.pct}% (сессий {fact.doneS}/{fact.plannedS})</span>}
             {fact && fact.factKcal > 0 && <span> · Факт: {fact.factKcal} ккал{fact.factKm > 0 ? ` · ${fact.factKm} км` : ''}</span>}
           </div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#fff' }}>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3b82f6', marginRight: 4 }} />план</span>
             {fact && <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#f8fafc', marginRight: 4 }} />факт (дневник)</span>}
           </div>

@@ -50,32 +50,32 @@ const MesoCorrectionCard: React.FC<Props> = ({
   return (
     <div style={GLASS}>
       <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🔄 Анализ и коррекция мезоцикла</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>{output.comment}</div>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>{output.comment}</div>
 
       {/* Итоговые параметры */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Объём</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>Объём</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: output.recommendedVolume > currentVolume ? ACCENT : '#ff4444' }}>
-            {output.recommendedVolume} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>сетов</span>
+            {output.recommendedVolume} <span style={{ fontSize: 10, color: '#fff' }}>сетов</span>
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>было {currentVolume}</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>было {currentVolume}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>RIR</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>RIR</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: output.recommendedRir !== currentRir ? '#ffaa00' : ACCENT }}>
             {output.recommendedRir}
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>было {currentRir}</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>было {currentRir}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Делоад</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>Делоад</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: output.needsDeloadFirst ? '#ff4444' : ACCENT }}>
             {output.needsDeloadFirst ? '⚠ Нужен' : output.recommendedDeloadFreq + ' нед'}
           </div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Прогрессия</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>Прогрессия</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>
             +{output.recommendedProgressionPct}%
           </div>
@@ -88,11 +88,11 @@ const MesoCorrectionCard: React.FC<Props> = ({
           <span style={{ color: severityColor(a.severity), flexShrink: 0 }}>
             {a.severity === 'critical' ? '🔴' : a.severity === 'warning' ? '🟡' : '🟢'}
           </span>
-          <span style={{ color: 'rgba(255,255,255,0.7)' }}>{a.reason}</span>
+          <span style={{ color: '#fff' }}>{a.reason}</span>
         </div>
       ))}
 <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить коррекцию мезоцикла к планировщику — рекомендуемый объём {output.recommendedVolume} сет/нед, RIR→{output.recommendedRir}, делод каждые {output.recommendedDeloadFreq} нед.</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить коррекцию мезоцикла к планировщику — рекомендуемый объём {output.recommendedVolume} сет/нед, RIR→{output.recommendedRir}, делод каждые {output.recommendedDeloadFreq} нед.</div>
         <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Мезо-коррекция: MRV ' + output.recommendedVolume + ' сет/нед, RIR→' + output.recommendedRir, data: { mrv: output.recommendedVolume } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить коррекцию мезо к планировщику</button>
       </div>
     </div>

@@ -212,7 +212,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     <div style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>📓 Дневник выполнения кардио</span>
-        <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : 'rgba(255,255,255,0.55)'}>🔥 стрик {streak.current}д</Badge>
+        <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : '#fff'}>🔥 стрик {streak.current}д</Badge>
         <button style={BTN_SMALL} onClick={exportCsv} title="Экспорт в CSV">📥 CSV</button>
         <button style={BTN_SMALL} onClick={exportJson} title="Экспорт в JSON">📥 JSON</button>
         {undoPrev && (
@@ -244,21 +244,21 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       )}
 
       {adherence && (
-        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+        <div style={{ fontSize: 11, color: '#fff' }}>
           Неделя {adherence.week}: выполнено {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин ({adherence.pctMinutes}%)
         </div>
       )}
       {weekHint && (
-        <div style={{ fontSize: 11, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.65)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }}>
+        <div style={{ fontSize: 11, color: HINT_COLOR[weekHint.kind] ?? '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px' }}>
           {HINT_ICON[weekHint.kind] ?? '💡'} {weekHint.text}
         </div>
       )}
       {cycleStats && (
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, padding: '6px 8px' }}>
+        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 8, padding: '6px 8px' }}>
           📊 Цикл: {cycleStats.weeksDone} пройденных нед · сессий {cycleStats.doneSessions}/{cycleStats.planned} ({cycleStats.pctSessions ?? 0}%) · минут {cycleStats.doneMin}/{cycleStats.plannedMin} ({cycleStats.pctMinutes ?? 0}%)
         </div>
       )}
-      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+      <div style={{ fontSize: 11, color: '#fff' }}>
         7д: {stats7.sessions} сессий · {stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.avgPace ? ` · ${stats7.avgPace}` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}
         {stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}
         {' '}· 28д: {stats28.sessions} сессий · {stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}
@@ -287,7 +287,7 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       })()}
 
       {log.length === 0 && (
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px' }}>
+        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px' }}>
           📭 Записей пока нет — заполните форму выше и нажмите «+ Записать», чтобы вести журнал кардио.
         </div>
       )}
@@ -295,18 +295,18 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {(showAll ? log : log.slice(0, 6)).map(e => (
             <div key={e.id} style={{ ...ROW, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 84 }}>{e.date}</span>
-              <span style={{ fontSize: 11, minWidth: 60, fontWeight: 700, color: TYPE_COLOR[e.type] ?? 'var(--text-dim)' }}>{TYPE_LABEL[e.type]}</span>
+              <span style={{ fontSize: 11, color: '#fff', width: 84 }}>{e.date}</span>
+              <span style={{ fontSize: 11, minWidth: 60, fontWeight: 700, color: TYPE_COLOR[e.type] ?? '#fff' }}>{TYPE_LABEL[e.type]}</span>
               {e.completed === false
                 ? <span style={{ fontSize: 10, color: '#f87171', minWidth: 60 }}>⏭ пропущена</span>
-                : <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>{e.durationMin} мин</span>}
-              {e.completed !== false && e.rpe != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 40 }}>RPE {e.rpe}</span>}
-              {e.completed !== false && e.avgHr != null && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.avgHr} уд</span>}
-              {e.completed !== false && e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.calories} ккал</span>}
+                : <span style={{ fontSize: 11, color: '#fff', minWidth: 60 }}>{e.durationMin} мин</span>}
+              {e.completed !== false && e.rpe != null && <span style={{ fontSize: 11, color: '#fff', minWidth: 40 }}>RPE {e.rpe}</span>}
+              {e.completed !== false && e.avgHr != null && <span style={{ fontSize: 11, color: '#fff', minWidth: 50 }}>{e.avgHr} уд</span>}
+              {e.completed !== false && e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: '#fff', minWidth: 50 }}>{e.calories} ккал</span>}
               {e.completed !== false && e.distanceKm != null && e.distanceKm > 0 && (
                 <>
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 50 }}>{e.distanceKm} км</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 70 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                  <span style={{ fontSize: 11, color: '#fff', minWidth: 50 }}>{e.distanceKm} км</span>
+                  <span style={{ fontSize: 11, color: '#fff', minWidth: 70 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
                 </>
               )}
               <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>

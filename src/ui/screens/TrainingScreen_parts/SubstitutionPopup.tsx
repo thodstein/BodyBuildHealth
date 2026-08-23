@@ -3,7 +3,7 @@ import { EXERCISE_CATALOG, getSubstitutes, getExerciseById } from '../../../core
 import { getExerciseBio, type ExerciseBio } from '../../../data/exercise-biomechanics-db';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 300, display: 'flex',
@@ -55,7 +55,7 @@ const BioLine: React.FC<{ bio?: ExerciseBio }> = ({ bio }) => {
   const js = bio.jointStress;
   const strs = Object.entries(js || {}).map(([k, v]) => `${STRESS_KEYS_RU[k] || k} ${v}/10`);
   return (
-    <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+    <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
       🔬 Биомеханика: {strs.join(', ')} | Сложность: {bio.difficulty}/10 | ЦНС: {bio.cnsDemand}/5
       {bio.primaryMuscles?.length > 0 && <div style={{ marginTop: 2 }}>🎯 Цель: {bio.primaryMuscles.join(', ')}{bio.secondaryMuscles?.length ? ' + ' + bio.secondaryMuscles.join(', ') : ''}</div>}
     </div>
@@ -206,7 +206,7 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
                   </div>
                 )}
                 {opt.description && (
-                  <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 1, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 10, color:'#fff', marginTop: 1, lineHeight: 1.4 }}>
                     📝 {opt.description}
                   </div>
                 )}

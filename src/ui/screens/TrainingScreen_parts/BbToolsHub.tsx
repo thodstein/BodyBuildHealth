@@ -6,7 +6,7 @@ import { BbToolsCard } from './BbToolsCard';
 import TechniqueTab from './ExerciseLabTechnique';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 type BbToolsHubMode = 'tools' | 'target';
 
 const MODE_DEFS: Array<{ m: BbToolsHubMode; label: string; icon: string }> = [

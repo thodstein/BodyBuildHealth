@@ -11,6 +11,6 @@ export const StructuredAnalyticsCard: React.FC<{ sessions: any[] }> = ({ session
   return (<div className="card" style={{ marginTop:8, padding:10 }}>
     <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📊 Структурная</h4>
     <div style={{ fontSize:10 }}>Сессий: <b>{(result as any).sessionCount || sessions.length}</b> | Объём: <b>{(result as any).totalVolume || '—'}</b></div>
-    {(result as any).insights?.slice(0,3).map((r:any,i:number)=><div key={i} style={{ fontSize:10,color:'var(--text-dim)',marginTop:2 }}>• {r}</div>)}
+    {(result as any).insights?.slice(0,3).map((r:any,i:number)=><div key={i} style={{ fontSize:10,color:'#fff',marginTop:2 }}>• {r}</div>)}
   </div>);
 };

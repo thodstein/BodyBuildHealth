@@ -106,7 +106,7 @@ export const TempoTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>⏱️ Темп повторений</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 12, lineHeight: 1.5 }}>
         Управление скоростью повторений. Формат <b>Эксцентрика–Пауза внизу–Концентрика–Пауза вверху</b> (сек).
         Каждая фаза определяет стимул: эксцентрика — микротравмы, пауза внизу — растяжение, концентрика — сила.
       </div>
@@ -122,7 +122,7 @@ export const TempoTab: React.FC = () => {
               style={{
                 padding: '6px 4px', borderRadius: 8, border: '1px solid ' + (selectedGoal === g ? ACCENT : 'rgba(255,255,255,0.08)'),
                 background: selectedGoal === g ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.03)',
-                color: selectedGoal === g ? ACCENT : 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: 10, fontWeight: 700,
+                color: selectedGoal === g ? ACCENT : '#fff', cursor: 'pointer', fontSize: 10, fontWeight: 700,
                 textAlign: 'center' as const, transition: 'all 0.2s',
               }}
             >
@@ -144,7 +144,7 @@ export const TempoTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
           🎨 Визуальная схема темпа: <span style={{ color: ACCENT, fontFamily: 'monospace', fontSize: 15 }}>{formatTempo(customTempo)}</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginLeft: 8 }}>TUL: {totalRepTime}с</span>
+          <span style={{ fontSize: 10, color: '#fff', marginLeft: 8 }}>TUL: {totalRepTime}с</span>
         </div>
 
         <div style={{ display: 'flex', gap: 1, height: 40, marginBottom: 8, borderRadius: 8, overflow: 'hidden' }}>
@@ -181,7 +181,7 @@ export const TempoTab: React.FC = () => {
                 onChange={e => setCustomTempo(prev => ({ ...prev, [phase]: +e.target.value }))}
                 style={{ width: '100%', accentColor: PHASE_COLORS[phase] }}
               />
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{customTempo[phase]}с</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>{customTempo[phase]}с</div>
             </div>
           ))}
         </div>
@@ -194,7 +194,7 @@ export const TempoTab: React.FC = () => {
           <div style={{ display: 'flex', gap: 4 }}>
             <button
               onClick={() => setFilterGoal('all')}
-              style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === 'all' ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === 'all' ? ACCENT : 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+              style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === 'all' ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === 'all' ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === 'all' ? ACCENT : '#fff', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
             >
               Все
             </button>
@@ -202,7 +202,7 @@ export const TempoTab: React.FC = () => {
               <button
                 key={g}
                 onClick={() => setFilterGoal(g)}
-                style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === g ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === g ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === g ? ACCENT : 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
+                style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (filterGoal === g ? ACCENT : 'rgba(255,255,255,0.1)'), background: filterGoal === g ? 'rgba(0,230,138,0.1)' : 'transparent', color: filterGoal === g ? ACCENT : '#fff', cursor: 'pointer', fontSize: 10, fontWeight: 700 }}
               >
                 {g === 'strength' ? 'Сила' : g === 'hypertrophy' ? 'Гипер' : g === 'power' ? 'Мощь' : 'Техн'}
               </button>
@@ -236,7 +236,7 @@ export const TempoTab: React.FC = () => {
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{preset.nameRu}</span>
                   <span style={{ fontSize: 10, color: ACCENT, fontFamily: 'monospace', fontWeight: 700 }}>
                     {formatTempo(t)}
-                    <span style={{ color: 'rgba(255,255,255,0.85)', marginLeft: 4 }}>TUL {repTime}с</span>
+                    <span style={{ color: '#fff', marginLeft: 4 }}>TUL {repTime}с</span>
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 1, height: 14, borderRadius: 4, overflow: 'hidden', marginBottom: 4 }}>
@@ -253,7 +253,7 @@ export const TempoTab: React.FC = () => {
                     </div>
                   ))}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>
+                <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3 }}>
                   {preset.description}
                 </div>
               </div>
@@ -265,7 +265,7 @@ export const TempoTab: React.FC = () => {
       {/* Реп-паттерны */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>🔄 Паттерны повторений</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>
           Реп-паттерн определяет способ выполнения серии повторений: обычный, с паузой, кластерный, взрывной и др.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -274,7 +274,7 @@ export const TempoTab: React.FC = () => {
             return (
               <div key={rp.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{rp.nameRu}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3, marginBottom: 3 }}>{rp.desc}</div>
+                <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, marginBottom: 3 }}>{rp.desc}</div>
                 <div style={{ fontSize: 10, color: '#a855f7', fontFamily: 'monospace', background: 'rgba(168,85,247,0.1)', padding: '1px 5px', borderRadius: 4, display: 'inline-block' }}>
                   {engineTempo.tempo.toString}
                 </div>
@@ -287,7 +287,7 @@ export const TempoTab: React.FC = () => {
       {/* Как использовать */}
       <div style={{ ...CARD, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>💡 Как применять темп в плане</div>
-        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color:'#fff', lineHeight: 1.6 }}>
           • <b>Сила (2-1-1-0):</b> контролируй эксцентрику, пауза для снятия инерции, взрывной подъём.<br />
           • <b>Гипертрофия (3-1-1-0):</b> медленный негатив + пауза в растяжении = макс. микротравмы.<br />
           • <b>Мощность (1-0-0-0):</b> компенсаторное ускорение, никаких пауз, макс. скорость.<br />
@@ -296,7 +296,7 @@ export const TempoTab: React.FC = () => {
         </div>
       </div>
       <div style={{ marginTop: 6, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить темп <b style={{ color: '#00e68a' }}>{formatTempo(customTempo)}</b> к активному планировщику — все упражнения плана получат этот темп (эксцентрика/пауза/концентрика/пауза).</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить темп <b style={{ color: '#00e68a' }}>{formatTempo(customTempo)}</b> к активному планировщику — все упражнения плана получат этот темп (эксцентрика/пауза/концентрика/пауза).</div>
         <button onClick={() => applyToPlanner({ kind: 'tempo', label: 'Темп ' + formatTempo(customTempo), data: { ...customTempo, label: formatTempo(customTempo) } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить темп к планировщику</button>
       </div>
     </div>

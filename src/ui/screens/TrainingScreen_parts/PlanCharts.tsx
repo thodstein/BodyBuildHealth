@@ -69,21 +69,21 @@ export const VolumeByWeekChart: React.FC<{
                 fill={COLORS[mi % COLORS.length]} opacity={0.85} rx={2} />;
             })}
             <text x={x + barW / 2} y={PAD.top + chartH + 14} textAnchor="middle"
-              fill="rgba(255,255,255,0.85)" fontSize={9}>н{d.week}</text>
+              fill="#fff" fontSize={9}>н{d.week}</text>
             <text x={x + barW / 2} y={PAD.top + chartH - totalH - 4} textAnchor="middle"
-              fill="rgba(255,255,255,0.7)" fontSize={8}>{d.totalSets}</text>
+              fill="#fff" fontSize={8}>{d.totalSets}</text>
           </g>
         );
       })}
       {/* Y-axis labels */}
-      <text x={6} y={PAD.top + 4} fill="rgba(255,255,255,0.85)" fontSize={8}>{maxSets}</text>
-      <text x={6} y={PAD.top + chartH - 1} fill="rgba(255,255,255,0.85)" fontSize={8}>0</text>
+      <text x={6} y={PAD.top + 4} fill="#fff" fontSize={8}>{maxSets}</text>
+      <text x={6} y={PAD.top + chartH - 1} fill="#fff" fontSize={8}>0</text>
       {/* Legend */}
       <g transform={'translate(' + PAD.left + ', ' + (H - 4) + ')'}>
         {top.map((m, i) => (
           <g key={m} transform={'translate(' + (i * 70) + ', 0)'}>
             <rect x={0} y={-4} width={8} height={8} fill={COLORS[i % COLORS.length]} rx={1} />
-            <text x={11} y={3} fill="rgba(255,255,255,0.85)" fontSize={7}>{m}</text>
+            <text x={11} y={3} fill="#fff" fontSize={7}>{m}</text>
           </g>
         ))}
       </g>
@@ -147,14 +147,14 @@ export const RirDriftChart: React.FC<{
           <g key={p.week}>
             <circle cx={x} cy={y} r={3} fill="#00e68a" />
             <text x={x} y={PAD.top + chartH + 14} textAnchor="middle"
-              fill="rgba(255,255,255,0.85)" fontSize={9}>н{p.week}</text>
+              fill="#fff" fontSize={9}>н{p.week}</text>
             <text x={x - 6} y={y - 6} textAnchor="end" fill="#00e68a" fontSize={8}>{p.avg.toFixed(1)}</text>
           </g>
         );
       })}
       {/* Y-axis */}
-      <text x={6} y={PAD.top + 4} fill="rgba(255,255,255,0.85)" fontSize={8}>RIR {maxRir.toFixed(0)}</text>
-      <text x={6} y={PAD.top + chartH - 1} fill="rgba(255,255,255,0.85)" fontSize={8}>{minRir.toFixed(0)}</text>
+      <text x={6} y={PAD.top + 4} fill="#fff" fontSize={8}>RIR {maxRir.toFixed(0)}</text>
+      <text x={6} y={PAD.top + chartH - 1} fill="#fff" fontSize={8}>{minRir.toFixed(0)}</text>
       {/* RIR zone bg */}
       <rect x={PAD.left} y={PAD.top} width={chartW} height={chartH * (1 / range)} fill="rgba(0,230,138,0.04)" />
       <text x={PAD.left + 4} y={PAD.top + 14} fill="rgba(0,230,138,0.3)" fontSize={8}>RIR 0-1</text>

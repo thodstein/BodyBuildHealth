@@ -54,12 +54,12 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
     <div className="card" style={{ marginBottom:8, padding:10 }}>
       <h4 style={{ margin:'0 0 6px',fontSize:12 }}>📏 Замеры тела</h4>
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
-        <div><label style={{ fontSize:10 }}>Вес</label><input type="number" value={mWeight} onChange={e=>setMWeight(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Талия</label><input type="number" value={mWaist} onChange={e=>setMWaist(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Грудь</label><input type="number" value={mChest} onChange={e=>setMChest(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Бицепс</label><input type="number" value={mArm} onChange={e=>setMArm(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Бедро</label><input type="number" value={mThigh} onChange={e=>setMThigh(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
-        <div><label style={{ fontSize:10 }}>Дата</label><input type="date" value={mDate || ''} onChange={e=>setMDate(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'var(--bg-secondary)',border:'1px solid var(--border)',color:'var(--text)',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Вес</label><input type="number" value={mWeight} onChange={e=>setMWeight(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#fff',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Талия</label><input type="number" value={mWaist} onChange={e=>setMWaist(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#fff',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Грудь</label><input type="number" value={mChest} onChange={e=>setMChest(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#fff',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Бицепс</label><input type="number" value={mArm} onChange={e=>setMArm(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#fff',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Бедро</label><input type="number" value={mThigh} onChange={e=>setMThigh(parseFloat(e.target.value) || 0)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#fff',fontSize:11,boxSizing:'border-box' }} /></div>
+        <div><label style={{ fontSize:10 }}>Дата</label><input type="date" value={mDate || ''} onChange={e=>setMDate(e.target.value)} style={{ width:'100%',padding:'4px',borderRadius:4,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'#fff',fontSize:11,boxSizing:'border-box' }} /></div>
       </div>
       <button onClick={save} style={{ width:'100%',marginTop:6,padding:8,borderRadius:6,border:'none',cursor:'pointer',background:'var(--accent)',color:'#000',fontWeight:600,fontSize:12 }}>Сохранить замер</button>
     </div>
@@ -83,7 +83,7 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
 
     {repData && <div className="card" style={{ padding:10, marginTop:8 }}>
       <h4 style={{ margin:'0 0 4px',fontSize:12 }}>📋 Недельный отчёт</h4>
-      <div style={{ fontSize:10,color:'var(--text-light)' }}>{repData.insights?.slice(0,3).map((r:any,i:number)=><div key={i}>• {r}</div>)}</div>
+      <div style={{ fontSize:10,color:'#fff' }}>{repData.insights?.slice(0,3).map((r:any,i:number)=><div key={i}>• {r}</div>)}</div>
     </div>}
 
     {/* Графики прогресса из дневника: ПМ (e1RM) по топ-упражнениям и тоннаж по неделям */}
@@ -115,8 +115,8 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
       const maxWk = Math.max(1, ...wkArr.map(([, v]) => v));
       return <div className="card" style={{ padding: 10, marginTop: 8 }}>
         <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📈 Прогресс из дневника</h4>
-        {top.length === 0 ? <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Недостаточно данных (нужно ≥2 тренировок на упражнение с весами).</div> : <>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>ПМ (e1RM) по топ-упражнениям:</div>
+        {top.length === 0 ? <div style={{ fontSize: 10, color: '#fff' }}>Недостаточно данных (нужно ≥2 тренировок на упражнение с весами).</div> : <>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>ПМ (e1RM) по топ-упражнениям:</div>
           <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: 360, margin: '0 auto', display: 'block' }}>
             {top.map((t, i) => renderLine(t.arr, colors[i % colors.length], 0, minV, maxV, W, H))}
             {top.flatMap((t, i) => t.arr.map((p, j) => <circle key={t.n + j} cx={6 + (j / Math.max(1, t.arr.length - 1)) * (W - 12)} cy={H - 8 - ((p.e1rm - minV) / Math.max(1, maxV - minV)) * (H - 16)} r={2} fill={colors[i % colors.length]} />))}
@@ -124,9 +124,9 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>{top.map((t, i) => <span key={t.n} style={{ fontSize: 10, color: colors[i % colors.length] }}>● {t.n.slice(0, 18)}</span>)}</div>
         </>}
         {wkArr.length >= 2 && <>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
-            {wkArr.map(([wk, v], i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)' }} /><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{wk.slice(5)}</span></div>)}
+            {wkArr.map(([wk, v], i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)' }} /><span style={{ fontSize: 10, color: '#fff' }}>{wk.slice(5)}</span></div>)}
           </div>
         </>}
       </div>;

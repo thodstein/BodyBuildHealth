@@ -23,7 +23,7 @@ import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.55)';
+const DIM = '#fff';
 
 /** Ядровые движения (в каждом калькуляторе есть параметры для всех 6). */
 const CORE_LIFTS: Lift[] = ['bench', 'squat', 'deadlift', 'sumo', 'ohp', 'biceps'];
@@ -160,9 +160,9 @@ const OptionBlock: React.FC<{
       </div>
       <div style={{ fontSize: 9, color: DIM, marginTop: 2, lineHeight: 1.4 }}>{o.description}</div>
       <div style={{ fontSize: 9, color: '#fbbf24', marginTop: 4, lineHeight: 1.4 }}>📋 {o.method}</div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 3, lineHeight: 1.4 }}>🧠 {o.rationale}</div>
+      <div style={{ fontSize: 9, color: '#fff', marginTop: 3, lineHeight: 1.4 }}>🧠 {o.rationale}</div>
       {o.references.length > 0 && (
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>📚 {o.references.join(' · ')}</div>
+        <div style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>📚 {o.references.join(' · ')}</div>
       )}
       {analysis.items.map((item, idx) => (
         <ExerciseRow key={idx} item={item} selected={selected[keyOf]?.includes(item.exercise.name) ?? false}
@@ -352,7 +352,7 @@ export const LimiterCalculatorCard: React.FC<{ dayCount?: number }> = ({ dayCoun
       )}
       {effectiveCategory && auxVisible.length > 0 && (
         <div style={CARD}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.7)' }}>🧰 Вспомогательные движения (дополнительно)</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>🧰 Вспомогательные движения (дополнительно)</div>
           {auxVisible.map(l => (
             <div key={l} style={{ marginTop: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', padding: '4px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)' }}>

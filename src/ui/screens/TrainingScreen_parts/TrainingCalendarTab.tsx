@@ -15,7 +15,7 @@ import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -624,7 +624,7 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
       transition: 'all 0.15s',
       position: 'relative',
     }}>
-      <div style={{ fontSize: 10, fontWeight: isToday ? 800 : 500, color: isToday ? ACCENT : 'var(--text)' }}>
+      <div style={{ fontSize: 10, fontWeight: isToday ? 800 : 500, color: isToday ? ACCENT : '#fff' }}>
         {day.date.slice(8)}
       </div>
       {(hasMind || hasMob || hasWarm || hasCool) && (
@@ -666,8 +666,8 @@ const CalendarCell: React.FC<{ day: CalendarDay; today: string; mindDates?: Set<
 const MiniStat: React.FC<{ label: string; value: string | number; color: string }> = ({ label, value, color }) => (
   <div style={{
     padding: '6px 10px', borderRadius: 8, fontSize: 10,
-    background: 'var(--bg-secondary)',
-    border: '1px solid var(--border)',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.08)',
     textAlign: 'center', minWidth: 60,
   }}>
     <div style={{ fontSize: 16, fontWeight: 800, color }}>{value}</div>

@@ -42,25 +42,25 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
                 <div style={style.card}>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Объём/нед</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>Объём/нед</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{analytics.volume.weeklyVolumeKg.toLocaleString()} кг</div>
                   <div style={{ fontSize: 10, color: analytics.volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
                     {analytics.volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(analytics.volume.volumeTrend)}% vs пред.
                   </div>
                 </div>
                 <div style={style.card}>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Интенсивность</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>Интенсивность</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{analytics.intensity.avgIntensity}%</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>RPE avg: {analytics.intensity.avgRPE}</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>RPE avg: {analytics.intensity.avgRPE}</div>
                 </div>
                 <div style={style.card}>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>Усталость</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: analytics.fatigue.weeklyFatigue > 0.7 ? '#ef4444' : analytics.fatigue.weeklyFatigue > 0.4 ? '#f59e0b' : '#22c55e' }}>
                     {Math.round(analytics.fatigue.weeklyFatigue * 100)}%
                   </div>
                 </div>
                 <div style={style.card}>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>Готовность</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: analytics.recovery.readinessEstimate > 60 ? '#22c55e' : analytics.recovery.readinessEstimate > 40 ? '#f59e0b' : '#ef4444' }}>
                     {analytics.recovery.readinessEstimate}%
                   </div>
@@ -124,17 +124,17 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={style.label}>📊 Неделя vs предыдущая</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тренировок</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{twWorkouts} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>vs {lwWorkouts}</span></div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Тренировок</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{twWorkouts} <span style={{ fontSize: 10, color: '#fff' }}>vs {lwWorkouts}</span></div>
                       </div>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тоннаж</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Тоннаж</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: volDelta >= 0 ? '#22c55e' : '#ef4444' }}>
                           {volDelta >= 0 ? '+' : ''}{volDelta}%
                         </div>
                       </div>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Подходы</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Подходы</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: setsDelta >= 0 ? '#22c55e' : '#ef4444' }}>
                           {setsDelta >= 0 ? '+' : ''}{setsDelta}%
                         </div>
@@ -151,7 +151,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={{ width: `${analytics.intensity.intensityDistribution.hypertrophy}%`, background: '#f59e0b' }} />
                   <div style={{ width: `${analytics.intensity.intensityDistribution.endurance}%`, background: '#22c55e' }} />
                 </div>
-                <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-dim)' }}>
+                <div style={{ display: 'flex', gap: 10, fontSize: 10, color: '#fff' }}>
                   <span>🔴 Сила {analytics.intensity.intensityDistribution.strength}%</span>
                   <span>🟠 Гипертрофия {analytics.intensity.intensityDistribution.hypertrophy}%</span>
                   <span>🟢 Выносливость {analytics.intensity.intensityDistribution.endurance}%</span>
@@ -200,9 +200,9 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   </div>
                   {/* Неделя labels */}
                   <div style={{ display: 'flex', gap: 2, marginBottom: 6 }}>
-                    {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Н{wi + 1}</span>)}
+                    {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: '#fff' }}>Н{wi + 1}</span>)}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color:'rgba(255,255,255,0.9)' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color:'#fff' }}>
                     {groups.filter(g => (wsg[g]?.reduce((s: number, x: number) => s + x, 0) || 0) > 0).map(g => (
                       <span key={g} style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: 1, background: GROUP_COLORS[g] || '#888', display: 'inline-block' }} />{GRP_RU[g] || g}</span>
                     ))}
@@ -211,7 +211,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   {barTooltip && (
                     <div style={{ position: 'fixed', left: barTooltip.x + 8, top: barTooltip.y - 30, background: '#18181b', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '4px 8px', fontSize: 10, color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
                       <span style={{ color: GROUP_COLORS[barTooltip.group] || '#888', fontWeight: 700 }}>{GRP_RU[barTooltip.group] || barTooltip.group}</span>
-                      <span style={{ marginLeft: 6, color:'rgba(255,255,255,0.9)' }}>Н{barTooltip.week}: {barTooltip.sets} сетов</span>
+                      <span style={{ marginLeft: 6, color:'#fff' }}>Н{barTooltip.week}: {barTooltip.sets} сетов</span>
                     </div>
                   )}
                 </div>
@@ -224,11 +224,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   const maxVol3 = Math.max(...Object.values(analytics.volume.volumeByGroup).map(v2 => v2 as number), 1);
                   return (
                     <div key={group} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                      <span style={{ width: 80, fontSize: 10, color: 'var(--text-dim)', textAlign: 'right' }}>{GRP_RU[group] || group}</span>
+                      <span style={{ width: 80, fontSize: 10, color: '#fff', textAlign: 'right' }}>{GRP_RU[group] || group}</span>
                       <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.05)', overflow: 'hidden' }}>
                         <div style={{ width: `${(v / maxVol3) * 100}%`, height: '100%', background: '#8b5cf6', borderRadius: 4 }} />
                       </div>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)', width: 50 }}>{Math.round(v).toLocaleString()} кг</span>
+                      <span style={{ fontSize: 10, color: '#fff', width: 50 }}>{Math.round(v).toLocaleString()} кг</span>
                     </div>
                   );
                 })}
@@ -249,7 +249,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 return (
                   <div style={style.card}>
                     <div style={style.label}>⚖️ Баланс мышц</div>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>средний объём: {Math.round(avgVol).toLocaleString()} кг</div>
+                    <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>средний объём: {Math.round(avgVol).toLocaleString()} кг</div>
                     {groups.sort((a, b) => volByGroup[b] - volByGroup[a]).slice(0, 8).map(g => {
                       const v = volByGroup[g];
                       const ratio = v / avgVol;
@@ -257,7 +257,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       const label = ratio > 1.3 ? 'перегруз' : ratio > 1.1 ? 'выше нормы' : ratio < 0.5 ? 'недогруз' : ratio < 0.7 ? 'ниже нормы' : 'ok';
                       return (
                         <div key={g} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                          <span style={{ width: 70, fontSize: 10, color: 'var(--text-dim)', textAlign: 'right' }}>{GRP_RU[g] || g}</span>
+                          <span style={{ width: 70, fontSize: 10, color: '#fff', textAlign: 'right' }}>{GRP_RU[g] || g}</span>
                           <div style={{ flex: 1, height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.05)', overflow: 'hidden', position: 'relative' }}>
                             <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(255,255,255,0.15)' }} />
                             <div style={{ width: `${Math.min((v / maxVol4) * 100, 100)}%`, height: '100%', background: color, borderRadius: 4, opacity: 0.8 }} />
@@ -276,16 +276,16 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const bw = measurements.length > 0 ? (measurements[measurements.length - 1].weightKg || 0) : 0;
                 return (
                   <div style={style.card}>
-                    <div style={style.label}>🏆 Расчётный 1RM {bw > 0 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', fontWeight: 400, textTransform: 'none', marginLeft: 6 }}>вес тела: {bw} кг</span>}</div>
+                    <div style={style.label}>🏆 Расчётный 1RM {bw > 0 && <span style={{ fontSize: 9, color: '#fff', fontWeight: 400, textTransform: 'none', marginLeft: 6 }}>вес тела: {bw} кг</span>}</div>
                     {Object.entries(analytics.strength.estimated1RM).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 5).map(([exId2, rm]) => {
                       const trend = analytics.strength.strengthTrend[exId2] || 0;
                       const ex = EXERCISE_CATALOG.find((e2: any) => e2.id === exId2);
                       const ratio = bw > 0 ? ((rm as number) / bw).toFixed(2) : null;
                       return (
                         <div key={exId2} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 11 }}>
-                          <span style={{ color: 'var(--text-dim)' }}>{ex?.name || exId2}</span>
+                          <span style={{ color: '#fff' }}>{ex?.name || exId2}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {ratio && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>×{ratio} МТ</span>}
+                            {ratio && <span style={{ fontSize: 9, color: '#fff' }}>×{ratio} МТ</span>}
                             <span><strong style={{ color: ACCENT }}>{Math.round(rm as number)} кг</strong><span style={{ marginLeft: 6, fontSize: 10, color: trend >= 0 ? '#22c55e' : '#ef4444' }}>{trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%</span></span>
                           </span>
                         </div>
@@ -314,20 +314,20 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 return (
                   <div style={style.card}>
                     <div style={style.label}>🏅 Нормативы ПЛ ({sex === 'female' ? '♀ WRPF, женщины' : 'WRPF, raw'} · {bw} кг · {sex === 'female' ? '43-84+ кат.' : '60-140+ кат.'})</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.4 }}>e1RM из дневника → разряд по ближайшей категории (WRPF без ДК). Пол берётся из профиля ({sex === 'female' ? 'женские пороги ~60% от мужских' : 'мужские'}). Для точного выбора федерации/категории — «Анализ силы → Единый».</div>
+                    <div style={{ fontSize: 9, color: '#fff', marginBottom: 6, lineHeight: 1.4 }}>e1RM из дневника → разряд по ближайшей категории (WRPF без ДК). Пол берётся из профиля ({sex === 'female' ? 'женские пороги ~60% от мужских' : 'мужские'}). Для точного выбора федерации/категории — «Анализ силы → Единый».</div>
                     {lifts.map(({ id, rm, disc }) => {
                       const perTable = getNormTable(fedForDiary, disc as Discipline, sex);
                       if (!perTable) return null;
                       const cls = classifyTotal(perTable, bw, rm);
                       return (
                         <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, fontSize: 11 }}>
-                          <span style={{ color: 'var(--text-dim)' }}>{EXERCISE_CATALOG.find(e => e.id === id)?.name || id}</span>
+                          <span style={{ color: '#fff' }}>{EXERCISE_CATALOG.find(e => e.id === id)?.name || id}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{Math.round(rm)} кг</span>
+                            <span style={{ fontSize: 10, color: '#fff' }}>{Math.round(rm)} кг</span>
                             {cls.achievedRank ? (
                               <span style={{ fontSize: 10, fontWeight: 800, color: cls.achievedRank === 'kms' ? '#22c55e' : cls.achievedRank === 'ms' ? '#60a5fa' : '#f59e0b', padding: '1px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>{RANK_LABELS[cls.achievedRank as keyof typeof RANK_LABELS]}</span>
                             ) : (
-                              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>до {RANK_LABELS[cls.nextRank as keyof typeof RANK_LABELS]}: {cls.kgToNext} кг</span>
+                              <span style={{ fontSize: 9, color: '#fff' }}>до {RANK_LABELS[cls.nextRank as keyof typeof RANK_LABELS]}: {cls.kgToNext} кг</span>
                             )}
                           </span>
                         </div>
@@ -366,7 +366,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={style.label}>🔀 Прогресс по мезоциклам (e1RM)</div>
                     {exercises.map(ex => (
                       <div key={ex.name} style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 2 }}>{ex.name}</div>
+                        <div style={{ fontSize: 10, color:'#fff', marginBottom: 2 }}>{ex.name}</div>
                         <MiniLineChart
                           data={[]}
                           series={ex.mesos.map(m => ({ name: m.name, color: m.color, data: m.pts.map(p => p.e1rm), labels: m.pts.map(p => p.date) }))}
@@ -421,14 +421,14 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               : <span style={{ fontSize: 9, color: '#60a5fa' }}>из профиля</span>}
                           </div>
                           {picks.length > 0 && (
-                            <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 2 }}>
+                            <div style={{ fontSize: 10, color:'#fff', marginTop: 2 }}>
                               {picks.map((e, i) => `${i > 0 ? ' · ' : ''}${e.name}`)}
                             </div>
                           )}
                         </div>
                       );
                     })}
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+                    <div style={{ fontSize: 9, color: '#fff' }}>
                       Группы ниже 70% среднего объёма за последние 12 сессий + слабые точки из профиля; упражнения — из каталога.
                     </div>
                   </div>
@@ -457,12 +457,12 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {prs.map((pr, i) => (
                       <div key={pr.name + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, fontSize: 10 }}>
                         <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          <span style={{ color: 'rgba(255,255,255,0.85)', marginRight: 4 }}>#{i + 1}</span>
-                          <span style={{ color: 'var(--text-dim)' }}>{pr.name}</span>
+                          <span style={{ color: '#fff', marginRight: 4 }}>#{i + 1}</span>
+                          <span style={{ color: '#fff' }}>{pr.name}</span>
                         </div>
                         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <strong style={{ color: ACCENT }}>{pr.weight}кг×{pr.reps}</strong>
-                          <span style={{ marginLeft: 4, color: 'rgba(255,255,255,0.85)' }}>e1RM {pr.e1rm}</span>
+                          <span style={{ marginLeft: 4, color: '#fff' }}>e1RM {pr.e1rm}</span>
                           <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>{pr.date.slice(5)}</span>
                         </div>
                       </div>
@@ -476,15 +476,15 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <div style={style.label}>Метрики усталости</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Монотонность</div>
+                    <div style={{ color: '#fff', fontSize: 10 }}>Монотонность</div>
                     <div style={{ fontWeight: 700, color: analytics.fatigue.monotony > 2 ? '#ef4444' : ACCENT }}>{analytics.fatigue.monotony.toFixed(1)}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Напряжение</div>
+                    <div style={{ color: '#fff', fontSize: 10 }}>Напряжение</div>
                     <div style={{ fontWeight: 700, color: analytics.fatigue.strain > 300 ? '#ef4444' : ACCENT }}>{Math.round(analytics.fatigue.strain)}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>ЦНС</div>
+                    <div style={{ color: '#fff', fontSize: 10 }}>ЦНС</div>
                     <div style={{ fontWeight: 700, color: analytics.fatigue.cnsFatigue > 0.7 ? '#ef4444' : ACCENT }}>{Math.round(analytics.fatigue.cnsFatigue * 100)}%</div>
                   </div>
                 </div>
@@ -518,7 +518,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       </span>
                     </div>
                     {risks.map((r, i) => (
-                      <div key={i} style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 3, paddingLeft: 8, borderLeft: `2px solid ${level === 'high' ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)'}` }}>• {r}</div>
+                      <div key={i} style={{ fontSize: 10, color:'#fff', marginBottom: 3, paddingLeft: 8, borderLeft: `2px solid ${level === 'high' ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)'}` }}>• {r}</div>
                     ))}
                     {level === 'high' && (
                       <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', fontSize: 10, color: '#ef4444' }}>
@@ -547,7 +547,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <span style={{ fontSize: 14 }}>📉</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>Рекомендация: разгрузочная неделя</span>
                     </div>
-                    <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 10, color:'#fff', lineHeight: 1.5 }}>
                       {weeksSinceDeload} недель подряд без снижения объёма. Тренд объёма растёт ({Math.round(trend)} → {Math.round(avgVol)} сетов). Рекомендуется неделя объёмом ~50% ({Math.round(avgVol * 0.5)} сетов) с RIR 3-4.
                     </div>
                     <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.08)', fontSize: 9, color: '#60a5fa' }}>
@@ -564,7 +564,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const lastRPE = rpes[rpes.length - 1];
                 const trend = lastRPE > avgRPE * 1.15 ? 'high' : lastRPE < avgRPE * 0.85 ? 'low' : 'normal';
                 const trendLabel = trend === 'high' ? '⚠ выше нормы' : trend === 'low' ? '✓ ниже нормы' : 'в норме';
-                const trendColor = trend === 'high' ? '#ef4444' : trend === 'low' ? '#22c55e' : 'rgba(255,255,255,0.85)';
+                const trendColor = trend === 'high' ? '#ef4444' : trend === 'low' ? '#22c55e' : '#fff';
                 return (
                   <div style={style.card}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -575,7 +575,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <Sparkline data={rpes} width={100} height={24} color={trend === 'high' ? '#ef4444' : '#f59e0b'} />
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{avgRPE.toFixed(1)}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>avg RPE</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>avg RPE</div>
                       </div>
                     </div>
                   </div>
@@ -602,14 +602,14 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const color = b <= 6 ? '#22c55e' : b <= 7 ? '#60a5fa' : b <= 8 ? '#f59e0b' : '#ef4444';
                         return (
                           <div key={b} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>{pct}%</div>
+                            <div style={{ fontSize: 7, color: '#fff' }}>{pct}%</div>
                             <div style={{ width: '100%', height: h, background: color, borderRadius: 2 }} />
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{b}</div>
+                            <div style={{ fontSize: 8, color: '#fff' }}>{b}</div>
                           </div>
                         );
                       })}
                     </div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 4, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: '#fff', marginTop: 4, textAlign: 'center' }}>
                       Всего {total} замеров RPE
                     </div>
                   </div>
@@ -640,7 +640,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                       {exercises.map(ex => (
                         <div key={ex.name} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px' }}>
-                          <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                          <div style={{ fontSize: 9, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                             <Sparkline data={ex.data} width={50} height={14} color={ex.delta > 0 ? '#22c55e' : '#ef4444'} showDots={false} />
                             <div style={{ fontSize: 9, textAlign: 'right' }}>
@@ -697,13 +697,13 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {plateaued.map(p => (
                       <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                         <div>
-                          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{p.name}</span>
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginLeft: 4 }}>{p.sessions} сессий</span>
+                          <span style={{ fontSize: 10, color: '#fff' }}>{p.name}</span>
+                          <span style={{ fontSize: 9, color: '#fff', marginLeft: 4 }}>{p.sessions} сессий</span>
                         </div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{p.best}кг</span>
                       </div>
                     ))}
-                    <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
+                    <div style={{ marginTop: 4, fontSize: 9, color: '#fff' }}>
                       💡 Попробуйте: изменить хват, темп, диапазон повторов или добавить assistance
                     </div>
                   </div>
@@ -738,15 +738,15 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                       <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{avgPerWeek.toFixed(1)}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>трен/нед</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>трен/нед</div>
                       </div>
                       <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: '#22c55e' }}>{consistency}/{weeks}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>стабильных</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>стабильных</div>
                       </div>
                       <div style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px' }}>
                         <div style={{ fontSize: 16, fontWeight: 800, color: '#f59e0b' }}>{perfectWeeks}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>идеальных</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>идеальных</div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 32 }}>
@@ -755,7 +755,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const color = w.count >= 4 ? '#22c55e' : w.count >= 3 ? '#f59e0b' : w.count >= 1 ? '#ef4444' : 'rgba(255,255,255,0.05)';
                         return (
                           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{w.count}</div>
+                            <div style={{ fontSize: 8, color: '#fff' }}>{w.count}</div>
                             <div style={{ width: '100%', height: `${h}%`, minHeight: 2, background: color, borderRadius: 2 }} />
                           </div>
                         );
@@ -795,15 +795,15 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                     <div style={{ ...style.card, textAlign: 'center' }}>
                       <div style={{ fontSize: 18, fontWeight: 800, color: currentStreak >= 3 ? '#22c55e' : ACCENT }}>{currentStreak}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>🔥 Серия дней</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>🔥 Серия дней</div>
                     </div>
                     <div style={{ ...style.card, textAlign: 'center' }}>
                       <div style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>{maxStreak}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>🏆 Макс. серия</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>🏆 Макс. серия</div>
                     </div>
                     <div style={{ ...style.card, textAlign: 'center' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: recentPRs > 0 ? '#a855f7' : 'rgba(255,255,255,0.85)' }}>{recentPRs}</div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>⭐ PR за 7д</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: recentPRs > 0 ? '#a855f7' : '#fff' }}>{recentPRs}</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>⭐ PR за 7д</div>
                     </div>
                   </div>
                 );
@@ -843,20 +843,20 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={style.label}>💪 Частота по группам (подходы/нед)</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '86px repeat(8, 1fr)', gap: '2px 4px', alignItems: 'center' }}>
                       <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', textAlign: 'right' }}>Н-8…Н-1</span>
-                      {Array.from({ length: weeks }, (_, i) => <span key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>{i + 1}</span>)}
+                      {Array.from({ length: weeks }, (_, i) => <span key={i} style={{ fontSize: 8, color: '#fff', textAlign: 'center' }}>{i + 1}</span>)}
                       {groups.map(({ group, total, data }) => (
                         <React.Fragment key={group}>
-                          <span style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'right' }}>{GRP_RU[group] || group}</span>
+                          <span style={{ fontSize: 9, color: '#fff', textAlign: 'right' }}>{GRP_RU[group] || group}</span>
                           {data.map((v, wi) => (
                             <div key={wi} style={{ height: 12, borderRadius: 3, background: heat(v), display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }} title={`${GRP_RU[group] || group}: ${v} подходов`}>
-                              {v > 0 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>{v}</span>}
+                              {v > 0 && <span style={{ fontSize: 7, color: '#fff' }}>{v}</span>}
                             </div>
                           ))}
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textAlign: 'right' }}>{total}</span>
+                          <span style={{ fontSize: 9, color: '#fff', textAlign: 'right' }}>{total}</span>
                         </React.Fragment>
                       ))}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: '#fff' }}>
                       <span>меньше</span>
                       {[0.1, 0.3, 0.6, 1].map(t => <span key={t} style={{ width: 10, height: 10, borderRadius: 2, background: heat(maxSets * t) }} />)}
                       <span>больше</span>
@@ -890,8 +890,8 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                           <div key={i} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 6, background: bg }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: d.workouts > 0 ? '#00e68a' : 'rgba(255,255,255,0.2)' }}>{d.name}</div>
                             <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', margin: '2px 0' }}>{d.workouts}</div>
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{d.sets} сетов</div>
-                            {d.topGroup !== '—' && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{d.topGroup}</div>}
+                            <div style={{ fontSize: 8, color: '#fff' }}>{d.sets} сетов</div>
+                            {d.topGroup !== '—' && <div style={{ fontSize: 7, color: '#fff', marginTop: 1 }}>{d.topGroup}</div>}
                           </div>
                         );
                       })}
@@ -922,12 +922,12 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const color = data.group ? (GRP_RU[data.group] ? '#00e68a' : '#60a5fa') : '#a855f7';
                         return (
                           <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', width: 14, textAlign: 'right' }}>{i + 1}</div>
+                            <div style={{ fontSize: 9, color: '#fff', width: 14, textAlign: 'right' }}>{i + 1}</div>
                             <div style={{ flex: 1, height: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
                               <div style={{ height: '100%', width: `${pct * 100}%`, background: `${color}33`, borderRadius: 3, transition: 'width 0.3s' }} />
-                              <span style={{ position: 'absolute', left: 4, top: 1, fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 12 }}>{name}</span>
+                              <span style={{ position: 'absolute', left: 4, top: 1, fontSize: 8, color: '#fff', lineHeight: 12 }}>{name}</span>
                             </div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', width: 30, textAlign: 'right' }}>{data.count}×</div>
+                            <div style={{ fontSize: 9, color: '#fff', width: 30, textAlign: 'right' }}>{data.count}×</div>
                             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', width: 24, textAlign: 'right' }}>{data.sets}с</div>
                           </div>
                         );
@@ -962,11 +962,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: ACCENT }}>{avgMin} мин</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Среднее за сессию</div>
+                        <div style={{ fontSize: 10, color: '#fff' }}>Среднее за сессию</div>
                       </div>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{totalMin} мин</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Всего (8 нед)</div>
+                        <div style={{ fontSize: 10, color: '#fff' }}>Всего (8 нед)</div>
                       </div>
                     </div>
                   </div>
@@ -990,15 +990,15 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 return (
                   <div style={{ ...style.card, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>⚡ Плотность</div>
+                      <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>⚡ Плотность</div>
                       <div style={{ fontSize: 16, fontWeight: 800, color: trend ? '#f59e0b' : ACCENT }}>{avgSetsPerMin.toFixed(2)}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>сетов/мин (avg)</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>сетов/мин (avg)</div>
                       <Sparkline data={densities.map(d => d.setsPerMin)} width={60} height={14} color={trend ? '#f59e0b' : '#00e68a'} showDots={false} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>📊 Объём/мин</div>
+                      <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>📊 Объём/мин</div>
                       <div style={{ fontSize: 16, fontWeight: 800, color: '#60a5fa' }}>{Math.round(avgVolPerMin)}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>кг/мин (avg)</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>кг/мин (avg)</div>
                       <Sparkline data={densities.map(d => d.volPerMin)} width={60} height={14} color="#60a5fa" showDots={false} />
                     </div>
                   </div>
@@ -1020,7 +1020,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         return (
                           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                             <div style={{ width: '100%', height: h, borderRadius: 2, background: isMax ? '#22c55e' : isMin ? '#ef4444' : '#00e68a', opacity: isMax ? 1 : 0.6 }} />
-                            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>{(v / 1000).toFixed(1)}т</div>
+                            <div style={{ fontSize: 7, color: '#fff' }}>{(v / 1000).toFixed(1)}т</div>
                           </div>
                         );
                       })}
@@ -1032,7 +1032,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               {totals.filter(t => t > 0).length >= 2 && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                   <div style={style.card}>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Объём (сеты/нед)</div>
+                    <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>Объём (сеты/нед)</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Sparkline data={totals} width={60} height={20} color="#00e68a" />
                       <span style={{ fontSize: 10, color: totals[7] > totals[0] ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
@@ -1041,7 +1041,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     </div>
                   </div>
                   <div style={style.card}>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Напряжение</div>
+                    <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>Напряжение</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Sparkline data={[analytics.fatigue.monotony, analytics.fatigue.strain / 100, analytics.fatigue.cnsFatigue * 10, analytics.recovery.readinessEstimate / 10]} width={60} height={20} color="#a855f7" />
                       <span style={{ fontSize: 10, color: analytics.fatigue.weeklyFatigue > 0.7 ? '#ef4444' : '#22c55e', fontWeight: 600 }}>
@@ -1057,7 +1057,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={style.label}>📉 Тренды по неделям</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                     <div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Объём (кг/нед)</div>
+                      <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>Объём (кг/нед)</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Sparkline data={diaryProgress.slice(-8).map(w => w.totalVolume / 1000)} width={70} height={20} color="#00e68a" />
                         {diaryProgress.length >= 2 && <span style={{ fontSize: 10, fontWeight: 600, color: diaryProgress[diaryProgress.length - 1].totalVolume > diaryProgress[0].totalVolume ? '#22c55e' : '#ef4444' }}>
@@ -1066,7 +1066,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       </div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>Тренировок/нед</div>
+                      <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>Тренировок/нед</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Sparkline data={diaryProgress.slice(-8).map(w => w.workoutCount)} width={70} height={20} color="#60a5fa" />
                         {diaryProgress.length >= 2 && <span style={{ fontSize: 10, fontWeight: 600, color: '#60a5fa' }}>
@@ -1092,17 +1092,17 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={style.label}>💚 Восстановление</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Восстановление</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Восстановление</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: avgRecovery >= 50 ? '#22c55e' : '#ef4444' }}>{Math.round(avgRecovery)}%</div>
                         <Sparkline data={recent.map(r => r.recovery)} width={50} height={12} color={recTrend ? '#22c55e' : '#ef4444'} showDots={false} />
                       </div>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Усталость</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Усталость</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: avgFatigue <= 50 ? '#22c55e' : '#f59e0b' }}>{Math.round(avgFatigue)}%</div>
                         <Sparkline data={recent.map(r => r.fatigue)} width={50} height={12} color={fatTrend ? '#22c55e' : '#f59e0b'} showDots={false} />
                       </div>
                       <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Readiness</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Readiness</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: readinessScore >= 50 ? '#22c55e' : '#ef4444' }}>{readinessScore}%</div>
                         <Sparkline data={recent.map(r => r.recovery * 0.6 + (100 - r.fatigue) * 0.4)} width={50} height={12} color={readinessScore >= 50 ? '#22c55e' : '#ef4444'} showDots={false} />
                       </div>
@@ -1135,32 +1135,32 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={style.label}>📋 Итоги недели</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
                       <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тренировок</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Тренировок</div>
                         <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{lastWeek.length}</div>
                       </div>
                       <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Подходов</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Подходов</div>
                         <div style={{ fontSize: 16, fontWeight: 800, color: '#60a5fa' }}>{totalSetsW}</div>
                       </div>
                       <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тоннаж</div>
+                        <div style={{ fontSize: 9, color: '#fff' }}>Тоннаж</div>
                         <div style={{ fontSize: 16, fontWeight: 800, color: '#a855f7' }}>{(totalVol / 1000).toFixed(1)}т</div>
                       </div>
                     </div>
                     {sorted.length > 0 && (
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.85)' }}>Топ: </span>
+                      <div style={{ fontSize: 10, color: '#fff' }}>
+                        <span style={{ color: '#fff' }}>Топ: </span>
                         {sorted.map(([name, data], i) => (
                           <span key={i}>
                             {i > 0 && ' · '}
                             <span style={{ color: '#fff' }}>{name}</span>
-                            <span style={{ color: 'rgba(255,255,255,0.85)' }}> ({Math.round(data.vol).toLocaleString()} кг)</span>
+                            <span style={{ color: '#fff' }}> ({Math.round(data.vol).toLocaleString()} кг)</span>
                           </span>
                         ))}
                       </div>
                     )}
                     {bestPR && bestPR.e1rm > 0 && (
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
                         🏆 Лучший e1RM: <span style={{ color: ACCENT, fontWeight: 700 }}>{bestPR.name}</span> {Math.round(bestPR.e1rm)} кг
                       </div>
                     )}
@@ -1223,8 +1223,8 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               return (
                                 <g key={wk}>
                                   <rect x={x} y={h - bh - 8} width={bw} height={bh} rx={3} fill={data.vol >= volMax * 0.8 ? '#22c55e' : data.vol >= volMax * 0.5 ? '#60a5fa' : 'rgba(255,255,255,0.15)'} />
-                                  <text x={x + bw / 2} y={h - bh - 10} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize={7}>{data.vol >= 1000 ? `${(data.vol / 1000).toFixed(1)}т` : data.vol}</text>
-                                  <text x={x + bw / 2} y={h - 1} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={6}>{wk.slice(5, 10)}</text>
+                                  <text x={x + bw / 2} y={h - bh - 10} textAnchor="middle" fill="#fff" fontSize={7}>{data.vol >= 1000 ? `${(data.vol / 1000).toFixed(1)}т` : data.vol}</text>
+                                  <text x={x + bw / 2} y={h - 1} textAnchor="middle" fill="#fff" fontSize={6}>{wk.slice(5, 10)}</text>
                                 </g>
                               );
                             })}
@@ -1247,11 +1247,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         <div style={style.card}>
                           <div style={style.label}>📅 {now.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })} (итого)</div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>{monthW.length}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>тренировок</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{(totalVol / 1000).toFixed(1)}т</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>тоннаж</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#a855f7' }}>{totalSets}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>подходов</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>{avgRPE}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>RPE avg</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: prCount > 0 ? '#22c55e' : 'rgba(255,255,255,0.85)' }}>{prCount}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>PR</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>{monthW.length}</div><div style={{ fontSize: 8, color: '#fff' }}>тренировок</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{(totalVol / 1000).toFixed(1)}т</div><div style={{ fontSize: 8, color: '#fff' }}>тоннаж</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#a855f7' }}>{totalSets}</div><div style={{ fontSize: 8, color: '#fff' }}>подходов</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>{avgRPE}</div><div style={{ fontSize: 8, color: '#fff' }}>RPE avg</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: prCount > 0 ? '#22c55e' : '#fff' }}>{prCount}</div><div style={{ fontSize: 8, color: '#fff' }}>PR</div></div>
                           </div>
                         </div>
                       );
@@ -1288,13 +1288,13 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               const label = avg < mev ? 'Ниже MEV' : avg < mrv * 0.7 ? 'Оптимально' : avg < mrv ? 'Выше нормы' : 'Over MRV';
                               return (
                                 <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                                  <span style={{ width: 70, color: 'rgba(255,255,255,0.85)', textAlign: 'right' }}>{GRP_RU[m] || m}</span>
+                                  <span style={{ width: 70, color: '#fff', textAlign: 'right' }}>{GRP_RU[m] || m}</span>
                                   <div style={{ flex: 1, height: 8, borderRadius: 3, background: 'rgba(255,255,255,0.06)', position: 'relative', overflow: 'hidden' }}>
                                     <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, ratio * 100)}%`, background: color, borderRadius: 3 }} />
-                                    <div style={{ position: 'absolute', left: `${(mev / mrv) * 100}%`, top: -1, width: 1, height: 10, background: 'rgba(255,255,255,0.85)' }} />
+                                    <div style={{ position: 'absolute', left: `${(mev / mrv) * 100}%`, top: -1, width: 1, height: 10, background: '#fff' }} />
                                   </div>
                                   <span style={{ minWidth: 35, textAlign: 'right', fontWeight: 600, color }}>{Math.round(avg)}</span>
-                                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', minWidth: 55 }}>/ {mrv} MRV</span>
+                                  <span style={{ fontSize: 8, color: '#fff', minWidth: 55 }}>/ {mrv} MRV</span>
                                   <span style={{ fontSize: 8, color }}>{label}</span>
                                 </div>
                               );
@@ -1322,7 +1322,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       return (
                         <div style={style.card}>
                           <div style={style.label}>⚡ Кривая усталости</div>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>RPE (синий) + объём (зелёный) по сессиям</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>RPE (синий) + объём (зелёный) по сессиям</div>
                           <svg width="100%" viewBox={`0 0 ${ww} ${h}`} style={{ display: 'block' }}>
                             <polyline points={fatigueData.map((v, i) => `${(i / Math.max(fatigueData.length - 1, 1)) * ww},${h - (v / fMax) * (h - 4) - 2}`).join(' ')} fill="none" stroke="#60a5fa" strokeWidth={2} strokeLinejoin="round" />
                             <polyline points={volumeData.map((v, i) => `${(i / Math.max(volumeData.length - 1, 1)) * ww},${h - (v / vMax) * (h - 4) - 2}`).join(' ')} fill="none" stroke="#22c55e" strokeWidth={1.5} strokeDasharray="4 2" strokeLinejoin="round" opacity={0.6} />
@@ -1367,13 +1367,13 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       return (
                         <div style={style.card}>
                           <div style={style.label}>🚀 Скорость прогресса (кг/нед)</div>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Изменение 1ПМ по мышечным группам</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>Изменение 1ПМ по мышечным группам</div>
                           <div style={{ display: 'grid', gap: 3 }}>
                             {velocities.map(v => (
                               <div key={v.group} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                                <span style={{ width: 70, color: 'rgba(255,255,255,0.85)', textAlign: 'right' }}>{GRP_RU[v.group] || v.group}</span>
-                                <span style={{ fontWeight: 700, color: v.velocity > 0 ? '#22c55e' : v.velocity < 0 ? '#ef4444' : 'rgba(255,255,255,0.85)', minWidth: 40 }}>{v.velocity > 0 ? '+' : ''}{v.velocity}</span>
-                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>кг/нед ({v.first}→{v.last}кг, {v.sessions} упр.)</span>
+                                <span style={{ width: 70, color: '#fff', textAlign: 'right' }}>{GRP_RU[v.group] || v.group}</span>
+                                <span style={{ fontWeight: 700, color: v.velocity > 0 ? '#22c55e' : v.velocity < 0 ? '#ef4444' : '#fff', minWidth: 40 }}>{v.velocity > 0 ? '+' : ''}{v.velocity}</span>
+                                <span style={{ fontSize: 9, color: '#fff' }}>кг/нед ({v.first}→{v.last}кг, {v.sessions} упр.)</span>
                               </div>
                             ))}
                           </div>
@@ -1395,7 +1395,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       return (
                         <div style={style.card}>
                           <div style={style.label}>⏱ Плотность тренировок</div>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>Подходы/минуту по сессиям</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>Подходы/минуту по сессиям</div>
                           <svg width="100%" viewBox={`0 0 ${ww} ${h}`} style={{ display: 'block' }}>
                             {densityData.map((d, i) => {
                               const bh = (d.setsPerMin / maxD) * (h - 4);
@@ -1432,16 +1432,16 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       return (
                         <div style={style.card}>
                           <div style={style.label}>⏱ Прогноз времени</div>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4 }}>На основе последних {last10.length} тренировок (ср. {avgDuration} мин)</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginBottom: 4 }}>На основе последних {last10.length} тренировок (ср. {avgDuration} мин)</div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
                             {[4, 6, 8].map(n => (
                               <div key={n} style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-                                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{n} упр.</div>
+                                <div style={{ fontSize: 9, color: '#fff' }}>{n} упр.</div>
                                 <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{predictByExercises(n)}<span style={{ fontSize: 10, fontWeight: 400 }}> мин</span></div>
                               </div>
                             ))}
                           </div>
-                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 4, textAlign: 'center' }}>Ср. {avgSets} подходов / {avgExercises} упр. / {avgDuration} мин</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginTop: 4, textAlign: 'center' }}>Ср. {avgSets} подходов / {avgExercises} упр. / {avgDuration} мин</div>
                         </div>
                       );
                     })()}

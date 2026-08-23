@@ -8,7 +8,7 @@ import { loadReadinessHistory, type ReadinessHistoryPoint } from './readiness-hi
 import { MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.45 };
 
 export const ReadinessForecastCard: React.FC = () => {
   const [history] = useState<ReadinessHistoryPoint[]>(() => loadReadinessHistory());
@@ -18,7 +18,7 @@ export const ReadinessForecastCard: React.FC = () => {
   if (recs.length < 3) {
     return <div className="card" style={{ padding: 12 }}>
       <h3 style={{ margin: '0 0 4px', fontSize: 13, color: ACCENT }}>📈 Прогноз готовности</h3>
-      <div style={{ ...SMALL, color: 'var(--text-dim)' }}>Недостаточно данных ({recs.length}/3 дней). Открывайте приложение ежедневно — готовность записывается в историю, и прогноз появится.</div>
+      <div style={{ ...SMALL, color: '#fff' }}>Недостаточно данных ({recs.length}/3 дней). Открывайте приложение ежедневно — готовность записывается в историю, и прогноз появится.</div>
     </div>;
   }
 
@@ -45,9 +45,9 @@ export const ReadinessForecastCard: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
         {forecast?.values.map((v: number, i: number) => (
           <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 6, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>+{i + 1} дн</div>
+            <div style={{ fontSize: 10, color: '#fff' }}>+{i + 1} дн</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: v >= 70 ? '#22c55e' : v >= 50 ? '#eab308' : '#ef4444' }}>{Math.round(v)}</div>
-            {forecast.ci95[i] && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>ДИ {Math.round(forecast.ci95[i][0])}-{Math.round(forecast.ci95[i][1])}</div>}
+            {forecast.ci95[i] && <div style={{ fontSize: 10, color: '#fff' }}>ДИ {Math.round(forecast.ci95[i][0])}-{Math.round(forecast.ci95[i][1])}</div>}
           </div>
         ))}
       </div>

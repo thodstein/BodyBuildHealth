@@ -91,7 +91,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
         <h3 style={{ margin: '0 0 2px', fontSize: 15, fontWeight: 800, color: '#fff' }}>
           ⚡ Интеллект тренировки
         </h3>
-        <p style={{ margin: 0, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.35 }}>
+        <p style={{ margin: 0, fontSize: 10, color: '#fff', lineHeight: 1.35 }}>
           Инструменты анализа, сборки и контроля качества тренировочного процесса
         </p>
       </div>
@@ -144,7 +144,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
                     </span>
                   )}
                 </div>
-                <span style={{ fontSize: 10, color:'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 10, color:'#fff', lineHeight: 1.3 }}>
                   {t.desc}
                 </span>
               </button>

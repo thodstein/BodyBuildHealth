@@ -99,7 +99,7 @@ const VolumeRecoveryCorrelationCard: React.FC<{ sessions: WorkoutLog[] }> = ({ s
       <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
         🔄 Корреляция объём ↔ восстановление
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
         {points.length} точек (недель с данными) · r = {corr.r.toFixed(2)}
         {corr.r < -0.3 ? ' (умеренная обратная)' : corr.r < -0.1 ? ' (слабая обратная)' : Math.abs(corr.r) < 0.1 ? ' (нет корреляции)' : ' (положительная)'}
       </div>
@@ -126,8 +126,8 @@ const VolumeRecoveryCorrelationCard: React.FC<{ sessions: WorkoutLog[] }> = ({ s
           />
         ))}
         {/* Labels */}
-        <text x={W / 2} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={7}>Объём (тыс. кг)</text>
-        <text x={6} y={H / 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={7} transform={`rotate(-90, 6, ${H / 2})`}>Готовность (%)</text>
+        <text x={W / 2} y={H - 2} textAnchor="middle" fill="#fff" fontSize={7}>Объём (тыс. кг)</text>
+        <text x={6} y={H / 2} textAnchor="middle" fill="#fff" fontSize={7} transform={`rotate(-90, 6, ${H / 2})`}>Готовность (%)</text>
       </svg>
       {estimatedMRV && estimatedMRV > 0 && (
         <div style={{ marginTop: 4, fontSize: 10, padding: '4px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)' }}>
@@ -142,7 +142,7 @@ const VolumeRecoveryCorrelationCard: React.FC<{ sessions: WorkoutLog[] }> = ({ s
       )}
 {estimatedMRV != null && (
       <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>🔗 MRV из корреляции объём↔восстановление: <b style={{ color: '#00e68a' }}>{estimatedMRV}</b> (объём, где готовность падает до 40).</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>🔗 MRV из корреляции объём↔восстановление: <b style={{ color: '#00e68a' }}>{estimatedMRV}</b> (объём, где готовность падает до 40).</div>
         <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'MRV (корреляция) ' + estimatedMRV, data: { mrv: estimatedMRV } })} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, minHeight: 40 }}>🛠 Применить MRV к планировщику</button>
       </div>
     )}

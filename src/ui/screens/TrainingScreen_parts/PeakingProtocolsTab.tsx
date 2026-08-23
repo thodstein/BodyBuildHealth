@@ -6,7 +6,7 @@ import type { RecoveryProtocol, MentalRoutine } from '../../../engines/gym-compe
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.5)', borderRadius: 10, padding: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 10 };
 
 const PROTOCOL_COLORS: Record<string, string> = { pl: '#3b82f6', bb: '#a855f7', classic: '#f59e0b' };
@@ -73,7 +73,7 @@ export const PeakingProtocolsTab: React.FC = () => {
                 <div style={{ fontSize: 13, fontWeight: 800, color }}>
                   {icon} {proto.name} <span style={{ fontSize: 10, fontWeight: 400, color: DIM }}>({proto.durationWeeks} нед)</span>
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginTop: 4, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 4, lineHeight: 1.5 }}>
                   {proto.description}
                 </div>
               </div>
@@ -116,7 +116,7 @@ export const PeakingProtocolsTab: React.FC = () => {
                 <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>
                   {r.name} <span style={{ fontSize: 10, color: DIM, fontWeight: 400 }}>({r.durationMin} мин)</span>
                 </div>
-                <ol style={{ margin: '0 0 6px 14px', padding: 0, color: 'rgba(255,255,255,0.8)', fontSize: 10 }}>
+                <ol style={{ margin: '0 0 6px 14px', padding: 0, color: '#fff', fontSize: 10 }}>
                   {r.instructions.slice(0, 3).map((s, i) => <li key={i} style={{ marginBottom: 1 }}>{s}</li>)}
                   {r.instructions.length > 3 && <li style={{ color: DIM }}>…</li>}
                 </ol>

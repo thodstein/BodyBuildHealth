@@ -127,17 +127,17 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
         {link ? (
           <>
             <Badge bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.24)" color="#4ade80">Подключено: {cycleName ?? link.cycleId}</Badge>
-            <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="rgba(255,255,255,0.65)">{SPORT_LABELS[link.sport]}</Badge>
+            <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="#fff">{SPORT_LABELS[link.sport]}</Badge>
           </>
         ) : (
-          <Badge bg="rgba(255,255,255,0.04)" border="rgba(255,255,255,0.08)" color="rgba(255,255,255,0.85)">Не подключено</Badge>
+          <Badge bg="rgba(255,255,255,0.04)" border="rgba(255,255,255,0.08)" color="#fff">Не подключено</Badge>
         )}
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }} role="status">{flash}</div>}
       {pendingDiff && !pendingDiff.unchanged && (
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontSize: 10, color: '#fff', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontWeight: 700, color: '#93c5fd' }}>🔄 Пересчёт под ACWR{pendingDiff.acwr != null ? ` (${pendingDiff.acwr.toFixed(2)})` : ''}{pendingDiff.legDaysNote} — что изменится:</div>
-          <div style={{ color: 'rgba(255,255,255,0.75)' }} role="status">{pendingDiff.diffText}</div>
+          <div style={{ color: '#fff' }} role="status">{pendingDiff.diffText}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button style={BTN_PRIMARY} onClick={applyRecalc} aria-label="Применить пересчёт кардио">✅ Применить</button>
             <button style={BTN} onClick={() => setPendingDiff(null)} aria-label="Отменить пересчёт кардио">✕ Отмена</button>
@@ -152,7 +152,7 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
         </div>
       )}
       {nextText && (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '6px 10px' }}>
+        <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '6px 10px' }}>
           ⏭ Следующая сессия: {nextText}
         </div>
       )}

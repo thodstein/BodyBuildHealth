@@ -42,7 +42,7 @@ export const BBContestPrepActiveCard: React.FC<{ onOpen?: () => void }> = ({ onO
     <div style={{
       marginBottom: 8, padding: 10, borderRadius: 12, cursor: onOpen ? 'pointer' : 'default',
       background: 'linear-gradient(135deg, rgba(236,72,153,0.10), rgba(24,24,27,0.5))',
-      border: '1px solid rgba(236,72,153,0.25)', fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5,
+      border: '1px solid rgba(236,72,153,0.25)', fontSize: 11, color: '#fff', lineHeight: 1.5,
     }} onClick={onOpen} role={onOpen ? 'button' : undefined}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
         <span style={{ fontSize: 13 }}>🏁</span>
@@ -58,7 +58,7 @@ export const BBContestPrepActiveCard: React.FC<{ onOpen?: () => void }> = ({ onO
           </span>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', color: 'rgba(255,255,255,0.85)' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', color: '#fff' }}>
         <span>Шоу <b style={{ color: '#fff' }}>{plan.showDate}</b> · {CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category}</span>
         <span>Подготовка <b style={{ color: '#fff' }}>{plan.preparation.weeks}</b> нед</span>
         <span>Taper <b style={{ color: '#fff' }}>{plan.taper.weeks}</b> нед</span>

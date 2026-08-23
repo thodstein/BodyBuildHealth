@@ -186,7 +186,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
               const label = id === 'men_olympic' ? 'Ол.' : id === 'women_olympic' ? 'Жен.' : id === 'ez_curl' ? 'EZ' : id === 'trap_bar' ? 'Трап' : id === 'ssb' ? 'SSB' : id === 'swiss_bar' ? 'Swiss' : id === 'technique' ? 'Техн.' : 'Станд.';
               return (
                 <button key={id} onClick={() => applyBarPreset(id)}
-                  style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: barId === id ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)', background: barId === id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color: barId === id ? ACCENT : 'rgba(255,255,255,0.7)' }}>
+                  style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer', border: barId === id ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)', background: barId === id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)', color: barId === id ? ACCENT : '#fff' }}>
                   {label} {w}
                 </button>
               );
@@ -244,7 +244,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
             {plates.platesPerSide.map((p, i) => (
               <div key={i} style={{ ...ROW, borderBottom: 'none' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ display: 'inline-block', width: 28, height: 28, borderRadius: '50%', background: p.plate >= 20 ? '#ef4444' : p.plate >= 10 ? '#f59e0b' : '#3b82f6', border: '2px solid rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: '24px', fontSize: 10, fontWeight: 800, color: '#fff' }}>{p.plate}</span>
+                  <span style={{ display: 'inline-block', width: 28, height: 28, borderRadius: '50%', background: p.plate >= 20 ? '#ef4444' : p.plate >= 10 ? '#f59e0b' : '#3b82f6', border: '2px solid #fff', textAlign: 'center', lineHeight: '24px', fontSize: 10, fontWeight: 800, color: '#fff' }}>{p.plate}</span>
                   <span>Блин {p.plate} {unitLabel}</span>
                 </span>
                 <b style={{ color: ACCENT }}>×{p.count} на сторону</b>
@@ -283,14 +283,14 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
                 const w = plateW(p.plate);
                 for (let j = 0; j < p.count; j++) {
                   xL -= w;
-                  els.push(<rect key={`pl-${idx}-${j}`} x={xL} y={cy - 14} width={w} height={28} fill={plateColor(p.plate)} stroke="rgba(255,255,255,0.85)" strokeWidth={0.5} rx={1} />);
+                  els.push(<rect key={`pl-${idx}-${j}`} x={xL} y={cy - 14} width={w} height={28} fill={plateColor(p.plate)} stroke="#fff" strokeWidth={0.5} rx={1} />);
                   if (p.plate >= 5) els.push(<text key={`tx-${idx}-${j}`} x={xL + w / 2} y={cy + 2} textAnchor="middle" fill="#fff" fontSize={5} fontWeight={700}>{p.plate}</text>);
                   xR += w;
-                  els.push(<rect key={`pr-${idx}-${j}`} x={xR - w} y={cy - 14} width={w} height={28} fill={plateColor(p.plate)} stroke="rgba(255,255,255,0.85)" strokeWidth={0.5} rx={1} />);
+                  els.push(<rect key={`pr-${idx}-${j}`} x={xR - w} y={cy - 14} width={w} height={28} fill={plateColor(p.plate)} stroke="#fff" strokeWidth={0.5} rx={1} />);
                   if (p.plate >= 5) els.push(<text key={`txr-${idx}-${j}`} x={xR - w / 2} y={cy + 2} textAnchor="middle" fill="#fff" fontSize={5} fontWeight={700}>{p.plate}</text>);
                 }
               });
-              els.push(<text key="bar-label" x={cx} y={58} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={8}>Гриф {barWeight} {unitLabel} · {plates.totalPlates} × 2 = {plates.totalPlates * 2} блинов</text>);
+              els.push(<text key="bar-label" x={cx} y={58} textAnchor="middle" fill="#fff" fontSize={8}>Гриф {barWeight} {unitLabel} · {plates.totalPlates} × 2 = {plates.totalPlates * 2} блинов</text>);
               return els;
             })()}
           </svg>

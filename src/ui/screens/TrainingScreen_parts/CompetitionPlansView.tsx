@@ -78,7 +78,7 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
           <div style={{ ...diaryLabel, color: '#eab308', marginBottom: 0 }}>🏁 Соревнования</div>
           {onBack && <button onClick={onBack} style={{ fontSize: 10, color: DIM, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>← В запись</button>}
         </div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
           Пока нет сохранённых соревновательных циклов.
           <br />В ПЛ-авто → «Соревнование + тапер» → добавьте тапер к плану, затем нажмите «🏆 Сохранить как соревновательный» — цикл с неделей соревнований и прикидами появится здесь.
         </div>
@@ -93,7 +93,7 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
           <div style={{ ...diaryLabel, color: '#eab308', marginBottom: 0 }}>🏁 Соревновательные циклы ({plans.length})</div>
           {onBack && <button onClick={onBack} style={{ fontSize: 10, color: DIM, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}>← В запись</button>}
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Сохранённые планы с тапером: разгрузка выполнена, прикиды готовы к выходу на пик (до {MEET_STRATEGY_PCT_LABEL[plans[0]?.strategy as 'balanced'] ?? '105%'}).</div>
+        <div style={{ fontSize: 10, color: '#fff' }}>Сохранённые планы с тапером: разгрузка выполнена, прикиды готовы к выходу на пик (до {MEET_STRATEGY_PCT_LABEL[plans[0]?.strategy as 'balanced'] ?? '105%'}).</div>
       </div>
 
       {plans.map(rec => {
@@ -106,7 +106,7 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 800, color: '#eab308', overflowWrap: 'break-word' }}>🏁 {rec.cycleTitle}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
                   {new Date(rec.savedAt).toLocaleDateString('ru-RU')} · {rec.weekCount} нед · прикиды {pct} ({label})
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
@@ -140,11 +140,11 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
                       <div key={l.name} style={{ padding: 6, borderRadius: 8, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)', fontSize: 10 }}>
                         <b style={{ color: '#eab308' }}>{l.name}</b>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 3, marginTop: 4 }}>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '3px 1px' }}><div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9 }}>1-я</div><b>{l.opener}</b></div>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '3px 1px' }}><div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9 }}>2-я</div><b>{l.second}</b></div>
-                          <div style={{ textAlign: 'center', background: 'rgba(234,179,8,0.14)', borderRadius: 6, padding: '3px 1px', border: '1px solid rgba(234,179,8,0.4)' }}><div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 9 }}>3-я</div><b style={{ color: '#eab308' }}>{l.third}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '3px 1px' }}><div style={{ color: '#fff', fontSize: 9 }}>1-я</div><b>{l.opener}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '3px 1px' }}><div style={{ color: '#fff', fontSize: 9 }}>2-я</div><b>{l.second}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(234,179,8,0.14)', borderRadius: 6, padding: '3px 1px', border: '1px solid rgba(234,179,8,0.4)' }}><div style={{ color: '#fff', fontSize: 9 }}>3-я</div><b style={{ color: '#eab308' }}>{l.third}</b></div>
                         </div>
-                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 3 }}>×1 сингл · RIR 2/1/0</div>
+                        <div style={{ fontSize: 9, color: '#fff', marginTop: 3 }}>×1 сингл · RIR 2/1/0</div>
                       </div>
                     ))}
                   </div>
@@ -152,7 +152,7 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
 
                 {/* Состав недель плана */}
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Состав мезоцикла</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Состав мезоцикла</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {rec.plan.weeks.map(w => {
                       const k = weekKind(w);
@@ -163,7 +163,7 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
                       );
                     })}
                   </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 9, color: '#fff', marginTop: 4, lineHeight: 1.4 }}>
                     ПМ: присед {rec.weights.squat} · жим {rec.weights.bench} · тяга {rec.weights.deadlift} кг · {rec.plan.weeks.length} нед с тапером.
                   </div>
                 </div>
@@ -172,7 +172,7 @@ export const CompetitionPlansView: React.FC<{ onBack?: () => void }> = ({ onBack
           </div>
         );
       })}
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
+      <div style={{ fontSize: 10, color: '#fff', textAlign: 'center' }}>
         {ACCENT ? 'Максимум ' + COMPETITION_PLANS_CAP + ' сохранённых циклов — новые вытесняют старые.' : ''}
       </div>
     </div>

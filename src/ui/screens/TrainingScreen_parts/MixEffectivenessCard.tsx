@@ -36,7 +36,7 @@ export const MixEffectivenessCard: React.FC<{ workouts: { date: string; overallR
 
   const Cell: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{label}</div>
+      <div style={{ fontSize: 9, color: '#fff' }}>{label}</div>
       <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginTop: 2 }}>{value}</div>
     </div>
   );
@@ -44,7 +44,7 @@ export const MixEffectivenessCard: React.FC<{ workouts: { date: string; overallR
   return (
     <div style={CARD}>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa', marginBottom: 2 }}>🎯 Эффективность миксов</div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
+      <div style={{ fontSize: 9, color: '#fff', marginBottom: 8 }}>
         Сравнение сессий в дни с приёмом микса/пресета и без него (RPE, объём, длительность).
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
@@ -58,10 +58,10 @@ export const MixEffectivenessCard: React.FC<{ workouts: { date: string; overallR
       <div style={{ fontSize: 10, color: volumeBetter ? '#00e68a' : '#f59e0b', fontWeight: 600, marginBottom: 3 }}>
         {data.volumeDelta === 0 ? 'Объём без изменений' : (volumeBetter ? `📈 В дни с миксом объём выше на ${fmtVolume(Math.abs(data.volumeDelta))} (${volPct}%)` : `📉 В дни с миксом объём ниже на ${fmtVolume(Math.abs(data.volumeDelta))} (${Math.abs(volPct)}%)`)}
       </div>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>
+      <div style={{ fontSize: 9, color: '#fff' }}>
         • {rpeNote} · сессий с миксом: {data.withMix.sessions}, без: {data.withoutMix.sessions}
       </div>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
+      <div style={{ fontSize: 8, color: '#fff', marginTop: 4 }}>
         ⚠️ Корреляция, не причинность: на качество сессии влияют сон, нагрузка и план. Отмечайте фазы приёма в секции «💊 Миксы и пресеты».
       </div>
     </div>

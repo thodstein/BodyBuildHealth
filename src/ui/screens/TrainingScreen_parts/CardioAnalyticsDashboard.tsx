@@ -32,7 +32,7 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     <div style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>Аналитика 7д / 28д</span>
-        <Badge bg={delta >= 10 ? 'rgba(239,68,68,0.12)' : delta <= -10 ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)'} border={delta >= 10 ? 'rgba(239,68,68,0.24)' : delta <= -10 ? 'rgba(34,197,94,0.24)' : 'rgba(255,255,255,0.08)'} color={delta >= 10 ? '#f87171' : delta <= -10 ? '#4ade80' : 'rgba(255,255,255,0.6)'}>{delta > 0 ? '+' + delta + '%' : delta + '%'} к 28д</Badge>
+        <Badge bg={delta >= 10 ? 'rgba(239,68,68,0.12)' : delta <= -10 ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)'} border={delta >= 10 ? 'rgba(239,68,68,0.24)' : delta <= -10 ? 'rgba(34,197,94,0.24)' : 'rgba(255,255,255,0.08)'} color={delta >= 10 ? '#f87171' : delta <= -10 ? '#4ade80' : '#fff'}>{delta > 0 ? '+' + delta + '%' : delta + '%'} к 28д</Badge>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <StatTile label="7Д МИН" value={String(s7.minutes)} color="#22c55e" sub={s7.sessions + ' сесс' + (s7.avgPace ? ' · ' + s7.avgPace : '')} />
@@ -40,7 +40,7 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
         <StatTile label="TRIMP 7Д" value={String(trimp7)} color="#a78bfa" sub="нагрузка" />
         <StatTile label="HR в зоне" value={hr?.inZonePct != null ? hr.inZonePct + '%' : '—'} color={hr?.inZonePct != null && hr.inZonePct >= 70 ? '#4ade80' : '#fbbf24'} sub={hr?.avgDelta != null ? (hr.avgDelta > 0 ? '+' : '') + hr.avgDelta + ' уд' : ''} />
       </div>
-      {hr?.advice && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>{hr.advice}</div>}
+      {hr?.advice && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>{hr.advice}</div>}
       <div style={HINT_SM}>TRIMP — сумма мин×интенсивность. Рост &gt;15% за неделю — риск перегруза.</div>
     </div>
   );

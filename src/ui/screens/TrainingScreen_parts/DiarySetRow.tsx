@@ -58,8 +58,8 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
       }}>
         <span style={{ fontWeight: 700, color: ACCENT, minWidth: 20 }}>#{setNumber}</span>
         <span style={{ color: '#fff', fontWeight: 600 }}>{set.weight}кг × {set.reps}</span>
-        <span style={{ color: 'rgba(255,255,255,0.85)' }}>RPE {set.rpe}</span>
-        <span style={{ color: 'rgba(255,255,255,0.85)' }}>RIR {set.rir}</span>
+        <span style={{ color: '#fff' }}>RPE {set.rpe}</span>
+        <span style={{ color: '#fff' }}>RIR {set.rir}</span>
         <span style={{ color: ACCENT, marginLeft: 'auto', fontSize: compact ? 9 : 10 }}>
           {Math.round(epley1RM(set.weight, set.reps))}кг 1RM
         </span>
@@ -72,7 +72,7 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
     borderRadius: 6,
     background: isBodyweight ? 'rgba(255,255,255,0.03)' : '#18181b',
     border: '1px solid rgba(255,255,255,0.08)',
-    color: isBodyweight ? 'rgba(255,255,255,0.85)' : '#fff',
+    color: isBodyweight ? '#fff' : '#fff',
     fontSize: compact ? 11 : 12,
     textAlign: 'center' as const,
     minHeight: compact ? 30 : 36,
@@ -110,13 +110,13 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
             style={{
               flex: 2, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer',
               background: weight > 0 && reps > 0 ? 'linear-gradient(135deg, #00e68a, #00c853)' : 'rgba(255,255,255,0.05)',
-              color: weight > 0 && reps > 0 ? '#000' : 'rgba(255,255,255,0.85)',
+              color: weight > 0 && reps > 0 ? '#000' : '#fff',
               fontWeight: 700, fontSize: 12, minHeight: 40,
             }}>✓ Записать</button>
           <button onClick={onSkip}
             style={{
               flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)',
-              background: 'transparent', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 11, minHeight: 40,
+              background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 11, minHeight: 40,
             }}>Пропустить</button>
           {exerciseId && exerciseName && (
             <button onClick={() => setMmcOpen(o => !o)}
@@ -124,7 +124,7 @@ export const DiarySetRow: React.FC<DiarySetRowProps> = ({
                 flex: 1, padding: '10px', borderRadius: 8,
                 border: mmcOpen ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.08)',
                 background: mmcOpen ? 'rgba(0,230,138,0.08)' : 'transparent',
-                color: mmcOpen ? ACCENT : 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 11, minHeight: 40,
+                color: mmcOpen ? ACCENT : '#fff', cursor: 'pointer', fontSize: 11, minHeight: 40,
               }}>🧠 MMC</button>
           )}
         </div>

@@ -147,7 +147,7 @@ export const DeloadSchedulerTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>🧘 Планировщик делода</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 12, lineHeight: 1.5 }}>
         Авто-расписание разгрузочных недель по накопленной усталости (sRPE ACWR, HRV, сон, восстановление).
         Система анализирует 12 маркеров перетренированности и строит понедельный план с делодами.
       </div>
@@ -159,7 +159,7 @@ export const DeloadSchedulerTab: React.FC = () => {
          </div>
          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
            {sessions.length === 0 ? (
-             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Нет сохранённых сессий</div>
+             <div style={{ fontSize: 10, color: '#fff' }}>Нет сохранённых сессий</div>
            ) : (
              sessions.map((s, i) => (
                <div 
@@ -180,7 +180,7 @@ export const DeloadSchedulerTab: React.FC = () => {
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>⚙️ Параметры планирования</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Цель</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 3 }}>Цель</div>
             <select value={goal} onChange={e => setGoal(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 11, outline: 'none' }}>
               <option value="strength">Сила</option>
               <option value="hypertrophy">Гипертрофия</option>
@@ -189,7 +189,7 @@ export const DeloadSchedulerTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Уровень</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 3 }}>Уровень</div>
             <select value={level} onChange={e => setLevel(e.target.value as any)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 11, outline: 'none' }}>
               <option value="beginner">Новичок</option>
               <option value="intermediate">Средний</option>
@@ -197,11 +197,11 @@ export const DeloadSchedulerTab: React.FC = () => {
             </select>
           </div>
           <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Недель до цели</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 3 }}>Недель до цели</div>
             <input type="number" min={4} max={52} value={weeksUntilGoal} onChange={e => setWeeksUntilGoal(+e.target.value || 12)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 11, outline: 'none', boxSizing: 'border-box' }} />
           </div>
           <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Текущая неделя</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 3 }}>Текущая неделя</div>
             <input type="number" min={0} max={weeksUntilGoal - 1} value={currentWeek} onChange={e => setCurrentWeek(+e.target.value || 0)} style={{ width: '100%', padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 11, outline: 'none', boxSizing: 'border-box' }} />
           </div>
         </div>
@@ -211,27 +211,27 @@ export const DeloadSchedulerTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📊 Данные нагрузки (sRPE)</div>
         {srpeSessions.length === 0 ? (
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', textAlign: 'center', padding: 12 }}>
+          <div style={{ fontSize: 10, color: '#fff', textAlign: 'center', padding: 12 }}>
             Нет sRPE-сессий. Ведите дневник нагрузки через «Проведение тренировки» — данные появятся здесь.
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
             <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Сессий</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Сессий</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{srpeSessions.length}</div>
             </div>
             {acwr && (
               <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: acwr.ratio > 1.5 ? 'rgba(239,68,68,0.08)' : acwr.ratio > 1.3 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>ACWR</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>ACWR</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#f59e0b' : '#22c55e' }}>{acwr.ratio.toFixed(2)}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{acwr.zone === 'dangerous' ? 'ОПАСНО' : acwr.zone === 'caution' ? 'Осторожно' : acwr.zone === 'optimal' ? 'Оптимум' : 'Недотрен'}</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>{acwr.zone === 'dangerous' ? 'ОПАСНО' : acwr.zone === 'caution' ? 'Осторожно' : acwr.zone === 'optimal' ? 'Оптимум' : 'Недотрен'}</div>
               </div>
             )}
             {monotonyResult && (
               <div style={{ textAlign: 'center', padding: 8, borderRadius: 8, background: monotonyResult.monotony > 2 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Монотонность</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Монотонность</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: monotonyResult.monotony > 2 ? '#ef4444' : ACCENT }}>{monotonyResult.monotony.toFixed(1)}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Strain: {Math.round(monotonyResult.strain)}</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Strain: {Math.round(monotonyResult.strain)}</div>
               </div>
             )}
           </div>
@@ -244,12 +244,12 @@ export const DeloadSchedulerTab: React.FC = () => {
           <div style={{ fontSize: 12, fontWeight: 700, color: otResult.riskPercent >= 50 ? '#ef4444' : otResult.riskPercent >= 25 ? '#f59e0b' : '#22c55e' }}>
             🩺 Детектор перетренированности: {otResult.totalScore}/{otResult.maxScore} ({otResult.riskPercent}%)
           </div>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{showOvertraining ? '▴' : '▾'}</span>
+          <span style={{ fontSize: 10, color: '#fff' }}>{showOvertraining ? '▴' : '▾'}</span>
         </div>
         <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', marginTop: 6, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: otResult.riskPercent + '%', borderRadius: 3, background: otResult.riskPercent >= 50 ? '#ef4444' : otResult.riskPercent >= 25 ? '#f59e0b' : '#22c55e', transition: 'width 0.3s' }} />
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
           <b style={{ color: otResult.riskPercent >= 50 ? '#ef4444' : otResult.riskPercent >= 25 ? '#f59e0b' : '#22c55e' }}>
             {otResult.deloadUrgency === 'urgent' ? 'СРОЧНЫЙ ДЕЛОД' : otResult.deloadUrgency === 'required' ? 'Требуется делод' : otResult.deloadUrgency === 'recommended' ? 'Рекомендован делод' : otResult.deloadUrgency === 'advisory' ? 'Контроль' : 'Норма'}
           </b>
@@ -257,14 +257,14 @@ export const DeloadSchedulerTab: React.FC = () => {
         </div>
          {showOvertraining && (
            <div style={{ marginTop: 12, padding: '12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-             <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>🛠️ Корректировка маркеров</div>
+             <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 8 }}>🛠️ Корректировка маркеров</div>
              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
                <div>
-                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Падение 1RM (%)</div>
+                 <div style={{ fontSize: 10, color: '#fff', marginBottom: 3 }}>Падение 1RM (%)</div>
                  <input type="number" value={perfDecline} onChange={e => setPerfDecline(+e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 10, outline: 'none' }} />
                </div>
                <div>
-                 <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>Пульс покоя ↑ (уд/мин)</div>
+                 <div style={{ fontSize: 10, color: '#fff', marginBottom: 3 }}>Пульс покоя ↑ (уд/мин)</div>
                  <input type="number" value={restingHR} onChange={e => setRestingHR(+e.target.value)} style={{ width: '100%', padding: '6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: '#fff', fontSize: 10, outline: 'none' }} />
                </div>
              </div>
@@ -276,7 +276,7 @@ export const DeloadSchedulerTab: React.FC = () => {
                    style={{ 
                      padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', 
                      background: otSymptoms[key] ? ACCENT : 'rgba(255,255,255,0.05)', 
-                     color: otSymptoms[key] ? '#000' : 'rgba(255,255,255,0.7)', 
+                     color: otSymptoms[key] ? '#000' : '#fff', 
                      border: '1px solid ' + (otSymptoms[key] ? ACCENT : 'rgba(255,255,255,0.08)'),
                      fontWeight: otSymptoms[key] ? 700 : 400,
                      transition: 'all 0.2s'
@@ -335,7 +335,7 @@ export const DeloadSchedulerTab: React.FC = () => {
                   <div style={{ height: 3, width: '100%', borderRadius: 2, background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: Math.round(w.volumePercent) + '%', borderRadius: 2, background: color }} />
                   </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{w.volumePercent}%</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>{w.volumePercent}%</div>
                 </div>
               );
             })}
@@ -347,7 +347,7 @@ export const DeloadSchedulerTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📋 Детальный понедельный план</div>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.5fr 0.5fr 0.4fr 0.4fr', gap: 2, padding: '4px 8px', fontSize:10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', minWidth: 340 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.5fr 0.5fr 0.4fr 0.4fr', gap: 2, padding: '4px 8px', fontSize:10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', minWidth: 340 }}>
           <span>Нед</span><span>Фаза</span><span>Объём</span><span>Инт.</span><span>RPE</span><span>RIR</span>
         </div>
         {schedule.weeks.slice(0, 24).map((w, i) => {
@@ -356,7 +356,7 @@ export const DeloadSchedulerTab: React.FC = () => {
           return (
             <div key={i} style={{
               display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.5fr 0.5fr 0.4fr 0.4fr', gap: 2,
-              padding: '5px 8px', fontSize: 10, color: 'rgba(255,255,255,0.85)',
+              padding: '5px 8px', fontSize: 10, color: '#fff',
               borderTop: '1px solid rgba(255,255,255,0.04)',
               background: isDeload ? 'rgba(96,165,250,0.06)' : 'transparent',
               borderLeft: isDeload ? '3px solid #60a5fa' : '3px solid transparent',
@@ -364,7 +364,7 @@ export const DeloadSchedulerTab: React.FC = () => {
             }}>
               <span style={{ fontWeight: 700, color }}>{w.week}</span>
               <span style={{ color, fontWeight: 600, fontSize: 10 }}>{PHASE_LABELS_RU[w.phase]}{isDeload ? ' ⬇' : ''}</span>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{w.volumePercent}%</span>
+              <span style={{ color: '#fff' }}>{w.volumePercent}%</span>
               <span style={{ color: '#f59e0b' }}>{w.intensityPercent}%</span>
               <span style={{ color: '#a855f7' }}>{w.rpeTarget}</span>
               <span style={{ color: ACCENT }}>{w.rirTarget}</span>
@@ -403,7 +403,7 @@ export const DeloadSchedulerTab: React.FC = () => {
       </div>
       {schedule.deloadWeeks.length > 0 && (
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить делод-недели ({schedule.deloadWeeks.join(', ')}) к планировщику — объём ×0.5, RIR +3 на этих неделях.</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить делод-недели ({schedule.deloadWeeks.join(', ')}) к планировщику — объём ×0.5, RIR +3 на этих неделях.</div>
           <button onClick={() => applyToPlanner({ kind: 'deload', label: 'Делод: нед ' + schedule.deloadWeeks.join(','), data: { volumeMult: 0.5, rirShift: 3, weeks: schedule.deloadWeeks } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить делод к планировщику</button>
         </div>
       )}

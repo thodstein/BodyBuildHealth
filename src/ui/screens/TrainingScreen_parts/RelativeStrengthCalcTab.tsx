@@ -27,7 +27,7 @@ const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-betwe
 const LIFT_COLORS: Record<string, string> = { squat: '#ef4444', bench: '#3b82f6', deadlift: '#f59e0b' };
 const LIFT_RU: Record<string, string> = { squat: 'Присед', bench: 'Жим', deadlift: 'Тяга' };
 const CLASS_COLORS: Record<string, string> = {
-  novice: 'rgba(255,255,255,0.85)',
+  novice: '#fff',
   intermediate: '#60a5fa',
   advanced: '#a855f7',
   elite: '#f59e0b',

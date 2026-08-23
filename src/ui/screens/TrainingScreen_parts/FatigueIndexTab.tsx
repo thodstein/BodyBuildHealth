@@ -16,8 +16,8 @@ import {
 import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
+const DIM = '#fff';
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.45 };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', minHeight: 40, width: '100%', boxSizing: 'border-box' as const, fontSize: 12, textAlign: 'center' as const };
@@ -109,7 +109,7 @@ export const FatigueIndexTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>📉 Индекс усталости (Fatigue Index из sRPE)</div>
-      <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+      <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Источник: sRPE-дневник. Метрики: недельная нагрузка (sRPE × минуты), монотонность (mean/stdev), strain (mono × total),
         ACWR (острая 7д / хроническая 28д), EWMA Rollinson, тренд последних дней, графическая шкала опасности.
       </div>
@@ -169,10 +169,10 @@ export const FatigueIndexTab: React.FC = () => {
       {/* EWMA */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📈 EWMA (Rollinson/Gabbett)</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(255,255,255,0.75)', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#fff', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <span>EWMA острая (α=2/8):</span><b style={{ color: '#3b82f6' }}>{Math.round(ewmaAcute)}</b>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'rgba(255,255,255,0.75)', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#fff', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
           <span>EWMA хроническая (α=2/29):</span><b style={{ color: '#fff' }}>{Math.round(ewmaChronic)}</b>
         </div>
       </div>
@@ -209,7 +209,7 @@ export const FatigueIndexTab: React.FC = () => {
               const pct = (w.load / max) * 100;
               return (
                 <div key={w.weekIdx} style={{ marginBottom: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 2 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color:'#fff', marginBottom: 2 }}>
                     <span>Нед {w.weekIdx} (с {w.start})</span>
                     <span><b style={{ color: ACCENT }}>{w.load} AU</b> · {w.days} трен.дн.</span>
                   </div>
@@ -239,7 +239,7 @@ export const FatigueIndexTab: React.FC = () => {
       </div>
 {acwr && (
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 ACWR = {acwr.ratio.toFixed(2)}. Применить усталость к планировщику: объём ×{acwr.ratio > 1.5 ? 0.8 : acwr.ratio > 1.3 ? 0.9 : acwr.ratio < 0.8 ? 1.1 : 1}, RIR +{acwr.ratio > 1.5 ? 1 : 0} при перетренированности.</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 ACWR = {acwr.ratio.toFixed(2)}. Применить усталость к планировщику: объём ×{acwr.ratio > 1.5 ? 0.8 : acwr.ratio > 1.3 ? 0.9 : acwr.ratio < 0.8 ? 1.1 : 1}, RIR +{acwr.ratio > 1.5 ? 1 : 0} при перетренированности.</div>
           <button onClick={() => { const mult = acwr.ratio > 1.5 ? 0.8 : acwr.ratio > 1.3 ? 0.9 : acwr.ratio < 0.8 ? 1.1 : 1; const rsh = acwr.ratio > 1.5 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Усталость ACWR ' + acwr.ratio.toFixed(2) + ' → объём ×' + mult, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить усталость к планировщику</button>
         </div>
       )}

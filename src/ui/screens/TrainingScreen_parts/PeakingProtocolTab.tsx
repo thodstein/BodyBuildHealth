@@ -11,10 +11,10 @@ const STYLES = {
     padding: '5px 12px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer',
     border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
     background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
-    color: on ? '#00e68a' : 'rgba(255,255,255,0.6)',
+    color: on ? '#00e68a' : '#fff',
   }),
   cell: { fontSize: 10, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' } as React.CSSProperties,
-  label: { color: 'rgba(255,255,255,0.55)', fontSize: 10, margin: '6px 0 4px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.3 },
+  label: { color: '#fff', fontSize: 10, margin: '6px 0 4px', fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.3 },
 };
 
 const PROTOCOL_OPTIONS: { id: PeakingProtocol; label: string; icon: string }[] = [
@@ -31,7 +31,7 @@ const PeakingProtocolTab: React.FC = () => {
     <div>
       <div style={GLASS}>
         <div style={H}>📈 Протоколы пиковой фазы</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
           Пиковая фаза — последние 3-4 недели перед целью (соревнования/фотосессия/пляж).
           Цель: максимальная производительность при минимальной усталости.
         </div>
@@ -47,7 +47,7 @@ const PeakingProtocolTab: React.FC = () => {
 
       <div style={GLASS}>
         <div style={H}>{protocol.name}</div>
-        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 10 }}>{protocol.description}</div>
+        <div style={{ fontSize: 10, color:'#fff', marginBottom: 10 }}>{protocol.description}</div>
 
         {/* Таблица понедельно */}
         <div style={STYLES.label}>Понедельное расписание</div>
@@ -57,19 +57,19 @@ const PeakingProtocolTab: React.FC = () => {
               <span>Неделя {w.week}: {w.label}</span>
               <span style={{ color: ACCENT }}>RIR {w.rirMin}-{w.rirMax}</span>
             </div>
-            <div style={{ display: 'flex', gap: 12, color: 'rgba(255,255,255,0.85)' }}>
+            <div style={{ display: 'flex', gap: 12, color: '#fff' }}>
               <span>Объём {Math.round(w.volumePct * 100)}%</span>
               <span>Интенсивность {Math.round(w.intensityPct * 100)}%</span>
               {w.deloadBefore && <span style={{ color: '#ffaa00' }}>⚠ После делода</span>}
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{w.focus}</div>
+            <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{w.focus}</div>
           </div>
         ))}
       </div>
 
       <div style={GLASS}>
         <div style={H}>📋 Как интегрировать в план</div>
-        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color:'#fff', lineHeight: 1.6 }}>
           <p>1. Постройте мезоцикл обычным образом.</p>
           <p>2. За {protocol.durationWeeks} нед до цели переключитесь на пиковый протокол:</p>
           <p>   • Объём: −{Math.round((1 - protocol.weeks[protocol.weeks.length - 1].volumePct) * 100)}% на финальной неделе</p>
@@ -80,7 +80,7 @@ const PeakingProtocolTab: React.FC = () => {
         </div>
       </div>
 <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить пиковый протокол «{protocol.name}» к планировщику — финальная неделя: объём ×{Math.round(protocol.weeks[protocol.weeks.length - 1].volumePct * 100)}%, RIR→{protocol.weeks[protocol.weeks.length - 1].rirMin}.</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить пиковый протокол «{protocol.name}» к планировщику — финальная неделя: объём ×{Math.round(protocol.weeks[protocol.weeks.length - 1].volumePct * 100)}%, RIR→{protocol.weeks[protocol.weeks.length - 1].rirMin}.</div>
         <button onClick={() => { const fw = protocol.weeks[protocol.weeks.length - 1]; applyToPlanner({ kind: 'peak', label: 'Пик «' + protocol.name + '»: объём ×' + fw.volumePct + ', RIR→' + fw.rirMin, data: { volumeMult: fw.volumePct, rirTarget: fw.rirMin } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить пик к планировщику</button>
       </div>
     </div>

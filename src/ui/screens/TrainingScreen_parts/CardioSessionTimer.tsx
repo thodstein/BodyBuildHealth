@@ -208,7 +208,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
       {active && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 9, alignItems: 'center', padding: '8px 0' }}>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700 }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</span>
+            <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</span>
             {active.targetHr?.max && <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.28)', borderRadius: 20, padding: '2px 8px' }}>🎯 ЧСС {active.targetHr.min}-{active.targetHr.max}</span>}
           </div>
           <div role="timer" aria-live="polite" aria-atomic="true" style={{ fontSize: 44, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1 }}>{fmt(active.remainingSec)}</div>
@@ -229,7 +229,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             return (
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
                 {protocol.map((p, i) => (
-                  <div key={p.name} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, border: i === activeIdx ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.08)', background: i === activeIdx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: i === activeIdx ? '#4ade80' : 'rgba(255,255,255,0.55)' }}>
+                  <div key={p.name} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, border: i === activeIdx ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.08)', background: i === activeIdx ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)', color: i === activeIdx ? '#4ade80' : '#fff' }}>
                     {i === activeIdx ? '▶ ' : ''}{p.name} {p.minutes}м
                   </div>
                 ))}
@@ -248,7 +248,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
       {finished && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 10, padding: 10 }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+          <div style={{ fontSize: 11, color: '#fff' }}>
             ✅ {TYPE_LABEL[finished.type]} {finished.durationMin} мин завершена — оцените сессию:
           </div>
           <div style={ROW}>
@@ -273,7 +273,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
       {!active && !finished && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {todaySessions.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>По плану на сегодня кардио нет.</div>}
+          {todaySessions.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>По плану на сегодня кардио нет.</div>}
           {todaySessions.map((s, i) => (
             <div key={i} style={ROW}>
               <span style={{ fontSize: 12, flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>

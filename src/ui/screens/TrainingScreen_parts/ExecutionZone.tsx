@@ -79,11 +79,11 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                   <h3 style={{ margin: 0, fontSize: 13, color: 'var(--accent)' }}>
                     {plRunOpen ? '▶ Выполнение плана' : '⏸ Сессия свёрнута'} · {plRuntime.track === 'bb' ? 'ББ' : 'ПЛ'} · {plRuntime.focus}
                   </h3>
-                  <p style={{ fontSize: 10, color: 'var(--text-dim)', margin: '2px 0 0' }}>
+                  <p style={{ fontSize: 10, color: '#fff', margin: '2px 0 0' }}>
                     Неделя {plRuntime.week} · {plRuntime.days.length} дн. {plRunOpen ? '· выполнение записывается в дневник' : '· прогресс сохранён, нажмите «Возобновить»'}
                   </p>
                 </div>
-                <button onClick={() => setPlRunOpen(!plRunOpen)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: 'var(--text)', cursor: 'pointer', fontSize: 11 }}>
+                <button onClick={() => setPlRunOpen(!plRunOpen)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)', color: '#fff', cursor: 'pointer', fontSize: 11 }}>
                   {plRunOpen ? '⏸ Свернуть' : '▶ Возобновить'}
                 </button>
               </div>
@@ -96,7 +96,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
           {plRuntime && plRuntime.days.length > 0 ? null : !runtimeStarted ? (
             <div className="card" style={{ padding: '12px' }}>
               <h3 style={{ margin: '0 0 8px', fontSize: 14 }}>🏃 Начать тренировку</h3>
-              <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 10px' }}>
+              <p style={{ fontSize: 11, color: '#fff', margin: '0 0 10px' }}>
                 Выберите день из плана для отслеживания подходов в реальном времени.
               </p>
               {macrocycle && currentMicrocycle && trainingDaysList.length > 0 ? (
@@ -108,16 +108,16 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     {trainingDaysList.map((day: any, di: number) => (
                       <button key={di} onClick={() => setRuntimeDay(di)} style={{
                         padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: safeRuntimeDay === di ? 700 : 400, cursor: 'pointer',
-                        background: safeRuntimeDay === di ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: safeRuntimeDay === di ? '#000' : 'var(--text)', border: '1px solid ' + (safeRuntimeDay === di ? 'var(--accent)' : 'var(--border)'),
+                        background: safeRuntimeDay === di ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+                        color: safeRuntimeDay === di ? '#000' : '#fff', border: '1px solid ' + (safeRuntimeDay === di ? 'var(--accent)' : 'rgba(255,255,255,0.08)'),
                       }}>{day.day || `День ${di+1}`}</button>
                     ))}
                   </div>
-            <div style={{ background: 'var(--bg-secondary)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+            <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: '#fff' }}>
                 {trainingDaysList[safeRuntimeDay]?.exercises?.length || 0} упражнений • {trainingDaysList[safeRuntimeDay]?.duration || 60} мин
               </div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
                 Интенсивность: {trainingDaysList[safeRuntimeDay]?.intensity || 'средняя'} | Схема: {currentMicrocycle.mesocycleType || ''}
               </div>
               <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 2, fontWeight: 600 }}>
@@ -139,23 +139,23 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           aria-expanded={dayDetailsOpen}
                           aria-label="Детали плана дня"
                         >
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
                             📋 План дня — {dayExercises.length} упр. · {totalSets} подходов · ~{estMin} мин
                           </span>
-                          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{dayDetailsOpen ? '▲' : '▼'}</span>
+                          <span style={{ fontSize: 10, color: '#fff' }}>{dayDetailsOpen ? '▲' : '▼'}</span>
                         </div>
                         {dayDetailsOpen && (
                           <div style={{ padding: '0 10px 8px' }}>
                             {dayExercises.map((ex: any, i: number) => (
                               <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10 }}>
-                                <span style={{ color: 'var(--text-dim)', minWidth: 16 }}>{i + 1}</span>
-                                <span style={{ flex: 1, minWidth: 0, color: 'var(--text)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                <span style={{ color: '#fff', minWidth: 16 }}>{i + 1}</span>
+                                <span style={{ flex: 1, minWidth: 0, color: '#fff', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {ex.name}{ex.isCompound ? ' 🔴' : ''}
                                 </span>
                                 <span style={{ color: 'var(--accent)', fontWeight: 700, whiteSpace: 'nowrap' }}>{ex.sets}×{ex.reps}</span>
-                                <span style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{ex.weight ? `${ex.weight}кг` : 'в/т'}</span>
-                                <span style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>RIR {ex.rir ?? '—'}</span>
-                                <span style={{ color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>~{ex.restSec ?? 90}с</span>
+                                <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>{ex.weight ? `${ex.weight}кг` : 'в/т'}</span>
+                                <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>RIR {ex.rir ?? '—'}</span>
+                                <span style={{ color: '#fff', whiteSpace: 'nowrap' }}>~{ex.restSec ?? 90}с</span>
                                 {ex.technique && (
                                   <span style={{ color: '#fbbf24', whiteSpace: 'nowrap' }} title={ex.technique}>🎯</span>
                                 )}
@@ -177,9 +177,9 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     const color = totalSets > 25 ? '#ef4444' : totalSets > 15 ? '#f59e0b' : '#22c55e';
                     return (
                       <div style={{ fontSize: 10, margin: '6px 0', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-                        <span style={{ color: 'var(--text-dim)' }}>Сложность: </span>
+                        <span style={{ color: '#fff' }}>Сложность: </span>
                         <span style={{ fontWeight: 600, color }}>{difficulty}</span>
-                        <span style={{ color: 'var(--text-dim)', marginLeft: 6 }}>· {totalSets} подходов · ~{avgIntensity.toFixed(0)}% ср.</span>
+                        <span style={{ color: '#fff', marginLeft: 6 }}>· {totalSets} подходов · ~{avgIntensity.toFixed(0)}% ср.</span>
                         {totalSets > 25 && (
                           <div style={{ color: '#f97316', marginTop: 2 }}>⚠ Высокий объём — отдых ≥ 3 мин между подходами</div>
                         )}
@@ -199,7 +199,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       const work = Math.max(45, Math.min(180, avgRest));
                        return (
                          <button onClick={() => { setTimerInitialSettings({ work, rest: avgRest, rounds }); onGoToTimers?.({ work, rest: avgRest, rounds }); }} style={{
-                          width: '100%', padding: 10, borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer',
+                          width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
                           background: 'rgba(59,130,246,0.1)', color: '#60a5fa', fontWeight: 600, fontSize: 12, marginTop: 8,
                         }}>
                           ⏱ Таймер для этого дня · отдых ~{avgRest}с · {rounds} раундов
@@ -212,31 +212,31 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       const dayExercises = trainingDaysList[safeRuntimeDay]?.exercises || [];
                       if (!dayExercises.length) return null;
                       return (
-                        <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)' }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 6 }}>📈 Прогресс по упражнениям дня</div>
+                        <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📈 Прогресс по упражнениям дня</div>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
                             {dayExercises.slice(0, 6).map((ex: any, i: number) => {
                               const cached = getCachedProgressForExercise(ex.name || ex.id || '');
                               if (!cached) return (
                                 <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{ex.name || ex.id}</div>
-                                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</div>
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 4 }}>{ex.name || ex.id}</div>
+                                  <div style={{ fontSize: 10, color: '#fff' }}>Нет данных</div>
                                 </div>
                               );
                               const trendIcon = cached.trend === 'up' ? '↑' : cached.trend === 'down' ? '↓' : '→';
-                              const trendColor = cached.trend === 'up' ? '#22c55e' : cached.trend === 'down' ? '#ef4444' : 'var(--text-dim)';
+                              const trendColor = cached.trend === 'up' ? '#22c55e' : cached.trend === 'down' ? '#ef4444' : '#fff';
                               return (
                                 <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)' }}>
-                                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{cached.exerciseName}</div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)' }}>
+                                  <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 3 }}>{cached.exerciseName}</div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff' }}>
                                     <span>1RM {cached.bestE1RM}кг</span>
                                     <span style={{ color: trendColor }}>{trendIcon} {cached.e1RMDelta > 0 ? '+' : ''}{cached.e1RMDelta}</span>
                                   </div>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', marginTop: 2 }}>
                                     <span>Объём {cached.totalVolume.toLocaleString()}</span>
                                     <span style={{ color: trendColor }}>{trendIcon} {cached.weightDelta > 0 ? '+' : ''}{cached.weightDelta}кг</span>
                                   </div>
-                                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{cached.sessions} сессий · {cached.lastDate}</div>
+                                  <div style={{ fontSize: 9, color: '#fff', marginTop: 2 }}>{cached.sessions} сессий · {cached.lastDate}</div>
                                 </div>
                               );
                             })}
@@ -246,7 +246,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     })()}
                 </>
               ) : (
-                <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 11 }}>
+                <div style={{ textAlign: 'center', color: '#fff', fontSize: 11 }}>
                   Сначала сгенерируйте план во вкладке 📋 План
                 </div>
               )}
@@ -263,7 +263,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                   <div className="card" style={{ textAlign: 'center', padding: 20 }}>
                     <div style={{ fontSize: 28, marginBottom: 8 }}>🏆</div>
                     <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Тренировка завершена!</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+                    <div style={{ fontSize: 11, color: '#fff', marginBottom: 12 }}>
                       {Object.values(runtimeLogs).filter(l => l.completed).length} из {exercises.length} упражнений выполнено
                     </div>
                     {/* Summary stats */}
@@ -278,15 +278,15 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         return (
                           <>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Подходов</div>
+                              <div style={{ color: '#fff', fontSize: 10 }}>Подходов</div>
                               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalSets}</div>
                             </div>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Тоннаж</div>
+                              <div style={{ color: '#fff', fontSize: 10 }}>Тоннаж</div>
                               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{totalVolume.toLocaleString()} кг</div>
                             </div>
                             <div style={{ background: 'rgba(0,230,138,0.08)', borderRadius: 6, padding: 6 }}>
-                              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>Макс 1RM</div>
+                              <div style={{ color: '#fff', fontSize: 10 }}>Макс 1RM</div>
                               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{max1RM} кг</div>
                             </div>
                           </>
@@ -307,21 +307,21 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       });
                       return (
                         <div style={{ marginBottom: 12, textAlign: 'left' }}>
-                          <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>📊 Сводка по упражнениям</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 4 }}>📊 Сводка по упражнениям</div>
                           {comparisons.map((c, i) => (
                             <div key={i} style={{
                               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                               padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)',
                               marginBottom: 2, fontSize: 10,
                             }}>
-                              <span style={{ color: 'rgba(255,255,255,0.7)', flex: 1 }}>{c.exName}</span>
+                              <span style={{ color: '#fff', flex: 1 }}>{c.exName}</span>
                               <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
                                 {c.sets}×{c.currentMaxW}кг
                               </span>
-                              <span style={{ color: 'rgba(255,255,255,0.85)', minWidth: 50, textAlign: 'right' }}>
+                              <span style={{ color: '#fff', minWidth: 50, textAlign: 'right' }}>
                                 {c.currentVol.toLocaleString()}кг
                               </span>
-                              <span style={{ color: 'rgba(255,255,255,0.85)', minWidth: 50, textAlign: 'right' }}>
+                              <span style={{ color: '#fff', minWidth: 50, textAlign: 'right' }}>
                                 1RM {c.current1RM}
                               </span>
                             </div>
@@ -407,7 +407,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     {/* Exercise header */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                       <div>
-                        <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Упражнение {runtimeExIdx + 1}/{exercises.length}</span>
+                        <span style={{ fontSize: 10, color: '#fff' }}>Упражнение {runtimeExIdx + 1}/{exercises.length}</span>
                         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>{ex.name}</div>
                       </div>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>  
@@ -417,7 +417,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     </div>
 
                     {/* Target */}
-                    <div style={{ display: 'flex', gap: 12, marginBottom: 4, fontSize: 10, color: 'var(--text-dim)' }}>
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 4, fontSize: 10, color: '#fff' }}>
                       <span>Цель: {ex.sets}×{ex.reps}</span>
                       <span>RIR: {ex.rir}</span>
                       {ex.weight && <span>Вес: {ex.weight}кг | ~{Math.round(ex.weight * (1 + Number(ex.reps) / 30))}кг 1RM</span>}
@@ -425,7 +425,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
 
                     {/* Technique note */}
                     {ex.technique && (
-                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
+                      <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 6, fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
                         <span style={{ fontWeight: 600, color: 'var(--accent)' }}>🎯 </span>{ex.technique}
                       </div>
                     )}
@@ -437,7 +437,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       return (
                         <div style={{ marginBottom: 6, padding: '5px 8px', background: 'rgba(255,145,0,0.05)', borderRadius: 6, fontSize: 10 }}>
                           <div style={{ fontWeight: 600, color: '#ff9100', marginBottom: 3 }}>🔥 Разминочные подходы</div>
-                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rows.length, 5)}, 1fr)`, gap: 2, color: 'var(--text-dim)' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rows.length, 5)}, 1fr)`, gap: 2, color: '#fff' }}>
                             {rows.map(wu => (
                               <div key={wu.pct} style={{ textAlign: 'center', padding: '2px 4px', background: 'rgba(255,145,0,0.08)', borderRadius: 3 }}>
                                 <div style={{ color: '#ff9100', fontWeight: 600 }}>{wu.bar ? 'гриф' : `~${wu.load}кг`}</div>
@@ -458,13 +458,13 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                     {/* Previous sets log */}
                     {log.sets.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 2 }}>Выполнено:</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', marginBottom: 2 }}>Выполнено:</div>
                         {log.sets.map((s, si) => (
                           <div key={si} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0' }}>
                             <span style={{ fontWeight: 600, minWidth: 16 }}>#{si + 1}</span>
                             <span>{s.weight}кг × {s.reps}</span>
-                            <span style={{ color: 'var(--text-dim)' }}>RPE {s.rpe}</span>
-                            <span style={{ color: 'var(--text-dim)' }}>RIR {s.rir}</span>
+                            <span style={{ color: '#fff' }}>RPE {s.rpe}</span>
+                            <span style={{ color: '#fff' }}>RIR {s.rir}</span>
                             <span style={{ color: 'var(--accent)' }}>1RM ~{Math.round(s.weight * (1 + s.reps / 30))}кг</span>
                           </div>
                         ))}
@@ -476,7 +476,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           const lastSet = log.sets[log.sets.length - 1];
                           const isBW = isBWExercise(ex);
                           let hint = '';
-                          let hintColor = 'var(--text-dim)';
+                          let hintColor = '#fff';
                           if (isBW) {
                             if (lastSet.rpe <= 5 && lastSet.rir >= 3) {
                               hint = 'Лёгкий подход: можно добавить 1-2 повтора в следующем подходе.';
@@ -513,14 +513,14 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           }}>
                             <div>
-                              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отдых</div>
+                              <div style={{ fontSize: 9, color: '#fff' }}>Отдых</div>
                               <div style={{ fontSize: 18, fontWeight: 800, color: restTimer <= 10 ? '#ef4444' : 'var(--accent)' }}>
                                 {Math.floor(restTimer / 60)}:{(restTimer % 60).toString().padStart(2, '0')}
                               </div>
                             </div>
                             <button onClick={() => setRestTimer(0)} style={{
                               padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)',
-                              background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10,
+                              background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 10,
                             }}>Пропустить</button>
                           </div>
                         )}
@@ -528,13 +528,13 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         {/* Rest timer settings */}
                         {restTimer === 0 && log.sets.length > 0 && (
                           <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
-                            <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Отдых:</span>
+                            <span style={{ fontSize: 9, color: '#fff' }}>Отдых:</span>
                             {[60, 90, 120, 180].map(sec => (
                               <button key={sec} onClick={() => setRestTarget(sec)} style={{
                                 padding: '3px 8px', borderRadius: 5, fontSize: 9, cursor: 'pointer',
                                 border: `1px solid ${restTarget === sec ? 'var(--accent)' : 'rgba(255,255,255,0.06)'}`,
                                 background: restTarget === sec ? 'rgba(0,230,138,0.1)' : 'transparent',
-                                color: restTarget === sec ? 'var(--accent)' : 'var(--text-dim)',
+                                color: restTarget === sec ? 'var(--accent)' : '#fff',
                               }}>{sec}с</button>
                             ))}
                           </div>
@@ -547,24 +547,24 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       <div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
                           <div>
-                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Вес (кг)</label>
+                            <label style={{ fontSize: 10, color: '#fff' }}>Вес (кг)</label>
                             <input type="number" value={runtimeSetW} disabled={isBWExercise(ex)} onChange={e => setRuntimeSetW(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: isBWExercise(ex) ? 'rgba(255,255,255,0.03)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box', opacity: isBWExercise(ex) ? 0.5 : 1 }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: isBWExercise(ex) ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box', opacity: isBWExercise(ex) ? 0.5 : 1 }} />
                           </div>
                           <div>
-                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Повторения</label>
+                            <label style={{ fontSize: 10, color: '#fff' }}>Повторения</label>
                             <input type="number" value={runtimeSetR} onChange={e => setRuntimeSetR(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
                           <div>
-                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RPE (1-10)</label>
+                            <label style={{ fontSize: 10, color: '#fff' }}>RPE (1-10)</label>
                             <input type="number" min={1} max={10} value={runtimeSetRP} onChange={e => setRuntimeSetRP(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
                           <div>
-                            <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>RIR</label>
+                            <label style={{ fontSize: 10, color: '#fff' }}>RIR</label>
                             <input type="number" min={0} max={5} value={runtimeSetRI} onChange={e => setRuntimeSetRI(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box' }} />
+                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box' }} />
                           </div>
                         </div>
                         <button onClick={() => {
@@ -581,8 +581,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
                           if (runtimeExIdx < exercises.length - 1) setRuntimeExIdx(runtimeExIdx + 1);
                         }} style={{
-                          width: '100%', padding: 6, borderRadius: 6, border: '1px solid var(--border)', cursor: 'pointer',
-                          background: 'transparent', color: 'var(--text-dim)', fontSize: 11,
+                          width: '100%', padding: 6, borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+                          background: 'transparent', color: '#fff', fontSize: 11,
                         }}>Пропустить →</button>
                       </div>
                     )}

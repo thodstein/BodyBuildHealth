@@ -98,7 +98,7 @@ export const VBTCalcTab: React.FC = () => {
   // Цвет скорости по интенту (в зоне?)
   const velColor = (v: number) => {
     const z = INTENT_ZONES[intent];
-    return v >= z.velocity[0] && v <= z.velocity[1] ? ACCENT : 'rgba(255,255,255,0.85)';
+    return v >= z.velocity[0] && v <= z.velocity[1] ? ACCENT : '#fff';
   };
 
   return (

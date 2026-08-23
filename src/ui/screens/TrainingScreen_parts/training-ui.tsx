@@ -11,8 +11,8 @@ import React from 'react';
 export const ACCENT = '#00e68a';
 export const ACCENT_SOFT = 'rgba(0,230,138,0.14)';
 export const ACCENT_LINE = 'rgba(0,230,138,0.45)';
-export const DIM = 'var(--text-dim, rgba(255,255,255,0.6))';
-export const DIM_STRONG = 'var(--text-light, rgba(255,255,255,0.92))';
+export const DIM = 'var(--text-dim, #fff)';
+export const DIM_STRONG = 'var(--text-light, #fff)';
 
 /** Радиусы — единая шкала (крупнее для мобильных тап-зон). */
 export const R = { card: 16, pill: 18, btn: 12, in: 10, chip: 10, bar: 6 } as const;
@@ -94,7 +94,7 @@ export const Chip: React.FC<{ label: string; value: string; color: string }> = (
     display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center',
     minWidth: 56,
   }}>
-    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.3 }}>{label}</span>
+    <span style={{ fontSize: 11, color: '#fff', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.3 }}>{label}</span>
     <span style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</span>
   </div>
 );

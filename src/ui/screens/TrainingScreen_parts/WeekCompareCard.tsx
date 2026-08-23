@@ -34,23 +34,23 @@ export const WeekCompareCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions
       <div style={{ fontSize: 12, fontWeight: 800, color: '#a855f7', marginBottom: 6 }}>⚖️ Сравнение двух недель</div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <select value={a} onChange={e => setA(+e.target.value)} style={{ flex: 1, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 6, fontSize: 11 }}>{[0,1,2,3,4,5,6,7].map(opt)}</select>
-        <span style={{ alignSelf: 'center', color: 'var(--text-dim)' }}>vs</span>
+        <span style={{ alignSelf: 'center', color: '#fff' }}>vs</span>
         <select value={b} onChange={e => setB(+e.target.value)} style={{ flex: 1, background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: 6, fontSize: 11 }}>{[0,1,2,3,4,5,6,7].map(opt)}</select>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize:10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', marginBottom: 4 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize:10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', marginBottom: 4 }}>
         <span>Метрика</span><span style={{ color: ACCENT }}>{A.label}</span><span style={{ color: '#a855f7' }}>{B.label}</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.85)', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, color: '#fff', padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
         <span>Тренировок</span><span style={{ color: ACCENT }}>{A.wcount}</span><span style={{ color: '#a855f7' }}>{B.wcount}</span>
         <span>Сетов</span><span style={{ color: ACCENT }}>{A.sets}</span><span style={{ color: '#a855f7' }}>{B.sets} {A.sets - B.sets !== 0 && <span style={{ fontSize: 10, color: A.sets - B.sets > 0 ? '#ef4444' : '#3b82f6' }}>({A.sets - B.sets > 0 ? '+' : ''}{A.sets - B.sets})</span>}</span>
         <span>Тоннаж</span><span style={{ color: ACCENT }}>{Math.round(A.vol)}</span><span style={{ color: '#a855f7' }}>{Math.round(B.vol)} {A.vol - B.vol !== 0 && <span style={{ fontSize: 10, color: A.vol - B.vol > 0 ? '#ef4444' : '#3b82f6' }}>({A.vol - B.vol > 0 ? '+' : ''}{Math.round(A.vol - B.vol)})</span>}</span>
       </div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginTop: 6, marginBottom: 2 }}>По группам (сетов)</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.6fr 0.6fr 0.6fr', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginTop: 6, marginBottom: 2 }}>По группам (сетов)</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.6fr 0.6fr 0.6fr', gap: 4, fontSize: 10, color: '#fff' }}>
         {groups.map(g => { const va = A.byGroup[g] || 0, vb = B.byGroup[g] || 0; const d = va - vb; return (
           <React.Fragment key={g}>
             <span>{ru(g)}</span><span style={{ color: ACCENT, textAlign: 'center' }}>{va}</span><span style={{ color: '#a855f7', textAlign: 'center' }}>{vb}</span>
-            <span style={{ textAlign: 'center', color: d > 0 ? '#ef4444' : d < 0 ? '#3b82f6' : 'var(--text-dim)' }}>{d === 0 ? '=' : (d > 0 ? '+' : '') + d}</span>
+            <span style={{ textAlign: 'center', color: d > 0 ? '#ef4444' : d < 0 ? '#3b82f6' : '#fff' }}>{d === 0 ? '=' : (d > 0 ? '+' : '') + d}</span>
           </React.Fragment>
         ); })}
       </div>

@@ -33,7 +33,7 @@ export const LoadRadarCard: React.FC<{ sessions: WorkoutLog[]; level: string }> 
   return (
     <div style={{ padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 10 }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🕸️ Радар распределения нагрузки (неделя)</div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Каждая ось — мышечная группа, радиус = объём относительно MRV (1.0 = MRV). Кольца: MEV/MAV/MRV. Идеал — равносторонний многоугольник в зоне MAV.</div>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Каждая ось — мышечная группа, радиус = объём относительно MRV (1.0 = MRV). Кольца: MEV/MAV/MRV. Идеал — равносторонний многоугольник в зоне MAV.</div>
       <svg width="100%" viewBox="0 0 260 240" style={{ maxWidth: 260, margin: '0 auto', display: 'block' }}>
         {[0.5, 1].map(ring => (
           <polygon key={ring} points={data.map((_, i) => pt(i, ring * R).join(',')).join(' ')} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
@@ -49,10 +49,10 @@ export const LoadRadarCard: React.FC<{ sessions: WorkoutLog[]; level: string }> 
         })}
         {data.map((d, i) => {
           const [lx, ly] = pt(i, R + 14);
-          return <text key={i} x={lx} y={ly} fontSize={8} fill="rgba(255,255,255,0.6)" textAnchor="middle" dominantBaseline="middle">{GRP_RU[d.g] || d.g}</text>;
+          return <text key={i} x={lx} y={ly} fontSize={8} fill="#fff" textAnchor="middle" dominantBaseline="middle">{GRP_RU[d.g] || d.g}</text>;
         })}
       </svg>
-      <div style={{ display: 'flex', gap: 10, fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, fontSize: 10, color:'#fff', marginTop: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
         <span>🟢 в зоне MAV</span><span>🟡 &lt; MEV (недотрен)</span><span>🔴 &gt; MRV (перетрен)</span>
         <span>· макс. отношение: <b style={{ color: maxRatio > 1 ? '#ef4444' : ACCENT }}>{maxRatio.toFixed(2)}× MRV</b></span>
       </div>

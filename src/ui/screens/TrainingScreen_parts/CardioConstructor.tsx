@@ -814,7 +814,7 @@ export const CardioConstructor: React.FC = () => {
               <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #00e68a, #06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, boxShadow: '0 4px 14px rgba(0,230,138,0.35)' }}>❤️</span>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', letterSpacing: -0.2, lineHeight: 1 }}>Кардио-конструктор</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Шаг {stepIdx + 1} из {STEPS.length} — <span style={{ color: '#00e68a' }}>{STEPS[stepIdx].label}</span></div>
+                <div style={{ fontSize: 11, color: '#fff', fontWeight: 600 }}>Шаг {stepIdx + 1} из {STEPS.length} — <span style={{ color: '#00e68a' }}>{STEPS[stepIdx].label}</span></div>
               </div>
             </div>
           </div>
@@ -829,7 +829,7 @@ export const CardioConstructor: React.FC = () => {
                 </>
               );
             })()}
-            {cycle && <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.22)', borderRadius: 20, padding: '5px 12px', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cycle.name}>⭐ {cycle.name}</div>}
+            {cycle && <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.22)', borderRadius: 20, padding: '5px 12px', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={cycle.name}>⭐ {cycle.name}</div>}
           </div>
         </div>
         {/* Второй ряд — статусы, компактно */}
@@ -869,7 +869,7 @@ export const CardioConstructor: React.FC = () => {
           <div style={{ flex: 1, height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.25)' }} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(((stepIdx + 1) / STEPS.length) * 100)}>
             <div style={{ height: 8, borderRadius: 4, width: `${Math.round(((stepIdx + 1) / STEPS.length) * 100)}%`, background: 'linear-gradient(90deg, #00e68a 0%, #06b6d4 100%)', transition: 'width 0.4s ease', boxShadow: '0 0 10px rgba(0,230,138,0.45)' }} />
           </div>
-          <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', minWidth: 34, textAlign: 'right' }}>{Math.round(((stepIdx + 1) / STEPS.length) * 100)}%</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', minWidth: 34, textAlign: 'right' }}>{Math.round(((stepIdx + 1) / STEPS.length) * 100)}%</span>
         </div>
       </div>
 
@@ -887,7 +887,7 @@ export const CardioConstructor: React.FC = () => {
                 flex: '1 0 auto', minWidth: 92, padding: '10px 8px', borderRadius: 11, cursor: 'pointer',
                 border: active ? '1px solid rgba(0,230,138,0.55)' : done ? '1px solid rgba(0,230,138,0.20)' : '1px solid rgba(255,255,255,0.06)',
                 background: active ? 'linear-gradient(180deg, rgba(0,230,138,0.28), rgba(0,230,138,0.10))' : done ? 'rgba(0,230,138,0.07)' : 'rgba(255,255,255,0.025)',
-                color: active ? '#fff' : done ? 'rgba(255,255,255,0.75)' : 'var(--text-dim)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                color: active ? '#fff' : done ? '#fff' : '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 fontSize: 11, fontWeight: active ? 800 : 650, whiteSpace: 'nowrap',
                 boxShadow: active ? '0 0 16px rgba(0,230,138,0.22), inset 0 1px 0 rgba(255,255,255,0.07)' : done ? 'inset 0 1px 0 rgba(255,255,255,0.04)' : 'none',
                 opacity: !active && !done ? 0.85 : 1,
@@ -968,7 +968,7 @@ export const CardioConstructor: React.FC = () => {
       {/* Навигация v2 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: 12, borderRadius: 14, background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 4px 16px rgba(0,0,0,0.18)' }}>
         <button style={{ ...NAV_BTN, minWidth: 110 }} onClick={goPrev} disabled={stepIdx === 0} aria-label="Назад">← Назад</button>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{stepIdx + 1} / {STEPS.length}</div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff', fontWeight: 600 }}>{stepIdx + 1} / {STEPS.length}</div>
         {stepIdx < STEPS.length - 1 && (
           <button style={{ ...NAV_BTN_PRIMARY, minWidth: 160, boxShadow: '0 4px 14px rgba(0,230,138,0.22)' }} onClick={goNext} aria-label="Далее">
             {step === 'preview' && !cycle ? '🛠 Собрать и далее →' : `Далее: ${STEPS[stepIdx + 1].label} →`}

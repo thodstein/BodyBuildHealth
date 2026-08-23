@@ -110,7 +110,7 @@ export const LoadGuardPanel: React.FC<GuardPanelProps> = ({ program }) => {
       )}
 
       {/* Рекомендации */}
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
         {recs.map((r, i) => <div key={i} style={{ marginBottom: 2 }}>{r}</div>)}
       </div>
     </div>
@@ -254,7 +254,7 @@ export const RIRCalibrationPanel: React.FC<GuardPanelProps> = ({ program, dir, o
         <div style={{ fontSize: 10, color: DIM, textAlign: 'center', marginTop: 2 }}>Bias: {bias > 0 ? '+' : ''}{bias.toFixed(2)} RIR</div>
       </div>
 
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 11, color: '#fff', marginBottom: 6, lineHeight: 1.4 }}>
         📋 {correction}
       </div>
 
@@ -634,8 +634,8 @@ export const ReadinessForecastPanel: React.FC<GuardPanelProps> = () => {
         <line x1={4} x2={chartW - 4} y1={chartH - 6 - ((40 - minVal) / range) * (chartH - 12)} y2={chartH - 6 - ((40 - minVal) / range) * (chartH - 12)} stroke="rgba(239,68,68,0.2)" strokeDasharray="2 2" />
         <path d={pathD} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         {points.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2.5} fill={stroke} />)}
-        <text x={4} y={10} fontSize="8" fill="rgba(255,255,255,0.85)">день+1</text>
-        <text x={chartW - 30} y={10} fontSize="8" fill="rgba(255,255,255,0.85)">день+5</text>
+        <text x={4} y={10} fontSize="8" fill="#fff">день+1</text>
+        <text x={chartW - 30} y={10} fontSize="8" fill="#fff">день+5</text>
       </svg>
       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
         {forecast.values.map((v, i) => (
@@ -700,7 +700,7 @@ export const CheckinGuardPanel: React.FC<GuardPanelProps> = () => {
         {checkin.subjectiveEnergy != null && <div style={{ padding: '3px 5px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, textAlign: 'center' }}><div style={{ fontSize: 9, color: DIM }}>Энергия</div><div style={{ fontSize: 11, fontWeight: 700, color: DIM_STRONG }}>{checkin.subjectiveEnergy}/5</div></div>}
         {checkin.hrvMs != null && <div style={{ padding: '3px 5px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, textAlign: 'center' }}><div style={{ fontSize: 9, color: DIM }}>HRV</div><div style={{ fontSize: 11, fontWeight: 700, color: DIM_STRONG }}>{checkin.hrvMs}мс</div></div>}
       </div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
         {recs.map((r, i) => <div key={i} style={{ marginBottom: 2 }}>{r}</div>)}
       </div>
     </div>

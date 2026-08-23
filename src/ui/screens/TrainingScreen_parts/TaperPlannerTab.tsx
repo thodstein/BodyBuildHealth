@@ -24,16 +24,16 @@ import { LMS_CYCLES, getCyclesByTrainingDirection } from '../../../data/lms-cycl
 import { AGE_GROUPS, eligibleRanksForAge, ageEligibilityNote, type AgeGroup, type Federation, type Sex } from '../../../engines/pl-norms.engine';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
+const DIM = '#fff';
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.45 };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const CARD_GLASS: React.CSSProperties = { padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 10 };
 const BTN: React.CSSProperties = { flex: 1, padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 13, minHeight: 44 };
 const BTN_GHOST: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: DIM };
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const, fontSize: 12 };
-const LABEL: React.CSSProperties = { color:'rgba(255,255,255,0.9)', fontSize: 11, margin: '4px 0 2px' };
-const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: 'rgba(255,255,255,0.8)' };
+const LABEL: React.CSSProperties = { color:'#fff', fontSize: 11, margin: '4px 0 2px' };
+const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: '#fff' };
 const LIFT_RU: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Тяга' };
 const LIFT_COLOR: Record<Lift, string> = { squat: '#ef4444', bench: '#3b82f6', deadlift: '#f59e0b' };
 
@@ -259,7 +259,7 @@ export const TaperPlannerTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>🔻 Тапер-планер (ПОЛНЫЙ)</div>
-      <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+      <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Единый калькулятор: тейпер/пик для пауэрлифтинга (снижение объёма 40-60%, прикиды, стратегия,
         весовая категория, таймлайн дня, восстановление, ментал) + шоу-пик для бодибилдинга
         (углеводная загрузка, водная манипуляция, памп-тренировки). Источники: Mujika & Padilla 2003 (тейпер), Bosquet et al. 2007, Pritchard et al. 2015, Helms — без выдумок.
@@ -435,9 +435,9 @@ export const TaperPlannerTab: React.FC = () => {
             {plan.taperCurve.map(tw => (
               <div key={tw.week} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
                 <span style={{ color: ACCENT, fontWeight: 700 }}>Нед {tw.week}</span>
-                <span style={{ color: 'rgba(255,255,255,0.7)' }}>Объём: <b style={{ color: '#fff' }}>{Math.round(tw.volumePctOfPeak * 100)}%</b></span>
-                <span style={{ color: 'rgba(255,255,255,0.7)' }}>Инт.: <b style={{ color: '#fff' }}>{Math.round(tw.intensityPct * 100)}%</b></span>
-                <span style={{ color: 'rgba(255,255,255,0.7)' }}>RIR: <b style={{ color: '#fff' }}>{tw.rir}</b></span>
+                <span style={{ color: '#fff' }}>Объём: <b style={{ color: '#fff' }}>{Math.round(tw.volumePctOfPeak * 100)}%</b></span>
+                <span style={{ color: '#fff' }}>Инт.: <b style={{ color: '#fff' }}>{Math.round(tw.intensityPct * 100)}%</b></span>
+                <span style={{ color: '#fff' }}>RIR: <b style={{ color: '#fff' }}>{tw.rir}</b></span>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: DIM, marginTop: 2 }}>{tw.rationale}</div>
               </div>
             ))}
@@ -451,9 +451,9 @@ export const TaperPlannerTab: React.FC = () => {
             {canonicalCurve.map(pt => (
               <div key={pt.week} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
                 <span style={{ color: '#a78bfa', fontWeight: 700 }}>Нед {pt.week}</span>
-                <span style={{ color: 'rgba(255,255,255,0.7)' }}>Объём: <b style={{ color: '#fff' }}>{Math.round(pt.volumePct * 100)}%</b></span>
-                <span style={{ color: 'rgba(255,255,255,0.7)' }}>Инт.: <b style={{ color: '#fff' }}>{pt.intensityMode === 'preserve' ? 'сохр.' : Math.round(pt.intensityPct * 100) + '%'}</b></span>
-                <span style={{ color: 'rgba(255,255,255,0.7)' }}>RIR: <b style={{ color: '#fff' }}>{pt.rirTarget != null ? pt.rirTarget : `+${pt.rirShift}`}</b></span>
+                <span style={{ color: '#fff' }}>Объём: <b style={{ color: '#fff' }}>{Math.round(pt.volumePct * 100)}%</b></span>
+                <span style={{ color: '#fff' }}>Инт.: <b style={{ color: '#fff' }}>{pt.intensityMode === 'preserve' ? 'сохр.' : Math.round(pt.intensityPct * 100) + '%'}</b></span>
+                <span style={{ color: '#fff' }}>RIR: <b style={{ color: '#fff' }}>{pt.rirTarget != null ? pt.rirTarget : `+${pt.rirShift}`}</b></span>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: DIM, marginTop: 2 }}>{pt.label}{pt.focus ? ` · ${pt.focus}` : ''}</div>
               </div>
             ))}
@@ -470,12 +470,12 @@ export const TaperPlannerTab: React.FC = () => {
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{s.dayName}</span>
                   <span style={{ fontSize: 10, color: ACCENT }}>{s.daysUntilMeet} дн. до старта</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>{s.focus}</div>
+                <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>{s.focus}</div>
                 {s.exercises.map((ex, ei) => {
                   const weight = ex.lift === 'squat' ? squat1RM : ex.lift === 'bench' ? bench1RM : deadlift1RM;
                   const wkg = Math.round(weight * ex.percent * 10) / 10;
                   return (
-                    <div key={ei} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr', gap: 6, fontSize: 10, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)' }}>
+                    <div key={ei} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr 1fr', gap: 6, fontSize: 10, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#fff' }}>
                       <span style={{ color: LIFT_COLOR[ex.lift], fontWeight: 700 }}>{LIFT_RU[ex.lift]}</span>
                       <span>{Math.round(ex.percent * 100)}% × {ex.reps}</span>
                       <span style={{ color: ACCENT, fontWeight: 700 }}>{wkg} кг × {ex.sets}</span>
@@ -514,7 +514,7 @@ export const TaperPlannerTab: React.FC = () => {
             <div style={CARD}>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🔥 Разминка (опенер присед {plan.attempts.squat.opener} кг)</div>
               {warmup.map((w, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#fff' }}>
                   <span>{Math.round(w.percent * 100)}%</span>
                   <b style={{ color: ACCENT }}>{w.weight} кг × {w.reps} повт.</b>
                 </div>
@@ -528,7 +528,7 @@ export const TaperPlannerTab: React.FC = () => {
                   <span style={{ color: '#fff' }}><b>{plan.lastHeavyDays[l]}</b> дн.</span>
                 </div>
               ))}
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: '#fff', marginTop: 8 }}>
                 {plan.meetDayInstructions.map((m, i) => <div key={i} style={{ padding: '4px 0', lineHeight: 1.45 }}>• {m}</div>)}
               </div>
             </div>
@@ -605,7 +605,7 @@ export const TaperPlannerTab: React.FC = () => {
           <div style={CARD}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📋 План соревновательного дня</div>
             {plan.meetDayInstructions.map((m, i) => (
-              <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', padding: '4px 0', lineHeight: 1.45 }}>• {m}</div>
+              <div key={i} style={{ fontSize: 11, color: '#fff', padding: '4px 0', lineHeight: 1.45 }}>• {m}</div>
             ))}
           </div>
         )}
@@ -613,7 +613,7 @@ export const TaperPlannerTab: React.FC = () => {
         {/* Apply + Save */}
         {plan && (<>
           <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
               🔗 Применить ПМ ({squat1RM}/{bench1RM}/{deadlift1RM} кг) и taper-план (объём ×{plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5}, RIR→0) к планировщику.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -655,7 +655,7 @@ export const TaperPlannerTab: React.FC = () => {
             {bb.weekPlan.map(d => (
               <div key={d.day} style={{ ...ROW, flexWrap: 'wrap', gap: 4 }}>
                 <span style={{ color: ACCENT, fontWeight: 700, width: 28 }}>Д{d.day}</span>
-                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>{d.training} · {d.carbs} · {d.water} · {d.sodium} · {d.posing}</span>
+                <span style={{ color: '#fff', fontSize: 11 }}>{d.training} · {d.carbs} · {d.water} · {d.sodium} · {d.posing}</span>
               </div>
             ))}
             {bb.recommendations.length > 0 && (
@@ -669,7 +669,7 @@ export const TaperPlannerTab: React.FC = () => {
         {bb && (
           <>
             <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
                 🔗 Применить BB шоу-пик к планировщику (карб-загрузка, водная манипуляция, памп).
               </div>
               <button onClick={() => applyToPlanner({ kind: 'peak', label: 'BB шоу-пик: карб-загрузка, вода и натрий стабильны, RIR 2-4', data: { volumeMult: 0.6, rirTarget: 2 } })} style={{ width: '100%', ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}>

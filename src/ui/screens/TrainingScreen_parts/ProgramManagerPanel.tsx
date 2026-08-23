@@ -186,7 +186,7 @@ const ManualModeToggle: React.FC<{ mode: ManualMode; onMode: (m: ManualMode) => 
             whiteSpace: 'nowrap',
             border: active ? `2px solid ${meta.color}` : '1px solid rgba(255,255,255,0.06)',
             background: active ? `${meta.color}20` : 'rgba(255,255,255,0.02)',
-            color: active ? '#ffffff' : 'var(--text-dim)',
+            color: active ? '#ffffff' : '#fff',
             boxShadow: active ? `0 0 0 1px ${meta.color}40, 0 2px 10px rgba(0,0,0,0.25)` : 'none',
           }}
         >
@@ -571,7 +571,7 @@ export const ProgramManagerPanel: React.FC = () => {
                 {belowMev > 0 && <span style={finalBadge('rgba(59,130,246,0.12)', 'rgba(59,130,246,0.35)', '#60a5fa')}>{belowMev} ниже MEV</span>}
               </>
             )}
-            <span style={finalBadge('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0.85)')}>📝 Упражнений: {totalExercises}</span>
+            <span style={finalBadge('rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', '#fff')}>📝 Упражнений: {totalExercises}</span>
           </div>
           {dir === 'bb' && p.bb?.weeks?.[0] && (() => {
             const w1 = p.bb.weeks[0];
@@ -580,7 +580,7 @@ export const ProgramManagerPanel: React.FC = () => {
             return (
               <div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.5, display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'baseline' }}>
                 <b style={{ color: DIM_STRONG }}>🗓 Неделя 1:</b>
-                {days.map((d, i) => <span key={i} style={finalBadge('rgba(255,255,255,0.05)', 'rgba(255,255,255,0.1)', 'rgba(255,255,255,0.8)')}>{d}</span>)}
+                {days.map((d, i) => <span key={i} style={finalBadge('rgba(255,255,255,0.05)', 'rgba(255,255,255,0.1)', '#fff')}>{d}</span>)}
               </div>
             );
           })()}
@@ -805,7 +805,7 @@ export const ProgramManagerPanel: React.FC = () => {
         {renderMstepNav()}
         <div style={{ padding: '14px 12px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.10))', border: '1px solid rgba(0,230,138,0.25)' }}>
           <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>✋ Ручной конструктор программ</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 4, lineHeight: 1.45 }}>
+          <div style={{ fontSize: 11, color: '#fff', marginTop: 4, lineHeight: 1.45 }}>
             Здесь вы сами собираете программу: выбираете упражнения, ставите сеты,
             RIR, вес, отдых. Можно создать с нуля, загрузить готовую для правки или
             подключить LMS-цикл и поверх него сделать свой оверлей.
@@ -1077,7 +1077,7 @@ export const ProgramManagerPanel: React.FC = () => {
           const dc = DIR_COLOR[p.meta.direction];
           const goalLabel = GOAL_OPTS.find(g => g.id === p.meta.goal)?.label ?? p.meta.goal;
           const levelLabel = LEVEL_OPTS.find(l => l.id === p.meta.level)?.label ?? p.meta.level;
-          const chip: React.CSSProperties = { padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.82)', whiteSpace: 'nowrap' };
+          const chip: React.CSSProperties = { padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#fff', whiteSpace: 'nowrap' };
           const iconBtn: React.CSSProperties = { ...BTN_GHOST, padding: '3px 6px', fontSize: 10, minWidth: 36, minHeight: 36, lineHeight: 1 };
           return (
             <div key={p.meta.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 8, borderRadius: 14, background: `linear-gradient(135deg, ${dc}14, rgba(24,24,27,0.6))`, border: `1px solid ${dc}30`, boxShadow: '0 2px 10px rgba(0,0,0,0.15)' }}>

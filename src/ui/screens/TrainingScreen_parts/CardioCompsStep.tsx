@@ -37,8 +37,8 @@ export const CardioCompsStep: React.FC<{
           (только лёгкое восстановительное кардио). Можно не указывать — тогда последняя неделя будет переходной.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', background: taperEnabled ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${taperEnabled ? 'rgba(234,179,8,0.22)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '7px 10px' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: taperEnabled ? '#eab308' : 'rgba(255,255,255,0.6)' }}>Режим:</span>
-          <Badge bg={taperEnabled ? 'rgba(234,179,8,0.14)' : 'rgba(255,255,255,0.06)'} border={taperEnabled ? 'rgba(234,179,8,0.28)' : 'rgba(255,255,255,0.10)'} color={taperEnabled ? '#eab308' : 'rgba(255,255,255,0.55)'}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: taperEnabled ? '#eab308' : '#fff' }}>Режим:</span>
+          <Badge bg={taperEnabled ? 'rgba(234,179,8,0.14)' : 'rgba(255,255,255,0.06)'} border={taperEnabled ? 'rgba(234,179,8,0.28)' : 'rgba(255,255,255,0.10)'} color={taperEnabled ? '#eab308' : '#fff'}>
             {taperEnabled ? `📉 taper ${taperWeeks} нед${peakWeek ? ' + пик-неделя' : ' (без пик-недели)'}` : 'без taper — перед стартом наращивание (contest_prep)'}
           </Badge>
           <span style={HINT_SM}>— настраивается на шаге «Параметры» (Структура фаз).</span>
@@ -50,10 +50,10 @@ export const CardioCompsStep: React.FC<{
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {comps.map((c, idx) => (
                 <div key={c.id} draggable onDragStart={() => setDragIdx(idx)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const next = [...comps]; const [moved] = next.splice(dragIdx, 1); next.splice(idx, 0, moved); setComps(next); setDragIdx(null); }} onDragEnd={() => setDragIdx(null)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: dragIdx === idx ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px', opacity: dragIdx === idx ? 0.6 : 1 }}>
-                  <span style={{ cursor: 'grab', color: 'rgba(255,255,255,0.85)', fontSize: 12, userSelect: 'none' }} aria-hidden>⋮⋮</span>
+                  <span style={{ cursor: 'grab', color: '#fff', fontSize: 12, userSelect: 'none' }} aria-hidden>⋮⋮</span>
                   <span style={{ fontSize: 13, fontWeight: 800, flex: 1, color: '#fff' }}>{c.name}</span>
                   <Badge bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.22)" color="#60a5fa">нед {c.week}</Badge>
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+                  <span style={{ fontSize: 11, color: '#fff' }}>
                     {taperEnabled ? `taper с нед ${Math.max(1, c.week - taperWeeks)}` : peakWeek ? 'пик-неделя' : 'без пика'}
                   </span>
                   <button style={{ ...BTN_DANGER, minHeight: 28, padding: '4px 8px' }} onClick={() => setComps(comps.filter(x => x.id !== c.id))} aria-label={`Удалить ${c.name}`}>✕</button>
@@ -69,7 +69,7 @@ export const CardioCompsStep: React.FC<{
                 return <div key={week} style={{ flex: 1, background: comp ? '#ef4444' : isPeak ? '#eab308' : isTaper ? 'rgba(234,179,8,0.32)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: comp ? '#fff' : 'transparent', borderLeft: week > 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }} title={comp ? `${comp.name} нед ${week}` : isTaper ? `taper нед ${week}` : `нед ${week}`}>{comp ? '●' : ''}</div>;
               })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}><span>нед 1</span><span>нед {totalWeeks}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff' }}><span>нед 1</span><span>нед {totalWeeks}</span></div>
           </>
         )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>

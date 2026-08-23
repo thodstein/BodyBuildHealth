@@ -27,7 +27,7 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
   bb: [
     { id: 'bb', title: 'ББ-инструменты', icon: '💪', short: 'Темп/отдых, техники, слабые группы, демография — теперь в лаборатории упражнений.', render: () => (
       <div style={{ padding: 12, fontSize: 11 }}>
-        <div style={{ color:'rgba(255,255,255,0.9)', marginBottom: 8, lineHeight: 1.5 }}>
+        <div style={{ color:'#fff', marginBottom: 8, lineHeight: 1.5 }}>
           ББ-инструменты объединены с Лабораторией упражнений в единый ПРОФ-калькулятор.
           Перейдите в зону «Калькуляторы» → «Лаборатория упражнений» → вкладка «ББ-инструменты».
         </div>
@@ -58,7 +58,7 @@ export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' }> = ({ mode }) => 
       <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent)', margin: '8px 0 4px', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         🔧 Инструменты планирования ({tools.length})
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>
         {TITLE_RU[mode]} — раскройте нужный инструмент, он откроется прямо здесь. Каждый имеет кнопку «🛠 Применить к планировщику».
       </div>
       {tools.map(t => {
@@ -69,7 +69,7 @@ export const PlannerToolsPanel: React.FC<{ mode: 'pl' | 'bb' }> = ({ mode }) => 
               <span style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>{t.icon} {t.title}</span>
               <span style={{ fontSize: 10, color: '#00e68a', flexShrink: 0, marginLeft: 8 }}>{open ? '▲' : '▼'}</span>
             </button>
-            {!open && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', padding: '0 12px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.short}</div>}
+            {!open && <div style={{ fontSize: 10, color: '#fff', padding: '0 12px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.short}</div>}
             {open && <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: 4, minWidth: 0, maxWidth: '100%', overflowX: 'hidden' }}>{t.render()}</div>}
           </div>
         );

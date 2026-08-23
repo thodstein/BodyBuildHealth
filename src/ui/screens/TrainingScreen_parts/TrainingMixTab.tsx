@@ -109,7 +109,7 @@ const SaveResultPopup: React.FC<{
               <span>🧮 <b>Внести в план поддержки</b> — вещества попадут в калькулятор поддержки: расчёт рисков, дозировок и карточка «Тренировочные миксы и пресеты здоровья».</span>
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={onClose} style={btn('rgba(255,255,255,0.08)', 'rgba(255,255,255,0.75)', true)}>Отмена</button>
+              <button onClick={onClose} style={btn('rgba(255,255,255,0.08)', '#fff', true)}>Отмена</button>
               <button onClick={onConfirm} style={btn('linear-gradient(135deg,#00e68a,#00c853)', '#000', true)}>Сохранить</button>
             </div>
           </>
@@ -345,7 +345,7 @@ export const TrainingMixTab: React.FC = () => {
 
       {/* ── Результат: тренировочный стек ── */}
       {mixSubstances.length > 0 && (
-        <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border: '1px solid var(--glass-border)' }}>
+        <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(0,230,138,0.04), rgba(139,92,246,0.04))', border: '1px solid rgba(255,255,255,0.07)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 24 }}>{mixTiming === 'pre' ? '🔥' : mixTiming === 'intra' ? '💧' : '🍗'}</span>
             <div style={{ flex: 1 }}>

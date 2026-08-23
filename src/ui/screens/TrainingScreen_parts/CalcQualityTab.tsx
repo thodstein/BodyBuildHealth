@@ -505,7 +505,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         </div>
         <div style={{ padding: 16, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
           <div style={{ fontSize: 12, color: '#fff', marginBottom: 8 }}>Разделение «{division === 'bb' ? 'ББ' : 'ПЛ'}» не содержит данных в выбранной программе «{selectedProgram?.meta.title}».</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 12 }}>{division === 'bb' ? 'ББ-программа хранит недели → сессии → блоки (мышечные группы). Создайте ББ-план в ПЛ/ББ-авто или ручном конструкторе.' : 'ПЛ-программа хранит недели → дни → упражнения (присед/жим/тяга). Клонируйте СРЦ-цикл или создайте кастом.'}</div>
+          <div style={{ fontSize: 11, color: '#fff', marginBottom: 12 }}>{division === 'bb' ? 'ББ-программа хранит недели → сессии → блоки (мышечные группы). Создайте ББ-план в ПЛ/ББ-авто или ручном конструкторе.' : 'ПЛ-программа хранит недели → дни → упражнения (присед/жим/тяга). Клонируйте СРЦ-цикл или создайте кастом.'}</div>
           <button onClick={onBuildPlan} style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: ACCENT, cursor: 'pointer', fontWeight: 800, fontSize: 11 }}>📋 Открыть планировщик</button>
         </div>
       </div>
@@ -857,7 +857,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
               </div>
             </div>
           )}
-          <div style={{ fontSize: 9, color:'rgba(255,255,255,0.9)', marginTop: 6, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 9, color:'#fff', marginTop: 6, lineHeight: 1.4 }}>
             Тоннаж = Σвес×пов×под×Множ · КПШ = Σпов×под · Ср.вес = Тоннаж/КПШ · Инт.отн = Ср.вес/(PM×Множ) · УОИ = ΣКПШ×Коэф/ΣКПШ · Инт.Ф+Б = Σk(вес/PM)×вес×пов×под×Множ×Коэф. По Прилепину: оптимум 60-70% — КПШ 18-30, 70-80% — 12-24 и т.д.
           </div>
         </div>

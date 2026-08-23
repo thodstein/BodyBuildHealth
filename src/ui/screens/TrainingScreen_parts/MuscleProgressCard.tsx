@@ -40,14 +40,14 @@ const MuscleProgressCardBase: React.FC<{ sessions: Session[]; level: string }> =
           {GROUPS.map(g => <option key={g} value={g}>{GROUP_RU[g]}</option>)}
         </select>
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Недельный объём (кг·повт) для «{GROUP_RU[group]}» за 6 нед. Линии: MEV/MAV/MRV (×1000 кг).</div>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Недельный объём (кг·повт) для «{GROUP_RU[group]}» за 6 нед. Линии: MEV/MAV/MRV (×1000 кг).</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ maxWidth: W, margin: '0 auto', display: 'block' }}>
         {[ref.mev, ref.mav, ref.mrv].map((v, i) => v > 0 && <line key={i} x1={P} x2={W - P} y1={yline(v)} y2={yline(v)} stroke={['#f59e0b', '#22c55e', '#ef4444'][i]} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />)}
         <polyline points={linePts} fill="none" stroke={COLORS[group]} strokeWidth={2} />
         {weekly.map((w, i) => <circle key={i} cx={x(i)} cy={y(w.vol)} r={2.5} fill={COLORS[group]} />)}
-        {weekly.map((w, i) => <text key={i} x={x(i)} y={H - 6} fontSize={7} fill="rgba(255,255,255,0.85)" textAnchor="middle">{w.label}</text>)}
+        {weekly.map((w, i) => <text key={i} x={x(i)} y={H - 6} fontSize={7} fill="#fff" textAnchor="middle">{w.label}</text>)}
       </svg>
-      <div style={{ display: 'flex', gap: 10, fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 4, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, fontSize: 10, color:'#fff', marginTop: 4, flexWrap: 'wrap' }}>
         <span>🟡 MEV {ref.mev}</span><span>🟢 MAV {ref.mav}</span><span>🔴 MRV {ref.mrv}</span>
         <span>· текущий нед: <b style={{ color: COLORS[group] }}>{Math.round((weekly[weekly.length - 1]?.vol || 0) / 1000)}т</b></span>
       </div>

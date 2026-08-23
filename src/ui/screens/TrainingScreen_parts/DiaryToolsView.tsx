@@ -30,9 +30,9 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* CSV Export */}
           <div style={style.card}>
             <div style={style.label}>📥 Экспорт CSV</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт всех тренировок в CSV (совместим с импортом)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт всех тренировок в CSV (совместим с импортом)</div>
             {historyWorkouts.length === 0 ? (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', padding: 8 }}>Нет данных для экспорта</div>
+              <div style={{ fontSize: 10, color: '#fff', padding: 8 }}>Нет данных для экспорта</div>
             ) : (
               <button onClick={() => {
                 const rows: string[] = ['date,exercise,set,weight,reps,rpe,rir,notes'];
@@ -65,7 +65,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Mindset check-ins CSV export */}
           <div style={style.card}>
             <div style={style.label}>🧠 Психо-чек-ины CSV</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт чек-инов уверенности/активации/фокуса из вкладки «Психология» ({loadCheckins().length} записей)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов уверенности/активации/фокуса из вкладки «Психология» ({loadCheckins().length} записей)</div>
             <button onClick={() => {
               const csv = exportMindsetCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -82,7 +82,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Mobility check-ins CSV export */}
           <div style={style.card}>
             <div style={style.label}>🧘 Мобильность CSV</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт чек-инов мобильности (выполнено + ROM) из вкладки «Мобильность» ({loadMobilityCheckins().length} записей)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт чек-инов мобильности (выполнено + ROM) из вкладки «Мобильность» ({loadMobilityCheckins().length} записей)</div>
             <button onClick={() => {
               const csv = exportMobilityCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -99,7 +99,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Warmup diary CSV export */}
           <div style={style.card}>
             <div style={style.label}>🔥 Разминка CSV</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт дневника разминки (выполнена/качество/причина пропуска) — {loadWarmupLog().length} записей</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника разминки (выполнена/качество/причина пропуска) — {loadWarmupLog().length} записей</div>
             <button onClick={() => {
               const csv = exportWarmupCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -116,7 +116,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Cooldown diary CSV export */}
           <div style={style.card}>
             <div style={style.label}>❄️ Заминка CSV</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт дневника заминки (выполнена/качество/причина пропуска) — {loadCooldownLog().length} записей</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт дневника заминки (выполнена/качество/причина пропуска) — {loadCooldownLog().length} записей</div>
             <button onClick={() => {
               const csv = exportCooldownCheckinsCSV();
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -146,12 +146,12 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             return (
               <div style={style.card}>
                 <div style={style.label}>📋 Шаблоны из дневника</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Повторить тренировку из прошлого</div>
+                <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Повторить тренировку из прошлого</div>
                 {templates.map(([key, t], i) => (
                   <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{t.exercises.slice(0, 3).join(', ')}{t.exercises.length > 3 ? ` +${t.exercises.length - 3}` : ''}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{t.sets} сетов · {t.date}</div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{t.exercises.slice(0, 3).join(', ')}{t.exercises.length > 3 ? ` +${t.exercises.length - 3}` : ''}</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>{t.sets} сетов · {t.date}</div>
                     </div>
                     <button onClick={() => {
                       const wo = recent.find((w: any) => {
@@ -244,12 +244,12 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             {trainingArchive.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Архив ({trainingArchive.length})</span>
+                  <span style={{ fontSize: 10, color: '#fff' }}>Архив ({trainingArchive.length})</span>
                   <button onClick={() => { setTrainingArchive([]); localStorage.removeItem('he_training_reports'); setTrainingReportGenerated(false); }}
                     style={{ padding: '3px 8px', borderRadius: 5, fontSize: 9, background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: 'none', cursor: 'pointer' }}>Очистить</button>
                 </div>
                 {[...trainingArchive].slice(0, 3).map((r: any) => (
-                  <div key={r.id} style={{ fontSize: 10, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', color: 'var(--text-dim)' }}>
+                  <div key={r.id} style={{ fontSize: 10, padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)', color: '#fff' }}>
                     {new Date(r.date).toLocaleDateString('ru')} · {r.planWeeks} нед · {r.goal}
                   </div>
                 ))}
@@ -261,7 +261,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Exercise Substitution */}
           <div style={style.card}>
             <div style={style.label}>🔄 Подбор замены</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Альтернативы по мышечной группе</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Альтернативы по мышечной группе</div>
             <ExerciseSubstitutionCard />
           </div>
           {/* 1RM Calculator — existing component */}
@@ -277,7 +277,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Хранилище: диагностика дублей + импорт/экспорт веса (Google Fit мост) */}
           <div style={style.card}>
             <div style={style.label}>🧹 Хранилище: дубли и вес</div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
               Поиск одинаковых тренировок (дата + контент) и синхронизация веса с внешними приложениями.
             </div>
             {dupes && dupes.length > 0 && (
@@ -371,7 +371,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 🔄 Синхронизировано: IDB ↔ localStorage ({historyWorkouts.length})
               </span>
             </div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт/импорт всех данных дневника (JSON)</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Экспорт/импорт всех данных дневника (JSON)</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={() => { void (async () => { await diary.getWorkoutLogs(); onRefresh(); })(); }} style={{ flex: 1, padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: 'rgba(0,230,138,0.08)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>
                 🔄 Синхронизировать

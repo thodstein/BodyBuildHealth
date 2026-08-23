@@ -50,10 +50,10 @@ export const MethodologyEncyclopedia: React.FC = () => {
         {CAT.map(c => {
           const on = cat === c.id;
           const cnt = methods.filter(m => m.category === c.id).length;
-          return <button key={c.id} onClick={() => setCat(c.id)} style={{ padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : 'rgba(255,255,255,0.6)' }}>{c.icon} {c.label} ({cnt})</button>;
+          return <button key={c.id} onClick={() => setCat(c.id)} style={{ padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#00e68a' : '#fff' }}>{c.icon} {c.label} ({cnt})</button>;
         })}
       </div>
-      {list.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нет методов в категории.</div>}
+      {list.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>Нет методов в категории.</div>}
       {list.map((m, i) => (
         <ExpandableCard key={i} title={m.name} icon="" accent={EV_COLOR[m.evidenceLevel] || '#00e68a'}
           short={<><span style={{ fontSize: 10, color: EV_COLOR[m.evidenceLevel], fontWeight: 700, marginRight: 6 }}>{EV_LABEL[m.evidenceLevel]}</span>{m.description}</>}
@@ -61,8 +61,8 @@ export const MethodologyEncyclopedia: React.FC = () => {
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Как работает:</b> {m.howItWorks}</div>
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Кому подходит:</b> {m.bestFor}</div>
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Пример:</b> {m.example}</div>
-            {m.popularizedBy && <div style={{ marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Популяризатор: {m.popularizedBy}</div>}
-            {m.caveats.length > 0 && <div><b style={{ color: '#ef4444' }}>Осторожно:</b> <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{m.caveats.map((c, j) => <li key={j}>{c}</li>)}</ul></div>}
+            {m.popularizedBy && <div style={{ marginBottom: 6, fontSize: 10, color: '#fff' }}>Популяризатор: {m.popularizedBy}</div>}
+            {m.caveats.length > 0 && <div><b style={{ color: '#ef4444' }}>Осторожно:</b> <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 10, color: '#fff' }}>{m.caveats.map((c, j) => <li key={j}>{c}</li>)}</ul></div>}
             {m.name.toLowerCase().includes('westside') ? (
               <div style={{ marginTop: 8, padding: 10, background: 'rgba(255,107,53,0.06)', borderRadius: 10, border: '1px solid rgba(255,107,53,0.15)' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#ff6b35', marginBottom: 4 }}>⚡ Генератор конъюгата (Westside)</div>

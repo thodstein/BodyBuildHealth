@@ -53,7 +53,7 @@ export const PedInputPanel: React.FC<{
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>💉 PED / Курс</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1, lineHeight: 1.35 }}>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 1, lineHeight: 1.35 }}>
             Адаптация объёмов (MRV) и восстановления под фармакологию{active ? ` · активных: ${peds.length}` : ''}
           </div>
         </div>
@@ -76,7 +76,7 @@ export const PedInputPanel: React.FC<{
                 padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                 border: on ? '1.5px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
                 background: on ? 'rgba(0,230,138,0.16)' : 'rgba(255,255,255,0.02)',
-                color: on ? ACCENT : 'rgba(255,255,255,0.6)',
+                color: on ? ACCENT : '#fff',
                 boxShadow: on ? '0 2px 10px rgba(0,230,138,0.18)' : 'none',
                 transition: 'all 0.15s ease',
               }}
@@ -93,7 +93,7 @@ export const PedInputPanel: React.FC<{
       {/* Дозировки */}
       {active && (
         <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
             Дозировки
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
@@ -102,9 +102,9 @@ export const PedInputPanel: React.FC<{
               const val = pedDoses[p] || 0;
               return (
                 <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>
                     {meta.emoji} {meta.label}
-                    <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}> · {meta.unit}</span>
+                    <span style={{ color: '#fff', fontWeight: 500 }}> · {meta.unit}</span>
                   </label>
                   <input
                     type="number"
@@ -123,7 +123,7 @@ export const PedInputPanel: React.FC<{
                       outline: 'none', minHeight: 38,
                     }}
                   />
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>{meta.hint}</span>
+                  <span style={{ fontSize: 9, color: '#fff', lineHeight: 1.3 }}>{meta.hint}</span>
                   {val > meta.cap && (
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', lineHeight: 1.3 }}>
                       ⚠ Выше {meta.cap} {meta.unit} — кап: дальнейшее повышение дозы НЕ увеличивает MRV/восстановление
@@ -139,7 +139,7 @@ export const PedInputPanel: React.FC<{
       {/* Интенсивность курса */}
       {active && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
             Интенсивность курса
           </div>
           <div role="radiogroup" aria-label="Интенсивность курса" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
@@ -156,7 +156,7 @@ export const PedInputPanel: React.FC<{
                     padding: '8px 6px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                     border: on ? '1.5px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
                     background: on ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)',
-                    color: on ? ACCENT : 'rgba(255,255,255,0.6)',
+                    color: on ? ACCENT : '#fff',
                   }}
                 >
                   <span style={{ fontSize: 13 }}>{item.emoji}</span>
@@ -178,9 +178,9 @@ export const PedInputPanel: React.FC<{
 
 const Tile: React.FC<{ label: string; value: string; color: string; hint?: string }> = ({ label, value, color, hint }) => (
   <div style={{ padding: '8px 6px', borderRadius: 10, background: color + '10', border: '1px solid ' + color + '28', textAlign: 'center' }}>
-    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{label}</div>
+    <div style={{ fontSize: 9, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{label}</div>
     <div style={{ fontSize: 16, fontWeight: 900, color, lineHeight: 1.2, marginTop: 2 }}>{value}</div>
-    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 9, color: '#fff', marginTop: 1 }}>{hint}</div>}
   </div>
 );
 
@@ -193,11 +193,11 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#a855f7' }}>{title || '📊 Расчёт адаптации под PED'}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>Пороги MEV/MAV/MRV увеличены на суммарный множитель</div>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 1 }}>Пороги MEV/MAV/MRV увеличены на суммарный множитель</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: '#a855f7', lineHeight: 1.1 }}>×{a.combinedMrvMultiplier.toFixed(2)}</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>итог MRV</div>
+          <div style={{ fontSize: 9, color: '#fff' }}>итог MRV</div>
         </div>
       </div>
 
@@ -211,7 +211,7 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
       {/* 🧬 Почему достигается прибавка */}
       <div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>🧬 Почему достигается прибавка</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
           Андрогены ускоряют синтез мышечного белка и регенерацию соединительной ткани → мышца выдерживает и успевает восстановить <b>больший объём</b> (порог MRV растёт). ГР/инсулин улучшают усвоение нутриентов и восстановление между сессиями. Итог: можно тренироваться больше/чаще без перетренированности — план расширяется до нового потолка, а не «на глаз».
         </div>
       </div>
@@ -225,9 +225,9 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
               <div key={pp.ped} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: 14, flexShrink: 0 }}>{meta ? meta.emoji : '💊'}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
                     {meta ? meta.label : pp.ped}
-                    {pp.dose > 0 && <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}> · {pp.dose} {meta ? meta.unit : ''}</span>}
+                    {pp.dose > 0 && <span style={{ color: '#fff', fontWeight: 500 }}> · {pp.dose} {meta ? meta.unit : ''}</span>}
                     {pp.dose > (meta ? meta.cap : getPedCap(pp.ped as PED)) && (
                       <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 5, padding: '1px 5px' }}>
                         кап
@@ -251,7 +251,7 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
         return (
           <div style={{ marginBottom: 10, padding: 8, borderRadius: 10, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', marginBottom: 4 }}>🚫 Почему больше нельзя</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
               {totalCapped && <>Суммарный потолок адаптации <b>×2.0</b> достигнут: рецепторное насыщение и предел регенерации сухожилий/ЦНС не масштабируются с дозой — дальнейшее повышение доз НЕ увеличивает MRV, добавляется только риск. </>}
               {overCapPeds.length > 0 && <>Доза выше капа вещества ({overCapPeds.map(pp => PED_META_UI[pp.ped as PED]?.label ?? pp.ped).join(', ')}): кривая «доза→восстановление» выходит на плато — прибавка перестаёт расти, растёт побочная нагрузка.</>}
             </div>
@@ -262,9 +262,9 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
       {/* Как считается */}
       {a.rationale.length > 0 && (
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Как считается</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Как считается</div>
           {a.rationale.map((r, i) => (
-            <div key={i} style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.45, paddingLeft: 10, position: 'relative' }}>
+            <div key={i} style={{ fontSize: 10, color:'#fff', lineHeight: 1.45, paddingLeft: 10, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 0, color: '#a855f7' }}>•</span>
               {r}
             </div>
@@ -277,7 +277,7 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
         <div style={{ padding: 8, borderRadius: 10, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)' }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171', marginBottom: 4 }}>⚠ Контроль и риски</div>
           {a.risks.map((r, i) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.45, paddingLeft: 10, position: 'relative' }}>
+            <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.45, paddingLeft: 10, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 0, color: '#f87171' }}>!</span>
               {r}
             </div>

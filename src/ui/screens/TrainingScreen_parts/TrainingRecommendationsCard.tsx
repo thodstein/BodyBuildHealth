@@ -36,14 +36,14 @@ export const TrainingRecommendationsCard: React.FC<{
         {recs.map(r => {
           const s = SEV[r.severity];
           return (
-            <div key={r.id} style={{ padding: '8px 10px', borderRadius: 8, background: s.bg, border: '1px solid ' + s.border, fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+            <div key={r.id} style={{ padding: '8px 10px', borderRadius: 8, background: s.bg, border: '1px solid ' + s.border, fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
               <span style={{ fontWeight: 700, color: s.color }}>{s.icon} </span>{r.text}
             </div>
           );
         })}
       </div>
       <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить рекомендации к планировщику.</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить рекомендации к планировщику.</div>
         <button onClick={() => applyToPlanner({ kind: 'volume', label: 'Рекомендации тренажа', data: { sets: {} } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить рекомендации к планировщику</button>
       </div>
     </div>

@@ -13,8 +13,8 @@ import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/Tr
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
+const DIM = '#fff';
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.45 };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 
@@ -119,7 +119,7 @@ export const MRVEstimatorTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>🎯 Work capacity / MRV-оценщик</div>
-      <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+      <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Индивидуальный MRV (Maximum Recoverable Volume) оценивается по истории тренировок (sRPE) и готовности:
         ищется точка перегиба — объём, после которого рост нагрузки приводит к падению recovery. Без точки перегиба —
         MRV считается недостигнутым (толерантность = max объём в истории).
@@ -169,7 +169,7 @@ export const MRVEstimatorTab: React.FC = () => {
             {/* y-grid для recovery (40-100) */}
             {[60, 80, 100].map(yv => {
               const y = 80 - ((yv - 40) / 60) * 70;
-              return <g key={yv}><line x1="0" y1={y} x2="360" y2={y} stroke="rgba(255,255,255,0.04)" /><text x="4" y={y - 3} fontSize="8" fill="rgba(255,255,255,0.85)">{yv}</text></g>;
+              return <g key={yv}><line x1="0" y1={y} x2="360" y2={y} stroke="rgba(255,255,255,0.04)" /><text x="4" y={y - 3} fontSize="8" fill="#fff">{yv}</text></g>;
             })}
             {(() => {
               const bw = 360 / Math.max(1, weeks.length);
@@ -183,8 +183,8 @@ export const MRVEstimatorTab: React.FC = () => {
                 return (
                   <g key={i}>
                     <rect x={i * bw + 1} y={barY} width={bw - 2} height={barH} fill={isDecl ? '#ef4444' : `${ACCENT}88`} />
-                    <text x={i * bw + bw / 2} y={barY - 2} fontSize="7" fill="rgba(255,255,255,0.6)" textAnchor="middle">{w.volume}</text>
-                    <text x={i * bw + bw / 2} y={158} fontSize="6" fill="rgba(255,255,255,0.85)" textAnchor="middle">Н{i + 1}</text>
+                    <text x={i * bw + bw / 2} y={barY - 2} fontSize="7" fill="#fff" textAnchor="middle">{w.volume}</text>
+                    <text x={i * bw + bw / 2} y={158} fontSize="6" fill="#fff" textAnchor="middle">Н{i + 1}</text>
                     {recoveryPt != null && <circle cx={i * bw + bw / 2} cy={recoveryPt} r="3" fill="#3b82f6" />}
                     {est.firstDeclineIdx > 0 && i > 0 && !isNaN(weeks[i - 1].meanRecovery) && !isNaN(weeks[i].meanRecovery) && (() => {
                       const px = (i - 1) * bw + bw / 2;
@@ -210,7 +210,7 @@ export const MRVEstimatorTab: React.FC = () => {
       {est.mrvVolume != null && (
         <div style={CARD}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📊 Интерпретация</div>
-          <div style={{ ...SMALL, color: 'rgba(255,255,255,0.7)' }}>{est.rationale}</div>
+          <div style={{ ...SMALL, color: '#fff' }}>{est.rationale}</div>
           {est.firstDeclineIdx >= 0 && (
             <div style={{ padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', color: '#f87171', fontSize: 11, marginTop: 8 }}>
               ⛔ Падение готовности: объём {weeks[est.firstDeclineIdx].volume} AU → {weeks[est.firstDeclineIdx + 1].volume} AU (↑{Math.round((weeks[est.firstDeclineIdx + 1].volume - weeks[est.firstDeclineIdx].volume) / weeks[est.firstDeclineIdx].volume * 100)}%), recovery упал на {weeks[est.firstDeclineIdx].meanRecovery - weeks[est.firstDeclineIdx + 1].meanRecovery} п.
@@ -227,10 +227,10 @@ export const MRVEstimatorTab: React.FC = () => {
       {/* Контекстная статистика */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🛈 Сводные показатели</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>Недельных точек: <b style={{ color: '#fff' }}>{weeks.length}</b></div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>ACWR: <b style={{ color: acwr.ratio > 1.5 ? '#ef4444' : ACCENT }}>{acwr.ratio}</b></div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>Монотонность: <b style={{ color: mon.monotony > 2 ? '#ef4444' : '#fff' }}>{mon.monotony}</b></div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', padding: '4px 0' }}>Недельная нагрузка: <b style={{ color: ACCENT }}>{mon.weeklyLoad} AU</b></div>
+        <div style={{ fontSize: 11, color: '#fff', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>Недельных точек: <b style={{ color: '#fff' }}>{weeks.length}</b></div>
+        <div style={{ fontSize: 11, color: '#fff', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>ACWR: <b style={{ color: acwr.ratio > 1.5 ? '#ef4444' : ACCENT }}>{acwr.ratio}</b></div>
+        <div style={{ fontSize: 11, color: '#fff', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>Монотонность: <b style={{ color: mon.monotony > 2 ? '#ef4444' : '#fff' }}>{mon.monotony}</b></div>
+        <div style={{ fontSize: 11, color: '#fff', padding: '4px 0' }}>Недельная нагрузка: <b style={{ color: ACCENT }}>{mon.weeklyLoad} AU</b></div>
       </div>
 
       <div style={{ fontSize: 10, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
@@ -239,7 +239,7 @@ export const MRVEstimatorTab: React.FC = () => {
       </div>
       {est.mrvVolume != null && (
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить индивидуальный MRV (<b style={{ color: '#00e68a' }}>{perMuscleSets} сет/м/нед</b>) к планировщику — объём плана будет ограничен этой величиной.</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить индивидуальный MRV (<b style={{ color: '#00e68a' }}>{perMuscleSets} сет/м/нед</b>) к планировщику — объём плана будет ограничен этой величиной.</div>
           <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'MRV ' + perMuscleSets + ' сет/м/нед', data: { mrv: perMuscleSets } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить MRV к планировщику</button>
         </div>
       )}

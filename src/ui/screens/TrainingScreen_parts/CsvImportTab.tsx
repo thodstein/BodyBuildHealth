@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { importSessionsFromCSV } from '../../../engines/workout-logger.engine';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color:'rgba(255,255,255,0.9)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color:'#fff', fontSize: 11, lineHeight: 1.4 };
 
 type ImportFormat = 'csv' | 'hevy' | 'strong' | 'mesomorph';
 
@@ -154,13 +154,13 @@ export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
             style={{
               padding: '5px 12px', borderRadius: 8, border: format === f.id ? '1px solid ' + ACCENT : '1px solid rgba(255,255,255,0.08)',
               background: format === f.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-              color: format === f.id ? ACCENT : 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 10, fontWeight: 700,
+              color: format === f.id ? ACCENT : '#fff', cursor: 'pointer', fontSize: 10, fontWeight: 700,
             }}
           >{f.label}</button>
         ))}
       </div>
 
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>
         {format === 'csv' && <>Формат: <b>date,exercise,set,weight,reps,rpe,rir</b>. Дата YYYY-MM-DD. Строки группируются по дате в сессии.</>}
         {format === 'hevy' && <>Hevy JSON — массив тренировок с полями <b>title, start_time, exercises[].sets[]</b> (weight_kg, reps, rpe).</>}
         {format === 'strong' && <>Strong JSON — массив тренировок с полями <b>Name, Date, Exercises[].Sets[]</b> (WeightKg, Reps, RPE).</>}
@@ -172,10 +172,10 @@ export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
 
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <button onClick={doImport} disabled={!text.trim()}
-          style={{ flex: 1, padding: 11, borderRadius: 8, border: 'none', cursor: text.trim() ? 'pointer' : 'not-allowed', background: text.trim() ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.05)', color: text.trim() ? '#000' : 'var(--text-dim)', fontWeight: 700, fontSize: 13 }}>
+          style={{ flex: 1, padding: 11, borderRadius: 8, border: 'none', cursor: text.trim() ? 'pointer' : 'not-allowed', background: text.trim() ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.05)', color: text.trim() ? '#000' : '#fff', fontWeight: 700, fontSize: 13 }}>
           📥 Импортировать ({FORMATS.find(f => f.id === format)?.label || format})
         </button>
-        <button onClick={loadSample} style={{ padding: '11px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11 }}>Пример</button>
+        <button onClick={loadSample} style={{ padding: '11px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 11 }}>Пример</button>
       </div>
 
       {result && (
@@ -185,7 +185,7 @@ export const CsvImportTab: React.FC<{ onDone?: () => void }> = ({ onDone }) => {
           </div>
           {result.errors.length > 0 && (
             <div style={{ marginTop: 6 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>Ошибки/пропуски ({result.errors.length}):</div>
+              <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>Ошибки/пропуски ({result.errors.length}):</div>
               <div style={{ maxHeight: 120, overflowY: 'auto' }}>
                 {result.errors.slice(0, 30).map((e, i) => <div key={i} style={{ fontSize: 10, color: '#fca5a5', lineHeight: 1.4 }}>{e}</div>)}
               </div>

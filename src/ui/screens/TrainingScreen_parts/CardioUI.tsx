@@ -35,9 +35,9 @@ export const CARD_SOFT: React.CSSProperties = {
 };
 export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' };
 export const ROW_TIGHT: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-export const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1 };
-export const LABEL_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 };
-export const HINT: React.CSSProperties = { fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.55 };
+export const LABEL: React.CSSProperties = { fontSize: 11, color: '#fff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1 };
+export const LABEL_SM: React.CSSProperties = { fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 };
+export const HINT: React.CSSProperties = { fontSize: 11, color: '#fff', lineHeight: 1.55 };
 export const HINT_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 };
 export const BTN: React.CSSProperties = {
   padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 750, cursor: 'pointer',
@@ -47,7 +47,7 @@ export const BTN: React.CSSProperties = {
   transition: 'all 0.15s ease',
 };
 export const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'linear-gradient(180deg, rgba(0,230,138,0.22), rgba(0,230,138,0.14))', border: `1px solid ${ACCENT_BORDER}`, color: ACCENT, boxShadow: '0 0 14px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.08)' };
-export const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' };
+export const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' };
 export const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.11)', border: '1px solid rgba(239,68,68,0.32)', color: '#f87171' };
 export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 32, padding: '6px 11px', fontSize: 11, borderRadius: 9 };
 export const BTN_XS: React.CSSProperties = { ...BTN, minHeight: 28, padding: '4px 9px', fontSize: 11, borderRadius: 8 };
@@ -59,7 +59,7 @@ export const INPUT: React.CSSProperties = {
 export const CHIP: React.CSSProperties = {
   padding: '7px 13px', borderRadius: 10, fontSize: 12, fontWeight: 650, cursor: 'pointer',
   border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.035)',
-  color: 'var(--text-dim)', whiteSpace: 'nowrap', minHeight: 36,
+  color: '#fff', whiteSpace: 'nowrap', minHeight: 36,
   transition: 'all 0.15s ease',
 };
 export const CHIP_ACTIVE: React.CSSProperties = {
@@ -111,7 +111,7 @@ export const StatTile: React.FC<{ label: string; value: string; color?: string; 
 );
 
 export const NoteList: React.FC<{ items: string[]; color?: string }> = ({ items, color }) => (
-  <div style={{ fontSize: 10, color: color ?? 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+  <div style={{ fontSize: 10, color: color ?? '#fff', lineHeight: 1.5 }}>
     {items.map((it, i) => <div key={i}>• {it}</div>)}
   </div>
 );
@@ -251,7 +251,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
             background: error ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.05)',
           }}
         />
-        {suffix && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>{suffix}</span>}
+        {suffix && <span style={{ fontSize: 11, color: '#fff' }}>{suffix}</span>}
       </div>
       {error && <span style={{ fontSize: 10, color: '#f87171' }}>⚠ {error}</span>}
     </div>
@@ -334,7 +334,7 @@ export const Stepper: React.FC<{
     >
       +
     </button>
-    {suffix && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{suffix}</span>}
+    {suffix && <span style={{ fontSize: 10, color: '#fff' }}>{suffix}</span>}
   </div>
 );
 
@@ -379,7 +379,7 @@ export const EmptyState: React.FC<{ icon: string; title: string; desc?: string; 
   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 12px', textAlign: 'center' }}>
     <div style={{ fontSize: 28 }}>{icon}</div>
     <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{title}</div>
-    {desc && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', maxWidth: 340, lineHeight: 1.5 }}>{desc}</div>}
+    {desc && <div style={{ fontSize: 11, color: '#fff', maxWidth: 340, lineHeight: 1.5 }}>{desc}</div>}
     {action}
   </div>
 );
@@ -397,7 +397,7 @@ export const Tabs: React.FC<{ tabs: { id: string; label: string; icon?: string }
             flex: '1 0 auto', minWidth: 64, padding: '7px 12px', borderRadius: 9, fontSize: 12, fontWeight: isActive ? 800 : 600,
             border: isActive ? `1px solid ${ACCENT_BORDER}` : '1px solid transparent',
             background: isActive ? ACCENT_SOFT : 'transparent',
-            color: isActive ? '#fff' : 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+            color: isActive ? '#fff' : '#fff', cursor: 'pointer', whiteSpace: 'nowrap',
             boxShadow: isActive ? '0 0 10px rgba(0,230,138,0.12)' : 'none', transition: 'all 0.15s ease',
           }}
         >
@@ -420,7 +420,7 @@ export const Accordion: React.FC<{ id?: string; title: React.ReactNode; defaultO
         }}
         aria-expanded={open}
       >
-        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontSize: 12, color: '#fff' }}>{open ? '▾' : '▸'}</span>
         {icon && <span style={{ fontSize: 15 }}>{icon}</span>}
         <span style={{ fontSize: 13, fontWeight: 850, color: '#fff', flex: 1 }}>{title}</span>
         {badge}

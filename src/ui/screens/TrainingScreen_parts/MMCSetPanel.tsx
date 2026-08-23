@@ -29,7 +29,7 @@ const FIELDS: MMCFieldDef[] = [
 ];
 
 const toneFor = (f: MMCFieldDef, v: number | undefined): string => {
-  if (v === undefined) return 'rgba(255,255,255,0.85)';
+  if (v === undefined) return '#fff';
   const pct = f.higherIsBetter ? (10 - v) / 10 : v / 10;
   return pct <= 0.25 ? '#22c55e' : pct <= 0.5 ? '#84cc16' : pct <= 0.75 ? '#f59e0b' : '#ef4444';
 };
@@ -97,7 +97,7 @@ export const MMCSetPanel: React.FC<MMCSetPanelProps> = ({ exerciseId, exerciseNa
                 toneFn={val => toneFor(f, val)}
               />
               {!compact && (
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{f.hint}</div>
+                <div style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>{f.hint}</div>
               )}
             </div>
           );
@@ -112,7 +112,7 @@ export const MMCSetPanel: React.FC<MMCSetPanelProps> = ({ exerciseId, exerciseNa
             flex: 1, padding: compact ? '6px 10px' : '9px 12px', borderRadius: 8, border: 'none',
             cursor: filled ? 'pointer' : 'not-allowed',
             background: filled ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)',
-            color: filled ? '#000' : 'rgba(255,255,255,0.85)',
+            color: filled ? '#000' : '#fff',
             fontWeight: 800, fontSize: compact ? 10 : 11, minHeight: compact ? 30 : 38,
           }}
         >

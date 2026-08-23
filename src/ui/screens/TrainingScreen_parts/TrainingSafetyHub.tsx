@@ -32,7 +32,7 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
   return (
     <div style={{ color: '#fff', padding: 4 }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginBottom: 2 }}>🛡 Безопасность и нагрузка</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 12, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 12, lineHeight: 1.4 }}>
         Единый контейнер без дублей формул: ортопедия (быстрый чек) + нагрузка + авторегуляция + восстановление. Полный разбор сустава и техники упражнения → <b style={{ color: '#fff' }}>«Суставы и ортопедия»</b> (вкладка рядом, единый инструмент). Кардио-цикл → <b style={{ color: '#fff' }}>Кардио-конструктор</b> (Планировщик), объём → <b style={{ color: '#fff' }}>Объём-хаб</b> (MEV/MAV/MRV). Источники: Foster/Banister/Helms/McGill.
       </div>
 
@@ -43,20 +43,20 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
               padding: '8px 13px', borderRadius: 9, cursor: 'pointer', fontSize: 11, fontWeight: 700,
               border: section === s.id ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
               background: section === s.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-              color: section === s.id ? '#00e68a' : 'rgba(255,255,255,0.6)',
+              color: section === s.id ? '#00e68a' : '#fff',
             }}>
             {s.icon} {s.label}
           </button>
         ))}
       </div>
 
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
         {SECTIONS.find(s => s.id === section)?.desc}
       </div>
 
       {section === 'ortho' && (
         <>
-          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.14)', fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.4 }}>
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.14)', fontSize: 10, color:'#fff', lineHeight: 1.4 }}>
             🦴 Глубокий анализ сустава (JSI, 8 блоков, FMS) и оценка техники упражнения — во вкладке <b style={{ color: '#f43f5e' }}>«Суставы и ортопедия»</b> (единый инструмент, без дублей). Здесь — быстрый орто-чек.
           </div>
           <LoadSafetyCard initialSubTab="ortho" />

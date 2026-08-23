@@ -10,7 +10,7 @@ import { getMappedIds } from '../../../data/exercise-id-mapping';
 import type { Exercise } from '../../../core/types';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 const BG = 'rgba(24,24,27,0.15)';
 const BORDER = 'rgba(255,255,255,0.05)';
 
@@ -191,7 +191,7 @@ export const TechniqueCalcTab: React.FC = () => {
         <button onClick={() => setShowFavOnly(v => !v)} style={filterBtn(showFavOnly)}>⭐ Избранное ({favorites.length})</button>
       </div>
 
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
         {filtered.length} из {group === 'all' ? EXERCISE_CATALOG.length : EXERCISE_CATALOG.filter(e => e.group === group).length} упражнений · {GROUP_RU[group]}{search ? ` · «${search}»` : ''}{showFavOnly ? ' · ⭐ Избранное' : ''}
       </div>
 
@@ -240,7 +240,7 @@ export const TechniqueCalcTab: React.FC = () => {
                 </div>
               </div>
               {ex.technique && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5, marginTop: 8, fontStyle: 'italic' }}>
+                <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginTop: 8, fontStyle: 'italic' }}>
                   {ex.technique.length > 180 ? ex.technique.slice(0, 180) + '…' : ex.technique}
                 </div>
               )}
@@ -264,7 +264,7 @@ export const TechniqueCalcTab: React.FC = () => {
                       <div style={{ height: '100%', width: `${(b.value / b.max) * 100}%`, borderRadius: 4, background: lvl(b.value, b.max), transition: 'width 0.3s' }} />
                     </div>
                     <div style={{ width: 32, textAlign: 'right', fontWeight: 700, color: lvl(b.value, b.max) }}>{b.value}</div>
-                    <div style={{ width: 22, color: 'rgba(255,255,255,0.85)', fontSize: 10 }}>/ {b.max}</div>
+                    <div style={{ width: 22, color: '#fff', fontSize: 10 }}>/ {b.max}</div>
                   </div>
                 ))}
 
@@ -272,7 +272,7 @@ export const TechniqueCalcTab: React.FC = () => {
                 {technique ? (
                   <>
                     <div style={sectionTitle}>🎯 Полный разбор техники</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.7 }}>
+                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.7 }}>
                       <p style={{ margin: '0 0 8px', fontWeight: 700, color: ACCENT }}>Исходное положение:</p>
                       {technique.setup.map((s: string, i: number) => <div key={i} style={{ marginBottom: 3 }}>{i + 1}. {s}</div>)}
                       <p style={{ margin: '10px 0 8px', fontWeight: 700, color: ACCENT }}>Выполнение:</p>
@@ -290,7 +290,7 @@ export const TechniqueCalcTab: React.FC = () => {
                 ) : ex.technique ? (
                   <>
                     <div style={sectionTitle}>🎯 Техника выполнения</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{ex.technique}</div>
+                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{ex.technique}</div>
                   </>
                 ) : null}
 
@@ -321,7 +321,7 @@ export const TechniqueCalcTab: React.FC = () => {
                     {errors.map((e: any, i: number) => (
                       <div key={i} style={{ marginBottom: 6, padding: '8px 10px', background: 'rgba(239,68,68,0.05)', borderRadius: 6, border: '1px solid rgba(239,68,68,0.1)' }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171' }}>{e.error}</div>
-                        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 2 }}>Причина: {e.cause}</div>
+                        <div style={{ fontSize: 10, color:'#fff', marginTop: 2 }}>Причина: {e.cause}</div>
                         <div style={{ fontSize: 10, color: '#22c55e', marginTop: 2 }}>Исправление: {e.fix}</div>
                       </div>
                     ))}
@@ -437,7 +437,7 @@ export const TechniqueCalcTab: React.FC = () => {
                     return (
                       <div key={i} style={{ flex: 1, textAlign: 'center', background: `${colors[i]}14`, borderRadius: 8, padding: '6px 4px', border: `1px solid ${colors[i]}22` }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: colors[i] }}>{sec === 0 ? 'X' : sec}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{labels[i]}</div>
+                        <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{labels[i]}</div>
                         <div style={{ fontSize: 10, color: colors[i] }}>{i === 0 ? `${sec}c` : i === 2 ? (sec === 0 ? 'взрыв' : `${sec}c`) : `${sec}c`}</div>
                       </div>
                     );
@@ -503,7 +503,7 @@ export const TechniqueCalcTab: React.FC = () => {
                 {ex.comments && (
                   <>
                     <div style={sectionTitle}>💬 Комментарий</div>
-                    <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.5, fontStyle: 'italic' }}>{ex.comments}</div>
+                    <div style={{ fontSize: 10, color:'#fff', lineHeight: 1.5, fontStyle: 'italic' }}>{ex.comments}</div>
                   </>
                 )}
 

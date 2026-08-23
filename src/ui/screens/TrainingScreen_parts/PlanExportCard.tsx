@@ -17,7 +17,7 @@ import type { ManualResult, ManualDay } from './program-types';
 import { GROUP_RU, LEVELS, GOALS } from './program-types';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 const CARD: React.CSSProperties = {
   background: 'rgba(24,24,27,0.5)',
   borderRadius: 12,
@@ -337,7 +337,7 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
           {criticals.length > 0 && (
             <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>
               🔴 {criticals.length} критических:
-              {criticals.slice(0, 3).map((c, i) => <div key={i} style={{ fontSize: 10, fontWeight: 400, color:'rgba(255,255,255,0.9)', marginLeft: 12 }}>{c.message}</div>)}
+              {criticals.slice(0, 3).map((c, i) => <div key={i} style={{ fontSize: 10, fontWeight: 400, color:'#fff', marginLeft: 12 }}>{c.message}</div>)}
             </div>
           )}
           {warnings.length > 0 && (

@@ -37,7 +37,7 @@ export const ExerciseLabPicker: React.FC<{
           fontSize: 11, 
           textAlign: 'left', 
           cursor: 'pointer', 
-          color: value ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.85)', 
+          color: value ? '#fff' : '#fff', 
           background: 'rgba(118,118,128,0.12)',
           border: '0.5px solid rgba(255,255,255,0.1)',
           borderRadius: 12,

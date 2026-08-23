@@ -846,9 +846,9 @@ return (
             <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>
               🧪 Лабораторная коррекция плана (MRV ×{labAdjust.mrvMultiplier.toFixed(2)})
             </div>
-            {labAdjust.intensityNote && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{labAdjust.intensityNote}</div>}
+            {labAdjust.intensityNote && <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>{labAdjust.intensityNote}</div>}
             {labAdjust.warnings.length > 0 && (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
                 {labAdjust.warnings.map((w, i) => <div key={i}>• {w}</div>)}
               </div>
             )}
@@ -909,7 +909,7 @@ return (
           <div style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', marginBottom: 3 }}>
             🏆 ПЛ PRO: диагностика, мёртвые точки и инструменты
           </div>
-          <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color:'#fff', marginBottom: 8 }}>
             Анализ применяется только как рекомендация и добавление ассистентов. Исходные упражнения и процентовки ПЛ-цикла не изменяются.
           </div>
           <PlannerToolsPanel mode="pl" />
@@ -1296,7 +1296,7 @@ return (
                         textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
                         background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                         border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : isOcc ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.85)',
+                        color: isSel ? ACCENT : isOcc ? '#fff' : '#fff',
                         minHeight: 44,
                       }}
                     >
@@ -1326,7 +1326,7 @@ return (
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
                         padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11,
                         background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                        color: 'rgba(255,255,255,0.85)', minHeight: 44,
+                        color: '#fff', minHeight: 44,
                       }}
                     >
                       <span>{si + 1}. {s.name || `День ${si + 1}`}</span>
@@ -1630,7 +1630,7 @@ return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <button type="button" onClick={() => setProgFavOnly(v => !v)} style={{
                     padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',
-                    background: progFavOnly ? 'var(--accent)' : 'var(--bg-secondary)', color: progFavOnly ? '#000' : 'var(--text-dim)', border: 'none',
+                    background: progFavOnly ? 'var(--accent)' : 'rgba(255,255,255,0.04)', color: progFavOnly ? '#000' : '#fff', border: 'none',
                   }}>
                     ⭐ Избранное ({progFavs.length})
                   </button>
@@ -1696,7 +1696,7 @@ return (
         <>
            <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #3b82f6', background: 'rgba(59,130,246,0.06)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>⚡ Powerbuilder (Hybrid)</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>Гибрид ПЛ+ББ — редактируйте ПЛ и ББ части независимо. Баланс дней: {program.hybrid.plRef?.sessionIndices?.length ?? 2} ПЛ + {Math.max(1, program.meta.daysPerWeek - (program.hybrid.plRef?.sessionIndices?.length ?? 2))} ББ = {program.meta.daysPerWeek}д/нед × {program.meta.weeks} нед.</div>
+            <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>Гибрид ПЛ+ББ — редактируйте ПЛ и ББ части независимо. Баланс дней: {program.hybrid.plRef?.sessionIndices?.length ?? 2} ПЛ + {Math.max(1, program.meta.daysPerWeek - (program.hybrid.plRef?.sessionIndices?.length ?? 2))} ББ = {program.meta.daysPerWeek}д/нед × {program.meta.weeks} нед.</div>
           </div>
           {(() => {
             const isEmptyHybridBb = (bbw: any[]) => bbw.length===0 || bbw.some(w=> (w.sessions??[]).length===0 || w.sessions.some((s:any)=> !(s.blocks??[]).some((b:any)=> b.exerciseName && b.exerciseName.trim())));

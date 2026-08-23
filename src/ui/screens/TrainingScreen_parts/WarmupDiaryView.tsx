@@ -80,7 +80,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
     } catch { /* SSR/блокировка — игнор */ }
   }, [log, adherence, quality, insights, skipCounts]);
 
-  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 10, minHeight: 36 };
+  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>
@@ -90,7 +90,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
           <div style={{ fontSize: 13, fontWeight: 800, color: WARMUP_COLOR }}>🔥 Разминка</div>
           <span style={{ fontSize: 9, color: DIM }}>Приверженность и качество разминки — из дневника и сессий</span>
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
           Разминочные пирамиды генерируются автоматически (единый канон: гриф 20кг×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1).
           Здесь — только факт: выполнена ли разминка, качество 1-5, причины пропуска. Вкладка только отображает — план не меняется.
         </div>
@@ -114,12 +114,12 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
           const prep = collectGroupPrep(groups, true);
           return (
             <div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>
                 🎯 {planDay.name || 'Тренировка'} · зоны: <b style={{ color: '#fff' }}>{prepGroupLabels(groups)}</b>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
                 {joints.slice(0, 6).map(j => (
-                  <span key={j.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(249,115,22,0.1)', color: 'rgba(255,255,255,0.85)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                  <span key={j.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(249,115,22,0.1)', color: '#fff', border: '1px solid rgba(249,115,22,0.25)' }}>
                     {warmupLabel(j.id)}{j.note ? ` — ${j.note}` : ''}
                   </span>
                 ))}
@@ -153,27 +153,27 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Записей</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: WARMUP_COLOR }}>{adherence.total}</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Приверженность</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: adherence.pct >= 80 ? '#22c55e' : adherence.pct >= 50 ? '#f59e0b' : '#ef4444' }}>
                   {adherence.total > 0 ? `${adherence.pct}%` : '—'}
                 </div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Ср. качество</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#a78bfa' }}>{quality.count > 0 ? quality.avg.toFixed(1) : '—'}</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Выполнено дней</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a' }}>{adherence.done}</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Серия</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: streak >= 3 ? '#22c55e' : streak > 0 ? '#f59e0b' : 'var(--text-dim)' }}>{streak > 0 ? `${streak} дн` : '—'}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: streak >= 3 ? '#22c55e' : streak > 0 ? '#f59e0b' : '#fff' }}>{streak > 0 ? `${streak} дн` : '—'}</div>
               </div>
             </div>
             {quality.count >= 2 && (
@@ -207,7 +207,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Связь качества разминки и e1RM сессии (n={link.n}):</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {link.buckets.map(b => (
-                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                       <div style={{ fontSize: 8, color: DIM }}>{b.range}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgE1RM} кг` : '—'}</div>
                       <div style={{ fontSize: 8, color: DIM }}>{b.n} сессий</div>
@@ -224,7 +224,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Причины пропуска:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {skipCounts.map(([reason, n]) => (
-                    <span key={reason} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                    <span key={reason} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#fff', border: '1px solid rgba(239,68,68,0.25)' }}>
                       {reason} · {n}×
                     </span>
                   ))}
@@ -241,7 +241,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
           💡 Персональные инсайты
         </div>
         {insights.map((s, i) => (
-          <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.04)', borderLeft: '2px solid rgba(249,115,22,0.4)', marginBottom: 4 }}>
+          <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.04)', borderLeft: '2px solid rgba(249,115,22,0.4)', marginBottom: 4 }}>
             {s}
           </div>
         ))}
@@ -255,7 +255,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {[...log].reverse().slice(0, 10).map(e => (
-              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, padding: '5px 8px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
                 <span style={{ color: DIM, minWidth: 64 }}>{e.date.slice(5).replace('-', '.')}</span>
                 <span style={{ fontWeight: 700, color: e.done ? '#22c55e' : '#ef4444' }}>{e.done ? '✓ выполнена' : '✕ пропущена'}</span>
                 {e.quality !== null && <span style={{ color: '#a78bfa' }}>качество {e.quality}/5</span>}

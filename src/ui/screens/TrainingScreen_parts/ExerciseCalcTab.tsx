@@ -11,7 +11,7 @@ import { getTargetMuscleForExercise, getTargetMusclesByGroup } from '../../../da
 import type { Exercise } from '../../../core/types';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color:'rgba(255,255,255,0.9)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color:'#fff', fontSize: 11, lineHeight: 1.4 };
 const CARD: React.CSSProperties = { padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' };
 
 const GROUPS = ['all', 'chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
@@ -874,11 +874,11 @@ export const ExerciseCalcTab: React.FC = () => {
       {/* Weak point + compare toggles */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <button onClick={() => setWeakToggle(v => !v)}
-          style={{ padding: '6px 12px', borderRadius: 6, border: weakToggle ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.15)', background: weakToggle ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.04)', color: weakToggle ? ACCENT : 'var(--text-dim)', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
+          style={{ padding: '6px 12px', borderRadius: 6, border: weakToggle ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.15)', background: weakToggle ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.04)', color: weakToggle ? ACCENT : '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
           🎯 Слабая группа {weakToggle ? '(вкл)' : '(выкл)'}
         </button>
         <button onClick={() => setCompareMode(v => !v)}
-          style={{ padding: '6px 12px', borderRadius: 6, border: compareMode ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.15)', background: compareMode ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.04)', color: compareMode ? ACCENT : 'var(--text-dim)', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
+          style={{ padding: '6px 12px', borderRadius: 6, border: compareMode ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.15)', background: compareMode ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.04)', color: compareMode ? ACCENT : '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 11 }}>
           ⚖ Сравнить {compareMode ? '(вкл)' : '(выкл)'}
         </button>
         {isDeload && <span style={{ padding: '6px 12px', borderRadius: 6, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 11, fontWeight: 700 }}>⚠ ДЕЛОАД (фаза {phase})</span>}
@@ -991,12 +991,12 @@ export const ExerciseCalcTab: React.FC = () => {
                   <div style={{ ...SMALL, fontSize: 10, marginTop: 2 }}>Лучшая цель: {resistanceProfile.bestGoal === 'hypertrophy' ? 'Гипертрофия' : resistanceProfile.bestGoal === 'strength' ? 'Сила' : 'Насос/пампинг'}</div>
                 </div>
               </div>
-              <div style={{ ...SMALL, fontSize: 10, marginTop: 6, lineHeight: 1.5, color: 'rgba(255,255,255,0.7)' }}>
+              <div style={{ ...SMALL, fontSize: 10, marginTop: 6, lineHeight: 1.5, color: '#fff' }}>
                 {resistanceProfile.desc}
               </div>
               <div style={{ marginTop: 6, padding: '6px 8px', background: 'rgba(0,0,0,0.12)', borderRadius: 4, borderLeft: `3px solid ${resistanceProfile.curve === 'stretch_mediated' ? '#22c55e' : resistanceProfile.curve === 'mid_range' ? '#60a5fa' : '#f59e0b'}` }}>
                 <div style={{ ...SMALL, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>🎯 Стиль повторений</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginTop: 1 }}>{resistanceProfile.repStyle}</div>
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 1 }}>{resistanceProfile.repStyle}</div>
               </div>
               {/* Mini SVG curve visualization */}
               <div style={{ marginTop: 6 }}>
@@ -1154,7 +1154,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     return (
                       <g key={t}>
                         <line x1={pad} y1={y} x2={svgW - pad} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
-                        <text x={pad - 4} y={y + 3} textAnchor="end" fill="rgba(255,255,255,0.85)" fontSize={6}>{val}</text>
+                        <text x={pad - 4} y={y + 3} textAnchor="end" fill="#fff" fontSize={6}>{val}</text>
                       </g>
                     );
                   })}
@@ -1164,7 +1164,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     <g key={i}>
                       <circle cx={toX(i)} cy={toY(p.weight, wMax)} r={2} fill="#60a5fa" />
                       {i % Math.max(1, Math.ceil(projections.length / 10)) === 0 && (
-                        <text x={toX(i)} y={svgH - pad + 10} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={6}>{p.w}</text>
+                        <text x={toX(i)} y={svgH - pad + 10} textAnchor="middle" fill="#fff" fontSize={6}>{p.w}</text>
                       )}
                     </g>
                   ))}
@@ -1180,7 +1180,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     const x = toX(p.w) - 8;
                     return <rect key={`dl-${i}`} x={x} y={pad - 4} width={16} height={svgH - pad * 2 + 4} fill="rgba(239,68,68,0.12)" rx={2} />;
                   })}
-                  <text x={svgW / 2} y={svgH - 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={7}>Неделя</text>
+                  <text x={svgW / 2} y={svgH - 2} textAnchor="middle" fill="#fff" fontSize={7}>Неделя</text>
                 </svg>
                 <div style={{ display: 'flex', gap: 10, fontSize: 10, marginTop: 2, flexWrap: 'wrap' }}>
                   <span style={{ color: '#60a5fa' }}>— Вес (кг)</span>
@@ -1250,7 +1250,7 @@ export const ExerciseCalcTab: React.FC = () => {
           {weakPointAdvice && (
             <div style={{ marginTop: 12, padding: 12, borderRadius: 8, border: `1px solid ${weakPointAdvice.color}33`, background: `${weakPointAdvice.color}0a` }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: weakPointAdvice.color }}>🎯 Объём (MEV/MAV/MRV)</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{weakPointAdvice.advice}</div>
+              <div style={{ fontSize: 11, color: '#fff', marginTop: 2 }}>{weakPointAdvice.advice}</div>
               <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
                 <div style={{ ...SMALL, fontSize: 10 }}>MEV: {weakPointAdvice.mev}</div>
                 <div style={{ ...SMALL, fontSize: 10 }}>MAV: {weakPointAdvice.mav}</div>
@@ -1295,7 +1295,7 @@ export const ExerciseCalcTab: React.FC = () => {
                 {ex.technique && (
                   <div style={{ marginBottom: 8, padding: 10, background: 'rgba(0,0,0,0.15)', borderRadius: 6, borderLeft: `3px solid ${ACCENT}` }}>
                     <div style={{ ...SMALL, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>🎯 Техника выполнения</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>{ex.technique}</div>
+                    <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5 }}>{ex.technique}</div>
                   </div>
                 )}
 
@@ -1312,7 +1312,7 @@ export const ExerciseCalcTab: React.FC = () => {
                 {ex.comments && (
                   <ExpandableCard title="📝 Комментарий эксперта" accent="#818cf8"
                     short={ex.comments.length > 80 ? ex.comments.slice(0, 80) + '…' : ex.comments}
-                    full={<div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.55 }}>{ex.comments}</div>}
+                    full={<div style={{ fontSize: 11, color: '#fff', lineHeight: 1.55 }}>{ex.comments}</div>}
                   />
                 )}
 
@@ -1320,7 +1320,7 @@ export const ExerciseCalcTab: React.FC = () => {
                 <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
                   <div style={{ padding: 8, background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
                     <div style={{ ...SMALL, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>🔗 Позиция в тренировке</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: '#fff', marginTop: 2 }}>
                       {ex.jointStress === 'high' && ex.fatigueCost >= 8 ? '1-е упражнение (самое энергозатратное, требует свежести)' :
                        ex.type === 'compound' ? '1-2-е упражнение (после разминки, до изоляции)' :
                        ex.fatigueCost <= 4 ? 'В конец тренировки (добивка / финишёр)' :
@@ -1329,7 +1329,7 @@ export const ExerciseCalcTab: React.FC = () => {
                   </div>
                   <div style={{ padding: 8, background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
                     <div style={{ ...SMALL, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>🤝 Пара для суперсета</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: '#fff', marginTop: 2 }}>
                       {fvMusclePairs[fv] || 'не определена'}
                       {fv !== 'core_anti' && fv !== 'other' ? ' — 0 отдыха между, 60-90с после пары' : ''}
                     </div>
@@ -1347,7 +1347,7 @@ export const ExerciseCalcTab: React.FC = () => {
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '3px 0' }}>
                             <span style={{ padding: '1px 6px', borderRadius: 3, background: 'rgba(0,230,138,0.1)', color: ACCENT, fontSize: 10 }}>{opt.type}</span>
                           </div>
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.45 }}>{opt.reason}</div>
+                          <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{opt.reason}</div>
                           <div style={{ fontSize: 10, color: '#fb923c', marginTop: 2 }}>{opt.scheme}</div>
                         </div>
                       ))}
@@ -1405,7 +1405,7 @@ export const ExerciseCalcTab: React.FC = () => {
                         <ExpandableCard title="🦴 Анатомия и функция" accent="#60a5fa"
                           short={`${tm.anatomy.slice(0, 100)}... · Волокна: ${tm.fiberDominance === 'fast' ? 'быстрые' : tm.fiberDominance === 'slow' ? 'медленные' : 'смешанные'}`}
                           full={
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                               <div>{tm.anatomy}</div>
                               <div style={{ marginTop: 4, color: tm.fiberDominance === 'fast' ? '#f59e0b' : tm.fiberDominance === 'slow' ? '#60a5fa' : '#a855f7' }}>
                                 <b>Волокна:</b> {tm.fiberDominance === 'fast' ? 'Быстрые (IIx/IIa) — взрыв, сила, масса. Отвечают на 5-10 повт с тяжёлым весом.' : tm.fiberDominance === 'slow' ? 'Медленные (I) — выносливость. Отвечают на 15-25+ повт, 2-3×/нед.' : 'Смешанные — комбинируйте 5-8 (тяжёлые) и 12-20 (пампинг) повт.'}
@@ -1416,14 +1416,14 @@ export const ExerciseCalcTab: React.FC = () => {
                         />
                         <ExpandableCard title="🧠 Нейромышечная связь (как почувствовать)" accent="#a855f7"
                           short={tm.mmc.slice(0, 130) + '...'}
-                          full={<div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{tm.mmc}</div>}
+                          full={<div style={{ fontSize: 10, color: '#fff', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{tm.mmc}</div>}
                         />
                         <ExpandableCard title="🔧 Подсказки по технике (под эту мышцу)" accent={ACCENT}
                           short={`${tm.techniqueCues[0]} · ${tm.techniqueCues[1] || ''}${tm.techniqueCues.length > 2 ? ` + ещё ${tm.techniqueCues.length - 2}` : ''}`}
                           full={
                             <div style={{ display: 'grid', gap: 4 }}>
                               {tm.techniqueCues.map((cue, i) => (
-                                <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', padding: '4px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 4, lineHeight: 1.45 }}>
+                                <div key={i} style={{ fontSize: 10, color: '#fff', padding: '4px 8px', background: 'rgba(0,230,138,0.05)', borderRadius: 4, lineHeight: 1.45 }}>
                                   <span style={{ color: ACCENT, fontWeight: 700 }}>{i + 1}.</span> {cue}
                                 </div>
                               ))}
@@ -1444,7 +1444,7 @@ export const ExerciseCalcTab: React.FC = () => {
                           full={
                             <div style={{ display: 'grid', gap: 3 }}>
                               {tm.commonMistakes.map((m, i) => (
-                                <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', padding: '3px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 4, lineHeight: 1.4 }}>
+                                <div key={i} style={{ fontSize: 10, color: '#fff', padding: '3px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 4, lineHeight: 1.4 }}>
                                   <span style={{ color: '#ef4444', fontWeight: 700 }}>✕</span> {m}
                                 </div>
                               ))}
@@ -1453,7 +1453,7 @@ export const ExerciseCalcTab: React.FC = () => {
                         />
                         <div style={{ padding: 8, background: 'rgba(168,85,247,0.06)', borderRadius: 6, border: '1px solid rgba(168,85,247,0.15)' }}>
                           <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, color: '#a855f7', marginBottom: 2 }}>📍 Региональный акцент</div>
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{tm.regionalEmphasis}</div>
+                          <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>{tm.regionalEmphasis}</div>
                         </div>
                       </div>
                     </div>
@@ -1463,7 +1463,7 @@ export const ExerciseCalcTab: React.FC = () => {
                 {/* 📈 Progression Strategy */}
                 <div style={{ marginTop: 8, padding: 10, background: 'rgba(34,197,94,0.06)', borderRadius: 6, border: '1px solid rgba(34,197,94,0.15)' }}>
                   <div style={{ ...SMALL, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>📈 Стратегия прогрессии для {goal === 'hypertrophy' ? 'гипертрофии' : goal === 'strength' ? 'силы' : goal}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.6 }}>
                     {goal === 'hypertrophy' || goal === 'bulk' ? (
                       <span>🔹 <b>Двойная прогрессия:</b> сначала доведите повторы до верхней границы ({formatRepsRange(goal, ex.type === 'compound')}), затем повышайте вес на 2.5-5 кг, начиная с нижней границы.
                       <br />🔹 <b>Когда повышать вес:</b> сделали все подходы на верхней границе диапазона с RIR {presc?.rir} → добавляйте 2.5 кг (изоляция) или 5 кг (базовое).
@@ -1488,7 +1488,7 @@ export const ExerciseCalcTab: React.FC = () => {
                 {weakToggle && (
                   <div style={{ marginTop: 8, padding: 10, background: 'rgba(245,158,11,0.06)', borderRadius: 6, border: '1px solid rgba(245,158,11,0.2)' }}>
                     <div style={{ ...SMALL, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>🎯 Тактика для отстающей группы</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.6 }}>
                       {ex.group === 'chest' && '🔸 Ставьте это упражнение ПЕРВЫМ в тренировку груди (максимум энергии).\n🔸 После основного подхода — дроп-сет (−20% вес, до отказа) или.myoreps (15 активационных + 3×3 мини-сетов с 5с отдыха).\n🔸 В день ног — изолируйте грудные в начале, а не после жимов.'}
                       {ex.group === 'back' && '🔸 Для широчайших: подтягивания/тяга верхнего блока — первыми. Фокус на сведении лопаток в каждом повторе.\n🔸 Добавьте 1-2 изолирующих подхода после основных (пуловер или тяга прямыми руками).\n🔸 Работайте хватом: узкий → широчайшие, широкий → ромбовидные.'}
                       {ex.group === 'legs' && '🔸 Квадрицепсы отстают: фронтальные приседания или гакк-присед перед классическими.\n🔸 Задняя поверхность: румынская тяга + сгибания ног — обязательная пара.\n🔸 Добавьте 1 подход выпадов в конце тренировки ног для баланса.'}
@@ -1510,7 +1510,7 @@ export const ExerciseCalcTab: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 4 }}>
                 {warmupRamp.steps.map((s, i) => (
                   <div key={i} style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, borderLeft: i === warmupRamp.steps.length - 1 ? `2px solid ${ACCENT}` : '2px solid transparent' }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{s.label}</div>
+                    <div style={{ fontSize: 10, color: '#fff' }}>{s.label}</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: i === warmupRamp.steps.length - 1 ? ACCENT : '#fb923c' }}>{s.weight} кг</div>
                     <div style={{ ...SMALL, fontSize: 10 }}>{s.reps} повт · {s.pct}% раб. веса</div>
                   </div>
@@ -1532,7 +1532,7 @@ export const ExerciseCalcTab: React.FC = () => {
             {bfrSuitability && (
               <div style={{ padding: 10, background: bfrSuitability.suitable ? 'rgba(168,85,247,0.06)' : 'rgba(239,68,68,0.06)', borderRadius: 8, border: `1px solid ${bfrSuitability.suitable ? 'rgba(168,85,247,0.2)' : 'rgba(239,68,68,0.15)'}` }}>
                 <div style={{ ...SMALL, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>🔴 BFR-тренинг</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: bfrSuitability.suitable ? '#a855f7' : 'rgba(255,255,255,0.6)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: bfrSuitability.suitable ? '#a855f7' : '#fff' }}>
                   {bfrSuitability.suitable ? '✅ Подходит' : '❌ Не подходит'}
                 </div>
                 <div style={{ ...SMALL, fontSize: 10 }}>{bfrSuitability.note.slice(0, 80)}</div>
@@ -1563,7 +1563,7 @@ export const ExerciseCalcTab: React.FC = () => {
           {oneRMHistory && (
             <div style={{ marginTop: 14, padding: 12, background: 'rgba(34,197,94,0.06)', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>📈 Тренд 1ПМ — {ex?.name}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
                 {oneRMHistory.length} записей · {oneRMHistory[0].date} → {oneRMHistory[oneRMHistory.length - 1].date}
                 · {(() => { const d = oneRMHistory[oneRMHistory.length - 1].oneRM - oneRMHistory[0].oneRM; return `${d >= 0 ? '+' : ''}${d.toFixed(1)} кг`; })()}
               </div>
@@ -1585,7 +1585,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     {pts.filter((_, i) => i % Math.max(1, Math.floor(pts.length / 6)) === 0 || i === pts.length - 1).map((p, i) => (
                       <g key={i}>
                         <circle cx={toX(pts.indexOf(p))} cy={toY(p.oneRM)} r={2.5} fill="#22c55e" />
-                        <text x={toX(pts.indexOf(p))} y={svgH - pad + 10} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={6}>{p.date.slice(5)}</text>
+                        <text x={toX(pts.indexOf(p))} y={svgH - pad + 10} textAnchor="middle" fill="#fff" fontSize={6}>{p.date.slice(5)}</text>
                       </g>
                     ))}
                   </svg>
@@ -1622,7 +1622,7 @@ export const ExerciseCalcTab: React.FC = () => {
                 </div>
               </div>
               <div style={{ padding: 8, background: 'rgba(0,0,0,0.1)', borderRadius: 6, borderLeft: `3px solid ${fatigueAnalysis.cnsLoad >= 7 || fatigueAnalysis.muscularLoad >= 7 ? '#ef4444' : fatigueAnalysis.cnsLoad >= 4 || fatigueAnalysis.muscularLoad >= 4 ? '#f59e0b' : '#22c55e'}` }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{fatigueAnalysis.advice}</div>
+                <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>{fatigueAnalysis.advice}</div>
               </div>
             </div>
           )}

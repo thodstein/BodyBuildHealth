@@ -13,7 +13,7 @@ import {
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.85)';
+const DIM = '#fff';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 13, width: '100%', boxSizing: 'border-box' as const };
 const LABEL: React.CSSProperties = { fontSize: 10, color: DIM, margin: '6px 0 3px', fontWeight: 700 };
@@ -100,7 +100,7 @@ export const CheckinMetricsCard: React.FC = () => {
         <button style={{ ...btn, marginTop: 10 }} onClick={submit}>💾 Сохранить чек-ин</button>
         {saved && <div style={{ fontSize: 10, color: ACCENT, marginTop: 6, textAlign: 'center' }}>✓ Сохранено. Сегодня: {today.date} {synced ? '· вес/сон/пульс записаны в дневники профиля' : ''}</div>}
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить готовность (из чек-ина) к планировщику: сон {form.sleepHours || 0}ч, HRV {form.hrvMs || 0}, боль {form.subjectiveSoreness || 0}/5, стресс {form.subjectiveStress || 0}/5 → корректировка объёма.</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить готовность (из чек-ина) к планировщику: сон {form.sleepHours || 0}ч, HRV {form.hrvMs || 0}, боль {form.subjectiveSoreness || 0}/5, стресс {form.subjectiveStress || 0}/5 → корректировка объёма.</div>
           <button onClick={() => { const e = form.subjectiveEnergy || 3; const s = form.subjectiveSoreness || 1; const st = form.subjectiveStress || 1; const mult = (s >= 4 || st >= 4 || e <= 2) ? 0.85 : (s >= 3 || st >= 3 || e <= 3) ? 0.93 : 1; const rsh = s >= 4 ? 1 : 0; applyToPlanner({ kind: 'pri', label: 'Чек-ин: готовность → объём ×' + mult + ', RIR +' + rsh, data: { volumeMult: mult, rirShift: rsh } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить готовность к планировщику</button>
         </div>
       </div>

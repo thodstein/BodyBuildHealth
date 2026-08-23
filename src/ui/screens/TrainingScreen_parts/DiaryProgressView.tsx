@@ -24,12 +24,12 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
-              <div><label style={{ fontSize: 10 }}>Вес</label><input type="number" value={mWeight} onChange={e => setMWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} /></div>
-              <div><label style={{ fontSize: 10 }}>Талия</label><input type="number" value={mWaist} onChange={e => setMWaist(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} /></div>
-              <div><label style={{ fontSize: 10 }}>Грудь</label><input type="number" value={mChest} onChange={e => setMChest(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} /></div>
-              <div><label style={{ fontSize: 10 }}>Бицепс</label><input type="number" value={mArm} onChange={e => setMArm(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} /></div>
-              <div><label style={{ fontSize: 10 }}>Бедро</label><input type="number" value={mThigh} onChange={e => setMThigh(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} /></div>
-              <div><label style={{ fontSize: 10 }}>Дата</label><input type="date" value={mDate || ''} onChange={e => setMDate(e.target.value)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 11, boxSizing: 'border-box' }} /></div>
+              <div><label style={{ fontSize: 10 }}>Вес</label><input type="number" value={mWeight} onChange={e => setMWeight(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} /></div>
+              <div><label style={{ fontSize: 10 }}>Талия</label><input type="number" value={mWaist} onChange={e => setMWaist(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} /></div>
+              <div><label style={{ fontSize: 10 }}>Грудь</label><input type="number" value={mChest} onChange={e => setMChest(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} /></div>
+              <div><label style={{ fontSize: 10 }}>Бицепс</label><input type="number" value={mArm} onChange={e => setMArm(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} /></div>
+              <div><label style={{ fontSize: 10 }}>Бедро</label><input type="number" value={mThigh} onChange={e => setMThigh(parseFloat(e.target.value) || 0)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} /></div>
+              <div><label style={{ fontSize: 10 }}>Дата</label><input type="date" value={mDate || ''} onChange={e => setMDate(e.target.value)} style={{ width: '100%', padding: '4px', borderRadius: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, boxSizing: 'border-box' }} /></div>
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={saveMeasurementHandler} style={{ flex: 1, padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer', background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12 }}>Сохранить замер</button>
@@ -77,12 +77,12 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   const delta = first > 0 ? (last - first) : 0;
                   return (
                     <div key={m.label} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px' }}>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>{m.label}</div>
+                      <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>{m.label}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Sparkline data={m.data} width={60} height={18} color={m.color} />
                         <div style={{ fontSize: 10 }}>
                           <div style={{ fontWeight: 700, color: '#fff' }}>{last}{m.unit}</div>
-                          <div style={{ fontSize: 9, color: delta === 0 ? 'rgba(255,255,255,0.85)' : delta > 0 ? '#22c55e' : '#ef4444' }}>
+                          <div style={{ fontSize: 9, color: delta === 0 ? '#fff' : delta > 0 ? '#22c55e' : '#ef4444' }}>
                             {delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`}
                           </div>
                         </div>
@@ -96,7 +96,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {repData && (
             <div className="card" style={{ padding: 10, marginTop: 8 }}>
               <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📋 Недельный отчёт</h4>
-              <div style={{ fontSize: 10, color: 'var(--text-light)' }}>{repData.insights?.slice(0, 3).map((r: any, i: number) => <div key={i}>• {r}</div>)}</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>{repData.insights?.slice(0, 3).map((r: any, i: number) => <div key={i}>• {r}</div>)}</div>
             </div>
           )}
           {/* PR Timeline */}
@@ -124,12 +124,12 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 {prs.map((pr, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                     <div>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{pr.exercise}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{pr.weight}кг × {pr.reps}</div>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#fff' }}>{pr.exercise}</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>{pr.weight}кг × {pr.reps}</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }}>e1RM {pr.e1rm}</div>
-                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{pr.date.slice(0, 10)}</div>
+                      <div style={{ fontSize: 8, color: '#fff' }}>{pr.date.slice(0, 10)}</div>
                     </div>
                   </div>
                 ))}
@@ -167,7 +167,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                   {top.map(ex => (
                     <div key={ex.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px' }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.id}</div>
+                      <div style={{ fontSize: 9, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.id}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Sparkline data={ex.data} width={50} height={16} color={ex.delta >= 0 ? '#22c55e' : '#ef4444'} />
                         <div style={{ fontSize: 10, fontWeight: 700, color: ex.delta >= 0 ? '#22c55e' : '#ef4444' }}>
@@ -205,7 +205,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🏆 Календарь PR ({prDays.size} дней за {weeks} нед)</h4>
                 <div style={{ display: 'flex', gap: 2 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginRight: 2 }}>
-                    {dayLabels.map((l, i) => <div key={i} style={{ height: 10, fontSize: 7, color: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center' }}>{l}</div>)}
+                    {dayLabels.map((l, i) => <div key={i} style={{ height: 10, fontSize: 7, color: '#fff', display: 'flex', alignItems: 'center' }}>{l}</div>)}
                   </div>
                   {Array.from({ length: weeks }, (_, wi) => (
                     <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -264,7 +264,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {pts.map((p, i) => (
                       <g key={i}>
                         <circle cx={p.x} cy={p.y} r={2.5} fill={p.l.color} />
-                        <text x={cx + (R + 12) * Math.cos(p.angle)} y={cy + (R + 12) * Math.sin(p.angle)} textAnchor="middle" dominantBaseline="middle" fill="rgba(255,255,255,0.85)" fontSize={7}>{p.l.name}</text>
+                        <text x={cx + (R + 12) * Math.cos(p.angle)} y={cy + (R + 12) * Math.sin(p.angle)} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize={7}>{p.l.name}</text>
                         {p.l.e1rm > 0 && <text x={p.x} y={p.y - 6} textAnchor="middle" fill={p.l.color} fontSize={7} fontWeight={700}>{p.l.e1rm}</text>}
                       </g>
                     ))}

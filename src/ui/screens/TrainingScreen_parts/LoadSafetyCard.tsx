@@ -90,12 +90,12 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
                     padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer',
                     border: on ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)',
                     background: on ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)',
-                    color: on ? '#f59e0b' : 'rgba(255,255,255,0.6)',
+                    color: on ? '#f59e0b' : '#fff',
                   }}>{ {knee:'Колено',shoulder:'Плечо',lower_back:'Поясница',elbow:'Локоть',wrist:'Кисть',hip:'Таз',ankle:'Голеностоп',neck:'Шея'}[inj] || inj }</button>;
                 })}
               </div>
               <MetricCard title="Ограничения" icon="⚠" accent="#f59e0b">
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
                   {ortho.blockedPatterns.length > 0
                     ? ortho.blockedPatterns.map((g: string) => <div key={g}>• {g}: исключение приоритета, RIR ↑</div>)
                     : <div>Нет ограничений</div>}
@@ -105,10 +105,10 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
                 <PopupSelect label="Степень колена" value={jointLimitations.knee || 'none'} options={['none','mild','moderate','severe'].map(id => ({ id, label: SEVERITY_LABELS[id] }))} onChange={v => setJointLimitations(p => ({ ...p, knee: v as any }))} />
                 <PopupSelect label="Степень плеча" value={jointLimitations.shoulder || 'none'} options={['none','mild','moderate','severe'].map(id => ({ id, label: SEVERITY_LABELS[id] }))} onChange={v => setJointLimitations(p => ({ ...p, shoulder: v as any }))} />
                 <PopupSelect label="Степень поясницы" value={jointLimitations.spine || 'none'} options={['none','mild','moderate','severe'].map(id => ({ id, label: SEVERITY_LABELS[id] }))} onChange={v => setJointLimitations(p => ({ ...p, spine: v as any }))} />
-                <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Текущая боль (через запятую)<input value={currentPain} onChange={e => setCurrentPain(e.target.value)} placeholder="колено, плечо" style={{ width:'100%', marginTop:3, padding:8, boxSizing:'border-box', background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,.1)', borderRadius:7 }} /></label>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>{[['rounding_back','Округление спины'],['butt_wink','Клевок таза']].map(([id,label]) => <button key={id} onClick={() => setTechniqueIssues(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])} style={{ padding:'5px 8px', borderRadius:8, cursor:'pointer', color: techniqueIssues.includes(id) ? '#f59e0b' : 'var(--text-dim)', background: techniqueIssues.includes(id) ? 'rgba(245,158,11,.15)' : 'transparent', border:'1px solid rgba(255,255,255,.1)', fontSize:10 }}>{label}</button>)}</div>
+                <label style={{ fontSize: 10, color: '#fff' }}>Текущая боль (через запятую)<input value={currentPain} onChange={e => setCurrentPain(e.target.value)} placeholder="колено, плечо" style={{ width:'100%', marginTop:3, padding:8, boxSizing:'border-box', background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,.1)', borderRadius:7 }} /></label>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>{[['rounding_back','Округление спины'],['butt_wink','Клевок таза']].map(([id,label]) => <button key={id} onClick={() => setTechniqueIssues(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])} style={{ padding:'5px 8px', borderRadius:8, cursor:'pointer', color: techniqueIssues.includes(id) ? '#f59e0b' : '#fff', background: techniqueIssues.includes(id) ? 'rgba(245,158,11,.15)' : 'transparent', border:'1px solid rgba(255,255,255,.1)', fontSize:10 }}>{label}</button>)}</div>
                 <div style={{ fontSize:10, color:'#f59e0b' }}>Фаза: <b>{ortho.phase}</b> · стресс суставов: {Object.entries(ortho.jointStressLimits).filter(([,v]) => v < 4).map(([k,v]) => `${k} ${v}/4`).join(', ') || 'без ограничений'}</div>
-                {ortho.recommendations.map((r, i) => <div key={i} style={{ fontSize:10, color:'var(--text-dim)' }}>• {r}</div>)}
+                {ortho.recommendations.map((r, i) => <div key={i} style={{ fontSize:10, color:'#fff' }}>• {r}</div>)}
               </div>
             </div>
             <PopupToggle label="Применить ортопедию" value={orthoOn} onChange={setOrthoOn} icon="🔄" />
@@ -126,7 +126,7 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
             <PopupToggle label="Применить распределение" value={weeklyOn} onChange={setWeeklyOn} icon="🔄" />
             <div style={{ gridColumn: '1 / -1' }}>
               <MetricCard title="План недели" icon="📋" accent="#22c55e">
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
                   {dist.weekPlan.map((d, i) => <div key={i}>• Д{i+1}: {d.difficulty === 'hard' ? '🔴 Тяжёлая' : d.difficulty === 'medium' ? '🟡 Средняя' : '🟢 Лёгкая'} · объём {d.volumeTarget}%</div>)}
                 </div>
               </MetricCard>
@@ -171,7 +171,7 @@ export const LoadSafetyCard: React.FC<{ initialSubTab?: SubTab }> = ({ initialSu
             padding: '6px 12px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',
             border: subTab === s.id ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
             background: subTab === s.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-            color: subTab === s.id ? '#00e68a' : 'var(--text-dim)',
+            color: subTab === s.id ? '#00e68a' : '#fff',
           }}>{s.icon} {s.label}</button>
         ))}
       </div>

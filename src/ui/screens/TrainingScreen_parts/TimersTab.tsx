@@ -148,9 +148,9 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
   return (<div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
     <div style={{
       padding: 16, borderRadius: 16, textAlign: 'center',
-      background: 'rgba(24,24,27,0.12)', border: '1px solid var(--glass-border)',
+      background: 'rgba(24,24,27,0.12)', border: '1px solid rgba(255,255,255,0.07)',
     }}>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>
+      <div style={{ fontSize: 11, color: '#fff', marginBottom: 4 }}>
         {phase === 'work' ? 'РАБОТА' : 'ОТДЫХ'} · Раунд {currentRound}/{rounds}
       </div>
       <div style={{
@@ -174,7 +174,7 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {PRESETS.map(preset => (
         <button key={preset.name} onClick={() => applyPreset(preset)} disabled={isRunning}
-          style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'var(--text-dim)' }}>
+          style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff' }}>
           {preset.name}
         </button>
       ))}
@@ -182,19 +182,19 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
 
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
       <div>
-        <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Работа (с)</label>
+        <label style={{ fontSize: 10, color: '#fff' }}>Работа (с)</label>
         <input type="number" min={5} max={600} value={totalSec || ''} onChange={e => { const v = parseInt(e.target.value) || 60; setTotalSec(v); setSettings(s => ({ ...s, work: v })); }} disabled={isRunning}
-          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
       </div>
       <div>
-        <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Отдых (с)</label>
+        <label style={{ fontSize: 10, color: '#fff' }}>Отдых (с)</label>
         <input type="number" min={5} max={600} value={restSec || ''} onChange={e => { const v = parseInt(e.target.value) || 30; setRestSec(v); setSettings(s => ({ ...s, rest: v })); }} disabled={isRunning}
-          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
       </div>
       <div>
-        <label style={{ fontSize: 10, color: 'var(--text-dim)' }}>Раунды</label>
+        <label style={{ fontSize: 10, color: '#fff' }}>Раунды</label>
         <input type="number" min={1} max={20} value={rounds || ''} onChange={e => { const v = parseInt(e.target.value) || 3; setRounds(v); setSettings(s => ({ ...s, rounds: v })); }} disabled={isRunning}
-          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 14, boxSizing: 'border-box' }} />
+          style={{ width: '100%', padding: '8px', borderRadius: 8, textAlign: 'center', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 14, boxSizing: 'border-box' }} />
       </div>
     </div>
 
@@ -213,29 +213,29 @@ export const TimersTab: React.FC<TimersTabProps> = ({ initialSettings }) => {
         </button>
       )}
       <button onClick={skipPhase} disabled={!isRunning}
-        style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border)', cursor: 'pointer',
-          background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 14, opacity: isRunning ? 1 : 0.5 }}>
+        style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+          background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14, opacity: isRunning ? 1 : 0.5 }}>
         ⏭ След.
       </button>
       <button onClick={reset}
-        style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid var(--border)', cursor: 'pointer',
-          background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 14 }}>
+        style={{ padding: '12px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+          background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 14 }}>
         ↺ Сброс
       </button>
     </div>
 
     {roundHistory.length > 0 && (
-      <div style={{ padding: 10, borderRadius: 12, border: '1px solid var(--glass-border)', background: 'rgba(255,255,255,0.03)' }}>
+      <div style={{ padding: 10, borderRadius: 12, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.03)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)' }}>🕓 История раундов</div>
-          <button onClick={() => setRoundHistory([])} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }}>Очистить</button>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>🕓 История раундов</div>
+          <button onClick={() => setRoundHistory([])} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#fff', cursor: 'pointer' }}>Очистить</button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 6, maxHeight: 140, overflowY: 'auto' }}>
           {roundHistory.map((r, i) => (
             <div key={i} style={{ padding: 6, borderRadius: 8, background: r.phase === 'work' ? 'rgba(0,230,138,0.08)' : 'rgba(59,130,246,0.08)', border: '1px solid ' + (r.phase === 'work' ? 'rgba(0,230,138,0.18)' : 'rgba(59,130,246,0.18)') }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: r.phase === 'work' ? 'var(--accent)' : '#60a5fa' }}>Раунд {r.round}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{r.phase === 'work' ? 'РАБОТА' : 'ОТДЫХ'} · {r.duration}с</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{r.timestamp}</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>{r.phase === 'work' ? 'РАБОТА' : 'ОТДЫХ'} · {r.duration}с</div>
+              <div style={{ fontSize: 9, color: '#fff' }}>{r.timestamp}</div>
             </div>
           ))}
         </div>

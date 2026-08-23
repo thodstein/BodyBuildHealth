@@ -70,14 +70,14 @@ export const ConfirmDialogProvider: React.FC<{ children: ReactNode }> = ({ child
                 {danger ? '⚠ ' : ''}{state.options.title}
               </div>
             )}
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 16 }}>
               {state.options.message}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 ref={cancelRef}
                 onClick={() => handleClose(false)}
-                style={{ ...BTN_GHOST, flex: 1, borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)' }}
+                style={{ ...BTN_GHOST, flex: 1, borderColor: 'rgba(255,255,255,0.15)', color: '#fff' }}
               >
                 {state.options.cancelLabel || 'Отмена'}
               </button>

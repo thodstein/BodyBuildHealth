@@ -430,7 +430,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
           <span style={{ fontSize: 10, color: DIM, alignSelf: 'center', lineHeight: 1.3 }}>{isMobile ? 'Тап по фазе → тап по неделе — быстрый ввод' : 'Drag&Drop фазы на таймлайн, или тап по фазе → клик по неделе'}</span>
         </div>
         {showHelp && (
-          <div style={{ marginTop: 8, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11, lineHeight: 1.5, color: 'rgba(255,255,255,0.85)' }}>
+          <div style={{ marginTop: 8, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11, lineHeight: 1.5, color: '#fff' }}>
             <div style={{ fontWeight: 800, color: '#fff', marginBottom: 6 }}>📱 Телефон: зажмите фазу 0.35с → вибрация → перетащите на неделю (или тап фаза → тап неделя)</div>
             <div>• <b>ПЛ</b>: GPP база → сила → DE/скорость → пик к помосту · <b>ББ</b>: гипертрофия объём → интенс → памп → пик формы</div>
             <div>• Таймлайн — кварталы по {isMobile ? 8 : 13} нед, свайп/кнопки ◀▶ · Список — удобно на узком экране</div>
@@ -534,7 +534,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
             {incompatibleBlocks.length > 0 && (
               <div role="alert" style={{ marginBottom: 10, padding: 10, borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', fontSize: 11, lineHeight: 1.45 }}>
                 <div style={{ fontWeight: 800, color: '#ef4444', marginBottom: 4 }}>⚠ {incompatibleBlocks.length} блок(ов) не из набора {disciplineLabel}</div>
-                <div style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+                <div style={{ color: '#fff', marginBottom: 6 }}>
                   {incompatibleBlocks.map(b => `${PHASE_ICONS[b.phaseKey]} ${PHASE_LABELS_RU[b.phaseKey]} (${b.startWeek}–${b.endWeek})`).join(' · ')}
                 </div>
                 <div style={{ color: DIM, fontSize: 10 }}>Эти фазы сохранены, но не характерны для {disciplineLabel}. Для чистого плана используйте палитру ниже — лишние можно удалить.</div>
@@ -736,7 +736,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                           <span style={{ fontSize: 11, fontWeight: 800, color }}>{PHASE_LABELS_RU[pk as PhaseKey]}</span>
                           <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM, background: 'rgba(0,0,0,0.18)', padding: '2px 6px', borderRadius: 6 }}>{tmpl.weeks}н · {tmpl.volumeLevel}/{tmpl.intensityLevel}</span>
                         </div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.35 }}>{tmpl.description}</div>
+                        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.35 }}>{tmpl.description}</div>
                         <div style={{ fontSize: 9, color: accent, background: accent+'12', border: `1px solid ${accent}22`, borderRadius: 6, padding: '4px 6px', lineHeight: 1.3 }}>{guide.tip} · <span style={{ color: DIM }}>Авто: {guide.autoPeriod} → {guide.bbPhase}</span></div>
                         <div style={{ fontSize: 10, color: DIM, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           <span>RPE {tmpl.rpeTarget}</span><span>· RIR {tmpl.rirTarget}</span><span>· {tmpl.frequencyDays} дн/нед</span><span>· {tmpl.focus}</span>
@@ -942,7 +942,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                   <div style={{ padding: 12, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>Добавьте блоки в дизайн — микроциклы появятся здесь</div>
                 ) : (
                   <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '40px 1fr 64px 58px' : '36px 1fr 70px 60px', gap: 4, padding: '8px 8px', fontSize: isMobile ? 11 : 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', minWidth: 0 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '40px 1fr 64px 58px' : '36px 1fr 70px 60px', gap: 4, padding: '8px 8px', fontSize: isMobile ? 11 : 10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', minWidth: 0 }}>
                       <span>Нед</span><span>Фаза</span><span>Объём</span><span>Нагрузка</span>
                     </div>
                     {getDesignVolumeCurve(current).slice(0, Math.min(24, current.totalWeeks)).map(pt => {
@@ -1329,7 +1329,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 800, color: isAllowed ? color : '#ef4444', lineHeight: 1.2 }}>{PHASE_LABELS_RU[block.phaseKey]}</div>
                       <div style={{ fontSize: 11, color: DIM, marginTop: 2 }}>нед {block.startWeek}–{block.endWeek} · {block.endWeek - block.startWeek + 1} нед {isAllowed ? '' : '⚠ не из ' + disciplineLabel}</div>
-                      {block.notes && !block.notes.includes('[OVERLAP') && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{block.notes}</div>}
+                      {block.notes && !block.notes.includes('[OVERLAP') && <div style={{ fontSize: 10, color: '#fff', marginTop: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{block.notes}</div>}
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <button aria-label="Удалить" onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }} style={{ ...btn, minHeight: 36, color: '#ef4444' }}>✕</button>
@@ -1471,7 +1471,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
             <div role="alert" aria-live="polite" style={{ ...CARD, borderLeft: '3px solid #ef4444' }} className="pd-card-mobile">
               <div style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>⚠ Проблемы структуры</div>
               {stats.overlapWeeks > 0 && (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.45 }}>
+                <div style={{ fontSize: 11, color: '#fff', marginBottom: 6, lineHeight: 1.45 }}>
                   🔴 Перекрытие блоков: {stats.overlapWeeks} нед. Недели с перекрытием получат непредсказуемую фазу при применении.
                   <button onClick={handleResolveOverlaps} style={{ ...btn, marginLeft: 8, color: '#ef4444', borderColor: 'rgba(239,68,68,0.45)', minHeight: 36 }}>
                     Исправить автоматически
@@ -1479,7 +1479,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                 </div>
               )}
               {stats.gapRanges.length > 0 && (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
+                <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.45 }}>
                   🟡 Пропуски (недели без блока → accumulation по умолчанию): {stats.gapRanges.join(', ')}
                 </div>
               )}
@@ -1501,9 +1501,9 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
         return (
           <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: accent + '0E', border: '1px solid ' + accent + '22' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: accent, marginBottom: 6 }}>{disciplineIcon} {disciplineLabel} — применение</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 10, lineHeight: 1.45 }}>🔗 Применить первый блок «{PHASE_LABELS_RU[fb.phaseKey] || fb.phaseKey}» к планировщику. Полная последовательность: {seq}.</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 10, lineHeight: 1.45 }}>🔗 Применить первый блок «{PHASE_LABELS_RU[fb.phaseKey] || fb.phaseKey}» к планировщику. Полная последовательность: {seq}.</div>
             <button onClick={() => applyToPlanner({ kind: r.kind, label: 'Периодизация: ' + seq, data: r.data })} style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,${accent},${accent}CC)`, color: '#000', fontWeight: 800, fontSize: 13, minHeight: 48, marginBottom: 10 }}>🛠 Применить первый блок — {disciplineLabel}</button>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6, marginTop: 4, lineHeight: 1.4 }}>📥 Весь дизайн ({current.blocks.length} бл · {current.totalWeeks} нед) в ручной планировщик как новая программа.</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6, marginTop: 4, lineHeight: 1.4 }}>📥 Весь дизайн ({current.blocks.length} бл · {current.totalWeeks} нед) в ручной планировщик как новая программа.</div>
             <button
               onClick={async () => {
                 const ok = await confirm({

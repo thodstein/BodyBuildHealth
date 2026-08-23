@@ -13,7 +13,7 @@ import { loadTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
 
 // ── Константы ──
-const ACCENT = '#00e68a'; const DIM = 'rgba(255,255,255,0.85)'; const BG = 'rgba(24,24,27,0.3)';
+const ACCENT = '#00e68a'; const DIM = '#fff'; const BG = 'rgba(24,24,27,0.3)';
 const C: React.CSSProperties = { padding: 14, borderRadius: 12, background: BG, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 8px' };
 const L: React.CSSProperties = { fontSize: 10, color: DIM, margin: '6px 0 3px', fontWeight: 700 };
@@ -267,7 +267,7 @@ export const SplitGenCard: React.FC = () => {
                   <div style={{ fontSize:18, marginBottom:4 }}>{s.icon}</div>
                   <div style={{ fontSize:11, fontWeight:700, color:active?ACCENT:'#fff', marginBottom:2 }}>{s.name}</div>
                   <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>{s.who} · {s.days>0 ? s.days+' дн/нед' : 'авто'}</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1.3 }}>{s.desc}</div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>{s.desc}</div>
                 </button>
               );
             })}
@@ -413,7 +413,7 @@ export const SplitGenCard: React.FC = () => {
                 <div style={{ marginTop:8, padding:10, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
                   <div style={{ fontSize:10, fontWeight:700, color:'#f87171', marginBottom:4 }}>⚠️ Низкий интервал восстановления</div>
                   {overlaps.map((o, i) => (
-                    <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.9)' }}>
+                    <div key={i} style={{ fontSize:10, color:'#fff' }}>
                       {GROUP_RU[o.group]}: дни {o.days.join(', ')} — интервал {o.gap} дн (рекомендуется ≥2 дн). Добавьте день отдыха между этими тренировками.
                     </div>
                   ))}

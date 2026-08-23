@@ -13,7 +13,7 @@ import type { UserProgram } from '../../../engines/user-program/user-program.typ
 import { GROUP_RU, ACCENT, DIM, SET_TEMPLATES } from './program-types';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 
-const DIM_STRONG = 'rgba(255,255,255,0.85)';
+const DIM_STRONG = '#fff';
 const CARD: React.CSSProperties = {
   background: 'rgba(24,24,27,0.5)',
   borderRadius: 12,

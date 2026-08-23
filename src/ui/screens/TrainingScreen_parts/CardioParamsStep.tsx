@@ -20,14 +20,14 @@ import {
 
 const GOAL_CARD: React.CSSProperties = {
   flex: '1 1 140px', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
-  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)',
+  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: '#fff',
 };
 const GOAL_CARD_ACTIVE: React.CSSProperties = {
   ...GOAL_CARD, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff',
 };
 const PRESET: React.CSSProperties = {
   flex: '1 1 130px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)',
+  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: '#fff',
 };
 
 const GOAL_DESC: Record<CardioGoal, string> = {
@@ -182,7 +182,7 @@ export const CardioParamsStep: React.FC<{
         <InfoBanner tone="info">👋 Подсказка: выберите цель (например, Сушка) → пресет «Сушка 16 нед» → проверьте предпросмотр (фазы + прогноз VO2max) → «Далее» и соберите цикл. Taper и дни ног подстроятся сами.</InfoBanner>
       )}
 
-      <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{age}л · {bodyWeight}кг{CARDIO_LEVEL_LABELS[level]}</span>}>
+      <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 10, color: '#fff' }}>{age}л · {bodyWeight}кг{CARDIO_LEVEL_LABELS[level]}</span>}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={BTN_SMALL} onClick={onFromProfile} title="Загрузить из профиля">📋 Из профиля</button>
           <button style={BTN_SMALL} onClick={onFromDiaryHr} title="ЧСС покоя из дневника АД">❤️ Из АД</button>
@@ -279,7 +279,7 @@ export const CardioParamsStep: React.FC<{
           <button style={factorsOn.joints ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('joints')} aria-label="Фактор: суставы">🦴 Суставы</button>
         </div>
         {factorsSummary.length > 0 && (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.60)', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
             {factorsSummary.map((s, i) => <div key={i}>• {s}</div>)}
           </div>
         )}
@@ -352,7 +352,7 @@ export const CardioParamsStep: React.FC<{
             <div style={ROW}>
               <span style={LABEL}>🗺 Фазы по неделям</span>
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 11, color: taperEnabled ? '#eab308' : 'rgba(255,255,255,0.55)', fontWeight: 800 }}>
+              <span style={{ fontSize: 11, color: taperEnabled ? '#eab308' : '#fff', fontWeight: 800 }}>
                 {taperEnabled ? `📉 taper ${taperWeeks} нед${peakWeek ? ' + пик' : ''}` : 'без taper'}
               </span>
             </div>
@@ -363,7 +363,7 @@ export const CardioParamsStep: React.FC<{
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {PHASE_ORDER.filter(p => (s?.phaseWeeks[p.phase] ?? 0) > 0).map(p => (
-                <span key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: 600 }}>
+                <span key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#fff', fontWeight: 600 }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: PHASE_COLOR[p.phase] }} />
                   {p.label} · {s?.phaseWeeks[p.phase]}
                 </span>

@@ -10,12 +10,12 @@ import { applyToPlanner } from './planner-bridge';
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.5)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', padding: 10, marginBottom: 8 };
 const H: React.CSSProperties = { fontSize: 12, fontWeight: 800, color: ACCENT, marginBottom: 6 };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.85)', fontSize: 10, margin: '6px 0 3px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 10, margin: '6px 0 3px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
 const PILL = (on: boolean, accent = ACCENT): React.CSSProperties => ({
   padding: '4px 10px', borderRadius: 12, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 28,
   border: on ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
   background: on ? `${accent}22` : 'rgba(255,255,255,0.02)',
-  color: on ? accent : 'rgba(255,255,255,0.85)',
+  color: on ? accent : '#fff',
 });
 
 const MODES: { id: ConjugateMode; label: string }[] = [
@@ -121,7 +121,7 @@ const ConjugateDesigner: React.FC = () => {
           </div>
         </div>
         <div style={{ ...GLASS, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 700 }}>Недель</div>
+          <div style={{ fontSize: 10, color: '#fff', fontWeight: 700 }}>Недель</div>
           {[3, 6, 9, 12].map(n => (
             <button key={n} onClick={() => { setWeeks(n); setWeekIdx(0); }} style={PILL(weeks === n, '#22c55e')}>{n}</button>
           ))}
@@ -135,7 +135,7 @@ const ConjugateDesigner: React.FC = () => {
           {WEAK_GROUPS.map(g => (
             <button key={g.id} onClick={() => toggleWp(g.id)} style={PILL(weakPoints.includes(g.id), '#ec4899')}>{g.label}</button>
           ))}
-          {weakPoints.length === 0 && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Не выбраны — общий акцент</span>}
+          {weakPoints.length === 0 && <span style={{ fontSize: 10, color: '#fff' }}>Не выбраны — общий акцент</span>}
         </div>
       </div>
 
@@ -149,7 +149,7 @@ const ConjugateDesigner: React.FC = () => {
           <button disabled={weekIdx >= weeks - 1} onClick={() => setWeekIdx(Math.min(weeks - 1, weekIdx + 1))} style={{ ...PILL(false), opacity: weekIdx >= weeks - 1 ? 0.3 : 1 }}>▶</button>
         </div>
       </div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+      <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
         ME вариации: верх <b style={{ color: '#ff6b35' }}>{currentWeek.meVariation.upper}</b> · низ <b style={{ color: '#ff6b35' }}>{currentWeek.meVariation.lower}</b>
         <span style={{ marginLeft: 6, color: 'rgba(255,255,255,0.25)' }}>Волна: {waveInfo.note}</span>
       </div>
@@ -161,14 +161,14 @@ const ConjugateDesigner: React.FC = () => {
             <span style={{ fontSize: 11, fontWeight: 700, color: DAY_COLORS[day.type] || '#fff' }}>
               {DAY_ICON[day.type]} {DAY_LABEL[day.type]}
             </span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{day.mainLift}</span>
+            <span style={{ fontSize: 10, color: '#fff' }}>{day.mainLift}</span>
           </div>
           {day.exercises.map((ex, ei) => (
             <div key={ei} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-              <span style={{ color: ex.type === 'main' ? '#fff' : 'rgba(255,255,255,0.55)', fontWeight: ex.type === 'main' ? 700 : 400 }}>
+              <span style={{ color: ex.type === 'main' ? '#fff' : '#fff', fontWeight: ex.type === 'main' ? 700 : 400 }}>
                 {ex.name}
               </span>
-              <span style={{ color: 'rgba(255,255,255,0.85)' }}>
+              <span style={{ color: '#fff' }}>
                 {ex.sets}×{ex.reps} @{Math.round(ex.intensity * 100)}% RIR {ex.rir}
               </span>
             </div>

@@ -56,9 +56,9 @@ const ScaleRow: React.FC<{ label: string; hint: string; value: number; onChange:
           onClick={() => onChange(v)}
           style={{
             flex: 1, minHeight: 36, borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-            border: value === v ? '1px solid rgba(0,230,138,0.5)' : '1px solid var(--border)',
-            background: value === v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-            color: value === v ? ACCENT : 'var(--text-dim)',
+            border: value === v ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.08)',
+            background: value === v ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+            color: value === v ? ACCENT : '#fff',
           }}>
           {v}
         </button>
@@ -325,12 +325,12 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   }, [active, insights, perfs]);
 
   const btn: React.CSSProperties = { padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 11, minHeight: 40 };
-  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-secondary)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 10, minHeight: 36 };
+  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
   const chip = (on: boolean, color = ACCENT): React.CSSProperties => ({
     padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 600, minHeight: 30,
-    border: on ? `1px solid ${color}` : '1px solid var(--border)',
-    background: on ? `${color}22` : 'var(--bg-secondary)',
-    color: on ? color : 'var(--text-dim)',
+    border: on ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.08)',
+    background: on ? `${color}22` : 'rgba(255,255,255,0.04)',
+    color: on ? color : '#fff',
   });
 
   return (
@@ -341,7 +341,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           <div style={{ fontSize: 13, fontWeight: 800, color: '#a78bfa' }}>🧠 Психология тренировок</div>
           <span style={{ fontSize: 9, color: DIM }}>Собери личный ментальный протокол — он появится в сессии (до/во время/после)</span>
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
           Источник шагов — методики Библиотеки (визуализация, цели, активация, устойчивость, дневник-рефлексия).
           Пресеты: {PRESET_LABELS.pl} · {PRESET_LABELS.bb} · {PRESET_LABELS.both}. Вкладка только отображает — план не меняется.
         </div>
@@ -422,7 +422,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             ) : (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {active.items.map((it, idx) => (
-                  <div key={it.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                  <div key={it.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 9, fontWeight: 700, color: KIND_COLOR[it.kind], minWidth: 64 }}>
                         {KIND_ICON[it.kind]} {KIND_LABELS[it.kind]}
@@ -435,7 +435,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         <button type="button" style={{ ...ghost, padding: '2px 8px', minHeight: 28, color: 'rgba(248,113,113,0.9)' }} onClick={() => removeItem(idx)} aria-label="Удалить шаг">✕</button>
                       </div>
                     </div>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 9, color: '#fff', marginTop: 4, lineHeight: 1.5 }}>
                       {it.script.length > 180 ? it.script.slice(0, 180) + '…' : it.script}
                     </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
@@ -472,7 +472,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {filteredLibrary.map(r => {
                       const added = active.items.some(it => it.title === r.title && it.script === r.script);
                       return (
-                        <div key={r.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--bg-secondary)' }}>
+                        <div key={r.id} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.04)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 9, fontWeight: 700, color: KIND_COLOR[r.kind], minWidth: 64 }}>{KIND_ICON[r.kind]} {KIND_LABELS[r.kind]}</span>
                             <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', flex: 1, minWidth: 120 }}>{r.title}</span>
@@ -481,7 +481,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               {added ? '✓ добавлен' : '＋ добавить'}
                             </button>
                           </div>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3, lineHeight: 1.45 }}>{r.description}</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginTop: 3, lineHeight: 1.45 }}>{r.description}</div>
                           <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 2 }}>
                             {r.durationMin} мин · {r.targetDays.map(d => DAYTYPE_LABELS[d]).join(' · ')} · {DIRECTION_ICON[r.direction]} {DIRECTION_LABELS[r.direction]}
                           </div>
@@ -551,11 +551,11 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {dayItems.map(it => (
-                  <div key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)' }}>
+                  <div key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
                     <span style={{ fontSize: 10 }}>{KIND_ICON[it.kind]}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>· {it.durationMin} мин</span></div>
-                      <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45 }}>{it.script}</div>
+                      <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.45 }}>{it.script}</div>
                     </div>
                   </div>
                 ))}
@@ -598,11 +598,11 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   onClick={() => { setMood(p => ({ ...p, value: v })); setMoodSaved(false); }}
                   style={{
                     padding: '8px 4px', borderRadius: 10, cursor: 'pointer', textAlign: 'center',
-                    border: mood.value === v ? `1px solid ${MOOD_LABELS[v].color}` : '1px solid var(--border)',
-                    background: mood.value === v ? `${MOOD_LABELS[v].color}22` : 'var(--bg-secondary)',
+                    border: mood.value === v ? `1px solid ${MOOD_LABELS[v].color}` : '1px solid rgba(255,255,255,0.08)',
+                    background: mood.value === v ? `${MOOD_LABELS[v].color}22` : 'rgba(255,255,255,0.04)',
                   }}>
                   <div style={{ fontSize: 18 }}>{MOOD_LABELS[v].emoji}</div>
-                  <div style={{ fontSize: 8, color: mood.value === v ? MOOD_LABELS[v].color : 'var(--text-dim)', marginTop: 2 }}>{MOOD_LABELS[v].label}</div>
+                  <div style={{ fontSize: 8, color: mood.value === v ? MOOD_LABELS[v].color : '#fff', marginTop: 2 }}>{MOOD_LABELS[v].label}</div>
                 </button>
               ))}
             </div>
@@ -627,19 +627,19 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   ySuffix="/5"
                 />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 6 }}>
-                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                     <div style={{ fontSize: 8, color: DIM }}>Среднее</div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>{moodTrend.avg.toFixed(1)}/5</div>
                   </div>
-                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                     <div style={{ fontSize: 8, color: DIM }}>Дельта 14д</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: moodTrend.delta > 0.05 ? '#22c55e' : moodTrend.delta < -0.05 ? '#ef4444' : 'var(--text-dim)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: moodTrend.delta > 0.05 ? '#22c55e' : moodTrend.delta < -0.05 ? '#ef4444' : '#fff' }}>
                       {moodTrend.delta > 0.05 ? '▲' : moodTrend.delta < -0.05 ? '▼' : '•'} {Math.abs(moodTrend.delta) > 0.05 ? Math.abs(moodTrend.delta).toFixed(1) : ''}
                     </div>
                   </div>
-                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                  <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                     <div style={{ fontSize: 8, color: DIM }}>Низкие (≤2)</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: (moodTrend.distribution[1] || 0) + (moodTrend.distribution[2] || 0) > 0 ? '#f59e0b' : 'var(--text-dim)' }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: (moodTrend.distribution[1] || 0) + (moodTrend.distribution[2] || 0) > 0 ? '#f59e0b' : '#fff' }}>
                       {(moodTrend.distribution[1] || 0) + (moodTrend.distribution[2] || 0)} из {moodTrend.count}
                     </div>
                   </div>
@@ -674,7 +674,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     const avg = trends.averages[key];
                     const delta = trends.deltas[key];
                     return (
-                      <div key={key} style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                      <div key={key} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                         <div style={{ fontSize: 9, color: DIM }}>{label}</div>
                         <div style={{ fontSize: 16, fontWeight: 800, color }}>{avg > 0 ? avg.toFixed(1) : '—'}</div>
                         <div style={{ fontSize: 9, color: delta > 0.05 ? '#22c55e' : delta < -0.05 ? '#ef4444' : DIM }}>
@@ -687,14 +687,14 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Приверженность протоколу · 30д</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: adherence.pct >= 80 ? '#22c55e' : adherence.pct >= 40 ? '#f59e0b' : '#ef4444' }}>
                   {adherence.total > 0 ? `${adherence.pct}%` : '—'}
                 </div>
                 <div style={{ fontSize: 9, color: DIM }}>{adherence.followed}/{adherence.total} сессий</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: 9, color: DIM }}>Связь уверенности и e1RM</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{link.pearson !== null ? `r = ${link.pearson}` : '—'}</div>
                 <div style={{ fontSize: 9, color: DIM }}>{link.n} пар (чек-ин + сессия)</div>
@@ -705,7 +705,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Средний e1RM сессии по уровню уверенности:</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                   {link.buckets.map(b => (
-                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'var(--bg-secondary)', textAlign: 'center' }}>
+                    <div key={b.level} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
                       <div style={{ fontSize: 9, color: DIM }}>{b.range}</div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: b.n > 0 ? '#fff' : DIM }}>{b.n > 0 ? `${b.avgE1RM} кг` : '—'}</div>
                       <div style={{ fontSize: 8, color: DIM }}>{b.n} сессий</div>
@@ -722,7 +722,7 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               💡 Персональные инсайты
             </div>
             {insights.map((s, i) => (
-              <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', borderLeft: '2px solid rgba(0,230,138,0.4)', marginBottom: 4 }}>
+              <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.04)', borderLeft: '2px solid rgba(0,230,138,0.4)', marginBottom: 4 }}>
                 {s}
               </div>
             ))}
@@ -743,21 +743,21 @@ export const MindsetTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </div>
               </div>
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginTop: 8 }}>{motivation.description}</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginTop: 8 }}>{motivation.description}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Признаки</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {motivation.signs.map((s, i) => (
-                    <span key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>• {s}</span>
+                    <span key={i} style={{ fontSize: 9, color: '#fff' }}>• {s}</span>
                   ))}
                 </div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'var(--bg-secondary)' }}>
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Что делать</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {motivation.interventions.map((s, i) => (
-                    <span key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)' }}>• {s}</span>
+                    <span key={i} style={{ fontSize: 9, color: '#fff' }}>• {s}</span>
                   ))}
                 </div>
               </div>

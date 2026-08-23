@@ -12,7 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { Lift } from '../../../engines/lms/weakpoint-pl';
 
 const ACCENT = '#38bdf8';
-const DIM = 'rgba(255,255,255,0.55)';
+const DIM = '#fff';
 
 const LIFT_GUIDE: Record<Lift, { title: string; cam: string; dist: string; height: string; light: string; markers: string[]; bad: string[] }> = {
   bench: {
@@ -228,7 +228,7 @@ export const VideoCaptureCard: React.FC<{ lift: Lift; onResult?: (r: VideoAnalys
             {result.barVelocity!=null && <div>Скорость (оценка): <b style={{color:'#fff'}}>{result.barVelocity.toFixed(2)} м/с</b></div>}
             {result.bridge!=null && <div>Мост: <b style={{color:'#fff'}}>{result.bridge?'есть':'нет'}</b></div>}
             <div style={{ marginTop:4, color:'#fbbf24' }}>{result.note}</div>
-            <div style={{ marginTop:4, fontSize:9, color:'rgba(255,255,255,0.85)' }}>След. шаг — воркер + BlazePose: автозамер локтей/хвата/скорости и подсветка коррекции в блоке 5 мастера.</div>
+            <div style={{ marginTop:4, fontSize:9, color:'#fff' }}>След. шаг — воркер + BlazePose: автозамер локтей/хвата/скорости и подсветка коррекции в блоке 5 мастера.</div>
           </div>
         </div>
       )}

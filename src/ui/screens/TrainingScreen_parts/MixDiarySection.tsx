@@ -10,7 +10,7 @@ import {
 
 const CARD: React.CSSProperties = {
   padding: 10, borderRadius: 12,
-  background: 'var(--bg-secondary)', border: '1px solid rgba(139,92,246,0.2)',
+  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)',
   marginBottom: 8,
 };
 
@@ -83,7 +83,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
     <div style={CARD}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>💊 Тренировочные миксы и пресеты ({records.length})</div>
-        <button onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color:'rgba(255,255,255,0.9)', background: 'none', border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color:'#fff', background: 'none', border: 'none', cursor: 'pointer' }}>
           {expanded ? 'Свернуть ▲' : 'Все ▼'}
         </button>
       </div>
@@ -100,8 +100,8 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 13 }}>{r.kind === 'preset' ? '🧪' : '💪'}</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{r.title}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{r.title}</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>
                 {r.date} · {r.substances.length} веществ{r.score != null ? ` · скор ${r.score} (${r.label || ''})` : ''}
               </div>
               {(() => {
@@ -111,7 +111,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
                 const better = eff.type === 'sleep' ? eff.delta > 0 : eff.delta < 0;
                 const arrow = eff.delta === 0 ? '→' : (better ? '↑' : '↓');
                 return (
-                  <div style={{ fontSize: 10, color: better ? '#00e68a' : eff.delta === 0 ? 'rgba(255,255,255,0.85)' : '#f59e0b', marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: better ? '#00e68a' : eff.delta === 0 ? '#fff' : '#f59e0b', marginTop: 2 }}>
                     📈 {eff.label}: {eff.before} → {eff.after} {eff.type === 'sleep' ? 'ч' : 'кг'} ({arrow} {Math.abs(eff.delta)}) {eff.samplesAfter === 0 ? `· данных после: ${eff.samplesBefore} зап. до` : ''}
                   </div>
                 );
@@ -131,7 +131,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
                   <button key={p} onClick={() => { toggleMixPhaseIntake(today, r.id, p); setIntakeTick(t => t + 1); }} style={{
                     padding: '4px 9px', borderRadius: 8, cursor: 'pointer', fontSize: 9, border: 'none',
                     background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.05)',
-                    color: active ? '#c4b5fd' : 'rgba(255,255,255,0.55)', fontWeight: active ? 700 : 400,
+                    color: active ? '#c4b5fd' : '#fff', fontWeight: active ? 700 : 400,
                   }}>
                     {active ? '✓ ' : ''}{meta.icon} {meta.label}
                   </button>
@@ -147,7 +147,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
                   {s.name} · {s.mg >= 1000 ? `${(s.mg / 1000).toFixed(1)} г` : `${s.mg} мг`}
                 </span>
               ))}
-              {r.substances.length > 6 && <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>+{r.substances.length - 6}</span>}
+              {r.substances.length > 6 && <span style={{ fontSize: 9, color: '#fff' }}>+{r.substances.length - 6}</span>}
             </div>
           )}
           {r.recommendations && r.recommendations.interactions.length > 0 && (
