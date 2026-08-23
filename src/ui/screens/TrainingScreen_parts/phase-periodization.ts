@@ -102,8 +102,8 @@ export function getPhaseConfig(phase: BBPhase, focus?: BBTrainingFocus): PhaseCo
 /* ──────────── Распределение недель по фазам ──────────── */
 export interface PhaseDistribution {
   phase: BBPhase;
-  startНеделя: number;
-  endНеделя: number;
+  startWeek: number;
+  endWeek: number;
   weeks: number[];
   config: PhaseConfig;
 }
@@ -150,20 +150,20 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
     // P1-2: peaking проверяется ПЕРЕД deload — финальные недели peaking
     // не должны перекрываться регулярным deload (taper → peak, не deload → peak).
     if (w > mesoLength - peakWeeks) {
-      dist.push({ phase: 'peaking', startНеделя: w, endНеделя: w, weeks: [w], config: getPhaseConfig('peaking', trainingFocus) });
+      dist.push({ phase: 'peaking', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('peaking', trainingFocus) });
       continue;
     }
     if (deloadWeeks.has(w)) {
-      dist.push({ phase: 'deload', startНеделя: w, endНеделя: w, weeks: [w], config: getPhaseConfig('deload', trainingFocus) });
+      dist.push({ phase: 'deload', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('deload', trainingFocus) });
       continue;
     }
     // Определяем позицию среди активных недель
     const activeIdx = activeWeeks.indexOf(w);
     if (activeIdx < 0) continue;
     if (activeIdx < accumEnd) {
-      dist.push({ phase: 'accumulation', startНеделя: w, endНеделя: w, weeks: [w], config: getPhaseConfig('accumulation', trainingFocus) });
+      dist.push({ phase: 'accumulation', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('accumulation', trainingFocus) });
     } else {
-      dist.push({ phase: 'intensification', startНеделя: w, endНеделя: w, weeks: [w], config: getPhaseConfig('intensification', trainingFocus) });
+      dist.push({ phase: 'intensification', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('intensification', trainingFocus) });
     }
   }
 
@@ -175,7 +175,7 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
  * Получить RIR для конкретной недели.
  * Учитывает: rirWave (по четвертям) + фазу (phaseConfig.rirRange) + позицию внутри фазы.
  */
-export function getRirForWeek(week: number, mesoLength: number, rirWaveKey: string, phase: BBPhase, phaseНеделя: number): number {
+export function getRirForWeek(week: number, mesoLength: number, rirWaveKey: string, phase: BBPhase, phaseWeek: number): number {
   const wave = RIR_WAVE_PATTERNS[rirWaveKey];
   const qLen = Math.ceil(mesoLength / 4);
   const quarter = Math.min(3, Math.floor((week - 1) / qLen));
@@ -196,7 +196,7 @@ export function getRirForWeek(week: number, mesoLength: number, rirWaveKey: stri
  * Рассчитать вес для недели с прогрессией.
  * Прогрессия внутри фазы: +2.5% каждую неделю от базового веса.
  */
-export function calcPhaseWeight(baseWeight: number, week: number, phase: BBPhase, phaseНеделя: number, rir: number): number {
+export function calcPhaseWeight(baseWeight: number, week: number, phase: BBPhase, phaseWeek: number, rir: number): number {
   const cfg = PHASE_CONFIGS[phase];
   const pct = PCT_FOR_RIR[Math.max(0, Math.min(5, rir))] ?? 0.85;
   const phaseProgression = Math.max(0, (phaseWeek - 1) * 0.025);
@@ -253,7 +253,7 @@ export function getPhaseVolumeMult(phase: BBPhase, focus?: BBTrainingFocus): num
  * поздние → меньше (механическое натяжение).
  * Принцип Daily Undulating Periodization, адаптированный под недельный блок.
  */
-export function getDupReps(config: PhaseConfig, phaseНеделя: number, totalPhaseWeeks: number): string {
+export function getDupReps(config: PhaseConfig, phaseWeek: number, totalPhaseWeeks: number): string {
   const [min, max] = config.repRange;
   if (totalPhaseWeeks <= 1) return `${min}-${max}`;
   const ratio = Math.min(1, (phaseWeek - 1) / (totalPhaseWeeks - 1));
@@ -275,7 +275,7 @@ export function getDupReps(config: PhaseConfig, phaseНеделя: number, total
  * Неделя 4: 1.05 (консолидация)
  * Циклы повторяются с +2.5% на базу (прогрессивная перегрузка).
  */
-export function getVolumeWaveFactor(phaseНеделя: number, phase: BBPhase): number {
+export function getVolumeWaveFactor(phaseWeek: number, phase: BBPhase): number {
   if (phase === 'deload') return 0.5;
   const cycle = (phaseWeek - 1) % 4;
   const cycleNum = Math.floor((phaseWeek - 1) / 4);
@@ -444,7 +444,7 @@ export function buildPhasePlan(
 ): ManualWeek[] {
   const dist = distributePhases(mesoLength, deloadFreq, goal);
   if (addFinalDeload) {
-    dist.push({ phase: 'deload', startНеделя: mesoLength + 1, endНеделя: mesoLength + 1, weeks: [mesoLength + 1], config: PHASE_CONFIGS.deload });
+    dist.push({ phase: 'deload', startWeek: mesoLength + 1, endWeek: mesoLength + 1, weeks: [mesoLength + 1], config: PHASE_CONFIGS.deload });
   }
   
   // Подсчёт общего числа недель в каждой фазе (для DUP-повторений)

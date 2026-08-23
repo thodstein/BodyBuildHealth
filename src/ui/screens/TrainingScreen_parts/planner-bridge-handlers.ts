@@ -433,7 +433,7 @@ const designHandler: Handler = (payload, { program: p, dir, update, onChange, sh
   try {
     const design = payload.data.design as MacrocycleDesign;
     const fillExercises: boolean = !!payload.data.fillExercises;
-    const daysPerНеделя: number = payload.data.daysPerWeek ?? 4;
+    const daysPerWeek: number = payload.data.daysPerWeek ?? 4;
     if (dir === 'bb' && p.bb) {
       const existingWeeks = p.bb.weeks;
       const remapped = applyDesignPhasesToWeeks(existingWeeks, design);
@@ -479,7 +479,7 @@ const macrocycleHandler: Handler = (payload, { program: p, onChange, showToast, 
     const newProg = macrocycleToBBProgram(macro, {
       level: payload.data.level ?? p.meta.level,
       goal: payload.data.goal ?? p.meta.goal,
-      daysPerНеделя: payload.data.daysPerWeek ?? p.meta.daysPerWeek,
+      daysPerWeek: payload.data.daysPerWeek ?? p.meta.daysPerWeek,
       weakPoints: (tprofile.weakPoints ?? []) as string[],
       equipment: p.bb?.constraints?.equipment ?? [],
       trainingFocus: p.meta.trainingFocus,
@@ -567,7 +567,7 @@ const cardioHandler: Handler = (payload, { showToast }) => {
     if (!cycle) { showToast('⚠ Кардио-цикл не найден — соберите его в кардио-конструкторе'); return; }
     const p = cardioToNutritionPayload(cycle, loadCardioLog());
     try {
-      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerНеделя: p.avgKcalPerWeek, avgMinutesPerНеделя: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
+      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerWeek: p.avgKcalPerWeek, avgMinutesPerWeek: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
     } catch { /* ignore */ }
     try { navigator.clipboard?.writeText(p.text) } catch { /* ignore */ }
     showToast(`🍽 Расход кардио передан в питание: ~${p.avgKcalPerWeek} ккал/нед · сегодня ${p.todayMinutes} мин${p.todayKcal > 0 ? ' · ' + p.todayKcal + ' ккал' : ''} (в буфер)`);

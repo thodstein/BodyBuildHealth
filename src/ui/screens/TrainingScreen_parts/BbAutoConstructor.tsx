@@ -808,7 +808,7 @@ export const BbAutoConstructor: React.FC = () => {
     }
   };
 
-  // ── Test Peak Неделя: тестовый прогон НЕ меняет основной план ──
+  // ── Test Peak Week: тестовый прогон НЕ меняет основной план ──
   const [testRatings, setTestRatings] = useState<Record<string, number>>({});
   const [testWeightDelta, setTestWeightDelta] = useState<number>(0);
   const [lastTest, setLastTest] = useState<ReturnType<typeof latestTestPeakWeek>>(null);
@@ -846,7 +846,7 @@ export const BbAutoConstructor: React.FC = () => {
       preparation: {
         ...prepPlan.preparation,
         currentCalories: Math.max(1200, prepPlan.preparation.currentCalories + caloriesDelta),
-        cardioMinutesPerНеделя: Math.max(0, prepPlan.preparation.cardioMinutesPerWeek + cardioDelta),
+        cardioMinutesPerWeek: Math.max(0, prepPlan.preparation.cardioMinutesPerWeek + cardioDelta),
       },
       adjustments: [
         ...(prepPlan.adjustments ?? []),
@@ -1078,7 +1078,7 @@ export const BbAutoConstructor: React.FC = () => {
   const ranked = useMemo(() => rankBBSplits({
     level: bbLevel,
     goal: bbGoal as any,
-    daysPerНеделя: bbDays,
+    daysPerWeek: bbDays,
     weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
     sex: linked.profile?.settings?.personal?.sex,
     focusGroup: specTargets[0] || undefined,
@@ -1407,7 +1407,7 @@ export const BbAutoConstructor: React.FC = () => {
             labMrvMultiplier: labAdjust.mrvMultiplier,
             labWarnings: labAdjust.warnings,
             labIntensityNote: labAdjust.intensityNote,
-            planStartНеделя: new Date().toISOString().slice(0, 10),
+            planStartWeek: new Date().toISOString().slice(0, 10),
             supersetMode,
             volumeScheme: effectiveVolumeScheme,
             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
@@ -1467,7 +1467,7 @@ export const BbAutoConstructor: React.FC = () => {
              labMrvMultiplier: labAdjust.mrvMultiplier,
              labWarnings: labAdjust.warnings,
              labIntensityNote: labAdjust.intensityNote,
-             planStartНеделя: new Date().toISOString().slice(0, 10),
+             planStartWeek: new Date().toISOString().slice(0, 10),
              supersetMode,
              volumeScheme: effectiveVolumeScheme,
              previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
@@ -1491,7 +1491,7 @@ export const BbAutoConstructor: React.FC = () => {
           specialization: specializationMode,
           specializationSchedule: buildSpecBlocks,
          injuries,
-         planStartНеделя: new Date().toISOString().slice(0, 10),
+         planStartWeek: new Date().toISOString().slice(0, 10),
          favoriteExercises: bbFavEx,
          excludedExercises: bbExclEx,
          avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
@@ -1743,7 +1743,7 @@ export const BbAutoConstructor: React.FC = () => {
            equipment: bbEquipment.slice(),
            specialization: specializationMode,
            specBlocks: buildSpecBlocks,
-           daysPerНеделя: bbDays,
+           daysPerWeek: bbDays,
            source: bbSource,
            programPath: bbProgramPath,
             programId: selectedProgramId || undefined,
@@ -1752,12 +1752,12 @@ export const BbAutoConstructor: React.FC = () => {
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
            avgRir: exportMetrics.avgRir,
-           sessionsPerНеделя: exportPlan.pattern.sessionsPerRotation,
+           sessionsPerWeek: exportPlan.pattern.sessionsPerRotation,
           phases: phases.map(p => p.phase),
            qualityScore: exportQuality.score,
            muscleCount: Object.keys(exportPlan.muscleFrequency || {}).length,
           mrvMult: pedAdapt.combinedMrvMultiplier,
-           peakНеделя: exportPlan.report?.peakWeek,
+           peakWeek: exportPlan.report?.peakWeek,
            peakDirectSets: exportPlan.report?.peakDirectSets,
             peakEffectiveSets: exportPlan.report
               ? Object.values(exportPlan.report.peakVolume as Record<string, { effectiveSets: number }>)
@@ -2103,7 +2103,7 @@ export const BbAutoConstructor: React.FC = () => {
                       style={{ padding:'4px 8px', borderRadius:999, fontSize:9, fontWeight:700, cursor:'pointer', minHeight:30,
                         border: b.tradeoffMode === mode ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.08)',
                         background: b.tradeoffMode === mode ? 'rgba(236,72,153,0.15)' : 'rgba(255,255,255,0.03)',
-                        color: b.tradeoffMode === mode ? '#ec4899' : 'rgba(255,255,255,0.85)' }}>{label}</button>
+                        color: b.tradeoffMode === mode ? '#ec4899' : 'rgba(255,255,255,0.6)' }}>{label}</button>
                   ))}
                 </div>
                 {b.tradeoffMode !== 'none' && (
@@ -2123,7 +2123,7 @@ export const BbAutoConstructor: React.FC = () => {
                             style={{ padding:'4px 8px', borderRadius:999, cursor:disabled?'default':'pointer', fontSize:9, fontWeight:700, minHeight:30,
                               background:on?'rgba(236,72,153,0.15)':'rgba(255,255,255,0.03)',
                               border:on?'1px solid rgba(236,72,153,0.4)':'1px solid rgba(255,255,255,0.08)',
-                              color:on?'#ec4899':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.85)', opacity:disabled?0.5:1 }}>
+                              color:on?'#ec4899':disabled?'rgba(255,255,255,0.25)':'rgba(255,255,255,0.6)', opacity:disabled?0.5:1 }}>
                             {on ? '✓ ' : ''}{l}
                           </button>
                         );
@@ -2163,13 +2163,13 @@ export const BbAutoConstructor: React.FC = () => {
             flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11,
             border: planMode === 'generic_split' ? '2px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
             background: planMode === 'generic_split' ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.02)',
-            color: planMode === 'generic_split' ? '#a855f7' : 'rgba(255,255,255,0.85)',
+            color: planMode === 'generic_split' ? '#a855f7' : 'rgba(255,255,255,0.6)',
           }}>🧩 Generic-сплит (авто-генерация)</button>
           <button onClick={() => setPlanMode('bb_cycle')} style={{
             flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11,
             border: planMode === 'bb_cycle' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
             background: planMode === 'bb_cycle' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
-            color: planMode === 'bb_cycle' ? '#00e68a' : 'rgba(255,255,255,0.85)',
+            color: planMode === 'bb_cycle' ? '#00e68a' : 'rgba(255,255,255,0.6)',
           }}>📋 ПРОФ-цикл (12 готовых программ)</button>
         </div>
        </div>
@@ -2184,13 +2184,13 @@ export const BbAutoConstructor: React.FC = () => {
               flex:1, padding:'7px 8px', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:11,
               border: bbSource === 'cycle' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
               background: bbSource === 'cycle' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
-              color: bbSource === 'cycle' ? '#00e68a' : 'rgba(255,255,255,0.85)',
+              color: bbSource === 'cycle' ? '#00e68a' : 'rgba(255,255,255,0.6)',
             }}>📋 ПРОФ-цикл</button>
             <button onClick={() => setBbSource('program')} style={{
               flex:1, padding:'7px 8px', borderRadius:9, cursor:'pointer', fontWeight:700, fontSize:11,
               border: bbSource === 'program' ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
               background: bbSource === 'program' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)',
-              color: bbSource === 'program' ? '#60a5fa' : 'rgba(255,255,255,0.85)',
+              color: bbSource === 'program' ? '#60a5fa' : 'rgba(255,255,255,0.6)',
             }}>📚 Из библиотеки</button>
           </div>
 
@@ -2281,13 +2281,13 @@ export const BbAutoConstructor: React.FC = () => {
                           flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 10,
                           border: bbAdaptMode === 'faithful' ? '2px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)',
                           background: bbAdaptMode === 'faithful' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)',
-                          color: bbAdaptMode === 'faithful' ? '#60a5fa' : 'rgba(255,255,255,0.85)',
+                          color: bbAdaptMode === 'faithful' ? '#60a5fa' : 'rgba(255,255,255,0.6)',
                         }}>🎯 Точно по программе</button>
                         <button onClick={() => setBbAdaptMode('adapt')} style={{
                           flex: 1, padding: '7px 8px', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 10,
                           border: bbAdaptMode === 'adapt' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
                           background: bbAdaptMode === 'adapt' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
-                          color: bbAdaptMode === 'adapt' ? '#00e68a' : 'rgba(255,255,255,0.85)',
+                          color: bbAdaptMode === 'adapt' ? '#00e68a' : 'rgba(255,255,255,0.6)',
                         }}>🔧 Адаптировать</button>
                       </div>
                       <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
@@ -2379,7 +2379,7 @@ export const BbAutoConstructor: React.FC = () => {
                       fontSize: 11, fontWeight: 700, textAlign: 'left', boxSizing: 'border-box',
                       background: autoDeload ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
                       border: autoDeload ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)',
-                      color: autoDeload ? ACCENT : 'rgba(255,255,255,0.85)',
+                      color: autoDeload ? ACCENT : 'rgba(255,255,255,0.6)',
                     }}
                   >
                     {autoDeload ? '✅ Авто-делод при перегрузке' : '⬜ Авто-делод при перегрузке'} (ACWR&gt;1.3)
@@ -2412,7 +2412,7 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ gridColumn:'1 / span 2', padding:'10px 12px', borderRadius:12, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.18)' }}>
             <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>📦 Объёмный тренинг <span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.9)' }}>капы от уровня — новичок без фармы 60 сетов недоступно</span></div>
             <div style={{ display:'flex', gap:6 }}>
-              <button onClick={() => setTrainingVolumeMode('standard')} style={{ flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11, border: trainingVolumeMode==='standard' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='standard' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='standard' ? '#3b82f6' : 'rgba(255,255,255,0.85)' }}>Обычный</button>
+              <button onClick={() => setTrainingVolumeMode('standard')} style={{ flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11, border: trainingVolumeMode==='standard' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='standard' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='standard' ? '#3b82f6' : 'rgba(255,255,255,0.6)' }}>Обычный</button>
               {(() => {
                 const highDisabled = false;
                 const isBeginnerNoPed = bbLevel === 'beginner' && peds.length === 0;
@@ -2525,7 +2525,7 @@ export const BbAutoConstructor: React.FC = () => {
           ]} />
         </div>
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Подбор упражнений</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Подбор упражнений</div>
           {[
             {
               icon: '🚫', title: 'Исключить осевую нагрузку',
@@ -2656,7 +2656,7 @@ export const BbAutoConstructor: React.FC = () => {
             { id:'full_rest', label:'😴 Полный отдых: минимальная активность, только при перетрене' },
             { id:'mini', label:'🪶 Мини-делоад: −1-2 сета, вес почти тот же, без смены схемы' },
           ]} />
-          <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(34,197,94,0.06)', fontSize:11, color:'rgba(255,255,255,0.85)' }}>
+          <div style={{ marginTop:4, padding:'4px 8px', borderRadius:8, background:'rgba(34,197,94,0.06)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>
             {DELOAD_PROTOCOLS[deloadType].description}
           </div>
         </div>
@@ -2682,7 +2682,7 @@ export const BbAutoConstructor: React.FC = () => {
           {([['barbell','Штанга'],['dumbbell','Гантели'],['cable','Блок/кроссовер'],['machine','Тренажёр'],['kettlebell','Гири'],['bodyweight','Свой вес'],['bands','Резинки']] as const).map(([id,label]) => {
             const on = bbEquipment.includes(id);
             return <button key={id} onClick={() => setBbEquipment(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
-              style={{ padding:'5px 10px', borderRadius:14, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:38, border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.02)', color:on?'#60a5fa':'rgba(255,255,255,0.85)' }}>{label}{on?' ✓':''}</button>;
+              style={{ padding:'5px 10px', borderRadius:14, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:38, border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.02)', color:on?'#60a5fa':'rgba(255,255,255,0.6)' }}>{label}{on?' ✓':''}</button>;
           })}
         </div>
         <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.85)' }}>Если ничего не выбрано — используются все упражнения. Выбор ограничивает пул отбора.</div>
@@ -2715,7 +2715,7 @@ export const BbAutoConstructor: React.FC = () => {
             return (
               <button key={r.id} onClick={() => setMobilityRestrictions(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])}
                 style={{ padding:'7px 10px', borderRadius:10, fontSize:11, cursor:'pointer', textAlign:'left', minWidth:'110px', flex:'1 1 auto',
-                  border: active ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#f59e0b' : 'rgba(255,255,255,0.85)' }}>
+                  border: active ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#f59e0b' : 'rgba(255,255,255,0.6)' }}>
                 <div style={{ fontWeight:700, display:'flex', alignItems:'center', gap:5 }}>{r.icon} {r.label} {active && <span style={{ marginLeft:'auto', fontSize:10 }}>✕</span>}</div>
                 <div style={{ fontSize:8.5, opacity:0.75, marginTop:2, lineHeight:1.3 }}>{r.desc}</div>
               </button>
@@ -2723,7 +2723,7 @@ export const BbAutoConstructor: React.FC = () => {
           })}
         </div>
         <div style={{ marginTop:8, fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.45 }}>
-          💡 <b style={{ color:'rgba(255,255,255,0.85)' }}>Чем отличается от «Травм»:</b> травмы защищают <b>мышцу</b> (исключение или щадящая нагрузка), а мобильность — конкретные <b>движения</b>. Работают вместе, не дублируя друг друга.
+          💡 <b style={{ color:'rgba(255,255,255,0.6)' }}>Чем отличается от «Травм»:</b> травмы защищают <b>мышцу</b> (исключение или щадящая нагрузка), а мобильность — конкретные <b>движения</b>. Работают вместе, не дублируя друг друга.
         </div>
       </div>
 
@@ -2771,7 +2771,7 @@ export const BbAutoConstructor: React.FC = () => {
             );
           })()}
       <div style={H}>💪 Рабочие максимумы (кг)</div>
-      <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', fontSize:11, color:'rgba(255,255,255,0.85)' }}>
+      <div style={{ marginBottom:8, padding:'6px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>
         💡 Введите <b>рабочий вес на 5-8 повторений</b> (НЕ 1ПМ!) для каждой группы. Например: жим лёжа 100кг×8 → «Грудь 100».
         Для икр/пресса — вес в тренажёре. Веса используются для расчёта нагрузки по RIR и %1RM.
       </div>
@@ -3054,7 +3054,7 @@ export const BbAutoConstructor: React.FC = () => {
                           <span style={{ fontSize:8, color:volColor, fontWeight:700, whiteSpace:'nowrap' }}>MEV{lm.mev}·MAV{lm.mav}·MRV{lm.mrv}</span>
                         </div>
                       )}
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop:4 }}>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop:4 }}>
                         паттерн: {Object.entries(v.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'} · direct {v.directSets} · косв. {Math.round(v.indirectSets)}
                       </div>
                         </>);
@@ -3175,7 +3175,7 @@ export const BbAutoConstructor: React.FC = () => {
                       if (!pp || (!pp.weight && !pp.bodyFat && !pp.sex)) return null;
                       const leanMass = pp.weight && pp.bodyFat ? (pp.weight * (1 - pp.bodyFat/100)).toFixed(1) : null;
                       return (
-                        <div style={{ marginTop:3, fontSize:10, color:'rgba(255,255,255,0.85)' }}>
+                        <div style={{ marginTop:3, fontSize:10, color:'rgba(255,255,255,0.6)' }}>
                           <b>Patient:</b> {pp.sex || '—'} {pp.age ? `${pp.age}y` : '—'} {pp.weight ? `${pp.weight}kg` : '—'}{pp.height ? `/${pp.height}cm` : ''} {pp.bodyFat ? ` BF ${pp.bodyFat}%` : ''} {leanMass ? ` LBM ${leanMass}kg` : ''}
                         </div>
                       );
@@ -3290,7 +3290,7 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* Неделя selector with phase colors */}
+        {/* Week selector with phase colors */}
         <div style={{ marginTop:10 }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>
             Неделя {wk.week} из {W.length} · <span style={{ color:PHASE_COLORS[currentPhase] }}>{PHASE_LABELS[currentPhase]}</span>
@@ -3591,8 +3591,8 @@ export const BbAutoConstructor: React.FC = () => {
                           <Chip label="Подходы" value={edit.sets + '×' + edit.reps} color="#22c55e" />
                           <Chip label="RIR" value={String(e.rir)} color="#f59e0b" />
                           <Chip label="Вес" value={edit.weight + ' кг'} color="#60a5fa" />
-                          {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="rgba(255,255,255,0.85)" />}
-                          <Chip label="Группа" value={muscleLabel(e.muscle)} color="rgba(255,255,255,0.85)" />
+                          {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="rgba(255,255,255,0.55)" />}
+                          <Chip label="Группа" value={muscleLabel(e.muscle)} color="rgba(255,255,255,0.55)" />
                         </div>
 
                         {/* Разбивка по подходам (включая дроп-цепочки финального сета) */}
@@ -3761,7 +3761,7 @@ export const BbAutoConstructor: React.FC = () => {
         {(() => {
           const ws = weeklySetsFromBBPlan(W);
           const b = validatePlan({
-            weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerНеделя: bbDays, weakPoints,
+            weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints,
             readiness: ((prof.recovery ?? 7) * 10),
             trainingYears: bbTrainingYears,
             mrvMultiplier: pedAdapt.combinedMrvMultiplier,
@@ -3772,7 +3772,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ ...CARD, marginBottom:8, background:'rgba(220,38,38,0.04)', border:'1px solid rgba(220,38,38,0.15)' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#f87171', marginBottom:6 }}>🛡 Валидация плана</div>
               {b.map((bn, i) => (
-                <div key={i} style={{ fontSize:11, color:bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'rgba(255,255,255,0.85)', marginBottom:4, padding:'4px 6px', borderRadius:4, background:bn.level==='error'?'rgba(248,113,113,0.08)':bn.level==='warning'?'rgba(251,191,36,0.08)':'rgba(255,255,255,0.03)', borderLeft:'2px solid '+(bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'rgba(255,255,255,0.2)'), lineHeight:1.4 }}>
+                <div key={i} style={{ fontSize:11, color:bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'rgba(255,255,255,0.6)', marginBottom:4, padding:'4px 6px', borderRadius:4, background:bn.level==='error'?'rgba(248,113,113,0.08)':bn.level==='warning'?'rgba(251,191,36,0.08)':'rgba(255,255,255,0.03)', borderLeft:'2px solid '+(bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'rgba(255,255,255,0.2)'), lineHeight:1.4 }}>
                   <div style={{ fontWeight:700 }}>{bn.level==='error'?'⛔':bn.level==='warning'?'⚠':'ℹ'} {bn.title}</div>
                   <div style={{ opacity:0.7, marginTop:1 }}>{bn.detail}</div>
                 </div>
@@ -3787,7 +3787,7 @@ export const BbAutoConstructor: React.FC = () => {
           return (
             <div style={{ ...CARD, marginBottom:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 ПРОФ-цикл: {c.meta.title}</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.85)' }}>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.6)' }}>
                 <div>Упражнения: заданы циклом ({c.week1.reduce((s, d) => s + d.exercises.length, 0)} упр/день)</div>
                 <div>Фазы: {c.meta.phases && c.meta.phases.length > 0 ? c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ') : 'RIR-прогрессия'}</div>
                 <div>{c.meta.conditions.slice(0, 2).map((cond, i) => <div key={i}>• {cond}</div>)}</div>
@@ -4160,7 +4160,7 @@ export const BbAutoConstructor: React.FC = () => {
               profile={{
                 level: bbLevel,
                 goal: bbGoal,
-                daysPerНеделя: bbDays,
+                daysPerWeek: bbDays,
                 bodyWeight: prof.bodyWeight,
                 pmSquat: prof.pmSquat,
                 pmBench: prof.pmBench,
@@ -4244,7 +4244,7 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:8 }}>🎭 Пик-неделя (тапер ББ) · шоу {peakPrep.config.showDate}</div>
               <div style={{ marginBottom:10, fontSize:11 }}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <span style={{ color:'rgba(255,255,255,0.85)' }}>Категория:</span>
+                  <span style={{ color:'rgba(255,255,255,0.6)' }}>Категория:</span>
                   <select value={peakWeekCategory} onChange={e => applyPeakWeekToCurrentPlan(e.target.value as BBContestCategory)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', fontSize:11 }}>
                     <option value="mens_physique">{CONTEST_CATEGORY_LABELS.mens_physique}</option>
                     <option value="classic_physique">{CONTEST_CATEGORY_LABELS.classic_physique}</option>
@@ -4256,7 +4256,7 @@ export const BbAutoConstructor: React.FC = () => {
                     <option value="womens_physique">{CONTEST_CATEGORY_LABELS.womens_physique}</option>
                     <option value="womens_bb">{CONTEST_CATEGORY_LABELS.womens_bb}</option>
                   </select>
-                  <span style={{ color:'rgba(255,255,255,0.85)' }}>⭐ Специализация:</span>
+                  <span style={{ color:'rgba(255,255,255,0.6)' }}>⭐ Специализация:</span>
                   <select value={peakSpec} onChange={e => applyPeakWeekToCurrentPlan(peakWeekCategory, e.target.value as ContestSpecialization)} style={{ padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.05)', color:'#c084fc', border:'1px solid rgba(168,85,247,0.3)', fontSize:11 }}>
                     {(Object.keys(CONTEST_SPECIALIZATION_LABELS) as ContestSpecialization[]).map(s => (
                       <option key={s} value={s}>{CONTEST_SPECIALIZATION_LABELS[s]}</option>
@@ -4314,7 +4314,7 @@ export const BbAutoConstructor: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div style={{ marginTop:8, fontSize:11, color:'rgba(255,255,255,0.85)' }}>
+              <div style={{ marginTop:8, fontSize:11, color:'rgba(255,255,255,0.6)' }}>
                 {peakPrep.rationale.map((r, i) => <div key={i}>{r}</div>)}
               </div>
               <div style={{ marginTop:4, fontSize:9, color:'rgba(255,255,255,0.9)' }}>
@@ -4382,7 +4382,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ display:'flex', gap:4 }}>
               {W.map(w => {
                 const ph = phaseForWeek(w.week, bbWeeks);
-                return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:w.week===bbWeekSel?'1px solid ' + PHASE_COLORS[ph]:'1px solid rgba(255,255,255,0.08)', background:w.week===bbWeekSel?PHASE_COLORS[ph]+'20':'transparent', color:w.week===bbWeekSel?PHASE_COLORS[ph]:'rgba(255,255,255,0.85)' }}>{w.week}</button>;
+                return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:w.week===bbWeekSel?'1px solid ' + PHASE_COLORS[ph]:'1px solid rgba(255,255,255,0.08)', background:w.week===bbWeekSel?PHASE_COLORS[ph]+'20':'transparent', color:w.week===bbWeekSel?PHASE_COLORS[ph]:'rgba(255,255,255,0.6)' }}>{w.week}</button>;
               })}
             </div>
           </div>
@@ -4420,7 +4420,7 @@ export const BbAutoConstructor: React.FC = () => {
                       </div>
                     )}
                     {altExercises.length > 0 && <div style={{ fontSize:11, color:'rgba(255,255,255,0.85)' }}>Альтернативы: {altExercises.map(x => x.name).join(', ')}</div>}
-                    <div style={{ marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.04)', fontSize:11, color:'rgba(255,255,255,0.85)' }}>💡 {exerciseComment(e, weakPoints, '', currentPhase)}</div>
+                    <div style={{ marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.04)', fontSize:11, color:'rgba(255,255,255,0.6)' }}>💡 {exerciseComment(e, weakPoints, '', currentPhase)}</div>
                   </div>;
                 })}
               </div>
@@ -4620,8 +4620,8 @@ export const BbAutoConstructor: React.FC = () => {
                       <td style={{ padding:'4px 6px' }}>
                         {p.key === 'show_day' ? 'день шоу' : p.key === 'post_show' ? 'после шоу' : `${p.weekStart}–${p.weekEnd}`}
                       </td>
-                      <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.85)' }}>{p.dateStart} — {p.dateEnd}</td>
-                      <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.85)' }}>{p.note}</td>
+                      <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.6)' }}>{p.dateStart} — {p.dateEnd}</td>
+                      <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.6)' }}>{p.note}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -4831,9 +4831,9 @@ export const BbAutoConstructor: React.FC = () => {
               } catch { return null; }
             })()}
 
-            {/* 🧪 Test Peak Неделя */}
+            {/* 🧪 Test Peak Week */}
             <div style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧪 Test Peak Неделя (не меняет основной план)</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧪 Test Peak Week (не меняет основной план)</div>
               <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', marginBottom:8 }}>
                 Прогоните протокол за 3–4 недели до шоу и зафиксируйте реакцию — результат сохраняется ({'testPeakWeekId'}) и влияет на стратегию основной пик-недели.
               </div>
@@ -4989,9 +4989,9 @@ export const BbAutoConstructor: React.FC = () => {
               )}
             </div>
 
-            {/* 🎬 Таймлайн Show День */}
+            {/* 🎬 Таймлайн Show Day */}
             <div style={{ marginTop:10 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fbbf24', marginBottom:4 }}>🎬 Таймлайн Show День</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fbbf24', marginBottom:4 }}>🎬 Таймлайн Show Day</div>
               <div style={{ background:'rgba(251,191,36,0.04)', border:'1px solid rgba(251,191,36,0.12)', borderRadius:8, padding:8 }}>
                 {buildShowTimeline(configFromPlan(prepPlan)).map((t, i) => (
                   <div key={i} style={{ display:'grid', gridTemplateColumns:'80px 1fr', gap:8, padding:'4px 0', borderBottom: i < buildShowTimeline(configFromPlan(prepPlan)).length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', fontSize:10 }}>
@@ -5132,7 +5132,7 @@ export const BbAutoConstructor: React.FC = () => {
                           <td style={{ padding:'4px 6px' }}>{a.date}</td>
                           <td style={{ padding:'4px 6px', textAlign:'right', color: a.caloriesDelta !== 0 ? (a.caloriesDelta > 0 ? '#4ade80' : '#f87171') : 'rgba(255,255,255,0.85)' }}>{a.caloriesDelta > 0 ? '+' : ''}{a.caloriesDelta}</td>
                           <td style={{ padding:'4px 6px', textAlign:'right', color: a.cardioDelta !== 0 ? (a.cardioDelta > 0 ? '#4ade80' : '#f87171') : 'rgba(255,255,255,0.85)' }}>{a.cardioDelta > 0 ? '+' : ''}{a.cardioDelta}</td>
-                          <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.85)' }}>{a.weightStatus}</td>
+                          <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.6)' }}>{a.weightStatus}</td>
                           <td style={{ padding:'4px 6px', color:'rgba(255,255,255,0.9)', fontSize:9 }}>{a.reason}</td>
                         </tr>
                       ))}
@@ -5360,7 +5360,7 @@ export const BbAutoConstructor: React.FC = () => {
               padding: '6px 10px', borderRadius: 999, border: 'none', cursor: i < stepIdx ? 'pointer' : 'default',
               fontSize: 10, fontWeight: 800, minHeight: 32,
               background: prepStep === s.id ? 'linear-gradient(135deg,#ec4899,#be185d)' : 'rgba(255,255,255,0.05)',
-              color: prepStep === s.id ? '#fff' : 'rgba(255,255,255,0.85)',
+              color: prepStep === s.id ? '#fff' : 'rgba(255,255,255,0.6)',
             }}>{s.label}</button>
           ))}
         </div>
@@ -5372,7 +5372,7 @@ export const BbAutoConstructor: React.FC = () => {
             <select value={prepCat} onChange={e => setPrepCat(e.target.value as BBContestCategory)} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12 }}>
               {catOpts.map(c => <option key={c} value={c}>{CATEGORY_PROFILES[c].label}</option>)}
             </select>
-            {prepProfile.balanceNote && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', padding: '8px 10px', borderRadius: 10, background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.2)' }}>💡 {prepProfile.balanceNote}</div>}
+            {prepProfile.balanceNote && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', padding: '8px 10px', borderRadius: 10, background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.2)' }}>💡 {prepProfile.balanceNote}</div>}
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 130 }}>
@@ -5392,7 +5392,7 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Подготовка {Math.max(1, pcWeeks - prepTaper - 1)} нед → тапер {prepTaper} нед → пик-неделя (1) → шоу</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Подготовка {Math.max(1, pcWeeks - prepTaper - 1)} нед → тапер {prepTaper} нед → пик-неделя (1) → шоу</div>
 
             <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Дата соревнования (якорь фаз и тапера)</label>
             <input type="date" value={pcShowDate} onChange={e => e.target.value && setPcShowDate(e.target.value)} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', fontSize: 12, width: '100%', boxSizing: 'border-box' }} />
@@ -5401,7 +5401,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Доп. старты сезона (необязательно):</div>
             {prepComps.map(c => (
               <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <span style={{ fontWeight: 700, color: c.priority === 'A' ? '#fbbf24' : c.priority === 'B' ? '#60a5fa' : 'rgba(255,255,255,0.85)' }}>[{c.priority}]</span>
+                <span style={{ fontWeight: 700, color: c.priority === 'A' ? '#fbbf24' : c.priority === 'B' ? '#60a5fa' : 'rgba(255,255,255,0.6)' }}>[{c.priority}]</span>
                 <span style={{ flex: 1 }}>{c.name}</span>
                 <span style={{ color: 'rgba(255,255,255,0.85)' }}>{c.date}</span>
                 <button onClick={() => setPrepMainId(c.id)} style={{ ...chipBtn('', prepMainId === c.id), padding: '2px 6px', minHeight: 24, fontSize: 9 }}>★ главный</button>
@@ -5481,7 +5481,7 @@ export const BbAutoConstructor: React.FC = () => {
             {(() => {
               const p = getPattern(prepSplit);
               if (!p) return null;
-              return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>{p.description}</div>;
+              return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)' }}>{p.description}</div>;
             })()}
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Всего дней: {getPattern(prepSplit)?.sessionsPerRotation ?? '—'} / ротация {getPattern(prepSplit)?.rotationDays ?? '—'}</div>
 
@@ -5500,7 +5500,7 @@ export const BbAutoConstructor: React.FC = () => {
               Prep-цикл строит единый план подготовки (дефицит по категории), тапер последних {prepTaper} нед и пик-неделю под дату {pcShowDate}.
               Он будет применён в планировщике питания автоматически (вкладка «🏁 Тапер ББ» и дневные цели).
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Текущий вес: {profileWeight} кг · пол: {prepSex === 'female' ? 'женский' : 'мужской'} · категория: {CATEGORY_PROFILES[prepCat].label}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Текущий вес: {profileWeight} кг · пол: {prepSex === 'female' ? 'женский' : 'мужской'} · категория: {CATEGORY_PROFILES[prepCat].label}</div>
 
             {/* Стратегия объёма подготовки */}
             <div>
@@ -5546,9 +5546,9 @@ export const BbAutoConstructor: React.FC = () => {
                   {prepSeason.summary.map((s, i) => (
                     <button key={i} onClick={() => { setPrepResult(prepSeason.cycles[i]); setPrepStep('result'); }}
                       style={{ display: 'flex', alignItems: 'center', gap: 6, textAlign: 'left', padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>
-                      <span style={{ fontWeight: 700, color: s.priority === 'A' ? '#fbbf24' : 'rgba(255,255,255,0.85)' }}>[{s.priority ?? '—'}]</span>
+                      <span style={{ fontWeight: 700, color: s.priority === 'A' ? '#fbbf24' : 'rgba(255,255,255,0.6)' }}>[{s.priority ?? '—'}]</span>
                       <span style={{ flex: 1 }}>{s.name}</span>
-                      <span style={{ color: 'rgba(255,255,255,0.85)' }}>{s.date} · {s.totalWeeks} нед (подг {s.prepWeeks}+тапер {s.taperWeeks}+пик)</span>
+                      <span style={{ color: 'rgba(255,255,255,0.55)' }}>{s.date} · {s.totalWeeks} нед (подг {s.prepWeeks}+тапер {s.taperWeeks}+пик)</span>
                     </button>
                   ))}
                 </div>
@@ -5575,7 +5575,7 @@ export const BbAutoConstructor: React.FC = () => {
               })}
             </div>
 
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
               <div>⭐ Акцент: {prepResult.accentMuscles.length ? prepResult.accentMuscles.map(muscleRu).join(', ') : 'без акцента'}</div>
               <div>⬇ Минимальная нагрузка: {prepResult.minimalMuscles.length ? prepResult.minimalMuscles.map(muscleRu).join(', ') : 'не задана'} · {PREP_MINIMAL_MODE_LABELS[prepResult.minimalMode]}</div>
               <div>📐 Сплит: {getPattern(prepResult.config.splitPatternId || '')?.name ?? prepResult.config.splitPatternId}</div>
@@ -5607,7 +5607,7 @@ export const BbAutoConstructor: React.FC = () => {
             {/* Что учтено в объёме */}
             <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ fontWeight: 800, color: 'rgba(255,255,255,0.9)', marginBottom: 4 }}>🧮 Что учтено в объёме</div>
-              <div style={{ color: 'rgba(255,255,255,0.85)' }}>
+              <div style={{ color: 'rgba(255,255,255,0.6)' }}>
                 Цель: {prepResult.config.enhanced ? 'поддержание массы (PED)' : prepResult.config.experienceLevel} · стаж {prepResult.config.trainingYears ?? '—'} г · {prepResult.config.enhanced ? 'курс' : 'натурал'}
                 {prepResult.config.bodyFat != null ? ` · %жира ${prepResult.config.bodyFat}` : ''}
                 {prepResult.config.hrvMs != null ? ` · HRV ${prepResult.config.hrvMs}` : ''}
@@ -5631,11 +5631,11 @@ export const BbAutoConstructor: React.FC = () => {
                   ))}
                   <span style={{ padding: '3px 8px', borderRadius: 8, fontSize: 9, fontWeight: 700, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#fbbf24' }}>→ тапер ×0.6 → пик</span>
                 </div>
-                <div style={{ color: 'rgba(255,255,255,0.85)' }}>
+                <div style={{ color: 'rgba(255,255,255,0.6)' }}>
                   🎯 Целевой объём на группу мышц/нед: базовый {prepResult.volumePlan.targetSetsPerMusclePerWeek[0]}–{prepResult.volumePlan.targetSetsPerMusclePerWeek[1]} сетов
                   → <b style={{ color: '#93c5fd' }}>~{prepResult.volumePlan.scaledTargetSetsPerMusclePerWeek[0]}–{prepResult.volumePlan.scaledTargetSetsPerMusclePerWeek[1]}</b> с учётом PED/стажа/уровня
                 </div>
-                <div style={{ color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{prepResult.volumePlan.note}</div>
+                <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{prepResult.volumePlan.note}</div>
                 <div style={{ color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>База 10–15 сетов/группу/нед — для натурала/среднего стажа. У продвинутого атлета (стаж, PED, уровень) целевой объём выше — это уже заложено в плане. Объём подготовки снижается лишь умеренно; тапер — финальный спуск к пику.</div>
               </div>
             )}
@@ -5666,7 +5666,7 @@ export const BbAutoConstructor: React.FC = () => {
                   <div style={{ fontSize: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(251,146,60,0.06)', border: '1px solid rgba(251,146,60,0.2)' }}>
                     <div style={{ fontWeight: 800, color: '#fb923c', marginBottom: 4 }}>🏃 Кардио подготовки: ~{cp.minutesPerWeek} мин/нед · ~{cp.stepsPerDay} шагов/день</div>
                     <div style={{ color: 'rgba(255,255,255,0.7)' }}>{cp.zone}</div>
-                    <div style={{ color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{cp.note}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{cp.note}</div>
                   </div>
                 );
               } catch { return null; }
@@ -5739,7 +5739,7 @@ export const BbAutoConstructor: React.FC = () => {
                       {nt.waterMl ? ` · 💧 ${(nt.waterMl / 1000).toFixed(1)}л` : ''}
                       {nt.sodiumMg ? ` · Na ${nt.sodiumMg}мг` : ''}
                     </div>
-                    {nt.note && <div style={{ color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{nt.note}</div>}
+                    {nt.note && <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{nt.note}</div>}
                     <div style={{ color: 'rgba(255,255,255,0.85)', marginTop: 3 }}>Эти цели уже применяет планировщик питания (вкладка «🏁 Тапер ББ»).</div>
                   </div>
                 );
@@ -5761,7 +5761,7 @@ export const BbAutoConstructor: React.FC = () => {
                         </span>
                       ))}
                     </div>
-                    <div style={{ color: 'rgba(255,255,255,0.85)' }}>
+                    <div style={{ color: 'rgba(255,255,255,0.6)' }}>
                       <div>⚖ {np.refeedStrategy}</div>
                       <div>🍗 {np.mealTiming.join(' ')}</div>
                       <div>💊 {np.micronutrients.join(' ')}</div>

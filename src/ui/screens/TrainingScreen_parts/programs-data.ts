@@ -15,11 +15,11 @@ export const GOAL_FILTER_OPTIONS: { value: string; label: string; goal?: string 
 
 /** Files supplied by the user. These are intentionally raw files, not parsed programs. */
 export const ORIGINAL_PROGRAM_FILES = [
-  { id: 'original-01', name: '8-дневный сплит (без дня плеч и рук)', file: 'original-01.md', textFile: 'original-01.txt', format: 'MD', daysPerНеделя: 8 },
-  { id: 'original-02', name: 'Базовый переработанный сплит', file: 'original-02.docx', textFile: 'original-02.txt', format: 'DOCX', daysPerНеделя: 5 },
-  { id: 'original-03', name: 'Тренировочный план Апрель', file: 'original-03.docx', textFile: 'original-03.txt', format: 'DOCX', daysPerНеделя: 5 },
-  { id: 'original-04', name: 'Тренировочный план: ягодицы', file: 'original-04.md', textFile: 'original-04.txt', format: 'MD', daysPerНеделя: 8 },
-  { id: 'original-05', name: 'Тренировочный план Июль: масса', file: 'original-05.docx', textFile: 'original-05.txt', format: 'DOCX', daysPerНеделя: 9 },
+  { id: 'original-01', name: '8-дневный сплит (без дня плеч и рук)', file: 'original-01.md', textFile: 'original-01.txt', format: 'MD', daysPerWeek: 8 },
+  { id: 'original-02', name: 'Базовый переработанный сплит', file: 'original-02.docx', textFile: 'original-02.txt', format: 'DOCX', daysPerWeek: 5 },
+  { id: 'original-03', name: 'Тренировочный план Апрель', file: 'original-03.docx', textFile: 'original-03.txt', format: 'DOCX', daysPerWeek: 5 },
+  { id: 'original-04', name: 'Тренировочный план: ягодицы', file: 'original-04.md', textFile: 'original-04.txt', format: 'MD', daysPerWeek: 8 },
+  { id: 'original-05', name: 'Тренировочный план Июль: масса', file: 'original-05.docx', textFile: 'original-05.txt', format: 'DOCX', daysPerWeek: 9 },
 ] as const;
 
 export const ORIGINAL_PROGRAMS_URL = '/original-programs/';
@@ -53,7 +53,7 @@ export const WOMENS_PROGRAMS: FullProgram[] = [
   {
     id: 'women_glutes_hips', name: 'Ягодицы и бёдра (Женский)', author: 'Health Engine',
     type: 'Lower Body 4x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '50-65',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '50-65',
     description: 'Специализированная программа для женщин с акцентом на ягодицы и бёдра. 4 дня в неделю: два нижних дня (тяжёлый и пампинг), один верхний лёгкий, один фулбоди.',
     targetAudience: 'Женщины со средним опытом тренировок, которые хотят акцентировать ягодицы и бёдра, сохраняя баланс верха.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'band'],
@@ -105,7 +105,7 @@ export const WOMENS_PROGRAMS: FullProgram[] = [
   {
     id: 'women_hourglass', name: 'Песочные часы (Женский)', author: 'Health Engine',
     type: 'Glutes + Shoulders 4x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '50-60',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '50-60',
     description: 'Программа для создания пропорций "песочные часы": акцент на ягодицы и плечи для визуального сужения талии. 4 дня: тяжёлые ягодицы, плечи+спина, пампинг ягодиц, фулбоди тонинг.',
     targetAudience: 'Женщины, которые хотят визуально расширить плечи и ягодицы для пропорции песочных часов.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'band'],
@@ -156,7 +156,7 @@ export const WOMENS_PROGRAMS: FullProgram[] = [
   {
     id: 'women_start', name: 'Старт (Женский, начинающие)', author: 'Health Engine',
     type: 'Full Body 3x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'beginner',
-    durationWeeks: 6, daysPerНеделя: 3, sessionTimeMin: '40-50',
+    durationWeeks: 6, daysPerWeek: 3, sessionTimeMin: '40-50',
     description: 'Программа для начинающих женщин. 3 тренировки в неделю на всё тело. Простые, безопасные упражнения с акцентом на технику и привыкание к нагрузкам.',
     targetAudience: 'Женщины, которые только начинают заниматься в зале (0-3 месяца опыта).',
     equipmentNeeded: ['dumbbell', 'cable', 'band'],
@@ -200,8 +200,8 @@ export const WOMENS_PROGRAMS: FullProgram[] = [
   },
   {
     id: 'women_glutes_8day', name: 'Ягодицы 8-дневный (Женский)', author: 'Health Engine',
-    type: 'Glutes 8-День Rotating Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 8, sessionTimeMin: '55-70',
+    type: 'Glutes 8-Day Rotating Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
+    durationWeeks: 8, daysPerWeek: 8, sessionTimeMin: '55-70',
     description: '8-дневный цикл с приоритетом ягодиц и задней цепи. Ягодицы и бицепс бедра получают 2 тяжёлых и 1 памповый стимул. Квадрицепс остаётся в программе без перетягивания нагрузки. Верх тела — поддерживающий объём.',
     targetAudience: 'Женщины со средним/продвинутым опытом, цель — ягодицы и форма бёдер.',
     equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable', 'smith_machine', 'band'],
@@ -286,8 +286,8 @@ export const WOMENS_PROGRAMS: FullProgram[] = [
 export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'split_8day_advanced', name: '8-дневный сплит (Продвинутый)', author: 'Health Engine',
-    type: '8-День Rotating Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'advanced',
-    durationWeeks: 8, daysPerНеделя: 8, sessionTimeMin: '60-75',
+    type: '8-Day Rotating Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'advanced',
+    durationWeeks: 8, daysPerWeek: 8, sessionTimeMin: '60-75',
     description: 'Продвинутый 8-дневный сплит с чередованием тяжёлых и пампинговых тренировок. Дни: квадрицепс тяжёлый, грудь пампинг, спина тяжёлая, кардио/восстановление, бицепс бедра тяжёлый, грудь тяжёлая, спина пампинг, полный отдых. Каждая мышечная группа прорабатывается дважды за цикл с разной интенсивностью.',
     targetAudience: 'Продвинутые атлеты (2+ года опыта), использующие фармакологическую поддержку.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -371,7 +371,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'ppl_6day_classic', name: 'Push/Pull/Legs 6 дней (Классика)', author: 'Health Engine',
     type: 'PPL 6x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 6, sessionTimeMin: '60-70',
+    durationWeeks: 8, daysPerWeek: 6, sessionTimeMin: '60-70',
     description: 'Классический PPL x2 в неделю. Push: грудь+плечи+трицепс, Pull: спина+бицепс, Legs: ноги. Первый раунд — силовой (6-8 повт), второй — гипертрофийный (10-12 повт).',
     targetAudience: 'Средний уровень (1-3 года). Цель — мышечная масса при высокой частоте тренировок.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -437,7 +437,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'upper_lower_4day', name: 'Upper/Lower 4 дня (Сила+Масса)', author: 'Health Engine',
     type: 'Upper/Lower 4x/week', goal: 'strength', direction: 'strength', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '55-75',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '55-75',
     description: '4-дневный Upper/Lower: два верхних дня (силовой и гипертрофийный), два нижних (силовой и гипертрофийный). Чередование для оптимального соотношения сила/масса.',
     targetAudience: 'Средний уровень. Хороший баланс между силой и гипертрофией. Идеально при 4 днях в неделю.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -489,7 +489,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'fullbody_3day_beginner', name: 'Full Body 3 дня (Начинающие)', author: 'Health Engine',
     type: 'Full Body 3x/week', goal: 'strength', direction: 'strength', level: 'beginner',
-    durationWeeks: 6, daysPerНеделя: 3, sessionTimeMin: '45-55',
+    durationWeeks: 6, daysPerWeek: 3, sessionTimeMin: '45-55',
     description: 'Программа для начинающих: 3 тренировки в неделю на всё тело. Компаунд-фокус: присед, жим, тяга + 2-3 подсобных упражнения. Простая прогрессия.',
     targetAudience: 'Начинающие (0-6 месяцев). Освоение базовых движений, привыкание к регулярным тренировкам.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'bench', 'rack'],
@@ -531,7 +531,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'arnold_split_6day', name: 'Арнольд Сплит 6 дней', author: 'Health Engine',
     type: 'Arnold Split 6x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'advanced',
-    durationWeeks: 8, daysPerНеделя: 6, sessionTimeMin: '60-75',
+    durationWeeks: 8, daysPerWeek: 6, sessionTimeMin: '60-75',
     description: 'Классический Арнольд-сплит: Грудь+Спина / Плечи+Руки / Ноги ×2 в неделю. Высокий объём, двойная частота, антагонистические суперсеты опционально.',
     targetAudience: 'Продвинутые атлеты (2+ года). Максимальная гипертрофия при достаточном восстановлении.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -600,7 +600,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'fullbody_3day_strength', name: 'Фулбоди 3 дня (Сила)', author: 'BBH',
     type: 'Full Body 3x/week', goal: 'strength', direction: 'strength', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 3, sessionTimeMin: '60-75',
+    durationWeeks: 8, daysPerWeek: 3, sessionTimeMin: '60-75',
     description: 'Силовая программа на всё тело. 3 дня в неделю, каждое занятие — полный фулбоди с акцентом на базовые движения: присед, жим, тяга. Прогрессия весов каждую неделю. Минимум изоляции, максимум эффективности.',
     targetAudience: 'Средний уровень (6+ мес). Атлеты, которые хотят наращивать силу во всех базовых движениях одновременно при 3 тренировках в неделю.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'rack', 'bench'],
@@ -642,7 +642,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'split_5day_bb', name: 'Сплит 5 дней (Классический бодибилдинг)', author: 'BBH',
     type: 'Bodybuilding Split 5x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 5, sessionTimeMin: '60-75',
+    durationWeeks: 8, daysPerWeek: 5, sessionTimeMin: '60-75',
     description: 'Классический бодибилдерский сплит на 5 дней. Каждый день — отдельная мышечная группа: грудь, спина, плечи, ноги, руки. Высокий объём, диапазон 8-12 повторов для максимальной гипертрофии.',
     targetAudience: 'Средний/опытный уровень. Атлеты, которые хотят максимального внимания каждой мышечной группе при 5 тренировках в неделю.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -700,7 +700,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'pl_3day_prep', name: 'Пауэрлифтинг (3 дня, подготовка)', author: 'BBH',
     type: 'Powerlifting 3x/week', goal: 'powerlifting', direction: 'strength', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 3, sessionTimeMin: '60-75',
+    durationWeeks: 8, daysPerWeek: 3, sessionTimeMin: '60-75',
     description: 'Подготовительная программа по пауэрлифтингу: присед, жим, тяга — каждое движение в свой день. RPE 8 на основных подходах, специализированная подсобка. Паузные и вариативные движения для слабых точек.',
     targetAudience: 'Средний уровень и выше. Атлеты, готовящиеся к соревнованиям по пауэрлифтингу или желающие специализироваться в большой тройке.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'rack', 'bench'],
@@ -739,7 +739,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'cut_4day_volume', name: 'Сушка (4 дня, высокообъёмный)', author: 'BBH',
     type: 'Cutting 4x/week', goal: 'peaking', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '60-90',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '60-90',
     description: 'Программа для периода сушки/жиросжигания. 4 дня в неделю с высоким объёмом, суперсетами и обязательным кардио. Сохраняет мышечную массу при дефиците калорий. Упор на метаболический стресс и плотность тренировки.',
     targetAudience: 'Средний уровень и выше. Атлеты на дефиците калорий, которые хотят сохранить мышцы и ускорить жиросжигание.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -786,7 +786,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'ppl_6day_detailed', name: 'Гипертрофия 6 дней (PPL x2)', author: 'BBH',
     type: 'PPL 6x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'advanced',
-    durationWeeks: 8, daysPerНеделя: 6, sessionTimeMin: '60-75',
+    durationWeeks: 8, daysPerWeek: 6, sessionTimeMin: '60-75',
     description: 'Детальный PPL x2 в неделю для максимальной гипертрофии. Первый раунд — силовой (6-8 повт, RPE 8-9), второй — гипертрофийный (10-15 повт, RPE 7.5-8.5). Каждая мышечная группа тренируется дважды с разной нагрузкой.',
     targetAudience: 'Продвинутые атлеты (2+ года). Цель — максимальный рост мышечной массы при высокой частоте тренировок и хорошем восстановлении.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -855,7 +855,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'calisthenics_4day', name: 'Воркаут/Калистеника (4 дня)', author: 'BBH',
     type: 'Calisthenics 4x/week', goal: 'athletic', direction: 'both', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '50-70',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '50-70',
     description: 'Программа по калистенике/воркауту на 4 дня в неделю. День 1: горизонтальные тяги+жимы, День 2: ноги с весом тела, День 3: вертикальные жимы+кор, День 4: вертикальные тяги+статика. Развивает силу, контроль тела и мышечную выносливость.',
     targetAudience: 'Средний уровень. Атлеты, тренирующиеся с весом тела или на турниках/брусьях. Цель — функциональная сила, контроль тела и эстетика через калистенику.',
     equipmentNeeded: ['bodyweight', 'band'],
@@ -902,7 +902,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'rehab_3day', name: 'Реабилитация/Возвращение (3 дня)', author: 'BBH',
     type: 'Rehab 3x/week', goal: 'rehab', direction: 'both', level: 'beginner',
-    durationWeeks: 6, daysPerНеделя: 3, sessionTimeMin: '35-50',
+    durationWeeks: 6, daysPerWeek: 3, sessionTimeMin: '35-50',
     description: 'Программа для возвращения к тренировкам после перерыва, травмы или для начинающих с осторожным подходом. 3 дня в неделю: лёгкий фулбоди, кардио+мобильность, средний фулбоди. Упор на форму, контроль и постепенное увеличение нагрузки.',
     targetAudience: 'Начинающие, возвращающиеся после перерыва, или атлеты после лёгких травм. Все, кому нужен плавный вход в тренировочный режим.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'bench'],
@@ -945,7 +945,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'home_3day_db', name: 'Домашняя тренировка (3 дня, с гантелями)', author: 'BBH',
     type: 'Home 3x/week', goal: 'strength', direction: 'strength', level: 'beginner',
-    durationWeeks: 8, daysPerНеделя: 3, sessionTimeMin: '45-60',
+    durationWeeks: 8, daysPerWeek: 3, sessionTimeMin: '45-60',
     description: 'Программа для домашних тренировок с гантелями. 3 дня в неделю на всё тело. Минимум оборудования: пара гантелей и коврик. Идеально для тех, кто тренируется дома.',
     targetAudience: 'Начинающие и средний уровень, тренирующиеся дома с гантелями. Не требуется доступ к залу.',
     equipmentNeeded: ['dumbbell', 'bodyweight'],
@@ -991,7 +991,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'powerlift_peak_3day', name: 'Пауэрлифтинг — пик (3 дня, 4 недели)', author: 'Health Engine',
     type: 'Powerlifting Peak 3x/week', goal: 'powerlifting', direction: 'strength', level: 'advanced',
-    durationWeeks: 4, daysPerНеделя: 3, sessionTimeMin: '60-75',
+    durationWeeks: 4, daysPerWeek: 3, sessionTimeMin: '60-75',
     description: 'Программа пикинга для соревнований по пауэрлифтингу. 3 тренировки в неделю: присед, жим, становая. Интенсивность растёт с RPE 8 до 9.5 по неделям, объём снижается к пику.',
     targetAudience: 'Опытные пауэрлифтеры, готовящиеся к соревнованиям. Оптимально за 4 недели до старта.',
     equipmentNeeded: ['barbell', 'rack', 'bench', 'plates', 'cable', 'machine'],
@@ -1075,17 +1075,17 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
       },
       { week: 4, phase: 'peaking', volumeMultiplier: 0.5, intensityMultiplier: 1.15, deload: false,
         days: [
-          { day: 1, name: 'Н1: Присед (RPE 9.5) — ПИК', focus: 'Squat — Peak Неделя', warmup: 'Пустой гриф, ramp-up + активация ЦНС (прыжки)',
+          { day: 1, name: 'Н1: Присед (RPE 9.5) — ПИК', focus: 'Squat — Peak Week', warmup: 'Пустой гриф, ramp-up + активация ЦНС (прыжки)',
             exercises: [
               { name: 'Присед (соревновательный)', sets: 1, reps: '1', rpe: 9.5, rir: 0.5, restSec: 360, notes: 'Максимальный сингл', progression: '+2.5 кг' },
               { name: 'Присед с паузой', sets: 1, reps: '1', rpe: 8, rir: 2, restSec: 240, notes: 'Лёгкий сингл', progression: '+2.5 кг' },
             ], cooldown: 'Растяжка, массаж' },
-          { day: 2, name: 'Н2: Жим (RPE 9.5) — ПИК', focus: 'Bench — Peak Неделя', warmup: 'Пустой гриф, ramp-up + активация',
+          { day: 2, name: 'Н2: Жим (RPE 9.5) — ПИК', focus: 'Bench — Peak Week', warmup: 'Пустой гриф, ramp-up + активация',
             exercises: [
               { name: 'Жим лёжа (соревновательный)', sets: 1, reps: '1', rpe: 9.5, rir: 0.5, restSec: 360, notes: 'Максимальный сингл', progression: '+2.5 кг' },
               { name: 'Жим с паузой', sets: 1, reps: '1', rpe: 8, rir: 2, restSec: 240, notes: 'Лёгкий сингл', progression: '+2.5 кг' },
             ], cooldown: 'Растяжка' },
-          { day: 3, name: 'Н3: Становая (RPE 9.5) — ПИК', focus: 'Deadlift — Peak Неделя', warmup: 'RDL лёгкий, ramp-up + активация',
+          { day: 3, name: 'Н3: Становая (RPE 9.5) — ПИК', focus: 'Deadlift — Peak Week', warmup: 'RDL лёгкий, ramp-up + активация',
             exercises: [
               { name: 'Становая (соревновательная)', sets: 1, reps: '1', rpe: 9.5, rir: 0.5, restSec: 420, notes: 'Максимальный сингл', progression: '+5 кг' },
               { name: 'Дефицит тяга', sets: 1, reps: '1', rpe: 8, rir: 2, restSec: 240, notes: 'Лёгкий сингл', progression: '+5 кг' },
@@ -1097,7 +1097,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'contest_cut_5day', name: 'Конкурсная сушка (5 дней, 8-12 недель)', author: 'Health Engine',
     type: 'Contest Prep 5x/week', goal: 'peaking', direction: 'bodybuilding', level: 'advanced',
-    durationWeeks: 10, daysPerНеделя: 5, sessionTimeMin: '60-75',
+    durationWeeks: 10, daysPerWeek: 5, sessionTimeMin: '60-75',
     description: 'Программа конкурсной сушки: 5 тренировок в неделю с высоким объёмом (12-20 повторов), коротким отдыхом (60-90 сек), дроп-сетами и суперсетами. Ежедневное кардио 30 мин.',
     targetAudience: 'Соревнующиеся бодибилдеры на сушке. Опытные атлеты, готовящиеся к выступлению.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -1160,7 +1160,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'five_three_one_4day', name: 'Силовой цикл 5/3/1 (4 дня)', author: 'Health Engine / Wendler',
     type: '5/3/1 4x/week', goal: 'strength', direction: 'strength', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '50-65',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '50-65',
     description: 'Программа на основе Wendler 5/3/1. 4 тренировки: присед, жим, становая, OHP. Каждый день: основное движение 5/3/1 + дополнительная работа 5x10 (BBB-стиль).',
     targetAudience: 'Средний уровень. Медленный, но стабильный прогресс. Хорошо совмещается с другими видами спорта.',
     equipmentNeeded: ['barbell', 'rack', 'bench', 'plates', 'dumbbell', 'cable'],
@@ -1202,7 +1202,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'hyper_back_4day', name: 'Гипертрофия спины (4 дня, спец.)', author: 'Health Engine',
     type: 'Back Specialization 4x/week', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '55-70',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '55-70',
     description: 'Специализация на спине: 2 дня спины (толщина + ширина), 1 день ног (поддерживающий), 1 день грудь+плечи+руки (поддерживающий). Максимальный объём на спину при минимальной нагрузке на остальные группы.',
     targetAudience: 'Атлеты, желающие расширить спину и улучшить V-образный силуэт. Отстающая спина при хорошем развитии остальных групп.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -1251,7 +1251,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'functional_athletic_3day', name: 'Функциональный/Атлетический (3 дня)', author: 'Health Engine',
     type: 'Functional/Athletic 3x/week', goal: 'athletic', direction: 'both', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 3, sessionTimeMin: '55-75',
+    durationWeeks: 8, daysPerWeek: 3, sessionTimeMin: '55-75',
     description: 'Функциональная программа для развития атлетизма. Включает олимпийские движения, плиометрику, броски медбола и фермерскую прогулку. Развитие мощности, скорости и силовой выносливости.',
     targetAudience: 'Спортсмены и атлеты, желающие улучшить функциональные качества. Кроссфит-атлеты и единоборцы.',
     equipmentNeeded: ['barbell', 'dumbbell', 'kettlebell', 'rack', 'bench', 'bodyweight'],
@@ -1293,7 +1293,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'minimalist_2day', name: 'Минималистичный (2 дня, занятые люди)', author: 'Health Engine',
     type: 'Full Body 2x/week', goal: 'strength', direction: 'strength', level: 'beginner',
-    durationWeeks: 8, daysPerНеделя: 2, sessionTimeMin: '35-50',
+    durationWeeks: 8, daysPerWeek: 2, sessionTimeMin: '35-50',
     description: 'Минималистичная программа для занятых людей. 2 тренировки в неделю: Full Body A и Full Body B. Базовые движения с умеренным объёмом. Минимум времени, максимум эффективности.',
     targetAudience: 'Занятые люди, которые могут тренироваться только 2 раза в неделю. Поддержание формы и медленный, но стабильный прогресс.',
     equipmentNeeded: ['barbell', 'dumbbell', 'rack', 'bench', 'bodyweight'],
@@ -1326,8 +1326,8 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   },
   {
     id: 'basic_reworked_4day', name: 'Базовый переработанный (4 дня)', author: 'Health Engine',
-    type: '4-День Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '60-75',
+    type: '4-Day Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '60-75',
     description: 'Классический 4-дневный сплит: Грудь+Трицепс, Спина+Бицепс, Плечи+Ноги лёгкие, Ноги тяжёлые+Пресс. Оптимальный баланс объёма и восстановления для натурального тренинга и лёгкой фармподдержки.',
     targetAudience: 'Средний уровень (1-3 года). Цель — мышечная масса и пропорциональное развитие.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -1386,8 +1386,8 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   },
   {
     id: 'april_plan_5day', name: 'Тренировочный план Апрель (5 дней)', author: 'Health Engine',
-    type: '5-День Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
-    durationWeeks: 8, daysPerНеделя: 5, sessionTimeMin: '60-80',
+    type: '5-Day Split', goal: 'hypertrophy', direction: 'bodybuilding', level: 'intermediate',
+    durationWeeks: 8, daysPerWeek: 5, sessionTimeMin: '60-80',
     description: '5-дневный сплит с тяжёлыми днями на грудь и спину, днём ног и комбинированным днём плеч+рук. День 3 — отдых/кардио для восстановления ЦНС. Высокий объём для опытных атлетов.',
     targetAudience: 'Средний и продвинутый уровень. Для атлетов на курсе или с отличным восстановлением.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -1450,7 +1450,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'gvt_3day', name: 'Немецкий объёмный тренинг (GVT) — 3 дня', author: 'Health Engine',
     type: 'GVT 10x10', goal: 'hypertrophy', level: 'advanced',
-    durationWeeks: 8, daysPerНеделя: 3, sessionTimeMin: '60-75',
+    durationWeeks: 8, daysPerWeek: 3, sessionTimeMin: '60-75',
     description: 'Метод 10×10: 10 подходов по 10 повторений с 60% 1ПМ и 90-секундным отдыхом между подходами. Метаболический стресс + огромный объём. Классика гипертрофии по Чарльзу Поликвину.',
     targetAudience: 'Продвинутые атлеты (2+ года). Высокая работоспособность обязательна. Не для новичков.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'rack', 'bench'],
@@ -1487,7 +1487,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'fst7_4day', name: 'FST-7 (Fascia Stretch Training) — 4 дня', author: 'Health Engine',
     type: 'FST-7 Split', goal: 'hypertrophy', level: 'advanced',
     direction: 'bodybuilding',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '60-75',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '60-75',
     description: 'FST-7 по Хэни Рэмбоду: FST-7 (Fascia Stretch Training) — 7 подходов по 12 повторений с 30-секундным отдыхом для пампинга и растяжения фасции. Сочетание тяжёлых базовых подходов с пампинговой добивкой.',
     targetAudience: 'Продвинутые атлеты. Требуется хорошая связь мозг-мышцы для эффективного FST-7.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'machine', 'rack', 'bench'],
@@ -1534,7 +1534,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'cluster_sets_3day', name: 'Кластерные сеты (Сила) — 3 дня', author: 'Health Engine',
     type: 'Cluster Set Strength', goal: 'strength', level: 'advanced',
     direction: 'strength',
-    durationWeeks: 6, daysPerНеделя: 3, sessionTimeMin: '70-85',
+    durationWeeks: 6, daysPerWeek: 3, sessionTimeMin: '70-85',
     description: 'Кластерные сеты — 5 кластеров по (3×2) с 20-секундным отдыхом внутри кластера и 2.5-3 мин между кластерами. Позволяет работать с весами 85-90% 1ПМ при большом общем объёме. Для максимальной силы.',
     targetAudience: 'Продвинутые атлеты с опытом силовых циклов. Требуется знание точного 1ПМ.',
     equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'rack', 'bench'],
@@ -1570,7 +1570,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
   {
     id: 'competition_peak_5day', name: 'Подготовка к соревнованиям (8 нед) — 5 дней', author: 'Health Engine',
     type: 'Competition Peak', goal: 'peaking', level: 'advanced',
-    durationWeeks: 8, daysPerНеделя: 5, sessionTimeMin: '60-90',
+    durationWeeks: 8, daysPerWeek: 5, sessionTimeMin: '60-90',
     description: 'Пиковый 8-недельный цикл с волновой периодизацией: блок объёма → блок силы → блок мощности → пик. Подготовка к соревнованиям по пауэрлифтингу или пиковому выступлению. 5 тренировок в неделю.',
     targetAudience: 'Соревнующиеся атлеты, опыт 2+ года. Требуется знание точных 1ПМ в трёх движениях.',
     direction: 'strength',
@@ -1625,7 +1625,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'texas_method', name: 'Texas Method', author: 'Glenn Pendlay / Mark Rippetoe',
     type: 'Full Body 3x/week', goal: 'strength', level: 'intermediate',
     direction: 'strength',
-    durationWeeks: 8, daysPerНеделя: 3, sessionTimeMin: '60-90',
+    durationWeeks: 8, daysPerWeek: 3, sessionTimeMin: '60-90',
     description: 'Классическая промежуточная силовая программа: день объёма (5×5), лёгкий день (активное восстановление/техника), день интенсивности (1 рабочий подход 5 с новым ПМ). Прогресс за счёт еженедельного повышения рабочего веса в интенсивный день.',
     targetAudience: 'Атлеты после линейной прогрессии (Starting Strength), средний уровень.',
     equipmentNeeded: ['barbell', 'rack', 'bench'],
@@ -1658,7 +1658,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'madcow_5x5', name: 'Madcow 5x5', author: 'Bill Starr / Madcow',
     type: 'Full Body 3x/week', goal: 'strength', level: 'intermediate',
     direction: 'strength',
-    durationWeeks: 12, daysPerНеделя: 3, sessionTimeMin: '60-90',
+    durationWeeks: 12, daysPerWeek: 3, sessionTimeMin: '60-90',
     description: 'Промежуточная линейная программа с волнообразной нагрузкой внутри недели: пн средний, ср лёгкий, пт тяжёлый (новый рекорд 5×5). Еженедельная прогрессия 2.5%.',
     targetAudience: 'После Texas Method / линейной прогрессии.',
     equipmentNeeded: ['barbell', 'rack', 'bench'],
@@ -1691,7 +1691,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'doggcrap_dc', name: 'Doggcrapp (DC) Training', author: 'Dante Trudel',
     type: 'High-Intensity Split 3-5x/week', goal: 'hypertrophy', level: 'advanced',
     direction: 'bodybuilding',
-    durationWeeks: 12, daysPerНеделя: 3, sessionTimeMin: '45-60',
+    durationWeeks: 12, daysPerWeek: 3, sessionTimeMin: '45-60',
     description: 'Высокоинтенсивный бодибилдинг-протокол: низкая частота, 1 рабочий подход до отказа с rest-pause, негативы, растяжка мышцы после. Прогресс = рост веса/повторений.',
     targetAudience: 'Продвинутые бодибилдеры (часто на курсе), строгое ведение журнала.',
     equipmentNeeded: ['barbell', 'dumbbell', 'machine', 'cable'],
@@ -1724,7 +1724,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'nsuns_531', name: 'nSuns 5/3/1 (4-day)', author: 'nSuns (по Wendler)',
     type: 'Upper/Lower 4x/week', goal: 'strength', level: 'intermediate',
     direction: 'strength',
-    durationWeeks: 12, daysPerНеделя: 4, sessionTimeMin: '70-100',
+    durationWeeks: 12, daysPerWeek: 4, sessionTimeMin: '70-100',
     description: 'Популярный гибрид 5/3/1 + большой объём (5/3/1 + FSL AMRAP + дополнительные тяги/жимы с % от тренировочного максимума). Высокий объём КПШ, прогресс за счёт +протяжки ТМ.',
     targetAudience: 'Средний-продвинутый пауэрлифтинг/пауэрбилдинг.',
     equipmentNeeded: ['barbell', 'rack', 'bench', 'dumbbell', 'cable'],
@@ -1762,7 +1762,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'smolov_jr_bench', name: 'Smolov Jr (жим)', author: 'Смолов',
     type: 'Bench specialisation 4x/week', goal: 'peaking', level: 'advanced',
     direction: 'strength',
-    durationWeeks: 3, daysPerНеделя: 4, sessionTimeMin: '45-70',
+    durationWeeks: 3, daysPerWeek: 4, sessionTimeMin: '45-70',
     description: 'Специализация на жиме лёжа 4×/нед с высокой частотой и прогрессией веса. Короткий пик-блок 3 недели. Высокая нагрузка на плечи/трицепс.',
     targetAudience: 'Продвинутые, нужен опыт и восстановление; не чаще 1-2 раза в год.',
     equipmentNeeded: ['barbell', 'bench', 'rack'],
@@ -1795,7 +1795,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'rts_emerging_strategies', name: 'RTS Emerging Strategies (Tuchscherer)', author: 'Mike Tuchscherer',
     type: 'RPE-based Powerlifting 4x/week', goal: 'powerlifting', level: 'advanced',
     direction: 'strength',
-    durationWeeks: 8, daysPerНеделя: 4, sessionTimeMin: '75-100',
+    durationWeeks: 8, daysPerWeek: 4, sessionTimeMin: '75-100',
     description: 'Авторегулируемая программа пауэрлифтинга на основе RPE. Каждый подход оценивается по шкале 1-10, объём и интенсивность регулируются по текущей готовности. Emerging Strategies: fatigue per set, load drop 5-7%, repetition conservation.',
     targetAudience: 'Продвинутые пауэрлифтеры с опытом RPE-оценки ≥6 мес. Соревнующиеся и те, кто готовится к старту.',
     equipmentNeeded: ['barbell', 'bench', 'rack', 'dumbbell'],
@@ -1845,7 +1845,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'westside_conjugate', name: 'Westside Conjugate Method (Шаблон)', author: 'Louie Simmons / Westside Barbell',
     type: 'Conjugate 4x/week (ME/DE)', goal: 'powerlifting', level: 'advanced',
     direction: 'strength',
-    durationWeeks: 3, daysPerНеделя: 4, sessionTimeMin: '90-120',
+    durationWeeks: 3, daysPerWeek: 4, sessionTimeMin: '90-120',
     description: 'Сопряжённый метод Westside: максимальное усилие (ME) + динамическое усилие (DE). Ротация основных упражнений каждые 1-2 недели. Резина и цепи для аккомодации сопротивления.',
     targetAudience: 'Продвинутые пауэрлифтеры, выступающие в экипировке или без. Требует доступа к резине/цепям.',
     equipmentNeeded: ['barbell', 'bench', 'rack', 'dumbbell', 'band'],
@@ -1855,7 +1855,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     deloadProtocol: 'Каждые 4-6 нед — неделя без ME/DE: лёгкая работа 3×10 @50-60%.',
     customization: ['Ротировать ME-вариации каждые 1-2 недели.', 'Выбирать вариации под слабые точки.', 'DE вес: 50-60% 1ПМ + 25% натяжение резины.'],
     weeks: [
-      { week: 1, phase: 'Неделя 1 — ME/DE split', volumeMultiplier: 1, intensityMultiplier: 1, deload: false, days: [
+      { week: 1, phase: 'Week 1 — ME/DE split', volumeMultiplier: 1, intensityMultiplier: 1, deload: false, days: [
         { day: 1, name: 'Пн — ME Upper (Макс. усилие — верх)', focus: 'Max Effort Bench variation', warmup: 'Рамп до 1-3ПМ', exercises: [
           { name: 'Bench Press (1-board)', sets: 0, reps: 'работа до 1-3ПМ', rpe: 10, rir: 0, restSec: 300, notes: 'Вариация: жим с 1-доски. Ротировать каждые 1-2 нед.', progression: 'Новый рекорд в вариации каждую неделю' },
           { name: 'Close-Grip Bench', sets: 3, reps: '6-8', rpe: 9, rir: 1, restSec: 180, notes: 'Трицепс — слабое звено в дожиме', progression: '' },
@@ -1889,7 +1889,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'bulgarian_daily_max', name: 'Болгарский метод (Daily Max)', author: 'Ivan Abadjiev',
     type: 'Daily Max 6-7x/week', goal: 'powerlifting', level: 'advanced',
     direction: 'strength',
-    durationWeeks: 6, daysPerНеделя: 6, sessionTimeMin: '60-90',
+    durationWeeks: 6, daysPerWeek: 6, sessionTimeMin: '60-90',
     description: 'Ежедневная работа до максимума дня в приседе и жиме лёжа. Авторегуляция: максимум дня — это лучший результат на сегодня, не абсолютный ПМ. Back-off сеты на −10-15%. Минимум аксессуаров.',
     targetAudience: 'Элитные атлеты с отличным восстановлением. Требует полного приоритета сна и питания. Для специализации перед соревнованиями.',
     equipmentNeeded: ['barbell', 'bench', 'rack', 'dumbbell'],
@@ -1946,7 +1946,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'metabolic_giant_sets', name: 'Метаболический тренинг (Giant Sets)', author: 'Health Engine',
     type: 'Metabolic Circuit 3-4x/week', goal: 'peaking', level: 'intermediate',
     direction: 'bodybuilding',
-    durationWeeks: 6, daysPerНеделя: 4, sessionTimeMin: '45-60',
+    durationWeeks: 6, daysPerWeek: 4, sessionTimeMin: '45-60',
     description: 'Блочная периодизация для жима лёжа: накопительный блок (4 нед гипертрофия) → силовой блок (4 нед интенсивность) → пиковый блок (3 нед подводка к ПМ). Аксессуары под слабые точки.',
     targetAudience: 'Специалисты по жиму, жимовое троеборье, соревнующиеся пауэрлифтеры. Опыт от 2 лет.',
     equipmentNeeded: ['barbell', 'dumbbell', 'cable', 'bodyweight'],
@@ -1990,7 +1990,7 @@ export const CUSTOM_PROGRAMS: FullProgram[] = [
     id: 'bench_block_periodization', name: 'Жимовое троеборье: блочная периодизация', author: 'Health Engine',
     type: 'Bench-only 3-4x/week Block', goal: 'powerlifting', level: 'advanced',
     direction: 'strength',
-    durationWeeks: 11, daysPerНеделя: 4, sessionTimeMin: '75-100',
+    durationWeeks: 11, daysPerWeek: 4, sessionTimeMin: '75-100',
     description: 'Трёхблочная периодизация для специализации в жиме лёжа: накопительный блок (4 нед гипетрофия/объём) → силовой блок (4 нед интенсивность) → пиковый блок (3 нед подводка к ПМ). Аксессуары под слабые точки.',
     targetAudience: 'Специалисты по жиму, жимовое троеборье, соревнующиеся пауэрлифтеры. Опыт ≥2 лет.',
     equipmentNeeded: ['barbell', 'bench', 'rack', 'dumbbell', 'band'],

@@ -14,7 +14,7 @@ export interface TrainingProfile {
   goal: string;
   level: string;
   trainingYears: number;
-  daysPerНеделя: number;
+  daysPerWeek: number;
   recovery: number;     // 1-10
   fatigue: number;      // 1-10
   sleepHours: number;
@@ -59,7 +59,7 @@ export const DEFAULT_PROFILE: TrainingProfile = {
   goal: 'bulk',
   level: 'intermediate',
   trainingYears: 3,
-  daysPerНеделя: 4,
+  daysPerWeek: 4,
   recovery: 7,
   fatigue: 3,
   sleepHours: 7,
@@ -101,7 +101,7 @@ export function loadTrainingProfile(): TrainingProfile {
         goal: s.training?.primaryGoal ?? DEFAULT_PROFILE.goal,
         level: s.training?.level ?? DEFAULT_PROFILE.level,
         trainingYears: s.training?.experience ?? DEFAULT_PROFILE.trainingYears,
-        daysPerНеделя: s.training?.daysPerWeek ?? DEFAULT_PROFILE.daysPerWeek,
+        daysPerWeek: s.training?.daysPerWeek ?? DEFAULT_PROFILE.daysPerWeek,
         recovery: s.training?.recovery ?? DEFAULT_PROFILE.recovery,
         fatigue: s.lifestyle?.fatigueLevel ?? DEFAULT_PROFILE.fatigue,
         sleepHours: s.lifestyle?.sleepHours ?? DEFAULT_PROFILE.sleepHours,
