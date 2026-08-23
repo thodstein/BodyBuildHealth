@@ -331,11 +331,14 @@ function computeLabDietAdjustment(input: MealPlanInput): LabDietAdjustment {
     notes.push('⚠️ Креатинин/мочевина повышены: белок ×0.9, почечная поддержка, ограничены добавки/красное мясо');
   }
 
-  // 🟡 HEMATOCRIT HIGH — blood viscosity management
-  if (labs.HEMATOCRIT !== undefined && labs.HEMATOCRIT > 52) {
+  // 🟡 HEMATOCRIT/HEMOGLOBIN HIGH — blood viscosity management
+  // P2-fix: HCT может прийти как 0.52 (доля) или 52 (%), приводим к %; HGB >170 г/л — тоже вязкость
+  let _hct = labs.HEMATOCRIT; if (_hct !== undefined && _hct < 1) _hct *= 100;
+  let _hgb = labs.HEMOGLOBIN;
+  if ((_hct !== undefined && _hct > 52) || (_hgb !== undefined && _hgb > 170)) {
     preferByKeyword('serrapeptase', 'nattokinase', 'bromelain', 'garlic', 'onion', 'omega3', 'fish_oil', 'ginger', 'cayenne');
     restrictByKeyword('iron', 'red_meat', 'liver', 'spinach'); // avoid excess iron
-    notes.push('⚠️ Гематокрит >52%: фибринолитики (серрапептаза, наттокиназа), омега-3, ограничен Fe/красное мясо');
+    notes.push('⚠️ Гематокрит >52% / HGB >170 г/л: фибринолитики (серрапептаза, наттокиназа), омега-3, ограничен Fe/красное мясо');
   }
 
   // 🟡 LIPIDS (LDL/APOB) — lower sat fat, add fiber/plant sterols

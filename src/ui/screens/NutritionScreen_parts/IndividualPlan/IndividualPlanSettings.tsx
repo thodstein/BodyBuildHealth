@@ -410,17 +410,22 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
-            {sex === 'female' && <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />}
+            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
             <PopupSelect label="🏋 Категория" value={bbCategory} options={[{id:'none',label:'Не указана'}, ...categoriesForSex(sex).map(c => ({id:c.id,label:c.label}))]} onChange={v => setBBCategory(v as any)} />
-            <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:4 }}>
-              <button onClick={() => setPeakWeekEnabled(!peakWeekEnabled)} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:700, border:'none', background: peakWeekEnabled ? '#f59e0b' : 'rgba(255,255,255,0.08)', color: peakWeekEnabled ? '#000' : 'rgba(255,255,255,0.7)' }}>🏋 Peak-week {peakWeekEnabled ? 'ON' : 'OFF'}</button>
-              {peakWeekEnabled && <select value={peakWeekShowDay} onChange={e => setPeakWeekShowDay(parseInt(e.target.value))} style={{ fontSize:10, padding:'2px', background:'#202023', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4 }}>
-                {[0,1,2,3,4,5,6].map(d => <option key={d} value={d}>Show: день {d}</option>)}
-              </select>}
-            </div>
             {sex === 'female' && <PopupSelect label="🌿 Жизненный этап" value={lifeStage} options={[{id:'none',label:'Нет'},{id:'pregnancy',label:'Беременность'},{id:'lactation',label:'Лактация'},{id:'menopause',label:'Менопауза'},{id:'contraception',label:'Контрацепция'}]} onChange={v => setLifeStage(v as any)} />}
           </div>
         )}
+        {sex !== 'female' && (
+          <div style={{ marginBottom: 6 }}>
+            <PopupSelect label="🏋 Категория" value={bbCategory} options={[{id:'none',label:'Не указана'}, ...categoriesForSex(sex).map(c => ({id:c.id,label:c.label}))]} onChange={v => setBBCategory(v as any)} />
+          </div>
+        )}
+        <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom: 6 }}>
+          <button onClick={() => setPeakWeekEnabled(!peakWeekEnabled)} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:700, border:'none', background: peakWeekEnabled ? '#f59e0b' : 'rgba(255,255,255,0.08)', color: peakWeekEnabled ? '#000' : 'rgba(255,255,255,0.7)' }}>🏋 Peak-week {peakWeekEnabled ? 'ON' : 'OFF'}</button>
+          {peakWeekEnabled && <select value={peakWeekShowDay} onChange={e => setPeakWeekShowDay(parseInt(e.target.value))} style={{ fontSize:10, padding:'2px', background:'#202023', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4 }}>
+            {[0,1,2,3,4,5,6].map(d => <option key={d} value={d}>Show: день {d}</option>)}
+          </select>}
+        </div>
         <PopupNumber label="🍽 Голод/сытость (1–сыт, 10–голоден)" value={hungerLevel} min={1} max={10} suffix="/10" onChange={setHungerLevel} />
       </GlassCard>
       )}
