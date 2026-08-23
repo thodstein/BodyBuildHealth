@@ -879,8 +879,9 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     carbFruit: mergePreferred(limitPoolByVariety(cFruitBud.length > 0 ? cFruitBud : cFruitRaw, 10015), f => f.category === 'veg_fruit' && (f.carbs || 0) >= 4),
     fats: mergePreferred(limitPoolByVariety(fatsBud.length > 0 ? fatsBud : fatsRaw, 10017), f => f.category === 'fat'),
     // FIX preferred-foods: любимые овощи подмешиваются в зелёный/цветной пулы
-    vegGreen: mergePreferred(basePool.filter(f => f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple','bok_choy','brussels','cauliflower','watercress','arugula','endive','peas_green','edamame','fennel','leek'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2), f => f.category === 'veg_fruit' && (f.protein || 0) < 5 && (f.fat || 0) < 2),
-    vegColor: mergePreferred(basePool.filter(f => f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus','radish','sweet_potato','mushrooms','champignon','seaweed','wakame','papaya','kiwi','squash','turnip','parsnip'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2), f => f.category === 'veg_fruit' && (f.protein || 0) < 5 && (f.fat || 0) < 2),
+    // P2-fix: на low/medium фильтруем премиум овощи (спаржа/кейл) — как и для остальных пулов
+    vegGreen: mergePreferred(basePool.filter(f => (budget === 'max' || budget === 'enhanced' || !isPremiumOrExotic(f.id)) && f.category === 'veg_fruit' && ['broccoli','spinach','cucumber','zucchini','asparagus','green_bean','celery','cabbage','kale','green_apple','bok_choy','brussels','cauliflower','watercress','arugula','endive','peas_green','edamame','fennel','leek'].some(k => f.id.includes(k)) && (f.protein || 0) < 5 && (f.fat || 0) < 2), f => f.category === 'veg_fruit' && (f.protein || 0) < 5 && (f.fat || 0) < 2),
+    vegColor: mergePreferred(basePool.filter(f => (budget === 'max' || budget === 'enhanced' || !isPremiumOrExotic(f.id)) && f.category === 'veg_fruit' && ['tomato','pepper','carrot','beetroot','pumpkin','eggplant','pomegranate','citrus','radish','sweet_potato','mushrooms','champignon','seaweed','wakame','papaya','kiwi','squash','turnip','parsnip'].some(k => f.id.includes(k.toLowerCase())) && (f.protein || 0) < 5 && (f.fat || 0) < 2), f => f.category === 'veg_fruit' && (f.protein || 0) < 5 && (f.fat || 0) < 2),
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
     // Д-5: vegetarian protein pool — relaxed thresholds so tofu/tempeh/seitan and carb-category
     // legumes (lentils, chickpeas, edamame) actually enter the rotation (not only dairy).
@@ -1552,7 +1553,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const tPreSleep = (() => {
     try {
       const [h, m] = tBed.split(':').map(Number);
-      if (isNaN(h) || isNaN(m)) return '21:30';
+      if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return '21:30';
       const min = (h * 60 + m - 30 + 1440) % 1440;
       return String(Math.floor(min/60)).padStart(2,'0') + ':' + String(min%60).padStart(2,'0');
     } catch { return '21:30'; }
@@ -1789,9 +1790,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // fat distribution учитывает pre-sleep (~8г жира) — снижаем долю ужина.
   const preSleepFatG = (_keep.has('preSleep') && wantPreSleep) ? 8 : 0;
   // #5 Менструальный low-GI: в лютеиновую/менструацию строго низкий GI (≤50).
+  // P2-fix: не мутируем pool.carbSlow напрямую (влияет на завтрак и другие приёмы), используем копию
   if (input.carbGiPref === 'low' && pool.carbSlow.length > 0) {
     const _strictLowGi = pool.carbSlow.filter((f: FoodItem) => (f.gi || 0) <= 50);
-    if (_strictLowGi.length >= 3) pool.carbSlow = _strictLowGi;
+    if (_strictLowGi.length >= 3) pool.carbSlow = [..._strictLowGi];
   }
   const mealBudget = {
     breakfast: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
