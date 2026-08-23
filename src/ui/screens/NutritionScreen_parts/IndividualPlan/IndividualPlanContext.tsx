@@ -1386,10 +1386,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!dayData?.meals?.[mealIdx]) return;
     const mk = (f: any, grams: number) => ({ name: f.name, id: f.id, amount: grams, kcal: Math.round((f.kcal || 0) * grams / 100), p: Math.round((f.protein || 0) * grams / 100), f: Math.round((f.fat || 0) * grams / 100), c: Math.round((f.carbs || 0) * grams / 100), fiber: Math.round((f.fiber || 0) * grams / 100) });
     const whey = FOOD_DB.find(f => f.id === 'whey_isolate') || FOOD_DB.find(f => f.id === 'whey_protein');
-    const oats = FOOD_DB.find(f => f.id === 'oats');
+    const isWorkDayForAdd = (()=>{ try{ if(!workScheduleEnabled) return false; if(workScheduleType==='standard') return !!workDays[dayIdx%7]; if(workScheduleType==='sliding'||workScheduleType==='custom') return !!workDays[dayIdx%7]; return !!workDays[dayIdx%7]; }catch{ return false; }})();
+    const usePortable = workFood === 'portable' && isWorkDayForAdd;
+    const oats = FOOD_DB.find(f => f.id === (usePortable ? 'oats_dry' : 'oats')) || FOOD_DB.find(f => f.id === 'oats_dry') || FOOD_DB.find(f => f.id === 'oats');
     const additions = [] as any[];
     if (whey) additions.push(mk(whey, 30));
-    if (oats) additions.push(mk(oats, 50));
+    if (oats) additions.push(mk(oats, usePortable ? 70 : 50));
+    // полноценная еда на работе — добавляем орехи/фрукт для баланса
+    if (usePortable) {
+      const alm = FOOD_DB.find(f => f.id === 'almonds');
+      if (alm) additions.push(mk(alm, 15));
+    }
     if (additions.length === 0) return;
     saveUndo();
     const apply = (items: any[]) => [...items, ...additions];
