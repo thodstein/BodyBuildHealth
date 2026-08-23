@@ -9,6 +9,7 @@ import { labTrainingAdjust } from './lab-training-adjust';
 import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { adaptForPEDs } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
 
 const ACCENT = '#00e68a';
 const ru = (g: string) => GROUP_RU[g] || g;
@@ -137,6 +138,14 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     }
     return computePlanQualityFor(progForCalc, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1 });
   }, [selectedProgram, effectiveLevel, usePed, useLab, labMult, division]);
+
+  const pro = useMemo(() => {
+    if (!selectedProgram || !analysis) return null;
+    try {
+      const g = (selectedProgram.meta.goal || goal || 'hypertrophy') as string;
+      return analyzeProQuality(selectedProgram, division, effectiveLevel, g, analysis.perMuscle);
+    } catch { return null; }
+  }, [selectedProgram, division, effectiveLevel, goal, analysis]);
 
   const hasData = !!(selectedProgram && (division === 'bb' ? selectedProgram.bb : selectedProgram.pl));
   const hasAnyProgram = programs.length > 0 || !!propsProgram;
@@ -329,6 +338,70 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           );
         })}
       </div>
+
+      {/* PRO — паттерны / углы / растяжка / техника / цель */}
+      {pro && (
+        <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ padding: '10px 12px', borderRadius: 12, background: pro.scoreDelta >= 0 ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${pro.scoreDelta >= 0 ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: pro.scoreDelta >= 0 ? '#22c55e' : '#f87171' }}>PRO-корректировка: {pro.scoreDelta >= 0 ? `+${pro.scoreDelta}` : `${pro.scoreDelta}`} баллов</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: sc }}>Итог PRO: {Math.max(0, Math.min(100, analysis.score + pro.scoreDelta))}/100</span>
+            <span style={{ fontSize: 10, color: '#fff' }}>Паттерны {pro.patterns.filter(p => p.ok).length}/{pro.patterns.length} · Углы {pro.angles.filter(a => a.ok).length}/{pro.angles.length} · Растяжка {pro.stretches.filter(s => s.ok).length}/{pro.stretches.length}</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6 }}>
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🔀 Паттерны — разнообразие движений</div>
+              {pro.patterns.map(p => (
+                <div key={p.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, color: p.ok ? '#22c55e' : '#f59e0b', marginBottom: 2 }}>
+                  <span style={{ color: '#fff', fontWeight: 700 }}>{ru(p.muscle)}: {p.patterns.join(', ') || '—'}</span>
+                  <span style={{ color: p.ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{p.distinct} / {p.expected.length} {p.ok ? '✓' : '⚠'}</span>
+                </div>
+              ))}
+              {pro.patterns.every(p => p.ok) && <div style={{ fontSize: 9, color: '#22c55e', marginTop: 4 }}>Паттерны покрыты — разнообразие достаточное для гипертрофии/силы.</div>}
+            </div>
+
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>📐 Углы — проработка головок/сегментов</div>
+              {pro.angles.map(a => (
+                <div key={a.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, color: a.ok ? '#22c55e' : '#f59e0b', marginBottom: 2 }}>
+                  <span style={{ color: '#fff', fontWeight: 700 }}>{ru(a.muscle)}: {a.angles.join(', ') || '—'}</span>
+                  <span style={{ color: a.ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(a.coverage * 100)}% {a.ok ? '✓' : '⚠'}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🧘 Растяжка — stretch-фаза / удлинённая позиция</div>
+              {pro.stretches.map(s => (
+                <div key={s.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                  <span style={{ color: '#fff', fontWeight: 700 }}>{ru(s.muscle)}: {s.stretchExercises.join(', ') || '—'}</span>
+                  <span style={{ color: s.ok ? '#22c55e' : '#ef4444', fontWeight: 700 }}>{s.ok ? 'есть ✓' : 'нет ✕'}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: pro.technique.ok ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${pro.technique.ok ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}` }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>⚡ Техника — интенсификация</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Блоков с техникой: <b style={{ color: pro.technique.ok ? '#22c55e' : '#f59e0b' }}>{pro.technique.withTechnique}/{pro.technique.totalBlocks} ({pro.technique.pct}%)</b> · distinct: {pro.technique.distinct.join(', ') || 'нет'}</div>
+              {pro.technique.issue && <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 4 }}>{pro.technique.issue}</div>}
+            </div>
+
+            <div style={{ padding: '8px 10px', borderRadius: 10, background: pro.goalAlignment.ok ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${pro.goalAlignment.ok ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}` }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🎯 Привязка к цели — «{pro.goalAlignment.goal}»</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Объём {pro.goalAlignment.volumePctAvg}% MRV · Техники {pro.goalAlignment.techniquePct}% · Растяжка {Math.round(pro.goalAlignment.stretchCoverage * 100)}%</div>
+              {pro.goalAlignment.issue && <div style={{ fontSize: 9, color: '#f59e0b', marginTop: 4 }}>{pro.goalAlignment.issue}</div>}
+              {pro.goalAlignment.recommendation && <div style={{ fontSize: 9, color: '#22c55e', marginTop: 4 }}>💡 {pro.goalAlignment.recommendation}</div>}
+            </div>
+
+            {(pro.totalIssues.length > 0 || pro.totalRecommendations.length > 0) && (
+              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
+                {pro.totalIssues.slice(0, 6).map((iss, i) => <div key={i} style={{ color: '#f59e0b' }}>• {iss}</div>)}
+                {pro.totalRecommendations.slice(0, 6).map((r, i) => <div key={`r-${i}`} style={{ color: '#22c55e' }}>{r}</div>)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showDetails && (
         <ExpandableCard title="📊 Детальный разбор" icon="🔬" short="Нажмите чтобы раскрыть методологию" full={
