@@ -631,16 +631,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
 
   const calcTargets = useMemo(() => {
     try {
+      const _localWorkoutsPerWeek = trainingDays.filter(Boolean).length || 3;
+      const _localAvgMinutes = (() => {
+        try {
+          const v = (s as any)?.training?.minutesPerSession || (s as any)?.avgWorkoutMinutes;
+          return typeof v === 'number' && v > 0 ? v : 60;
+        } catch { return 60; }
+      })();
       return computePlannerTargets({
         weightKg: weight, heightCm: height, age, sex, goal, phase, bodyFatPct,
-        workoutsPerWeek: s?.workoutsPerWeek || 3, avgWorkoutMinutes: s?.avgWorkoutMinutes || 60,
+        workoutsPerWeek: _localWorkoutsPerWeek, avgWorkoutMinutes: _localAvgMinutes,
         dailySteps, householdActivity, trainType, trainIntensity, surplusPct,
         injections: injections.map(i => ({ type: i.type, dose: i.dose, esterType: i.esterType })),
         weightAdaptMode, weightLogWeek, expectedLossKgWeek,
         metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg: { protein: manualGPerKg.protein || 0, fat: manualGPerKg.fat || 0, carbs: manualGPerKg.carbs || 0 },
       });
     } catch { return { bmr: 0, tdee: 0, kcal: 2500, protein: 160, fats: 70, carbs: 300, adjustment: 0 }; }
-  }, [weight, height, age, sex, goal, s?.workoutsPerWeek, s?.avgWorkoutMinutes, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity]);
+  }, [weight, height, age, sex, goal, trainingDays, s?.avgWorkoutMinutes, injections, phase, bodyFatPct, weightAdaptMode, weightLogWeek, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, dailySteps, householdActivity, trainType, trainIntensity, surplusPct]);
 
   // FIX: manual KBJU + kbjuMode теперь инициализируются из localStorage и персистятся.
   // Раньше при перезагрузке страницы все ручные цели КБЖУ сбрасывались на null, а режим — на 'auto'.
@@ -1022,9 +1029,27 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [planDays, setPlanDays] = useState<1 | 3 | 7>(() => { try { const v = parseInt(localStorage.getItem("he_plan_days") || "1"); return (v === 3 || v === 7) ? v : 1; } catch { return 1; } });
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => { try { return parseInt(localStorage.getItem("he_plan_day_idx") || "0") || 0; } catch { return 0; } });
   const [planView, setPlanView] = useState<'list' | 'calendar'>(() => { try { return (localStorage.getItem("he_plan_view") === "calendar") ? "calendar" : "list"; } catch { return "list"; } });
-  const [dayPlan, setDayPlan] = useState<any>(null);
-  const [threeDayPlan, setThreeDayPlan] = useState<any>(null);
-  const [weekPlan, setWeekPlan] = useState<any>(null);
+  const [dayPlan, setDayPlan] = useState<any>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_day_plan') || 'null');
+      if (v && Array.isArray(v.meals) && v.meals.length) return v;
+    } catch {}
+    return null;
+  });
+  const [threeDayPlan, setThreeDayPlan] = useState<any>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_three_day_plan') || 'null');
+      if (v && Array.isArray(v.days) && v.days.length) return v;
+    } catch {}
+    return null;
+  });
+  const [weekPlan, setWeekPlan] = useState<any>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_week_plan') || 'null');
+      if (v && Array.isArray(v.days) && v.days.length) return v;
+    } catch {}
+    return null;
+  });
   const [shoppingList, setShoppingList] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
   const [waterCalc, setWaterCalc] = useState<any>(null); // Bug-3: не персистим — без плана это осиротевшие данные
   const [savedPlans, setSavedPlans] = useState<SavedPlan[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_saved_nutrition_plans') || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } });
@@ -1097,6 +1122,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { localStorage.setItem("he_plan_view", planView); } catch {} }, [planView]);
   useEffect(() => { try { localStorage.setItem("he_plan_month_mode", monthPlanMode ? "true" : "false"); } catch {} }, [monthPlanMode]);
   useEffect(() => { if (monthPlan.length > 0) { if (!safeWriteJSON("he_plan_month", monthPlan)) { try { console.warn("[Planner] he_plan_month not saved (quota?)"); } catch {} } } else { try { localStorage.removeItem("he_plan_month"); } catch {} } }, [monthPlan]);
+  useEffect(() => { try { if (dayPlan) localStorage.setItem('he_day_plan', JSON.stringify(dayPlan)); else localStorage.removeItem('he_day_plan'); } catch {} }, [dayPlan]);
+  useEffect(() => { try { if (threeDayPlan) localStorage.setItem('he_three_day_plan', JSON.stringify(threeDayPlan)); else localStorage.removeItem('he_three_day_plan'); } catch {} }, [threeDayPlan]);
+  useEffect(() => { try { if (weekPlan) localStorage.setItem('he_week_plan', JSON.stringify(weekPlan)); else localStorage.removeItem('he_week_plan'); } catch {} }, [weekPlan]);
 
   const saveUndo = () => {
     const snap: any = {};
@@ -1427,7 +1455,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const food = FOOD_DB.find(f => lower.includes(f.name.toLowerCase()) || lower.includes(f.id));
         if (food) {
           // P0-fix: считаем граммовку из kcal-плотности: grams = perItemKcal / (food.kcal/100)
-          const grams = food.kcal > 0 ? Math.round(perItemKcal / food.kcal * 100) : 100;
+          let grams = food.kcal > 0 ? Math.round(perItemKcal / food.kcal * 100) : 100;
+          if (food.category === 'grain' && grams < 50) grams = 50;
+          if (food.id === 'oats' && grams < 60) grams = 60;
           const ratio = grams / 100;
           return {
             name: food.name,
@@ -2273,6 +2303,25 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // T1.1 — Smart breakfast templates by day type
     // ═══════════════════════════════════════════════════════════════════════
     const getBreakfastTemplate = (isTraining: boolean, isCutting: boolean, isVeg: boolean) => {
+      // P1-fix: уважаем выбранный пользователем шаблон/стиль завтрака (раньше игнор)
+      if (breakfastTemplate && breakfastTemplate !== 'auto') {
+        const tmplMap: Record<string, any> = {
+          classic_oat: { name:'Овсянка + протеин + ягоды', pId: isVeg?'supp_pea_protein':'whey_isolate', carbId:'oats', fatId:'chia_seeds', berryId:'fruit_blueberry', pG:0.4, cG:0.5, fG:0.3, note:'Классика: овсянка + протеин' },
+          protein_flakes: { name:'Хлопья + протеин', pId: isVeg?'supp_pea_protein':'whey_isolate', carbId:'flakes', fatId:'almonds', berryId:'fruit_strawberry', pG:0.4, cG:0.6, fG:0.3, note:'Хлопья + протеин (портативно)' },
+          eggs_toast: { name:'Яйца + тост', pId:'egg_whole', carbId:'bread_white', fatId:'avocado', berryId:'fruit_blueberry', pG:0.5, cG:0.3, fG:0.4, note:'Яйца + тост + авокадо' },
+          cottage_berries: { name:'Творог + ягоды', pId:'cottage_cheese_5', carbId:'oats', fatId:'chia_seeds', berryId:'fruit_blueberry', pG:0.5, cG:0.4, fG:0.3, note:'Творог + ягоды' },
+        };
+        if (tmplMap[breakfastTemplate]) return tmplMap[breakfastTemplate];
+      }
+      if (breakfastStyle && breakfastStyle !== 'auto') {
+        const styleMap: Record<string, any> = {
+          porridge: { name:'Каша', pId: isVeg?'supp_pea_protein':'egg_whole', carbId:'oats', fatId:'chia_seeds', berryId:'fruit_blueberry', pG:0.4, cG:0.5, fG:0.3, note:'Каша' },
+          flakes: { name:'Хлопья', pId: isVeg?'supp_pea_protein':'whey_isolate', carbId:'flakes', fatId:'almonds', berryId:'fruit_strawberry', pG:0.4, cG:0.6, fG:0.3, note:'Хлопья (портативно)' },
+          eggs: { name:'Яйца', pId:'egg_whole', carbId:'bread_white', fatId:'avocado', berryId:'fruit_blueberry', pG:0.5, cG:0.3, fG:0.4, note:'Яйца' },
+          cottage: { name:'Творог', pId:'cottage_cheese_5', carbId:'oats', fatId:'chia_seeds', berryId:'fruit_blueberry', pG:0.5, cG:0.4, fG:0.3, note:'Творог' },
+        };
+        if (styleMap[breakfastStyle]) return styleMap[breakfastStyle];
+      }
       const vegProts = ['supp_pea_protein','soy_isolate'];
       const fastProts = isVeg ? vegProts : ['whey_isolate','whey_concentrate','egg_white'];
       const slowCarbs = isVeg ? ['oats','buckwheat','quinoa'] : ['oats','buckwheat','quinoa','egg_whole'];
@@ -2544,9 +2593,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       });
       const nMult = 1; // D-22: nutrMult already folded into effective*
       const tKcal = Math.round((effectiveKcal || weight * 30) * nMult);
-      let tP = Math.round(Math.max(50, (effectiveP || weight * 2) * nMult * (pMod || 1)));
-      const tF = Math.round(Math.max(20, (effectiveF || weight * 0.8) * nMult * (fMod || 1)));
-      const tC = Math.round(Math.max(50, (effectiveC || weight * 3.5) * nMult * (cMod || 1)));
+      let tP = Math.round(Math.max(50, (effectiveP || weight * 2) * nMult));
+      const tF = Math.round(Math.max(20, (effectiveF || weight * 0.8) * nMult));
+      const tC = Math.round(Math.max(50, (effectiveC || weight * 3.5) * nMult));
       let tKcalAdj = tKcal; let tCAdj = tC;
       if (cyclingMode === 'macro') { tKcalAdj = isTrainingDay ? tKcal : Math.round(tKcal * 0.85); tCAdj = isTrainingDay ? tC : Math.round(tC * 0.6); }
       if (cyclingMode === 'butch') { tKcalAdj = isTrainingDay ? Math.round(tKcal * 1.05) : Math.round(tKcal * 0.8); tCAdj = isTrainingDay ? Math.round(tC * 1.4) : Math.round(tC * 0.4); tP = isTrainingDay ? Math.round(tP * 0.95) : Math.round(tP * 1.05); }
