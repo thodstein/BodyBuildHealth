@@ -168,6 +168,31 @@ describe('nutrition-ocr-parser', () => {
       expect(items.map(item => item.foodId)).toEqual(['coconut_oil', 'cereal_semolina', 'supp_egg_white_powder']);
     });
 
+    it('does not turn FatSecret footer/navigation into food rows', () => {
+      const text = [
+        'Сегодня',
+        'Жиры Углев Белк РСК ккал',
+        'Общество Дневник Отчеты Premium',
+        'Куриная грудка 200 г 330 ккал Б:40 Ж:10 У:0',
+        'Копировать | Сохранить еду',
+      ].join('\n');
+      const items = parseNutritionText(text).flatMap(meal => meal.items);
+
+      expect(items).toHaveLength(1);
+      expect(items[0].foodId).toBe('chicken_breast');
+      expect(items[0].name).not.toMatch(/Дневник|Premium|Копировать/i);
+    });
+
+    it('normalizes OCR units and rejects impossible macro columns', () => {
+      const items = parseNutritionText('Завтрак\nКурица 200r 330 kcal Б:40 Ж:10 У:0').flatMap(meal => meal.items);
+      expect(items[0]).toMatchObject({ qtyGrams: 200, kcal: 165, p: 20, f: 5, c: 0 });
+
+      const impossible = parseNutritionText('Продукт 100 г 100 ккал Б:100 Ж:100 У:100').flatMap(meal => meal.items)[0];
+      expect(impossible.p).toBe(0);
+      expect(impossible.f).toBe(0);
+      expect(impossible.c).toBe(0);
+    });
+
     it('keeps a food and its quantity when OCR has no calories row', () => {
       const items = parseNutritionText('Обед\nОгурец\n100 г').flatMap(meal => meal.items);
 

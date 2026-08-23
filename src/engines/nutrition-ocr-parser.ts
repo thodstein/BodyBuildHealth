@@ -15,6 +15,8 @@ function normalizeOcrArtifacts(text: string): string {
     .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, '-')
     .replace(/[“”„‟«»]/g, '"')
     .replace(/[‘’‚‹›]/g, "'")
+    .replace(/(\d)\s*[rг]/gi, '$1 г')
+    .replace(/ккал|kcal/gi, ' ккал')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -482,7 +484,15 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   const food = findFood(name);
   const weight = Math.max(1, quantityToGrams(qty, food));
   const multiplier = weight / 100;
-  const hasMacros = kcal > 0 || p > 0 || f > 0 || c > 0;
+  const safeKcal = Number.isFinite(kcal) ? Math.max(0, kcal) : 0;
+  const safeP = Number.isFinite(p) ? Math.max(0, p) : 0;
+  const safeF = Number.isFinite(f) ? Math.max(0, f) : 0;
+  const safeC = Number.isFinite(c) ? Math.max(0, c) : 0;
+  // OCR can move a column value into another field. Reject impossible macro
+  // combinations instead of persisting them as real nutrition data.
+  const macroKcal = safeP * 4 + safeF * 9 + safeC * 4;
+  const macrosPlausible = macroKcal === 0 || safeKcal === 0 || macroKcal <= safeKcal * 1.35;
+  const hasMacros = safeKcal > 0 || safeP > 0 || safeF > 0 || safeC > 0;
   const confidence = food
     ? (hasMacros ? 0.9 : 0.7)
     : (hasMacros ? 0.5 : 0.3);
@@ -502,10 +512,10 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
     name: normalizedDisplayName || food?.name || 'Блюдо',
     qty,
     qtyGrams: Math.round(weight),
-    kcal: hasMacros ? Math.round((kcal || (food?.kcal || 0) * multiplier) / multiplier) : food?.kcal || 0,
-    p: hasMacros ? Math.round((p || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : food?.protein || 0,
-    f: hasMacros ? Math.round((f || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : food?.fat || 0,
-    c: hasMacros ? Math.round((c || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : food?.carbs || 0,
+    kcal: hasMacros ? Math.round((safeKcal || (food?.kcal || 0) * multiplier) / multiplier) : food?.kcal || 0,
+    p: hasMacros && macrosPlausible ? Math.round((safeP || (food?.protein || 0) * multiplier) / multiplier * 10) / 10 : (food?.protein || 0),
+    f: hasMacros && macrosPlausible ? Math.round((safeF || (food?.fat || 0) * multiplier) / multiplier * 10) / 10 : (food?.fat || 0),
+    c: hasMacros && macrosPlausible ? Math.round((safeC || (food?.carbs || 0) * multiplier) / multiplier * 10) / 10 : (food?.carbs || 0),
     micros,
     foodId: food?.id,
     category: food?.category,
@@ -578,27 +588,18 @@ function dedupeMeals(meals: ParsedMeal[]): ParsedMeal[] {
     if (existing) existing.items.push(...meal.items);
     else grouped.set(key, { ...meal, items: [...meal.items] });
   }
-  const output: ParsedMeal[] = [];
-  const seen = new Map<string, ParsedMeal['items'][number]>();
-  for (const meal of grouped.values()) {
-    const items = meal.items.filter(item => {
-      // The same product may legitimately appear in breakfast and lunch.
-      // Deduplicate only within the same meal type, where duplicate entries
-      // indicate the two OCR parser passes or a repeated screen capture.
-      const key = [mealTypeKey(meal.mealType), item.foodId || normalizeFoodText(item.name), item.qtyGrams || item.qty].join('|');
-      const existing = seen.get(key);
-      if (existing) {
-        existing.micros = { ...(existing.micros || {}), ...(item.micros || {}) };
-        // Keep the better OCR candidate if the same screen was read twice.
-        if ((item.confidence || 0) > (existing.confidence || 0)) Object.assign(existing, item);
+  return [...grouped.values()].map(meal => ({
+    ...meal,
+    items: meal.items.filter((item, index, all) => {
+      const key = [item.foodId || normalizeFoodText(item.name), item.qtyGrams || item.qty].join('|');
+      const duplicate = all.findIndex(candidate => [candidate.foodId || normalizeFoodText(candidate.name), candidate.qtyGrams || candidate.qty].join('|') === key);
+      if (duplicate !== index) {
+        all[duplicate].micros = { ...(all[duplicate].micros || {}), ...(item.micros || {}) };
         return false;
       }
-      seen.set(key, item);
       return true;
-    });
-    if (items.length > 0) output.push({ ...meal, items });
-  }
-  return output;
+    }),
+  })).filter(meal => meal.items.length > 0);
 }
 
 function mealTypeKey(value: string): string {
@@ -608,6 +609,10 @@ function mealTypeKey(value: string): string {
   if (/обед|lunch/.test(raw) || /обед/.test(normalized)) return 'lunch';
   if (/ужин|dinner/.test(raw) || /ужин/.test(normalized)) return 'dinner';
   if (/перекус|snack|бранч|brunch|полдник/.test(raw) || /перекус|бранч|полдник/.test(normalized)) return 'snack';
+  // The two nutrition parsers use different fallback labels for an input
+  // without a meal heading. Treat them as the same bucket so one OCR row is
+  // not returned twice.
+  if (/^(?:общее|при[её]м пищи|общий|meal)$/.test(normalized)) return 'generic';
   return normalized;
 }
 
