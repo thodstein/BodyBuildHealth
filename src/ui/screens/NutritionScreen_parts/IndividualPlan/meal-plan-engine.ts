@@ -1781,7 +1781,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
   // Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
-  const snackP = Math.max(15, Math.round(mpsPerMeal * 0.6));
+  // P2-fix: бюджет перекуса сразу 25г (mTOR порог), а не 15г с добивкой сывороткой — тогда usedP/residualP корректны
+  const snackP = Math.max(25, Math.round(mpsPerMeal * 0.6));
   const snackF = Math.round(fatTotal * 0.10);
   const hasSnack = _keep.has('snack');
 
