@@ -28,11 +28,17 @@ import {
   getPLPresetDesigns,
   getBBPresetDesigns,
   getPresetsForDiscipline,
+  getPhaseTemplate,
 } from '../../../engines/periodization-designer.engine';
 import { applyToPlanner } from './planner-bridge';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
 import { useConfirmDialog } from './ConfirmDialog';
 import { linkDesignToProgram } from '../../../engines/periodization/designer-to-program';
+import { PHASE_CONFIGS as BB_PHASE_CONFIGS } from './phase-periodization';
+import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
+import { rankCycles } from '../../../engines/lms/lms-selector.engine';
+import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
+import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { loadUserPrograms, saveUserProgram } from '../../../engines/user-program/program-store';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 
@@ -66,6 +72,17 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
   const [showHelp, setShowHelp] = useState(false);
+  const [activePanel, setActivePanel] = useState<'phases' | 'splits'>('phases');
+  // — подбор сплитов/циклов —
+  const [plLevel, setPlLevel] = useState('intermediate');
+  const [plDays, setPlDays] = useState(4);
+  const [plCycleA, setPlCycleA] = useState<string>(LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding')[0]?.meta.id || LMS_CYCLES[0]?.meta.id || '');
+  const [plCycleB, setPlCycleB] = useState<string>(LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding')[1]?.meta.id || LMS_CYCLES[1]?.meta.id || '');
+  const [bbLevel, setBbLevel] = useState('intermediate');
+  const [bbDays, setBbDays] = useState(4);
+  const [bbGoal, setBbGoal] = useState('mass');
+  const [bbSplitA, setBbSplitA] = useState<string>(SPLIT_PATTERNS[0]?.id || 'fullbody_3');
+  const [bbSplitB, setBbSplitB] = useState<string>(SPLIT_PATTERNS[1]?.id || 'upper_lower_4');
 
   useEffect(() => {
     const check = () => {
@@ -639,6 +656,189 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 : 'ББ-палитра: гипертрофия и кондиционный памп — объём/метабол. стресс, нет техники/скоростных блоков ПЛ.'}
               {dragPhase && <span style={{ color: accent, marginLeft: 6, fontWeight: 700 }}>Выбрано: {PHASE_LABELS_RU[dragPhase]} — тапните по неделе ниже ↓</span>}
             </div>
+          </div>
+
+          {/* ── Фазы и подбор сплитов/циклов — отдельная кнопка/панель ── */}
+          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}` }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+              <button onClick={() => setActivePanel('phases')} style={{ ...btn, flex: 1, minHeight: 44, background: activePanel==='phases' ? accent+'18' : 'rgba(255,255,255,0.04)', borderColor: activePanel==='phases' ? accent+'44' : 'rgba(255,255,255,0.08)', color: activePanel==='phases' ? accent : '#fff', fontWeight: 800 }}>⚙️ Фазы {disciplineLabel}</button>
+              <button onClick={() => setActivePanel('splits')} style={{ ...btn, flex: 1, minHeight: 44, background: activePanel==='splits' ? accent+'18' : 'rgba(255,255,255,0.04)', borderColor: activePanel==='splits' ? accent+'44' : 'rgba(255,255,255,0.08)', color: activePanel==='splits' ? accent : '#fff', fontWeight: 800 }}>🧩 Сплиты / Циклы</button>
+            </div>
+
+            {activePanel === 'phases' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                  {effectiveDiscipline==='pl' ? '🏋️ Фазы ПЛ — как в ПЛ-авто (LMS циклы, прогрессия ПМ)' : '💪 Фазы ББ — как в ББ-авто (объём/RIR/темп)'}
+                </div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>
+                  {effectiveDiscipline==='pl'
+                    ? 'ПЛ использует GPP → Накопление (сила) → Интенсификация → Мощностной (DE) → Пик → Разгрузка → Техника — каждая с шаблоном объёма/интенсивности как в СРЦ.'
+                    : 'ББ использует GPP → Гипертрофия → Сила → Интенсификация → Кондиционный → Пик → Разгрузка — каждая с гипертрофийным уклоном (высокий объём, RIR 2-3).'}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8 }}>
+                  {allowedKeys.map(pk => {
+                    const tmpl = getPhaseTemplate(pk as PhaseKey);
+                    if (!tmpl) return null;
+                    const color = PHASE_COLORS[pk as PhaseKey] || '#666';
+                    return (
+                      <div key={pk} style={{ padding: 10, borderRadius: 10, background: color+'12', border: `1px solid ${color}33`, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 14 }}>{PHASE_ICONS[pk as PhaseKey]}</span>
+                          <span style={{ fontSize: 11, fontWeight: 800, color }}>{PHASE_LABELS_RU[pk as PhaseKey]}</span>
+                          <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM, background: 'rgba(0,0,0,0.18)', padding: '2px 6px', borderRadius: 6 }}>{tmpl.weeks}н · {tmpl.volumeLevel}/{tmpl.intensityLevel}</span>
+                        </div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.35 }}>{tmpl.description}</div>
+                        <div style={{ fontSize: 10, color: DIM, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <span>RPE {tmpl.rpeTarget}</span><span>· RIR {tmpl.rirTarget}</span><span>· {tmpl.frequencyDays} дн/нед</span><span>· {tmpl.focus}</span>
+                        </div>
+                        <button onClick={() => {
+                          // добавить в конец или после последнего блока
+                          const nextWeek = current ? Math.max(1, current.blocks.reduce((m, b) => Math.max(m, b.endWeek), 0) + 1) : 1;
+                          if (current && nextWeek <= current.totalWeeks) handleDropOnCanvas(nextWeek, pk as PhaseKey);
+                        }} style={{ ...btn, minHeight: 36, marginTop: 4, background: color+'18', borderColor: color+'33', color }}>➕ Добавить</button>
+                      </div>
+                    );
+                  })}
+                </div>
+                {effectiveDiscipline==='bb' && (
+                  <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Детализация ББ-фаз (phase-periodization.ts)</div>
+                    {Object.entries(BB_PHASE_CONFIGS).map(([k, cfg]: any) => (
+                      <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <span style={{ color: '#fff', fontWeight: 700 }}>{cfg.label}</span>
+                        <span style={{ color: DIM }}>RIR {cfg.rirRange[0]}-{cfg.rirRange[1]} · объём ×{cfg.volumeMultiplier} · {cfg.repRange[0]}-{cfg.repRange[1]} повт</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activePanel === 'splits' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+                  {effectiveDiscipline==='pl' ? '🏆 Подбор СРЦ-цикла (ПЛ) — ранжирование и сравнение' : '💪 Подбор ББ-сплита — ранжирование и сравнение'}
+                </div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>
+                  {effectiveDiscipline==='pl'
+                    ? 'СРЦ-циклы ранжируются по уровню/цели/дням как в ПЛ-авто (rankCycles). Сравните два цикла по периодам, уровню и дням/нед.'
+                    : 'ББ-сплиты ранжируются по уровню/цели/дням как в ББ-авто (rankBBSplits). Сравните два сплита по частоте, объёму и дням/нед.'}
+                </div>
+
+                {effectiveDiscipline==='pl' ? (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Уровень</div>
+                        <select value={plLevel} onChange={e => setPlLevel(e.target.value)} style={{ ...btn, width: '100%', minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                          {['novice','II-KMS','KMS-MS','MS-MSMK','intermediate'].map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Дней/нед</div>
+                        <input type="number" min={2} max={6} value={plDays} onChange={e => setPlDays(parseInt(e.target.value)||3)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', minHeight: 44, boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: accent, fontWeight: 700, marginBottom: 4 }}>⭐ Топ-3 цикла для ПЛ (rankCycles)</div>
+                    <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
+                      {rankCycles({ goal: 'strength' as any, level: plLevel as any, daysPerWeek: plDays, direction: 'powerlifting' as any, mode: 'natural' }).slice(0,3).map((r, idx) => (
+                        <div key={r.cycle.meta.id} style={{ padding: 8, borderRadius: 8, background: idx===0 ? accent+'14' : 'rgba(255,255,255,0.03)', border: `1px solid ${idx===0 ? accent+'33' : 'rgba(255,255,255,0.06)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: idx===0 ? accent : '#fff' }}>{idx===0 ? '★ ' : ''}{r.cycle.meta.title}</div>
+                            <div style={{ fontSize: 10, color: DIM }}>{r.cycle.meta.period} · {r.cycle.meta.level} · {r.cycle.meta.sessionsPerWeek} дн/нед · {r.cycle.meta.weeks} нед · скор {r.score}</div>
+                          </div>
+                          <button onClick={() => applyToPlanner({ kind: 'cycle', label: 'Цикл ПЛ: '+r.cycle.meta.title, data: { cycleId: r.cycle.meta.id } } as any)} style={{ ...btn, minHeight: 36, background: accent+'18', borderColor: accent+'33', color: accent }}>Применить</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: DIM, marginBottom: 4 }}>⚖️ Сравнение двух циклов (отдельная кнопка)</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                      <select value={plCycleA} onChange={e => setPlCycleA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                        {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
+                      </select>
+                      <select value={plCycleB} onChange={e => setPlCycleB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                        {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
+                      </select>
+                    </div>
+                    {(() => {
+                      const a = LMS_CYCLES.find(c => c.meta.id===plCycleA);
+                      const b = LMS_CYCLES.find(c => c.meta.id===plCycleB);
+                      if (!a || !b) return null;
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ color: DIM, fontWeight: 700 }}>Параметр</div><div style={{ color: '#60a5fa', fontWeight: 700, textAlign: 'center' }}>{a.meta.title.slice(0,18)}</div><div style={{ color: '#a78bfa', fontWeight: 700, textAlign: 'center' }}>{b.meta.title.slice(0,18)}</div>
+                          <div style={{ color: DIM }}>Период</div><div style={{ textAlign: 'center' }}>{a.meta.period}</div><div style={{ textAlign: 'center' }}>{b.meta.period}</div>
+                          <div style={{ color: DIM }}>Уровень</div><div style={{ textAlign: 'center' }}>{a.meta.level}</div><div style={{ textAlign: 'center' }}>{b.meta.level}</div>
+                          <div style={{ color: DIM }}>Направ.</div><div style={{ textAlign: 'center' }}>{a.meta.direction}</div><div style={{ textAlign: 'center' }}>{b.meta.direction}</div>
+                          <div style={{ color: DIM }}>Дн/нед</div><div style={{ textAlign: 'center' }}>{a.meta.sessionsPerWeek}</div><div style={{ textAlign: 'center' }}>{b.meta.sessionsPerWeek}</div>
+                          <div style={{ color: DIM }}>Недель</div><div style={{ textAlign: 'center' }}>{a.meta.weeks}</div><div style={{ textAlign: 'center' }}>{b.meta.weeks}</div>
+                          <div style={{ color: DIM }}>Прогр./нед</div><div style={{ textAlign: 'center' }}>{(a.meta.correctionPct*100).toFixed(2)}%</div><div style={{ textAlign: 'center' }}>{(b.meta.correctionPct*100).toFixed(2)}%</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Уровень ББ</div>
+                        <select value={bbLevel} onChange={e => setBbLevel(e.target.value)} style={{ ...btn, width: '100%', minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                          {['beginner','intermediate','advanced','enhanced'].map(l => <option key={l} value={l}>{l}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Цель</div>
+                        <select value={bbGoal} onChange={e => setBbGoal(e.target.value)} style={{ ...btn, width: '100%', minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                          {['mass','cut','recomp','maintenance','strength_mass'].map(g => <option key={g} value={g}>{g}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: DIM, marginBottom: 3, fontWeight: 700 }}>Дней/нед</div>
+                        <input type="number" min={2} max={7} value={bbDays} onChange={e => setBbDays(parseInt(e.target.value)||4)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px', minHeight: 44, boxSizing: 'border-box' }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: accent, fontWeight: 700, marginBottom: 4 }}>⭐ Топ-3 сплита для ББ (rankBBSplits)</div>
+                    <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
+                      {rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays } as any).slice(0,3).map((r, idx) => (
+                        <div key={r.pattern.id} style={{ padding: 8, borderRadius: 8, background: idx===0 ? accent+'14' : 'rgba(255,255,255,0.03)', border: `1px solid ${idx===0 ? accent+'33' : 'rgba(255,255,255,0.06)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: idx===0 ? accent : '#fff' }}>{idx===0 ? '★ ' : ''}{r.pattern.name}</div>
+                            <div style={{ fontSize: 10, color: DIM }}>{r.pattern.rotationDays}д ротация · {r.pattern.sessionsPerRotation} тр/рот · скор {r.score} · {r.rationale[0]||''}</div>
+                          </div>
+                          <button onClick={() => applyToPlanner({ kind: 'split', label: 'Сплит ББ: '+r.pattern.name, data: { cycle: [[r.pattern.id]], name: r.pattern.name } } as any)} style={{ ...btn, minHeight: 36, background: accent+'18', borderColor: accent+'33', color: accent }}>Применить</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: DIM, marginBottom: 4 }}>⚖️ Сравнение двух сплитов (отдельная кнопка)</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                      <select value={bbSplitA} onChange={e => setBbSplitA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                        {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
+                      </select>
+                      <select value={bbSplitB} onChange={e => setBbSplitB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                        {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
+                      </select>
+                    </div>
+                    {(() => {
+                      const a = SPLIT_PATTERNS.find(p=>p.id===bbSplitA);
+                      const b = SPLIT_PATTERNS.find(p=>p.id===bbSplitB);
+                      if (!a || !b) return null;
+                      const aEff = (a.sessionsPerRotation*7/a.rotationDays).toFixed(1);
+                      const bEff = (b.sessionsPerRotation*7/b.rotationDays).toFixed(1);
+                      return (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ color: DIM, fontWeight: 700 }}>Параметр</div><div style={{ color: '#f472b6', fontWeight: 700, textAlign: 'center' }}>{a.name.slice(0,16)}</div><div style={{ color: '#60a5fa', fontWeight: 700, textAlign: 'center' }}>{b.name.slice(0,16)}</div>
+                          <div style={{ color: DIM }}>Ротация</div><div style={{ textAlign: 'center' }}>{a.rotationDays}д</div><div style={{ textAlign: 'center' }}>{b.rotationDays}д</div>
+                          <div style={{ color: DIM }}>Тр/ротация</div><div style={{ textAlign: 'center' }}>{a.sessionsPerRotation}</div><div style={{ textAlign: 'center' }}>{b.sessionsPerRotation}</div>
+                          <div style={{ color: DIM }}>Эфф. дн/нед</div><div style={{ textAlign: 'center' }}>{aEff}</div><div style={{ textAlign: 'center' }}>{bEff}</div>
+                          <div style={{ color: DIM }}>Направ.</div><div style={{ textAlign: 'center' }}>{a.direction || 'both'}</div><div style={{ textAlign: 'center' }}>{b.direction || 'both'}</div>
+                          <div style={{ color: DIM }}>Уровни</div><div style={{ textAlign: 'center', fontSize: 9 }}>{a.level.join('/')}</div><div style={{ textAlign: 'center', fontSize: 9 }}>{b.level.join('/')}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Timeline canvas / List view */}
