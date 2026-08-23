@@ -67,6 +67,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
 
   return (
     <div style={CARD}>
+      <style>{`@media (max-width:380px){.cardio-calendar-grid{grid-template-columns:repeat(7,1fr)!important;gap:2px!important}.cardio-calendar-grid div{font-size:9px!important;padding:3px 2px!important;min-height:52px!important}}`}</style>
       <div style={ROW}>
         <span style={LABEL}>🗓 Календарь цикла</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', textTransform: 'capitalize' }}>{monthLabel}</span>
@@ -78,7 +79,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
       </div>
       {open && (
         <>
-          <div role="grid" aria-label={`Календарь ${monthLabel}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          <div role="grid" aria-label={`Календарь ${monthLabel}`} className="cardio-calendar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {DAY_LABELS_RU.map(d => (
               <div key={d} role="columnheader" style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{d}</div>
             ))}
