@@ -578,18 +578,27 @@ function dedupeMeals(meals: ParsedMeal[]): ParsedMeal[] {
     if (existing) existing.items.push(...meal.items);
     else grouped.set(key, { ...meal, items: [...meal.items] });
   }
-  return [...grouped.values()].map(meal => ({
-    ...meal,
-    items: meal.items.filter((item, index, all) => {
-      const key = [item.foodId || normalizeFoodText(item.name), item.qtyGrams || item.qty].join('|');
-      const duplicate = all.findIndex(candidate => [candidate.foodId || normalizeFoodText(candidate.name), candidate.qtyGrams || candidate.qty].join('|') === key);
-      if (duplicate !== index) {
-        all[duplicate].micros = { ...(all[duplicate].micros || {}), ...(item.micros || {}) };
+  const output: ParsedMeal[] = [];
+  const seen = new Map<string, ParsedMeal['items'][number]>();
+  for (const meal of grouped.values()) {
+    const items = meal.items.filter(item => {
+      // The same product may legitimately appear in breakfast and lunch.
+      // Deduplicate only within the same meal type, where duplicate entries
+      // indicate the two OCR parser passes or a repeated screen capture.
+      const key = [mealTypeKey(meal.mealType), item.foodId || normalizeFoodText(item.name), item.qtyGrams || item.qty].join('|');
+      const existing = seen.get(key);
+      if (existing) {
+        existing.micros = { ...(existing.micros || {}), ...(item.micros || {}) };
+        // Keep the better OCR candidate if the same screen was read twice.
+        if ((item.confidence || 0) > (existing.confidence || 0)) Object.assign(existing, item);
         return false;
       }
+      seen.set(key, item);
       return true;
-    }),
-  })).filter(meal => meal.items.length > 0);
+    });
+    if (items.length > 0) output.push({ ...meal, items });
+  }
+  return output;
 }
 
 function mealTypeKey(value: string): string {
