@@ -819,10 +819,16 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   const ceiling = Math.min(maxGramPerItem(_currentBudget), capG ?? maxGramPerItem(_currentBudget));
   let base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
   // Человеческие порции — snap к сетке (каша 50-100-125-150-200-250, жидкость 250-500, орехи/сухофрукты 25-50-75-100, протеин 30-60-90, мясо/рыба 100-150-200-250)
+  // вне сетки — снапим к ближайшему целому шагу (5г для мяса/овощей, 25г для каши) чтобы граммовки были целые
   const snap = (v: number, brackets: number[]): number => {
     if (v <= 0) return v;
-    // если вне сетки — не снапим (для 110кг 666г каши не режем до 250)
-    if (v < brackets[0] || v > brackets[brackets.length - 1]) return v;
+    if (v < brackets[0] || v > brackets[brackets.length - 1]) {
+      const step = brackets[0] === 50 ? 25 : brackets[0] === 5 ? 5 : 10;
+      const snapped = Math.round(v / step) * step;
+      // для очень больших порций (>500г) не режем до 250 — оставляем округлённое
+      if (v > brackets[brackets.length - 1] * 1.5) return Math.round(v / step) * step;
+      return snapped;
+    }
     let best = brackets[0]; let bestDiff = Math.abs(v - best);
     for (const b of brackets) { const d = Math.abs(v - b); if (d < bestDiff || (d === bestDiff && b > best)) { bestDiff = d; best = b; } }
     return best;
