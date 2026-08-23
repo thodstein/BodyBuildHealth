@@ -1,10 +1,10 @@
 /** DiagnosticsHub.tsx — ДИАГНОСТИКА ДВИЖЕНИЯ.
- *  Полный вариант как в ПЛ-авто (PlDeadpointsBarPathCard — корректор движений):
+ *  Полный вариант как в ПЛ-авто (LiftMasterCard — единый мастер 9 движений):
  *  слабые мышцы (BB granular) → слабые точки → мёртвые точки → движение штанги
- *  + срывы (рус), + RIR-калибровка (исправлена), + добавление упражнения.
+ *  + геометрия техники + срывы (рус) + VBT + видео (VideoCaptureCard) + доп.движения + RIR-калибровка.
  *  Карточки — скрываемые (кнопка-карточка). */
 import React, { useMemo } from 'react';
-import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
+import { LiftMasterCard } from './LiftMasterCard';
 import type { WorkoutLog } from '../../../core/types';
 import type { TrainingProfile } from './training-profile';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
@@ -25,7 +25,7 @@ export interface DiagnosticsHubProps {
 }
 
 export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
-  sessions,
+  sessions, tprofile, readinessRecovery, readinessFatigue, mesoWeeks, missedSessions, currentVolume, currentRir,
 }) => {
   const template = useMemo(() => {
     try {
@@ -61,10 +61,10 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(96,165,250,0.12)', border:'1px solid rgba(96,165,250,0.22)', color:'#60a5fa', fontWeight:800, whiteSpace:'nowrap' }}>9 движений</span>
         </div>
         <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
-          Полный вариант как в <b style={{ color:'#a78bfa' }}>ПЛ-авто → 2 Корректор</b>: все 9 лифтов, BB granular (верх/низ груди → incline/dip), срывы на русском, добавление упражнения «➕ Своё», RIR-калибровка с план RIR (не константа 2). Карточки скрываются по клику на заголовок-кнопку.
+          Полный вариант как в <b style={{ color:'#a78bfa' }}>ПЛ-авто → 2 Мастер</b>: 9 лифтов · геометрия техники · BB granular · срывы (рус) · VBT · <b style={{ color:'#00e68a' }}>видео</b> (VideoCaptureCard, BlazePose) · доп.движения · RIR-калибровка. Карточки скрываются по клику.
         </div>
       </div>
-      <PlDeadpointsBarPathCard dayCount={dayCount} template={template as any} sessions={sessions as any} />
+      <LiftMasterCard dayCount={dayCount} template={template as any} sessions={sessions as any} profile={tprofile as any} readinessRecovery={readinessRecovery} readinessFatigue={readinessFatigue} mesoWeeks={mesoWeeks} missedSessions={missedSessions} currentVolume={currentVolume} currentRir={currentRir} />
     </div>
   );
 };
