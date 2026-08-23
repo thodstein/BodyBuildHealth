@@ -2329,7 +2329,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     // N1: track used food IDs across meals to avoid duplicates when budget=max
     const usedFoodIds = new Set<string>();
-    const portableFilter = (pool: any[]) => { if (workFood !== 'portable') return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_durum','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter(f => !nonPortableIds.has(f.id)); };
+    const portableFilter = (pool: any[]) => { if (workFood !== 'portable' || !isWorkDay) return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_durum','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter(f => !nonPortableIds.has(f.id)); };
     const applyFoodPrefs = (pool: any[], prefType: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool).filter(f => !excludedIds.has(f.id) && [...allergenIds].every(a => !getFoodAllergenTags(f.id, FOOD_DB).includes(a) && !allergenTextMatches(a, f.name))); };
     const seedRand = (seed: number) => { const x = Math.sin(seed) * 10000; return x - Math.floor(x); };
     // ═══════════════════════════════════════════════════════════════════════
@@ -2668,7 +2668,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const isPreWorkout = mt.label === 'Предтрен'; const isPostWorkout = mt.label === 'Пост-трен'; const isPeriWorkout = isPreWorkout || isPostWorkout;
         const highQuality = budget === 'max' || budget === 'enhanced'; const lowQuality = budget === 'low';
         const effectiveTierFilter = lazyDayMode ? (f: any) => f.tier === 'basic' : (f: any) => f.tier === 'basic' || f.tier === 'mid' || f.tier === 'max';
-        const fastCarbs = qualityRange(FOOD_DB.filter(f => f.gi && f.gi >= 80)); const slowCarbs = qualityRange(FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain')); const proteinFoods = qualityRange(FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f))); const allProtein = applyFoodPrefs(proteinFoods, 'protein');         const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 12) : qualitySort(allProtein, true).slice(0, 8);
+        const fastCarbs = qualityRange(FOOD_DB.filter(f => f.gi && f.gi >= 80)); const slowCarbs = qualityRange(FOOD_DB.filter(f => f.category === 'carb' || f.category === 'grain')); const proteinFoods = qualityRange(FOOD_DB.filter(f => f.category === 'protein' && effectiveTierFilter(f)));         const allProtein = applyFoodPrefs(proteinFoods, 'protein');         const topProtein = highQuality ? qualitySort(allProtein, true).slice(0, 12) : qualitySort(allProtein, true).slice(0, 8);
         // pickItem: selects foods to meet macro target. macroType: 'p'|'f'|'c' controls which macro is used for portion calc
         const SUPP_CAP: Record<string, number> = { creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 };
         const pickItem = (foodPool: any[], targetG: number, macroType: 'p'|'f'|'c', seed: number, maxItems = 2): any[] => {
@@ -2698,7 +2698,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const macroPer100 = getMacro(food);
             if (!macroPer100 || macroPer100 <= 0) continue;
             const portion = Math.min(3.5, targetG / macroPer100);
-            let amount = Math.round(portion * 100);
+            let amount = Math.round(Math.round(portion * 100)/5)*5;
             const idCap = SUPP_CAP[food.id];
             if (idCap) amount = Math.min(idCap, amount);
             const r = portion;
@@ -2721,14 +2721,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const preP = FOOD_DB.find(f=>f.id===prePId);
           if (preP) {
             const ratio = Math.min(2.0, prePG / Math.max(1, preP.protein));
-            let amt = Math.round(ratio * 100);
+            let amt = Math.round(Math.round(ratio * 100)/5)*5;
             const preCap = SUPP_CAP[prePId]; if (preCap) amt = Math.min(preCap, amt);
             items.push({name:preP.name,id:prePId,amount:amt,kcal:Math.round(preP.kcal*ratio),p:Math.round(preP.protein*ratio),f:Math.round(preP.fat*ratio),c:Math.round(preP.carbs*ratio)});
           }
           const preC = FOOD_DB.find(f=>f.id===preCId);
           if (preC) {
             const ratio = Math.min(2.5, preCG / Math.max(1, preC.carbs || 1));
-            let amt = Math.round(ratio * 100);
+            let amt = Math.round(Math.round(ratio * 100)/5)*5;
             items.push({name:preC.name,id:preCId,amount:amt,kcal:Math.round(preC.kcal*ratio),p:Math.round(preC.protein*ratio),f:Math.round(preC.fat*ratio),c:Math.round(preC.carbs*ratio)});
           }
         } else if (isPostWorkout) {
@@ -2745,14 +2745,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const pp = FOOD_DB.find(f=>f.id===ppId);
           if (pp) {
             const ratio = Math.min(2.5, postPG / Math.max(1, pp.protein));
-            let amt = Math.round(ratio * 100);
+            let amt = Math.round(Math.round(ratio * 100)/5)*5;
             const ppCap = SUPP_CAP[ppId]; if (ppCap) amt = Math.min(ppCap, amt);
             items.push({name:pp.name,id:ppId,amount:amt,kcal:Math.round(pp.kcal*ratio),p:Math.round(pp.protein*ratio),f:Math.round(pp.fat*ratio),c:Math.round(pp.carbs*ratio)});
           }
           const pc = FOOD_DB.find(f=>f.id===pcId);
           if (pc) {
             const ratio = Math.min(3.0, postCG / Math.max(1, pc.carbs || 1));
-            let amt = Math.round(ratio * 100);
+            let amt = Math.round(Math.round(ratio * 100)/5)*5;
             items.push({name:pc.name,id:pcId,amount:amt,kcal:Math.round(pc.kcal*ratio),p:Math.round(pc.protein*ratio),f:Math.round(pc.fat*ratio),c:Math.round(pc.carbs*ratio)});
           }
         } else {
