@@ -368,12 +368,22 @@ export const LiftMasterCard: React.FC<{
   }, [template, weakMuscleSubs]);
 
   return (
-    <div style={{ padding:12, color:'#fff' }}>
-      <div style={{ fontSize:15, fontWeight:800, color:ACCENT }}>🏋️ {LIFT_RU[lift]} — единый инструмент</div>
-      <div style={{ fontSize:10, color:DIM, marginTop:3, lineHeight:1.45 }}>
-        Один экран — 8 блоков: слабые мышцы → слабые точки → мёртвые точки → движение штанги → геометрия техники → VBT (+видео) → дневник → остальные лимитирующие. Старые калькуляторы оставлены как эксперт-режим.
+    <div style={{ padding:12, color:'#fff', maxWidth:760, margin:'0 auto' }}>
+      <div style={{ background:'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(96,165,250,0.10))', border:'1px solid rgba(0,230,138,0.18)', borderRadius:14, padding:'14px 14px 12px', position:'relative', overflow:'hidden', marginBottom:8 }}>
+        <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(0,230,138,0.14),transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+          <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:16 }}>🏋️</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>{LIFT_RU[lift]} — единый инструмент</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3, opacity:0.9 }}>8 блоков: слабые мышцы → слабые точки → мёртвые точки → траектория → геометрия → VBT + видео → дневник → лимитирующие</div>
+          </div>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>9 движений</span>
+        </div>
+        <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
+          Один экран — полный выбор по движению, <b style={{ color:ACCENT }}>видео</b> (BlazePose) и доп.движения. Выбери движение ниже — все блоки перестроятся.
+        </div>
       </div>
-      <div style={{ marginTop:6, padding:'7px 9px', borderRadius:8, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', fontSize:10, color:'#38bdf8' }}>
+      <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', fontSize:10, color:'#38bdf8', marginBottom:8 }}>
         📐 Геометрия техники — {diag.limiter.techniqueGeometry.length} парам. для {LIFT_RU[lift]} · {diag.headerHint}
       </div>
       {anthroHint && (
@@ -381,8 +391,8 @@ export const LiftMasterCard: React.FC<{
           {anthroHint} <span style={{ color:DIM }}>(задаётся ниже; пока без видео — планируем VBT/видео-замер скорости и углов).</span>
         </div>
       )}
-      {/* выбор движения */}
-      <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
+      {/* выбор движения — sticky */}
+      <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', position:'sticky', top:0, zIndex:4, backdropFilter:'blur(10px)' as any, background:'rgba(10,10,12,0.72)', border:'1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
         {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
       </div>
