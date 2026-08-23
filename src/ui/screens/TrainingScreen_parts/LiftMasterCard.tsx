@@ -218,6 +218,8 @@ export const LiftMasterCard: React.FC<{
   const [vbtBest, setVbtBest] = useState(initial.vbtBest);
   const [vbtLast, setVbtLast] = useState(initial.vbtLast);
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleCollapse = (id:string) => setCollapsed(p=>({...p,[id]:!p[id]}));
   const [armSpanInput, setArmSpanInput] = useState('');
   const [shoulderInput, setShoulderInput] = useState('');
   useEffect(()=>{
@@ -420,8 +422,12 @@ export const LiftMasterCard: React.FC<{
       </div>
 
       {/* ── 1. Слабые мышцы + BB-грануляр ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#4ade80' }}>1 · Слабые мышцы · BB-грануляр (головки)</div>
+      <div style={{...CARD, padding:0, overflow:'hidden' as any}}>
+        <button onClick={()=>toggleCollapse('sec-1-bb')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-1-bb'] ? '#4ade8010' : '#4ade8014', border:'none', borderBottom: collapsed['sec-1-bb'] ? 'none' : '1px solid #4ade8030', cursor:'pointer', color:'#4ade80', textAlign:'left' as any }}>
+          <span style={{ fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'#4ade8020', border:'1px solid #4ade8030', fontSize:12 }}>💪</span> 1 · Слабые мышцы · BB-грануляр (головки)</span>
+          <span style={{ fontSize:10, background:'#4ade8015', padding:'2px 8px', borderRadius:20, border:'1px solid #4ade8025' }}>{collapsed['sec-1-bb'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-1-bb'] && <div style={{ padding:12 }}><div style={{ fontSize:11, fontWeight:800, color:'#4ade80' }}>1 · Слабые мышцы · BB-грануляр (головки)</div>
         <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Ниже — 12 гранулярных BB-изолятов (верх/середина/низ груди, 3 головки дельт, 3 трицепса, 3 бицепса) — точечно по головкам.</div>
         <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.15)' }}>
           <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:6 }}>💎 BB-грануляр — 12 изолятов по головкам</div>
@@ -480,6 +486,7 @@ export const LiftMasterCard: React.FC<{
             </div>
           );
         })}
+        </div>}
       </div>
 
       {/* ── 2. Слабые точки ── */}
@@ -512,8 +519,12 @@ export const LiftMasterCard: React.FC<{
       </div>
 
       {/* ── 3. Мёртвые точки ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>3 · Мёртвые точки (углы) · {effectivePhase ? (PHASE_RU[effectivePhase]||effectivePhase) : ''}</div>
+      <div style={{...CARD, padding:0, overflow:'hidden' as any}}>
+        <button onClick={()=>toggleCollapse('sec-3-effectivephas')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-3-effectivephas'] ? '#60a5fa10' : '#60a5fa14', border:'none', borderBottom: collapsed['sec-3-effectivephas'] ? 'none' : '1px solid #60a5fa30', cursor:'pointer', color:'#60a5fa', textAlign:'left' as any }}>
+          <span style={{ fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'#60a5fa20', border:'1px solid #60a5fa30', fontSize:12 }}>🧱</span> 3 · Мёртвые точки (углы) · {effectivePhase ? (PHASE_RU[effectivePhase]||effectivePhase) : ''}</span>
+          <span style={{ fontSize:10, background:'#60a5fa15', padding:'2px 8px', borderRadius:20, border:'1px solid #60a5fa25' }}>{collapsed['sec-3-effectivephas'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-3-effectivephas'] && <div style={{ padding:12 }}><div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>3 · Мёртвые точки (углы) · {effectivePhase ? (PHASE_RU[effectivePhase]||effectivePhase) : ''}</div>
         {movement?.sticking ? (
           <div style={{ marginTop:6, padding:8, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', fontSize:10, color:DIM, lineHeight:1.5 }}>
             <div>📐 Угол: {movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}° · сустав: {movement.sticking.keyJoint}</div>
@@ -529,11 +540,16 @@ export const LiftMasterCard: React.FC<{
             {stickingAnalysis.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|sticking|${effectivePhase}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|sticking|${effectivePhase}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|sticking|${effectivePhase}`, [it.exercise.name])} />)}
           </div>
         )}
+        </div>}
       </div>
 
       {/* ── 4. Движение штанги ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#a855f7' }}>4 · Движение штанги (bar-path)</div>
+      <div style={{...CARD, padding:0, overflow:'hidden' as any}}>
+        <button onClick={()=>toggleCollapse('sec-4-bar-path')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-4-bar-path'] ? '#a855f710' : '#a855f714', border:'none', borderBottom: collapsed['sec-4-bar-path'] ? 'none' : '1px solid #a855f730', cursor:'pointer', color:'#a855f7', textAlign:'left' as any }}>
+          <span style={{ fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'#a855f720', border:'1px solid #a855f730', fontSize:12 }}>📈</span> 4 · Движение штанги (bar-path)</span>
+          <span style={{ fontSize:10, background:'#a855f715', padding:'2px 8px', borderRadius:20, border:'1px solid #a855f725' }}>{collapsed['sec-4-bar-path'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-4-bar-path'] && <div style={{ padding:12 }}><div style={{ fontSize:11, fontWeight:800, color:'#a855f7' }}>4 · Движение штанги (bar-path)</div>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:8 }}>
           {barPathIssuesForLift(lift).map(iss=>{ const on=issues.includes(iss); return <button key={iss} onClick={()=>toggleIssue(iss)} style={{ minHeight:34, padding:'5px 8px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.14)':'transparent', color: on?'#c084fc':DIM, fontSize:10 }}>{ISSUE_RU[iss]}</button>; })}
         </div>
@@ -554,6 +570,7 @@ export const LiftMasterCard: React.FC<{
             </div>
           </div>
         ))}
+        </div>}
       </div>
 
       {/* ── 5. Геометрия техники — для выбранного движения ── */}
@@ -582,8 +599,12 @@ export const LiftMasterCard: React.FC<{
       </div>
 
       {/* ── 6. VBT ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#f472b6' }}>6 · VBT: скорость штанги (м/с)</div>
+      <div style={{...CARD, padding:0, overflow:'hidden' as any}}>
+        <button onClick={()=>toggleCollapse('sec-6-vbt')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-6-vbt'] ? '#f472b610' : '#f472b614', border:'none', borderBottom: collapsed['sec-6-vbt'] ? 'none' : '1px solid #f472b630', cursor:'pointer', color:'#f472b6', textAlign:'left' as any }}>
+          <span style={{ fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'#f472b620', border:'1px solid #f472b630', fontSize:12 }}>⚡</span> 6 · VBT: скорость штанги (м/с)</span>
+          <span style={{ fontSize:10, background:'#f472b615', padding:'2px 8px', borderRadius:20, border:'1px solid #f472b625' }}>{collapsed['sec-6-vbt'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-6-vbt'] && <div style={{ padding:12 }}><div style={{ fontSize:11, fontWeight:800, color:'#f472b6' }}>6 · VBT: скорость штанги (м/с)</div>
         <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Лучший vs последний повтор → потеря скорости → зона → вероятная фаза срыва (максимальный момент). План не меняется — диагностика.</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>setVbtBest(e.target.value)} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
@@ -612,6 +633,7 @@ export const LiftMasterCard: React.FC<{
             </div>
           );
         })()}
+        </div>}
       </div>
 
       {/* ── 6b. Видео + гид ── */}
@@ -632,10 +654,15 @@ export const LiftMasterCard: React.FC<{
       </div>
 
       {/* ── 8. RIR-калибровка ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>8 · RIR-калибровка (bias из дневника)</div>
+      <div style={{...CARD, padding:0, overflow:'hidden' as any}}>
+        <button onClick={()=>toggleCollapse('sec-8-rir-bias')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-8-rir-bias'] ? '#60a5fa10' : '#60a5fa14', border:'none', borderBottom: collapsed['sec-8-rir-bias'] ? 'none' : '1px solid #60a5fa30', cursor:'pointer', color:'#60a5fa', textAlign:'left' as any }}>
+          <span style={{ fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'#60a5fa20', border:'1px solid #60a5fa30', fontSize:12 }}>🎚️</span> 8 · RIR-калибровка (bias из дневника)</span>
+          <span style={{ fontSize:10, background:'#60a5fa15', padding:'2px 8px', borderRadius:20, border:'1px solid #60a5fa25' }}>{collapsed['sec-8-rir-bias'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-8-rir-bias'] && <div style={{ padding:12 }}><div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>8 · RIR-калибровка (bias из дневника)</div>
         <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Насколько вы пере-/недооцениваете RIR. «Применить калибровку к плану» — сдвиг RIR одним кликом.</div>
         <RIRCalibrationCard />
+        </div>}
       </div>
 
       {/* ── 9. Коррекция мезоцикла ── */}

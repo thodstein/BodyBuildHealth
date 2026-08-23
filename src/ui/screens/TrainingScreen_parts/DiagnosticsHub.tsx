@@ -1,8 +1,6 @@
 /** DiagnosticsHub.tsx — ДИАГНОСТИКА ДВИЖЕНИЯ.
- *  Полный вариант как в ПЛ-авто (LiftMasterCard — единый мастер 9 движений):
- *  слабые мышцы (BB granular) → слабые точки → мёртвые точки → движение штанги
- *  + геометрия техники + срывы (рус) + VBT + видео (VideoCaptureCard) + доп.движения + RIR-калибровка.
- *  Карточки — скрываемые (кнопка-карточка). */
+ *  Анализ техники по 9 лифтам: углы суставов, траектория штанги, скорость (VBT), видео (BlazePose) и подбор коррекций.
+ *  Заголовки — кнопки-карточки, скрыть/раскрыть по клику. */
 import React, { useMemo } from 'react';
 import { LiftMasterCard } from './LiftMasterCard';
 import type { WorkoutLog } from '../../../core/types';
@@ -55,13 +53,13 @@ export const DiagnosticsHub: React.FC<DiagnosticsHubProps> = ({
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
           <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#60a5fa,#a78bfa)', color:'#fff', fontWeight:900, fontSize:16 }}>🔬</div>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Диагностика движения — полный корректор</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Слабые мышцы (BB granular) → слабые точки → мёртвые точки → траектория → срывы (рус) → RIR — один инструмент, без дублей</div>
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Диагностика движения</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3, opacity:0.9 }}>Выбери движение — получи углы, траекторию, скорость и точечные коррекции. Видео — по желанию.</div>
           </div>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(96,165,250,0.12)', border:'1px solid rgba(96,165,250,0.22)', color:'#60a5fa', fontWeight:800, whiteSpace:'nowrap' }}>9 движений</span>
         </div>
         <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
-          Полный вариант как в <b style={{ color:'#a78bfa' }}>ПЛ-авто → 2 Мастер</b>: 9 лифтов · геометрия техники · BB granular · срывы (рус) · VBT · <b style={{ color:'#00e68a' }}>видео</b> (VideoCaptureCard, BlazePose) · доп.движения · RIR-калибровка. Карточки скрываются по клику.
+          Нажми на заголовок карточки — скрыть/раскрыть блок. Протокол берётся из цикла, видео считает скорость автоматически.
         </div>
       </div>
       <LiftMasterCard dayCount={dayCount} template={template as any} sessions={sessions as any} profile={tprofile as any} readinessRecovery={readinessRecovery} readinessFatigue={readinessFatigue} mesoWeeks={mesoWeeks} missedSessions={missedSessions} currentVolume={currentVolume} currentRir={currentRir} />
