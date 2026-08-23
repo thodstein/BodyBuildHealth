@@ -151,6 +151,10 @@ export interface MealPlanInput {
   // еда» не передавался (работал только в классическом пути). portableMode ограничивает пулы
   // продуктов теми, что можно взять на работу без разогрева (порошок/хлопья/хлеб/фрукты/орехи).
   portableMode?: boolean;
+  // Работа: окно смены для сдвига обеда/ужина в pro-движке (раньше только классика)
+  workStartMin?: number;
+  workEndMin?: number;
+  isWorkDay?: boolean;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -1549,9 +1553,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
   const tBreakfast = input.wakeTime || '07:30';
-  const tLunch = input.lunchTime || '12:30';
-  const tDinner = input.dinnerTime || '19:00';
+  let tLunch = input.lunchTime || '12:30';
+  let tDinner = input.dinnerTime || '19:00';
   const tBed = input.bedTime || '22:00';
+  // Работа: если isWorkDay, сдвигаем обед в середину смены, ужин — через 30м после конца смены (раньше только классика)
+  if (input.isWorkDay && Number.isFinite(input.workStartMin) && Number.isFinite(input.workEndMin)) {
+    const ws = input.workStartMin as number, we = input.workEndMin as number;
+    if (ws >= 0 && ws < 1440 && we >= 0 && we < 1440 && we > ws) {
+      tLunch = fmtMin(Math.round((ws + we) / 2));
+      tDinner = fmtMin((we + 30) % 1440);
+    }
+  }
   // Pre-sleep 30 min before bed
   // P2-fix: try/catch на time parsing — malformed tBed давал "NaN:NaN" в таймах
   const tPreSleep = (() => {

@@ -2111,6 +2111,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             // D-28: «загрузка под утреннюю тренировку» + «еда на работе» (portable) в pro-движок.
             morningTrainLoad,
             portableMode: workFood === 'portable',
+            // Работа: окно смены для сдвига обеда/ужина (раньше только классика)
+            workStartMin: (()=>{ try{ const [h,m]=(workStartTime||'09:00').split(':').map(Number); return h*60+m; }catch{ return 9*60; }})(),
+            workEndMin: (()=>{ try{ const [h,m]=(workEndTime||'18:00').split(':').map(Number); return h*60+m; }catch{ return 18*60; }})(),
+            isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return false; const dow=(new Date().getDay()+6)%7; return !!workDays[(dow+offset)%7]; }catch{ return false; }})(),
           };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
