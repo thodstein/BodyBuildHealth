@@ -10,8 +10,8 @@ import { PopupSelect, PopupNumber, ExpandableCard } from '../SRCBBScreen_parts/T
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { adaptForPEDs } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
-import TrainingMetricsChart from '../SRCBBScreen_parts/TrainingMetricsChart';
-import { calcSessionMetrics, type LMSWeekMetric } from '../../../engines/lms/lms-metrics.engine';
+import TrainingMetricsChart, { type LMSWeekMetric } from '../SRCBBScreen_parts/TrainingMetricsChart';
+import { calcSessionMetrics } from '../../../engines/lms/lms-metrics.engine';
 import { norm } from '../../../engines/norm';
 import { applyToPlanner } from './planner-bridge';
 
@@ -371,6 +371,70 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     } catch { return null; }
   }, [selectedProgram, division]);
 
+  // BB-отчет доп. — фазы/методики/баланс/прогрессия (из bb-report.engine, без дублей PRO)
+  const bbReportExtras = useMemo(() => {
+    if (division !== 'bb' || !selectedProgram?.bb) return null;
+    try {
+      const weeks: any[] = (selectedProgram.bb as any).weeks || [];
+      if (!weeks.length) return null;
+      const phaseCount: Record<string, number> = {};
+      for (const w of weeks) phaseCount[String((w as any).phase || 'рабочая')] = (phaseCount[String((w as any).phase || 'рабочая')] || 0) + 1;
+      // баланс тяги/жимы по объёму (как в bb-report: pull/press)
+      let pull = 0, press = 0;
+      for (const w of weeks) for (const s of (w.sessions || [])) for (const b of (s.blocks || [])) {
+        const mu = String(b.muscle || '').toLowerCase();
+        if (mu === 'back' || mu === 'biceps') pull += (b.sets?.length || 0);
+        if (mu === 'chest' || mu === 'shoulders' || mu === 'triceps') press += (b.sets?.length || 0);
+      }
+      const ratio = press > 0 ? pull / press : 0;
+      // методики — superset/technique/DUP из блоков
+      let superset = 0, tech = 0; let dup = (selectedProgram.bb as any).progression?.loadStrategy || '';
+      for (const w of weeks) for (const s of (w.sessions || [])) for (const b of (s.blocks || [])) {
+        if ((b as any).supersetWith) superset++;
+        if ((b as any).technique && (b as any).technique !== 'none') tech++;
+      }
+      // прогрессия — прирост эфф. сетов w1→пик
+      const tonPerWeek = weeks.map((w: any) => {
+        let ton = 0;
+        for (const s of (w.sessions || [])) for (const b of (s.blocks || [])) for (const st of (b.sets || [])) ton += ((st as any).weight || 60) * (Number(st.reps) || 8);
+        return ton;
+      });
+      const peakIdx = tonPerWeek.indexOf(Math.max(...tonPerWeek));
+      const progPct = tonPerWeek[0] > 0 ? Math.round(((tonPerWeek[peakIdx] / tonPerWeek[0]) - 1) * 100) : 0;
+      return { phaseCount, pull, press, ratio: Math.round(ratio * 100) / 100, superset, tech, dup, progPct, peakWeek: peakIdx + 1 };
+    } catch { return null; }
+  }, [selectedProgram, division]);
+
+  const plReportExtras = useMemo(() => {
+    if (division !== 'pl' || !selectedProgram?.pl) return null;
+    try {
+      const weeks: any[] = (selectedProgram.pl as any).customWeeks || [];
+      let plWeeks: any[] = weeks;
+      if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
+        const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
+        if (tpl) {
+          const rawWeeks: any[] = (tpl as any).weeks && (tpl as any).weeks.length ? (tpl as any).weeks : [(tpl as any).week1];
+          plWeeks = rawWeeks.map((days: any, wi: number) => ({
+            week: wi + 1,
+            days: (days as any[]).map((d: any) => ({ exercises: (d.exercises as any[]).map((ex: any) => ({ name: ex.name, sets: (ex.sets as any[]).map((s: any) => ({ pct: s.pct, reps: s.reps, sets: s.sets })) })) })),
+          }));
+        }
+      }
+      if (!plWeeks.length) return null;
+      // фазы PL — sourcePhase или аккум/пик/дёлод
+      const phaseCount: Record<string, number> = {};
+      for (const w of plWeeks) phaseCount[String((w as any).phase || 'accumulation')] = (phaseCount[String((w as any).phase || 'accumulation')] || 0) + 1;
+      const kpshPerWeek = plWeeks.map((w: any) => {
+        let k = 0;
+        for (const d of (w.days || [])) for (const ex of (d.exercises || [])) for (const s of (ex.sets || [])) k += (s.reps || 5) * (s.sets || 3);
+        return k;
+      });
+      const peakK = Math.max(...kpshPerWeek);
+      const progPct = kpshPerWeek[0] > 0 ? Math.round(((peakK / kpshPerWeek[0]) - 1) * 100) : 0;
+      return { phaseCount, peakK, progPct, weeks: plWeeks.length };
+    } catch { return null; }
+  }, [selectedProgram, division]);
+
   // hybrid: показываем ББ+ПЛ совместно
   const isHybrid = selectedProgram?.meta.direction === 'hybrid';
   const hasData = !!(selectedProgram && (division === 'bb' ? selectedProgram.bb || isHybrid : selectedProgram.pl || isHybrid));
@@ -703,6 +767,24 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* BB/PL отчет — доп. без дублей (фазы, методики, баланс, прогрессия) */}
+      {division === 'bb' && bbReportExtras && (
+        <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
+          <div style={{ fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>🧩 ББ-отчет (дополнительно к PRO) — фазы/методики/баланс</div>
+          <div>Фазы: {Object.entries(bbReportExtras.phaseCount).map(([k, v]) => `${k}×${v}`).join(' · ') || '—'} · Пик нед {bbReportExtras.peakWeek} · Прогрессия тоннажа {bbReportExtras.progPct >= 0 ? `+${bbReportExtras.progPct}` : bbReportExtras.progPct}%</div>
+          <div>Баланс тяги/жимы: {bbReportExtras.pull}/{bbReportExtras.press} (ratio {bbReportExtras.ratio}) {bbReportExtras.ratio < 0.9 ? '⚠ тяг мало' : bbReportExtras.ratio > 1.3 ? '⚠ перекос в тяги' : '✓'}</div>
+          <div>Методики: superset {bbReportExtras.superset} · техники {bbReportExtras.tech} {bbReportExtras.dup ? `· DUP ${bbReportExtras.dup}` : ''}</div>
+          <div style={{ fontSize: 9, color: '#fff', marginTop: 4 }}>Источник: bb-report.engine (фазы/методики/баланс) — без дубля PRO-паттернов.</div>
+        </div>
+      )}
+      {division === 'pl' && plReportExtras && (
+        <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
+          <div style={{ fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🏋️ ПЛ-отчет — фазы/прогрессия КПШ</div>
+          <div>Фазы: {Object.entries(plReportExtras.phaseCount).map(([k, v]) => `${k}×${v}`).join(' · ') || '—'} · Недель {plReportExtras.weeks} · Пик КПШ {plReportExtras.peakK} · Прогрессия {plReportExtras.progPct >= 0 ? `+${plReportExtras.progPct}` : plReportExtras.progPct}%</div>
+          <div style={{ fontSize: 9, color: '#fff', marginTop: 4 }}>Источник: PLPlanView/лмс (фазы/тапер) — тоннаж/КПШ уже в графиках.</div>
         </div>
       )}
 
