@@ -191,7 +191,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
         {/* Quick actions */}
         <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-          <button onClick={onShowBarcode} aria-label="Штрих-код"
+          <button type="button" onClick={onShowBarcode} aria-label="Штрих-код"
             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
               background: showBarcode ? 'rgba(0,230,138,0.12)' : '#202023',
               border: `1px solid ${showBarcode ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`,
@@ -232,7 +232,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       </div>
 
       {showBarcode && (
-        <BarcodeScanner onProductFound={onBarcodeProduct} onClose={() => {}} />
+        <BarcodeScanner onProductFound={onBarcodeProduct} onClose={onShowBarcode} />
       )}
 
       {/* OCR Panel */}

@@ -16,22 +16,28 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchResults, setSearchResults] = useState<OFFProduct[]>([]);
-  const [scannerActive, setScannerActive] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedRef = useRef(false);
+  const barcodeRef = useRef('');
+  const onProductFoundRef = useRef(onProductFound);
+  const onCloseRef = useRef(onClose);
+  onProductFoundRef.current = onProductFound;
+  onCloseRef.current = onClose;
 
   const handleBarcodeLookup = useCallback(async (code?: string) => {
-    const raw = code || barcode.trim();
+    const raw = code || barcodeRef.current.trim();
     const bc = raw.replace(/\D/g, '');
     if (!bc) return;
     if (bc.length < 8) { setError('Штрихкод слишком короткий. EAN-13 — 13 цифр.'); return; }
+    barcodeRef.current = bc;
     setBarcode(bc);
     setLoading(true);
     setError('');
     try {
       const product = await searchByBarcode(bc);
       if (product) {
-        onProductFound(product);
+        onProductFoundRef.current(product);
+        onCloseRef.current();
       } else {
         const isRu = /^46/.test(bc);
         setError(isRu
@@ -43,7 +49,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
     } finally {
       setLoading(false);
     }
-  }, [barcode, onProductFound]);
+  }, []);
 
   const handleNameSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
@@ -63,20 +69,20 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   }, [searchQuery]);
 
   const stopScanner = useCallback(async () => {
-    if (scannerRef.current && scannerActive) {
-      try {
-        await scannerRef.current.stop();
-      } catch {}
-      scannerRef.current = null;
-      setScannerActive(false);
+    const scanner = scannerRef.current;
+    scannerRef.current = null;
+    if (!scanner) return;
+    try {
+      // stop() must be called even when React has not committed scannerActive
+      // yet. This matters when a barcode is decoded immediately after start().
+      await scanner.stop();
+    } catch {
+      // The scanner may already be stopped by the camera permission error path.
     }
-  }, [scannerActive]);
+  }, []);
 
   const startScanner = useCallback(async () => {
-    if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch {}
-      scannerRef.current = null;
-    }
+    await stopScanner();
     scannedRef.current = false;
     const scanner = new Html5Qrcode(SCANNER_ID);
     scannerRef.current = scanner;
@@ -90,12 +96,20 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
           await stopScanner();
           setBarcode(decodedText);
           setMode('manual');
-          handleBarcodeLookup(decodedText);
+          void handleBarcodeLookup(decodedText);
         },
         () => {}
       );
-      setScannerActive(true);
+      // start() can resolve after the component switched modes. Do not mark
+      // a stale scanner as active in that case.
+      if (scannerRef.current !== scanner) {
+        try { await scanner.stop(); } catch {}
+        return;
+      }
     } catch (err) {
+      if (scannerRef.current === scanner) {
+        scannerRef.current = null;
+      }
       setError('Не удалось запустить камеру. Введите штрихкод вручную.');
       setMode('manual');
     }
@@ -108,8 +122,9 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
   }, [mode, startScanner, stopScanner]);
 
   const handleSelectProduct = useCallback((product: OFFProduct) => {
-    onProductFound(product);
-  }, [onProductFound]);
+    onProductFoundRef.current(product);
+    onCloseRef.current();
+  }, []);
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)',
@@ -127,22 +142,22 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 1000, display: 'flex', flexDirection: 'column', padding: 16, overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <h3 style={{ margin: 0, color: '#fff', fontSize: 18 }}>📷 Сканировать продукт</h3>
-        <button onClick={() => { stopScanner(); onClose(); }} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer' }}>✕</button>
+        <button type="button" onClick={() => { void stopScanner(); onCloseRef.current(); }} aria-label="Закрыть сканер" style={{ background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer' }}>✕</button>
       </div>
       <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginBottom:8, lineHeight:1.4 }}>Без ключа • Работает в РФ через ru.openfoodfacts.org • Кэш 7 дней + оффлайн из FOOD_DB</div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <button onClick={() => setMode('manual')} style={mode === 'manual' ? btnStyle : btnSecondary}>Штрихкод</button>
-        <button onClick={() => setMode('search')} style={mode === 'search' ? btnStyle : btnSecondary}>Поиск</button>
-        <button onClick={() => setMode('scan')} style={mode === 'scan' ? btnStyle : btnSecondary}>Камера</button>
+        <button type="button" onClick={() => setMode('manual')} style={mode === 'manual' ? btnStyle : btnSecondary}>Штрихкод</button>
+        <button type="button" onClick={() => setMode('search')} style={mode === 'search' ? btnStyle : btnSecondary}>Поиск</button>
+        <button type="button" onClick={() => setMode('scan')} style={mode === 'scan' ? btnStyle : btnSecondary}>Камера</button>
       </div>
 
       {mode === 'manual' && (
         <div>
           <label style={{ color: 'var(--text-light)', fontSize: 12, marginBottom: 4, display: 'block' }}>Штрихкод (EAN-13)</label>
-          <input value={barcode} onChange={e => setBarcode(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleBarcodeLookup()} placeholder="4600494400795 (РФ 460…)" style={inputStyle} autoFocus />
+           <input value={barcode} onChange={e => { barcodeRef.current = e.target.value; setBarcode(e.target.value); }} onKeyDown={e => e.key === 'Enter' && handleBarcodeLookup()} placeholder="4600494400795 (РФ 460…)" style={inputStyle} autoFocus />
           {barcode.replace(/\D/g,'').startsWith('46') && <div style={{ fontSize:10, color:'#00e68a', marginTop:4 }}>🇷🇺 Российский штрихкод 460… — ищем в RU-базе первым</div>}
-          <button onClick={() => handleBarcodeLookup()} disabled={loading || !barcode.trim()} style={{ ...btnStyle, width: '100%', marginTop: 10, opacity: loading || !barcode.trim() ? 0.5 : 1 }}>
+           <button type="button" onClick={() => void handleBarcodeLookup()} disabled={loading || !barcode.trim()} style={{ ...btnStyle, width: '100%', marginTop: 10, opacity: loading || !barcode.trim() ? 0.5 : 1 }}>
             {loading ? 'Поиск...' : 'Найти по штрихкоду'}
           </button>
         </div>
@@ -153,7 +168,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
           <label style={{ color: 'var(--text-light)', fontSize: 12, marginBottom: 4, display: 'block' }}>Название продукта</label>
           <div style={{ display: 'flex', gap: 8 }}>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleNameSearch()} placeholder="Молоко 3.2%" style={{ ...inputStyle, flex: 1 }} autoFocus />
-            <button onClick={handleNameSearch} disabled={loading || !searchQuery.trim()} style={{ ...btnStyle, opacity: loading || !searchQuery.trim() ? 0.5 : 1 }}>
+             <button type="button" onClick={() => void handleNameSearch()} disabled={loading || !searchQuery.trim()} style={{ ...btnStyle, opacity: loading || !searchQuery.trim() ? 0.5 : 1 }}>
               {loading ? '...' : '🔍'}
             </button>
           </div>
@@ -186,7 +201,7 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
         <div style={{ marginTop:10, padding:10, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)' }}>
           <div style={{ color: '#ef4444', fontSize: 12, marginBottom:8 }}>{error}</div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-            <button onClick={async () => {
+             <button type="button" onClick={async () => {
               const name = prompt('Название продукта с этикетки:');
               if (!name) return;
               const kcal = Number(prompt('Ккал на 100г:', '100') || 100);
