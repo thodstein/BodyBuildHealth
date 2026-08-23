@@ -19,6 +19,7 @@ import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { normalizeWeekMrv } from './bb-builder.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
 import { expandDonorMuscles, specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
+import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
  *  не просто больше сетов, а целевое упражнение под слабое место). */
@@ -1977,6 +1978,11 @@ function enrichExerciseRationale(plan: BBPlan): void {
     const tags = [exercise.role === 'primary' ? 'primary' : 'accessory', `direct ${direct?.directSets ?? exercise.sets} sets`];
     if (indirect) tags.push(`effective overlap: ${indirect}`);
     if ((exercise as any).substituted) tags.push(`замена: ${(exercise as any).originalName || 'исходное упражнение'}`);
+    // Per-session explain: угол/паттерн и почему выбрано (Фаза 3.3)
+    const angleEntry = ANGLE_CLASSES[exercise.muscle]?.find(ac => ac.match(exercise as any));
+    if (angleEntry) tags.push(`угол: ${angleEntry.name}`);
+    if (lengthenedBonus(exercise.name || '')) tags.push('lengthened +10');
+    if ((exercise as any).supersetWith) tags.push(`суперсет: ${(exercise as any).supersetWith}`);
     const position = index === 0 ? 'primary/lead' : exercise.role === 'primary' ? 'secondary compound' : exercise.character === 'памп' ? 'pump finisher' : 'accessory';
     exercise.rationale = [exercise.rationale, tags.join('; '), `final position: ${position} (#${index + 1})`].filter(Boolean).join(' | ');
   }

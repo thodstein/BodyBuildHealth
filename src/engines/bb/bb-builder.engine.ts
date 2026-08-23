@@ -1599,6 +1599,8 @@ function buildSession(
         const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
         if (!canPullUp) return false;
       }
+      if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
+      if (mobilityRestrictions && isMobilityRestricted(ex, mobilityRestrictions)) return false;
       if (excludeIds.includes(ex.id) || excludeIds.includes(ex.name)) return false;
       return true;
     });
