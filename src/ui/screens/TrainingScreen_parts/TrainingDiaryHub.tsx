@@ -56,6 +56,7 @@ import { MixEffectivenessCard } from './MixEffectivenessCard';
 import { DiaryHubContext, type DiaryHubCtx } from './diary-hub-context';
 import { CompetitionPlansView } from './CompetitionPlansView';
 import { BBRecommendationsTab } from './BBRecommendationsTab';
+import BBFeedbackCard from './BBFeedbackCard';
 import { MyTrainingTab } from './MyTrainingTab';
 import { MindsetTab } from './MindsetTab';
 import { MobilityTab } from './MobilityTab';
@@ -127,7 +128,7 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining';
+type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining' | 'feedback';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
@@ -469,6 +470,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <button onClick={() => setMode('record')} style={{ flex: 1, minWidth: 100, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📓 Запись</button>
             <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
+            <button onClick={() => setMode('feedback')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📊 Фидбек</button>
             <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>⭐ Мои тренировки</button>
             <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
             <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
@@ -478,6 +480,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             try { localStorage.setItem('he_training_planning_track', 'bb'); } catch { /* ignore */ }
             window.dispatchEvent(new StorageEvent('storage', { key: 'he_training_planning_track', newValue: 'bb' }));
           }} />
+          {/* 📊 Фидбек ББ: план vs факт — компактно в записи, полно — в вкладке Фидбек */}
+          <BBFeedbackCard />
           <InfoErrorBoundary label="Сегодня"><>{(() => {
             const todayIdx = (new Date().getDay() + 6) % 7;
             const planned = (trainingOutput?.plan?.[todayIdx] && trainingOutput.plan[todayIdx].exercises.length > 0) ? trainingOutput.plan[todayIdx] : null;
@@ -764,6 +768,19 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
       {/* ═══ MODE: RECOMMENDATIONS ═══ — профессиональные рекомендации (ББ) */}
       {mode === 'recommendations' && <BBRecommendationsTab hub={hub} />}
+
+      {/* ═══ MODE: FEEDBACK ═══ — план vs факт (ББ фидбек из дневника) */}
+      {mode === 'feedback' && (
+        <InfoErrorBoundary label="Фидбек">
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <BBFeedbackCard />
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={() => setMode('record')} style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', color:'var(--text-dim)', fontSize:11, cursor:'pointer' }}>← К записи</button>
+              <button onClick={() => setMode('history')} style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.12)', color:'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer' }}>📜 История</button>
+            </div>
+          </div>
+        </InfoErrorBoundary>
+      )}
 
       {/* ═══ MODE: MY TRAINING ═══ — пользовательские упражнения/планы/циклы (перенесено из Библиотеки) */}
       {mode === 'mytraining' && (
