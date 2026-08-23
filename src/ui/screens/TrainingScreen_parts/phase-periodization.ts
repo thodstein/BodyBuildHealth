@@ -122,6 +122,8 @@ export interface PhaseDistribution {
  */
 export function distributePhases(mesoLength: number, deloadFreq: number, goal: string, trainingFocus?: BBTrainingFocus): PhaseDistribution[] {
   const dist: PhaseDistribution[] = [];
+  // maintenance: редкий deload (6 нед), не 4 — MV-поддержка не требует частой разгрузки
+  if (goal === 'maintenance' && deloadFreq === 4) deloadFreq = 6;
   const deloadWeeks = new Set<number>();
   
   if (deloadFreq > 0) {
@@ -140,8 +142,9 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
   }
   const totalActive = activeWeeks.length;
 
-  // Половина на accum, половина на intens
-  const accumEnd = totalActive > 1 ? Math.ceil(totalActive / 2) : 1;
+  // recomp 60/40 (accum/intens), остальные 50/50 — различаем recomp vs maintenance
+  const accumRatio = goal === 'recomp' ? 0.6 : 0.5;
+  const accumEnd = totalActive > 1 ? Math.ceil(totalActive * accumRatio) : 1;
 
   for (let w = 1; w <= mesoLength; w++) {
     // P1-2: peaking проверяется ПЕРЕД deload — финальные недели peaking

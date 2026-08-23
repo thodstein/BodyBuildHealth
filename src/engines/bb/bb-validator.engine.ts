@@ -216,6 +216,15 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       }
     }
   }
+  // goal↔focus связка: strength_mass требует strength фокуса (иначе reps 10-15 вместо 6-10/3-6)
+  const planGoal = (plan as any).goal as string | undefined;
+  const planFocus = (plan as any).trainingFocus as string | undefined;
+  if (planGoal === 'strength_mass' && planFocus && planFocus !== 'strength') {
+    issues.push({ level: 'warning', code: 'goal_focus_mismatch', message: `Цель strength_mass + фокус ${planFocus}: для силы нужны низкие повторы (6-10/3-6), смените фокус на «сила».`, exercise: 'trainingFocus' });
+  }
+  if (planGoal === 'cut' && planFocus === 'strength' && plan.weeks.length > 6) {
+    issues.push({ level: 'warning', code: 'goal_focus_mismatch', message: `Сушка + силовой фокус (низкие повторы) на ${plan.weeks} нед — риск потери мышц, предпочтителен hypertrophy фокус при дефиците.`, exercise: 'trainingFocus' });
+  }
   if (plan.volumeTargets) {
     for (const [muscle, target] of Object.entries(plan.volumeTargets)) {
       const peakVolume = plan.weeklyVolume
@@ -318,6 +327,14 @@ export function generateActionableRecommendations(
         recs.push({
           priority: 'medium',
           action: `${issue.exercise || 'Мышца'} 1×/нед — добавьте 2-й день: смените сплит на FullBody/Upper-Lower/PPL 4-6× для ≥2× стимула.`,
+          code: issue.code,
+        });
+        break;
+      }
+      case 'goal_focus_mismatch': {
+        recs.push({
+          priority: 'medium',
+          action: issue.message.includes('сушка') ? 'Сушка + сила: смените фокус на hypertrophy/endurance для сохранения мышц в дефиците.' : 'strength_mass требует фокус «сила» (низкие повторы) — смените trainingFocus.',
           code: issue.code,
         });
         break;

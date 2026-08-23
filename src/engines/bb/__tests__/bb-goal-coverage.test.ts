@@ -51,39 +51,44 @@ function deloadWeeks(plan: BBPlan): number {
  * Section A: Volume target коррекции
  * ═══════════════════════════════════════════════════════════════════ */
 describe('A: Volume target — goal-specific множители', () => {
-  it('cut: rotationMuscleVolume меньше чем maintenance (×0.75)', () => {
+  it('cut: rotationMuscleVolume меньше чем maintenance (0.72 vs 0.80 → 0.90)', () => {
     const cutPlan = buildBBPlan(makeInput('cut'));
     const maintPlan = buildBBPlan(makeInput('maintenance'));
     const cutChest = cutPlan.rotationMuscleVolume['chest'] || 0;
     const maintChest = maintPlan.rotationMuscleVolume['chest'] || 0;
     expect(cutChest).toBeLessThan(maintChest);
-    // ×0.75 → примерно 75% от maintenance
-    expect(cutChest / maintChest).toBeCloseTo(0.75, 1);
+    expect(cutChest / maintChest).toBeCloseTo(0.90, 1);
   });
 
-  it('mass: rotationMuscleVolume больше чем maintenance (×1.05)', () => {
+  it('mass: rotationMuscleVolume больше чем maintenance (1.05 vs 0.80 → ~1.31-1.38 с округлением)', () => {
     const massPlan = buildBBPlan(makeInput('mass'));
     const maintPlan = buildBBPlan(makeInput('maintenance'));
     const massChest = massPlan.rotationMuscleVolume['chest'] || 0;
     const maintChest = maintPlan.rotationMuscleVolume['chest'] || 0;
     expect(massChest).toBeGreaterThan(maintChest);
-    expect(massChest / maintChest).toBeCloseTo(1.05, 1);
+    const ratio = massChest / maintChest;
+    expect(ratio).toBeGreaterThan(1.25);
+    expect(ratio).toBeLessThan(1.45);
   });
 
-  it('strength_mass: rotationMuscleVolume равно mass (×1.05)', () => {
+  it('strength_mass: rotationMuscleVolume чуть ниже mass (1.03 vs 1.05 → ~0.91-0.98 с округлением)', () => {
     const smPlan = buildBBPlan(makeInput('strength_mass'));
     const massPlan = buildBBPlan(makeInput('mass'));
     const smChest = smPlan.rotationMuscleVolume['chest'] || 0;
     const massChest = massPlan.rotationMuscleVolume['chest'] || 0;
-    expect(smChest).toBe(massChest);
+    expect(smChest).toBeLessThanOrEqual(massChest);
+    const ratio = smChest / massChest;
+    expect(ratio).toBeGreaterThan(0.90);
+    expect(ratio).toBeLessThan(1.0);
   });
 
-  it('recomp: rotationMuscleVolume равно maintenance (без множителя)', () => {
+  it('recomp: rotationMuscleVolume больше чем maintenance (0.92 vs 0.80 → 1.15)', () => {
     const recompPlan = buildBBPlan(makeInput('recomp'));
     const maintPlan = buildBBPlan(makeInput('maintenance'));
     const recompChest = recompPlan.rotationMuscleVolume['chest'] || 0;
     const maintChest = maintPlan.rotationMuscleVolume['chest'] || 0;
-    expect(recompChest).toBe(maintChest);
+    expect(recompChest).toBeGreaterThan(maintChest);
+    expect(recompChest / maintChest).toBeCloseTo(1.15, 1);
   });
 });
 

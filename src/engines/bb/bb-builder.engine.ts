@@ -2562,9 +2562,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Общая цепочка модификаторов целевого объёма (уровень/стаж/PED/lab/meso) —
   // применяется к ЛЮБОМУ варианту целевого объёма (спец-блок или баланс).
   const applyRotationModifiers = (m: string, v: number): number => {
-    // B7: при смене cut (×0.75) → mass (×1.1) скачок 1.47x. Капнем mass на ×1.05, чтобы плавнее.
-    if (input.goal === 'cut') v = Math.round(v * 0.75);  // дефицит калорий → восстановление ↓25%, объём соответственно
-    if (input.goal === 'mass' || input.goal === 'strength_mass') v = Math.round(v * 1.05);
+    // Goal→объём: cut 0.72 (дефицит -28%), recomp 0.92 (рекомп ~ -8%), maintenance 0.80 (MV),
+    // mass 1.05, strength_mass 1.03 (чуть ниже mass — сила优先). Различаем recomp vs maintenance.
+    if (input.goal === 'cut') v = Math.round(v * 0.72);
+    else if (input.goal === 'recomp') v = Math.round(v * 0.92);
+    else if (input.goal === 'maintenance') v = Math.round(v * 0.80);
+    else if (input.goal === 'mass') v = Math.round(v * 1.05);
+    else if (input.goal === 'strength_mass') v = Math.round(v * 1.03);
     // Единый множитель режима (ПЕД/курс): ×2 на главные мышцы, ОДНО применение.
     // Заменяет стэкинг pedAdapt.combinedMrvMultiplier × backProfile/legProfile/torsoProfile.
     v = Math.round(v * regimeMrvMultFor(m, regimeMult));

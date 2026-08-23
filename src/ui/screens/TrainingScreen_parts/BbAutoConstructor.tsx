@@ -3319,7 +3319,7 @@ export const BbAutoConstructor: React.FC = () => {
         )}
 
         {builtPlan.validation && (() => {
-          const warnings = builtPlan.validation.issues.filter((issue: { level?: string; code: string }) => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow', 'low_training_frequency'].includes(issue.code));
+          const warnings = builtPlan.validation.issues.filter((issue: { level?: string; code: string }) => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow', 'low_training_frequency', 'goal_focus_mismatch'].includes(issue.code));
           if (warnings.length === 0) return null;
           return (
             <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)' }}>

@@ -204,7 +204,7 @@ export function generateBBRecommendations(ctx: BBRecContext): BBRecSection[] {
   const goal = params?.goal || 'mass';
   const bw = profile?.weightKg || 80;
   if (profile?.proteinPerKg != null && bw > 0) {
-    const targetProtein = goal === 'cut' ? 2.0 : 1.6;
+    const targetProtein = goal === 'cut' ? 2.3 : goal === 'recomp' ? 2.0 : 1.6;
     const pkg = profile.proteinPerKg;
     if (pkg < targetProtein) {
       nutrItems.push({ id: 'nutr-protein-low', severity: 'warn', text: `Белок ${pkg.toFixed(1)} г/кг ниже ориентира ${targetProtein.toFixed(1)} г/кг (${goal === 'cut' ? 'сушка: защита мышц' : 'гипертрофия'}) — добавьте ${Math.round((targetProtein - pkg) * bw)} г белка в день (порции по 30-40 г).` });
