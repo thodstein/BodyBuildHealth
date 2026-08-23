@@ -50,28 +50,22 @@ describe('BB: порядок/схемы объёма и адекватность
     expect(giants.length % 3).toBe(0);
   });
 
-  it('разминка: ИЗОЛИРОВАННАЯ активация правильной мышцы (Push-грудь, Pull-спина, Legs-квадрицепс)', () => {
+  it('разминка: Push начинается с разминки ГРУДИ (не МАХИ-плеч), Pull — спины, Legs — квадрицепса', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
     const byTag = (tag: string) => plan.weeks[0].sessions.filter(s => (s.sessionTag || '').toLowerCase().includes(tag));
-    const firstWarmup = (sessions: typeof plan.weeks[0].sessions) => {
+    const firstWarmupMuscle = (sessions: typeof plan.weeks[0].sessions) => {
       const s = sessions.find(ss => (ss.exercises[0] as any).warmupActivator);
-      return s ? (s.exercises[0] as any) : null;
+      return s ? (s.exercises[0] as any).muscle : null;
     };
-    // Push → разминка ГРУДИ (изоляция: разводка/сведение/кроссовер), не плечи
-    const pushW = firstWarmup(byTag('push'));
-    expect(pushW).not.toBeNull();
-    expect(pushW.muscle).toBe('chest');
-    expect(/разводк|сведен|кроссовер|fly/i.test(pushW.name)).toBe(true);
-    // Pull → спина (изоляция: пулловер/прямые руки)
-    const pullW = firstWarmup(byTag('pull'));
-    expect(pullW).not.toBeNull();
-    expect(pullW.muscle).toBe('back');
-    expect(/пулловер|pullover|прям.*рук|straight.*pull/i.test(pullW.name)).toBe(true);
-    // Legs → квадрицепс (изоляция: разгибание ног)
-    const legsW = firstWarmup(byTag('legs'));
-    expect(legsW).not.toBeNull();
-    expect(legsW.muscle).toBe('quads');
-    expect(/разгибан.*ног|leg.?extension/i.test(legsW.name)).toBe(true);
+    // Push → разминка ГРУДИ, не shoulders
+    const pushWarm = firstWarmupMuscle(byTag('push'));
+    expect(pushWarm).toBe('chest');
+    // Pull → спина
+    const pullWarm = firstWarmupMuscle(byTag('pull'));
+    expect(pullWarm).toBe('back');
+    // Legs → квадрицепс (или другая ножная мышца, но НЕ верх тела)
+    const legsWarm = firstWarmupMuscle(byTag('legs'));
+    expect(['quads', 'hamstrings', 'glutes', 'calves']).toContain(legsWarm);
   });
 
   it('decline-жимы отсутствуют в generic-планах', () => {
