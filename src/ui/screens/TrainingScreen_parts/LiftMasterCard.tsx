@@ -35,7 +35,7 @@ import MesoCorrectionCard from './MesoCorrectionCard';
 import type { TrainingProfile } from './training-profile';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.55)';
+const DIM = '#ffffff';
 
 const CARD: React.CSSProperties = {
   padding: 12, borderRadius: 10, background: 'rgba(24,24,27,0.45)',
@@ -449,7 +449,7 @@ export const LiftMasterCard: React.FC<{
             ))}
           </div>
         )}
-        {!template && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.45)' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>}
+        {!template && <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>}
         {weakMuscleGroups.map(group=>{
           const detail=WEAK_MUSCLE_DETAIL.find(d=>d.id===group); if(!detail) return null;
           return (
@@ -557,7 +557,7 @@ export const LiftMasterCard: React.FC<{
               <div style={{ fontSize:10, fontWeight:800, color:col.color }}>{opt.label}</div>
               <div style={{ fontSize:9, color:DIM, marginTop:2, lineHeight:1.4 }}>{opt.description}</div>
               <div style={{ fontSize:9, color:'#38bdf8', marginTop:4, lineHeight:1.4 }}>📋 {opt.method}</div>
-              <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)', marginTop:3, lineHeight:1.4 }}>🧠 {opt.rationale}</div>
+              <div style={{ fontSize:9, color:'#ffffff', marginTop:3, lineHeight:1.4 }}>🧠 {opt.rationale}</div>
               {an.items.map((it,idx)=> <ExerciseRow key={idx} item={it} selected={!!selectedGeom[k]?.includes(it.exercise.name)} onToggle={()=>toggleGeom(opt,it.exercise.name)} onAdd={()=>addGeom(opt,[it.exercise.name])} tag={`📐 ${opt.label.split(' ')[0]}`} />)}
               <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
                 <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(56,189,248,0.15)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.3)' }}>➕ Рекомендуемое</button>
@@ -582,7 +582,7 @@ export const LiftMasterCard: React.FC<{
         </div>
         {(()=>{
           const best=parseFloat(vbtBest), last=parseFloat(vbtLast);
-          if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.45)' }}>Введите скорости (последний не может быть быстрее лучшего).</div>;
+          if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Введите скорости (последний не может быть быстрее лучшего).</div>;
           const weight=parseFloat(vbtWeight);
           const d=diagnoseVelocity(lift, best, last, Number.isFinite(weight)&&weight>0?weight:undefined);
           const vbtPhase=(d.suggestedPhase ?? effectivePhase) as WeakPoint|null;

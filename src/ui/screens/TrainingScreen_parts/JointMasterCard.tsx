@@ -17,9 +17,10 @@ import { distributeWeeklyLoad } from '../../../engines/orthopedic-load-engines';
 import { applyToPlanner } from './planner-bridge';
 import { JointJsiCalculatorCard } from './JointJsiCalculatorCard';
 import { ExerciseSafetyPanel } from '../SRCBBScreen_parts/ExerciseSafetyPanel';
+import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 const CARD: React.CSSProperties = { padding:12, borderRadius:10, background:'rgba(24,24,27,0.45)', border:'1px solid rgba(255,255,255,0.08)', marginTop:8 };
-const DIM='rgba(255,255,255,0.55)', ACCENT='#f43f5e';
+const DIM='#ffffff', ACCENT='#f43f5e';
 const JOINT_COLOR: Record<JointId,string> = { shoulder:'#f43f5e', elbow:'#fb923c', wrist:'#facc15', spine:'#ef4444', hip:'#a78bfa', knee:'#38bdf8', ankle:'#4ade80' };
 const LEVEL_RU: Record<string,string> = { critical: 'Критично', high: 'Высокий', moderate: 'Средний', medium: 'Средний', low: 'Низкий', none: 'Нет' };
 const PHASE_RU: Record<string,string> = { acute: 'Острая', subacute: 'Подострая', chronic: 'Хроническая', normal: 'Норма', stable: 'Стабильная' };
@@ -33,10 +34,11 @@ export const JointMasterCard: React.FC = () => {
   const [phasePain, setPhasePain] = useState<string>('');
   const [selected, setSelected] = useState<Record<string,string[]>>({});
   const [weekGoal, setWeekGoal] = useState<'strength'|'hypertrophy'|'rehab'>('strength');
+  const [weeklySessions, setWeeklySessions] = useState<number>(4);
 
   const diag = useMemo(()=> jointLoadDiagnosis({ joint, lifts:[lift], currentPain: phasePain ? [phasePain] : [] }), [joint,lift,phasePain]);
   const opts = diag.options;
-  const weekPlan = useMemo(()=> distributeWeeklyLoad({ weeklySessions: 4, goal: weekGoal, volumeCapacity: 1, intensityCapacity: 1, priScore: 0.5, riskLevel: diag.phase==='acute'?'high': diag.phase==='subacute'?'medium':'low' }), [weekGoal, diag.phase]);
+  const weekPlan = useMemo(()=> distributeWeeklyLoad({ weeklySessions, goal: weekGoal, volumeCapacity: 1, intensityCapacity: 1, priScore: 0.5, riskLevel: diag.phase==='acute'?'high': diag.phase==='subacute'?'medium':'low' }), [weeklySessions, weekGoal, diag.phase]);
 
   return (
     <div style={{ padding:12, color:'#fff' }}>
@@ -74,7 +76,18 @@ export const JointMasterCard: React.FC = () => {
       <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
         {(['squat','deadlift','bench','ohp','row','pulldown','incline_press','sumo','biceps'] as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>setLift(l)} style={{ minHeight:28, padding:'4px 9px', borderRadius:10, cursor:'pointer', fontSize:9, border: on?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(56,189,248,0.15)':'transparent', color: on?'#38bdf8':DIM, fontWeight:700 }}>{LIFT_RU_ALL[l] || l}</button>; })}
-        <label style={{ fontSize:10, color:DIM, marginLeft:8 }}>Боль сейчас: <input value={phasePain} onChange={e=>setPhasePain(e.target.value)} placeholder="напр. поясница" style={{ width:110, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:10 }} /></label>
+        <div style={{ marginLeft:8, minWidth:160 }}>
+          <PopupSelect label="Боль сейчас" value={phasePain} options={[
+            { id:'', label:'Нет боли' },
+            { id:'spine', label:'Поясница / спина' },
+            { id:'shoulder', label:'Плечо' },
+            { id:'knee', label:'Колено' },
+            { id:'elbow', label:'Локоть' },
+            { id:'wrist', label:'Запястье' },
+            { id:'hip', label:'Таз / бедро' },
+            { id:'ankle', label:'Голеностоп' },
+          ]} onChange={setPhasePain} />
+        </div>
       </div>
 
       {/* 1 анатомия */}
@@ -149,24 +162,34 @@ export const JointMasterCard: React.FC = () => {
         <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Потоки: {diag.flows.map(f=>f.name).join(', ') || '—'}</div>
       </div>
 
-      {/* 4b недельный план нагрузки (orthopedic-load) */}
+      {/* 4b недельный план нагрузки (orthopedic-load) — синхронизирован с движком (равномерное распределение, без блока «дни подряд») */}
       <div style={CARD}>
         <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
           <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>4b · Недельный план (нагрузка)</div>
-          <div style={{ display:'flex', gap:4 }}>
+          <div style={{ display:'flex', gap:4, alignItems:'center' }}>
             {(['strength','hypertrophy','rehab'] as const).map(g=>{ const on=weekGoal===g; const ru = g==='strength'?'Сила': g==='hypertrophy'?'Масса':'Реабилитация'; return <button key={g} onClick={()=>setWeekGoal(g)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?'#00e68a':DIM}}>{ru}</button>; })}
+            <span style={{ fontSize:9, color:DIM, marginLeft:6 }}>Сессий:</span>
+            <div style={{ display:'flex', gap:3 }}>
+              {[2,3,4,5,6].map(n=>{ const on=weeklySessions===n; return <button key={n} onClick={()=>setWeeklySessions(n)} style={{ minWidth:26, padding:'3px 6px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?'#00e68a':DIM }}>{n}</button>; })}
+            </div>
           </div>
         </div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Фаза: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Риск: {weekPlan.warnings.join(' · ') || 'нет'} · Тяжёлых дней: {weekPlan.hardDays}</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Фаза: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Риск: {weekPlan.warnings.join(' · ') || 'нет'} · Тяжёлых дней: {weekPlan.hardDays} · Сессий: {weeklySessions} · Синхр. с движком ✓</div>
+        <div style={{ fontSize:9, color:DIM, marginTop:2 }}>Равномерное распределение — тренировки разнесены по неделе, без 4-дневного блока подряд. Объём синхронизирован с риском (high −40%).</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginTop:6 }}>
           {weekPlan.weekPlan.map(d=>(
-            <div key={d.day} style={{ padding:'6px 4px', borderRadius:6, background: d.difficulty==='hard'?'rgba(239,68,68,0.12)': d.difficulty==='medium'?'rgba(251,191,36,0.12)': d.difficulty==='light'?'rgba(56,189,248,0.12)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
+            <div key={d.day} style={{ padding:'6px 4px', borderRadius:6, background: d.difficulty==='hard'?'rgba(239,68,68,0.12)': d.difficulty==='medium'?'rgba(251,191,36,0.12)': d.difficulty==='light'?'rgba(56,189,248,0.12)': d.difficulty==='rehab'?'rgba(167,139,250,0.12)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
               <div style={{ fontSize:8, color:DIM }}>Д{d.day}</div>
               <div style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{d.difficulty==='off'?'—':`V${d.volumeTarget}`}</div>
               <div style={{ fontSize:8, color:DIM }}>{DIFF_RU[d.difficulty] || d.focus}</div>
+              <div style={{ fontSize:7, color:DIM }}>{d.intensityTarget ? `${Math.round(d.intensityTarget*100)}%` : ''}</div>
             </div>
           ))}
         </div>
+        <button onClick={()=>{
+          const hard = weekPlan.hardDays;
+          applyToPlanner({ kind:'pri', label:`Ортопедия неделя: ${weeklySessions} сесс., ${hard} тяж.`, data:{ volumeMult: hard>=4?0.85:0.9, rirShift: 0 } as any });
+        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#00e68a', color:'#000', fontWeight:800, fontSize:10 }}>🛠 Применить недельный план к планировщику</button>
       </div>
 
       {/* 5 видео гид для сустава */}

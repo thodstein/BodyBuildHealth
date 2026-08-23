@@ -10,7 +10,7 @@ import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import type { JointId } from '../../../engines/pro/joint-load-master.engine';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
-const DIM='rgba(255,255,255,0.55)';
+const DIM='#ffffff';
 const CARD: React.CSSProperties = { padding:12, borderRadius:10, background:'rgba(24,24,27,0.45)', border:'1px solid rgba(255,255,255,0.08)', marginTop:8 };
 const btn: React.CSSProperties = { padding:'5px 10px', borderRadius:7, cursor:'pointer', fontSize:10, fontWeight:700, minHeight:32 };
 
@@ -158,7 +158,7 @@ export const JointJsiCalculatorCard: React.FC = () => {
           <label style={{fontSize:10,color:DIM}}>Подх: <input value={sets} onChange={e=>setSets(e.target.value)} style={{width:40,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
           <label style={{fontSize:10,color:DIM}}>Повт: <input value={reps} onChange={e=>setReps(e.target.value)} style={{width:40,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
           <label style={{fontSize:10,color:DIM}}>Эксц. сек: <input value={tempo} onChange={e=>setTempo(e.target.value)} style={{width:46,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
-          <label style={{fontSize:10,color:DIM, display:'flex',alignItems:'center',gap:4}}><input type="checkbox" checked={hasBounce} onChange={e=>setHasBounce(e.target.checked)} /> Отбив</label>
+          <button onClick={()=>setHasBounce(v=>!v)} style={{ padding:'5px 10px', borderRadius:7, cursor:'pointer', fontSize:10, fontWeight:700, minHeight:28, border: hasBounce ? '1px solid #f43f5e' : '1px solid rgba(255,255,255,0.15)', background: hasBounce ? 'rgba(244,63,94,0.18)' : 'transparent', color: hasBounce ? '#f43f5e' : DIM }}>{hasBounce ? '✓ С отбивом' : 'Без отбива'}</button>
         </div>
         <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:6 }}>
           {AMPLITUDE_OPTS.map(o=>{ const on=amplitude===o.id; return <button key={o.id} onClick={()=>setAmplitude(o.id)} style={{ padding:'4px 8px', borderRadius:7, cursor:'pointer', fontSize:9, border:on?'1px solid #f43f5e':'1px solid rgba(255,255,255,0.1)', background:on?'rgba(244,63,94,0.12)':'transparent', color:on?'#f43f5e':DIM, fontWeight:700 }}>{o.label}{on?' ✓':''}</button>; })}

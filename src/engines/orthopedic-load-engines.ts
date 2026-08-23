@@ -196,7 +196,6 @@ export function computeOrthopedicConstraints(input: OrthopedicInput): Orthopedic
 // ═══════════════════════════════════════════════════════════════════════════
 
 export function distributeWeeklyLoad(input: LoadDistributionInput): LoadDistributionOutput {
-  const plan: DailyLoad[] = [];
   const warnings: string[] = [];
   const ndays = Math.max(2, Math.min(7, input.weeklySessions));
 
@@ -219,57 +218,75 @@ export function distributeWeeklyLoad(input: LoadDistributionInput): LoadDistribu
 
   const pattern = patterns[input.goal] || patterns.hypertrophy;
 
-  // Apply capacity modifiers
+  // Apply capacity modifiers — синхронизированы с ортопедией (high риск = -40%)
   const volModifier = input.volumeCapacity;
   const intModifier = input.intensityCapacity;
-
-  // Risk modifier
   const riskModifier = input.riskLevel === 'high' ? 0.6 : input.riskLevel === 'medium' ? 0.8 : 1.0;
-
-  // PRI modifier
   const priModifier = input.priScore < 0.3 ? 0.7 : input.priScore > 0.7 ? 1.1 : 1.0;
 
+  // 1. Собираем тренировочные слоты в порядке паттерна (синхрон с движком)
+  type Slot = { volume: number; intensity: number; density: number; difficulty: 'hard'|'medium'|'light'|'rehab'; focus: string };
+  const slots: Slot[] = [];
   let totalVolume = 0;
   let totalIntensity = 0;
   let hardDays = 0;
-
   for (let d = 0; d < ndays; d++) {
-    const tmpl = templates[pattern[d % pattern.length]];
+    const key = pattern[d % pattern.length];
+    const tmpl = templates[key] ?? templates.medium;
     const volTarget = Math.round(tmpl.volume * volModifier * riskModifier * priModifier * 100);
     const intTarget = Math.round(tmpl.intensity * intModifier * riskModifier * priModifier * 100) / 100;
-    const difficulty = tmpl.volume >= 0.9 ? 'hard' : tmpl.volume >= 0.6 ? 'medium' : 'light';
-
+    let difficulty: 'hard'|'medium'|'light'|'rehab' = tmpl.volume >= 0.9 ? 'hard' : tmpl.volume >= 0.6 ? 'medium' : (key === 'rehab' ? 'rehab' : 'light');
+    // риск high — понижаем hard до medium для безопасности
+    if (input.riskLevel === 'high' && difficulty === 'hard') difficulty = 'medium';
     totalVolume += volTarget;
     totalIntensity += intTarget;
     if (difficulty === 'hard') hardDays++;
-
-    plan.push({
-      day: d + 1,
-      volumeTarget: volTarget,
-      intensityTarget: Math.min(0.95, intTarget),
-      densityTarget: tmpl.density,
-      focus: difficulty === 'hard' ? 'Основной день' : difficulty === 'medium' ? 'Средний день' : 'Лёгкий день',
+    slots.push({
+      volume: volTarget,
+      intensity: Math.min(0.95, intTarget),
+      density: tmpl.density,
       difficulty,
+      focus: difficulty === 'hard' ? 'Основной день' : difficulty === 'medium' ? 'Средний день' : difficulty === 'rehab' ? 'Реабилитация' : 'Лёгкий день',
     });
   }
 
-  // Add off days
-  for (let d = ndays; d < 7; d++) {
-    plan.push({
-      day: d + 1,
-      volumeTarget: 0,
-      intensityTarget: 0,
-      densityTarget: 0,
-      focus: 'Отдых',
-      difficulty: 'off',
-    });
+  // 2. Равномерное распределение тренировочных дней по 7-дневной неделе (без «дни подряд» блоком)
+  // оптимальные позиции — максимизируют интервал между тренировками
+  const POSITION_MAP: Record<number, number[]> = {
+    2: [0, 3],
+    3: [0, 2, 4],
+    4: [0, 2, 4, 6],
+    5: [0, 1, 3, 4, 6],
+    6: [0, 1, 2, 4, 5, 6],
+    7: [0, 1, 2, 3, 4, 5, 6],
+  };
+  const positions = POSITION_MAP[ndays] ?? Array.from({ length: ndays }, (_, i) => Math.round((i * 6) / Math.max(1, ndays - 1)));
+  const posSet = new Set(positions);
+
+  const weekPlan: DailyLoad[] = [];
+  let slotIdx = 0;
+  for (let day = 0; day < 7; day++) {
+    if (posSet.has(day) && slotIdx < slots.length) {
+      const s = slots[slotIdx++];
+      weekPlan.push({ day: day + 1, volumeTarget: s.volume, intensityTarget: s.intensity, densityTarget: s.density, focus: s.focus, difficulty: s.difficulty });
+    } else {
+      weekPlan.push({ day: day + 1, volumeTarget: 0, intensityTarget: 0, densityTarget: 0, focus: 'Отдых', difficulty: 'off' });
+    }
   }
 
   if (hardDays >= 4) warnings.push('4+ тяжёлых дня — риск перетренированности');
   if (input.riskLevel === 'high' && hardDays > 1) warnings.push('Высокий риск — ограничьте до 1 тяжёлого дня');
+  // дополнительная проверка на подряд идущие hard (после распределения)
+  let consecutiveHard = 0, maxConsec = 0;
+  for (const d of weekPlan) {
+    if (d.difficulty === 'hard') { consecutiveHard++; maxConsec = Math.max(maxConsec, consecutiveHard); }
+    else if (d.difficulty !== 'off') consecutiveHard = 0;
+    else consecutiveHard = 0;
+  }
+  if (maxConsec >= 2 && input.riskLevel !== 'low') warnings.push('Тяжёлые дни подряд — добавьте отдых между ними');
 
   return {
-    weekPlan: plan,
+    weekPlan,
     totalVolume: Math.round(totalVolume),
     avgIntensity: ndays > 0 ? Math.round((totalIntensity / ndays) * 100) : 0,
     hardDays,

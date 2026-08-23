@@ -60,6 +60,7 @@ import { LAST_HEAVY_DAYS, warmupSequence } from '../../engines/pro/taper.engine'
 import { PlannerToolsPanel } from './TrainingScreen_parts/PlannerToolsPanel';
 import { saveCompetitionPlan, type CompetitionPlanRecord } from './TrainingScreen_parts/CompetitionPlansView';
 import { PlDeadpointsBarPathCard } from './TrainingScreen_parts/PlDeadpointsBarPathCard';
+import { LiftMasterCard } from './TrainingScreen_parts/LiftMasterCard';
 import { LimiterCalculatorCard } from './TrainingScreen_parts/LimiterCalculatorCard';
 import { PLSeasonBuilder, type SeasonBuildInfo } from './SRCBBScreen_parts/PLSeasonBuilder';
 import { buildPLPrintHtml, printPLHtml, buildPLExcelWorkbook, downloadPLExcel, plExportRows } from './SRCBBScreen_parts/pl-export';
@@ -1757,7 +1758,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'diagnostics' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>2 🎯 Слабые точки + 10 калькуляторов</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: '#ffffff', marginBottom: 8, lineHeight: 1.5 }}>
             Калькулятор лимитирующих факторов (скорость/дожимы/стабилизация/режимы сокращения/
             гипертрофия/антропометрия/тип старта/хват/координация/выносливость) + «Слабые мышцы → Слабые точки →
             Мёртвые точки → VBT → Движение штанги». Исходный цикл не изменяется; отмеченные упражнения добавляются
@@ -1765,7 +1766,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           </div>
           <LimiterCalculatorCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} />
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
-            <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
+            <div style={{ marginBottom: 8, padding: '7px 9px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', fontSize: 10, color: '#00e68a' }}>🏋️ Мастер движений — единый инструмент (9 лифтов · 8 блоков) — замена «мёртвые·слабые точки»</div>
+            <LiftMasterCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions as any} />
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ fontSize: 10, color: '#ffffff', cursor: 'pointer' }}>Показать легаси «Слабые мышцы → мёртвые точки» (PlDeadpointsBarPathCard)</summary>
+              <div style={{ marginTop: 6 }}>
+                <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
+              </div>
+            </details>
           </div>
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>← 1 Настройки</button>
