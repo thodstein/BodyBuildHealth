@@ -1376,68 +1376,8 @@ function buildSession(
     const mavRot = muscleVolumeRotation[muscle] || 0;
     const sessionsForMuscle = muscleSessionCount[muscle] || 1;
     let sets = sessionShareFor(mavRot, sessionsForMuscle, role, muscle, pedAdapt, isFemale);
-    // High-volume enhanced back: это прямой бюджет спины на одну сессию,
-    // а не общий лимит Pull-дня. Минимум зависит от подтверждённого стажа.
-    // 3+ лет — 18 сетов, 6+ лет — 22 сета до дальнейшего fatigue/recovery fit.
-    if (muscle === 'back' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 22 : 18);
-    }
-    // High-volume enhanced грудь/плечи: в Upper/Push/Chest-днях (где спина доминирует)
-    // грудь и плечи получают прямой минимум, а не остаток после спины.
-    // Верх: грудь ~38-48/нед на курсе → ~16-18/сессию; плечи — 6-8.
-    if (muscle === 'chest' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Chest|Push|ChestBack|Torso/.test(sched.sessionTag || '') && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 18 : 14);
-    }
-    if (muscle === 'shoulders' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Push|Chest|Shoulders|Torso/.test(sched.sessionTag || '') && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
-    }
-    // Natural advanced: спина не должна терять объём в Upper-днях из-за
-    // fatigue budget (грудь забирает бюджет). Минимум 10 сетов на сессию.
-    if (muscle === 'back' && level === 'advanced' && phase !== 'deload') {
-      sets = Math.max(sets, 10);
-    }
-    // High-volume enhanced legs: ноги тоже получают повышенный минимум,
-    // а не остаточный бюджет после рук/пресса.
-    if (['quads', 'hamstrings', 'glutes'].includes(muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 20 : 14);
-    }
-    // Glutes гарантированно получают минимум в каждой Lower-сессии,
-    // даже если они не primary по ротации.
-    if (muscle === 'glutes' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Legs|Lower/.test(sched.sessionTag || '') && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
-    }
-    // High-volume enhanced chest/shoulders: грудь и плечи получают
-    // повышенный минимум, а не остаток после спины.
-    if (['chest', 'shoulders'].includes(muscle) && level === 'enhanced' && (trainingYears ?? 0) >= 3 && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 14 : 10);
-    }
-    // Shoulders в Upper-днях: даже если плечи не lead-мышца, опытный enhanced
-    // должен получать минимум работы на среднюю дельту в каждой Upper-сессии.
-    if (muscle === 'shoulders' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Upper|Push|Pull/.test(sched.sessionTag || '') && phase !== 'deload') {
-      sets = Math.max(sets, 6);
-    }
-    // Руки в Push/Pull: опытный enhanced должен получать минимум работы
-    // на biceps в Pull и triceps в Push в каждой сессии.
-    if (muscle === 'biceps' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Pull|Upper|Arms/.test(sched.sessionTag || '') && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
-    }
-    if (muscle === 'triceps' && level === 'enhanced' && (trainingYears ?? 0) >= 3 && /Push|Upper|Arms/.test(sched.sessionTag || '') && phase !== 'deload') {
-      sets = Math.max(sets, (trainingYears ?? 0) >= 6 ? 8 : 6);
-    }
-    // Indirect overlap: если тяг/жимов много, прямые сеты рук снижаются —
-    // косвенный объём уже закрывает часть target (иначе MRV-overflow).
-    if (muscle === 'biceps') {
-      const pullSets = muscleVolumeRotation['back'] || 0;
-      if (pullSets >= 40) sets = Math.min(sets, Math.round(pullSets * 0.12));
-      else if (pullSets >= 24) sets = Math.min(sets, Math.round(pullSets * 0.15));
-      else if (pullSets >= 14) sets = Math.min(sets, Math.round(pullSets * 0.2));
-    }
-    if (muscle === 'triceps') {
-      const pushSets = (muscleVolumeRotation['chest'] || 0) + (muscleVolumeRotation['shoulders'] || 0);
-      if (pushSets >= 40) sets = Math.min(sets, Math.round(pushSets * 0.12));
-      else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.15));
-      else if (pushSets >= 14) sets = Math.min(sets, Math.round(pushSets * 0.2));
-    }
+    // 3.1 — вынесенный слой volume: high-volume минимумы + indirect overlap
+    sets = computeMuscleSets(muscle, sets, { level, trainingYears, phase, role, muscleVolumeRotation, isHeavy: /Upper|Chest|Push|Legs|Lower/.test(sched.sessionTag || '') });
     const specVol = specializationEmphasisFactor(muscle, specRes);
     if (specVol !== 1) sets = Math.round(sets * specVol);
     // Фазовая модуляция объёма (deload/intensification/peaking снижают)
