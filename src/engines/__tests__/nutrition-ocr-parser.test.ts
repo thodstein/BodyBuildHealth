@@ -138,6 +138,7 @@ describe('nutrition-ocr-parser', () => {
       expect(items.map(item => item.p)).toEqual([0, 7, 70]);
       expect(items.map(item => item.foodId)).toEqual(['coconut_oil', 'cereal_semolina', 'supp_egg_white_powder']);
       expect(items.map(item => item.name)).toEqual(['Кокосовое масло', 'Рисовая манка', 'Яичный протеин']);
+      expect(items.every(item => (item.confidence || 0) >= 0.9)).toBe(true);
     });
 
     it('ignores FatSecret chrome and deduplicates a repeated screen capture', () => {

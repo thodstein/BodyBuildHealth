@@ -305,8 +305,8 @@ const UNLABELED_MACRO_ROW_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|g|
 
 const RUSSIAN_FOOD_NAMES: Record<string, string> = {
   'куриная грудка': 'chicken_breast', 'курица': 'chicken_breast', 'грудка куриная': 'chicken_breast',
-  'рисовая манка': 'cereal_semolina', 'манка рисовая': 'cereal_semolina',
-  'яичный протеин': 'supp_egg_white_powder', 'протеин яичный': 'supp_egg_white_powder',
+  'рисовая манка': 'cereal_semolina', 'манка рисовая': 'cereal_semolina', 'гарнец рисовая манка': 'cereal_semolina',
+  'яичный протеин': 'supp_egg_white_powder', 'протеин яичный': 'supp_egg_white_powder', 'стоинг яичный протеин': 'supp_egg_white_powder',
   'говядина': 'beef_lean', 'стейк': 'beef_lean', 'говяжий': 'beef_lean',
   'лосось': 'salmon', 'семга': 'salmon', 'рыба': 'salmon',
   'рис': 'rice_white', 'рис белый': 'rice_white', 'рис бурый': 'rice_brown',
@@ -322,7 +322,7 @@ const RUSSIAN_FOOD_NAMES: Record<string, string> = {
   'орехи': 'nuts_mix', 'грецкие орехи': 'nuts_mix', 'миндаль': 'nuts_mix',
   'авокадо': 'avocado', 'шпинат': 'spinach', 'огурец': 'cucumber',
   'помидор': 'tomato', 'томат': 'tomato', 'перец': 'pepper',
-  'масло оливковое': 'olive_oil', 'оливковое масло': 'olive_oil', 'кокосовое масло': 'coconut_oil',
+  'масло оливковое': 'olive_oil', 'оливковое масло': 'olive_oil', 'кокосовое масло': 'coconut_oil', 'ворогорз кокосовое масло': 'coconut_oil',
   'сельдь': 'fish_oil_food', 'скумбрия': 'fish_oil_food',
   'протеин': 'whey_protein', 'сывороточный протеин': 'whey_protein',
   'казеин': 'casein', 'креатин': 'creatine',
