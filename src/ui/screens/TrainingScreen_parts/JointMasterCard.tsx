@@ -299,15 +299,15 @@ export const JointMasterCard: React.FC = () => {
           {diag.flows.slice(0,2).map(f => (
             <div key={f.id} style={{ padding:'8px', borderRadius:8, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.15)' }}>
               <div style={{ fontSize:10, fontWeight:700, color:'#38bdf8' }}>{f.name}</div>
-              <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>{(f.exercises || []).slice(0,2).join(' · ') || 'поток мобильности'}</div>
-              <button onClick={() => applyToPlanner({ kind:'limiter', label:`Поток ${f.name} для ${diag.joint.label}`, data:{ limiterExerciseMap:{ [diag.joint.id+'|flow|'+f.id]: f.exercises || [] }, limiterProtocolMap:{}, limiterDayMap:{} } as any })} style={{ marginTop:6, width:'100%', minHeight:26, border:'none', borderRadius:6, cursor:'pointer', background:'#38bdf8', color:'#000', fontWeight:700, fontSize:9 }}>+ Добавить поток</button>
+              <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>{(f.exercises || []).slice(0,2).map((e:any)=> e.name || e).join(' · ') || 'поток мобильности'}</div>
+              <button onClick={() => applyToPlanner({ kind:'limiter', label:`Поток ${f.name} для ${diag.joint.label}`, data:{ limiterExerciseMap:{ [diag.joint.id+'|flow|'+f.id]: (f.exercises || []).map((e:any)=> e.name || e) }, limiterProtocolMap:{}, limiterDayMap:{} } as any })} style={{ marginTop:6, width:'100%', minHeight:26, border:'none', borderRadius:6, cursor:'pointer', background:'#38bdf8', color:'#000', fontWeight:700, fontSize:9 }}>+ Добавить поток</button>
             </div>
           ))}
         </div>
         <button onClick={() => {
           const map: Record<string,string[]> = {};
           diag.mobilityTests.forEach(t => { map[diag.joint.id+'|mobility|'+t.id] = [t.title]; });
-          diag.flows.forEach(f => { map[diag.joint.id+'|flow|'+f.id] = f.exercises || [f.name]; });
+          diag.flows.forEach(f => { map[diag.joint.id+'|flow|'+f.id] = (f.exercises || []).map((e:any)=> e.name || e) as any || [f.name]; });
           applyToPlanner({ kind:'limiter', label:`Весь прехаб ${diag.joint.label}: ${diag.mobilityTests.length + diag.flows.length} блоков`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
         }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#a78bfa', color:'#fff', fontWeight:800, fontSize:10 }}>🛠 Добавить весь прехаб для {diag.joint.label}</button>
         <div style={{ marginTop:6, padding:'6px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', lineHeight:1.3 }}>

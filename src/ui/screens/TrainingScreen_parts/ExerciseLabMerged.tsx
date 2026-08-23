@@ -90,7 +90,7 @@ const ExerciseLabMerged: React.FC<{
       </div>
 
       {/* Единая шапка: выбор упражнения + глобальные действия — удобно, 0-кликов лишних */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center', ...CARD, marginBottom:10 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', ...CARD }}>
         <button onClick={() => setCatalogOpen(true)} style={{ flex: '0 0 auto', padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.30)', background: 'linear-gradient(135deg,rgba(0,230,138,0.14),rgba(0,200,83,0.08))', color: ACCENT, cursor: 'pointer', fontSize: 11, fontWeight: 800, boxShadow:'0 2px 8px rgba(0,230,138,0.15)' }}>
           📚 Каталог {selectedId ? '· выбрано ✓' : '· выбрать'}
         </button>

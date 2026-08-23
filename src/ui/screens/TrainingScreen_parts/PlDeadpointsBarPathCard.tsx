@@ -766,8 +766,8 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       </section>
 
       {/* ═══ 4. Движение штанги (bar-path) ═══ */}
-      <section id="sec-barpath" ref={el=> sectionRefs.current['sec-barpath']=el} style={{ scrollMarginTop:56 }}>
       {applicableIssues.length > 0 && (
+      <section id="sec-barpath" ref={el=> sectionRefs.current['sec-barpath']=el} style={{ scrollMarginTop:56 }}>
         <div style={{ ...CARD, borderLeft:'3px solid #f59e0b' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>4 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
@@ -808,7 +808,6 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
               </div>
             </div>
           ))}
-        </div>
         </div>
       </section>
       )}
