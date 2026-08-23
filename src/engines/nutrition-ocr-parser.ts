@@ -354,7 +354,10 @@ const ENGLISH_FOOD_NAMES: Record<string, string> = {
 
 function matchRussianFood(text: string): string | null {
   const lower = normalizeFoodText(text);
-  for (const [name, id] of Object.entries({ ...RUSSIAN_FOOD_NAMES, ...ENGLISH_FOOD_NAMES })) {
+  const aliases = { ...RUSSIAN_FOOD_NAMES, ...ENGLISH_FOOD_NAMES };
+  // Specific product names must win over broad aliases such as "рис",
+  // "протеин" or "масло".
+  for (const [name, id] of Object.entries(aliases).sort(([left], [right]) => right.length - left.length)) {
     if (lower.includes(normalizeFoodText(name))) return id;
   }
   return null;

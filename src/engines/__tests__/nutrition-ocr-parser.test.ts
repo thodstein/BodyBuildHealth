@@ -136,6 +136,8 @@ describe('nutrition-ocr-parser', () => {
       expect(items.map(item => item.qtyGrams)).toEqual([20, 150, 30]);
       expect(items.map(item => item.kcal)).toEqual([900, 350, 300]);
       expect(items.map(item => item.p)).toEqual([0, 7, 70]);
+      expect(items.map(item => item.foodId)).toEqual(['coconut_oil', 'cereal_semolina', 'supp_egg_white_powder']);
+      expect(items.map(item => item.name)).toEqual(['Кокосовое масло', 'Рисовая манка', 'Яичный протеин']);
     });
 
     it('keeps a food and its quantity when OCR has no calories row', () => {
