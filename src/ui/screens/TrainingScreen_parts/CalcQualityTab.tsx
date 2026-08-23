@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 import { GROUP_RU } from './program-types';
@@ -6,13 +6,14 @@ import { loadTrainingProfile } from './training-profile';
 import { loadUserPrograms } from '../../../engines/user-program/program-store';
 import { useDataLink } from '../../../core/data-link';
 import { labTrainingAdjust } from './lab-training-adjust';
-import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupSelect, PopupNumber, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { adaptForPEDs } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
 import TrainingMetricsChart from '../SRCBBScreen_parts/TrainingMetricsChart';
 import { calcSessionMetrics, type LMSWeekMetric } from '../../../engines/lms/lms-metrics.engine';
 import { norm } from '../../../engines/norm';
+import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
 const ru = (g: string) => GROUP_RU[g] || g;
@@ -75,12 +76,22 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     return prof.onCourse ? (['AAS'] as any) : [];
   }, [usePed, prof.onCourse]);
 
+  const [pedDosesEdit, setPedDosesEdit] = useState<Record<string, number>>(() => pedDoses);
+  useEffect(() => { setPedDosesEdit(pedDoses); }, [pedDoses]);
+  useEffect(() => {
+    if (!usePed) return;
+    try {
+      const cur = JSON.parse(localStorage.getItem('he_pl_session') || '{}');
+      const next = { ...cur, pedDoses: pedDosesEdit };
+      localStorage.setItem('he_pl_session', JSON.stringify(next));
+    } catch {}
+  }, [pedDosesEdit, usePed]);
+
   const pedAdapt = useMemo(() => {
     if (!usePed || peds.length === 0) return null;
-    // Базовый MRV для адаптации — берем средний MRV по группам для уровня
     const base: Record<string, number> = { chest: 20, back: 22, legs: 20, shoulders: 14, arms: 14, core: 12 };
-    try { return adaptForPEDs(peds as any, base, pedDoses, courseIntensity); } catch { return null; }
-  }, [usePed, peds, pedDoses, courseIntensity]);
+    try { return adaptForPEDs(peds as any, base, pedDosesEdit, courseIntensity); } catch { return null; }
+  }, [usePed, peds, pedDosesEdit, courseIntensity]);
 
   // Вычисляем анализ для выбранного разделения
   const analysis = useMemo(() => {
@@ -238,15 +249,27 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       if (!weeks.length) return null;
       const totalWeeks = weeks.length;
       const freq: Record<string, number> = {};
-      let hardSets = 0, totalSets = 0, rirSum = 0, rirN = 0;
+      let hardSets = 0, totalSets = 0, rirSum = 0, rirN = 0, tonnage = 0, effectiveSets = 0;
+      const perMuscleSets: Record<string, number> = {};
       for (const w of weeks) {
         for (const s of (w.sessions || [])) {
           const musclesInSess = new Set<string>();
           for (const b of (s.blocks || [])) {
             const mu = String(b.muscle || '').toLowerCase();
-            if (mu) musclesInSess.add(mu);
+            if (mu) {
+              musclesInSess.add(mu);
+              perMuscleSets[mu] = (perMuscleSets[mu] || 0) + (b.sets?.length || 0);
+            }
             const sets = (b.sets?.length || 0);
             totalSets += sets;
+            // тоннаж и effective
+            for (const st of (b.sets || [])) {
+              const wgt = (st as any).weight || 60;
+              const reps = Number(st.reps) || 8;
+              tonnage += wgt * reps;
+              // effective sets: RIR<=3 и reps>5
+              if ((st.rir ?? 2) <= 3 && reps >= 5) effectiveSets += 1;
+            }
             const rir = b.sets?.[0]?.rir ?? 2;
             if (Number.isFinite(rir) && rir < 1) hardSets += sets;
             if (Number.isFinite(rir)) { rirSum += rir * sets; rirN += sets; }
@@ -256,7 +279,67 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       }
       const freqPerWeek: Record<string, number> = {};
       for (const [k, v] of Object.entries(freq)) freqPerWeek[k] = Math.round((v / totalWeeks) * 10) / 10;
-      return { freqPerWeek, hardSets, totalSets, avgRir: rirN ? rirSum / rirN : 0 };
+      const avgFreq = Object.values(freqPerWeek).length ? (Object.values(freqPerWeek).reduce((a,b)=>a+b,0)/Object.values(freqPerWeek).length) : 0;
+      return { freqPerWeek, hardSets, totalSets, avgRir: rirN ? rirSum / rirN : 0, tonnage: Math.round(tonnage), effectiveSets, perMuscleSets, avgFreq: Math.round(avgFreq*10)/10 };
+    } catch { return null; }
+  }, [selectedProgram, division]);
+
+  const plExtra = useMemo(() => {
+    if (division !== 'pl' || !selectedProgram?.pl) return null;
+    try {
+      const weeks: any[] = (selectedProgram.pl as any).customWeeks || [];
+      let plWeeks: any[] = weeks;
+      if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
+        const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
+        if (tpl) {
+          const rawWeeks: any[] = (tpl as any).weeks && (tpl as any).weeks.length ? (tpl as any).weeks : [(tpl as any).week1];
+          plWeeks = rawWeeks.map((days: any, wi: number) => ({
+            week: wi + 1,
+            days: (days as any[]).map((d: any) => ({
+              exercises: (d.exercises as any[]).map((ex: any) => ({
+                name: ex.name,
+                lift: 'accessory' as const,
+                muscle: (ex as any).group || 'chest',
+                sets: (ex.sets as any[]).map((s: any) => ({ pct: s.pct, reps: s.reps, sets: s.sets })),
+              })),
+            })),
+          }));
+        }
+      }
+      if (!plWeeks.length) return null;
+      // частота по присед/жим/тяга
+      const liftFreq: Record<string, number> = { squat: 0, bench: 0, dead: 0 };
+      let totalKpsh = 0, totalTonnage = 0;
+      const zoneCounts: Record<string, number> = { '50-60': 0, '60-70': 0, '70-80': 0, '80-90': 0, '90+': 0 };
+      for (const w of plWeeks) {
+        for (const d of (w.days || [])) {
+          for (const ex of (d.exercises || [])) {
+            const name = norm(ex.name);
+            if (/присед|squat/.test(name)) liftFreq.squat += 1;
+            else if (/жим|bench|press/.test(name) && !/стоя/.test(name)) liftFreq.bench += 1;
+            else if (/тяга|dead|становая/.test(name)) liftFreq.dead += 1;
+            for (const s of (ex.sets || [])) {
+              const kpsh = (s.reps || 5) * (s.sets || 3);
+              totalKpsh += kpsh;
+              const pct = s.pct || 0.7;
+              const pm = 100; // условный
+              totalTonnage += pm * pct * (s.reps || 5) * (s.sets || 3);
+              if (pct < 0.6) zoneCounts['50-60'] += kpsh;
+              else if (pct < 0.7) zoneCounts['60-70'] += kpsh;
+              else if (pct < 0.8) zoneCounts['70-80'] += kpsh;
+              else if (pct < 0.9) zoneCounts['80-90'] += kpsh;
+              else zoneCounts['90+'] += kpsh;
+            }
+          }
+        }
+      }
+      const totalWeeks = plWeeks.length || 1;
+      const freqPerWeek = {
+        squat: Math.round((liftFreq.squat / totalWeeks) * 10) / 10,
+        bench: Math.round((liftFreq.bench / totalWeeks) * 10) / 10,
+        dead: Math.round((liftFreq.dead / totalWeeks) * 10) / 10,
+      };
+      return { freqPerWeek, totalKpsh, totalTonnage: Math.round(totalTonnage), zoneCounts };
     } catch { return null; }
   }, [selectedProgram, division]);
 
@@ -370,6 +453,14 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
                 const label = k === 'mild' ? 'Mild' : k === 'moderate' ? 'Moderate' : 'Heavy';
                 return <button key={k} onClick={() => setCourseIntensity(k)} style={{ padding: '4px 8px', borderRadius: 7, cursor: 'pointer', fontSize: 9, fontWeight: 700, border: on ? '1px solid #f87171' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(239,68,68,0.12)' : 'transparent', color: on ? '#f87171' : '#fff' }}>{label}{on ? ' ✓' : ''}</button>;
               })}
+            </div>
+          )}
+          {pedOn && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <PopupNumber label="AAS мг/нед" value={pedDosesEdit['AAS'] || 0} min={0} max={3000} step={50} onChange={v => setPedDosesEdit(p => ({ ...p, AAS: v }))} />
+              <PopupNumber label="GH МЕ/день" value={pedDosesEdit['GH'] || 0} min={0} max={15} step={1} onChange={v => setPedDosesEdit(p => ({ ...p, GH: v }))} />
+              <PopupNumber label="Инсулин МЕ/день" value={pedDosesEdit['insulin'] || 0} min={0} max={40} step={2} onChange={v => setPedDosesEdit(p => ({ ...p, insulin: v }))} />
+              <PopupNumber label="IGF-1 мкг/день" value={pedDosesEdit['IGF1'] || 0} min={0} max={200} step={10} onChange={v => setPedDosesEdit(p => ({ ...p, IGF1: v }))} />
             </div>
           )}
           {pedOn && pedAdapt && (
@@ -521,6 +612,15 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>📈 Графики нагрузки ПЛ — тоннаж / КПШ / интенсивность (источники: Фунтиков, Черняк, Прилепин, Шейко)</div>
           <TrainingMetricsChart lms={lmsChart} />
+          {plExtra && (
+            <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: '#fff' }}>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>КПШ/нед: <b>{plExtra.totalKpsh}</b> · Тоннаж: <b>{plExtra.totalTonnage.toLocaleString('ru-RU')} кг</b></div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Частота присед/жим/тяга: <b>{plExtra.freqPerWeek.squat}× / {plExtra.freqPerWeek.bench}× / {plExtra.freqPerWeek.dead}×</b></div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', gridColumn: '1 / -1' }}>
+                Зоны Прилепина КПШ: {Object.entries(plExtra.zoneCounts).map(([k, v]) => `${k}%: ${v}`).join(' · ')}
+              </div>
+            </div>
+          )}
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 6, lineHeight: 1.4 }}>
             Тоннаж = Σвес×пов×под×Множ · КПШ = Σпов×под · Ср.вес = Тоннаж/КПШ · Инт.отн = Ср.вес/(PM×Множ) · УОИ = ΣКПШ×Коэф/ΣКПШ · Инт.Ф+Б = Σk(вес/PM)×вес×пов×под×Множ×Коэф. По Прилепину: оптимум 60-70% — КПШ 18-30, 70-80% — 12-24 и т.д.
           </div>
@@ -532,10 +632,10 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           <TrainingMetricsChart bb={bbChart} />
           {bbExtra && (
             <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: '#fff' }}>
-              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Всего сетов/ротация: <b>{bbExtra.totalSets}</b></div>
-              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Хард-сетов RIR&lt;1: <b style={{ color: bbExtra.hardSets > 6 ? '#ef4444' : '#fff' }}>{bbExtra.hardSets}</b></div>
-              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Ср. RIR: <b>{bbExtra.avgRir.toFixed(1)}</b></div>
-              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Частота/нед: <b>{Object.entries(bbExtra.freqPerWeek).slice(0, 4).map(([k, v]) => `${ru(k)} ${v}×`).join(' · ') || '—'}</b></div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Всего сетов/нед: <b>{bbExtra.totalSets}</b> · эфф. {bbExtra.effectiveSets}</div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Хард RIR&lt;1: <b style={{ color: bbExtra.hardSets > 6 ? '#ef4444' : '#fff' }}>{bbExtra.hardSets}</b> · Ср.RIR {bbExtra.avgRir.toFixed(1)}</div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Тоннаж/нед: <b>{bbExtra.tonnage.toLocaleString('ru-RU')} кг</b></div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Частота ср.: <b>{bbExtra.avgFreq}×/нед</b> · {Object.entries(bbExtra.freqPerWeek).slice(0, 3).map(([k, v]) => `${ru(k)} ${v}×`).join(' · ')}</div>
             </div>
           )}
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.3 }}>Israetel: MEV/MAV/MRV по уровню; Schoenfeld: частота 2×/нед для гипертрофии; Helms: hard-cap по уровню (нач 3/ сред 6/ продв 10). Зелёный — тяж, голубой — памп, красный пунктир — MRV.</div>
@@ -556,6 +656,55 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button onClick={onBuildPlan} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: ACCENT, cursor: 'pointer', fontWeight: 800, fontSize: 11 }}>📋 Редактировать программу</button>
         <button onClick={() => setDivision(d => d === 'bb' ? 'pl' : 'bb')} style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>⇄ Переключить на {division === 'bb' ? 'ПЛ' : 'ББ'}</button>
+      </div>
+      <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => {
+            if (!pro) return;
+            const recs = pro.totalRecommendations.slice(0, 6).join('\n');
+            if (!recs) return;
+            try {
+              applyToPlanner({ kind: 'weakpoints', label: `Калькулятор качества PRO: ${division.toUpperCase()} — применить`, data: { groups: pro.patterns.filter(p => !p.ok).map(p => p.muscle) } as any });
+            } catch {}
+            navigator.clipboard?.writeText(recs).catch(() => {});
+          }}
+          style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', cursor: 'pointer', fontWeight: 800, fontSize: 10 }}
+        >
+          🛠 Применить рекомендации PRO
+        </button>
+        <button
+          onClick={() => {
+            const lines = [
+              `Калькулятор качества — ${division === 'bb' ? 'ББ' : 'ПЛ'} — ${selectedProgram?.meta.title || ''}`,
+              `Уровень: ${effectiveLevel} · ${pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2)}` : 'Натурал'} · Лаб ×${labMult.toFixed(2)}`,
+              `Оценка: ${analysis.score}/100 ${analysis.grade} · PRO: ${pro ? Math.max(0, Math.min(100, analysis.score + pro.scoreDelta)) : analysis.score}/100`,
+              `--- Объём ---`,
+              ...analysis.perMuscle.map(p => `${ru(p.muscle)}: ${p.peakSets} сет (MEV${p.mev}/MAV${p.mav}/MRV${p.mrv}) ${p.status}`),
+              `--- PRO ---`,
+              ...(pro ? [`Паттерны: ${pro.patterns.map(p => `${ru(p.muscle)}:${p.distinct}/${p.expected.length}${p.ok ? '✓' : '✕'}`).join(' · ')}`, `Углы: ${pro.angles.map(a => `${ru(a.muscle)}:${Math.round(a.coverage * 100)}%`).join(' · ')}`, `Техника: ${pro.technique.pct}%`, `Цель: ${pro.goalAlignment.goal} ${pro.goalAlignment.ok ? '✓' : '✕'}`] : []),
+              ...(lmsChart ? [`--- Тоннаж/КПШ (ПЛ) ---`, ...lmsChart.map(m => `Нед ${m.week}: тоннаж ${m.tonnage} кг · КПШ ${m.kpsh} · Инт ${m.relInt} · УОИ ${m.uoi}`)] : []),
+              ...(bbExtra ? [`--- ББ метрики ---`, `Всего сетов ${bbExtra.totalSets} · эфф ${bbExtra.effectiveSets} · хард ${bbExtra.hardSets} · RIR ${bbExtra.avgRir.toFixed(1)} · тоннаж ${bbExtra.tonnage} кг`] : []),
+            ];
+            const text = lines.join('\n');
+            navigator.clipboard?.writeText(text).catch(() => {});
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `quality-${division}-${(selectedProgram?.meta.title || 'program').replace(/\s+/g, '_')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          style={{ flex: 1, padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 10 }}
+        >
+          📤 Экспорт отчёта
+        </button>
+        <button
+          onClick={() => window.print()}
+          style={{ padding: '9px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.02)', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 10 }}
+        >
+          🖨 Печать
+        </button>
       </div>
     </div>
   );
