@@ -556,9 +556,23 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🔀 Паттерны — разнообразие движений</div>
               {pro.patterns.map(p => (
-                <div key={p.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, color: p.ok ? '#22c55e' : '#f59e0b', marginBottom: 2 }}>
+                <div key={p.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, marginBottom: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ color: '#fff', fontWeight: 700 }}>{ru(p.muscle)}: {p.patterns.join(', ') || '—'}</span>
-                  <span style={{ color: p.ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{p.distinct} / {p.expected.length} {p.ok ? '✓' : '⚠'}</span>
+                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ color: p.ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{p.distinct} / {p.expected.length} {p.ok ? '✓' : '⚠'}</span>
+                    {!p.ok && p.distinct > 0 && (
+                      <button
+                        onClick={() => {
+                          const missing = p.expected.find(x => !p.patterns.includes(x));
+                          if (!missing) return;
+                          try { applyToPlanner({ kind: 'weakpoints', label: `Добавить паттерн ${missing} для ${ru(p.muscle)}`, data: { groups: [p.muscle] } as any }); } catch {}
+                        }}
+                        style={{ padding: '3px 7px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}
+                      >
+                        ➕ {p.expected.find(x => !p.patterns.includes(x)) || 'паттерн'}
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
               {pro.patterns.every(p => p.ok) && <div style={{ fontSize: 9, color: '#22c55e', marginTop: 4 }}>Паттерны покрыты — разнообразие достаточное для гипертрофии/силы.</div>}
@@ -567,9 +581,23 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>📐 Углы — проработка головок/сегментов</div>
               {pro.angles.map(a => (
-                <div key={a.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, color: a.ok ? '#22c55e' : '#f59e0b', marginBottom: 2 }}>
+                <div key={a.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, marginBottom: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ color: '#fff', fontWeight: 700 }}>{ru(a.muscle)}: {a.angles.join(', ') || '—'}</span>
-                  <span style={{ color: a.ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(a.coverage * 100)}% {a.ok ? '✓' : '⚠'}</span>
+                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ color: a.ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>{Math.round(a.coverage * 100)}% {a.ok ? '✓' : '⚠'}</span>
+                    {!a.ok && a.angles.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const missing = a.expected.find(x => !a.angles.includes(x));
+                          if (!missing) return;
+                          try { applyToPlanner({ kind: 'weakpoints', label: `Добавить угол ${missing} для ${ru(a.muscle)}`, data: { groups: [a.muscle] } as any }); } catch {}
+                        }}
+                        style={{ padding: '3px 7px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}
+                      >
+                        ➕ {a.expected.find(x => !a.angles.includes(x)) || 'угол'}
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>
@@ -577,9 +605,21 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>🧘 Растяжка — stretch-фаза / удлинённая позиция</div>
               {pro.stretches.map(s => (
-                <div key={s.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                <div key={s.muscle} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, fontSize: 10, marginBottom: 2, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{ color: '#fff', fontWeight: 700 }}>{ru(s.muscle)}: {s.stretchExercises.join(', ') || '—'}</span>
-                  <span style={{ color: s.ok ? '#22c55e' : '#ef4444', fontWeight: 700 }}>{s.ok ? 'есть ✓' : 'нет ✕'}</span>
+                  <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <span style={{ color: s.ok ? '#22c55e' : '#ef4444', fontWeight: 700 }}>{s.ok ? 'есть ✓' : 'нет ✕'}</span>
+                    {!s.ok && (
+                      <button
+                        onClick={() => {
+                          try { applyToPlanner({ kind: 'weakpoints', label: `Добавить растяжку для ${ru(s.muscle)}`, data: { groups: [s.muscle] } as any }); } catch {}
+                        }}
+                        style={{ padding: '3px 7px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', color: '#60a5fa', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}
+                      >
+                        ➕ stretch
+                      </button>
+                    )}
+                  </span>
                 </div>
               ))}
             </div>

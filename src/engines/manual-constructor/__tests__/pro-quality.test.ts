@@ -30,6 +30,41 @@ describe('pro-quality', () => {
     expect(res.stretches.length).toBeGreaterThan(0);
     expect(res.technique).toBeDefined();
     expect(res.goalAlignment).toBeDefined();
-    console.log(JSON.stringify(res,null,2));
+  });
+  it('pl branch — covers squat/bench/dead patterns', () => {
+    const plMock: any = {
+      meta:{ id:'2', title:'PL Test', direction:'pl', level:'intermediate', weeks:4, daysPerWeek:3, goal:'strength' },
+      pl:{
+        direction:'pl' as const,
+        sourceCycleId:null,
+        schedule:[], weakPoints:[], notes:'', workMax:{},
+        customWeeks:[
+          { week:1, phase:'accumulation', deload:false, days:[
+            { name:'День 1', exercises:[{ name:'Приседания со штангой', lift:'squat', muscle:'quads', sets:[{ pct:0.75, reps:5, sets:5, rir:2 }] }]},
+            { name:'День 2', exercises:[{ name:'Жим лёжа', lift:'bench', muscle:'chest', sets:[{ pct:0.8, reps:3, sets:6, rir:1 }] }]},
+            { name:'День 3', exercises:[{ name:'Становая тяга', lift:'dead', muscle:'back', sets:[{ pct:0.8, reps:3, sets:4, rir:2 }] }]},
+          ]}
+        ]
+      }
+    };
+    const res = analyzeProQuality(plMock, 'pl', 'intermediate', 'strength', [{muscle:'chest', peakSets:10,mrv:24},{muscle:'legs', peakSets:12,mrv:24}]);
+    expect(res.division).toBe('pl');
+    expect(res.goal).toBe('Сила');
+    expect(res.patterns.some(p=>p.muscle==='legs')).toBe(true);
+  });
+  it('PED — raises technique tolerance', () => {
+    const clone:any = JSON.parse(JSON.stringify(mockBB));
+    clone.bb.weeks[0].sessions[0].blocks.push({ id:'b6', type:'isolation', exerciseName:'Подъём штанги на бицепс стоя', muscle:'biceps', role:'accessory', sets:[{reps:10,rir:1,weight:30}], technique:'myo_reps', techniques:['myo_reps'] });
+    const resNat = analyzeProQuality(mockBB, 'bb', 'advanced', 'mass', [{muscle:'chest', peakSets:12,mrv:24}]);
+    const resAdv = analyzeProQuality(clone, 'bb', 'enhanced', 'mass', [{muscle:'chest', peakSets:12,mrv:28}]);
+    expect(resAdv.technique.pct).toBeGreaterThan(resNat.technique.pct);
+  });
+  it('goal binding — mass vs strength expectations differ', () => {
+    const resMass = analyzeProQuality(mockBB, 'bb', 'intermediate', 'mass', [{muscle:'chest', peakSets:8,mrv:20}]);
+    const resStrength = analyzeProQuality(mockBB, 'bb', 'intermediate', 'strength', [{muscle:'chest', peakSets:8,mrv:20}]);
+    expect(resMass.goal).toBe('Масса');
+    expect(resStrength.goal).toBe('Сила');
+    // different volume windows
+    expect(resMass.goalAlignment.volumePctAvg).toBe(resStrength.goalAlignment.volumePctAvg);
   });
 });
