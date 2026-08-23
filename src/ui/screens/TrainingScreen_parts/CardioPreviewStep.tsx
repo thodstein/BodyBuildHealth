@@ -19,7 +19,7 @@ import { CardioCalendar } from './CardioCalendar';
 
 const VARIANT_BTN: React.CSSProperties = {
   flex: '1 1 100px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
-  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'var(--text-dim)', fontSize: 11,
+  border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 11,
 };
 const VARIANT_BTN_ACTIVE: React.CSSProperties = {
   ...VARIANT_BTN, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff',
@@ -52,7 +52,7 @@ export const CardioPreviewStep: React.FC<{
   const [nameDraft, setNameDraft] = useState('');
   const [weekNo, setWeekNo] = useState(1);
   const [improve, setImprove] = useState<{ changes: CardioTuneChange[]; cycle: CardioCycle } | null>(null);
-  const [selectedSession, setSelectedSession] = useState<{ week: number; dayOfНеделя: number } | null>(null);
+  const [selectedSession, setSelectedSession] = useState<{ week: number; dayOfWeek: number } | null>(null);
   const [kcalFlash, setKcalFlash] = useState(false);
 
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
@@ -130,7 +130,7 @@ export const CardioPreviewStep: React.FC<{
 
   const goTo = (id: string) => {
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const NAV = [
@@ -159,7 +159,7 @@ export const CardioPreviewStep: React.FC<{
   if (!cycle || !summary) {
     return (
       <div style={CARD}>
-        <div style={{ fontSize: 12, color:'rgba(255,255,255,0.9)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color:'#fff', lineHeight: 1.5 }}>
           Соберите кардио-цикл из параметров и стартов — появится предпросмотр по неделям.
         </div>
         <button style={BTN_PRIMARY} onClick={onBuild}>🛠 Собрать и сохранить цикл</button>
@@ -181,12 +181,12 @@ export const CardioPreviewStep: React.FC<{
       <div style={CARD} id="sec-overview">
         <div style={ROW}>
           <span style={{ fontSize: 13, fontWeight: 800 }}>{cycle.name}</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
+          <span style={{ fontSize: 10, color: '#fff' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {metrics.map(m => (
             <div key={m.label} style={{ flex: '1 1 90px', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: 0.3 }}>{m.label}</div>
+              <div style={{ fontSize: 9, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3 }}>{m.label}</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: m.color }}>{m.value}</div>
             </div>
           ))}
@@ -230,7 +230,7 @@ export const CardioPreviewStep: React.FC<{
       <div style={CARD}>
         <div style={LABEL}>💡 Почему этот план</div>
         {explanation.map((e, i) => (
-          <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {e}</div>
+          <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>• {e}</div>
         ))}
       </div>
 
@@ -239,7 +239,7 @@ export const CardioPreviewStep: React.FC<{
         <div style={CARD}>
           <div style={LABEL}>📊 Учтённые факторы</div>
           {factorsSummary.map((f, i) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {f}</div>
+            <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>• {f}</div>
           ))}
         </div>
       )}
@@ -249,7 +249,7 @@ export const CardioPreviewStep: React.FC<{
         <div style={CARD} id="sec-nutrition">
           <div style={LABEL}>🍽 Питание для кардио</div>
           {nutritionNotes.map((n, i) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>• {n}</div>
+            <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>• {n}</div>
           ))}
         </div>
       )}
@@ -265,19 +265,19 @@ export const CardioPreviewStep: React.FC<{
           </div>
           <ProgressBar value={quality.score} color={quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444'} height={8} />
           {quality.findings.map((f, i) => (
-            <div key={i} style={{ fontSize: 10, lineHeight: 1.4, color: f.level === 'warn' ? '#fbbf24' : f.level === 'ok' ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.85)' }}>
+            <div key={i} style={{ fontSize: 10, lineHeight: 1.4, color: f.level === 'warn' ? '#fbbf24' : f.level === 'ok' ? 'rgba(74,222,128,0.85)' : '#fff' }}>
               {f.level === 'warn' ? '⚠ ' : f.level === 'ok' ? '✅ ' : '💡 '}{f.text}
             </div>
           ))}
           {improve && (
             <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {improve.changes.length === 0 ? (
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>План уже соответствует рекомендациям — улучшать нечего.</div>
+                <div style={{ fontSize: 11, color: '#fff' }}>План уже соответствует рекомендациям — улучшать нечего.</div>
               ) : (
                 <>
                   <div style={{ fontSize: 11, color: '#93c5fd', fontWeight: 700 }}>Авто-улучшения ({improve.changes.length}):</div>
                   {improve.changes.map((c, i) => (
-                    <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Нед {c.week}: <b>{c.label}</b> — {c.from} → {c.to}</div>
+                    <div key={i} style={{ fontSize: 11, color: '#fff' }}>Нед {c.week}: <b>{c.label}</b> — {c.from} → {c.to}</div>
                   ))}
                   <div style={ROW}>
                     <button style={BTN_PRIMARY} onClick={applyImprove}>✓ Применить</button>
@@ -298,17 +298,17 @@ export const CardioPreviewStep: React.FC<{
         return (
           <div style={{ ...CARD, borderColor: 'rgba(96,165,250,0.3)' }}>
             <div style={LABEL}>📈 Адаптация и контроль</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+            <div style={{ fontSize: 11, color: '#fff' }}>
               Прогноз адаптации: <b style={{ color: '#60a5fa' }}>+{forecast.vo2GainPct}% VO2max</b> за цикл ({forecast.effectiveWeeks} рабочих нед)
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>{forecast.note}</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>{forecast.note}</div>
             {tests.length > 0 && (
               <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 8, padding: '6px 8px' }}>
                 🔬 Контрольные замеры: недели {tests.map(t => t.week).join(', ')} — 30 мин на комфортном темпе, сравните пульс/ощущения с прошлым замером.
               </div>
             )}
             {hints.filter(h => h.kind !== 'work').slice(0, 4).map(h => (
-              <div key={h.week} style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.45 }}>
+              <div key={h.week} style={{ fontSize: 10, color:'#fff', lineHeight: 1.45 }}>
                 • Нед {h.week} ({CARDIO_PHASE_LABELS[h.phase]}): {h.text}
               </div>
             ))}
@@ -337,10 +337,10 @@ export const CardioPreviewStep: React.FC<{
           {phasesPlan.map(p => (
             <div key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
               <span style={{ width: 130, fontWeight: 700, color: PHASE_COLOR[p.phase] ?? '#888' }}>{p.label}</span>
-              <span style={{ width: 110, color: 'rgba(255,255,255,0.55)' }}>нед {p.first}–{p.last}</span>
-              <span style={{ color: 'rgba(255,255,255,0.55)' }}>{p.weeks} нед</span>
+              <span style={{ width: 110, color: '#fff' }}>нед {p.first}–{p.last}</span>
+              <span style={{ color: '#fff' }}>{p.weeks} нед</span>
               <span style={{ flex: 1 }} />
-              <span style={{ color: 'rgba(255,255,255,0.55)' }}>~{p.avgMin} мин/нед</span>
+              <span style={{ color: '#fff' }}>~{p.avgMin} мин/нед</span>
             </div>
           ))}
         </div>
@@ -353,8 +353,8 @@ export const CardioPreviewStep: React.FC<{
           {taperPlan.map(w => (
             <div key={w.week} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
               <span style={{ width: 44, fontWeight: 800, color: PHASE_COLOR[w.phase] }}>нед {w.week}</span>
-              <span style={{ width: 90, color:'rgba(255,255,255,0.9)' }}>{CARDIO_PHASE_LABELS[w.phase]}</span>
-              <span style={{ color: 'rgba(255,255,255,0.55)' }}>{w.minutes} мин · {w.sessions} сессий</span>
+              <span style={{ width: 90, color:'#fff' }}>{CARDIO_PHASE_LABELS[w.phase]}</span>
+              <span style={{ color: '#fff' }}>{w.minutes} мин · {w.sessions} сессий</span>
               <span style={{ flex: 1 }} />
               <span style={{ color: w.hiit ? '#f87171' : '#4ade80', fontWeight: 700 }}>{w.hiit ? 'есть HIIT' : 'без HIIT'}</span>
             </div>
@@ -384,11 +384,11 @@ export const CardioPreviewStep: React.FC<{
             const sess = weekDays.filter(s => s.dayOfWeek === i);
             return (
               <div key={d} style={{ ...DAY_CELL, ...(isLeg ? { background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)' } : {}) }}>
-                <div style={{ color: isLeg ? '#fbbf24' : 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 3 }}>{d}{isLeg ? ' 🦵' : ''}</div>
+                <div style={{ color: isLeg ? '#fbbf24' : '#fff', fontWeight: 700, marginBottom: 3 }}>{d}{isLeg ? ' 🦵' : ''}</div>
                 {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.2)' }}>—</div> : sess.map((s, j) => (
                   <button
                     key={j}
-                    onClick={() => setSelectedSession({ week: Math.min(cycle.totalWeeks, Math.max(1, weekNo)), dayOfНеделя: i })}
+                    onClick={() => setSelectedSession({ week: Math.min(cycle.totalWeeks, Math.max(1, weekNo)), dayOfWeek: i })}
                     title="Показать протокол сессии"
                     style={{ color: isLeg ? '#f87171' : '#4ade80', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 10 }}
                     aria-label={`Протокол: ${TYPE_LABEL[s.type]} ${d}`}
@@ -419,7 +419,7 @@ export const CardioPreviewStep: React.FC<{
             <div style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }} role="status">
               <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd' }}>📋 Протокол: {TYPE_LABEL[s.type]} {s.durationMin} мин · нед {selectedSession.week}</div>
               {protocol.map(p => (
-                <div key={p.name} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                <div key={p.name} style={{ fontSize: 10, color: '#fff' }}>
                   <b>{p.name}</b> {p.minutes} мин — {p.note}{p.hrZone?.max ? ` · ЧСС ${p.hrZone.min}-${p.hrZone.max}` : ''}
                 </div>
               ))}
@@ -453,7 +453,7 @@ export const CardioPreviewStep: React.FC<{
                 }}>
                   <div style={ROW}>
                     <span style={{ minWidth: 22, fontSize: 12, fontWeight: 800, color }}>{w.week}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
                       {CARDIO_PHASE_LABELS[w.phase]}{w.deload ? ' · делод' : ''}{w.taper ? ' · taper' : ''}
                     </span>
                     {w.deload && (
@@ -463,7 +463,7 @@ export const CardioPreviewStep: React.FC<{
                       <span style={{ fontSize: 9, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 20, padding: '1px 8px' }}>📉 taper</span>
                     )}
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.8)', whiteSpace: 'nowrap' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
                   </div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingLeft: 22 }}>
                     {w.sessions.map((s, i) => (
@@ -496,7 +496,7 @@ export const CardioPreviewStep: React.FC<{
         <div style={CARD} id="sec-rationale">
           <div style={LABEL}>💡 Обоснование</div>
           {cycle.rationale.map((r, i) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>• {r}</div>
+            <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>• {r}</div>
           ))}
         </div>
       )}

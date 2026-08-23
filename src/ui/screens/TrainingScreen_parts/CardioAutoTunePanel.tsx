@@ -13,6 +13,7 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge, Accordion } from './CardioUI';
+import { getProfile, updateSection } from '../../../core/profile-manager';
 
 export const CARDIO_AUTO_TUNE_KEY = 'he_cardio_auto_tune';
 export const CARDIO_AUTO_APPLY_KEY = 'he_cardio_auto_apply';
@@ -43,8 +44,12 @@ export const CardioAutoTunePanel: React.FC<{
   const [vdotKm, setVdotKm] = useState('');
   const [vdotMin, setVdotMin] = useState('');
   const [cooperKm, setCooperKm] = useState('');
-  const [periodStart, setPeriodStart] = useState('');
-  const [periodLen, setPeriodLen] = useState('28');
+  const [periodStart, setPeriodStart] = useState(() => {
+    try { return getProfile()?.settings?.lifestyle?.lastPeriodStart ?? ''; } catch { return ''; }
+  });
+  const [periodLen, setPeriodLen] = useState(() => {
+    try { return String(getProfile()?.settings?.lifestyle?.cycleLengthDays ?? 28); } catch { return '28'; }
+  });
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -187,11 +192,11 @@ export const CardioAutoTunePanel: React.FC<{
         <div style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 11, color: '#93c5fd', fontWeight: 700 }}>Предпросмотр изменений ({pending.changes.length})</div>
           {pending.changes.map((c, i) => (
-            <div key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>
+            <div key={i} style={{ fontSize: 11, color: '#fff' }}>
               Нед {c.week}: <b>{c.label}</b> — {c.from} → {c.to}
             </div>
           ))}
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{pending.reason}</div>
+          <div style={{ fontSize: 11, color: '#fff' }}>{pending.reason}</div>
           <div style={ROW}>
             <button style={BTN_PRIMARY} onClick={applyTune}>✓ Применить</button>
             <button style={BTN_DANGER} onClick={() => setPending(null)}>✕ Отменить</button>
@@ -200,7 +205,7 @@ export const CardioAutoTunePanel: React.FC<{
       )}
 
       {today && (
-        <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+        <div style={{ fontSize: 11, color: '#fff' }}>
           🔔 Сегодня (нед {today.week.week}, {today.week.phase}):{' '}
           {today.sessions.length === 0 ? 'кардио по плану нет' : today.sessions.map(s => `${s.type.toUpperCase()} ${s.durationMin} мин`).join(' · ')}
         </div>
@@ -220,7 +225,7 @@ export const CardioAutoTunePanel: React.FC<{
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {zones.map(z => (
-            <div key={z.zone} title={z.purpose} style={{ fontSize: 10, padding: '5px 9px', borderRadius: 8, background: z.zone === 2 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', color: z.zone === 2 ? '#4ade80' : 'rgba(255,255,255,0.62)', fontWeight: z.zone === 2 ? 800 : 500 }}>
+            <div key={z.zone} title={z.purpose} style={{ fontSize: 10, padding: '5px 9px', borderRadius: 8, background: z.zone === 2 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', color: z.zone === 2 ? '#4ade80' : '#fff', fontWeight: z.zone === 2 ? 800 : 500 }}>
               {z.label}: {z.bpmMin}–{z.bpmMax}
             </div>
           ))}
@@ -234,7 +239,7 @@ export const CardioAutoTunePanel: React.FC<{
           <NumberInput value={vdotMin} onChange={setVdotMin} min={1} max={120} step={1} placeholder="20" ariaLabel="Время теста мин" width={70} suffix="мин" />
           {vdot && <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.26)" color="#60a5fa">VDOT {vdot.vdot}</Badge>}
         </div>
-        {vdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.66)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
+        {vdot && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
         <div style={HINT_SM}>Любая дистанция/время → VDOT → темпы Daniels.</div>
       </Accordion>
 
@@ -243,7 +248,7 @@ export const CardioAutoTunePanel: React.FC<{
           <NumberInput value={cooperKm} onChange={setCooperKm} min={0.5} max={5} step={0.05} placeholder="2.4" ariaLabel="Дистанция Cooper км" width={80} suffix="км за 12мин" />
           {cooperVdot && <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.26)" color="#60a5fa">VDOT {cooperVdot.vdot}</Badge>}
         </div>
-        {cooperVdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.66)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы Cooper: {cooperVdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
+        {cooperVdot && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы Cooper: {cooperVdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
         <div style={HINT_SM}>Cooper: 12 мин максимально → VDOT.</div>
       </Accordion>
 
@@ -255,7 +260,7 @@ export const CardioAutoTunePanel: React.FC<{
         {periodInfo && (
           <div style={{ fontSize: 11, padding: '7px 10px', borderRadius: 8, background: periodInfo.phase === 'luteal' ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.07)', border: `1px solid ${periodInfo.phase === 'luteal' ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.18)'}`, color: periodInfo.phase === 'luteal' ? '#f87171' : '#4ade80' }}>
             День {periodInfo.cycleDay} · {periodInfo.phase === 'follicular' ? 'Фолликулярная' : periodInfo.phase === 'ovulatory' ? 'Овуляция' : 'Лютеиновая'} — {periodInfo.note}
-            {periodInfo.phase === 'luteal' && <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>HIIT/MISS → zone2.</div>}
+            {periodInfo.phase === 'luteal' && <div style={{ marginTop: 4, fontSize: 10, color: '#fff' }}>HIIT/MISS → zone2.</div>}
           </div>
         )}
         <div style={ROW}>

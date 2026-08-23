@@ -758,6 +758,8 @@ export interface UnifiedSettings {
     bedtime?: string;
     wakeTime?: string;
     nightAwakenings: number;
+    lastPeriodStart?: string;      // YYYY-MM-DD — дата последней менструации
+    cycleLengthDays?: number;      // длина цикла 21-35 (default 28)
   };
 
   // ─────────── 7. СИСТЕМНЫЕ ───────────
