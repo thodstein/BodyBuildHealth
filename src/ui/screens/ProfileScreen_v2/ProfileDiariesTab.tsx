@@ -247,7 +247,7 @@ const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDism
           style={{
             background: 'transparent',
             border: 'none',
-            color: 'rgba(255,255,255,0.7)',
+            color: '#ffffff',
             fontSize: 18,
             cursor: 'pointer',
             minWidth: 32,
@@ -443,7 +443,7 @@ export const ProfileDiariesTab: React.FC<{
     'baseline' | 'course' | 'bridge' | 'pct' | 'post_pct' | 'fertility' | undefined;
   const courseStartDate = (profile.settings as any)?.pharma?.courseStartDate as string | undefined;
   const PHASE_LABELS: Record<string, { label: string; color: string }> = {
-    baseline: { label: 'Базовая линия', color: '#6b7280' },
+    baseline: { label: 'Базовая линия', color: '#ffffff' },
     course: { label: 'Курс', color: '#f59e0b' },
     bridge: { label: 'Мост', color: '#a78bfa' },
     pct: { label: 'ПКТ', color: '#8b5cf6' },
@@ -1134,7 +1134,7 @@ const exportAllDiariesPdf = () => {
                       style={{
                         background: 'rgba(255,255,255,0.07)',
                         border: '1px solid rgba(255,255,255,0.18)',
-                        color: '#d4d4d8',
+                        color: '#ffffff',
                         cursor: 'pointer',
                         fontSize: 11,
                         fontWeight: 800,

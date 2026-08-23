@@ -254,7 +254,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const morningEvening = useMemo(() => getMorningEveningComparison(rows, 7), [rows]);
   const homeClass = homeAdherence.homeMeanS && homeAdherence.homeMeanD ? classifyHomeBP(homeAdherence.homeMeanS, homeAdherence.homeMeanD) : null;
   const homeClassLabel = homeClass ? getBpClassificationLabel(homeClass) : null;
-  const homeClassColor = homeClass ? getBpClassificationColor(homeClass) : '#888';
+  const homeClassColor = homeClass ? getBpClassificationColor(homeClass) : '#ffffff';
   const cardioRisk = useMemo(() => {
     const profile = getProfile();
     const personal = profile.settings?.personal || {};
@@ -873,9 +873,9 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                       padding: 10, borderRadius: 8, textAlign: 'center',
                       background: `${bg}18`, border: `1px solid ${bg}44`,
                     }}>
-                      <div style={{ fontSize: 12, color: '#aaa' }}>{label}</div>
+                      <div style={{ fontSize: 12, color: '#ffffff' }}>{label}</div>
                       <div style={{ fontSize: 18, fontWeight: 700, color: bg }}>{g.avgS}/{g.avgD}</div>
-                      <div style={{ fontSize: 11, color: '#888' }}>{g.count} изм.</div>
+                      <div style={{ fontSize: 11, color: '#ffffff' }}>{g.count} изм.</div>
                     </div>
                   );
                 })}
@@ -1008,7 +1008,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {BP_SYMPTOMS.map(symptom => {
                   const active = draft.selectedSymptoms.includes(symptom);
-                  return <button key={symptom} type="button" style={{ minHeight: 32, padding: '4px 9px', borderRadius: 16, border: active ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(239,68,68,.2)' : 'rgba(255,255,255,0.05)', color: active ? '#ef4444' : '#aaa', cursor: 'pointer' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
+                  return <button key={symptom} type="button" style={{ minHeight: 32, padding: '4px 9px', borderRadius: 16, border: active ? '1px solid #ef4444' : '1px solid rgba(255,255,255,0.12)', background: active ? 'rgba(239,68,68,.2)' : 'rgba(255,255,255,0.05)', color: active ? '#ef4444' : '#ffffff', cursor: 'pointer' }} onClick={() => setDraft({ ...draft, selectedSymptoms: active ? draft.selectedSymptoms.filter(x => x !== symptom) : [...draft.selectedSymptoms, symptom] })}>{symptom}</button>;
                 })}
               </div>
             </div>

@@ -165,10 +165,10 @@ export const RecompScatter: React.FC<RecompScatterProps> = ({ points }) => {
         ))}
 
         {/* axes labels */}
-        <text x={SVG_W / 2} y={SVG_H - 6} textAnchor="middle" fill="#aaa" fontSize="10">
+        <text x={SVG_W / 2} y={SVG_H - 6} textAnchor="middle" fill="#ffffff" fontSize="10">
           Вес, кг
         </text>
-        <text x={12} y={SVG_H / 2} textAnchor="middle" fill="#aaa" fontSize="10" transform={`rotate(-90 12 ${SVG_H / 2})`}>
+        <text x={12} y={SVG_H / 2} textAnchor="middle" fill="#ffffff" fontSize="10" transform={`rotate(-90 12 ${SVG_H / 2})`}>
           % жира
         </text>
 

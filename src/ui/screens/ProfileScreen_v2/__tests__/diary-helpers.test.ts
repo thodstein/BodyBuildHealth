@@ -138,7 +138,7 @@ describe('computePeriodDelta', () => {
     ];
     const r = computePeriodDelta('pain', entries);
     expect(r).not.toBeNull();
-    expect(r!.color).toBe('#6b7280');
+    expect(r!.color).toBe('#ffffff');
   });
 
   it('возвращает null если данные не числовые', () => {

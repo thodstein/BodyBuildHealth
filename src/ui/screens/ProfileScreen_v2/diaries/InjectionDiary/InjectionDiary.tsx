@@ -1372,7 +1372,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                     return (
                       <g key={entry.id}>
                         <circle cx={30 + index * 44} cy={y} r="4" fill={chartMetric === 'pain' ? '#f97316' : '#ef4444'} stroke="#09090b" strokeWidth="1.5" />
-                        <text x={30 + index * 44} y="215" fill="#aaa" fontSize="8" textAnchor="middle">
+                        <text x={30 + index * 44} y="215" fill="#ffffff" fontSize="8" textAnchor="middle">
                           {entry.date.slice(5)}
                         </text>
                       </g>
@@ -1733,7 +1733,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
                     <text x={55 + index * 115} y={137 - height} textAnchor="middle" fill="#fff" fontSize="14">
                       {item.count}
                     </text>
-                    <text x={55 + index * 115} y="170" textAnchor="middle" fill="#aaa" fontSize="9">
+                    <text x={55 + index * 115} y="170" textAnchor="middle" fill="#ffffff" fontSize="9">
                       {item.week.split('–')[0]}
                     </text>
                   </g>
@@ -1872,7 +1872,7 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
           .inj-table thead { display: none; }
           .inj-table tbody tr { display: block; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px; background: rgba(255,255,255,0.02); }
           .inj-table tbody td { display: flex; justify-content: space-between; padding: 5px 0; border: none; }
-          .inj-table tbody td::before { content: attr(data-label); font-weight: 600; color: rgba(255,255,255,0.5); margin-right: 10px; }
+          .inj-table tbody td::before { content: attr(data-label); font-weight: 600; color: #ffffff; margin-right: 10px; }
           .inj-table tbody td:last-child { justify-content: flex-start; }
         }
         @media (hover: none) and (pointer: coarse) {

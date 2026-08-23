@@ -32,9 +32,9 @@ export const CompletenessIndicator: React.FC<CompletenessIndicatorProps> = ({ en
                 fontSize: 9,
                 padding: '1px 5px',
                 borderRadius: 3,
-                background: has ? (FIELD_COLORS[f] || '#888') + '33' : '#27272a',
-                color: has ? (FIELD_COLORS[f] || '#888') : '#6b7280',
-                border: `1px solid ${has ? (FIELD_COLORS[f] || '#888') + '66' : '#3f3f46'}`,
+                background: has ? (FIELD_COLORS[f] || '#ffffff') + '33' : '#27272a',
+                color: has ? (FIELD_COLORS[f] || '#ffffff') : '#ffffff',
+                border: `1px solid ${has ? (FIELD_COLORS[f] || '#ffffff') + '66' : '#3f3f46'}`,
               }}
             >
               {FIELD_LABELS[f] || f}

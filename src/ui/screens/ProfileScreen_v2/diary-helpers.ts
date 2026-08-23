@@ -201,7 +201,7 @@ export const computePeriodDelta = (
   const isImprovement = isPositiveWhenRising ? delta > 0 : delta < 0;
   const isNeutral = key === 'weight' || key === 'bp';
   const trendColor = Math.abs(delta) < 0.05
-    ? '#6b7280'
+    ? '#ffffff'
     : (isNeutral ? '#60a5fa' : (isImprovement ? '#22c55e' : '#ef4444'));
   return {
     label: `Тренд ${half} vs ${sorted.length - half}`,

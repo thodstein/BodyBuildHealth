@@ -94,8 +94,8 @@ export const FfmiBmiTrend: React.FC<FfmiBmiTrendProps> = ({ rows, heightCm, sex 
               const y2 = tyFFMI(p.ffmi);
               return <line key={`ffmi-l-${i}`} x1={x1} y1={y1} x2={x2} y2={y2} stroke={ffmiColor} strokeWidth="2" opacity={0.6} />;
             })}
-            <text x={W / 2} y={H - 4} textAnchor="middle" fill="#aaa" fontSize="9">{data[0]?.date}</text>
-            <text x={W - PAD} y={H - 4} textAnchor="end" fill="#aaa" fontSize="9">{data.at(-1)?.date}</text>
+            <text x={W / 2} y={H - 4} textAnchor="middle" fill="#ffffff" fontSize="9">{data[0]?.date}</text>
+            <text x={W - PAD} y={H - 4} textAnchor="end" fill="#ffffff" fontSize="9">{data.at(-1)?.date}</text>
             {tooltip && (
               <>
                 <rect x={Math.min(tooltip.x + 8, W - 140)} y={Math.max(tooltip.y - 50, 4)} width={130} height={44} rx={6} fill="rgba(0,0,0,0.9)" stroke="#3f3f46" />

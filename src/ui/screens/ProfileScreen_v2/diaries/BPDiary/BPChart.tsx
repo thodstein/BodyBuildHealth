@@ -319,7 +319,7 @@ export const BPChart = forwardRef<SVGSVGElement, BPChartProps>(({
         </div>
       )}
 
-      <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>
+      <div style={{ fontSize: 10, color: '#ffffff', marginTop: 4 }}>
         Клик по линиям легенды скрывает/показывает серии. Наведите на график для деталей.
       </div>
     </div>

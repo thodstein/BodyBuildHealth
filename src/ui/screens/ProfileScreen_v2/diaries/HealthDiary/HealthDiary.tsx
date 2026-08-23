@@ -619,7 +619,7 @@ const EntryEditor: React.FC<{
               ...button,
               flex: 1,
               background: valid ? colors.primary : 'rgba(255,255,255,0.08)',
-              color: valid ? '#07130d' : '#aaa',
+              color: valid ? '#07130d' : '#ffffff',
             }}
             onClick={() => { if (valid) { clearEditDraft(); onSave(draft); } }}
           >
@@ -1118,12 +1118,12 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             role="img"
             aria-label="График суставной боли"
           >
-            <line x1="40" y1="190" x2="580" y2="190" stroke="#52525b" />
-            <line x1="40" y1="30" x2="40" y2="190" stroke="#52525b" />
+            <line x1="40" y1="190" x2="580" y2="190" stroke="#ffffff" />
+            <line x1="40" y1="30" x2="40" y2="190" stroke="#ffffff" />
             {[0, 10, 20, 30, 40, 50, 60, 70].map((value) => (
               <g key={value}>
                 <line x1="40" y1={190 - value * 2.25} x2="580" y2={190 - value * 2.25} stroke="#ffffff12" />
-                <text x="34" y={194 - value * 2.25} textAnchor="end" fill="#71717a" fontSize="8">
+                <text x="34" y={194 - value * 2.25} textAnchor="end" fill="#ffffff" fontSize="8">
                   {value}
                 </text>
               </g>
@@ -1177,14 +1177,14 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                   <span style={{ color: colors.textMuted, fontSize: 11 }}>Норма ≤ {normalHigh ?? maxVal}/{maxVal}</span>
                 </div>
                 <svg viewBox="0 0 600 230" width="100%" height="210" role="img" aria-label={title}>
-                  <line x1="40" y1="190" x2="580" y2="190" stroke="#52525b" />
-                  <line x1="40" y1="30" x2="40" y2="190" stroke="#52525b" />
+                  <line x1="40" y1="190" x2="580" y2="190" stroke="#ffffff" />
+                  <line x1="40" y1="30" x2="40" y2="190" stroke="#ffffff" />
                   {Array.from({ length: 5 }, (_, i) => {
                     const v = Math.round((maxVal / 4) * i);
                     return (
                       <g key={v}>
                         <line x1="40" y1={190 - v * (180 / maxVal)} x2="580" y2={190 - v * (180 / maxVal)} stroke="#ffffff12" />
-                        <text x="34" y={194 - v * (180 / maxVal)} textAnchor="end" fill="#71717a" fontSize="8">{v}</text>
+                        <text x="34" y={194 - v * (180 / maxVal)} textAnchor="end" fill="#ffffff" fontSize="8">{v}</text>
                       </g>
                     );
                   })}

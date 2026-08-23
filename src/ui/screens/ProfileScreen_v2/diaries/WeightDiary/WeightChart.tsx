@@ -96,11 +96,11 @@ const Tooltip: React.FC<TooltipState> = ({ x, y, date, values }) => {
         minWidth: 140,
       }}
     >
-      <div style={{ fontSize: 11, color: '#aaa', marginBottom: 4 }}>{date}</div>
+      <div style={{ fontSize: 11, color: '#ffffff', marginBottom: 4 }}>{date}</div>
       {values.map(v => (
         <div key={v.field} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
           <span style={{ width: 8, height: 8, borderRadius: 4, background: v.color, display: 'inline-block' }} />
-          <span style={{ color: '#ccc' }}>{v.label}:</span>
+          <span style={{ color: '#ffffff' }}>{v.label}:</span>
           <b>{Number.isInteger(v.value) ? v.value : v.value.toFixed(1)}</b>
         </div>
       ))}
@@ -116,7 +116,7 @@ export const ChartLegend: React.FC<{ series: Series[] }> = ({ series }) => (
       <span key={s.field} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
         <span style={{ width: 10, height: 3, borderRadius: 2, background: s.color, display: 'inline-block' }} />
         {FIELD_LABELS[s.field] || s.field}
-        {s.useRightAxis ? <small style={{ color: '#888' }}>(%)</small> : null}
+        {s.useRightAxis ? <small style={{ color: '#ffffff' }}>(%)</small> : null}
       </span>
     ))}
   </div>
@@ -397,8 +397,8 @@ export const OverlayChart: React.FC<OverlayChartProps> = ({
         )}
 
         {/* dates */}
-        <text x="42" y="194" fill="#aaa" fontSize="10">{dates[0]}</text>
-        <text x="582" y="194" textAnchor="end" fill="#aaa" fontSize="10">{dates.at(-1)}</text>
+        <text x="42" y="194" fill="#ffffff" fontSize="10">{dates[0]}</text>
+        <text x="582" y="194" textAnchor="end" fill="#ffffff" fontSize="10">{dates.at(-1)}</text>
       </svg>
 
       <ChartLegend series={activeSeries} />

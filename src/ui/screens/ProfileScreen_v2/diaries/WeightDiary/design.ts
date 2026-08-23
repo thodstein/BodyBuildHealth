@@ -27,7 +27,7 @@ export const c = {
   purple: '#bf5af2',
   teal: '#64d2ff',
   pink: '#ff375f',
-  gray: '#8e8e93',
+  gray: '#ffffff',
   // Glassmorphism
   glass: 'rgba(28,28,30,0.72)',
   glassBorder: 'rgba(255,255,255,0.12)',

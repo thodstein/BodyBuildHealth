@@ -176,7 +176,7 @@ export const btnGhost = {
   fontSize: 13,
   fontWeight: 700,
   background: 'rgba(255,255,255,0.055)',
-  color: '#d4d4d8',
+  color: '#ffffff',
   border: `1px solid rgba(255,255,255,0.16)`,
   cursor: 'pointer',
   transition: 'background 0.15s, border-color 0.15s',
@@ -191,7 +191,7 @@ export const btnDanger = {
 
 export const fieldLabel = {
   fontSize: 11,
-  color: '#d4d4d8',
+  color: '#ffffff',
   fontWeight: 700,
   marginBottom: 5,
   display: 'block',
@@ -251,7 +251,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</h3>
       {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: `${color}33`, color }}>{badge}</span>}
     </div>
-    {hint && <div style={{ fontSize: 11, color: '#888', marginBottom: 10 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 11, color: '#ffffff', marginBottom: 10 }}>{hint}</div>}
     {children}
   </div>
 );
@@ -341,10 +341,10 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
           </div>
           <div style={{ textAlign: 'center', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{meta.title}</div>
-            <div style={{ fontSize: 12, color: '#d4d4d8' }}>
+            <div style={{ fontSize: 12, color: '#ffffff' }}>
               {meta.unit ? `Единицы: ${meta.unit}` : 'Ещё нет записей'}
             </div>
-            <div style={{ fontSize: 11, color: '#d4d4d8', marginTop: 8 }}>
+            <div style={{ fontSize: 11, color: '#ffffff', marginTop: 8 }}>
               Нажмите «+ Добавить» для первой записи
             </div>
           </div>
@@ -387,7 +387,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
                 fontSize: 13,
                 fontWeight: 600,
                 background: 'rgba(255,255,255,0.04)',
-                color: '#d4d4d8',
+                color: '#ffffff',
                 border: `1px solid rgba(255,255,255,0.16)`,
                 cursor: 'pointer',
                 transition: 'all 0.15s',
@@ -458,7 +458,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: '#ffffff', marginTop: 2 }}>
                 {count} {count === 1 ? 'запись' : count < 5 ? 'записи' : 'записей'}
               </div>
             </div>
@@ -471,12 +471,12 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
             <span style={{ ...statusChip(meta.color, true), flexShrink: 0 }}>
               {count > 0 ? '✓' : '+'}
             </span>
-            {extra && <span style={{ fontSize: 11, color: '#d4d4d8', flex: 1 }}>{extra}</span>}
+            {extra && <span style={{ fontSize: 11, color: '#ffffff', flex: 1 }}>{extra}</span>}
           </div>
 
           {history && history.length > 0 && (
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4 }}>История (последние 5):</div>
+              <div style={{ fontSize: 10, color: '#ffffff', marginBottom: 4 }}>История (последние 5):</div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {history.slice(0, 5).map((h, i) => (
                   <div
@@ -487,7 +487,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
                       borderRadius: 4,
                       background: 'rgba(255,255,255,0.04)',
                       border: '1px solid rgba(255,255,255,0.06)',
-                      color: '#ccc',
+                      color: '#ffffff',
                       whiteSpace: 'nowrap',
                     }}
                   >
@@ -532,7 +532,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
                 fontSize: 11,
                 fontWeight: 700,
                 background: 'transparent',
-                color: '#d4d4d8',
+                color: '#ffffff',
                 border: `1px solid rgba(255,255,255,0.16)`,
                 cursor: 'pointer',
               }}

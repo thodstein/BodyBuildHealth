@@ -93,7 +93,7 @@ style.textContent = `
     .wd-table-wrap tbody tr { display: block; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; margin-bottom: 10px; padding: 10px 12px; background: #1c1c1e; }
     .wd-table-wrap td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 2px !important; border-bottom: 1px dashed rgba(255,255,255,0.06); }
     .wd-table-wrap td:last-child { border-bottom: none; }
-    .wd-table-wrap td::before { content: attr(data-label); color: rgba(235,235,245,0.36); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
+    .wd-table-wrap td::before { content: attr(data-label); color: #ffffff; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
     .wd-table-wrap td[data-label="Заметка"] { flex-direction: column; align-items: flex-start; }
   }
 `;
@@ -505,7 +505,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const series: OverlayChartProps['series'] = activeChartFields.map(f => ({
       field: f,
       points: pointsFor(chartRows, f),
-      color: FIELD_COLORS[f] || '#888',
+      color: FIELD_COLORS[f] || '#ffffff',
       useRightAxis: PERCENT_FIELDS.has(f),
     }));
     if (profileHeight && chartRows.some(r => r.bodyFat !== undefined)) {
@@ -1351,7 +1351,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                     title={`${cell.date}: ${fmtW(cell.value)}`}
                     style={{ aspectRatio: '1', borderRadius: 6, background: `rgba(48,209,88,${(0.12 + cell.pct * 0.85).toFixed(2)})`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    <small style={{ fontSize: 8, color: '#d4d4d8' }}>{(dispW(cell.value) as number).toFixed(0)}</small>
+                    <small style={{ fontSize: 8, color: '#ffffff' }}>{(dispW(cell.value) as number).toFixed(0)}</small>
                   </div>
                 ) : (
                   <div key={i} style={{ aspectRatio: '1', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.06)' }} />
@@ -1635,7 +1635,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             ×
           </button>
           <img src={viewPhoto.src} alt="" style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} />
-          <div style={{ position: 'absolute', bottom: 16, background: 'rgba(0,0,0,0.8)', padding: '6px 12px', borderRadius: 999, color: '#ccc', fontSize: 12 }}>
+          <div style={{ position: 'absolute', bottom: 16, background: 'rgba(0,0,0,0.8)', padding: '6px 12px', borderRadius: 999, color: '#ffffff', fontSize: 12 }}>
             {viewPhoto.date}
           </div>
         </div>

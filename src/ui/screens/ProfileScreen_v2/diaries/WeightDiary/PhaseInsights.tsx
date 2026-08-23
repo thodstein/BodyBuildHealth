@@ -208,7 +208,7 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
 
       if (!phase || phase.label !== currentPhase || hasCourse !== (phase.substances && phase.substances.length > 0)) {
         add();
-        const color: string = phaseColors[currentPhase] || '#888';
+        const color: string = phaseColors[currentPhase] || '#ffffff';
         phase = {
           label: currentPhase,
           start: r.date,
@@ -237,7 +237,7 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
     return (
       <section style={{ padding: 12, background: '#18181b', borderRadius: 10, marginBottom: 12 }}>
         <b>Фазы курса</b>
-        <small style={{ display: 'block', marginTop: 6, color: '#888' }}>
+        <small style={{ display: 'block', marginTop: 6, color: '#ffffff' }}>
           Добавьте минимум 2 записи веса — анализ фаз курса появится автоматически.
         </small>
       </section>
@@ -287,7 +287,7 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
                           padding: '2px 6px',
                           borderRadius: 4,
                           background: w.deltaWeight < 0 ? '#22c55e22' : w.deltaWeight > 0 ? '#f59e0b22' : '#27272a',
-                          color: w.deltaWeight < 0 ? '#22c55e' : w.deltaWeight > 0 ? '#f59e0b' : '#888',
+                          color: w.deltaWeight < 0 ? '#22c55e' : w.deltaWeight > 0 ? '#f59e0b' : '#ffffff',
                           border: `1px solid ${w.deltaWeight < 0 ? '#22c55e44' : w.deltaWeight > 0 ? '#f59e0b44' : '#3f3f46'}`,
                           display: 'inline-flex',
                           flexDirection: 'column',
@@ -310,7 +310,7 @@ export const PhaseInsights: React.FC<PhaseInsightsProps> = ({ rows }) => {
                     </span>
                   ))}
                   {p.substances.length > 5 && (
-                    <span style={{ padding: '2px 6px', borderRadius: 4, background: '#27272a', color: '#aaa', fontSize: 10 }}>
+                    <span style={{ padding: '2px 6px', borderRadius: 4, background: '#27272a', color: '#ffffff', fontSize: 10 }}>
                       +{p.substances.length - 5}
                     </span>
                   )}

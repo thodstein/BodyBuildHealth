@@ -117,7 +117,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
           onClick={() => setTab(null)}
           aria-label="Назад к hero"
           style={{
-            padding: '4px 8px', cursor: 'pointer', fontSize: 20, color: 'rgba(255,255,255,0.85)',
+            padding: '4px 8px', cursor: 'pointer', fontSize: 20, color: '#ffffff',
             border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', minHeight: 36,
           }}
         >←</button>
@@ -125,7 +125,7 @@ export const ProfileScreen_v2: React.FC<{ onNavigate?: (screen: string) => void;
         <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: -0.3 }}>
           {meta.title}
         </div>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>авто-сохранение</span>
+        <span style={{ fontSize: 9, color: '#ffffff' }}>авто-сохранение</span>
         <UndoButton undoAvailable={undoAvailable} setUndoAvailable={setUndoAvailable} />
       </div>
 

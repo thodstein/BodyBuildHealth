@@ -252,7 +252,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
                 style={{
                   border: `1px solid ${draft.timeOfDay === t ? '#22c55e' : 'rgba(255,255,255,0.18)'}`,
                   background: draft.timeOfDay === t ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
-                  color: draft.timeOfDay === t ? '#4ade80' : '#d4d4d8',
+                  color: draft.timeOfDay === t ? '#4ade80' : '#ffffff',
                   borderRadius: 10,
                   padding: '7px 9px',
                   cursor: 'pointer',
@@ -280,7 +280,7 @@ export const AddBodyMeasurementsModal: React.FC<{ open: boolean; onClose: () => 
           style={{
             border: `1px solid ${activePreset === p.id ? '#22c55e' : 'rgba(255,255,255,0.18)'}`,
             background: activePreset === p.id ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
-            color: activePreset === p.id ? '#4ade80' : '#d4d4d8',
+            color: activePreset === p.id ? '#4ade80' : '#ffffff',
             borderRadius: 8,
             padding: '5px 10px',
             cursor: 'pointer',
@@ -482,7 +482,7 @@ export const AddWeightModal: React.FC<{ open: boolean; onClose: () => void; onSa
                 style={{
                   border: `1px solid ${draft.timeOfDay === t ? '#22c55e' : 'rgba(255,255,255,0.18)'}`,
                   background: draft.timeOfDay === t ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)',
-                  color: draft.timeOfDay === t ? '#4ade80' : '#d4d4d8',
+                  color: draft.timeOfDay === t ? '#4ade80' : '#ffffff',
                   borderRadius: 10,
                   padding: '7px 9px',
                   cursor: 'pointer',
@@ -511,7 +511,7 @@ export const AddWeightModal: React.FC<{ open: boolean; onClose: () => void; onSa
       {weightInvalid && <FormBanner tone="error">Вес обязателен — введите число больше 0</FormBanner>}
 
       {weightDelta !== null && (
-        <div style={{ marginTop: 8, fontSize: 12, color: weightDelta > 0 ? '#ef4444' : weightDelta < 0 ? '#22c55e' : '#d4d4d8' }}>
+        <div style={{ marginTop: 8, fontSize: 12, color: weightDelta > 0 ? '#ef4444' : weightDelta < 0 ? '#22c55e' : '#ffffff' }}>
           {weightDelta > 0 ? '+' : ''}{weightDelta.toFixed(1)} кг от прошлого замера
         </div>
       )}

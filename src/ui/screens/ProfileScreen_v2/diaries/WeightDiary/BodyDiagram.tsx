@@ -141,7 +141,7 @@ export const BodyDiagram: React.FC<BodyDiagramProps> = ({ measurements, sex }) =
                   <>
                     <rect x={cfg.cx - 40} y={cfg.cy - 6} width={80} height={12} rx={6} fill="#3f3f46" opacity={0.4} />
                     <rect x={cfg.cx - 40} y={cfg.cy - 6} width={band.width} height={12} rx={6} fill={band.color} opacity={0.9} />
-                    <text x={cfg.cx - 42} y={cfg.cy + 3} textAnchor="end" fill="#ccc" fontSize="9">
+                    <text x={cfg.cx - 42} y={cfg.cy + 3} textAnchor="end" fill="#ffffff" fontSize="9">
                       {cfg.label}
                     </text>
                   </>
@@ -151,7 +151,7 @@ export const BodyDiagram: React.FC<BodyDiagramProps> = ({ measurements, sex }) =
                     <text x={cfg.cx} y={cfg.cy + 3} textAnchor="middle" fill="#000" fontSize="10" fontWeight={700}>
                       {Number(m.value).toFixed(1)}
                     </text>
-                    <text x={cfg.cx} y={cfg.cy - 10} textAnchor="middle" fill="#ccc" fontSize="9">
+                    <text x={cfg.cx} y={cfg.cy - 10} textAnchor="middle" fill="#ffffff" fontSize="9">
                       {cfg.label}
                     </text>
                   </>
@@ -184,15 +184,15 @@ export const BodyDiagram: React.FC<BodyDiagramProps> = ({ measurements, sex }) =
                 fontSize: 12,
               }}
             >
-              <span style={{ color: '#ccc' }}>{r.label}: </span>
+              <span style={{ color: '#ffffff' }}>{r.label}: </span>
               <b style={{ color: statusColor(r.status) }}>{r.value}</b>
-              <small style={{ color: '#888' }}> (идеал {r.ideal[0]}-{r.ideal[1]})</small>
+              <small style={{ color: '#ffffff' }}> (идеал {r.ideal[0]}-{r.ideal[1]})</small>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', fontSize: 10, color: '#888' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', fontSize: 10, color: '#ffffff' }}>
         <span>🔴 &lt;35%</span>
         <span>🟠 35-65%</span>
         <span>🟡 65-85%</span>

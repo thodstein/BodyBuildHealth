@@ -44,8 +44,8 @@ export const c = {
   hairline: 'rgba(255,255,255,0.07)',
   row: 'rgba(255,255,255,0.04)',
   text: '#f5f5f7',
-  text2: 'rgba(235,235,245,0.62)',
-  text3: 'rgba(235,235,245,0.36)',
+  text2: '#ffffff',
+  text3: '#ffffff',
   green: '#30d158',
   red: '#ff453a',
   orange: '#ff9f0a',
@@ -54,7 +54,7 @@ export const c = {
   purple: '#bf5af2',
   teal: '#64d2ff',
   pink: '#ff375f',
-  gray: '#8e8e93',
+  gray: '#ffffff',
   glass: 'rgba(28,28,30,0.72)',
   glassBorder: 'rgba(255,255,255,0.12)',
   glassHighlight: 'rgba(255,255,255,0.08)',
@@ -334,7 +334,7 @@ export const selectStyle: React.CSSProperties = {
 export const labelStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  color: 'rgba(255,255,255,0.62)',
+  color: '#ffffff',
   textTransform: 'uppercase',
   letterSpacing: '0.5px',
   marginBottom: 4,
@@ -503,7 +503,7 @@ export const SliderInput: React.FC<{
     <div>
       {label && (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', fontWeight: 600 }}>{label}</span>
+          <span style={{ fontSize: 11, color: '#ffffff', fontWeight: 600 }}>{label}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{
               fontSize: 11, fontWeight: 700, color: c,
@@ -545,7 +545,7 @@ export const SliderInput: React.FC<{
         }} />
       </div>
       {(minLabel || maxLabel) && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.35 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4, fontSize: 10, color: '#ffffff', lineHeight: 1.35 }}>
           <span style={{ flex: 1, minWidth: 0 }}>{minLabel ? `${min} — ${minLabel}` : ''}</span>
           <span style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>{maxLabel ? `${max} — ${maxLabel}` : ''}</span>
         </div>

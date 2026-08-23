@@ -131,7 +131,7 @@ export const tableTh: React.CSSProperties = {
   fontSize: 11,
   textTransform: 'uppercase',
   letterSpacing: '0.4px',
-  color: 'rgba(255,255,255,0.55)',
+  color: '#ffffff',
   whiteSpace: 'nowrap',
   fontWeight: 600,
 };

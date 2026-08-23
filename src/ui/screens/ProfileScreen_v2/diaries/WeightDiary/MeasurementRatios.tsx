@@ -16,7 +16,7 @@ interface MeasurementRatiosProps {
 }
 
 const band = (v: number | null, ideal: [number, number]) => {
-  if (v === null) return { color: '#27272a', text: '#6b7280', label: '—' };
+  if (v === null) return { color: '#27272a', text: '#ffffff', label: '—' };
   if (v >= ideal[0] && v <= ideal[1]) return { color: '#22c55e18', text: '#22c55e', label: 'В норме' };
   if (v < ideal[0]) return { color: '#ef444418', text: '#ef4444', label: 'Ниже нормы' };
   return { color: '#f59e0b18', text: '#f59e0b', label: 'Выше нормы' };
@@ -38,7 +38,7 @@ export const MeasurementRatios: React.FC<MeasurementRatiosProps> = ({ ratios }) 
         {ratios.map(r => {
           const state = band(r.value, r.ideal);
           const trendIcon = r.trend === 'up' ? '▲' : r.trend === 'down' ? '▼' : '●';
-          const trendColor = r.trend === 'up' ? '#22c55e' : r.trend === 'down' ? '#ef4444' : '#888';
+          const trendColor = r.trend === 'up' ? '#22c55e' : r.trend === 'down' ? '#ef4444' : '#ffffff';
           return (
             <div key={r.id} style={{ padding: 10, background: state.color, borderRadius: 8, border: `1px solid ${state.text}44` }}>
               <div style={{ fontSize: 11, color: colors.textMuted, display: 'flex', justifyContent: 'space-between' }}>
@@ -58,7 +58,7 @@ export const MeasurementRatios: React.FC<MeasurementRatiosProps> = ({ ratios }) 
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                 <div style={{ fontSize: 10, color: state.text }}>{state.label}</div>
-                <div style={{ fontSize: 10, color: '#888' }}>
+                <div style={{ fontSize: 10, color: '#ffffff' }}>
                   идеал {r.ideal[0]}-{r.ideal[1]}
                 </div>
               </div>

@@ -124,7 +124,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             </div>
             {(parts.length > 0 || goalLabel) && (
               <div style={{
-                fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2,
+                fontSize: 12, color: '#ffffff', marginTop: 2,
                 textShadow: '0 1px 4px rgba(0,0,0,0.6)',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
               }}>
@@ -174,7 +174,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
 
         {/* Подсказка для заполнения */}
         {filled < 8 && (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', textAlign: 'center', padding: '0 8px' }}>
+          <div style={{ fontSize: 11, color: '#ffffff', textAlign: 'center', padding: '0 8px' }}>
             {filled === 0
               ? '👇 Заполните основное в карточке "Пользователь"'
               : `Заполнено ${filled}/12 ключевых полей. Можно дополнить ниже.`}
@@ -225,7 +225,7 @@ export const ProfileHero: React.FC<{ onSelectTab: (id: TabDef['id']) => void }> 
             >{t.icon}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: t.color, letterSpacing: -0.2, marginBottom: 1 }}>{t.label}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.3 }}>{t.desc}</div>
+              <div style={{ fontSize: 10, color: '#ffffff', lineHeight: 1.3 }}>{t.desc}</div>
             </div>
             <span aria-hidden="true" style={{ color: t.color, fontSize: 18, opacity: 0.7 }}>→</span>
           </button>

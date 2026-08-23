@@ -473,14 +473,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
         aria-label="3D карта зон боли"
       >
         {failed && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, fontSize: 12, color: '#ffffff' }}>
             3D недоступно в этом окружении
           </div>
         )}
         {!loaded && !failed && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
             <div className="loading-spinner" style={{ marginRight: 8 }} />
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Загрузка 3D модели…</span>
+            <span style={{ fontSize: 12, color: '#ffffff' }}>Загрузка 3D модели…</span>
           </div>
         )}
         {hoverInfo && !failed && (() => {
@@ -520,12 +520,12 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
             style={{
               minHeight: 36, padding: '6px 12px', borderRadius: 10, cursor: 'pointer',
               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-              color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600,
+              color: '#ffffff', fontSize: 12, fontWeight: 600,
             }}
           >
             🧹 Сбросить
           </button>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>
+          <span style={{ fontSize: 10, color: '#ffffff', marginLeft: 4 }}>
             Клик по телу — анализ зоны (одно нажатие)
           </span>
         </div>
@@ -545,14 +545,14 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               <b style={{ fontSize: 12, color: c }}>{meta.label}</b>
               <button
                 onClick={() => selectZone(selectedZone)}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 14, minWidth: 32, minHeight: 32 }}
+                style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: 14, minWidth: 32, minHeight: 32 }}
                 aria-label="Закрыть"
               >
                 ✕
               </button>
             </div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginRight: 2 }}>Боль:</span>
+              <span style={{ fontSize: 10, color: '#ffffff', marginRight: 2 }}>Боль:</span>
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => (
                 <button
                   key={v}
@@ -572,7 +572,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               ))}
             </div>
             {analysis && (
-              <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+              <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', fontSize: 11, color: '#ffffff' }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: c, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
                   📊 Сводный анализ
                 </div>
@@ -586,7 +586,7 @@ export const PainZone3D: React.FC<PainZone3DProps> = ({ zones, onChange, height 
               </div>
             )}
             {!analysis && (
-              <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#ffffff' }}>
                 Записей с этой зоной пока нет — отметьте уровень боли выше.
               </div>
             )}
