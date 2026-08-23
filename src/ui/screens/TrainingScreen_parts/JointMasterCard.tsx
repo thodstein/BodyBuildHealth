@@ -157,6 +157,27 @@ export const JointMasterCard: React.FC = () => {
         <div style={{ fontSize:10, color:'#fbbf24', marginTop:4 }}>Опасные структуры: {diag.joint.dangerous.join(' · ')}</div>
         <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Связанные движения: {diag.joint.relatedLifts.join(', ')}</div>
         {joint==='spine' && <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontSize:10 }}>🦴 Поясница выделена: диск L4-S1 не терпит округления + сдвиг. Нейтраль + брейсинг + ограничение глубины — база.</div>}
+        <div style={{ marginTop:8, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, color:'#fff', lineHeight:1.4 }}>
+          <div style={{ fontWeight:700, color:JOINT_COLOR[joint] }}>Что добавится при нажатии:</div>
+          {(() => {
+            const flow = diag.flows[0];
+            if (flow) {
+              return (
+                <>
+                  <div>📋 Поток: <b style={{color:'#fff'}}>{flow.name}</b> → Упражнения: <span style={{color:ACCENT}}>{(flow.exercises || []).slice(0,3).join(', ') || diag.mobilityTests.map(t=>t.title).slice(0,2).join(', ')}</span></div>
+                  <div style={{ marginTop:4, color:'#fff' }}>📍 Куда: <b>ПЛ-авто → Лимитеры → {diag.joint.label} → мобильность</b> · Канал <span style={{color:ACCENT}}>limiterExerciseMap</span> (`{diag.joint.id}|mobility|{flow.id}`)</div>
+                </>
+              );
+            }
+            return (
+              <>
+                <div>📋 Тесты: <span style={{color:ACCENT}}>{diag.mobilityTests.map(t=>t.title).slice(0,3).join(', ') || '—'}</span></div>
+                <div style={{ marginTop:4, color:'#fff' }}>📍 Куда: <b>ПЛ-авто → Лимитеры → {diag.joint.label} → прехаб</b> · Канал <span style={{color:ACCENT}}>limiterExerciseMap</span></div>
+              </>
+            );
+          })()}
+          <div style={{ marginTop:4, fontSize:9, color:'#fff' }}>После нажатия открой ПЛ-авто — блок появится в плане как коррекция подвижности.</div>
+        </div>
         <button onClick={() => {
           const flow = diag.flows[0];
           if (flow) applyToPlanner({ kind:'limiter', label:`Мобильность ${diag.joint.label}: ${flow.name}`, data:{ limiterExerciseMap:{ [diag.joint.id+'|mobility|'+flow.id]: flow.exercises || [] }, limiterProtocolMap:{}, limiterDayMap:{} } as any });
@@ -173,6 +194,21 @@ export const JointMasterCard: React.FC = () => {
         <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Лимиты амплитуды: {Object.keys(diag.romLimits).length? Object.entries(diag.romLimits).map(([k,v])=>`${k} ${v.min}-${v.max}°`).join(', ') : 'нет'} · Стресс-лимиты: {Object.entries(diag.stressLimits).slice(0,3).map(([k,v])=>`${k}:${v}`).join(', ')}</div>
         <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Пример упражнений с высокой нагрузкой на сустав:</div>
         <div style={{ fontSize:10, color:'#fff' }}>{EXERCISE_CATALOG.filter(e=>e.jointStress==='high' && (e.group==='legs' && joint==='knee' || e.group==='back' && joint==='spine' || e.group==='chest' && joint==='shoulder')).slice(0,3).map(e=>e.name).join(' · ') || '—'}</div>
+        <div style={{ marginTop:8, padding:'8px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, color:'#fff', lineHeight:1.4 }}>
+          <div style={{ fontWeight:700, color:ACCENT }}>Что добавится при нажатии:</div>
+          {diag.blockedPatterns.length ? (
+            <>
+              <div>📋 Паттерны: <span style={{color:'#f87171'}}>{diag.blockedPatterns.map(p=>PATTERN_RU[p]||p).join(', ')}</span> → будут исключены</div>
+              <div style={{ marginTop:4 }}>📍 Куда: <b>ПЛ-авто → Лимитеры → {diag.joint.label} → блокировка</b> · Канал <span style={{color:ACCENT}}>limiterExerciseMap</span> (`{diag.joint.id}|blocked|паттерн`)</div>
+            </>
+          ) : (
+            <>
+              <div>📋 Ограничений нет — применится <span style={{color:ACCENT}}>норма объёма ×1.0</span></div>
+              <div style={{ marginTop:4 }}>📍 Куда: <b>ПЛ-авто → План → объём</b> · Канал <span style={{color:ACCENT}}>pri</span></div>
+            </>
+          )}
+          <div style={{ marginTop:4, fontSize:9, color:'#fff' }}>После нажатия открой ПЛ-авто — изменения отразятся в плане.</div>
+        </div>
         <button onClick={() => {
           if (diag.blockedPatterns.length) {
             const map: Record<string,string[]> = {};
