@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 
 // Общие (сила/нагрузка/периодизация)
 import { StrengthAnalysisHub } from './StrengthAnalysisHub';
-import { TrainingSafetyHub } from './TrainingSafetyHub';
 
 // ББ-специфичные
 import { SplitGenCard } from './SplitGenCard';
@@ -20,8 +19,8 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
     // «🔬 Диагностика» убрана — полный калькулятор движения (PlDeadpointsBarPathCard)
     // живёт во вкладке «📋 План цикла» (с template + сессиями дневника); анализ срывов
     // по дневнику — в аналитике дневника (StickingPointAnalysisCard с реальными данными).
+    // «🛡 Безопасность и нагрузка» (TrainingSafetyHub) удалён по ТЗ — не показывается в ПЛ-авто.
     { id: 'intelligence-strength', title: 'Анализ силы', icon: '🏋️', short: 'Интеллектуальный анализ силы: 1RM, VBT, относительная сила, нормативы и аналитика.', render: () => <StrengthAnalysisHub /> },
-    { id: 'safety', title: 'Безопасность и нагрузка', icon: '🛡', short: 'Единый инструмент: безопасность, sRPE/ACWR, объём, авторегуляция, восстановление, кардио, разгрузка.', render: () => <TrainingSafetyHub /> },
   ],
 
   // ═══ ББ-АВТО ═══
