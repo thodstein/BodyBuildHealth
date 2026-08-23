@@ -835,6 +835,80 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
   }
 }
 
+/** PPL: в день груди — памповые махи на среднюю дельту (медл. опускание + пауза), опционально. */
+function ensurePPLMidDeltFinisher(session: any, week: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  if (!/^(Push|Chest)$/i.test(session.sessionTag || '')) return;
+  const isPPL = String((options as any).patternId || '').includes('ppl') || String((options as any).pattern?.id || '').includes('ppl') || /Push|Pull/.test(session.sessionTag || '');
+  if (session.exercises.some((e: any) => e.muscle === 'shoulders' && /мах.*сторон|lateral.*raise|отведен.*сторон/i.test(e.name) && (e as any).optional)) return;
+  const lateral = EXERCISE_CATALOG.find((x: any) => {
+    if (trueMuscleOf(x) !== 'shoulders') return false;
+    if (!/мах.*сторон|lateral.*raise|отведен.*сторон/i.test(x.name)) return false;
+    if (/наклон|задн|rear|обратн|лёжа/i.test(x.name)) return false;
+    if (session.exercises.some((e: any) => e.name === x.name)) return false;
+    if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    return true;
+  });
+  if (!lateral) return;
+  const baseWeight = options.workMax?.shoulders || 40;
+  session.exercises.push({
+    muscle: 'shoulders',
+    name: lateral.name,
+    exerciseName: lateral.name,
+    role: 'accessory',
+    character: 'памп',
+    sets: 3,
+    repsRange: [15, 20],
+    rir: 3,
+    restSeconds: 45,
+    tempoSpec: '3-2-1-1',
+    workSets: Array.from({ length: 3 }, () => ({ reps: 18, rir: 3, weight: Math.round(baseWeight * 0.22 * 10) / 10, tempo: '3-2-1-1', restSeconds: 45 })),
+    warmupSets: [],
+    optional: true,
+    comment: 'Опционально — добивка при наличии сил и восстановления: памповые махи на среднюю дельту, медленное опускание 3с + пауза 2с в растянутой позиции.',
+    rationale: 'PPL Push: средняя дельта — опциональный памп-финишер (3×15-20, темп 3-2-1-1) для объёма без перегрузки ЦНС.',
+  });
+}
+
+/** PPL: в день спины — памповые махи на заднюю дельту лёжа на наклонной (медл. опускание + пауза), опционально. */
+function ensurePPLRearDeltFinisher(session: any, week: any, options: BBFinalizeOptions): void {
+  if (options.preserveSource) return;
+  if (!/^(Pull|Back)$/i.test(session.sessionTag || '')) return;
+  if (session.exercises.some((e: any) => e.muscle === 'shoulders' && /лёжа.*наклон|лежа.*наклон|incline.*rear|rear.*fly.*incline/i.test(e.name) && (e as any).optional)) return;
+  const candidate = EXERCISE_CATALOG.find((x: any) => {
+    if (trueMuscleOf(x) !== 'shoulders') return false;
+    if (!/обратн|rear|задн.*дельт|задн.*пуч|разведен.*наклон|reverse.*fly/i.test(x.name)) return false;
+    if (!/лёжа|лежа|наклон|incline/i.test(x.name)) return false;
+    if (session.exercises.some((e: any) => e.name === x.name)) return false;
+    if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    return true;
+  }) || EXERCISE_CATALOG.find((x: any) => {
+    if (trueMuscleOf(x) !== 'shoulders') return false;
+    if (!/обратн|rear|задн.*дельт/i.test(x.name)) return false;
+    if (session.exercises.some((e: any) => e.name === x.name)) return false;
+    return true;
+  });
+  if (!candidate) return;
+  const baseWeight = options.workMax?.shoulders || 40;
+  session.exercises.push({
+    muscle: 'shoulders',
+    name: candidate.name,
+    exerciseName: candidate.name,
+    role: 'accessory',
+    character: 'памп',
+    sets: 3,
+    repsRange: [15, 20],
+    rir: 3,
+    restSeconds: 45,
+    tempoSpec: '3-2-1-1',
+    workSets: Array.from({ length: 3 }, () => ({ reps: 18, rir: 3, weight: Math.round(baseWeight * 0.22 * 10) / 10, tempo: '3-2-1-1', restSeconds: 45 })),
+    warmupSets: [],
+    optional: true,
+    comment: 'Опционально — добивка при наличии восстановления: памповые махи на заднюю дельту лёжа на наклонной, медленное опускание 3с + пауза 1с.',
+    rationale: 'PPL Pull: задняя дельта лёжа — опциональный памп-финишер (3×15-20, темп 3-2-1-1) для баланса плечевого пояса.',
+  });
+}
+
 /** Гарантирует rear delt работу в Pull-дне (задняя дельта — тяговая мышца). */
 function ensureRearDeltInPull(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
@@ -2760,6 +2834,13 @@ for (const week of next.weeks) {
   // Лимит упражнений сессии пост-фактум (слабые группы могут дать перебор в buildSession).
   if (!options.preserveSource && (next as any).pattern?.id) {
     enforceSessionExerciseLimit(next, options);
+  }
+  // PPL: опциональные добивки средней/задней дельты (после всех лимитов, optional — вне бюджета)
+  if (!options.preserveSource && String((next as any).pattern?.id || '').includes('ppl')) {
+    for (const week of next.weeks) for (const session of week.sessions) {
+      ensurePPLMidDeltFinisher(session, week, { ...options, patternId: (next as any).pattern?.id } as any);
+      ensurePPLRearDeltFinisher(session, week, { ...options, patternId: (next as any).pattern?.id } as any);
+    }
   }
   // Cleanup dangling supersetWith после всех удалений (fit/cap/donor/superset)
   // Per-session: партнёр должен быть в той же сессии, global check ложно считал
