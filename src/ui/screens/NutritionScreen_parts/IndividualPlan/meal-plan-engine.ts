@@ -242,17 +242,24 @@ const NON_PORTABLE_TOKENS = ['soup','porridge_','kfc','mcd','bk_','big_mac','roy
 function isPortableFood(f: FoodItem): boolean {
   const lid = f.id.toLowerCase();
   const lname = (f.name || '').toLowerCase();
+  if (NON_PORTABLE_TOKENS.some(t => lid.includes(t) || lname.includes(t))) return false;
   if (f.category === 'supplement') return true;        // порошки/батончики
   if (f.category === 'veg_fruit') return true;          // фрукты/ягоды/сырые овощи
-  if (f.category === 'fat') return true;                // орехи/семечки/масла
-  if (f.category === 'dairy') return true;              // йогурт/творог/кефир в упаковке
-  if (NON_PORTABLE_TOKENS.some(t => lid.includes(t) || lname.includes(t))) return false;
-  if (f.category === 'protein') return true;            // рыба консерв./вареное яйцо/курица нарезка
+  if (f.category === 'fat') {
+    if (lid.includes('mayonnaise') || lid.includes('cream_sauce')) return false;
+    return true;                // орехи/семечки/масла (кроме соусов)
+  }
+  if (f.category === 'dairy') {
+    if (lid.includes('ice_cream') || lid.includes('cream_sauce')) return false;
+    return true;              // йогурт/творог/кефир в упаковке
+  }
+  if (f.category === 'protein') return true;            // после проверки NON_PORTABLE — любой белок портативен (консервы/вареное/нарезка)
   if (f.category === 'grain' || f.category === 'carb') {
     // готовые к употреблению злаки (хлопья/мюсли/хлеб/рисовый крем/хлебцы) — портативны
-    return ['oats','cereal','muesli','rice_cream','bread','rice_cake','crispbread','bar','flakes','buckwheat','cream_of_rice'].some(k => lid.includes(k) || lname.includes(k));
+    // buckwheat (гречка горячая) — НЕ портативна, требует варки
+    return ['oats','cereal','muesli','rice_cream','bread','rice_cake','crispbread','bar','flakes','cream_of_rice'].some(k => lid.includes(k) || lname.includes(k));
   }
-  return true;
+  return false;
 }
 
 // ─── Lab-driven dietary adjustments ─────────────────────────────────────
@@ -461,7 +468,11 @@ function templateFoodRole(f: FoodItem): MealItem['role'] {
   if (f.category === 'dairy') return 'slow_protein';
   if (f.category === 'grain' || f.category === 'carb') return 'carb_slow';
   if (f.category === 'fat') return 'fat';
-  if (f.category === 'veg_fruit') return (f.protein || 0) > 8 ? 'veg' : 'fruit';
+  if (f.category === 'veg_fruit') {
+    const lid = (f.id || '').toLowerCase();
+    if (['spinach','broccoli','cabbage','kale','cucumber','tomato','pepper','carrot','onion','lettuce','arugula'].some(k => lid.includes(k))) return 'veg';
+    return 'fruit';
+  }
   return 'protein';
 }
 
@@ -780,7 +791,18 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const mergePreferred = <T extends FoodItem>(arr: T[], pred: (f: FoodItem) => boolean): T[] => {
     if (!preferredIds || preferredIds.size === 0) return arr;
     const have = new Set(arr.map(f => f.id));
-    const extra = basePoolRaw.filter(f => preferredIds.has(f.id) && !have.has(f.id) && !excludedIds.has(f.id) && pred(f));
+    const extra = basePoolRaw.filter(f => {
+      if (!preferredIds.has(f.id) || have.has(f.id) || excludedIds.has(f.id)) return false;
+      if (!_isMealFoodOk(f)) return false;
+      if (matchesAllergenTags(f)) return false;
+      if (isVeg) {
+        const diet = FOOD_ALLERGEN_DIET[f.id];
+        if (diet && diet.isVegetarian === false) return false;
+        if (diet === undefined && f.isVegetarian === false) return false;
+        if (diet === undefined && isMeatId(f.id) && f.isVegetarian !== true && f.isVegan !== true) return false;
+      }
+      return pred(f);
+    });
     return extra.length ? ([...arr, ...extra] as T[]) : arr;
   };
     const basePoolRaw = FOOD_DB.filter(f => {
@@ -788,7 +810,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     if (!_isMealFoodOk(f)) return false;
     // Д-10: prefer explicit isVegetarian tag; isMeatId is only a last-resort heuristic for unlabeled foods.
     // Vegetarian (lacto-ovo) ALLOWS dairy and eggs — only isVegan excludes them, so we don't use isVegan here.
-    if (isVeg) { const diet = FOOD_ALLERGEN_DIET[f.id]; if ((diet && diet.isVegetarian === false) || (diet === undefined && f.isVegetarian === false) || (isMeatId(f.id) && f.isVegetarian !== true && f.isVegan !== true)) return false; }
+    if (isVeg) { const diet = FOOD_ALLERGEN_DIET[f.id]; if ((diet && diet.isVegetarian === false) || (diet === undefined && f.isVegetarian === false) || (diet === undefined && isMeatId(f.id) && f.isVegetarian !== true && f.isVegan !== true)) return false; }
     // FIX allergens-restrictions: фильтр по тегам аллергенов (defense-in-depth)
     if (opts?.allergenTags && opts.allergenTags.size > 0) {
       const diet = FOOD_ALLERGEN_DIET[f.id];
@@ -1636,7 +1658,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // D-19: dedicated pre-sleep protein budget (~0.7x MPS per meal = casein scoop + dairy).
   // Pulled OUT of dinner so dinner becomes lighter and pre-sleep is its own meal, not residual.
   const preSleepP = wantPreSleep ? Math.max(20, Math.round(mpsPerMeal * 0.7)) : 0;
-  const trainWindow = input.isTrainingDay && !!input.trainStartMin;
+  const trainWindow = input.isTrainingDay && input.trainStartMin != null;
   // Пери-тренировочные времена (относительно старта и ДЛИТЕЛЬНОСТИ сессии):
   //  - предтрен: за 90 мин до старта
   //  - интра: на 30-й минуте (середина/начало длинной сессии)
@@ -1674,7 +1696,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Жёсткие %-фиксации (раньше 20/21/14/20/25) ломались, когда mealsCount исключал
   // часть приёмов — углеводы «терялись» → недобор ~20%, а обед получался ~10%.
   const CARB_W: Record<string, number> = { breakfast: 1.0, lunch: 1.7, dinner: 0.7, prew: 1.0, postw: 1.2, snack: 0.5, snack2: 0.5, snack3: 0.4, snack4: 0.4, preSleep: 0.3, intra: 0.4 };
-  const intraEligible = trainWindow && input.allowIntraWorkout && (!input.trainDurationMin || input.trainDurationMin >= 75);
+  const intraEligible = trainWindow && input.allowIntraWorkout && (input.trainDurationMin ?? 0) >= 75;
   // P0-фикс (Aug 22 2026): пери-тренировочные приёмы — ОТДЕЛЬНО от основных.
   // Раньше prew/postw/intra входили в общий лимит mealsCount и «съедали» слоты регулярных
   // приёмов (жалоба «тренировочные занимают половину, не хватает рекомендуемых»).
@@ -1723,14 +1745,29 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     let v = CARB_W[r] ?? 0.5;
     if (r === 'dinner' && input.eveningLowCarb) v *= 0.5;
     if (morningTrainLoad) {
-      if (r === 'dinner') v = CARB_W.dinner * 2.0;      // вечер: много углеводов
-      if (r === 'breakfast') v = CARB_W.breakfast * 0.5; // утро: меньше (сессия уже завтра)
-      if (r === 'postw') v = CARB_W.postw * 1.5;          // сразу после утренней сессии — загрузка
+      if (r === 'dinner') v *= 2.0;      // вечер: много углеводов (сохраняет eveningLowCarb если был)
+      if (r === 'breakfast') v *= 0.5; // утро: меньше (сессия уже завтра)
+      if (r === 'postw') v *= 1.5;          // сразу после утренней сессии — загрузка
     }
+    // eveningLowCarb «снижаем ужин, повышаем обед» — после всех модификаторов
+    // размазывать освобождённые 0.35 по всем нельзя, бустим обед на +20% когда eveningLowCarb
+    if (input.eveningLowCarb && r === 'lunch') v *= 1.2;
     return v;
   };
   const _wSum = _roles.reduce((s, r) => s + _wOf(r), 0) || 1;
-  const _carbFor = (r: string): number => _keep.has(r) ? Math.round(carbsTotal * _wOf(r) / _wSum) : 0;
+  const _carbForRaw = (r: string): number => _keep.has(r) ? Math.round(carbsTotal * _wOf(r) / _wSum) : 0;
+  // P2: reconcile rounding — сумма _carbForRaw может отличаться от carbsTotal на ±3-6г
+  const _carbFor = (() => {
+    const vals: Record<string, number> = {};
+    let sum = 0;
+    for (const r of _roles) { vals[r] = _carbForRaw(r); sum += vals[r]; }
+    const diff = carbsTotal - sum;
+    if (diff !== 0 && _roles.length > 0) {
+      const last = _roles[_roles.length - 1];
+      vals[last] = Math.max(0, vals[last] + diff);
+    }
+    return (r: string) => vals[r] ?? 0;
+  })();
   const breakC = _carbFor('breakfast');
   const lunchC = _carbFor('lunch');
   const dinnerC = _carbFor('dinner');

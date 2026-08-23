@@ -714,11 +714,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // the plan read +50% / ~+100g protein over the displayed target.
   const [nutrLevel, setNutrLevel] = useState<NutritionLevel>((['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base');
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
-  const effectiveP = Math.round((kbjuMode === 'profile' ? profileTargets.protein : (manualP ?? calcTargets.protein)) * _nutrMult);
+  // P0-fix Aug 23 2026: manualP/F НЕ умножаются повторно на _nutrMult — switchKbjuMode уже
+  // скопировал эффективные (умноженные) значения в manualP/F. При kbjuMode==='manual' берём как есть.
+  const _baseP = kbjuMode === 'manual' && manualP !== null ? manualP : (kbjuMode === 'profile' ? profileTargets.protein : calcTargets.protein);
+  const effectiveP = kbjuMode === 'manual' ? _baseP : Math.round(_baseP * _nutrMult);
   // D-28+ fix (КБЖУ-соответствие, Aug 22 2026): ЖИРЫ НЕ ниже физиологического пола 0.8 г/кг —
   // движок (FAT_FLOOR_PER_KG) никогда не спускается ниже, а раньше цель в карточке (60 г для
   // 120 кг = 0.5 г/кг) была ниже пола → «разбег» жиров до 60%+. Поднимаем отображаемую цель до пола.
-  const effectiveF = Math.max(Math.round(weight * 0.8), Math.round((kbjuMode === 'profile' ? profileTargets.fats : (manualF ?? calcTargets.fats)) * _nutrMult));
+  const _baseF = kbjuMode === 'manual' && manualF !== null ? manualF : (kbjuMode === 'profile' ? profileTargets.fats : calcTargets.fats);
+  const effectiveF = kbjuMode === 'manual' ? Math.max(Math.round(weight * 0.8), _baseF) : Math.max(Math.round(weight * 0.8), Math.round(_baseF * _nutrMult));
   // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом и ограничены
   // ДИЕТОЛОГИЧЕСКИМ потолком (computeDieteticCarbTarget). Цель углеводов — г/кг (межсезонье
   // 4-6 г/кг), а не абстрактный ×множитель (жалоба «120 кг на курсе → 900/814 г углеводов»).
@@ -727,7 +731,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
   const effectiveC = (() => {
     if (kbjuMode === 'manual' && manualC !== null) return manualC;
-    if (manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
+    if (kbjuMode === 'manual' && manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
       return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
     }
     const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;

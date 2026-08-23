@@ -79,9 +79,11 @@ export function computeDieteticCarbTarget(opts: {
   const minCarbG = opts.minCarbG ?? 50;
   const insulinTotal = Math.max(0, opts.insulinTotalUnits || 0);
   const insulinFloor = Math.round(insulinTotal * 10); // ~10 г на 1 ЕД
-  // потолок: 5 г/кг, но не ниже инсулин-флора; при инсулине до 8 г/кг
-  const ceiling = Math.max(Math.round(w * carbGPerKg), Math.min(insulinFloor, Math.round(w * maxCarbGPerKg)), minCarbG);
-  return Math.max(insulinFloor, Math.min(Math.max(opts.rawCarbsG || 0, minCarbG), ceiling));
+  const ceilingAbs = Math.round(w * maxCarbGPerKg);
+  const floorCapped = Math.min(insulinFloor, ceilingAbs);
+  const ceiling = Math.max(Math.round(w * carbGPerKg), floorCapped, minCarbG);
+  const val = Math.max(floorCapped, Math.min(Math.max(opts.rawCarbsG || 0, minCarbG), ceiling));
+  return Math.min(val, ceilingAbs);
 }
 
 const PHASE_MULT: Record<string, { kcalMod: number; pAdd: number }> = {
@@ -103,22 +105,31 @@ const GOAL_MAP: Record<string, string> = {
 
 export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets {
   const {
-    weightKg: weight, heightCm: height, age, sex, goal, phase, bodyFatPct,
-    workoutsPerWeek: wpw, avgWorkoutMinutes: awm, dailySteps, householdActivity,
-    trainType, trainIntensity, surplusPct, injections,
+    weightKg: _weight, heightCm: height, age, sex, goal, phase, bodyFatPct,
+    workoutsPerWeek: _wpw, avgWorkoutMinutes: _awm, dailySteps, householdActivity,
+    trainType, trainIntensity, surplusPct, injections: _injections,
     weightAdaptMode, weightLogWeek, expectedLossKgWeek,
-    metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg,
+    metabolicAdaptEnabled, metabolicAdaptPct: _metabolicAdaptPct, manualGPerKg: _manualGPerKg,
   } = input;
+  const weight = Math.max(40, Math.min(300, Number(_weight) || 80));
+  const wpw = Math.max(0, Number(_wpw) || 0);
+  const awm = Math.max(0, Number(_awm) || 0);
+  const injections = Array.isArray(_injections) ? _injections : [];
+  const metabolicAdaptPct = Math.max(0, Math.min(50, Number(_metabolicAdaptPct) || 0));
+  const manualGPerKg = _manualGPerKg && typeof _manualGPerKg === 'object' ? _manualGPerKg : { protein: 0, fat: 0, carbs: 0 };
 
   // 1. PAL + TDEE
-  let pal = 1.2 + (wpw || 3) * 0.075;
+  let pal = 1.2 + wpw * 0.075;
   if (awm > 60) pal += 0.1;
   if (awm > 90) pal += 0.05;
   if (wpw >= 6) pal += 0.05;
   if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
-  if (householdActivity === 'active') pal += 0.15; else if (householdActivity === 'moderate') pal += 0.1; else if (householdActivity === 'light') pal += 0.05;
-  if (trainType === 'hiit') pal += 0.1; else if (trainType === 'cardio') pal += 0.05; else if (trainType === 'mixed') pal += 0.03;
-  if (trainIntensity === 'high') pal += 0.1; else if (trainIntensity === 'medium') pal += 0.05;
+  const _ha = String(householdActivity || '').toLowerCase();
+  if (_ha === 'active') pal += 0.15; else if (_ha === 'moderate') pal += 0.1; else if (_ha === 'light') pal += 0.05;
+  const _tt = String(trainType || '').toLowerCase();
+  if (_tt === 'hiit') pal += 0.1; else if (_tt === 'cardio') pal += 0.05; else if (_tt === 'mixed') pal += 0.03;
+  const _ti = String(trainIntensity || '').toLowerCase();
+  if (_ti === 'high') pal += 0.1; else if (_ti === 'medium') pal += 0.05;
   pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
 
   const engineGoal = GOAL_MAP[goal] || 'maintenance';
@@ -210,20 +221,22 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
 
   // 4-7. Pharma adjustments
   const hasAAS = injections.some(i => i.type === 'ААС');
-  const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');
+  const hasShortInsulin = injections.some(i => i.type === 'инсулин' && i.esterType != null && i.esterType !== 'long');
   const hasInsulin = injections.some(i => i.type === 'инсулин');
   const hasGLP = injections.some(i => i.type === 'семаглутид' || i.type === 'тирзепатид');
 
-  if (hasAAS) targets.protein = Math.round(targets.protein + weight * 0.3);
+  if (hasAAS) {
+    targets.protein = Math.round(targets.protein + weight * 0.3);
+    targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
+  }
   if (hasShortInsulin) {
-    const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType !== 'long').reduce((s, i) => s + i.dose, 0);
+    const totalInsulinDose = injections.filter(i => i.type === 'инсулин' && i.esterType != null && i.esterType !== 'long').reduce((s, i) => s + (Number(i.dose) || 0), 0);
     const minInsulinCarbs = totalInsulinDose * 10;
     if (targets.carbs < minInsulinCarbs) targets.carbs = Math.round(minInsulinCarbs * 1.2);
     const maxFat = Math.round(weight * 0.5);
     if (targets.fats > maxFat) targets.fats = maxFat;
     targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
-  }
-  if (hasInsulin) {
+  } else if (hasInsulin) {
     const maxFat = Math.round(weight * 0.5);
     if (targets.fats > maxFat) targets.fats = maxFat;
     targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
@@ -250,6 +263,11 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     targets.fats = Math.round(targets.fats * adaptFactor);
     targets.carbs = Math.round(targets.carbs * adaptFactor);
   }
+  // Safety: never negative macros
+  targets.protein = Math.max(0, targets.protein);
+  targets.fats = Math.max(0, targets.fats);
+  targets.carbs = Math.max(0, targets.carbs);
+  targets.kcal = Math.max(0, targets.kcal);
 
   // 10. Manual г/кг (overrides macros, recompute kcal)
   if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
