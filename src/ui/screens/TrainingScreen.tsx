@@ -473,7 +473,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
+            <p style={{ fontSize: 11, color: '#fff', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
               План, дневник, упражнения, калькуляторы и аналитика
             </p>
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -482,7 +482,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
                 return (
                 <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else if (z !== 'planner') setTab(group.tabs[0]); }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
-                  background: 'rgba(20,22,30,0.35)', border: '1px solid var(--glass-border)', color: 'var(--text)',
+                  background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.07)', color: '#fff',
                   transition: 'all 0.2s',
                 }}>
                   <div style={{
@@ -493,7 +493,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2, color: group.color }}>{group.title}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>{group.subtitle}</div>
+                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3 }}>{group.subtitle}</div>
                   </div>
                   <span style={{ color: group.color, fontSize: 16, opacity: 0.6 }}>→</span>
                 </button>
@@ -506,10 +506,10 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ─── TAB VIEW HEADER (компактный, без обрезки) ─── */}
       {page !== 'hero' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', flexShrink: 0, borderBottom: '1px solid var(--border)', minHeight: 36 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.08)', minHeight: 36 }}>
           <button onClick={() => { setPage('hero'); setZone(null); }} style={{
             padding: '4px 8px', cursor: 'pointer', fontSize: 13,
-            color: 'var(--text-dim)', border: 'none', background: 'transparent',
+            color: '#fff', border: 'none', background: 'transparent',
             display: 'flex', alignItems: 'center', gap: 3,
             fontWeight: 600, whiteSpace: 'nowrap',
           }}>← На главную</button>
@@ -529,16 +529,16 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         const cats = ZONES[zone].categories;
         if (cats) {
           return (
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 8, position:'sticky', top:0, zIndex:4, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px 8px', padding:'6px 4px' }}>
               {cats.map(cat => (
                 <div key={cat.label} style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', margin: '2px 0 2px', textTransform: 'uppercase', letterSpacing: 0.3 }}>{cat.icon} {cat.label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', margin: '2px 0 2px', textTransform: 'uppercase', letterSpacing: 0.3 }}>{cat.icon} {cat.label}</div>
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                     {cat.tabs.map(k => (
                       <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
                         padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600,
-                        background: tab === k ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: tab === k ? '#000' : 'var(--text-dim)', border: 'none', cursor: 'pointer',
+                        background: tab === k ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+                        color: tab === k ? '#000' : '#fff', border: tab === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
                         transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word',
                       }}>{TAB_LABELS[k]}</button>
                     ))}
@@ -549,12 +549,12 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           );
         }
         return (
-          <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap', position:'sticky', top:0, zIndex:4, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px 8px', paddingLeft:4, paddingRight:4 }}>
             {ZONES[zone].tabs.map(k => (
               <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
                 padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600,
-                background: tab === k ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: tab === k ? '#000' : 'var(--text-dim)', border: 'none', cursor: 'pointer',
+                background: tab === k ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+                color: tab === k ? '#000' : '#fff', border: tab === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
                 transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word',
               }}>{TAB_LABELS[k]}</button>
             ))}
@@ -580,15 +580,15 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
               { label: 'Усталость', value: 100 - (readiness.fatigue ?? 50), color: (readiness.fatigue ?? 50) < 40 ? '#22c55e' : '#ef4444' },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 38, whiteSpace:'normal' }}>{item.label}</span>
-                <div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
+                <span style={{ fontSize: 11, color: '#fff', minWidth: 38, whiteSpace:'normal' }}>{item.label}</span>
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 3, height: 4, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(100, Math.max(0, item.value))}%`, height: '100%', background: item.color, borderRadius: 3 }} />
                 </div>
                 <span style={{ fontSize: 11, fontWeight: 600, color: item.color, minWidth: 22, textAlign: 'right' }}>{Math.round(item.value)}%</span>
               </div>
             ))}
           </div>
-          {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}><span style={{ color: 'var(--text-dim)', minWidth: 38 }}>Нагрузка</span><div style={{ flex: 1, background: 'var(--bg-secondary)', borderRadius: 3, height: 4, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 3 }} /></div><span style={{ fontWeight: 700, color: zoneColor, minWidth: 50, textAlign: 'right', fontSize:11 }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
+          {(() => { const srpe = loadSRPESessions(); if (srpe.length < 2) return null; const acwr = acuteChronicRatio(toDailyLoads(srpe)); const zoneColor = acwr.ratio > 1.5 ? '#ef4444' : acwr.ratio > 1.3 ? '#eab308' : acwr.ratio < 0.8 ? '#3b82f6' : '#22c55e'; const zoneLabel = acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум'; return <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}><span style={{ color: '#fff', minWidth: 38 }}>Нагрузка</span><div style={{ flex: 1, background: 'rgba(255,255,255,0.04)', borderRadius: 3, height: 4, overflow: 'hidden' }}><div style={{ width: Math.min(100, acwr.ratio * 50) + '%', height: '100%', background: zoneColor, borderRadius: 3 }} /></div><span style={{ fontWeight: 700, color: zoneColor, minWidth: 50, textAlign: 'right', fontSize:11 }}>ACWR {acwr.ratio.toFixed(2)} · {zoneLabel}</span></div>; })()}
         </div>
       )}
 
@@ -602,7 +602,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display:'flex', gap:4, padding:'6px', borderRadius:12, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
               {PLANNER_MODES.map(m => (
-                <button key={m.id} onClick={() => { hapticImpact('medium'); switchPlanningTrack(m.id); }} style={{ flex:'0 0 auto', minWidth:104, padding:'8px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border: planningTrack === m.id ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === m.id ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.02)', color: planningTrack === m.id ? '#ffffff' : 'var(--text-dim)', display:'flex', flexDirection:'column', alignItems:'center', gap:2, whiteSpace:'nowrap', boxShadow: planningTrack === m.id ? '0 0 0 1px rgba(0,230,138,0.4), 0 2px 10px rgba(0,0,0,0.25)' : 'none' }}>
+                <button key={m.id} onClick={() => { hapticImpact('medium'); switchPlanningTrack(m.id); }} style={{ flex:'0 0 auto', minWidth:104, padding:'8px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border: planningTrack === m.id ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === m.id ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.02)', color: planningTrack === m.id ? '#ffffff' : '#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:2, whiteSpace:'nowrap', boxShadow: planningTrack === m.id ? '0 0 0 1px rgba(0,230,138,0.4), 0 2px 10px rgba(0,0,0,0.25)' : 'none' }}>
                   <span style={{ fontSize:16 }}>{m.icon}</span>
                   <span>{m.label}</span>
                   <span style={{ fontSize:11, fontWeight:400, opacity:0.75, lineHeight:1.2, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis' }}>{m.hint}</span>
@@ -692,7 +692,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         const isCalcTab = CALC_TABS.has(effectiveTab as string);
         if (isCalcTab) {
           // Показываем конкретный инструмент с кнопкой назад
-          const backBtnStyle: React.CSSProperties = { padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)', cursor: 'pointer', marginBottom: 6 };
+          const backBtnStyle: React.CSSProperties = { padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', marginBottom: 6 };
           return (<>
             <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
             {effectiveTab === 'intelligence_hub' && <InfoErrorBoundary label="Интеллект — единый пульт"><UnifiedIntelligenceHub /></InfoErrorBoundary>}

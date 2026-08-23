@@ -199,7 +199,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
   return (<div>
     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, padding:"8px 10px", marginBottom:8, borderRadius:10, background:"rgba(0,230,138,0.08)", border:"1px solid rgba(0,230,138,0.2)" }}>
       <div style={{ fontSize:11, color:"#fff" }}>🧩 Композиция методик: <b style={{ color:"var(--accent)" }}>{Object.keys(appliedMethods).length}</b> из {cats.length} категорий {Object.keys(appliedMethods).length>0 ? "(по одной из каждой)" : ""}</div>
-      <button onClick={() => onApplyComposition()} disabled={Object.keys(appliedMethods).length===0} style={{ padding:"8px 14px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer", border:"none", background: Object.keys(appliedMethods).length>0 ? "var(--accent)" : "rgba(255,255,255,0.1)", color: Object.keys(appliedMethods).length>0 ? "#000" : "var(--text-dim)", opacity: Object.keys(appliedMethods).length===0?0.5:1 }}>Применить к плану ▶</button>
+      <button onClick={() => onApplyComposition()} disabled={Object.keys(appliedMethods).length===0} style={{ padding:"8px 14px", borderRadius:8, fontSize:11, fontWeight:700, cursor:"pointer", border:"none", background: Object.keys(appliedMethods).length>0 ? "var(--accent)" : "rgba(255,255,255,0.1)", color: Object.keys(appliedMethods).length>0 ? "#000" : '#fff', opacity: Object.keys(appliedMethods).length===0?0.5:1 }}>Применить к плану ▶</button>
     </div>
     {Object.keys(appliedMethods).length > 0 && (
       <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginBottom:8 }}>
@@ -228,27 +228,27 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
           <h4 style={{ margin: '0 0 6px', fontSize: 12, color: '#8b5cf6' }}>🔍 Анализ ваших тренировок</h4>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
             <div>
-              <span style={{ color: 'var(--text-dim)' }}>Сплит: </span>
+              <span style={{ color: '#fff' }}>Сплит: </span>
               <b>{trainingOutput?.splitName || 'Не определён'}</b>
             </div>
             <div>
-              <span style={{ color: 'var(--text-dim)' }}>Дней/нед: </span>
+              <span style={{ color: '#fff' }}>Дней/нед: </span>
               <b>{daysPerWeek}</b>
             </div>
             <div>
-              <span style={{ color: 'var(--text-dim)' }}>Цель: </span>
+              <span style={{ color: '#fff' }}>Цель: </span>
               <b>{goal === 'bulk' ? 'Масса' : goal === 'cut' ? 'Сушка' : goal === 'strength' ? 'Сила' : goal}</b>
             </div>
             <div>
-              <span style={{ color: 'var(--text-dim)' }}>Уровень: </span>
+              <span style={{ color: '#fff' }}>Уровень: </span>
               <b>{level === 'beginner' ? 'Новичок' : level === 'intermediate' ? 'Средний' : level === 'advanced' ? 'Опытный' : 'Enhanced'}</b>
             </div>
             <div>
-              <span style={{ color: 'var(--text-dim)' }}>Готовность: </span>
+              <span style={{ color: '#fff' }}>Готовность: </span>
               <b style={{ color: Math.max(0, (readiness?.recovery || 50) - (readiness?.fatigue || 30)) > 30 ? '#22c55e' : '#f59e0b' }}>{Math.max(0, Math.round((readiness?.recovery || 50) - (readiness?.fatigue || 30)))}%</b>
             </div>
             <div>
-              <span style={{ color: 'var(--text-dim)' }}>Тренировок: </span>
+              <span style={{ color: '#fff' }}>Тренировок: </span>
               <b>{historyWorkouts.length}</b>
             </div>
           </div>
@@ -294,7 +294,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
             <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📈 Статус прогрессии</h4>
             {progressionStatus.map((p, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: i < progressionStatus.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', fontSize: 10 }}>
-                <span style={{ color: 'var(--text-dim)' }}>{p.name}</span>
+                <span style={{ color: '#fff' }}>{p.name}</span>
                 <span style={{
                   fontWeight: 600,
                   color: p.status === 'progressing' ? '#22c55e' : p.status === 'slow' ? '#f59e0b' : '#ef4444',
@@ -315,7 +315,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
               <div style={{ width: `${intensityDist.mid}%`, background: '#f59e0b' }} title="RIR 2-3" />
               <div style={{ width: `${intensityDist.high}%`, background: '#22c55e' }} title="RIR 4+" />
             </div>
-            <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-dim)' }}>
+            <div style={{ display: 'flex', gap: 10, fontSize: 10, color: '#fff' }}>
               <span>🔴 RIR 0-1: {intensityDist.low}%</span>
               <span>🟠 RIR 2-3: {intensityDist.mid}%</span>
               <span>🟢 RIR 4+: {intensityDist.high}%</span>
@@ -348,15 +348,15 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
             <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>💤 Статус восстановления</h4>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 10 }}>
               <div style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Усталость</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Усталость</div>
                 <div style={{ fontWeight: 700, color: (readiness.fatigue || 30) > 50 ? '#ef4444' : '#22c55e' }}>{Math.round(readiness.fatigue || 30)}%</div>
               </div>
               <div style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Восстановление</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Восстановление</div>
                 <div style={{ fontWeight: 700, color: (readiness.recovery || 70) > 60 ? '#22c55e' : '#f59e0b' }}>{Math.round(readiness.recovery || 70)}%</div>
               </div>
               <div style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Готовность</div>
+                <div style={{ fontSize: 10, color: '#fff' }}>Готовность</div>
                 <div style={{ fontWeight: 700, color: '#8b5cf6' }}>{Math.max(0, Math.round((readiness?.recovery || 50) - (readiness?.fatigue || 30)))}%</div>
               </div>
             </div>
@@ -373,9 +373,9 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
                   <div style={{ fontWeight: 600, fontSize: 11, color: (appliedMethods[r.method!.category] === r.method!.name) ? '#00e68a' : '#8b5cf6' }}>
                     {(appliedMethods[r.method!.category] === r.method!.name) ? '✓ ' : ''}{r.method.name}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{r.reason}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{r.method.description}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{r.reason}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{r.method.description}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 1 }}>
                     Протокол: {r.method.example} | Уровень доказательности: {r.method.evidenceLevel}
                   </div>
                   {(appliedMethods[r.method!.category] === r.method!.name) ? (
@@ -396,13 +396,13 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     <div style={{ marginBottom: 8 }}>
       <PopupSelect label="Категория методики" value={methodCat} options={methodCatOptions} onChange={setMethodCat} />
     </div>
-    {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: (appliedMethods[m.category] === m.name) ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)' }}>
-      <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:10, color:'var(--text-dim)' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
-      <div style={{ fontSize:10, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
-      <div style={{ fontSize:10, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}>Как работает: {m.howItWorks}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}>Протокол: {m.example}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
+    {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: (appliedMethods[m.category] === m.name) ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:10, color:'#fff' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
+      <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{m.description}</div>
+      <div style={{ fontSize:10, color:'#fff' }}>Лучше всего для: {m.bestFor}</div>
+      <div style={{ fontSize:10, color:'#fff' }}>Как работает: {m.howItWorks}</div>
+      <div style={{ fontSize:10, color:'#fff' }}>Протокол: {m.example}</div>
+      <div style={{ fontSize:10, color:'#fff', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
       {m.caveats?.length > 0 && <div style={{ fontSize:10, color:'#f87171', marginTop:2, padding:'4px 6px', background:'rgba(239,68,68,0.06)', borderRadius:4 }}>⚠ {m.caveats.join(' | ')}</div>}
       {(appliedMethods[m.category] === m.name) ? (
         <div style={{ marginTop:4, fontSize:10, color:'#00e68a', fontWeight:600 }}>✅ Применена к плану</div>
@@ -420,7 +420,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
         <div style={{ fontWeight:700, fontSize:11, color:'#fff' }}>{v.muscle}</div>
         <div style={{ fontSize:10, color:'#00e68a', fontWeight:700 }}>MEV {lvl.mev} · MAV {lvl.mav} · MRV {lvl.mrv}</div>
       </div>
-      <div style={{ display:'flex', gap:6, fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:3 }}>
+      <div style={{ display:'flex', gap:6, fontSize:10, color:'#fff', marginTop:3 }}>
         <span>📡 {lvl.frequency}</span>
         <span style={{ flex:1 }}>
           <span style={{ display:'inline-block', width:100, height:5, background:'rgba(255,255,255,0.06)', borderRadius:3, verticalAlign:'middle', marginRight:4 }}>
@@ -428,7 +428,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
           </span>
         </span>
       </div>
-      <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:3 }}>{v.notes}</div>
+      <div style={{ fontSize:10, color:'#fff', marginTop:3 }}>{v.notes}</div>
       <div style={{ fontSize:10, color:'rgba(0,230,138,0.7)', marginTop:2 }}>🏋️ {v.bestExercises.join(' · ')}</div>
     </div>; })}
 
@@ -438,16 +438,16 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
         <div style={{ fontWeight:700, fontSize:11, color: expandedSplit===i?'#00e68a':'#fff' }}>{s.name}</div>
         <span style={{ fontSize:10, color:'#00e68a' }}>{expandedSplit===i?'▲':'▼'}</span>
       </div>
-      <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>📊 {s.totalVolume} · 🔁 {s.totalFrequency}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginTop:1 }}>✅ Подходит: {s.suitability.join(', ')}</div>
+      <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>📊 {s.totalVolume} · 🔁 {s.totalFrequency}</div>
+      <div style={{ fontSize:10, color:'#fff', marginTop:1 }}>✅ Подходит: {s.suitability.join(', ')}</div>
       {expandedSplit===i && <div style={{ marginTop:8, borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:8 }}>
         {s.days.map((d,di) => <div key={di} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'6px 8px', marginBottom:4, borderLeft:'2px solid #00e68a' }}>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, fontWeight:700, color:'#fff' }}>
             <span>Д{d.day}: {d.name}</span>
-            <span style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}>{d.volume} объём · {d.intensity} инт.</span>
+            <span style={{ fontSize:10, color:'#fff' }}>{d.volume} объём · {d.intensity} инт.</span>
           </div>
           <div style={{ fontSize:10, color:'rgba(0,230,138,0.8)', marginTop:2 }}>🎯 {d.focus}</div>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:2 }}>Шаблоны: {d.patterns.join(' · ')}</div>
+          <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>Шаблоны: {d.patterns.join(' · ')}</div>
         </div>)}
       </div>}
       </div>)}
@@ -456,7 +456,7 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
         <div style={{ fontSize: 13, fontWeight: 800, color: '#00e68a', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
           🏁 Taper-планер (снижение объёма к соревнованию)
         </div>
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 10 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 10 }}>
           Полный инструмент: PL-taper (1-3 нед по усталости, прикиды, весовая категория, таймлайн, восстановление, ментал) + BB шоу-пик (углеводная загрузка, водная манипуляция).
           Кнопки «🛠 Применить к планировщику» связывают результат с вашим планом.
         </div>

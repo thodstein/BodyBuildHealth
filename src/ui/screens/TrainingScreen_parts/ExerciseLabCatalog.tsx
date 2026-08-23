@@ -100,9 +100,9 @@ const ExerciseLabCatalog: React.FC<{
       </div>
 
       {/* Фильтры */}
-      <div style={{ background: 'var(--bg-secondary)', borderRadius: 14, padding: '10px', border: '1px solid var(--border)', marginBottom: 8 }}>
+      <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '10px', border: '1px solid rgba(255,255,255,0.08)', marginBottom: 8 }}>
         <input type="text" value={search} onChange={e => { setSearch(e.target.value); setVisible(40); }}
-          placeholder="🔍 Поиск по названию, мышце, технике..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 13, boxSizing: 'border-box', marginBottom: 8 }} />
+          placeholder="🔍 Поиск по названию, мышце, технике..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box', marginBottom: 8 }} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           <PopupSelect label="Группа" value={group} options={groupOptions} onChange={v => { setGroup(v); filterReset(); }} />
           <PopupSelect label="Тип" value={type} options={typeOptions} onChange={v => { setType(v); filterReset(); }} />
@@ -120,8 +120,8 @@ const ExerciseLabCatalog: React.FC<{
           return (
             <div key={ex.id} onClick={() => setSelectedId(isSelected ? null : ex.id)} style={{
               padding: '8px 10px', borderRadius: 12, cursor: 'pointer',
-              background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(59,130,246,0.04))' : 'var(--bg-secondary)',
-              border: isSelected ? '1px solid rgba(0,230,138,0.3)' : '1px solid var(--border)',
+              background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(59,130,246,0.04))' : 'rgba(255,255,255,0.04)',
+              border: isSelected ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.08)',
               transition: 'all 0.15s',
             }}>
               {/* Сводная строка */}
@@ -145,7 +145,7 @@ const ExerciseLabCatalog: React.FC<{
 
               {/* ПОЛНАЯ КАРТОЧКА */}
               {isSelected && (
-                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
 
                   {/* Бейджи */}
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -173,7 +173,7 @@ const ExerciseLabCatalog: React.FC<{
 
                   {/* Техника выполнения */}
                   {ex.technique && (
-                    <div style={{ marginBottom: 4, background: 'rgba(0,230,138,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
+                    <div style={{ marginBottom: 4, background: 'rgba(0,230,138,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
                       <b style={{ color: ACCENT }}>🎯 Техника:</b> {ex.technique}
                     </div>
                   )}
@@ -260,7 +260,7 @@ const ExerciseLabCatalog: React.FC<{
                       {/* Мышцы: primary / secondary / stabilizers */}
                       <div style={{ marginBottom: 4 }}>
                         {bio.primaryMuscles && bio.primaryMuscles.length > 0 && (
-                          <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text)', marginBottom: 2 }}>
+                          <div style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: '#fff', marginBottom: 2 }}>
                             <b style={{ color: ACCENT }}>🎯 Основные:</b> {bio.primaryMuscles.map(m => GROUP_RU[m] || m).join(', ')}
                           </div>
                         )}
@@ -285,7 +285,7 @@ const ExerciseLabCatalog: React.FC<{
 
                       {/* Технические подсказки */}
                       {bio.techniqueCues && bio.techniqueCues.length > 0 && (
-                        <div style={{ marginBottom: 4, background: 'rgba(0,230,138,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: 'var(--text)', lineHeight: 1.5 }}>
+                        <div style={{ marginBottom: 4, background: 'rgba(0,230,138,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                           <b style={{ color: ACCENT }}>🎯 Технические подсказки:</b>
                           {bio.techniqueCues.map((cue, ci) => <div key={ci} style={{ marginLeft: 8 }}>• {cue}</div>)}
                         </div>

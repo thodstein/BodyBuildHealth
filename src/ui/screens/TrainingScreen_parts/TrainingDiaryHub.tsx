@@ -82,13 +82,13 @@ const RecordModeSelector: React.FC<{
 }> = ({ diary, historyWorkouts, selectedWeek, onSave, sub, onSubChange, pendingTemplate, templateKey, onTemplateApplied }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 4, position:'sticky', top:0, zIndex:3, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px', paddingLeft:4, paddingRight:4 }}>
         {([['quick', '⚡ Быстро'], ['full', '📝 Подробно']] as const).map(([k, l]) => (
           <button key={k} onClick={() => onSubChange(k)} style={{
             flex: 1, padding: '8px 12px', borderRadius: 8,
             border: sub === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
             background: sub === k ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-            color: sub === k ? 'var(--accent)' : 'var(--text-dim)',
+            color: sub === k ? 'var(--accent)' : '#fff',
             fontWeight: sub === k ? 700 : 400, fontSize: 11, cursor: 'pointer',
           }}>{l}</button>
         ))}
@@ -446,17 +446,27 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   return (
     <DiaryHubContext.Provider value={hub}>
     <div key={mode} className="diary-mode-pop" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ background:'linear-gradient(135deg, rgba(168,85,247,0.14), rgba(0,230,138,0.08))', border:'1px solid rgba(168,85,247,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.18)', border:'1px solid rgba(168,85,247,0.30)', fontSize:16 }}>📓</span>
+          <div>
+            <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Дневник тренировок</div>
+            <div style={{ fontSize:10, color:'#fff', opacity:0.9 }}>Запись · история · аналитика · прогресс · календарь</div>
+          </div>
+        </div>
+        <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{mode}</span>
+      </div>
       {/* Program context header */}
       {macrocycle && curPhase && (
         <div style={{ ...style.card, border: '1px solid rgba(0,230,138,0.12)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Текущая программа</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Текущая программа</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{macrocycle.totalWeeks}-нед макроцикл</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Фаза: <b>{PHASE_RU[curPhase.type] || curPhase.type}</b> · Нед {selectedWeek}</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Фаза: <b>{PHASE_RU[curPhase.type] || curPhase.type}</b> · Нед {selectedWeek}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сплит</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Сплит</div>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#60a5fa' }}>{historyWorkouts[0]?.split || '—'}</div>
             </div>
           </div>
@@ -467,13 +477,13 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {/* Подвкладки дневника: запись / соревнования (mode внутри record-блока сужен до 'record') */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', position:'sticky', top:0, zIndex:3, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px 8px', paddingLeft:4, paddingRight:4 }}>
             <button onClick={() => setMode('record')} style={{ flex: 1, minWidth: 100, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📓 Запись</button>
-            <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
-            <button onClick={() => setMode('feedback')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📊 Фидбек</button>
-            <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>⭐ Мои тренировки</button>
-            <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
-            <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: 'var(--text-dim)', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
+            <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
+            <button onClick={() => setMode('feedback')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📊 Фидбек</button>
+            <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>⭐ Мои тренировки</button>
+            <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
+            <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
           </div>
           {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
           <BBContestPrepActiveCard onOpen={() => {
@@ -505,11 +515,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 200 }}>
                     <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Неделя объём</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>Неделя объём</div>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{(weekVol / 1000).toFixed(1)}т</div>
                     </div>
                     <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Всего сессий</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>Всего сессий</div>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{historyWorkouts.length}</div>
                     </div>
                   </div>
@@ -550,9 +560,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                             <circle cx="17" cy="17" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
                             <circle cx="17" cy="17" r={r} fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round"
                               strokeDasharray={`${d} ${c - d}`} transform="rotate(-90 17 17)" opacity={pct === null ? 0.25 : 1} />
-                            <text x="17" y="20" textAnchor="middle" fontSize="9" fontWeight="700" fill={pct === null ? 'rgba(255,255,255,0.85)' : color}>{pct === null ? '·' : v + '%'}</text>
+                            <text x="17" y="20" textAnchor="middle" fontSize="9" fontWeight="700" fill={pct === null ? '#fff' : color}>{pct === null ? '·' : v + '%'}</text>
                           </svg>
-                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{label}</span>
+                          <span style={{ fontSize: 8, color: '#fff' }}>{label}</span>
                         </button>
                       );
                     };
@@ -573,16 +583,16 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                         </span>
                       ) : (
                         <button onClick={() => scheduleReminder('18:00', planned.name, planned.exercises.map((e: any) => e.name))}
-                          style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                           🔔 Напомнить в 18:00
                         </button>
                       )}
                     </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
+                    <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
                       {planned.exercises.slice(0, 6).map(e => e.name).join(' · ')}{planned.exercises.length > 6 ? ` +${planned.exercises.length - 6}` : ''}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>~{planned.duration} мин</div>
+                      <div style={{ fontSize: 9, color: '#fff' }}>~{planned.duration} мин</div>
                       <button onClick={() => setPlanToRecord({ day: planned, nonce: Date.now() })}
                         style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>
                         ✍️ Записать по плану
@@ -591,7 +601,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   </div>
                 )}
                 {last && (
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>
                     {/* legacy-запись без exercises или с exercises={} не должна ронять «Сегодня» */}
                     Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {(Array.isArray(last.exercises) ? last.exercises : []).length} упр. · {((Array.isArray(last.exercises) ? last.exercises : []).reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
                   </div>
@@ -775,7 +785,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             <BBFeedbackCard />
             <div style={{ display:'flex', gap:6 }}>
-              <button onClick={() => setMode('record')} style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', color:'var(--text-dim)', fontSize:11, cursor:'pointer' }}>← К записи</button>
+              <button onClick={() => setMode('record')} style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', color:'#fff', fontSize:11, cursor:'pointer' }}>← К записи</button>
               <button onClick={() => setMode('history')} style={{ flex:1, padding:'8px 12px', borderRadius:8, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.12)', color:'var(--accent)', fontWeight:700, fontSize:11, cursor:'pointer' }}>📜 История</button>
             </div>
           </div>

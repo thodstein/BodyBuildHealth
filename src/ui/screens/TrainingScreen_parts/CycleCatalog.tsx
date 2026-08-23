@@ -83,27 +83,27 @@ export const CycleLayoutView: React.FC<{ cycle: SRCycleTemplate }> = ({ cycle })
   const days = explicit
     ? explicit[Math.min(weekIdx, explicit.length - 1)]
     : cycle.week1;
-  if (!days || days.length === 0) return <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Раскладка цикла не задана.</div>;
+  if (!days || days.length === 0) return <div style={{ fontSize: 11, color: '#fff' }}>Раскладка цикла не задана.</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {explicit && (
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Неделя раскладки:</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Неделя раскладки:</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {explicit.map((_, i) => (
               <button key={i} onClick={() => setWeekIdx(i)} style={{
                 minWidth: 30, padding: '4px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                 border: weekIdx === i ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                 background: weekIdx === i ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)',
-                color: weekIdx === i ? 'var(--accent)' : 'rgba(255,255,255,0.7)',
+                color: weekIdx === i ? 'var(--accent)' : '#fff',
               }}>Неделя {i + 1}</button>
             ))}
           </div>
         </div>
       )}
       {!explicit && cycle.meta.weeks > 1 && (
-        <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+        <div style={{ fontSize: 10, color: '#fff' }}>
           Показана неделя 1 из {cycle.meta.weeks}. Недели 2..N генерируются прогрессией (коррекция ПМ {Math.round((cycle.meta.correctionPct || 0) * 1000) / 10}%/нед).
         </div>
       )}
@@ -115,9 +115,9 @@ export const CycleLayoutView: React.FC<{ cycle: SRCycleTemplate }> = ({ cycle })
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '5px 8px' }}>
             {day.exercises.map((ex, ei) => (
               <div key={ei} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 4, fontSize: 11, lineHeight: 1.5 }}>
-                <span style={{ color: 'rgba(255,255,255,0.9)' }}>{ex.name}</span>
+                <span style={{ color: '#fff' }}>{ex.name}</span>
                 {ex.load && <span style={{ fontSize: 10, color: ex.load === 'Тяжелая' ? '#ef4444' : ex.load === 'Средняя' ? '#eab308' : '#22c55e' }}>{ex.load}</span>}
-                <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>
+                <span style={{ color: '#fff', fontSize: 10 }}>
                   {(ex.sets || []).map((s, si) => `${s.sets}×${s.reps} @${Math.round(s.pct * 100)}%${s.rir !== undefined ? ` · RIR ${s.rir}` : ''}`).join(' + ')}
                 </span>
               </div>
@@ -135,8 +135,8 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
     <button onClick={onClick} style={{
       padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',
       whiteSpace: 'normal', wordBreak: 'break-word', transition: 'all 0.2s',
-      background: active ? 'var(--accent)' : 'var(--bg-secondary)',
-      color: active ? '#000' : 'var(--text-dim)', border: 'none',
+      background: active ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+      color: active ? '#000' : '#fff', border: 'none',
     }}>{label}</button>
   );
 }
@@ -219,8 +219,10 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ background:'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(0,230,138,0.08))', border:'1px solid rgba(245,158,11,0.18)', borderRadius:14, padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}><span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.15)', border:'1px solid rgba(245,158,11,0.25)', fontSize:16 }}>📖</span><div><div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Каталог циклов</div><div style={{ fontSize:10, color:'#fff', opacity:0.9 }}>Готовые циклы ПЛ и ББ с фильтрами и раскладкой</div></div></div><span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>каталог</span></div>
       <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 2 }}>📖 Каталог тренировочных циклов</div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Справочник готовых циклов. Выберите тип (силовые / бодибилдинг), уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
+      <div style={{ fontSize: 11, color: '#fff' }}>Справочник готовых циклов. Выберите тип (силовые / бодибилдинг), уточните специализацию, уровень, период и другие параметры — каталог перестроится автоматически.</div>
 
       {/* ── Сегмент-контрол: Силовые / Бодибилдинг / Все ── */}
       <div style={{ display: 'flex', gap: 4, padding: '6px', borderRadius: 12, background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)' }}>
@@ -231,7 +233,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         ]).map(s => (
           <button key={s.id} onClick={() => { setCat(s.id); setFocus('all'); }} style={{
             flex: 1, padding: '8px 4px', borderRadius: 9, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: cat === s.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-            background: cat === s.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: cat === s.id ? 'var(--accent)' : 'var(--text-dim)',
+            background: cat === s.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.02)', color: cat === s.id ? 'var(--accent)' : '#fff',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
           }}>
             <span style={{ fontSize: 15 }}>{s.icon}</span>
@@ -245,13 +247,13 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="🔎 Поиск по названию и описанию…"
-        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 12, fontSize: 12, color: 'var(--text)', background: 'rgba(118,118,128,0.12)', border: '0.5px solid rgba(255,255,255,0.1)', outline: 'none' }}
+        style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 12, fontSize: 12, color: '#fff', background: 'rgba(118,118,128,0.12)', border: '0.5px solid rgba(255,255,255,0.1)', outline: 'none' }}
       />
 
       {/* ── Подфильтры ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{focusLabel}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>{focusLabel}</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <Chip label="Все" active={focus === 'all'} onClick={() => setFocus('all')} />
             {availableFocus.map(k => (
@@ -261,7 +263,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         </div>
 
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Уровень</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Уровень</div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <Chip label="Все" active={levelF === 'all'} onClick={() => setLevelF('all')} />
             {LEVELS.map(l => (
@@ -272,7 +274,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 160px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Период</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Период</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={period === 'all'} onClick={() => setPeriod('all')} />
               {PERIODS.map(p2 => (
@@ -281,7 +283,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
             </div>
           </div>
           <div style={{ flex: '1 1 160px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Длительность</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Длительность</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={weeks === 'all'} onClick={() => setWeeks('all')} />
               {Object.keys(WEEKS_LABELS).map(w => (
@@ -293,7 +295,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 160px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Частота</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Частота</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Chip label="Все" active={freq === 'all'} onClick={() => setFreq('all')} />
               {['2', '3', '4', '6'].map(f => (
@@ -303,7 +305,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
           </div>
           {availableAuthors.length > 0 && (
             <div style={{ flex: '1 1 160px' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Автор / источник</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4 }}>Автор / источник</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <Chip label="Все" active={author === 'all'} onClick={() => setAuthor('all')} />
                 {availableAuthors.map(a => (
@@ -316,10 +318,10 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Найдено: <b style={{ color: 'var(--accent)' }}>{filtered.length}</b> циклов</div>
+            <div style={{ fontSize: 11, color: '#fff' }}>Найдено: <b style={{ color: 'var(--accent)' }}>{filtered.length}</b> циклов</div>
             <Chip label={`⭐ Избранное (${favs.length})`} active={favOnly} onClick={() => setFavOnly(v => !v)} />
           </div>
-          <button onClick={resetFilters} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)', cursor: 'pointer' }}>↺ Сбросить</button>
+          <button onClick={resetFilters} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer' }}>↺ Сбросить</button>
         </div>
       </div>
 
@@ -336,7 +338,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                     <div style={{ fontSize: 12, fontWeight: 700, color: '#facc15', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.title}</div>
                     <button aria-label={`Убрать из избранного ${m.title}`} onClick={() => toggleFav(m.id)} style={{ minWidth: 44, minHeight: 44, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 15 }} title="Убрать из избранного">⭐</button>
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{m.level} · {m.weeks} нед · {m.sessionsPerWeek} дн/нед · {PERIOD_LABELS[m.period] || m.period}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{m.level} · {m.weeks} нед · {m.sessionsPerWeek} дн/нед · {PERIOD_LABELS[m.period] || m.period}</div>
                 </div>
               );
             })}
@@ -351,13 +353,13 @@ export const CycleCatalog: React.FC<Props> = (p) => {
         </button>
         {showRec && (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {recommendations.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Нет подходящих — уточните цель/уровень в профиле.</div>}
+            {recommendations.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>Нет подходящих — уточните цель/уровень в профиле.</div>}
             {recommendations.map(r => (
               <div key={r.cycle.meta.id} style={{ background: 'rgba(24,24,27,0.4)', borderRadius: 10, padding: 8, border: '1px solid rgba(0,230,138,0.18)' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)' }}>{r.cycle.meta.title}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '2px 0 4px' }}>Скоринг подбора: {r.score}</div>
+                <div style={{ fontSize: 11, color: '#fff', margin: '2px 0 4px' }}>Скоринг подбора: {r.score}</div>
                 {r.rationale.slice(0, 2).map((x, i) => (
-                  <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>✓ {x}</div>
+                  <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>✓ {x}</div>
                 ))}
               </div>
             ))}
@@ -367,13 +369,13 @@ export const CycleCatalog: React.FC<Props> = (p) => {
 
       {/* ── Сгруппированный список ── */}
       {filtered.length === 0 && (
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: 20 }}>По выбранным фильтрам циклов не найдено.</div>
+        <div style={{ fontSize: 12, color: '#fff', textAlign: 'center', padding: 20 }}>По выбранным фильтрам циклов не найдено.</div>
       )}
       {grouped.map(([fk, cycles]) => (
         <div key={fk}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.3, margin: '6px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>{FOCUS_LABELS[fk] || fk}</span>
-            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: 'var(--text-dim)' }}>{cycles.length}</span>
+            <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: '1px 7px', color: '#fff' }}>{cycles.length}</span>
           </div>
           {cycles.map(c => {
             const m = c.meta;
@@ -389,7 +391,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                         {chips.map((ch, i) => (
-                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '2px 7px' }}>{ch}</span>
                         ))}
                       </div>
                       <button aria-label={favs.includes(m.id) ? `Убрать из избранного ${m.title}` : `В избранное ${m.title}`}

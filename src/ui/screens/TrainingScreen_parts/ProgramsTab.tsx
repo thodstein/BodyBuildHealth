@@ -133,20 +133,20 @@ export const ProgramsTab: React.FC<{
         <button key={g.value} onClick={() => { setGoalFilter(g.value); setSelectedId(null); }}
           style={{
             padding: '8px 16px', borderRadius: 20, fontSize: 12, cursor: 'pointer', minHeight: 38,
-            background: goalFilter === g.value ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: goalFilter === g.value ? '#000' : 'var(--text-dim)', border: 'none',
+            background: goalFilter === g.value ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+            color: goalFilter === g.value ? '#000' : '#fff', border: 'none',
             fontWeight: goalFilter === g.value ? 600 : 400,
           }}>{g.label}</button>
       ))}
     </div>
     <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center' }}>Уровень:</span>
+      <span style={{ fontSize: 11, color: '#fff', alignSelf: 'center' }}>Уровень:</span>
       {[{v:'all',l:'Все'},{v:'beginner',l:'Начинающий'},{v:'intermediate',l:'Средний'},{v:'advanced',l:'Продвинутый'},{v:'enhanced',l:'Enhanced'}].map(l => (
         <button key={l.v} onClick={() => { setLevelFilter(l.v); setSelectedId(null); }}
           style={{
             padding: '6px 12px', borderRadius: 14, fontSize: 12, cursor: 'pointer', minHeight: 38,
-            background: levelFilter === l.v ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: levelFilter === l.v ? '#000' : 'var(--text-dim)', border: 'none',
+            background: levelFilter === l.v ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+            color: levelFilter === l.v ? '#000' : '#fff', border: 'none',
             fontWeight: levelFilter === l.v ? 600 : 400,
           }}>{l.l}</button>
       ))}
@@ -158,16 +158,16 @@ export const ProgramsTab: React.FC<{
           <div key={p.id} onClick={() => setSelectedId(p.id)}
             style={{
               padding: 12, borderRadius: 14, cursor: 'pointer',
-              background: 'rgba(24,24,27,0.12)', border: '1px solid var(--glass-border)',
+              background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any,
             }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>{p.name}</div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>{p.name}</div>
               <span style={{ fontSize: 11, padding: '3px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', fontWeight: 600 }}>
                 {PROGRAM_GOAL_MAP[p.goal] || p.goal}
               </span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>{p.description}</div>
-            <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text-light)', flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>{p.description}</div>
+            <div style={{ display: 'flex', gap: 10, fontSize: 11, color: '#fff', flexWrap: 'wrap' }}>
               <span>Автор: <b>{p.author}</b></span>
               <span>Уровень: <b style={{ color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[p.level] || p.level}</b></span>
                 <span>{p.daysPerWeek} дн/нед</span>
@@ -182,39 +182,39 @@ export const ProgramsTab: React.FC<{
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <button onClick={() => setSelectedId(null)}
           style={{
-            alignSelf: 'flex-start', padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)',
-            cursor: 'pointer', background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontSize: 12,
+            alignSelf: 'flex-start', padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)',
+            cursor: 'pointer', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 12,
             minHeight: 38,
           }}>← К списку</button>
 
         <div style={{
-          padding: 14, borderRadius: 14, background: 'rgba(24,24,27,0.12)',
-          border: '1px solid var(--glass-border)',
+          padding: 14, borderRadius: 14, background: 'rgba(24,24,27,0.42)',
+          border: '1px solid rgba(255,255,255,0.07)',
         }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: 16, color: 'var(--text)' }}>{expandedSelected.name}</h3>
-          <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: '0 0 8px' }}>{expandedSelected.description}</p>
+          <h3 style={{ margin: '0 0 4px', fontSize: 16, color: '#fff' }}>{expandedSelected.name}</h3>
+          <p style={{ fontSize: 11, color: '#fff', margin: '0 0 8px' }}>{expandedSelected.description}</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 11, marginBottom: 8 }}>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Уровень</div>
+              <div style={{ color: '#fff', fontSize: 11 }}>Уровень</div>
               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{PROGRAM_LEVEL_MAP[expandedSelected.level] || expandedSelected.level}</div>
             </div>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Цель</div>
+              <div style={{ color: '#fff', fontSize: 11 }}>Цель</div>
               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{PROGRAM_GOAL_MAP[expandedSelected.goal] || expandedSelected.goal}</div>
             </div>
             <div style={{ background: 'rgba(0,230,138,0.05)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-              <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Дней/нед</div>
+              <div style={{ color: '#fff', fontSize: 11 }}>Дней/нед</div>
               <div style={{ fontWeight: 700, color: 'var(--accent)' }}>{expandedSelected.daysPerWeek} ({expandedSelected.durationWeeks} нед)</div>
             </div>
           </div>
 
-          <div style={{ fontSize: 11, color: 'var(--text-light)', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: '#fff', marginBottom: 4 }}>
             <b>Снаряжение:</b> {expandedSelected.equipmentNeeded.map(e => PROGRAM_EQUIP_MAP[e] || e).join(', ')}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-light)', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: '#fff', marginBottom: 4 }}>
             <b>Прогрессия:</b> {expandedSelected.progressionModel}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-light)', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: '#fff', marginBottom: 8 }}>
             <b>Разгрузка:</b> {expandedSelected.deloadProtocol}
           </div>
           {expandedSelected.warnings.length > 0 && (
@@ -282,7 +282,7 @@ export const ProgramsTab: React.FC<{
           {myTrainingMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.3)', color:'#ffd700', fontSize:11, marginBottom:6, textAlign:'center' }}>{myTrainingMsg}</div>}
 
           {/* Week-by-week detail */}
-          <h4 style={{ margin: '0 0 6px', fontSize: 13, color: 'var(--text)' }}>
+          <h4 style={{ margin: '0 0 6px', fontSize: 13, color: '#fff' }}>
             Программа по неделям ({expandedSelected.weeks.length} из {expandedSelected.durationWeeks} нед{expandedSelected.weeks.length >= expandedSelected.durationWeeks ? ' ✅' : ' ⚠️'})
           </h4>
           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -290,9 +290,9 @@ export const ProgramsTab: React.FC<{
               <button key={i} onClick={() => setDetailWeek(i + 1)}
                 style={{
                   padding: '6px 12px', borderRadius: 12, fontSize: 12, cursor: 'pointer', minWidth: 44, minHeight: 38,
-                  background: detailWeek === i + 1 ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-                  border: detailWeek === i + 1 ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  color: detailWeek === i + 1 ? 'var(--accent)' : 'var(--text-dim)',
+                  background: detailWeek === i + 1 ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: detailWeek === i + 1 ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                  color: detailWeek === i + 1 ? 'var(--accent)' : '#fff',
                   fontWeight: detailWeek === i + 1 ? 600 : 400,
                 }}>
                 Нед {w.week}{w.deload ? ' 🟢' : ''}
@@ -307,7 +307,7 @@ export const ProgramsTab: React.FC<{
             wk.days.forEach(d => { dayMap[d.day] = d; });
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>
+                <div style={{ fontSize: 11, color: '#fff', marginBottom: 2 }}>
                   Фаза: <b>{PHASE_LABELS[wk.phase] || wk.phase}</b> | Объём: ×{wk.volumeMultiplier} | Интенсивность: ×{wk.intensityMultiplier}
                   {wk.deload ? ' | 🟢 Разгрузка' : ''}
                 </div>
@@ -317,14 +317,14 @@ export const ProgramsTab: React.FC<{
                 <div style={{
                   display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3,
                   borderRadius: 10, overflow: 'hidden',
-                  border: '1px solid var(--glass-border)',
+                  border: '1px solid rgba(255,255,255,0.07)',
                 }}>
                   {DAY_NAMES.map((dn, i) => (
                     <div key={`hdr-${i}`} style={{
                       padding: '6px 2px', textAlign: 'center',
                       background: 'rgba(0,230,138,0.08)',
                       fontSize: 11, fontWeight: 700, color: 'var(--accent)',
-                      borderBottom: '1px solid var(--glass-border)',
+                      borderBottom: '1px solid rgba(255,255,255,0.07)',
                     }}>{dn}</div>
                   ))}
                   {DAY_NAMES.map((_, i) => {
@@ -347,17 +347,17 @@ export const ProgramsTab: React.FC<{
                         }}
                       >
                         {isRest ? (
-                          <span style={{ fontSize: 11, color: 'var(--text-dim)', opacity: 0.5 }}>Отдых</span>
+                          <span style={{ fontSize: 11, color: '#fff', opacity: 0.5 }}>Отдых</span>
                         ) : (
                           <>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-light)' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
                               {day.focus || day.name}
                             </span>
                             <span style={{ fontSize: 11, color: 'var(--accent)', marginTop: 1 }}>
                               {day.exercises.length} упр
                             </span>
                             {day.day && (
-                              <span style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1 }}>
+                              <span style={{ fontSize: 11, color: '#fff', marginTop: 1 }}>
                                 День {day.day}
                               </span>
                             )}
@@ -380,14 +380,14 @@ export const ProgramsTab: React.FC<{
                         </div>
                         <button onClick={() => setExpandedDay(null)} style={{
                           padding: '4px 10px', borderRadius: 4, fontSize: 12, cursor: 'pointer',
-                          background: 'transparent', border: '1px solid var(--border)',
-                          color: 'var(--text-dim)', minHeight: 38,
+                          background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                          color: '#fff', minHeight: 38,
                         }}>✕</button>
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>
                         {day.focus} · Разминка: {day.warmup} · Заминка: {day.cooldown}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 52px 52px 58px', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 11, color: 'var(--text-dim)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 70px 52px 52px 58px', gap: 6, padding: '2px 8px', borderRadius: 4, marginBottom: 2, fontSize: 11, color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <span>Упражнение</span>
                         <span style={{ textAlign: 'center' }}>Подходы</span>
                         <span style={{ textAlign: 'center' }}>RPE</span>
@@ -402,10 +402,10 @@ export const ProgramsTab: React.FC<{
                         }}>
                           <span style={{ minWidth: 0, overflowWrap: 'anywhere', whiteSpace: 'normal', fontWeight: 600 }}>{ex.name}</span>
                           <span style={{ color: 'var(--accent)', fontSize: 11, textAlign: 'center', whiteSpace: 'normal' }}>{ex.sets}×{ex.reps}</span>
-                          <span style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center' }}>RPE {ex.rpe}</span>
-                          <span style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center' }}>RIR {ex.rir}</span>
-                          <span style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center' }}>{ex.restSec}с</span>
-                          {ex.notes ? <span style={{ gridColumn: '1 / -1', minWidth: 0, color: 'var(--text-dim)', lineHeight: 1.35, overflowWrap: 'anywhere' }}>{ex.notes}</span> : null}
+                          <span style={{ color: '#fff', fontSize: 11, textAlign: 'center' }}>RPE {ex.rpe}</span>
+                          <span style={{ color: '#fff', fontSize: 11, textAlign: 'center' }}>RIR {ex.rir}</span>
+                          <span style={{ color: '#fff', fontSize: 11, textAlign: 'center' }}>{ex.restSec}с</span>
+                          {ex.notes ? <span style={{ gridColumn: '1 / -1', minWidth: 0, color: '#fff', lineHeight: 1.35, overflowWrap: 'anywhere' }}>{ex.notes}</span> : null}
                         </div>
                       ))}
                     </div>

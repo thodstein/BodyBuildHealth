@@ -40,8 +40,25 @@ interface Props {
 }
 
 export const LibraryZone: React.FC<Props> = (p) => {
+  const TITLE_MAP: Record<string, { icon:string; title:string; accent:string; desc:string }> = {
+    library: { icon:'📖', title:'Каталог циклов', accent:'#f59e0b', desc:'Готовые циклы ПЛ и ББ с фильтрами и раскладкой' },
+    programs: { icon:'📚', title:'Программы', accent:'#8b5cf6', desc:'Полные программы по неделям и дням' },
+    methods: { icon:'🧠', title:'Методики', accent:'#a855f7', desc:'Техники интенсификации и периодизации' },
+    exercises: { icon:'🏋️', title:'Упражнения', accent:'#00e68a', desc:'Каталог 500+ упражнений с биомеханикой' },
+  };
+  const cur = TITLE_MAP[p.tab] || TITLE_MAP.library;
   return (
     <>
+      <div style={{ background:`linear-gradient(135deg, ${cur.accent}18, rgba(0,230,138,0.06))`, border:`1px solid ${cur.accent}30`, borderRadius:14, padding:'12px 14px', marginBottom:8, display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:`${cur.accent}22`, border:`1px solid ${cur.accent}35`, fontSize:16 }}>{cur.icon}</span>
+          <div>
+            <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{cur.title}</div>
+            <div style={{ fontSize:10, color:'#fff', opacity:0.9 }}>{cur.desc}</div>
+          </div>
+        </div>
+        <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', whiteSpace:'nowrap' }}>{p.tab}</span>
+      </div>
       {p.tab === 'library' && (
         <InfoErrorBoundary label="Каталог циклов">
           <CycleCatalog
