@@ -40,7 +40,7 @@ import { orderSessionExercises, type SessionMethodology } from './bb-session-ord
 import { type BBTrainingFocus, FOCUS_RIR_TABLE } from './bb-goal-types';
 import { clampRir } from './bb-utils';
 import { isInappropriateBB, bbExerciseTier } from './bb-exercise-tier.engine';
-import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
+import { ANGLE_CLASSES, lengthenedBonus, ensureStrictGroupCoverage } from './bb-exercise-selection.engine';
 import { loadSRPESessions } from '../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load.engine';
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
@@ -1351,6 +1351,8 @@ export interface BuildSessionParams {
   loadStrategy?: LoadStrategy;
   autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number };
   specialization?: boolean;
+  /** Пропустить жёсткие группы замены (cross-meso continuity — веса прогрессируют по имени). */
+  skipStrictCoverage?: boolean;
   pedDoses?: Record<string, number>;
   courseIntensity?: CourseIntensity;
   onCourse?: boolean;
@@ -1416,6 +1418,7 @@ function buildSession(
   rotationMode?: 'forbid' | 'strict' | 'variety',
   intensityLevel?: 'light' | 'moderate' | 'high',
   legDayIndex: number = 0,
+  skipStrictCoverage?: boolean,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -2019,6 +2022,17 @@ function buildSession(
     // Это формирует пропорцию compound/isolation/cable/machine, заявленную в PHASE_CONFIGS.
     const phaseEquip = PHASE_EQUIPMENT_PREF[phase] || ['barbell', 'dumbbell', 'machine', 'cable'];
 
+    // Жёсткие группы замены (требование пользователя): каждая группа мышцы,
+    // доступная в пуле, обязана быть представлена в сессии primary-мышцы
+    // (ротация — внутри группы; замена без изменения числа упражнений).
+    // Специализация: покрытие только для целевых мышц недели (не-цели держат MEV).
+    const isSpecTarget = specialization
+      ? (isWeak(muscle, weakPoints) || (focusGroup ? collapseKey(focusGroup) === muscle : false))
+      : true;
+    if (isSpecTarget && !skipStrictCoverage) {
+      ensureStrictGroupCoverage(exDatas, pool, muscle, exerciseCount, sessionSelectedIds, sessionSelectedNames, { isPrimary: role === 'primary' });
+    }
+
     const expectedFatigue = exerciseCount * (sets / exerciseCount) * (((exDatas[0] as any)?.fatigueCost || 5));
     totalExpectedFatigue += expectedFatigue;
     plans.push({ muscle, resolved, role, sets, exerciseCount, rir, reps, weight, pool, exDatas, selType, rationaleMap, phaseEquip });
@@ -2410,6 +2424,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.weekLocalUsed, p.primaryBySlot, p.trainingFocus, p.eccentricMult,
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
+    p.skipStrictCoverage,
   );
 }
 
@@ -2857,7 +2872,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
        const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
         const legDaysInWeek = sessions.filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
         const legDayIndex = legDaysInWeek === 1 ? (w % 2) : sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: undefined, courseIntensity: undefined, onCourse: false, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: undefined, courseIntensity: undefined, onCourse: false, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {

@@ -277,16 +277,18 @@ export function strictGroupMembersOf(ex: { id?: string; name?: string }, muscle?
  * Pass покрытия жёстких групп для сессии мышцы (buildSession):
  * каждая группа, доступная в пуле, обязана быть представлена в exDatas.
  *
- * Политика (сохраняет объёмную модель неизменной):
+ * Политика (сохраняет объёмную модель и finalize-балансы неизменными):
  *  - ТОЛЬКО замена, без добавления слотов: количество упражнений мышцы и
  *    делитель pl.sets/exDatas.length не меняются (weeklySets инвариантны);
+ *  - кандидат выбирается В ПРЕДЕЛАХ ТОГО ЖЕ углового класса (ANGLE_CLASSES),
+ *    что и заменяемое упражнение — width/thickness и прочие балансы
+ *    финализатора не сдвигаются; если в том же классе кандидатов нет —
+ *    группа не форсируется (ротация недель принесёт её позже);
  *  - заменяемый элемент НЕ является единственным представителем другой
- *    обязательной группы (иначе создадим дыру); lead-compound на 0-й
- *    позиции — крайний случай;
- *  - выбор кандидата детерминирован (лучший _score из пула, без учёта
- *    freshness недели) — primary-упражнения стабильны между неделями;
- *  - применяется ТОЛЬКО для primary-мышц (accessory-дни не трогаются);
- *  - deload-недели пропускаются (восстановление).
+ *    обязательной группы (иначе создадим дыру); lead (позиция 0) НЕ трогается;
+ *  - выбор детерминирован (лучший _score из пула, без freshness недели) —
+ *    primary-упражнения стабильны между неделями (включая deload);
+ *  - применяется ТОЛЬКО для primary-мышц (accessory-дни не трогаются).
  */
 export function ensureStrictGroupCoverage(
   exDatas: any[],
@@ -304,10 +306,6 @@ export function ensureStrictGroupCoverage(
     if (exDatas.some(ex => strictGroupMatches(ex, g))) continue;
     const poolMembers = pool.filter(ex => strictGroupMatches(ex, g));
     if (poolMembers.length === 0) continue; // группа недоступна (нет в каталоге/оборудовании)
-    const fresh = poolMembers.filter(m => !exDatas.some(d => d.id === m.id));
-    const candidates = fresh.length > 0 ? fresh : poolMembers;
-    const best = candidates.slice().sort((a, b) => ((b._score ?? 0) - (a._score ?? 0)))[0];
-    if (!best) continue;
     // Ищем заменяемый элемент: последний, НЕ являющийся единственным
     // представителем другой обязательной группы (иначе создадим дыру).
     let idx = -1;
@@ -318,14 +316,24 @@ export function ensureStrictGroupCoverage(
         && !exDatas.some((x, xi) => xi !== i && strictGroupMatches(x, other)));
       if (!onlyRep) { idx = i; break; }
     }
-    if (idx < 0 && !strictGroupMatches(exDatas[0], g)) idx = 0;
-    if (idx >= 0) {
-      const replaced = exDatas[idx];
-      exDatas[idx] = best;
-      const iId = sessionSelectedIds.indexOf(replaced.id);
-      if (iId >= 0) sessionSelectedIds[iId] = best.id; else sessionSelectedIds.push(best.id);
-      const iNm = sessionSelectedNames.indexOf(replaced.name);
-      if (iNm >= 0) sessionSelectedNames[iNm] = best.name; else sessionSelectedNames.push(best.name);
-    }
+    // Lead-compound (позиция 0) НЕ трогаем никогда — стабильность дня.
+    if (idx < 0) continue;
+    const replaced = exDatas[idx];
+    // Кандидат — ТОЛЬКО члены группы в том же угловом классе, что и заменяемое
+    // упражнение: width/thickness и прочие паттерны финализатора не сдвигаются,
+    // indirect-перекрытия рук не меняются. Если в том же классе кандидатов нет —
+    // группа не форсируется (ротация недель принесёт её позже).
+    const classes = ANGLE_CLASSES[muscle] || [];
+    const sameClass = poolMembers.filter(m =>
+      classes.some(ac => ac.match(replaced) && ac.match(m))
+      && !exDatas.some(d => d.id === m.id));
+    if (sameClass.length === 0) continue;
+    const best = sameClass.slice().sort((a, b) => ((b._score ?? 0) - (a._score ?? 0)))[0];
+    if (!best) continue;
+    exDatas[idx] = best;
+    const iId = sessionSelectedIds.indexOf(replaced.id);
+    if (iId >= 0) sessionSelectedIds[iId] = best.id; else sessionSelectedIds.push(best.id);
+    const iNm = sessionSelectedNames.indexOf(replaced.name);
+    if (iNm >= 0) sessionSelectedNames[iNm] = best.name; else sessionSelectedNames.push(best.name);
   }
 }
