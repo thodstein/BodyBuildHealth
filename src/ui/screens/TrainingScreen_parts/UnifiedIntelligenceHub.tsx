@@ -28,8 +28,8 @@ import { MetricCard, ExpandableCard, PopupNumber, PopupSelect } from '../SRCBBSc
 
 const ACCENT = '#00e68a';
 const DIM = 'rgba(255,255,255,0.52)';
-const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' };
-const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10 };
+const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' };
+const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' };
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: ACCENT, margin: '0 0 6px', letterSpacing: 0.2 };
 const SMALL: React.CSSProperties = { fontSize: 10, color: DIM, lineHeight: 1.45 };
 const HINT: React.CSSProperties = { ...SMALL, color: 'rgba(255,255,255,0.55)' };
@@ -69,6 +69,7 @@ function useStickySection(active: SectionId, setActive: (s: SectionId) => void) 
   return refs;
 }
 
+const SNAP_KEY = 'he_unified_intel_snapshot_v1';
 export const UnifiedIntelligenceHub: React.FC = () => {
   // ——— единый снапшот ———
   const [readiness, setReadiness] = useState(72);
@@ -99,8 +100,27 @@ export const UnifiedIntelligenceHub: React.FC = () => {
   const refs = useStickySection(active, setActive);
   const scrollTo = (id: SectionId) => document.getElementById('sec-'+id)?.scrollIntoView({ behavior:'smooth', block:'start' });
 
-  // autofill once from profile/history
+  // autofill once: снапшот → профиль → дефолт (снапшот приоритетнее, чтобы не терять ручные правки)
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SNAP_KEY);
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (typeof s.readiness === 'number') setReadiness(s.readiness);
+        if (typeof s.fatigue === 'number') setFatigue(s.fatigue);
+        if (typeof s.sleepHours === 'number') setSleepHours(s.sleepHours);
+        if (typeof s.sleepQuality === 'number') setSleepQuality(s.sleepQuality);
+        if (typeof s.rmssd === 'number') setRmssd(s.rmssd);
+        if (typeof s.restingHR === 'number') setRestingHR(s.restingHR);
+        if (typeof s.stress === 'number') setStress(s.stress);
+        if (typeof s.doms === 'number') setDoms(s.doms);
+        if (typeof s.trainDays === 'number') setTrainDays(s.trainDays);
+        if (s.phase) setPhase(s.phase);
+        if (typeof s.lastRPE === 'number') setLastRPE(s.lastRPE);
+        if (typeof s.vLoss === 'number') setVLoss(s.vLoss);
+        return;
+      }
+    } catch {}
     try {
       const p: any = getProfile()?.settings || {};
       if (p.lifestyle?.sleepHours) setSleepHours(p.lifestyle.sleepHours);
@@ -112,6 +132,13 @@ export const UnifiedIntelligenceHub: React.FC = () => {
       if (p.training?.daysPerWeek) setTrainDays(p.training.daysPerWeek);
     } catch {}
   }, []);
+  // persist снапшот (debounce 400мс через эффект)
+  useEffect(() => {
+    try {
+      const snap = { readiness, fatigue, sleepHours, sleepQuality, rmssd, restingHR, stress, doms, trainDays, phase, lastRPE, vLoss };
+      localStorage.setItem(SNAP_KEY, JSON.stringify(snap));
+    } catch {}
+  }, [readiness, fatigue, sleepHours, sleepQuality, rmssd, restingHR, stress, doms, trainDays, phase, lastRPE, vLoss]);
 
   const reload = useCallback(()=> setSessions(loadSRPESessions()), []);
   const addSession = ()=> { saveSRPESession({ date: sDate, sRPE, durationMin: sDur }); reload(); };
@@ -274,8 +301,13 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               if(p.training?.daysPerWeek) setTrainDays(p.training.daysPerWeek);
             } catch {}
             const t=(window as any).showToast; if(typeof t==='function') t('📋 Подтянуто из профиля','success');
-          }} style={{ flex:1, minHeight:42, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(99,102,241,0.28)', background:'rgba(99,102,241,0.12)', color:'#818cf8', fontWeight:800, fontSize:12, cursor:'pointer' }}>📋 Авто из профиля</button>
-          <button onClick={reload} style={{ flex:1, minHeight:42, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.10)', color:ACCENT, fontWeight:800, fontSize:12, cursor:'pointer' }}>🔁 Обновить sRPE ({sessions.length})</button>
+          }} style={{ flex:1, minHeight:42, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(99,102,241,0.28)', background:'rgba(99,102,241,0.12)', color:'#818cf8', fontWeight:800, fontSize:12, cursor:'pointer', transition:'all 0.15s' }}>📋 Авто из профиля</button>
+          <button onClick={reload} style={{ flex:1, minHeight:42, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(0,230,138,0.10)', color:ACCENT, fontWeight:800, fontSize:12, cursor:'pointer', transition:'all 0.15s' }}>🔁 sRPE ({sessions.length})</button>
+          <button onClick={()=>{
+            try { localStorage.removeItem(SNAP_KEY); } catch {}
+            setReadiness(72); setFatigue(28); setSleepHours(7.5); setSleepQuality(4); setRmssd(55); setRestingHR(58); setStress(4); setDoms(2); setTrainDays(4); setPhase('accumulation'); setLastRPE(7); setVLoss(12);
+            const t=(window as any).showToast; if(typeof t==='function') t('↩ Сброшено к дефолту','info');
+          }} style={{ minWidth:84, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:DIM, fontWeight:700, fontSize:12, cursor:'pointer', transition:'all 0.15s' }}>↩ Сброс</button>
         </div>
         <div style={{ ...SMALL, marginTop:8, padding:'7px 10px', borderRadius:9, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
           HRV-ratio {hrvRatio.toFixed(2)} · PRI {pri} ({priThr.label}) · trainToday: <b style={{ color: trainToday.train ? '#22c55e' : '#ef4444'}}>{trainToday.train ? 'да' : 'нет'}</b> — {trainToday.reason}
