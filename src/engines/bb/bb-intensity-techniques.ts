@@ -1,7 +1,13 @@
 /**
- * bb-intensity-techniques.ts — интенс-техники гипертрофии (Этап BB11, REUSE+EXTEND set-scheme/advanced-methods).
- * Дропсеты, rest-pause, суперсеты, myo-reps, BFR/окклюзия, lengthened partials, механический дроп, пре/пост-истощение.
+ * bb-intensity-techniques.ts — интенс-техники гипертрофии (Этап BB11, UI-каталог).
+ * Дропсеты, rest-pause, суперсеты, myo-reps, BFR/окклюзия, lengthened partials и т.д.
  * Применяются к памп-дням и фазе интенсификации.
+ *
+ * ВАЖНО: канонический источник движка — `bb-autocoach.engine.ts` (INTENSITY_TECHNIQUES,
+ * DEFAULT_TECHNIQUE_BY_PHASE, applyIntensityTechniqueToExercise). Этот файл — UI-каталог
+ * расширенных техник (bfr, lengthened_partials, superset/triset, pre/post_exhaust и др.),
+ * не дублирующий движок. Для отображения bridge — `bb-technique-display.ts` (обе системы имён).
+ * @deprecated engine: используйте `bb-autocoach.engine.ts`; этот файл — только каталог UI.
  */
 export type Technique = 'dropset' | 'rest_pause' | 'superset' | 'triset' | 'myo_rep' | 'bfr' | 'lengthened_partials' | 'mechanical_drop' | 'pre_exhaust' | 'post_exhaust' | 'slow_eccentric' | 'rest_pause_cluster';
 
@@ -32,3 +38,19 @@ export const INTENSITY_TECHNIQUES: TechniqueSpec[] = [
 export function techniquesFor(character: 'тяж' | 'памп' | 'both', level: string): TechniqueSpec[] {
   return INTENSITY_TECHNIQUES.filter(t => (t.appliesTo === character || t.appliesTo === 'both') && t.level.includes(level));
 }
+
+// ── Bridge к каноническому движку (bb-autocoach.engine.ts) ──
+// Движок использует `drop_set`/`myo_reps`/`negative`, UI — `dropset`/`myo_rep`/`slow_eccentric`.
+// Бридж для отображения — `bb-technique-display.ts` (поддерживает обе системы имён).
+export const TECHNIQUE_ALIAS_TO_ENGINE: Record<string, string> = {
+  dropset: 'drop_set',
+  myo_rep: 'myo_reps',
+  slow_eccentric: 'negative',
+  pre_exhaust: 'pre_exhaust', // methodology (порядок), не intensity движка
+  post_exhaust: 'post_exhaust',
+};
+export const ENGINE_ALIAS_TO_UI: Record<string, string> = {
+  drop_set: 'dropset',
+  myo_reps: 'myo_rep',
+  negative: 'slow_eccentric',
+};

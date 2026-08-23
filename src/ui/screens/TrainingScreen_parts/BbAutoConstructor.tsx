@@ -1393,6 +1393,11 @@ export const BbAutoConstructor: React.FC = () => {
             eccentricMult,
             mobilityRestrictions,
             labMrvMultiplier: labAdjust.mrvMultiplier,
+            labWarnings: labAdjust.warnings,
+            labIntensityNote: labAdjust.intensityNote,
+            planStartWeek: new Date().toISOString().slice(0, 10),
+            supersetMode,
+            volumeScheme: effectiveVolumeScheme,
             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
            });
           if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
@@ -1448,9 +1453,14 @@ export const BbAutoConstructor: React.FC = () => {
              eccentricMult,
              mobilityRestrictions,
              labMrvMultiplier: labAdjust.mrvMultiplier,
+             labWarnings: labAdjust.warnings,
+             labIntensityNote: labAdjust.intensityNote,
+             planStartWeek: new Date().toISOString().slice(0, 10),
+             supersetMode,
+             volumeScheme: effectiveVolumeScheme,
              previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
         });
-         const cycleWeeks = cycle.meta.sessionsPerWeek;
+          const cycleWeeks = cycle.meta.sessionsPerWeek;
          if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
          if (bbWeeks !== cycle.meta.weeks) {
            const clamped = Math.max(4, Math.min(24, Math.round(Number(cycle.meta.weeks) || 8)));
@@ -1515,16 +1525,9 @@ export const BbAutoConstructor: React.FC = () => {
       plan = applyMacrocycleToBBPlan(plan, bbAnnualMacrocycle);
     }
 
-    // Проф-методики (Библиотека → Методики):
-    // - DUP (волновая периодизация) — поверх построенного плана, любые ветки;
-    // - суперсеты-антагонисты и схемы объёма — для cycle/program веток
-    //   (в generic-пути они применяются в finalize через BBBuilderInput).
+    // Проф-методики: DUP поверх плана (все ветки). Суперсеты и схемы объёма для всех веток теперь обрабатываются внутри движка (finalize) через BBBuilderInput/CycleToPlanInput — единый путь.
     if (dupMode !== 'none') {
       plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2 });
-    }
-    if (planMode === 'bb_cycle') {
-      if (supersetMode === 'antagonist') markAntagonistSupersets(plan);
-      if (effectiveVolumeScheme !== 'standard') applyVolumeScheme(plan, effectiveVolumeScheme);
     }
     // Объёмный режим в generic-ветке уже прокинут через buildBBPlan(effectiveVolGoal/effectiveVolumeScheme); капы те же от уровня
 

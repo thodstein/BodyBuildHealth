@@ -88,6 +88,19 @@ function trimDonorIsolations(
       }
     }
   }
+  // Cleanup dangling supersetWith: донор-упражнение удалено, но партнёр мог
+  // остаться с ссылкой на несуществующего партнёра (supersetWith → удалённое имя).
+  // Per-session: партнёр должен быть в той же сессии.
+  for (const session of week.sessions) {
+    const remainingNames = new Set(session.exercises.map(e => (e as any).exerciseName || (e as any).name));
+    for (const ex of session.exercises as BBExercise[]) {
+      const partner = (ex as any).supersetWith;
+      if (partner && !remainingNames.has(partner)) {
+        delete (ex as any).supersetWith;
+        if (ex.comment) ex.comment = ex.comment.replace(/\s*\[Суперсет с:[^\]]*\]/, '').replace(/Суперсет с\s*“[^”]*”\s*·?/g, '').replace(/🔗 Суперсет с[^·]*·?/g, '').trim();
+      }
+    }
+  }
   return removed[0];
 }
 

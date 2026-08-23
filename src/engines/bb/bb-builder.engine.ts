@@ -1555,6 +1555,7 @@ function buildSession(
         const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
         if (exEq.length > 0 && !exEq.some(eq => equipmentList.includes(eq))) return false;
       }
+      if (excludeIds.includes(ex.id) || excludeIds.includes(ex.name)) return false;
       return true;
     });
     // Фильтр по контексту сессии (доп. страховка, в основном инертен после
@@ -1598,6 +1599,7 @@ function buildSession(
         const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
         if (!canPullUp) return false;
       }
+      if (excludeIds.includes(ex.id) || excludeIds.includes(ex.name)) return false;
       return true;
     });
 

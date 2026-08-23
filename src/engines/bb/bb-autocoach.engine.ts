@@ -199,7 +199,9 @@ export function rirDrift(baseRir: [number, number], weekInPhase: number, phaseWe
   return Math.max(end, start - drift);
 }
 
-/* ──────────── Intensity techniques (P6) ──────────── */
+/* ──────────── Intensity techniques (P6) — КАНОНИЧЕСКИЙ РЕЕСТР ДВИЖКА ──────────── */
+// UI-каталог расширенных техник — `bb-intensity-techniques.ts` (bfr, lengthened_partials и т.д.)
+// Bridge отображения — `bb-technique-display.ts` (обе системы имён).
 /**
  * Реальные intensity techniques, применяемые к финальному подходу упражнения.
  * Каждая техника модифицирует reps/tempo/weight/notes упражнения.

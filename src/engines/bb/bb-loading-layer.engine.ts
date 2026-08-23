@@ -80,10 +80,11 @@ export function computeLoading(input: LoadingInput): LoadingOutput {
   const repMax = isAccessory ? baseMax + 5 : baseMax;
 
   // phaseRepShift: reps снижаются на 1 каждые 2 недели внутри фазы (B1)
+  // FIX: parity с buildSession — для non-deload используем shiftedMin (B4), а не midpoint
   const repShift = input.phase === 'deload' ? 0 : Math.floor(input.phaseWeek / 2);
   const shiftedMin = Math.max(3, repMin - repShift);
   const shiftedMax = Math.max(shiftedMin + 2, repMax - repShift);
-  const reps = Math.round((shiftedMin + shiftedMax) / 2);
+  const reps = input.phase === 'deload' ? shiftedMax : shiftedMin;
 
   // RIR: bbRir (учитывает phase + phaseWeek + характер + focus)
   const rir = bbRir(input.character, input.phase, input.phaseWeek, input.trainingFocus);

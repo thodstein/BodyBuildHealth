@@ -2033,12 +2033,21 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     w.contestPhase === 'taper' || w.contestPhase === 'peak_week'
     || (typeof w.prepProtocol === 'string' && !String(w.prepProtocol).startsWith('Пропущена')) || w.peakWeek === true;
   const planHasPrep = next.weeks.some(isPrepControlled);
+  // Generic taper: последние 3 недели перед deload/концом — объём ×0.75/0.50.
+  // Leg/back heavy allocation не должен раздувать taper (иначе ×0.5 от накрученных 12).
+  const isGenericTaperWeek = (w: any): boolean => {
+    const total = next.weeks.length;
+    if (total < 4) return false;
+    if (isPrepControlled(w)) return false;
+    if (w.phase === 'deload' || (w as any).deload) return false;
+    return w.week >= total - 2;
+  };
   // Final hard invariant for adaptive high-volume leg sessions. This is kept
   // after every other pass so fatigue/rotation cannot silently turn a major
   // leg group into one 3-4 set exercise.
   if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
     for (const week of next.weeks) {
-      if (isPrepControlled(week)) continue; // prep-недели не раздуваем
+      if (isPrepControlled(week) || isGenericTaperWeek(week)) continue; // prep/taper-недели не раздуваем
       for (const session of week.sessions) {
       if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) continue;
       const target = (options.trainingYears ?? 0) >= 6 ? 12 : 10;
@@ -2082,7 +2091,7 @@ export function finalizeBBPlan(plan: BBPlan, options: BBFinalizeOptions = {}): B
     // Последний back allocation после rotation/fatigue/taper: именно здесь
   // проверяем фактические финальные сеты, а не промежуточный план.
   for (const week of next.weeks) {
-    if (isPrepControlled(week)) continue; // prep-недели: объём и состав фиксированы
+    if (isPrepControlled(week) || isGenericTaperWeek(week)) continue; // prep/taper-недели: объём и состав фиксированы
     for (const session of week.sessions) {
     allocateExperiencedBackSession(session, week, options);
     ensureBackBalance(session, week, options);
@@ -2735,6 +2744,19 @@ for (const week of next.weeks) {
   // Лимит упражнений сессии пост-фактум (слабые группы могут дать перебор в buildSession).
   if (!options.preserveSource && (next as any).pattern?.id) {
     enforceSessionExerciseLimit(next, options);
+  }
+  // Cleanup dangling supersetWith после всех удалений (fit/cap/donor/superset)
+  // Per-session: партнёр должен быть в той же сессии, global check ложно считал
+  // существующим, если имя есть в другой неделе.
+  for (const w of next.weeks) for (const s of w.sessions) {
+    const remaining = new Set(s.exercises.map(e => (e as any).exerciseName || (e as any).name));
+    for (const e of s.exercises as any[]) {
+      if (e.supersetWith && !remaining.has(e.supersetWith)) {
+        delete e.supersetWith;
+        if (e.comment) e.comment = e.comment.replace(/\s*\[Суперсет с:[^\]]*\]/, '').replace(/Суперсет с\s*“[^”]*”\s*·?/g, '').trim();
+        if (e.comment) e.comment = e.comment.replace(/🔗 Суперсет с[^·]*·?/g, '').trim();
+      }
+    }
   }
 
   // weeklyVolume нужен ДО validateBBPlan: target_volume_deficit проверяет

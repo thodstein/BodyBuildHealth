@@ -417,6 +417,16 @@ export interface CycleToPlanInput {
   mobilityRestrictions?: string[];
   /** Lab-based MRV multiplier. */
   labMrvMultiplier?: number;
+  /** P0-5: текстовые предупреждения лаборатории (пробрасываются в rationale плана). */
+  labWarnings?: string[];
+  /** P0-5: рекомендация по интенсивности из лаборатории (пробрасывается в rationale). */
+  labIntensityNote?: string;
+  /** ISO-дата начала мезоцикла (неделя 1) — для per-week оценки травм (fix F). */
+  planStartWeek?: string;
+  /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
+  supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
+  /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
+  volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
   /** P1-7 (audit 2026-08): предыдущий мезоцикл — для cross-mesocycle continuity
    *  (auto-progress весов, ротация упражнений, объёмная прогрессия).
    *  Ранее не передавался в cycle/program пути — continuity работала только для generic split. */
@@ -844,8 +854,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const rirProg = meta.rirProgression;
   const phases = meta.phases && meta.phases.length > 0 ? meta.phases : undefined;
 
-  // Injury exclusions
-  const today = new Date().toISOString().slice(0, 10);
+  // Injury exclusions — используем planStartWeek для per-week оценки травм (fix F)
+  const today = (input as any).planStartWeek || new Date().toISOString().slice(0, 10);
   const excludedMuscles = getExcludedMuscles(injuries, today);
   const gradedInjuries = getGradedInjuries(injuries, today);
 
@@ -858,6 +868,9 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   const nutritionMult = computeBBNutritionMultiplier(input);
   const labMult = input.labMrvMultiplier ?? 1.0;
   const mrvMult = (pedAdapt.combinedMrvMultiplier || 1.0) * recoveryMult * nutritionMult * labMult;
+  // P0-5: лабораторная коррекция MRV — пробрасываем предупреждения в rationale (паритет с generic)
+  const _labWarnings: string[] = (input as any).labWarnings || [];
+  const _labIntensityNote: string | undefined = (input as any).labIntensityNote;
 
   // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (поверх шаблона).
   // Faithful: всегда 1.0 — не меняем объём программы.
@@ -905,6 +918,14 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   if (focusGroup) rationale.push(`⭐ Фокус-группа: ${focusGroup} (+30% объём)`);
   if (excludedExercises.length > 0) rationale.push(`🚫 Исключённые упражнения: ${excludedExercises.length} шт. — заменены на альтернативы`);
   if (favoriteExercises.length > 0) rationale.push(`⭐ Любимые упражнения: ${favoriteExercises.length} шт. — приоритет при замене`);
+  if (labMult < 1) {
+    rationale.push(`🧪 Лабораторная коррекция: MRV ×${labMult.toFixed(2)} (печень/почки/воспаление/гормоны) → эффективный MRV-множитель ×${mrvMult.toFixed(2)}.`);
+    if (_labWarnings.length > 0) rationale.push(..._labWarnings.map((w: string) => `⚠ ${w}`));
+    if (_labIntensityNote) rationale.push(`🧪 Интенсивность: ${_labIntensityNote}`);
+  } else if (_labWarnings.length > 0) {
+    rationale.push(..._labWarnings.map((w: string) => `⚠ ${w}`));
+    if (_labIntensityNote) rationale.push(`🧪 Интенсивность: ${_labIntensityNote}`);
+  }
   rationale.push(`🎯 Источник упражнений: ПРОФ-цикл с фиксированными упражнениями (не автоподбор)`);
   rationale.push(`🛡 BB-фильтр: ПЛ/олимпийские упражнения автозаменены на ББ-альтернативы (становая→тяга в наклоне, жим стоя→жим сидя)`);
 
@@ -1290,6 +1311,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     preserveSource: mode === 'faithful',
     trainingYears: input.trainingYears,
     bodyweightCapability: input.bodyweightCapability,
+    supersetMode: (input as any).supersetMode,
+    volumeScheme: (input as any).volumeScheme,
   });
   (finalized as any).trainingVolumeMode = (input as any).trainingVolumeMode || 'standard';
   (finalized as any).volumeGoal = input.volumeGoal;
@@ -1323,6 +1346,11 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     calorieSurplus: input.calorieSurplus,
     proteinPerKg: input.proteinPerKg,
     labMrvMultiplier: input.labMrvMultiplier,
+    labWarnings: (input as any).labWarnings,
+    labIntensityNote: (input as any).labIntensityNote,
+    planStartWeek: (input as any).planStartWeek,
+    supersetMode: (input as any).supersetMode,
+    volumeScheme: (input as any).volumeScheme,
     bodyFat: input.bodyFat,
     leanMass: input.leanMass,
     hrvMs: input.hrvMs,
@@ -1403,6 +1431,16 @@ export interface ProgramToBBPlanOpts {
   /** PRO: ограничения мобильности — фильтр упражнений по биомеханике. */
   mobilityRestrictions?: string[];
   labMrvMultiplier?: number;
+  /** P0-5: текстовые предупреждения лаборатории (пробрасываются в rationale плана). */
+  labWarnings?: string[];
+  /** P0-5: рекомендация по интенсивности из лаборатории (пробрасывается в rationale). */
+  labIntensityNote?: string;
+  /** ISO-дата начала мезоцикла (неделя 1) — для per-week оценки травм (fix F). */
+  planStartWeek?: string;
+  /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
+  supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
+  /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
+  volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
   /** P1-7 (audit 2026-08): предыдущий мезоцикл — для cross-mesocycle continuity. */
   previousPlan?: BBPlan;
 }
@@ -1592,8 +1630,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const specSchedule = buildSpecializationSchedule(
     focusGroup, weakPoints, opts.specialization, totalWeeks, opts.specializationSchedule,
   );
-  const excludedMuscles = getExcludedMuscles(opts.injuries || [], new Date().toISOString().slice(0, 10));
-  const gradedInjuries = getGradedInjuries(opts.injuries || [], new Date().toISOString().slice(0, 10));
+  const _todayProgram = (opts as any).planStartWeek || new Date().toISOString().slice(0, 10);
+  const excludedMuscles = getExcludedMuscles(opts.injuries || [], _todayProgram);
+  const gradedInjuries = getGradedInjuries(opts.injuries || [], _todayProgram);
   const exclIds = new Set(opts.excludedExercises || []);
   const favIds = new Set(opts.favoriteExercises || []);
   // favoriteExercises могут быть id или именами — строим множество имён для приоритета при замене.
@@ -1609,8 +1648,11 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
   const recoveryMult = computeBBRecoveryMultiplier(opts);
   const nutritionMult = computeBBNutritionMultiplier(opts);
-  const effectiveMrvMult = mrvMult * recoveryMult * nutritionMult * (opts.labMrvMultiplier ?? 1);
+  const _labMultProgram = opts.labMrvMultiplier ?? 1;
+  const effectiveMrvMult = mrvMult * recoveryMult * nutritionMult * _labMultProgram;
   const pedMrvMult = effectiveMrvMult;
+  const _labWarningsProgram: string[] = (opts as any).labWarnings || [];
+  const _labIntensityNoteProgram: string | undefined = (opts as any).labIntensityNote;
 
   const rationale: string[] = [];
   rationale.push(`📚 Программа: ${program.name} (${program.author})`);
@@ -1626,6 +1668,14 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   if (excludedMuscles.size > 0) rationale.push(`⚠ Исключены мышцы (травма): ${[...excludedMuscles].join(', ')}`);
   if (opts.peds && opts.peds.length > 0) rationale.push(`💉 PED: MRV ×${mrvMult.toFixed(2)}`);
   if (opts.avoidAxialLoad) rationale.push(`🦴 Без осевой нагрузки`);
+  if (_labMultProgram < 1) {
+    rationale.push(`🧪 Лабораторная коррекция: MRV ×${_labMultProgram.toFixed(2)} (печень/почки/воспаление/гормоны) → эффективный MRV-множитель ×${effectiveMrvMult.toFixed(2)}.`);
+    if (_labWarningsProgram.length > 0) rationale.push(..._labWarningsProgram.map((w: string) => `⚠ ${w}`));
+    if (_labIntensityNoteProgram) rationale.push(`🧪 Интенсивность: ${_labIntensityNoteProgram}`);
+  } else if (_labWarningsProgram.length > 0) {
+    rationale.push(..._labWarningsProgram.map((w: string) => `⚠ ${w}`));
+    if (_labIntensityNoteProgram) rationale.push(`🧪 Интенсивность: ${_labIntensityNoteProgram}`);
+  }
 
   // Build weeks — все недели из program.weeks[] напрямую (faithful)
   const weeks: BBWeek[] = [];
@@ -2150,6 +2200,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     preserveSource: mode === 'faithful',
     trainingYears: opts.trainingYears,
     bodyweightCapability: opts.bodyweightCapability,
+    supersetMode: (opts as any).supersetMode,
+    volumeScheme: (opts as any).volumeScheme,
   });
   (finalized as any).trainingVolumeMode = (opts as any).trainingVolumeMode || 'standard';
   (finalized as any).volumeGoal = opts.volumeGoal;
@@ -2183,6 +2235,11 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     calorieSurplus: opts.calorieSurplus,
     proteinPerKg: opts.proteinPerKg,
     labMrvMultiplier: opts.labMrvMultiplier,
+    labWarnings: (opts as any).labWarnings,
+    labIntensityNote: (opts as any).labIntensityNote,
+    planStartWeek: (opts as any).planStartWeek,
+    supersetMode: (opts as any).supersetMode,
+    volumeScheme: (opts as any).volumeScheme,
     bodyFat: opts.bodyFat,
     leanMass: opts.leanMass,
     hrvMs: opts.hrvMs,

@@ -192,6 +192,13 @@ export function computeBBRecoveryMultiplier(input: {
   return Math.max(0.6, Math.min(1.5, value));
 }
 
+/** Единый cap сетов на упражнение — про-правило, единственный источник (Фаза 2.5). */
+export function perExerciseCap(level?: string, muscle?: string, trainingYears?: number): number {
+  const m = (muscle || '').toLowerCase();
+  if (level === 'enhanced' && Number.isFinite(trainingYears) && (trainingYears as number) >= 3 && ['back', 'chest', 'quads', 'hamstrings', 'legs'].includes(m)) return 8;
+  return 5;
+}
+
 /** Shared nutrition soft-cap used by every BB source (Helms 2022). */
 export function computeBBNutritionMultiplier(input: {
   calorieSurplus?: number;
