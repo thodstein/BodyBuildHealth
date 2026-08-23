@@ -627,6 +627,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [linkToTraining, setLinkToTraining] = useState(_trainBindInit.enabled);
   const [trainScheduleType, setTrainScheduleType] = useState<TrainScheduleType>(_trainBindInit.scheduleType);
   const [trainPattern, setTrainPattern] = useState<{ work: number; off: number }>({ ..._trainBindInit.pattern });
+  // FIX train-bind: trainingDays должен быть объявлен ДО calcTargets (TDZ fix — был после, давал TS2448)
+  const [trainingDays, setTrainingDays] = useState<boolean[]>([..._trainBindInit.weeklyDays]);
+  // FIX train-bind: персист графика тренировок (создаётся ПОСЛЕ объявления trainingDays)
+  useEffect(() => {
+    try {
+      safeWriteJSON('he_train_bind', buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern));
+    } catch {}
+  }, [linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern]);
+  // FIX train-bind: единая функция «тренировочный день?» для всех режимов графика.
+  const isTrainDay = (offset: number): boolean => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset);
+  const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const injectDrugTypes = ['инсулин', 'ГР', 'ИФР-1', 'MGF', 'IGF-1 DES', 'IGF-1 LR3', 'HMG', 'HCG', 'GHRP', 'CJC', 'BPC-157', 'TB-500', 'меланотан', 'семаглутид', 'тирзепатид', 'другое'];
 
   const calcTargets = useMemo(() => {
@@ -1013,16 +1024,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [workEndTime, setWorkEndTime] = useState('18:00');
   const [workDays, setWorkDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
   const [workScheduleType, setWorkScheduleType] = useState('standard');
-  const [trainingDays, setTrainingDays] = useState<boolean[]>([..._trainBindInit.weeklyDays]);
-  // FIX train-bind: персист графика тренировок (создаётся ПОСЛЕ объявления trainingDays)
-  useEffect(() => {
-    try {
-      safeWriteJSON('he_train_bind', buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern));
-    } catch {}
-  }, [linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern]);
-  // FIX train-bind: единая функция «тренировочный день?» для всех режимов графика.
-  const isTrainDay = (offset: number): boolean => isTrainingDayFor(buildTrainSchedule(linkToTraining, trainStart, trainEnd, trainingDays, trainScheduleType, trainPattern), offset);
-  const DAY_LABELS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
   const [generated, setGenerated] = useState(false);
   // ⏳ Признак неблокирующей генерации (3/7 дней с yield) — кнопки показывают «⏳».
   const [planBusy, setPlanBusy] = useState(false);
