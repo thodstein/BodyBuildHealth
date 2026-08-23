@@ -350,10 +350,10 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
                   <CalcSection icon="🧠" title="Тренерский score готовности к шоу" accent={c}>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6 }}>
                       <span style={{ fontSize: 26, fontWeight: 800, color: c }}>{verdict.score}/100</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{verdict.label}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{verdict.label}</span>
                     </div>
                     {verdict.notes.slice(0, 6).map((n, i) => (
-                      <div key={i} style={{ fontSize: 10, color: n.severity === 'danger' ? '#f87171' : n.severity === 'warn' ? '#fbbf24' : n.severity === 'info' ? '#93c5fd' : 'rgba(255,255,255,0.7)', padding: '2px 0', lineHeight: 1.4 }}>{n.icon} {n.text}</div>
+                      <div key={i} style={{ fontSize: 10, color: n.severity === 'danger' ? '#f87171' : n.severity === 'warn' ? '#fbbf24' : n.severity === 'info' ? '#93c5fd' : '#fff', padding: '2px 0', lineHeight: 1.4 }}>{n.icon} {n.text}</div>
                     ))}
                     {verdict.actions.length > 0 && (
                       <div style={{ marginTop: 4, fontSize: 10, color: '#4ade80', lineHeight: 1.4 }}>
@@ -369,7 +369,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
               {bbResult.taper.map(t => (
                 <div key={t.weekOffset} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11, alignItems: 'center' }}>
                   <span style={{ color: '#a855f7', fontWeight: 700 }}>Нед {t.weekOffset}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.8)' }}>{t.label}</span>
+                  <span style={{ color: '#fff' }}>{t.label}</span>
                   <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>объём {Math.round(t.volumePct * 100)}% · вес {Math.round(t.intensityPct * 100)}% · RIR {t.rirMin}–{t.rirMax}</span>
                 </div>
               ))}
@@ -426,7 +426,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
               {bbResult.showTimeline.map((t, i) => (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '52px 1fr', gap: 8, padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10 }}>
                   <span style={{ color: '#f59e0b', fontWeight: 700 }}>{t.time}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.8)' }}><b style={{ color: '#fff' }}>{t.action}</b> — {t.detail}</span>
+                  <span style={{ color: '#fff' }}><b style={{ color: '#fff' }}>{t.action}</b> — {t.detail}</span>
                 </div>
               ))}
             </CalcSection>
@@ -470,7 +470,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         {bbResult && (
           <button
             onClick={bbCopySummary}
-            style={{ width: '100%', padding: 11, borderRadius: 10, cursor: 'pointer', minHeight: 44, marginTop: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 11 }}
+            style={{ width: '100%', padding: 11, borderRadius: 10, cursor: 'pointer', minHeight: 44, marginTop: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontWeight: 700, fontSize: 11 }}
           >
             {bbCopyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
           </button>
@@ -512,7 +512,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
           }}>
             <span style={{ fontSize: 13, fontWeight: 800, color: '#fff', minWidth: 28 }}>Н{t.week}</span>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {t.label && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{t.label}{t.focus ? `: ${t.focus}` : ''}</span>}
+              {t.label && <span style={{ fontSize: 9, color: '#fff' }}>{t.label}{t.focus ? `: ${t.focus}` : ''}</span>}
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                 <span style={{ width: 48, fontSize: 9, color: 'var(--text-dim)' }}>Объём</span>
                 <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
@@ -550,7 +550,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
       <CalcSection icon="⏰" title="Таймлайн дня" accent="#ec4899" desc={`Взвешивание ${weighIn} · Старт ${startTime}`}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {timeline.map((line, i) => (
-            <div key={i} style={{ fontSize: 10, padding: '3px 8px', color: 'rgba(255,255,255,0.75)', borderLeft: i === 0 ? '2px solid #3b82f6' : i === 1 ? '2px solid #f59e0b' : '2px solid rgba(255,255,255,0.08)', marginLeft: 4 }}>
+            <div key={i} style={{ fontSize: 10, padding: '3px 8px', color: '#fff', borderLeft: i === 0 ? '2px solid #3b82f6' : i === 1 ? '2px solid #f59e0b' : '2px solid rgba(255,255,255,0.08)', marginLeft: 4 }}>
               {line}
             </div>
           ))}

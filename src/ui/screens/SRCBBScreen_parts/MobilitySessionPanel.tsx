@@ -43,7 +43,7 @@ function CheckboxList({ items, progress, onToggle }: {
             <input type="checkbox" checked={done} onChange={() => onToggle(it.id)} aria-label={`Шаг мобильности: ${it.title}`}
               style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer' }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: done ? '#fff' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
                 {it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>({it.durationMin} мин)</span>
               </div>
               {!done && <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}

@@ -15,8 +15,8 @@ import { getProfile } from '../../../core/profile-manager';
 const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '4px 0 2px' };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 12, lineHeight: 1.4 };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '4px 0 2px' };
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' };
 const zoneColor = (z: string) => z === 'dangerous' ? '#ef4444' : z === 'caution' ? '#f59e0b' : z === 'undertrained' ? '#60a5fa' : ACCENT;
@@ -147,7 +147,7 @@ export const ProMetricsPanel: React.FC = () => {
 
   return (
     <div>
-      <div style={{ ...H, fontSize: 16, margin: "0 0 8px" }}>🧮 Pro-метрики <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontWeight: 400 }}>проф-движки: e1RM · нагрузка · VBT · авторегуляция · относ. сила · прогрессии</span></div>
+      <div style={{ ...H, fontSize: 16, margin: "0 0 8px" }}>🧮 Pro-метрики <span style={{ fontSize: 10, color: "#fff", fontWeight: 400 }}>проф-движки: e1RM · нагрузка · VBT · авторегуляция · относ. сила · прогрессии</span></div>
 
       {/* Относительная сила */}
       <div style={CARD}>
@@ -162,13 +162,13 @@ export const ProMetricsPanel: React.FC = () => {
           <div><div style={LABEL}>Пол</div><select style={IN} value={sex} onChange={e => setSex(e.target.value as any)}><option value="male">М</option><option value="female">Ж</option></select></div>
           <div style={{ textAlign: 'center' }}>
             <div style={LABEL}>Тотал</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: ACCENT, lineHeight: '38px' }}>{total} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>кг</span></div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: ACCENT, lineHeight: '38px' }}>{total} <span style={{ fontSize: 10, color: '#fff', fontWeight: 400 }}>кг</span></div>
           </div>
         </div>
 
         {/* Per-lift relative strength bars */}
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>Относительная сила по движениям (× веса тела)</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Относительная сила по движениям (× веса тела)</div>
           {[
             { label: 'Присед', value: liftRel.squat, color: '#ef4444' },
             { label: 'Жим', value: liftRel.bench, color: '#3b82f6' },
@@ -176,10 +176,10 @@ export const ProMetricsPanel: React.FC = () => {
           ].map(l => {
             const pct = Math.min(100, (l.value / 4) * 100);
             const level = l.value >= 2.5 ? 'Элита' : l.value >= 2.0 ? 'Опытный' : l.value >= 1.5 ? 'Средний' : 'Новичок';
-            const lvlColor = l.value >= 2.5 ? ACCENT : l.value >= 2.0 ? '#60a5fa' : l.value >= 1.5 ? '#f59e0b' : 'rgba(255,255,255,0.4)';
+            const lvlColor = l.value >= 2.5 ? ACCENT : l.value >= 2.0 ? '#60a5fa' : l.value >= 1.5 ? '#f59e0b' : '#fff';
             return (
               <div key={l.label} style={{ marginBottom: 4 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', marginBottom: 1 }}>
                   <span>{l.label}</span>
                   <span>{l.value}× <span style={{ color: lvlColor }}>({level})</span></span>
                 </div>
@@ -190,19 +190,19 @@ export const ProMetricsPanel: React.FC = () => {
             );
           })}
         </div>
-        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.08)', fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.08)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
           <b style={{ color: '#fff' }}>Как читать график по движениям:</b> длина полосы — килограммы движения ÷ вес тела (×BW). Пороги для мужчин: присед 1.5/2.0/2.5, жим 1.0/1.3/1.6, тяга 2.0/2.5/3.0; для женщин — на ~30% ниже. Самая короткая полоса = отстающее движение (слабейшая группа). Переключатель пола выше меняет пороги и расчёт очков.
         </div>
 
         <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>Коэффициенты (тотал) — DOTS/Wilks/IPF GL + относительная</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Коэффициенты (тотал) — DOTS/Wilks/IPF GL + относительная</div>
           <div style={ROW}><span>Wilks</span><b style={{ color: '#fff' }}>{rs.wilks}</b></div>
           <div style={ROW}><span>DOTS</span><b style={{ color: ACCENT }}>{rs.dots} — {rs.classification.label}</b></div>
           <div style={ROW}><span>IPF GLI</span><b style={{ color: '#fff' }}>{rs.ipfGL}</b></div>
           <div style={ROW}><span>Allometric (×bw<sup>⅔</sup>)</span><b style={{ color: '#fff' }}>{rs.allometric}</b></div>
           <div style={ROW}><span>Относит. (тотал/вес)</span><b style={{ color: '#fff' }}>{rs.relative}×</b></div>
         </div>
-        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+        <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.1)', fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
           <b style={{ color: '#fff' }}>Что это:</b> {NORM_EXPLANATIONS.points}<br />
           <b style={{ color: '#fff' }}>Как читать:</b> DOTS/Wilks — полиномиальная компенсация веса (чем тяжелее, тем меньше очков за кг). IPF GL — 0-120 (100+ элита). Относительная — тотал/вес (простая, но игнорирует аллометрию). Все уже с учётом пола ({sex === 'female' ? 'женские коэффициенты' : 'мужские'}).
         </div>
@@ -243,12 +243,12 @@ export const ProMetricsPanel: React.FC = () => {
           <span>{discipline === 'total' ? 'Тотал' : disciplineOptions.find(d => d.value === discipline)?.label || discipline}</span>
           <b style={{ color: ACCENT }}>{liftValue} кг</b>
         </div>
-        <div style={ROW}><span>Достигнут разряд</span><b style={{ color: classif.achievedRank ? ACCENT : 'rgba(255,255,255,0.4)' }}>{classif.achievedLabel}</b></div>
+        <div style={ROW}><span>Достигнут разряд</span><b style={{ color: classif.achievedRank ? ACCENT : '#fff' }}>{classif.achievedLabel}</b></div>
         {classif.kgToNext > 0 && classif.nextRank && (
           <div style={{ marginTop: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>До {classif.nextLabel}: <b style={{ color: '#f59e0b' }}>+{classif.kgToNext} кг</b></span>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{liftValue} / {classif.allRanks.find(r => r.key === classif.nextRank)?.threshold || '?'} кг</span>
+              <span style={{ fontSize: 10, color: '#fff' }}>До {classif.nextLabel}: <b style={{ color: '#f59e0b' }}>+{classif.kgToNext} кг</b></span>
+              <span style={{ fontSize: 10, color: '#fff' }}>{liftValue} / {classif.allRanks.find(r => r.key === classif.nextRank)?.threshold || '?'} кг</span>
             </div>
             <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
               {(() => {
@@ -263,7 +263,7 @@ export const ProMetricsPanel: React.FC = () => {
         <div style={{ marginTop: 10 }}>
           <div style={{ display: 'grid', gridTemplateColumns: classif.allRanks.length <= 4 ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: 4 }}>
             {classif.allRanks.map(r => (
-              <div key={r.key} style={{ padding: '4px 6px', borderRadius: 6, textAlign: 'center', fontSize: 9, fontWeight: 700, background: r.achieved ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', border: r.achieved ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.05)', color: r.achieved ? ACCENT : 'rgba(255,255,255,0.5)' }}>
+              <div key={r.key} style={{ padding: '4px 6px', borderRadius: 6, textAlign: 'center', fontSize: 9, fontWeight: 700, background: r.achieved ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', border: r.achieved ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.05)', color: r.achieved ? ACCENT : '#fff' }}>
                 <div style={{ fontSize: 11 }}>{r.achieved ? '✓' : ''} {r.label}</div>
                 <div style={{ fontSize: 9, marginTop: 2 }}>{r.threshold} кг</div>
               </div>
@@ -274,7 +274,7 @@ export const ProMetricsPanel: React.FC = () => {
         {/* Per-lift mini cards (when total is selected and WRPF has individual norms) */}
         {discipline === 'total' && liftClassifs.length > 0 && (
           <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>По движениям ({federation === 'wrpf_untested' ? 'WRPF без ДК' : federation === 'wrpf_tested' ? 'WRPF с ДК' : 'ФПР/IPF'} · {sex === 'female' ? '♀ женщины' : '♂ мужчины'}):</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 6 }}>По движениям ({federation === 'wrpf_untested' ? 'WRPF без ДК' : federation === 'wrpf_tested' ? 'WRPF с ДК' : 'ФПР/IPF'} · {sex === 'female' ? '♀ женщины' : '♂ мужчины'}):</div>
             {liftClassifs.map(lc => (
               <div key={lc.key} style={{ marginBottom: 6, padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
@@ -283,7 +283,7 @@ export const ProMetricsPanel: React.FC = () => {
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {lc.classif.allRanks.map(r => (
-                    <span key={r.key} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, fontWeight: 700, background: r.achieved ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', color: r.achieved ? ACCENT : 'rgba(255,255,255,0.4)', border: r.achieved ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)' }}>
+                    <span key={r.key} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 8, fontWeight: 700, background: r.achieved ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', color: r.achieved ? ACCENT : '#fff', border: r.achieved ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.04)' }}>
                       {r.achieved ? '✓' : ''} {r.label} {r.threshold}
                     </span>
                   ))}
@@ -292,7 +292,7 @@ export const ProMetricsPanel: React.FC = () => {
             ))}
           </div>
         )}
-        <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+        <div style={{ marginTop: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
           <b style={{ color: '#fff' }}>Как читать нормативы:</b> {NORM_EXPLANATIONS.howRank} {CATEGORY_EXPLANATION} Полоса прогресса — доля пути от текущего разряда к следующему. Ручной выбор категории (в «Едином» калькуляторе вкладки «Анализ силы») позволяет посмотреть «что если» без смены веса.
         </div>
       </div>
@@ -306,7 +306,7 @@ export const ProMetricsPanel: React.FC = () => {
         <div style={ROW}><span>Острая / хроническая (AU)</span><b style={{ color: '#fff' }}>{Math.round(tlReport.acwr.acute)} / {Math.round(tlReport.acwr.chronic)}</b></div>
         <div style={ROW}><span>Monotony / Strain</span><b style={{ color: '#fff' }}>{tlReport.monotony.monotony} / {tlReport.monotony.strain}</b></div>
         {tlReport.banister.current && <div style={ROW}><span>Fitness − Fatigue (perf.)</span><b style={{ color: tlReport.banister.current.performance > 0 ? ACCENT : '#ef4444' }}>{tlReport.banister.current.fitness} − {tlReport.banister.current.fatigue} = {tlReport.banister.current.performance}</b></div>}
-        {tlReport.recommendations.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4, color: 'rgba(255,255,255,0.7)' }}>• {r}</div>)}
+        {tlReport.recommendations.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4, color: '#fff' }}>• {r}</div>)}
         <FFChart series={tlReport.banister.series} />
       </div>
 
@@ -329,7 +329,7 @@ export const ProMetricsPanel: React.FC = () => {
         <div style={ROW}><span>Объём множитель</span><b style={{ color: ar.volumeMultiplier >= 1 ? ACCENT : '#f59e0b' }}>×{ar.volumeMultiplier}</b></div>
         <div style={ROW}><span>RIR-сдвиг</span><b style={{ color: '#fff' }}>+{ar.rirShift}</b></div>
         <div style={ROW}><span>Deload-триггер</span><b style={{ color: ar.deload ? '#ef4444' : ACCENT }}>{ar.deload ? 'да' : 'нет'}</b></div>
-        {ar.decisions.map((d, i) => <div key={i} style={{ ...SMALL, marginTop: 3, color: 'rgba(255,255,255,0.65)' }}>• {d}</div>)}
+        {ar.decisions.map((d, i) => <div key={i} style={{ ...SMALL, marginTop: 3, color: '#fff' }}>• {d}</div>)}
       </div>
 
       {/* Прогрессии */}

@@ -11,9 +11,9 @@ const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px 
 const ACCENT = '#00e68a';
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const SEL: React.CSSProperties = { ...IN, minHeight: 40 };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '4px 0 2px' };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '4px 0 2px' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 12, lineHeight: 1.4 };
 
 const dirColor = (d: string) => d === 'increase' ? ACCENT : d === 'decrease' ? '#ef4444' : '#a1a1aa';
 const dirLabel = (d: string) => d === 'increase' ? '↑ увеличить' : d === 'decrease' ? '↓ уменьшить' : '→ держать';
@@ -124,7 +124,7 @@ export const AutoregPanel: React.FC = () => {
         >💾 Сохранить в профиль</button>
       </div>
       {lastSavedAt && (
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 6, textAlign: 'center' }}>
           ✓ Сохранено: {new Date(lastSavedAt).toLocaleTimeString('ru')}
         </div>
       )}
@@ -155,7 +155,7 @@ const DecisionRow: React.FC<{ label: string; dir: string; extra: string; reasons
       <span style={{ color: dirColor(dir), fontSize: 12, fontWeight: 700 }}>{dirLabel(dir)}</span>
     </div>
     <div style={{ ...SMALL, marginTop: 2 }}>{extra}</div>
-    {reasons.length > 0 && <div style={{ ...SMALL, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>• {reasons.join(' • ')}</div>}
+    {reasons.length > 0 && <div style={{ ...SMALL, color: '#fff', marginTop: 2 }}>• {reasons.join(' • ')}</div>}
   </div>
 );
 

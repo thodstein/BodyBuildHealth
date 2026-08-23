@@ -1,6 +1,6 @@
 /** Builds coach-facing execution notes from the Exercise Lab databases. */
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
-import { getExerciseBio, type ExerciseBio } from '../../data/exercise-biomechanics-db';
+import { getExerciseBio, hasExerciseBioEntry, type ExerciseBio } from '../../data/exercise-biomechanics-db';
 import { getMappedBioId, getMappedIds } from '../../data/exercise-id-mapping';
 import { getTargetMuscleForExercise, TARGET_MUSCLE_DB, type TargetMuscleEntry } from '../../data/target-muscle-db';
 import { derivePattern } from '../movement-pattern';
@@ -56,20 +56,23 @@ const PATTERN_RU: Record<string, string> = {
   elbow_extension: 'разгибание локтя',
 };
 
-function findBio(input: ExerciseInstructionInput): { bio?: ExerciseBio; target?: TargetMuscleEntry; id?: string } {
+function findBio(input: ExerciseInstructionInput): { bio?: ExerciseBio; target?: TargetMuscleEntry; id?: string; hasLabBio: boolean } {
   const catalog = input.exerciseId
     ? EXERCISE_CATALOG.find(e => e.id === input.exerciseId)
     : EXERCISE_CATALOG.find(e => e.name.toLowerCase() === input.exerciseName.toLowerCase());
   const id = input.exerciseId || catalog?.id;
   const resolvedId = id ? (EXERCISE_ID_ALIASES[id] || id) : undefined;
   const mapped = resolvedId ? getMappedBioId(resolvedId) : undefined;
+  // getExerciseBio имеет generic-fallback — bio truthy даже без записи.
+  // hasLabBio фиксирует РЕАЛЬНОЕ покрытие (прямая запись или маппинг).
+  const hasLabBio = (mapped ? hasExerciseBioEntry(mapped) : false) || (resolvedId ? hasExerciseBioEntry(resolvedId) : false);
   const bio = (mapped ? getExerciseBio(mapped) : undefined) || (resolvedId ? getExerciseBio(resolvedId) : undefined);
   const targetId = id && getTargetMuscleForExercise(id) ? id : resolvedId;
   let target = targetId ? getTargetMuscleForExercise(targetId) : undefined;
   if (!target && targetId) {
     target = Object.values(TARGET_MUSCLE_DB).find(entry => entry.exerciseMask.includes(targetId));
   }
-  return { bio, target, id: resolvedId };
+  return { bio, target, id: resolvedId, hasLabBio };
 }
 
 function catalogInstruction(input: ExerciseInstructionInput, id?: string) {
@@ -100,7 +103,7 @@ function orderLabel(input: ExerciseInstructionInput): string {
 
 /** Returns detailed instructions suitable for BBPlan.comment and exports. */
 export function buildExerciseInstructions(input: ExerciseInstructionInput): ExerciseInstructionProfile {
-  const { bio, target, id } = findBio(input);
+  const { bio, target, id, hasLabBio } = findBio(input);
   const catalog = catalogInstruction(input, id);
   const derived = derivePattern({ name: input.exerciseName, group: input.muscle, type: 'compound', targetMuscle: input.muscle } as any);
   const pattern = PATTERN_RU[bio?.pattern || ''] || PATTERN_RU[catalog?.pattern || ''] || PATTERN_RU[derived || ''] || bio?.pattern || catalog?.pattern || derived || input.muscle || 'силовой паттерн';
@@ -124,7 +127,10 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
     : lvl === 'beginner' || lvl === 'новичок'
       ? 'Сначала освойте технику (темп 3-1-2-1), затем добавляйте повторы до верхней границы, потом повышайте вес минимальным шагом.'
       : 'Сначала добавляйте повторы до верхней границы, затем повышайте вес минимальным шагом.';
-  const source = bio || target ? 'exercise-lab' : id || EXERCISE_CATALOG.some(e => e.name === input.exerciseName) ? 'catalog' : 'generic';
+  // Честный источник: exercise-lab ТОЛЬКО при реальной записи (bio БЕЗ generic-fallback)
+  // или target-muscle покрытии. Иначе — каталог (есть техника) или generic.
+  const source = hasLabBio || target ? 'exercise-lab'
+    : id || EXERCISE_CATALOG.some(e => e.name === input.exerciseName) ? 'catalog' : 'generic';
   return {
     pattern,
     cues,
@@ -137,7 +143,7 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
     progression,
     mistakes: [...(target?.commonMistakes || []), ...(catalog?.mistakes || [])].slice(0, 4),
     intensityTechnique: input.intensityTechnique,
-    source: bio || target ? 'exercise-lab' : catalog ? 'catalog' : source,
+    source,
   };
 }
 

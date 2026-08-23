@@ -78,13 +78,13 @@ const PERIOD_ICON: Record<string, string> = {
 
 const btnMini: React.CSSProperties = {
   padding: '2px 8px', borderRadius: 6, cursor: 'pointer', fontWeight: 700, fontSize: 10,
-  border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)',
+  border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)', color: '#fff',
 };
 const segBtn = (active: boolean): React.CSSProperties => ({
   padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontWeight: 700, fontSize: 10,
   border: active ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)',
   background: active ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)',
-  color: active ? '#c4b5fd' : 'rgba(255,255,255,0.6)',
+  color: active ? '#c4b5fd' : '#fff',
 });
 const selStyle: React.CSSProperties = {
   width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
@@ -273,15 +273,15 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12 }}>{PERIOD_ICON[slot.period]}</span>
           <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{slot.label}</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>({slot.weeksMin}–{slot.weeksMax} нед)</span>
+          <span style={{ fontSize: 10, color: '#fff' }}>({slot.weeksMin}–{slot.weeksMax} нед)</span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 3 }}>
             <button onClick={() => moveSlot(idx, -1)} title="Переместить раньше" aria-label="Переместить слот раньше" style={{ ...btnMini }}>◀</button>
             <button onClick={() => moveSlot(idx, 1)} title="Переместить позже" aria-label="Переместить слот позже" style={{ ...btnMini }}>▶</button>
-            <button onClick={() => toggleSlot(idx)} title={slot.enabled ? 'Отключить период' : 'Включить период'} aria-label={slot.enabled ? 'Отключить период' : 'Включить период'} style={{ ...btnMini, border: slot.enabled ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.2)', color: slot.enabled ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>{slot.enabled ? '✓' : '○'}</button>
+            <button onClick={() => toggleSlot(idx)} title={slot.enabled ? 'Отключить период' : 'Включить период'} aria-label={slot.enabled ? 'Отключить период' : 'Включить период'} style={{ ...btnMini, border: slot.enabled ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.2)', color: slot.enabled ? '#00e68a' : '#fff' }}>{slot.enabled ? '✓' : '○'}</button>
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, alignItems: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Недель в периоде</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>Недель в периоде</div>
           <input
             type="number" min={slot.weeksMin} max={slot.weeksMax} value={slot.weeks} disabled={!slot.enabled}
             onChange={e => setSlotWeeks(idx, Number(e.target.value))}
@@ -304,10 +304,10 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
           </select>
         )}
         {slot.enabled && chosen && (
-          <div style={{ marginTop: 6, fontSize: 10, lineHeight: 1.5, color: 'rgba(255,255,255,0.75)' }}>
+          <div style={{ marginTop: 6, fontSize: 10, lineHeight: 1.5, color: '#fff' }}>
             {pickMode === 'auto' ? <b style={{ color: '#00e68a' }}>🏆 Рекомендован: </b> : <b style={{ color: '#60a5fa' }}>Выбран: </b>}
             {chosen.cycle.meta.title}
-            <span style={{ display: 'block', color: 'rgba(255,255,255,0.45)' }}>
+            <span style={{ display: 'block', color: '#fff' }}>
               {seasonPlan.segments[idx]?.fit.notes.join(' · ') ?? chosen.rationale.join(' · ')}
             </span>
           </div>
@@ -362,7 +362,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
                 )}
               </>
             )}
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
               {seg.cycleId
                 ? <>Цикл: <b>{seg.cycleTitle}</b> ({seg.cycleWeeks} нед) → {seg.fitMode === 'skip' ? 'только старт' : `${seg.fitWeeks} нед`}
                   {seg.fitMode === 'shrink' && <span style={{ color: '#fb923c', fontWeight: 700 }}> · ⬇ сжат {seg.cycleWeeks}→{seg.fitWeeks}</span>}
@@ -370,11 +370,11 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
                   {seg.fitMode === 'exact' && <span style={{ color: '#22c55e', fontWeight: 700 }}> · ✓ точно</span>}
                 </>
                 : 'Поддерживающий объём (последняя неделя цикла)'}
-              {seg.notes.slice(1).map((n, ni) => <span key={ni} style={{ display: 'block', color: 'rgba(255,255,255,0.4)' }}>{n}</span>)}
+              {seg.notes.slice(1).map((n, ni) => <span key={ni} style={{ display: 'block', color: '#fff' }}>{n}</span>)}
             </div>
           </div>
         ))}
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Итого: {compGap.totalPlanWeeks} нед плана, у каждого старта пик-блок (вход в пик + mock + тапер + старт{taper.postMeet ? ' + пост' : ''}).</div>
+        <div style={{ fontSize: 10, color: '#fff' }}>Итого: {compGap.totalPlanWeeks} нед плана, у каждого старта пик-блок (вход в пик + mock + тапер + старт{taper.postMeet ? ' + пост' : ''}).</div>
       </div>
     );
   };
@@ -391,7 +391,7 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
 
       {seasonMode === 'season' && (
         <>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 6 }}>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>
             Периоды-микроциклы: выносливость 6–20 · сила 6–12 · скорость/координация 6–10 · пик 8–10 нед.
             Включите нужные, задайте недели, порядок. Авто-подбор подберёт лучший цикл под каждый период.
           </div>
@@ -403,9 +403,9 @@ export const PLSeasonBuilder: React.FC<PLSeasonBuilderProps> = ({ selector, meet
             <button onClick={() => setPickMode('manual')} style={segBtn(pickMode === 'manual')}>👆 Выбрать вручную</button>
           </div>
           {pickMode === 'manual' && seasonPlan.segments.length === 0 && (
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Включите хотя бы один период, чтобы выбрать для него цикл.</div>
+            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Включите хотя бы один период, чтобы выбрать для него цикл.</div>
           )}
-          {slotSummary && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>📅 Сезон: {slotSummary}</div>}
+          {slotSummary && <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>📅 Сезон: {slotSummary}</div>}
           {renderCompGap()}
           <button
             onClick={() => { saveSeasonState(); buildSeason(); }}

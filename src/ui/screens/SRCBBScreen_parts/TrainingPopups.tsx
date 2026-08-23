@@ -35,7 +35,7 @@ export const cardBtnStyle = (active: boolean): React.CSSProperties => ({
   textAlign: 'left' as const, boxSizing: 'border-box' as const,
   background: active ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
   border: active ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)',
-  color: active ? ACCENT : 'rgba(255,255,255,0.7)',
+  color: active ? ACCENT : '#fff',
   minWidth: 0,
   maxWidth: '100%',
   overflow: 'hidden',
@@ -50,20 +50,20 @@ export const PopupNumber: React.FC<{
   const display = value ? `${value}${suffix}` : `—${suffix ? ' ' + suffix : ''}`;
   return <>
       <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
-      <div style={{ fontSize: 14, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
+      <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+      <div style={{ fontSize: 14, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>
         <div style={topBar} />
         <div style={sheetBody}>
           <div style={titleStyle}>{label}</div>
-          {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+          {hint && <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
           <input type="number" value={edit} min={min} max={max} step={step}
             onChange={e => setEdit(e.target.value)} autoFocus
             style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 16, boxSizing: 'border-box', textAlign: 'center', marginBottom: 12 }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
+            <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
             <button onClick={() => { const v = parseFloat(edit); if (!isNaN(v)) onChange(v); setOpen(false); }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>OK</button>
           </div>
         </div>
@@ -84,8 +84,8 @@ export const PopupSelect: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
-        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
+      <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
         <PortalOverlay onClose={() => setOpen(false)}>
@@ -93,7 +93,7 @@ export const PopupSelect: React.FC<{
             <div style={topBar} />
             <div style={sheetBody}>
               <div style={titleStyle}>{label}</div>
-              {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+              {hint && <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {options.map(o => (
                   <button 
@@ -104,18 +104,18 @@ export const PopupSelect: React.FC<{
                       fontSize: 11, fontWeight: value === o.id ? 700 : 400,
                       background: value === o.id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                       border: value === o.id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                      color: value === o.id ? ACCENT : 'rgba(255,255,255,0.85)'
+                      color: value === o.id ? ACCENT : '#fff'
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span>{o.label}</span>
                       {value === o.id && <span style={{ fontSize: 10 }}>✓</span>}
                     </div>
-                    {o.desc && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                    {o.desc && <div style={{ fontSize: 9, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
                   </button>
                 ))}
               </div>
-              <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+              <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
             </div>
           </div>
         </PortalOverlay>
@@ -144,10 +144,10 @@ export const PopupSelectSmart: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!!value)}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
           {label}{isSuggested && value && suggestedIds!.has(value) && <span style={{ color: '#f59e0b', marginLeft: 4 }}>★</span>}
         </div>
-        <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
+        <div style={{ fontSize: 12, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{sel ? sel.label : 'Выбрать…'}</div>
       </button>
       {open && (
         <PortalOverlay onClose={() => setOpen(false)}>
@@ -155,7 +155,7 @@ export const PopupSelectSmart: React.FC<{
             <div style={topBar} />
             <div style={sheetBody}>
               <div style={titleStyle}>{label}</div>
-              {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+              {hint && <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
               {isSuggested && suggestionReason && (
                 <div style={{ fontSize: 10, color: '#f59e0b', marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', lineHeight: 1.4 }}>
                   ★ Рекомендовано: {suggestionReason}
@@ -174,19 +174,19 @@ export const PopupSelectSmart: React.FC<{
                         fontSize: 11, fontWeight: isSelected ? 700 : isSug ? 600 : 400,
                         background: isSelected ? 'rgba(0,230,138,0.12)' : isSug ? 'rgba(245,158,11,0.06)' : 'rgba(255,255,255,0.03)',
                         border: isSelected ? '1px solid rgba(0,230,138,0.3)' : isSug ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSelected ? ACCENT : isSug ? '#f59e0b' : 'rgba(255,255,255,0.85)'
+                        color: isSelected ? ACCENT : isSug ? '#f59e0b' : '#fff'
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>{isSug && !isSelected ? '★ ' : ''}{o.label}</span>
                         {isSelected && <span style={{ fontSize: 10 }}>✓</span>}
                       </div>
-                    {o.desc && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
+                    {o.desc && <div style={{ fontSize: 10, color: '#fff', marginTop: 2, lineHeight: 1.4 }}>{o.desc}</div>}
                     </button>
                   );
                 })}
               </div>
-              <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
+              <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Закрыть</button>
             </div>
           </div>
         </PortalOverlay>
@@ -203,20 +203,20 @@ export const PopupText: React.FC<{
   const [edit, setEdit] = useState(value);
   return <>
     <button onClick={() => { setEdit(value); setOpen(true); }} style={cardBtnStyle(!!value)}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
-      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{value || 'Введите...'}</div>
+      <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+      <div style={{ fontSize: 12, color: value ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{value || 'Введите...'}</div>
     </button>
     {open && <PortalOverlay onClose={() => setOpen(false)}>
       <div onClick={e => e.stopPropagation()} style={sheet()}>
         <div style={topBar} />
         <div style={sheetBody}>
           <div style={titleStyle}>{label}</div>
-          {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+          {hint && <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
           <input type="text" value={edit} placeholder={placeholder}
             onChange={e => setEdit(e.target.value)} autoFocus
             style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 16, boxSizing: 'border-box', textAlign: 'center', marginBottom: 12 }} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
+            <button onClick={() => setOpen(false)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Отмена</button>
             <button onClick={() => { onChange(edit); setOpen(false); }} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 700, fontSize: 12 }}>OK</button>
           </div>
         </div>
@@ -235,8 +235,8 @@ export const ExpandableCard: React.FC<{
       <div style={{ fontSize: 13, fontWeight: 700, color: accent, minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{icon ? icon + ' ' : ''}{title}</div>
       {full && <span style={{ fontSize: 10, color: accent, flexShrink: 0 }}>{open ? '▲ свернуть' : '▼ подробнее'}</span>}
     </div>
-    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginTop: 6, overflow: 'hidden', wordBreak: 'break-word' }}>{short}</div>
-    {open && full && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', lineHeight: 1.55, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', wordBreak: 'break-word' }}>{full}</div>}
+    <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5, marginTop: 6, overflow: 'hidden', wordBreak: 'break-word' }}>{short}</div>
+    {open && full && <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.55, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden', wordBreak: 'break-word' }}>{full}</div>}
     {children}
   </div>;
 };
@@ -280,7 +280,7 @@ export const CalcSection: React.FC<{
       <span style={{ fontSize: 16 }}>{icon}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: accent }}>{title}</div>
-        {desc && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 1, lineHeight: 1.3 }}>{desc}</div>}
+        {desc && <div style={{ fontSize: 10, color: '#fff', marginTop: 1, lineHeight: 1.3 }}>{desc}</div>}
       </div>
     </div>
     <div style={{
@@ -302,7 +302,7 @@ export const PopupToggle: React.FC<{
     padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
     background: value ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
     border: value ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)',
-    color: value ? ACCENT : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, width: '100%', textAlign: 'left' as const,
+    color: value ? ACCENT : '#fff', fontSize: 11, fontWeight: 700, width: '100%', textAlign: 'left' as const,
   }}>
     {icon && <span style={{ fontSize: 14 }}>{icon}</span>}
     <span style={{ flex: 1 }}>{label}</span>
@@ -325,9 +325,9 @@ export const CalcResult: React.FC<{
     background: `${accent}0d`, border: `1px solid ${accent}22`,
     marginBottom: 10,
   }}>
-    <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
     <div style={{ fontSize: 22, fontWeight: 800, color: accent }}>{value}</div>
-    {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2, lineHeight: 1.3 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 10, color: '#fff', marginTop: 2, lineHeight: 1.3 }}>{hint}</div>}
   </div>
 );
 
@@ -366,7 +366,7 @@ export const PopupExerciseList: React.FC<{
     >
       <span style={{ fontSize: 18, flexShrink: 0 }}>⭐</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{label}</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.3px' }}>{label}</div>
         <div style={{ fontSize: 14, fontWeight: 700, color: isFilled ? accent : 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isFilled ? `${ids.length} выбрано` : 'Не выбрано'}</div>
       </div>
       <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: isFilled ? accent : 'rgba(255,255,255,0.15)' }} />
@@ -378,7 +378,7 @@ export const PopupExerciseList: React.FC<{
           <div style={sheetBody}>
             <div style={titleStyle}>{label}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, minHeight: 4 }}>
-              {ids.length === 0 && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Список пуст — добавьте упражнения ниже</div>}
+              {ids.length === 0 && <div style={{ fontSize: 10, color: '#fff' }}>Список пуст — добавьте упражнения ниже</div>}
               {ids.map(id => (
                 <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8, background: `${accent}1f`, border: `1px solid ${accent}4d`, fontSize: 11, color: accent, fontWeight: 600 }}>
                   {nameOf(id)}
@@ -396,9 +396,9 @@ export const PopupExerciseList: React.FC<{
                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>+ добавить</span>
                 </button>
               ))}
-              {results.length === 0 && q.trim() && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Ничего не найдено</div>}
+              {results.length === 0 && q.trim() && <div style={{ fontSize: 10, color: '#fff', textAlign: 'center' }}>Ничего не найдено</div>}
             </div>
-            <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Готово</button>
+            <button onClick={() => setOpen(false)} style={{ width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Готово</button>
           </div>
         </div>
       </div>
@@ -436,8 +436,8 @@ export const PopupMultiSelect: React.FC<{
   return (
     <>
       <button onClick={() => setOpen(true)} style={cardBtnStyle(!allSelected)}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
-        <div style={{ fontSize: 12, color: !allSelected ? ACCENT : 'rgba(255,255,255,0.4)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
+        <div style={{ fontSize: 11, color: '#fff', fontWeight: 600, marginBottom: 2, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{label}</div>
+        <div style={{ fontSize: 12, color: !allSelected ? ACCENT : '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>{display}</div>
       </button>
       {open && (
         <PortalOverlay onClose={() => setOpen(false)}>
@@ -445,10 +445,10 @@ export const PopupMultiSelect: React.FC<{
             <div style={topBar} />
             <div style={sheetBody}>
               <div style={titleStyle}>{label}</div>
-              {hint && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
+              {hint && <div style={{ fontSize: 10, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>{hint}</div>}
               <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                 <button onClick={() => setAll(true)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: '1px solid rgba(0,230,138,0.3)', background: allSelected ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)', color: ACCENT }}>✓ Все</button>
-                <button onClick={() => setAll(false)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.6)' }}>Сброс</button>
+                <button onClick={() => setAll(false)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>Сброс</button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {options.map(o => {
@@ -460,7 +460,7 @@ export const PopupMultiSelect: React.FC<{
                       style={{ display: 'block', width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
                         background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                         border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : 'rgba(255,255,255,0.85)' }}
+                        color: isSel ? ACCENT : '#fff' }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>{o.label}</span>

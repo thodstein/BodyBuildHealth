@@ -100,7 +100,8 @@ import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feed
 import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
-import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
+import { sessionTagLabel, muscleLabel, exerciseTargetNote, movementPatternLabel } from './bb-labels';
+import { EQUIP_RU } from './ExerciseLabShared';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
@@ -123,12 +124,6 @@ const WEAK_GROUPS = [
 ] as const;
 const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
 const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
-const TAG_LABELS_RU: Record<string, string> = {
-  Push: 'Толкающие', Pull: 'Тянущие', Legs: 'Ноги', Upper: 'Верх', Lower: 'Низ',
-  FullBody: 'Всё тело', Chest: 'Грудь', Back: 'Спина', Shoulders: 'Плечи', Arms: 'Руки',
-  ChestBack: 'Грудь+Спина', ShouldersArms: 'Плечи+Руки', Torso: 'Торс', Limbs: 'Конечности',
-  UpperPower: 'Верх(сила)', LowerPower: 'Низ(сила)', UpperHyp: 'Верх(гиперт)', LowerHyp: 'Низ(гиперт)',
-  };
 export const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
   accumulation: ['Темповые повторы (TUT)', 'Пауза в растянутой позиции', 'Суперсеты антагонистов'],
   intensification: ['Дроп-сеты (последний подход)', 'Рест-пауза (compounds)', 'Форсированные повторы (с партнёром)'],
@@ -289,7 +284,7 @@ function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: strin
   if (ex.character === 'тяж') parts.push('💪 Силовая нагрузка');
   else if (ex.character === 'памп') parts.push('🩸 Нагнетание крови');
   const catalogEx = EXERCISE_CATALOG.find(e => e.name === ex.name || e.name === ex.muscle);
-  if (catalogEx?.movementPattern) parts.push('🧬 ' + catalogEx.movementPattern);
+  if (catalogEx?.movementPattern) parts.push('🧬 ' + movementPatternLabel(catalogEx.movementPattern));
   if (catalogEx?.targetMuscle) {
     const targets = catalogEx.targetMuscle.split(',').map(t => t.trim()).filter(t => t !== ex.muscle);
     if (targets.length > 0) parts.push('🎯 Доп. нагрузка: ' + targets.join(', '));
@@ -2829,7 +2824,7 @@ export const BbAutoConstructor: React.FC = () => {
             {sel && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>{r.rationale.map((x,i) => <div key={i}>✓ {x}</div>)}</div>}
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
               {mf.map(f => (
-                <span key={f.tag} style={{ fontSize:11, padding:'1px 6px', borderRadius:4, background:f.freq >= 2 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', color:f.freq >= 2 ? '#00e68a' : '#fff' }}>{TAG_LABELS_RU[f.tag] || f.tag} ~ {f.freq}×/нед</span>
+                <span key={f.tag} style={{ fontSize:11, padding:'1px 6px', borderRadius:4, background:f.freq >= 2 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', color:f.freq >= 2 ? '#00e68a' : '#fff' }}>{sessionTagLabel(f.tag)} ~ {f.freq}×/нед</span>
               ))}
             </div>
             <button onClick={() => setSelectedSplitId(r.pattern.id)} style={{ marginTop:8, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', background:sel?'#00e68a':'rgba(255,255,255,0.06)', color:sel?'#000':'#fff', border:'1px solid '+(sel?'#00e68a':'rgba(255,255,255,0.1)'), width:'100%' }}>{sel ? '✓ Выбран' : 'Выбрать этот сплит'}</button>
@@ -5838,7 +5833,7 @@ export const BbAutoConstructor: React.FC = () => {
                   style={{ display:'block', width:'100%', padding:'8px 10px', borderRadius:10, cursor:isCurrent?'default':'pointer', textAlign:'left', fontSize:11, fontWeight:isCurrent?400:500, background:isCurrent?'rgba(255,255,255,0.02)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:isCurrent?'#fff':'#fff', opacity:isCurrent?0.5:1 }}>
                   <div style={{ display:'flex', justifyContent:'space-between' }}>
                     <span>{ex.name}</span>
-                    <span style={{ fontSize:11, color:'#fff' }}>{ex.type} · {ex.equipment}</span>
+                    <span style={{ fontSize:11, color:'#fff' }}>{ex.type === 'compound' ? 'База' : 'Изо'} · {EQUIP_RU[ex.equipment] || ex.equipment}</span>
                   </div>
                   {isCurrent && <div style={{ fontSize:11, color:'#00e68a', marginTop:2 }}>✓ текущее</div>}
                 </button>;

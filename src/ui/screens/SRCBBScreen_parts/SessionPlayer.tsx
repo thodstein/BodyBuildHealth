@@ -954,7 +954,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 {b.exercises.map((ex, j) => {
                   const isDone = warmupDone[`w_${i}_${j}`];
                   return (
-                    <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="checkbox" checked={isDone} onChange={() => toggleWarmup(i, j)} />
                       <span style={{ flex: 1 }}>
                         <span>
@@ -1162,7 +1162,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                       })()}
                        {logged && (
                          <div style={{ width: '100%', fontSize: 10, color: 'var(--text-dim)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                           <span style={{ color: 'rgba(255,255,255,0.8)' }}>🏋️ {formatPlates(a.weight)}</span>
+                           <span style={{ color: '#fff' }}>🏋️ {formatPlates(a.weight)}</span>
                            <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
                            <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
                            <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
@@ -1277,7 +1277,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                      {supersetExercises.map((exIdx, order) => (
                        <span key={exIdx} style={{ 
                          fontSize: 10, padding: '2px 8px', borderRadius: 4,
-                         background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.8)',
+                         background: 'rgba(255,255,255,0.08)', color: '#fff',
                        }}>
                          {order + 1}. {day?.exercises[exIdx]?.name || `Упр ${exIdx + 1}`}
                        </span>
@@ -1350,7 +1350,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                   const isDone = cooldownDone[`c_${i}_${j}`];
                   const isTimer = coolTimer && coolTimer.i === i && coolTimer.j === j;
                   return (
-                    <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : 'rgba(255,255,255,0.8)', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
                       <input type="checkbox" checked={isDone} onChange={() => toggleCooldown(i, j)} />
                       <span style={{ flex: 1 }}>
                         <span>
@@ -1406,7 +1406,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               <div style={{ fontSize: 11, fontWeight: 700, color: anyDeload ? '#ef4444' : ACCENT, marginBottom: 6 }}>{anyDeload ? '⚠ Прогрессия + сигнал делода' : '📈 Прогрессия к следующей сессии (double progression)'}</div>
               {anyDeload && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 6 }}>Высокий RPE на нескольких сетах — рассмотрите делод-неделю (−15-20% объём, удержание интенсивности) перед следующей прогрессией.</div>}
               {nextSuggestions.map((s, i) => (
-                <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (s.deload ? '#ef4444' : 'rgba(0,230,138,0.4)') }}>
+                <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (s.deload ? '#ef4444' : 'rgba(0,230,138,0.4)') }}>
                   <b style={{ color: '#fff' }}>{s.name}</b> → след. {s.nextWeight}кг×{s.nextReps}. <span style={{ color: 'var(--text-dim)' }}>{s.note}</span>
                 </div>
               ))}
@@ -1420,7 +1420,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-dim)' }}>bias {rirFeedback.overallBias > 0 ? '+' : ''}{rirFeedback.overallBias} RIR</span>
               </div>
               {rirFeedback.exerciseFeedbacks.map((f, i) => (
-                <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (Math.abs(f.bias) > 1 ? '#ef4444' : Math.abs(f.bias) > 0.3 ? '#eab308' : 'rgba(0,230,138,0.4)') }}>
+                <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (Math.abs(f.bias) > 1 ? '#ef4444' : Math.abs(f.bias) > 0.3 ? '#eab308' : 'rgba(0,230,138,0.4)') }}>
                   <b style={{ color: '#fff' }}>{f.name}</b>
                   <span style={{ color: 'var(--text-dim)' }}> bias {f.bias > 0 ? '+' : ''}{f.bias} · согласованность {f.consistency}% — {f.recommendation}</span>
                 </div>
@@ -1459,7 +1459,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                </div>
                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 120, overflowY: 'auto' }}>
                  {restHistory.map((r, i) => (
-                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.7)', padding: '2px 4px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', padding: '2px 4px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                      <span style={{ flex: 1 }}>{r.exercise}</span>
                      <span style={{ color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{Math.floor(r.duration / 60)}:{String(r.duration % 60).padStart(2, '0')}</span>
                      <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>{r.timestamp}</span>

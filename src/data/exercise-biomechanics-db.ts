@@ -893,6 +893,15 @@ export function getExerciseBio(id: string): ExerciseBio | undefined {
 }
 
 /**
+ * Проверка НАЛИЧИЯ РЕАЛЬНОЙ bio-записи (без generic-fallback).
+ * Используется для честного source в инструкциях: 'exercise-lab' ТОЛЬКО
+ * если упражнение действительно покрыто лабораторной записью.
+ */
+export function hasExerciseBioEntry(id: string): boolean {
+  return EXERCISE_BIOMECHANICS_DB.some(e => e.id === id);
+}
+
+/**
  * Filter exercises by pattern, risk, and equipment.
  */
 export function filterExercises(filters: {

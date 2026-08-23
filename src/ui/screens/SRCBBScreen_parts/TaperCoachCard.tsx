@@ -12,7 +12,7 @@ import {
 } from '../../../engines/lms/lms-taper-coach.engine';
 import { MEET_STRATEGY_PCT_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
 
-const BTN_GHOST: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', minHeight: 36 };
+const BTN_GHOST: React.CSSProperties = { padding: '8px 16px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', minHeight: 36 };
 
 export interface TaperCoachCardProps {
   /** Текущий план ПЛ (с тапером или без). */
@@ -74,15 +74,15 @@ export const TaperCoachCard: React.FC<TaperCoachCardProps> = ({ builtSrc, hasTap
             <div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 }}>
                 <span style={{ fontSize: 20, fontWeight: 800, color: scoreColor }}>{verdict.score}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{verdict.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{verdict.label}</span>
                 {projected && (() => {
                   const sq = projected['Присед'] ?? projected['Приседания со штангой'];
                   if (!sq) return null;
-                  return <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>· прогноз к старту: присед ≈ {sq} кг</span>;
+                  return <span style={{ fontSize: 10, color: '#fff' }}>· прогноз к старту: присед ≈ {sq} кг</span>;
                 })()}
               </div>
               {verdict.notes.slice(0, 6).map((n, i) => (
-                <div key={i} style={{ fontSize: 10, color: n.severity === 'danger' ? '#f87171' : n.severity === 'warn' ? '#fbbf24' : n.severity === 'info' ? '#93c5fd' : 'rgba(255,255,255,0.7)', padding: '2px 0', lineHeight: 1.4 }}>{n.icon} {n.text}</div>
+                <div key={i} style={{ fontSize: 10, color: n.severity === 'danger' ? '#f87171' : n.severity === 'warn' ? '#fbbf24' : n.severity === 'info' ? '#93c5fd' : '#fff', padding: '2px 0', lineHeight: 1.4 }}>{n.icon} {n.text}</div>
               ))}
               {feas.status !== 'realistic' && feas.lifts.length > 0 && (
                 <div style={{ fontSize: 10, color: feas.status === 'unrealistic' ? '#f87171' : '#fbbf24', marginTop: 3 }}>🎯 {feas.summary}</div>
@@ -104,7 +104,7 @@ export const TaperCoachCard: React.FC<TaperCoachCardProps> = ({ builtSrc, hasTap
                     copyText(lines.join('\n'), () => onNote('📋 Вердикт тренера скопирован в буфер'));
                   } catch (error) { onNote(`⚠ Не удалось скопировать: ${(error as Error).message}`); }
                 }}
-                style={{ ...BTN_GHOST, marginTop: 6, marginLeft: 6, border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.03)' }}
+                style={{ ...BTN_GHOST, marginTop: 6, marginLeft: 6, border: '1px solid rgba(255,255,255,0.15)', color: '#fff', background: 'rgba(255,255,255,0.03)' }}
                 title="Скопировать полную сводку вердикта тренера (score, заметки, достижимость ПМ, прогноз)"
               >📋 Копировать вердикт</button>
               <button
@@ -128,8 +128,8 @@ export const TaperCoachCard: React.FC<TaperCoachCardProps> = ({ builtSrc, hasTap
                     <>
                       {cmp.results.slice(0, 5).map((r) => (
                         <div key={r.scenario.id} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, padding: '2px 0' }}>
-                          <span style={{ minWidth: 26, fontWeight: 800, color: r.scenario.id === cmp.best.scenario.id ? '#00e68a' : 'rgba(255,255,255,0.5)' }}>{r.score}</span>
-                          <span style={{ flex: 1, color: 'rgba(255,255,255,0.8)' }}>{r.summary}</span>
+                          <span style={{ minWidth: 26, fontWeight: 800, color: r.scenario.id === cmp.best.scenario.id ? '#00e68a' : '#fff' }}>{r.score}</span>
+                          <span style={{ flex: 1, color: '#fff' }}>{r.summary}</span>
                           {r.scenario.id === cmp.best.scenario.id && <span style={{ fontSize: 9, color: '#00e68a', fontWeight: 700 }}>лучший</span>}
                         </div>
                       ))}
@@ -152,7 +152,7 @@ export const TaperCoachCard: React.FC<TaperCoachCardProps> = ({ builtSrc, hasTap
                 return (
                   <div style={{ marginTop: 6, padding: 6, borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.14)' }}>
                     <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', marginBottom: 2 }}>🩺 Оценка прикидов по дневнику</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>{evalRes.summary}</div>
+                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>{evalRes.summary}</div>
                     {evalRes.nextStrategy !== attemptStrategy && (
                       <button
                         onClick={() => { onStrategyChange(evalRes.nextStrategy); onNote(`🏁 Стратегия прикидов обновлена по факту дневника: ${MEET_STRATEGY_PCT_LABEL[evalRes.nextStrategy]} — нажмите «🔄 Обновить прикиды».`); }}

@@ -2666,3 +2666,42 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **vitest-рантайм отдаёт `EXERCISE_CATALOG` без 16 упражнений** (hip_thrust, ohp, db_press, ohp_seated, lateral_raise, upright_row, plank, hanging_leg, knee_raise, overhead_squat, bench_bands, leg_press_single, hip_thrust_single, kickback_cable, leg_ext_v2, reverse_curl_cable; 544 из 562). В production-бандле (`vite build`) ВСЕ 562 на месте; в node/esbuild-CLI тоже. Причина не найдена (кэши .vite/.vite-temp очищены, mtime обновлён, дублей/синтаксиса нет). **Решение**: `workmax-exercises` НЕ зависит от каталога (имена встроены, маппинг статичен), `catalogName` — только fallback для отображения имён.
 - Файлы других агентов не тронуты; `exercise-catalog.ts` не изменялся.
 
+---
+
+## ББ-авто: вынос слоёв buildSession + серый→белый + честный source инструкций (Aug 24 2026)
+
+Финал контрольного списка ББ-авто одним махом: рефактор 3.1 (selection-слои), глобальный серый-текст SRCBBScreen_parts, честные источники инструкций, проверка единого quality.score, локализация паттернов/оборудования.
+
+### 3.1 — вынос selection/volume/loading слоёв из buildSession
+- **`buildExercisePool(muscle, role, opts)`** — РЕАЛЬНАЯ реализация вместо заглушки (была `return []`): истинно-мышечный фильтр (trueMuscleOf + roleMuscles) + контекст сессии (push/pull/legs) + fallback-пул + BB-фильтр (overhead/pistol squat) + `_score` (BB-приоритет/наклон/гакк/Смит/односторонние/армейский) + generic-блэклист. **buildSession использует её** (паритет побайтовый).
+- **`selectExercisesForMuscle(pool, muscle, count, opts)`** — реальная обёртка над selectExercisesSmart (+ фиксация выбранных id/имён в сессионные списки). Была мёртвая простая версия, никем не используемая. **buildSession использует её**.
+- **`computeLoading` (bb-loading-layer.engine)** — parity-фикс: deload reps = midpoint диапазона (как buildSession inline), было shiftedMax.
+- Удалён мёртвый `pushDay`/`TAG_LABELS_RU` (не использовались).
+- **Тесты**: NEW `bb-selection-layer.test.ts` — **21 тест**: пул (истинная мышца/оборудование/exclude/армейский без allowStrengthLifts/rear-delt только Pull/подтягивания по bodyweightCapability/generic-блэклист/weak снимает фильтр/скор-порядок/fewerCompound/мобильность), выбор (count+мутации/дедуп сессии/favorite), computeMuscleSets (enhanced-минимумы к капу 5/advanced спина/делод/indirect overlap), computeLoading (deload midpoint/**parity с реальным buildBBPlan**: reps/rir/tempo/rest совпадают). Паритет подтверждён: полный прогон bb — **61 падение = ровно HEAD-база** (все пред-существующие, vitest-каталог), мои изменения 0 регрессий.
+
+### Серый → белый текст в SRCBBScreen_parts
+- **14 файлов**: AutoregPanel, BBContestPrepCard, MindsetSessionPanels, MobilitySessionPanel, PeakingPanel, PLCompetitionTab, PLPlanView, PLSeasonBuilder, ProMetricsPanel, RecoveryPanel, TaperCoachCard, TrainingPopups, ExerciseSafetyPanel, MacrocyclePanel + SessionPlayer + pl-export.ts — все текстовые `rgba(255,255,255,0.4–0.85)` → `#fff` (консистентно с TrainingScreen_parts, раунд 94f78a578).
+- Защищены РАМКИ: MacrocyclePanel:1690 (`border 0.55` в backtick-шаблоне) и 2929 (`border 0.6` в `? '...'`) не тронуты; var()-фоллбеки `--text-dim/--text-light` → `#fff`; canvas `strokeStyle 0.9` (TrainingMetricsChart) не трогался.
+- Проверено: SRCBBScreen_parts тесты **140/140** (15 файлов).
+
+### Инструкции — честный source (lab/catalog/generic)
+- **Баг**: `getExerciseBio` имеет generic-fallback → `source` был 'exercise-lab' для ВСЕХ 562 (UI врал «лаборатория»).
+- **Фикс**: NEW `hasExerciseBioEntry(id)` в exercise-biomechanics-db; `findBio` возвращает `hasLabBio`; `buildExerciseInstructions` даёт 'exercise-lab' ТОЛЬКО при реальной записи/маппинге/целевой мышце, иначе 'catalog' (техника каталога) / 'generic'.
+- **Покрытие**: NEW ~230 записей в `exercise-id-mapping.ts` (bio → реальные записи БД): глобально 143→**385/562**; **упражнения реальных ББ-планов 228/228 — 100% exercise-lab** (было 86/228).
+- **Тесты**: NEW `bb-instructions-source.test.ts` — 4 (все план-упражнения lab / экзотика kb_tgu → честно 'catalog' / неизвестное → 'generic' / классика → lab).
+
+### Качество — единый score (проверено, уже unified)
+- Шаг 5 использует единый `quality.score = clamp(validatePlanQuality.score + analyzeProQuality.scoreDelta)` (мемо FIX-6, BbAutoConstructor:1141), гейдж 3799 на нём; PRO-оверлей — только детализация, не дублирует счёт.
+
+### Английский → русский
+- NEW `MOVEMENT_PATTERN_RU` (23 ключа — все значения EXERCISE_CATALOG) + `movementPatternLabel()` в bb-labels.ts; `exerciseComment` показывал сырой `horizontal_push` → RU («🧬 Горизонтальный жим»).
+- Своп-модал ББ-плана: `{ex.type} · {ex.equipment}` (сырые 'compound · barbell') → «База/Изо · Штанга/…» через EQUIP_RU; PlanOutput карточка: оборудование → EQUIP_RU.
+- TAG_LABELS_RU (дублировал bb-labels, без Glutes/GlutesHams/LegsBiceps) удалён → `sessionTagLabel`.
+- Адаптация к закоммиченному чужому полу-ренейму Week→Неделя (не откат!): WeekStrip деструктуризация под `phaseForНеделя/activeНеделя`; PLCompetitionTab record-поля `meetНеделя` (тип CompetitionPlanRecord).
+- **Тесты**: bb-labels +3 (движения/покрытие 23/Glutes).
+
+### Проверено
+- tsc: **мои файлы 0 ошибок** (оставшиеся ошибки — чужой закоммиченный WIP: Week→Неделя в SRCBBScreen/TrainingScreen/Cardio*/CalcQualityTab — не трогал).
+- Затронутые тесты: bb-selection-layer 21/21, bb-instructions-source 4/4, инструкции 14/14, loading-layer D3 6/6, bb-labels 12/12, SRCBBScreen_parts 140/140, bb-auto-smoke 5/5, bb-auto-annual-ctx 5/5.
+- Полный bb-прогон: 1411 passed / 61 failed = ровно HEAD-база (пред-существующие, vitest-рантайм каталога).
+

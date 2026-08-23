@@ -69,7 +69,7 @@ export const BBContestPrepCard: React.FC<{
     try { return prepPhaseForDate(plan, isoToday()); } catch { return null; }
   }, [plan]);
 
-  const statusColor = cfg ? '#22c55e' : 'rgba(255,255,255,0.55)';
+  const statusColor = cfg ? '#22c55e' : '#fff';
 
   const daysLeft = useMemo(() => {
     if (!cfg) return null;
@@ -88,7 +88,7 @@ export const BBContestPrepCard: React.FC<{
       marginTop: 6, padding: 10, borderRadius: 10,
       background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(24,24,27,0.5))',
       border: '1px dashed rgba(245,158,11,0.4)',
-      fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5,
+      fontSize: 10, color: '#fff', lineHeight: 1.5,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
         <span style={{ fontSize: 12 }}>🏁</span>
@@ -110,7 +110,7 @@ export const BBContestPrepCard: React.FC<{
             Шоу <b style={{ color: '#fff' }}>{cfg.showDate}</b> · {CONTEST_CATEGORY_LABELS[cfg.category] ?? cfg.category} · {cfg.weightKg} кг
           </div>
           {plan && (
-            <div style={{ color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+            <div style={{ color: '#fff', marginTop: 2 }}>
               {plan.preparation.weeks} нед подготовки · taper {plan.taper.weeks} нед · пик-неделя 7 дн
               {phaseNow && (
                 <span style={{ fontWeight: 700, color: PREP_PHASE_COLORS[phaseNow.key], marginLeft: 6 }}>
@@ -120,7 +120,7 @@ export const BBContestPrepCard: React.FC<{
             </div>
           )}
           {!plan && (
-            <div style={{ color: 'rgba(255,255,255,0.55)' }}>
+            <div style={{ color: '#fff' }}>
               Тапер {cfg.weeksOut} нед ({cfg.trainingProtocol}) · карбс {cfg.carbLoadStrategy} · вода {cfg.waterStrategy} · Na {cfg.sodiumStrategy}
             </div>
           )}
@@ -145,7 +145,7 @@ export const BBContestPrepCard: React.FC<{
             </div>
           )}
           {summary && compact && (
-            <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+            <div style={{ color: '#fff', marginTop: 2 }}>
               Пик-неделя: {summary.peakWeek[0]?.phaseLabel} → {summary.peakWeek[6]?.phaseLabel} ({summary.peakWeek[6]?.kcal} ккал в день шоу)
             </div>
           )}
@@ -162,7 +162,7 @@ export const BBContestPrepCard: React.FC<{
             </div>
           )}
           {competition && cfg.showDate && (
-            <div style={{ color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+            <div style={{ color: '#fff', marginTop: 2 }}>
               Соревнование «{competition.name}» (нед {competition.week}) — пик-неделя завершается в день шоу.
             </div>
           )}

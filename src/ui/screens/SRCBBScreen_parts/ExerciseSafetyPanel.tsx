@@ -8,7 +8,7 @@ import { quickSafetyCheck } from '../../../engines/biomechanics-risk-engine';
 import { PopupSelect, PopupNumber, MetricCard } from './TrainingPopups';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.55)';
+const DIM = '#fff';
 
 const EXERCISE_OPTIONS: { id: string; label: string; desc: string }[] = [
   { id: 'back_squat', label: 'Присед со штангой', desc: 'squat · axial · высокая сложность' },
@@ -94,13 +94,13 @@ export const ExerciseSafetyPanel: React.FC = () => {
         </div>
         <PopupNumber label="Техника (0–1)" value={technique} min={0} max={1} step={0.05} hint="0.5 — новичок, 0.8 — уверенно, 1.0 — идеально" onChange={setTechnique} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600 }}>Травмы в анамнезе (через запятую)</div>
+          <div style={{ fontSize: 11, color: '#fff', fontWeight: 600 }}>Травмы в анамнезе (через запятую)</div>
           <input
             value={injuries}
             onChange={e => setInjuries(e.target.value)}
             placeholder="напр. колено, поясница, плечо"
             aria-label="Травмы"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', borderRadius: 10, padding: '10px 12px', fontSize: 12, minHeight: 38, boxSizing: 'border-box', width: '100%' }}
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', borderRadius: 10, padding: '10px 12px', fontSize: 12, minHeight: 38, boxSizing: 'border-box', width: '100%' }}
           />
         </div>
       </div>
@@ -119,8 +119,8 @@ export const ExerciseSafetyPanel: React.FC = () => {
       <MetricCard title="Синергия мышц" icon="🧠" accent="#a78bfa">
         <div style={{ fontSize: 11, lineHeight: 1.5 }}>
           <div>Основные: <b style={{ color: '#fff' }}>{synergy.primary.map(ruMuscle).join(', ') || '—'}</b></div>
-          <div>Вспомогательные: <span style={{ color: 'rgba(255,255,255,0.8)' }}>{synergy.secondary.map(ruMuscle).join(', ') || '—'}</span></div>
-          <div>Стабилизаторы: <span style={{ color: 'rgba(255,255,255,0.7)' }}>{synergy.stabilizers.map(ruMuscle).join(', ') || '—'}</span></div>
+          <div>Вспомогательные: <span style={{ color: '#fff' }}>{synergy.secondary.map(ruMuscle).join(', ') || '—'}</span></div>
+          <div>Стабилизаторы: <span style={{ color: '#fff' }}>{synergy.stabilizers.map(ruMuscle).join(', ') || '—'}</span></div>
           {synergy.antagonists.length > 0 && <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Антагонисты: {synergy.antagonists.map(ruMuscle).join(', ')}</div>}
         </div>
       </MetricCard>
@@ -147,7 +147,7 @@ export const ExerciseSafetyPanel: React.FC = () => {
         {safety.precautions.length > 0 && (
           <div style={{ marginTop: 8 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>Меры предосторожности:</div>
-            {safety.precautions.map(item => <div key={item} style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>• {item}</div>)}
+            {safety.precautions.map(item => <div key={item} style={{ fontSize: 11, color: '#fff', marginTop: 2 }}>• {item}</div>)}
           </div>
         )}
         {safety.requiresSpotter && <div style={{ marginTop: 6, fontSize: 10, color: '#f59e0b' }}>⚠ Требуется страховка</div>}

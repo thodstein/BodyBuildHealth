@@ -38,12 +38,12 @@ import type { RepTempoOutput } from '../../../engines/rep-tempo-engine';
 
 const ACCENT = '#00e68a';
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.4 };
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: '1px solid var(--accent-dim)' };
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '8px', minHeight: 38 };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '6px 0 3px' };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 const CAT_GROUPS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'];
 const GRP_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки', core: 'Кор' };
@@ -245,7 +245,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
                         {tiles.map((t, i) => (
                           <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
-                            <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
+                            <div style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
                             <div style={{ fontSize:12, fontWeight:800, color:'#38bdf8', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
                           </div>
                         ))}
@@ -253,7 +253,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       {notes.length > 0 && (
                         <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
                           {notes.map((n, i) => (
-                            <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.6)', padding:'5px 8px', borderRadius:7, background:'rgba(56,189,248,0.06)', border:'1px solid rgba(56,189,248,0.12)', lineHeight:1.4 }}>
+                            <div key={i} style={{ fontSize:10, color:'#fff', padding:'5px 8px', borderRadius:7, background:'rgba(56,189,248,0.06)', border:'1px solid rgba(56,189,248,0.12)', lineHeight:1.4 }}>
                               {n}
                             </div>
                           ))}
@@ -271,7 +271,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
                    <span style={{ width:8, height:8, borderRadius:'50%', background: calendarColor, flexShrink:0 }} />
                    <span style={{ fontSize:12, fontWeight:800, color: calendarColor }}>{calendarLabel}</span>
-                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginLeft:'auto' }}>Неделя {wk.week} из {totalW}</span>
+                  <span style={{ fontSize:10, color:'#fff', marginLeft:'auto' }}>Неделя {wk.week} из {totalW}</span>
                 </div>
                 {(() => {
                   const tiles: Array<{ l: string; v: string }> = isMeetWeek(wk)
@@ -286,7 +286,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                   return (
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
                       {tiles.map((t, i) => <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
-                        <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
+                        <div style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
                         <div style={{ fontSize:12, fontWeight:800, color: calendarColor, marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
                       </div>)}
                     </div>
@@ -294,7 +294,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 })()}
                  <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:4 }}>
                    {splitDescriptionPoints(calendarDescription).map((point, i) => (
-                     <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.65)', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
+                     <div key={i} style={{ fontSize:10, color:'#fff', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
                        <span style={{ color: calendarColor, fontWeight:800 }}>•</span> {point}
                      </div>
                    ))}
@@ -317,7 +317,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(96px, 1fr))', gap:6 }}>
                       {tiles.map((t, i) => (
                         <div key={i} style={{ padding:'6px 9px', borderRadius:9, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.08)', minWidth:0 }}>
-                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
+                          <div style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{t.l}</div>
                           <div style={{ fontSize:12, fontWeight:800, color:'var(--accent)', marginTop:2, overflowWrap:'break-word' }}>{t.v}</div>
                         </div>
                       ))}
@@ -356,7 +356,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0, combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir });
                 const modeColor = autoRegMode === 'auto' ? '#60a5fa' : autoRegMode === 'diary' ? '#22c55e' : '#71717a';
                 const segBtn = (m: AutoRegMode, label: string) => (
-                  <button onClick={() => setAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : 'rgba(255,255,255,0.6)' }}>{label}</button>
+                  <button onClick={() => setAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : '#fff' }}>{label}</button>
                 );
                 return (
                   <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: autoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : autoRegResult.deload ? 'rgba(239,68,68,0.08)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : autoRegResult.deload ? 'rgba(239,68,68,0.25)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.2)') }}>
@@ -374,14 +374,14 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                         {segBtn('diary', 'ДНЕВНИК')}
                       </div>
                     </div>
-                    {autoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                    {autoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
                       <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
-                      {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
+                      {autoRegResult.decisions.slice(0,3).map((d, i) => <div key={i} style={{ marginTop:2, color:'#fff' }}>• {d}</div>)}
                     </div>}
-                    {autoRegMode === 'diary' && diaryAutoreg && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                    {autoRegMode === 'diary' && diaryAutoreg && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
                       <div style={{ fontWeight:700, color: '#22c55e' }}>✓ {diaryAutoreg.summary.adjusted} скорректировано · {diaryAutoreg.summary.unchanged} в норме · {diaryAutoreg.summary.noData} без данных</div>
                       {diaryAutoreg.summary.noData > 0 && <div style={{ marginTop:2, color:'#f59e0b' }}>⚠ {diaryAutoreg.summary.noData} упражнений без данных дневника — плановые веса</div>}
-                      {[...diaryAutoreg.perExercise.entries()].filter(([,v]) => v.source === 'diary').slice(0,4).map(([name, adj], i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {name}: {adj.factWeight}кг→{adj.adjustedWeight}кг (RPE {adj.factRPE}) {adj.note}</div>)}
+                      {[...diaryAutoreg.perExercise.entries()].filter(([,v]) => v.source === 'diary').slice(0,4).map(([name, adj], i) => <div key={i} style={{ marginTop:2, color:'#fff' }}>• {name}: {adj.factWeight}кг→{adj.adjustedWeight}кг (RPE {adj.factRPE}) {adj.note}</div>)}
                       {diaryAutoreg.plateauWarnings.map((w, i) => <div key={'pw'+i} style={{ marginTop:2, color:'#ef4444' }}>🔴 {w}</div>)}
                     </div>}
                     {autoRegMode === 'diary' && !diaryAutoreg && <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>⚠ Постройте план и выберите неделю — дневниковая авторегуляция применится к весам.</div>}
@@ -392,16 +392,16 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               {(() => {
                 const pmColor = pmAutoRegMode === 'auto' ? '#a78bfa' : pmAutoRegMode === 'diary' ? '#22c55e' : '#71717a';
                 const pmSegBtn = (m: PMAutoRegMode, label: string) => (
-                  <button onClick={() => setPmAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: pmAutoRegMode === m ? pmColor : 'rgba(255,255,255,0.08)', color: pmAutoRegMode === m ? '#000' : 'rgba(255,255,255,0.6)' }}>{label}</button>
+                  <button onClick={() => setPmAutoRegMode(m)} style={{ padding:'5px 10px', borderRadius:6, fontSize:11, fontWeight:700, cursor:'pointer', border:'none', background: pmAutoRegMode === m ? pmColor : 'rgba(255,255,255,0.08)', color: pmAutoRegMode === m ? '#000' : '#fff' }}>{label}</button>
                 );
                 return (
                   <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background: pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : 'rgba(167,139,250,0.06)', border: '1px solid ' + (pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.25)') }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:4 }}>
                       <div>
-                        <span style={{ fontSize:11, fontWeight:700, color: pmAutoRegMode === 'off' ? 'rgba(255,255,255,0.4)' : pmColor }}>
+                        <span style={{ fontSize:11, fontWeight:700, color: pmAutoRegMode === 'off' ? '#fff' : pmColor }}>
                           {pmAutoRegMode === 'off' ? 'Прогрессия ПМ: по данным цикла' : pmAutoRegMode === 'auto' ? '⚡ ПМ по авторасчётам' : '📒 ПМ по дневнику'}
                         </span>
-                        <span style={{ marginLeft:6, fontSize:10, color:'rgba(255,255,255,0.4)' }}>только ПМ · без объёма</span>
+                        <span style={{ marginLeft:6, fontSize:10, color:'#fff' }}>только ПМ · без объёма</span>
                       </div>
                       <div style={{ display:'flex', gap:3, alignItems:'center' }}>
                         <span style={{ fontSize:10, fontWeight:700, color: pmColor, marginRight: 4 }}>Авторег. ПМ:</span>
@@ -410,12 +410,12 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                         {pmSegBtn('diary', 'ДНЕВНИК')}
                       </div>
                     </div>
-                    {pmAutoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                    {pmAutoRegMode === 'auto' && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
                       <div>Темп ПМ рассчитывается автоматически (PED/курс/уровень), коррекция цикла игнорируется.</div>
                     </div>}
-                    {pmAutoRegMode === 'diary' && pmDiary && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>
+                    {pmAutoRegMode === 'diary' && pmDiary && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>
                       <div style={{ fontWeight:700, color: '#22c55e' }}>✓ {pmDiary.adjusted} скорректировано · {pmDiary.noData} без данных</div>
-                      {pmDiary.decisions.slice(0,4).map((d, i) => <div key={i} style={{ marginTop:2, color:'rgba(255,255,255,0.55)' }}>• {d}</div>)}
+                      {pmDiary.decisions.slice(0,4).map((d, i) => <div key={i} style={{ marginTop:2, color:'#fff' }}>• {d}</div>)}
                     </div>}
                     {pmAutoRegMode === 'diary' && !pmDiary && <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>⚠ Постройте план — дневниковая авторегуляция ПМ применится к кривой ПМ.</div>}
                   </div>
@@ -430,19 +430,19 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       <button onClick={() => setPickerDay(null)} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', padding:'4px 8px' }}>✕</button>
                     </div>
                     <div style={{ flex:1, overflowY:'auto', padding:'8px 12px 80px' }}>
-                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:11, cursor:'pointer', border: pickerGroup===g?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'var(--accent)':'rgba(255,255,255,0.7)' }}>{GRP_RU[g]||g}</button>)}</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:8 }}>{CAT_GROUPS.map(g => <button key={g} onClick={() => { setPickerGroup(g); setPickerExName(''); }} style={{ padding:'5px 10px', borderRadius:16, fontSize:11, cursor:'pointer', border: pickerGroup===g?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', background: pickerGroup===g?'rgba(0,230,138,0.15)':'rgba(255,255,255,0.03)', color: pickerGroup===g?'var(--accent)':'#fff' }}>{GRP_RU[g]||g}</button>)}</div>
                       <select value={pickerExName} onChange={e => setPickerExName(e.target.value)} style={{ ...SEL, marginBottom:8 }}>
                         <option value=''>— выберите упражнение —</option>
                         {getExercisesByGroup(pickerGroup).map(ex => <option key={ex.id} value={ex.name}>{ex.name}</option>)}
                       </select>
                       <div style={{ display:'flex', flexWrap:'wrap', gap:6, alignItems:'center', marginBottom:8 }}>
-                        <span style={{ fontSize:11, color:'rgba(255,255,255,0.6)' }}>Подходы</span>
+                        <span style={{ fontSize:11, color:'#fff' }}>Подходы</span>
                         <input type='number' value={pickerScheme.sets} onChange={e => setPickerScheme(s => ({ ...s, sets: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:11 }} />
                         <span style={{ fontSize:11 }}>×</span>
                         <input type='number' value={pickerScheme.reps} onChange={e => setPickerScheme(s => ({ ...s, reps: +e.target.value }))} style={{ width:48, ...IN, padding:'4px', fontSize:11 }} />
                         <span style={{ fontSize:11 }}>×</span>
                         <input type='number' value={pickerScheme.weight} onChange={e => setPickerScheme(s => ({ ...s, weight: +e.target.value }))} style={{ width:56, ...IN, padding:'4px', fontSize:11 }} />
-                        <span style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>кг</span>
+                        <span style={{ fontSize:11, color:'#fff' }}>кг</span>
                       </div>
                       <button onClick={() => addExToDay(pickerDay)} disabled={!pickerExName} style={{ width:'100%', padding:'10px', borderRadius:8, border:'none', cursor:'pointer', fontWeight:700, fontSize:11, background: pickerExName ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : 'rgba(255,255,255,0.1)', color: pickerExName ? '#000' : 'rgba(255,255,255,0.3)' }}>Добавить в день</button>
                     </div>
@@ -450,7 +450,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 </div>
               )}
               <div style={{ marginTop:10 }}>
-                <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ fontSize:12, color:'#fff', marginBottom:6, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span style={{ fontWeight:700, color:'#fff' }}>Неделя {wk.week} из {totalW}</span>
                   <span style={{ fontSize:11, fontWeight:700, color:calendarColor, background:calendarBadgeTint, padding:'2px 10px', borderRadius:8 }}>{calendarLabel}</span>
                 </div>
@@ -461,19 +461,19 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               {/* Визуальный календарь мезоцикла: недели × дни с тоннажём и фазой */}
               <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>📅 Календарь мезоцикла (нед × дни, тоннаж)</div>
                   {/* Переключатель: оригинальный цикл / с учётом тапера */}
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <button onClick={() => setCalendarView('original')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'original' ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'original' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'original' ? '#60a5fa' : 'rgba(255,255,255,0.55)' }}>
+                    <button onClick={() => setCalendarView('original')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'original' ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'original' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'original' ? '#60a5fa' : '#fff' }}>
                       🔵 Оригинальный ({W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w)).length} нед)
                     </button>
-                    <button onClick={() => setCalendarView('tapered')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'tapered' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'tapered' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'tapered' ? '#f59e0b' : 'rgba(255,255,255,0.55)' }}>
+                    <button onClick={() => setCalendarView('tapered')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'tapered' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'tapered' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'tapered' ? '#f59e0b' : '#fff' }}>
                       📉 С тапером ({W.length} нед)
                     </button>
                   </div>
                 </div>
                 {(W.some(isTaperWeek) || W.some(isMockWeek) || W.some(isMeetWeek)) && (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6, fontSize: 9, color: '#fff' }}>
                     {W.some(isTaperWeek) && <span><span style={{ color: TAPER_COLOR }}>📉</span> тапер · разгрузка</span>}
                     {W.some(isMockWeek) && <span><span style={{ color: MOCK_COLOR }}>🎯</span> mock meet · прикиды-синглы</span>}
                     {W.some(isMeetWeek) && <span><span style={{ color: MEET_COLOR }}>🏁</span> соревнования · прикиды</span>}
@@ -483,19 +483,19 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                     {(calendarView === 'original' ? W.filter(w => !isTaperWeek(w) && !isMockWeek(w) && !isMeetWeek(w) && !isPostMeetWeek(w)) : W).map(w => { const ph = displayPhaseForWeek(w, totalW); const original = sourceCalendar?.[w.week - 1]; const taper = isTaperWeek(w); const mock = isMockWeek(w); const meet = isMeetWeek(w); const post = isPostMeetWeek(w); const color = original && sourceCalendar ? sourceWeekColor(original, sourceCalendar) : meet ? MEET_COLOR : mock ? MOCK_COLOR : post ? POST_COLOR : taper ? TAPER_COLOR : PH_COLOR[ph]; const colorFade = original ? `color-mix(in srgb, ${color} 55%, transparent)` : color + '88'; const active = w.week === wk.week; const calWeeks = calendarView === 'original' ? W.filter(ww => !isTaperWeek(ww) && !isMockWeek(ww) && !isMeetWeek(ww) && !isPostMeetWeek(ww)) : W; const maxT = Math.max(1, ...calWeeks.map(ww => ww.days.reduce((s, d) => s + d.metrics.tonnage, 0))); const wTotal = w.days.reduce((s, d) => s + d.metrics.tonnage, 0); return (
                     <div key={w.week} onClick={() => setSrcWeek(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', background: active ? (meet ? 'rgba(234,179,8,0.12)' : mock ? 'rgba(167,139,250,0.12)' : post ? 'rgba(52,211,153,0.1)' : taper ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)') : 'transparent', border: active ? (meet ? '1px solid rgba(234,179,8,0.45)' : mock ? '1px solid rgba(167,139,250,0.45)' : post ? '1px solid rgba(52,211,153,0.4)' : taper ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(0,230,138,0.3)') : '1px solid transparent' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (meet ? '#eab308' : mock ? '#a78bfa' : post ? '#34d399' : taper ? '#f59e0b' : 'var(--accent)') : 'rgba(255,255,255,0.7)', minWidth: 26 }}>{meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : 'Н' + w.week}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? (meet ? '#eab308' : mock ? '#a78bfa' : post ? '#34d399' : taper ? '#f59e0b' : 'var(--accent)') : '#fff', minWidth: 26 }}>{meet ? '🏁' : mock ? '🎯' : post ? '🔄' : taper ? '📉' : 'Н' + w.week}</span>
                        <span style={{ width: 4, height: 14, borderRadius: 2, background: color, flexShrink: 0 }} title={original ? `${SOURCE_PHASE_ORIGIN_LABEL[original.phaseOrigin]} · ${SOURCE_PHASE_LABEL[original.phase]}: ${Math.round(original.intensityPct * 100)}% · ${original.volumeSets} сетов` : meet ? '🏁 Соревнования: прикиды как подходы' : mock ? '🎯 Имитация соревнований: прикиды-синглы' : post ? '🔄 Пост-старт: объём ×0.5, RIR +3' : taper ? '📉 Тапер: объём снижен, RIR +1/+2, интенсивность сохранена' : PH_RU[ph]} />
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
                           {w.days.map((d, di) => { const t = d.metrics.tonnage; return <div key={di} title={'Д' + (di+1) + ': ' + t.toFixed(0) + ' кг·пов'} style={{ flex: 1, height: 14, borderRadius: 3, background: t > 0 ? `linear-gradient(180deg, ${color}, ${colorFade})` : 'rgba(255,255,255,0.04)', opacity: 0.4 + 0.6 * (t / maxT) }} />; })}
                       </div>
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', minWidth: 38, textAlign: 'right' }}>{wTotal.toFixed(0)}</span>
+                      <span style={{ fontSize: 10, color: '#fff', minWidth: 38, textAlign: 'right' }}>{wTotal.toFixed(0)}</span>
                     </div>
                   ); })}
                 </div>
               </div>
               <div style={{ marginTop:6, display:'flex', flexDirection:'column', gap:4 }}>
                 {splitDescriptionPoints(calendarDescription).map((point, i) => (
-                  <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.65)', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
+                  <div key={i} style={{ fontSize:10, color:'#fff', padding:'5px 8px', borderRadius:7, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', lineHeight:1.4, wordBreak:'break-word' }}>
                     <span style={{ color: calendarColor, fontWeight:800 }}>•</span> {point}
                   </div>
                 ))}
@@ -561,7 +561,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     <button
                       onClick={() => setAutoRegMode(m)}
                       title={m === 'auto' ? 'Формульная авторегуляция: вес × топ-сет множитель, объём, RIR' : m === 'diary' ? 'Корректировка весов из последней сессии дневника' : 'Плановые веса без корректировок'}
-                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.6)' }}>
+                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : '#fff' }}>
                       {label}
                     </button>
                   );
@@ -572,7 +572,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     {arBtn('diary', '📓 Авто-дневник')}
                     {arBtn('auto', '🤖 Авто')}
                     {arBtn('off', 'ВЫКЛ')}
-                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : 'rgba(255,255,255,0.4)' }}>
+                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}>
                       {autoRegMode === 'auto'
                         ? (arMult !== 1 ? `попытки ×${arMult.toFixed(2)}` : 'множитель 1.00')
                         : autoRegMode === 'diary'
@@ -605,7 +605,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                         style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, border: cyclePmApplied ? '1px solid rgba(96,165,250,0.35)' : '1px solid rgba(255,255,255,0.08)', color: cyclePmApplied ? '#60a5fa' : 'rgba(255,255,255,0.3)', background: cyclePmApplied ? 'rgba(96,165,250,0.08)' : 'transparent' }}
                         title="Установить ПМ0 из прогноза цикла (pmRow финальной недели, уже с учётом пройденного цикла) — пересоберите план"
                       >📊 Из цикла{cyclePmApplied ? ` (присед ${basePm.squat} · жим ${basePm.bench} · тяга ${basePm.deadlift})` : ''}</button>
-                    {!hasDiary && !cyclePmApplied && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>нет записей в дневнике — попытки от ПМ по циклу</span>}
+                    {!hasDiary && !cyclePmApplied && <span style={{ fontSize: 9, color: '#fff' }}>нет записей в дневнике — попытки от ПМ по циклу</span>}
                   </div>
                 </MetricCard>
                 );
@@ -623,7 +623,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     <button
                       onClick={() => setAutoRegMode(m)}
                       title={m === 'auto' ? 'Формульная авторегуляция: вес × топ-сет множитель, объём, RIR' : m === 'diary' ? 'Корректировка весов из последней сессии дневника' : 'Плановые веса без корректировок'}
-                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.6)' }}>
+                      style={{ padding: '4px 8px', borderRadius: 5, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: 'none', background: active ? (m === 'off' ? '#71717a' : '#60a5fa') : 'rgba(255,255,255,0.08)', color: active ? '#000' : '#fff' }}>
                       {label}
                     </button>
                   );
@@ -634,7 +634,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     {arBtn('diary', '📓 Авто-дневник')}
                     {arBtn('auto', '🤖 Авто')}
                     {arBtn('off', 'ВЫКЛ')}
-                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : 'rgba(255,255,255,0.4)' }}>
+                    <span style={{ fontSize: 9, color: autoRegMode === 'auto' && arMult !== 1 ? '#60a5fa' : '#fff' }}>
                       {autoRegMode === 'auto'
                         ? (arMult !== 1 ? `прикиды ×${arMult.toFixed(2)}` : 'множитель 1.00')
                         : autoRegMode === 'diary'
@@ -647,9 +647,9 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       <div key={l.name} style={{ padding: 6, borderRadius: 6, background: wk.meetWeek ? 'rgba(234,179,8,0.08)' : wk.mockMeet ? 'rgba(167,139,250,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.3)' : wk.mockMeet ? 'rgba(167,139,250,0.25)' : 'rgba(245,158,11,0.2)'}`, fontSize: 10 }}>
                         <b style={{ color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{l.name}</b>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 4 }}>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>1-я</div><b style={{ fontSize: 12 }}>{scale(l.opener)}</b></div>
-                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>2-я</div><b style={{ fontSize: 12 }}>{scale(l.second)}</b></div>
-                          <div style={{ textAlign: 'center', background: wk.meetWeek ? 'rgba(234,179,8,0.14)' : wk.mockMeet ? 'rgba(167,139,250,0.14)' : 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.4)' : wk.mockMeet ? 'rgba(167,139,250,0.35)' : 'rgba(245,158,11,0.3)'}` }}><div style={{ color: 'rgba(255,255,255,0.5)' }}>3-я</div><b style={{ fontSize: 12, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{scale(l.third)}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: '#fff' }}>1-я</div><b style={{ fontSize: 12 }}>{scale(l.opener)}</b></div>
+                          <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: '4px 2px' }}><div style={{ color: '#fff' }}>2-я</div><b style={{ fontSize: 12 }}>{scale(l.second)}</b></div>
+                          <div style={{ textAlign: 'center', background: wk.meetWeek ? 'rgba(234,179,8,0.14)' : wk.mockMeet ? 'rgba(167,139,250,0.14)' : 'rgba(245,158,11,0.12)', borderRadius: 6, padding: '4px 2px', border: `1px solid ${wk.meetWeek ? 'rgba(234,179,8,0.4)' : wk.mockMeet ? 'rgba(167,139,250,0.35)' : 'rgba(245,158,11,0.3)'}` }}><div style={{ color: '#fff' }}>3-я</div><b style={{ fontSize: 12, color: wk.meetWeek ? '#eab308' : wk.mockMeet ? '#a78bfa' : '#f59e0b' }}>{scale(l.third)}</b></div>
                         </div>
                       </div>
                     ))}
@@ -661,16 +661,16 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                     const openerScaled = scale(first.opener);
                     const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(openerScaled * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
                     return (
-                      <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                      <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                         🔥 Разминка под опенер {openerScaled} кг ({first.name}): {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)
                       </div>
                     );
                   })()}
                   {/* Последние тяжёлые движения (тайминг разгрузки) */}
-                  <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                  <div style={{ marginTop: 4, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                     ⏱ Последние тяжёлые: {([['Присед', LAST_HEAVY_DAYS.squat], ['Жим', LAST_HEAVY_DAYS.bench], ['Тяга', LAST_HEAVY_DAYS.deadlift]] as const).map(([n, d]) => `${n} — за ${d} дн.`).join(' · ')} до старта.
                   </div>
-                  <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.45 }}>
+                  <div style={{ marginTop: 6, fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
                     {wk.meetWeek
                       ? '🏁 День старта: прикиды — реальные попытки на соревнованиях (опенер RIR2 → вторая RIR1 → третья RIR0). Разгрузка выполнена тапер-неделями — план полностью готов.'
                       : wk.mockMeet
@@ -708,7 +708,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                             <React.Fragment key={e.name}>
                               <div style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{e.name}</div>
                               <div style={{ color: 'var(--accent)', fontWeight: 700, textAlign: 'right' }}>{e.e1}</div>
-                              <div style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'right' }}>{e.w}×{e.r}</div>
+                              <div style={{ color: '#fff', textAlign: 'right' }}>{e.w}×{e.r}</div>
                             </React.Fragment>
                           ))}
                         </div>
@@ -724,7 +724,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                               style={{ padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 600, cursor: 'pointer',
                                 border: selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
                                 background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
-                                color: selectedTrendEx === e.name ? 'var(--accent)' : 'rgba(255,255,255,0.6)' }}>
+                                color: selectedTrendEx === e.name ? 'var(--accent)' : '#fff' }}>
                               {e.name} ({e.e1}кг)
                             </button>
                           ))}
@@ -747,14 +747,14 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                               </svg>
                               <div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
                                 <span style={{ fontSize: 10, color: 'var(--accent)' }}>посл: {exTrendSeries[exTrendSeries.length - 1].e1}кг</span>
-                                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>макс: {maxV.toFixed(0)}кг</span>
-                                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>тренировок: {n}</span>
+                                <span style={{ fontSize: 10, color: '#fff' }}>макс: {maxV.toFixed(0)}кг</span>
+                                <span style={{ fontSize: 10, color: '#fff' }}>тренировок: {n}</span>
                               </div>
                             </div>
                           );
                         })()}
                         {selectedTrendEx && exTrendSeries.length < 2 && (
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нужно ≥2 тренировок для графика (найдено {exTrendSeries.length})</div>
+                          <div style={{ fontSize: 10, color: '#fff' }}>нужно ≥2 тренировок для графика (найдено {exTrendSeries.length})</div>
                         )}
                       </div>
                     )}
@@ -836,7 +836,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                               <div key={ei} style={{ background:'rgba(255,255,255,0.02)', borderRadius:8, padding:'6px 8px', marginBottom:4, border:'1px solid rgba(255,255,255,0.04)', overflow:'hidden', boxSizing:'border-box' }}>
                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, marginBottom:2 }}>
                                  <span style={{ fontSize:11, fontWeight:600, color:'#fff', flex:1, minWidth:0, overflowWrap:'break-word' }}>{e.name}</span>
-                                  <span style={{ fontSize:11, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.4)', fontWeight:600, padding:'1px 6px', borderRadius:4, flexShrink:0, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
+                                  <span style={{ fontSize:11, color:e.load === 'main' ? 'var(--accent)' : e.load === 'additional' ? '#f59e0b' : '#fff', fontWeight:600, padding:'1px 6px', borderRadius:4, flexShrink:0, background: e.load === 'main' ? 'var(--accent-dim)' : e.load === 'additional' ? 'rgba(245,158,11,0.1)' : 'transparent' }}>
                                    {e.load === 'main' ? 'ОСН' : e.load === 'additional' ? 'ДОП' : 'АКС'}
                                  </span>
                                </div>
@@ -845,13 +845,13 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                   const allSets: { ws: typeof e.workSets[number]; blockIdx: number; setIdx: number }[] = [];
                                   e.workSets.forEach((ws, bi) => { for (let r=0; r<ws.sets; r++) allSets.push({ ws, blockIdx: bi, setIdx: allSets.length }); });
                                   const INM: React.CSSProperties = { background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'5px 4px', fontSize:12, textAlign:'center', minWidth:0 };
-                                  const IN_LBL: React.CSSProperties = { fontSize:9, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const };
+                                  const IN_LBL: React.CSSProperties = { fontSize:9, color:'#fff', textTransform:'uppercase' as const, letterSpacing:0.5, textAlign:'center' as const };
                                   return allSets.map(({ ws, blockIdx, setIdx }) => {
                                     const k = setKey(wk.week, di, ei, setIdx);
                                     const es = effSet(wk.week, di, ei, setIdx, ws);
                                     return (
                                       <div key={setIdx} style={{ background:'rgba(255,255,255,0.025)', borderRadius:6, padding:'4px 6px' }}>
-                                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span></div>
+                                        <div style={{ fontSize:10, color:'#fff', marginBottom:2, fontWeight:600, display:'flex', justifyContent:'space-between' }}><span>Сет {setIdx+1}</span><span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span></div>
                                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
                                           <div><div style={IN_LBL}>Вес, кг</div><input type='number' value={es.weight} onChange={ev => setSrcEdits(prev => { const next = { ...prev, [k]: { ...(prev[k] ?? {}), weight: +ev.target.value } }; delete next[k].pct; return next; })} style={{ ...INM, width:'100%' }} /></div>
                                           <div><div style={IN_LBL}>Повторы</div><input type='number' value={es.reps} onChange={ev => setSrcEdits(prev => ({ ...prev, [k]: { ...prev[k], reps: +ev.target.value } }))} style={{ ...INM, width:'100%' }} /></div>
@@ -868,7 +868,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                              <div key={a.uid} style={{ display:'flex', flexDirection:'column', gap:4, padding:'5px 0', borderBottom:'1px solid var(--accent-dim)' }}>
                                <div style={{ display:'flex', alignItems:'center', gap:4, minWidth:0 }}>
                                  <div style={{ fontSize:11, color:'var(--accent)', fontWeight:600, flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{a.name}</div>
-                                 <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)', flexShrink:0 }}>＋ добавлено</span>
+                                 <span style={{ fontSize:10, color:'#fff', flexShrink:0 }}>＋ добавлено</span>
                                  <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'none', background:'transparent', cursor:'pointer', flexShrink:0 }}>✕</button>
                                </div>
                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:3 }}>
@@ -895,8 +895,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                         {d.exercises.map((e, ei) => {
                           const tmpo = getTempo(e.name, goal, e.load === 'main');
                           const isCompound = !e.name.toLowerCase().includes('сгибан') && !e.name.toLowerCase().includes('разгибан') && !e.name.toLowerCase().includes('подъём') && !e.name.toLowerCase().includes('махи');
-                          const roleColor = e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : 'rgba(255,255,255,0.55)';
-                          const charColor = e.load === 'main' ? '#60a5fa' : e.load === 'additional' ? '#a855f7' : 'rgba(255,255,255,0.5)';
+                          const roleColor = e.load === 'main' ? '#00e68a' : e.load === 'additional' ? '#f59e0b' : '#fff';
+                          const charColor = e.load === 'main' ? '#60a5fa' : e.load === 'additional' ? '#a855f7' : '#fff';
                           const charLabel = e.load === 'main' ? '💪 Тяж' : e.load === 'additional' ? '🩸 Памп' : '🌿 Лёг';
                           const roleLabel = e.load === 'main' ? '🎯 Основное' : e.load === 'additional' ? '📌 Добивка' : '⚙️ Аксессуар';
                            const rawFirstWs = e.workSets[0] ? effSet(wk.week, di, ei, 0, e.workSets[0]) : null;
@@ -930,11 +930,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                 <span style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:5, background:charColor+'20', color:charColor, border:'0.5px solid '+charColor+'30' }}>{charLabel}</span>
                               </div>
                               <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(80px, 1fr))', gap:5 }}>
-                                 {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{e.workSets.reduce((n,ws)=>n+ws.sets,0)}×{firstWs.reps}{adjustedMark}</b></span>}
-                                <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(245,158,11,0.1)', border:'0.5px solid rgba(245,158,11,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(245,158,11,0.8)' }}>RIR</span><b style={{color:'#fff'}}>{firstRir ?? e.rir}</b></span>
-                                 {firstWs && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(96,165,250,0.1)', border:'0.5px solid rgba(96,165,250,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(96,165,250,0.8)' }}>Вес</span><b style={{color:'#fff'}}>{firstWs.weight}кг{adjustedMark}</b></span>}
-                                 {tempo && <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(168,85,247,0.1)', border:'0.5px solid rgba(168,85,247,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(168,85,247,0.8)' }}>Темп</span><b style={{color:'#fff'}}>{tempo}</b></span>}
-                                <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(255,255,255,0.6)' }}>Группа</span><b style={{color:'#fff'}}>{e.group}</b></span>
+                                 {firstWs && <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(34,197,94,0.1)', border:'0.5px solid rgba(34,197,94,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(34,197,94,0.8)' }}>Сеты</span><b style={{color:'#fff'}}>{e.workSets.reduce((n,ws)=>n+ws.sets,0)}×{firstWs.reps}{adjustedMark}</b></span>}
+                                <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(245,158,11,0.1)', border:'0.5px solid rgba(245,158,11,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(245,158,11,0.8)' }}>RIR</span><b style={{color:'#fff'}}>{firstRir ?? e.rir}</b></span>
+                                 {firstWs && <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(96,165,250,0.1)', border:'0.5px solid rgba(96,165,250,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(96,165,250,0.8)' }}>Вес</span><b style={{color:'#fff'}}>{firstWs.weight}кг{adjustedMark}</b></span>}
+                                 {tempo && <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(168,85,247,0.1)', border:'0.5px solid rgba(168,85,247,0.2)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'rgba(168,85,247,0.8)' }}>Темп</span><b style={{color:'#fff'}}>{tempo}</b></span>}
+                                <span style={{ fontSize:10, color:'#fff', padding:'3px 6px', borderRadius:6, background:'rgba(255,255,255,0.05)', border:'0.5px solid rgba(255,255,255,0.1)', display:'flex', justifyContent:'space-between' }}><span style={{ color:'#fff' }}>Группа</span><b style={{color:'#fff'}}>{e.group}</b></span>
                               </div>
                               <div style={{ marginTop:5, display:'flex', flexDirection:'column', gap:3 }}>
                                 {(() => {
@@ -947,11 +947,11 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                                   return allSets.map(({ ws, si, blockIdx }) => {
                                     const es = adjustDisplaySet(ws, blockIdx);
                                     return (
-                                      <div key={si} style={{ fontSize:11, color:'rgba(255,255,255,0.8)', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                      <div key={si} style={{ fontSize:11, color:'#fff', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                                         <span style={{ fontSize:9, fontWeight:700, color:'rgba(0,230,138,0.7)', minWidth:40 }}>Сет {si+1}</span>
                                         <span style={{ fontWeight:700, color:'#fff' }}>{es.reps} повт</span>
                                         <span style={{ color:'#60a5fa', fontWeight:700 }}>{Math.round(es.pct*100)}%</span>
-                                        <span style={{ color:'rgba(255,255,255,0.6)' }}>{es.weight}кг</span>
+                                        <span style={{ color:'#fff' }}>{es.weight}кг</span>
                                         {typeof es.rir === 'number' && <span style={{ color:'#f59e0b' }}>RIR {es.rir}</span>}
                                         {adjustedMark && <span style={{ fontSize:9 }}>{adjustedMark}</span>}
                                       </div>
@@ -966,7 +966,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                           <div key={a.uid} style={{ padding:'6px 10px', marginBottom:6, background:'rgba(0,230,138,0.05)', borderRadius:10, border:'0.5px solid rgba(0,230,138,0.2)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:6 }}>
                             <div style={{ minWidth:0, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                               <span style={{ fontSize:13, fontWeight:800, color:'#00e68a' }}>＋ {a.name}</span>
-                              <span style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginLeft:6 }}>{a.sets}×{a.reps}×{a.weight}кг</span>
+                              <span style={{ fontSize:11, color:'#fff', marginLeft:6 }}>{a.sets}×{a.reps}×{a.weight}кг</span>
                             </div>
                             <button onClick={() => setSrcAdditions(prev => { return { ...prev, [dk]: (prev[dk]||[]).filter(x => x.uid !== a.uid) }; })} style={{ fontSize:11, color:'#ef4444', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', borderRadius:5, padding:'4px 8px', cursor:'pointer', flexShrink:0 }}>✕</button>
                           </div>
@@ -986,7 +986,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               </MetricCard>
               {builtSrc && builtSrc.plVolumeLandmarks && builtSrc.plVolumeLandmarks.length > 0 && (
                 <MetricCard title={'Объём vs MRV (volume-landmarks)'} icon="📊">
-                  <div style={{ color:'rgba(255,255,255,0.55)', fontSize:11, marginBottom:8 }}>
+                  <div style={{ color:'#fff', fontSize:11, marginBottom:8 }}>
                     Пиковая неделя: {builtSrc.plVolumeLandmarks[0].peakWeek}{W.some(w => w.macroPhase === 'competition') ? ` · 📉 +${W.filter(w => w.macroPhase === 'competition').length} тапер-нед` : ''}{pedAuto && peds.length > 0 ? ` · 💉 MRV ×${Math.max(1, (() => { try { const lm = Object.fromEntries(Object.entries(getAllVolumeLandmarks(level)).map(([k, v]) => [k, v.mrv])); return adaptForPEDs(peds, lm, pedDoses, courseIntensity).combinedMrvMultiplier; } catch { return 1; } })()).toFixed(2)} (PED)` : ''}
                   </div>
                   {builtSrc.plVolumeLandmarks.map((lm) => {
@@ -998,7 +998,7 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                           <span style={{ color:'#fff', fontSize:12, minWidth: 0, overflowWrap: 'break-word' }}>{lm.muscle}</span>
                           <span style={{ color: c, fontSize:11, fontWeight:700, whiteSpace: 'nowrap' }}>{lm.sets} сет · MRV {lm.mrv} · {lbl}</span>
                         </div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>MAV {lm.mav} · MEV {lm.mev}</div>
+                        <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>MAV {lm.mav} · MEV {lm.mev}</div>
                         <div style={{ height:6, background:'rgba(255,255,255,0.1)', borderRadius:3, marginTop:3, overflow:'hidden' }}>
                           <div style={{ width: `${Math.min(100, (lm.sets / lm.mrv) * 100)}%`, height:'100%', background:c, borderRadius:3 }} />
                         </div>
@@ -1012,10 +1012,10 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
               )}
               {/* Календарь цикла: оригинальный / с учётом тапера */}
               <div style={{ marginTop: 4, display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
-                <button onClick={() => setCalendarView('original')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'original' ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'original' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'original' ? '#60a5fa' : 'rgba(255,255,255,0.55)' }}>
+                <button onClick={() => setCalendarView('original')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'original' ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'original' ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'original' ? '#60a5fa' : '#fff' }}>
                   🔵 Оригинальный ({originalCycleWeeks(getCycleById(selectedCycleId)!) ?? totalW} нед)
                 </button>
-                <button onClick={() => setCalendarView('tapered')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'tapered' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'tapered' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'tapered' ? '#f59e0b' : 'rgba(255,255,255,0.55)' }}>
+                <button onClick={() => setCalendarView('tapered')} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: calendarView === 'tapered' ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: calendarView === 'tapered' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: calendarView === 'tapered' ? '#f59e0b' : '#fff' }}>
                   📉 С тапером ({totalW} нед)
                 </button>
               </div>
@@ -1123,8 +1123,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                 };
                 const stepBtn = (on: boolean, label: string, sub: string, onClick: () => void, color: string, ariaLabel?: string) => (
                   <button onClick={onClick} aria-label={ariaLabel} style={{ padding:'10px 12px', borderRadius:10, textAlign:'left', cursor:'pointer', border: on ? '1px solid ' + color : '1px solid rgba(255,255,255,0.12)', background: on ? color + '22' : 'rgba(255,255,255,0.03)', color:'#fff' }}>
-                    <div style={{ fontSize:13, fontWeight:800, color: on ? color : 'rgba(255,255,255,0.85)' }}>{label}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{sub}</div>
+                    <div style={{ fontSize:13, fontWeight:800, color: on ? color : '#fff' }}>{label}</div>
+                    <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{sub}</div>
                   </button>
                 );
                 return (
@@ -1136,30 +1136,30 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       </div>
                       <div style={{ flex:1, overflowY:'auto', padding:'10px 12px', display:'flex', flexDirection:'column', gap:8 }}>
                         {!expFormat && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>1 · Формат</div>
+                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>1 · Формат</div>
                           {stepBtn(expFormat === 'xlsx', '📊 Excel (.xlsx)', 'Таблица для Excel / Google Sheets', () => setExpFormat('xlsx'), '#60a5fa')}
                           {stepBtn(expFormat === 'pdf', '🖨 PDF', 'Окно печати → «Сохранить как PDF»', () => setExpFormat('pdf'), '#f59e0b')}
                         </>}
                         {expFormat && !expScope && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>2 · Что выгружаем</div>
+                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>2 · Что выгружаем</div>
                           {stepBtn(expScope === 'all', '📋 Весь план', 'Тренировочный план — все недели', () => setExpScope('all'), '#00e68a')}
                           {stepBtn(expScope === 'block', '🧩 Отдельный блок на выбор', 'Основной цикл / тапер / mock / соревнования / пост-старт', () => setExpScope('block'), '#a78bfa')}
                           {stepBtn(expScope === 'week', '📅 Одна неделя на выбор', 'Выберите номер недели', () => setExpScope('week'), '#eab308')}
                           {stepBtn(expScope === 'full', '📦 Всё вместе', 'Все недели + сводка цикла + прикиды', () => setExpScope('full'), '#f59e0b')}
                         </>}
                         {expFormat && expScope === 'block' && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>3 · Выберите блок</div>
-                          {blocks.map(b => <div key={b.id} style={{ width:'100%' }}>{stepBtn(expBlock === b.id, `${b.icon} ${b.label}`, `нед ${b.range} · ${b.weeks.length} нед`, () => setExpBlock(b.id), '#a78bfa', `Экспорт блок ${b.id}`)}</div>)}                          {blocks.length === 0 && <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)' }}>Отдельных блоков нет — план однородный.</div>}
+                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>3 · Выберите блок</div>
+                          {blocks.map(b => <div key={b.id} style={{ width:'100%' }}>{stepBtn(expBlock === b.id, `${b.icon} ${b.label}`, `нед ${b.range} · ${b.weeks.length} нед`, () => setExpBlock(b.id), '#a78bfa', `Экспорт блок ${b.id}`)}</div>)}                          {blocks.length === 0 && <div style={{ fontSize:11, color:'#fff' }}>Отдельных блоков нет — план однородный.</div>}
                         </>}
                          {expFormat && expScope === 'week' && <>
-                          <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.45)' }}>3 · Выберите неделю</div>
+                          <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>3 · Выберите неделю</div>
                           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(72px, 1fr))', gap:4 }}>
                             {W.map(w => {
                               const ph2 = displayPhaseForWeek(w, totalW);
                               const active2 = expWeek === w.week;
                               return <button key={w.week} onClick={() => setExpWeek(w.week)} aria-label={'Экспорт неделя ' + w.week} style={{ padding:'8px 4px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border: active2 ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.1)', background: active2 ? 'rgba(234,179,8,0.18)' : 'rgba(255,255,255,0.03)', color:'#fff' }}>
                                 <div>{w.week}</div>
-                                <div style={{ fontSize:8, color: PH_COLOR[ph2 as keyof typeof PH_COLOR] ?? 'rgba(255,255,255,0.4)' }}>{PH_RU[ph2 as keyof typeof PH_RU] ?? ph2}</div>
+                                <div style={{ fontSize:8, color: PH_COLOR[ph2 as keyof typeof PH_COLOR] ?? '#fff' }}>{PH_RU[ph2 as keyof typeof PH_RU] ?? ph2}</div>
                               </button>;
                             })}
                            </div>
@@ -1175,8 +1175,8 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                          )}
                        </div>
                        <div style={{ display:'flex', gap:6, padding:'10px 12px', borderTop:'1px solid rgba(255,255,255,0.08)' }}>
-                         <button onClick={() => { if (expScope) setExpScope(null); else if (expFormat) setExpFormat(null); }} disabled={!expFormat} style={{ padding:'10px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'rgba(255,255,255,0.7)', opacity: expFormat ? 1 : 0.4 }}>⬅ Назад</button>
-                         <span style={{ flex:1, padding:'10px 12px', fontSize:11, color:'rgba(255,255,255,0.45)', textAlign:'center' }}>
+                         <button onClick={() => { if (expScope) setExpScope(null); else if (expFormat) setExpFormat(null); }} disabled={!expFormat} style={{ padding:'10px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'#fff', opacity: expFormat ? 1 : 0.4 }}>⬅ Назад</button>
+                         <span style={{ flex:1, padding:'10px 12px', fontSize:11, color:'#fff', textAlign:'center' }}>
                            {ready ? 'Кнопка сохранения находится выше' : 'Выберите формат и объём'}
                          </span>
                       </div>

@@ -405,7 +405,7 @@ export function showPrintOverlay(html: string, title: string, text?: string): vo
   const closeBtn = overlayBtn('✕ Закрыть', '#ef4444', 'transparent');
   bar.append(titleEl, printBtn, copyBtn, closeBtn);
   const hint = document.createElement('div');
-  hint.style.cssText = 'padding:0 12px 8px;color:rgba(255,255,255,0.5);font-size:11px;flex:0 0 auto;';
+  hint.style.cssText = 'padding:0 12px 8px;color:#fff;font-size:11px;flex:0 0 auto;';
   hint.textContent = 'На телефоне: «Печать» → «Сохранить как PDF» или «Сохранить в Файлы».';
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'flex:1;width:100%;border:none;background:#fff;min-height:0;';

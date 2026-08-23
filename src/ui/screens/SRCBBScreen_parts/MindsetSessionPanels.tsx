@@ -91,7 +91,7 @@ export const MindsetPreSessionCard: React.FC<{ focus: string; dayLabel: string }
               <input type="checkbox" checked={done} onChange={() => toggle(it.id)} aria-label={`Шаг: ${it.title}`}
                 style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer' }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: done ? '#fff' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
                   {KIND_ICON[it.kind]} {it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>({KIND_LABELS[it.kind]} · {it.durationMin} мин)</span>
                 </div>
                 {!done && <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}

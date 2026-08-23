@@ -12,10 +12,10 @@ const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px 
 const ACCENT = '#00e68a';
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const SEL: React.CSSProperties = { ...IN, minHeight: 40 };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '4px 0 2px' };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '4px 0 2px' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.4 };
-const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: 'rgba(255,255,255,0.8)' };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 12, lineHeight: 1.4 };
+const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: '#fff' };
 
 const labelColor = (l: string) => l === 'Отлично' ? ACCENT : l === 'Хорошо' ? '#84cc16' : l === 'Средне' ? '#f59e0b' : l === 'Низко' ? '#f97316' : '#ef4444';
 
@@ -141,7 +141,7 @@ export const RecoveryPanel: React.FC = () => {
         >💾 Сохранить в профиль</button>
       </div>
       {lastSavedAt && (
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 6, textAlign: 'center' }}>
           ✓ Сохранено: {new Date(lastSavedAt).toLocaleTimeString('ru')}
         </div>
       )}
@@ -182,8 +182,8 @@ export const RecoveryPanel: React.FC = () => {
             <div style={H}>🤸 Мобилити-флоу (разминка/преабил)</div>
             {flows.slice(0, 4).map(f => (
               <div key={f.name} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>{f.name} <span style={{ color: 'rgba(255,255,255,0.4)' }}>· {f.durationMin}мин · {f.targetAreas.join(', ')}</span></div>
-                <div style={{ ...SMALL, color: 'rgba(255,255,255,0.4)' }}>{f.exercises.slice(0, 4).map(e => e.name).join(' · ')}</div>
+                <div style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>{f.name} <span style={{ color: '#fff' }}>· {f.durationMin}мин · {f.targetAreas.join(', ')}</span></div>
+                <div style={{ ...SMALL, color: '#fff' }}>{f.exercises.slice(0, 4).map(e => e.name).join(' · ')}</div>
               </div>
             ))}
           </div>

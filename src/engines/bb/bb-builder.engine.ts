@@ -1110,24 +1110,214 @@ export function computeMuscleSets(muscle: string, baseSets: number, opts: { leve
   return Math.max(1, Math.min(5, sets));
 }
 
-export function selectExercisesForMuscle(muscle: string, pool: any[], count: number, opts: { favoriteIds: string[]; excludeIds: string[]; level: string }): any[] {
-  const scored = pool.map((ex: any) => {
+export interface SelectExercisesForMuscleOpts {
+  sessionSelectedIds: string[];
+  sessionSelectedNames: string[];
+  equipment: string[];
+  weakZones: string[];
+  level: string;
+  injuryProfile: string[];
+  type: 'compound' | 'isolation' | 'any';
+  targetRir: number;
+  favoriteIds: string[];
+  excludeIds: string[];
+  avoidAxialLoad?: boolean;
+  preferEquipment: string[];
+}
+
+/** 3.1 — вынесенный слой selection: выбор упражнений через selectExercisesSmart +
+ *  фиксация выбранных id/имён в сессионные списки (те же мутации, что были inline). */
+export function selectExercisesForMuscle(pool: any[], muscle: string, count: number, opts: SelectExercisesForMuscleOpts): any[] {
+  const selected = selectExercisesSmart({
+    candidates: pool, muscleGroup: muscle, count,
+    selectedIds: opts.sessionSelectedIds, selectedNames: opts.sessionSelectedNames,
+    equipment: opts.equipment, weakZones: opts.weakZones, level: opts.level,
+    injuryProfile: opts.injuryProfile, type: opts.type,
+    targetRir: opts.targetRir,
+    preferBB: true,
+    favoriteIds: opts.favoriteIds, excludeIds: opts.excludeIds,
+    avoidAxialLoad: opts.avoidAxialLoad,
+    preferEquipment: opts.preferEquipment,
+  });
+  for (const s of selected) { if (s && s.id) opts.sessionSelectedIds.push(s.id); if (s && s.name) opts.sessionSelectedNames.push(s.name); }
+  return selected;
+}
+
+export interface BuildExercisePoolOpts {
+  level: string;
+  /** Истинные мышцы пула (musclesForRole(repKey)) — фильтр по trueMuscleOf. */
+  roleMuscles: string[];
+  /** Тег сессии — контекстные фильтры push/pull/legs. */
+  sessionTag?: string;
+  allowExotic: boolean;
+  allowStrengthLifts?: boolean;
+  isPurePull: boolean;
+  equipmentList: string[];
+  excludeIds: string[];
+  avoidAxialLoad?: boolean;
+  mobilityRestrictions?: string[];
+  bodyweightCapability?: BBBuilderInput['bodyweightCapability'];
+  favoriteIds: string[];
+  muscle: string;
+  focusGroup?: string;
+  weakPoints: string[];
+  fewerCompound?: boolean;
+}
+
+/** 3.1 — вынесенный слой selection: построение скорированного пула упражнений.
+ *  Включает: истинно-мышечный фильтр + контекст сессии + fallback-пул +
+ *  BB-фильтр + _score (BB-приоритет) + generic-блэклист. */
+export function buildExercisePool(muscle: string, role: string, opts: BuildExercisePoolOpts): any[] {
+  const tag = (opts.sessionTag || '').toLowerCase();
+  let pool = EXERCISE_CATALOG.filter((ex: any) => {
+    const tm = trueMuscleOf(ex);
+    if (tm === null || !opts.roleMuscles.includes(tm)) return false;
+    if (isBBJunk(ex)) return false;
+    { const _t = bbExerciseTier(ex); if (_t === 4 || (!opts.allowExotic && _t === 3)) return false; }
+    // Становая/сумо/жим стоя — только в силовом цикле и по кнопке пользователя.
+    if (opts.allowStrengthLifts !== true) {
+      const n = (ex.name || '').toLowerCase();
+      if (n.includes('становая') || n.includes('сумо') || n.includes('армейский') || n.includes('жим стоя') || n.includes('швунг') || n.includes('мертв')) return false;
+    }
+    if (!opts.isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
+    if (opts.avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
+    if (opts.mobilityRestrictions && isMobilityRestricted(ex, opts.mobilityRestrictions)) return false;
+    // Bodyweight capability: подтягивания не ставятся без подтверждённой
+    // способности ни в какую роль — заменяются pulldown/машиной.
+    if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
+      const cap = opts.bodyweightCapability;
+      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+      if (!canPullUp) return false;
+    }
+    if (opts.equipmentList.length > 0) {
+      const rawEq = ex.equipment;
+      const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+      if (exEq.length > 0 && !exEq.some(eq => opts.equipmentList.includes(eq))) return false;
+    }
+    if (opts.excludeIds.includes(ex.id) || opts.excludeIds.includes(ex.name)) return false;
+    return true;
+  });
+  // Фильтр по контексту сессии (доп. страховка, в основном инертен после
+  // фильтрации по истинной мышце)
+  pool = pool.filter(ex => {
+    const n = (ex.name || '').toLowerCase();
+    if (tag.includes('push') || tag === 'chest' || tag === 'shoulders') {
+      if (n.includes('тяга')||n.includes('становая')||n.includes('мёртвая')||n.includes('мертвая')||n.includes('гиперэкстенз')||n.includes('фермер')||n.includes('carry')||n.includes('rdl')||n.includes('romanian')||n.includes('deadlift')||n.includes('good morning')||n.includes('гудморнинг')) return false;
+    }
+    if (tag.includes('pull') || tag === 'back') {
+      if (n.includes('жим')&&!n.includes('ногами')||n.includes('press')||n.includes('разгиб')||n.includes('extension')) return false;
+    }
+    if (tag === 'legs' || tag === 'lower') {
+      // Раньше: `n.includes('тяга')` блокировало ВСЕ тяги для ножного дня (включая RDL).
+      // Теперь релей-блокировка 'тяга' для всего что НЕ относится к ББ-поза-цепи (RDL/мёртвая
+      // на прямых ногах/гудморнинг/гиперэкстензия/обратная гипер). Эти лифты разрешены в
+      // хамстринг/поясничных днях — иначе хамстринги остаются только с leg_curl (изоляция).
+      // Паттерн `Тяга штанги в наклоне` (row) → всё ещё блокируется (BB-posterior не совпадает).
+      const isBbPosteriorChain = /румын|мёртв|stiff.?leg|мёртв.*в смите|мёртв.*на прям|мёртв.*на одной|гудморнинг|good.?morning|rdl|гиперэкстенз|обратн.*гипер|reverse.?hyper/.test(n);
+      if ((n.includes('жим') && !n.includes('ногами')) || (!isBbPosteriorChain && n.includes('тяга')) || n.includes('подтяг') || n.includes('бицепс') || n.includes('трицепс')) return false;
+    }
+    return true;
+  });
+  // Если после фильтра пул опустел — fallback на тот же истинный-мышечный пул
+  if (pool.length === 0) pool = EXERCISE_CATALOG.filter((ex: any) => {
+    const tm = trueMuscleOf(ex);
+    if (tm === null || !opts.roleMuscles.includes(tm)) return false;
+    if (isBBJunk(ex)) return false;
+    { const _t = bbExerciseTier(ex); if (_t === 4 || (!opts.allowExotic && _t === 3)) return false; }
+    // B12: equipment-fallback ТОЛЬКО если оборудование НЕ указано или совпадает (иначе — нет упражнений).
+    if (opts.equipmentList.length > 0) {
+      const rawEq = ex.equipment;
+      const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
+      if (exEq.length > 0 && !exEq.some(eq => opts.equipmentList.includes(eq))) return false;
+    }
+    // B5: avAxial — даже в fallback НЕ берём осевые упражнения
+    if (opts.avoidAxialLoad && ex.name && isAxialLoadExercise(ex)) return false;
+    // Bodyweight capability — и в fallback не берём подтягивания без способности.
+    if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
+      const cap = opts.bodyweightCapability;
+      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+      if (!canPullUp) return false;
+    }
+    if (!opts.isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
+    if (opts.mobilityRestrictions && isMobilityRestricted(ex, opts.mobilityRestrictions)) return false;
+    if (opts.excludeIds.includes(ex.id) || opts.excludeIds.includes(ex.name)) return false;
+    return true;
+  });
+  // ━━━ BB: минимальный фильтр non-BB упражнений (всегда, не только generic) ━━━
+  pool = pool.filter((ex: any) => {
+    const n = (ex.name || '').toLowerCase();
+    const id = (ex.id || '').toLowerCase();
+    if (/над голов|overhead.*squat|пистол.*присед|pistol.*squat/i.test(n)) return false;
+    return true;
+  });
+  // ━━━ _score: BB-приоритет ВСЕГДА (не только generic) ━━━
+  // Гакк/Смит > свободный присед, наклонный жим > плоский, стандартные
+  // compound'ы приоритетны. Этот скор используется multi-angle diversity
+  // для выбора лучшего упражнения из каждого угла.
+  pool = pool.map((ex: any) => {
     let score = 0;
     const n = (ex.name || '').toLowerCase();
     const id = (ex.id || '').toLowerCase();
-    if (opts.favoriteIds.includes(ex.id)) score += 20;
+    if (PREFERRED_BB_EXERCISES.has(ex.id)) score += 50;
+    else if (opts.favoriteIds.includes(ex.id)) score += 20;
     if (id.includes('incline') || n.includes('наклон')) score += 15;
     if (id.includes('hack') || n.includes('гакк')) score += 15;
     if (id.includes('smith') && id.includes('squat')) score += 10;
-    if (opts.excludeIds.includes(ex.id)) score -= 100;
-    return { ex, score };
-  }).sort((a, b) => b.score - a.score);
-  return scored.slice(0, count).map(s => s.ex);
-}
-
-export function buildExercisePool(muscle: string, role: string, opts: { level: string; equipmentList: string[]; excludeIds: string[]; allowExotic: boolean }): any[] {
-  // Thin wrapper для тестов — как в buildSession:1533 pool building
-  return [];
+    // Бодибилдинг-основы: наклонный жим (штанга) — главный для груди; широкий хват
+    // вертикальной тяги — для широчайших. Повышаем их приоритет.
+    if (muscle === 'chest' && /наклон|incline/.test(n) && /штанг|barbell|гантел|dumbbell/.test(n)) score += 12;
+    if (muscle === 'back' && /верхи|верхн.*блок|пуллдаун|pulldown|подтяг/.test(n) && /широк|wide/.test(n)) score += 12;
+    // Меньше многосуставных (кнопка пользователя): машина/Смит/поддержанные выше,
+    // свободные compound ниже — присед → гакк/жим ногами, тяга штанги → Смит и т.д.
+    if (opts.fewerCompound) {
+      if (/машин|тренаж|machine|гакк|hack|смит|smith|поддержан|chest.?supported|seal/.test(n)) score += 20;
+      if (/присед|squat|тяга.*штанг|тяга.*наклон|row.*barbell|жим.*штанг|bench.*press/.test(n)) score -= 25;
+    }
+    if ((id === 'bench_press' || id === 'barbell_bench_press') && !id.includes('incline')) score -= 10;
+    if ((id === 'squat' || id === 'barbell_squat' || id === 'back_squat') && !id.includes('hack') && !id.includes('smith')) score -= 10;
+    // Редкие/специфичные вариации (не для массонабора)
+    if (n.includes('обратн') || n.includes('обрат') || n.includes('reverse')) score -= 10;
+    if (n.includes('узкий') || n.includes('узк') || n.includes('narrow')) score -= 5;
+    // Односторонние варианты (румынская на одной ноге, тяга одной рукой) —
+    // менее приоритетны для мужчин/массы: классические двусторонние
+    // дают больше механического натяжения и стабильной прогрессии.
+    if (/на одной ног|одной ногой|single.?leg|one.?leg/i.test(n)) score -= 20;
+    if (/одной рук|одной рукой|one.?arm|single.?arm/i.test(n) && !muscle.includes('back')) score -= 10;
+    // Брусья — не приоритет груди (трицепс-доминантны, перегружают плечо);
+    // для растяжки приоритетны разводки и кроссовер.
+    if (muscle === 'chest' && /брус|dip/i.test(n)) score -= 20;
+    // Армейский жим стоя — ПЛ-движение: предпочтительны классические жимы
+    // перед собой (Smith широким хватом, жимы гантелей).
+    if (/армейск|жим.*стоя|standing.*press|military/i.test(n)) score -= 25;
+    return { ...ex, _score: score };
+  }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
+  // Generic-план (без специализации/слабых точек): убираем слишком специфичные вариации
+  // (обратный хват, узкая стойка) — они уже оштрафованы в _score, но при generic
+  // без weak-point лучше их полностью исключить.
+  const isGeneric = !opts.focusGroup && !opts.weakPoints.some(wp => {
+    const parent = WEAK_TO_MUSCLE[wp];
+    return wp === muscle || (parent && parent === muscle);
+  });
+  if (isGeneric) {
+    pool = pool.filter((ex: any) => {
+      const id = (ex.id || '').toLowerCase();
+      const n = (ex.name || '').toLowerCase();
+      const isBlacklisted = Array.from(BLACKLIST_GENERIC).some(bid =>
+        id.includes(bid) || n.includes(bid.replace(/_/g, ' ')));
+      if (isBlacklisted) return false;
+      // Пуловер — это тяга (широчайшие), а не грудная изоляция: не ставим в грудь.
+      // (каталог-group 'chest', но по движению — lat-упражнение; дублирует грудные изоляции)
+      if (muscle === 'chest' && /пуловер|pullover/.test(n)) return false;
+      // Грудь: брусья не приоритет (трицепс-доминантны, перегружают плечо).
+      // Для растяжки приоритетны разводки и кроссовер.
+      if (muscle === 'chest' && /брус|dip/i.test(n)) return false;
+      // Бицепс бедра: классическая румынская тяга двумя ногами приоритетна;
+      // односторонний вариант — специфичная вариация, не для generic-массы.
+      if (muscle === 'hamstrings' && /на одной ног|одной ногой|single.?leg|one.?leg/i.test(n)) return false;
+      return true;
+    });
+  }
+  return pool;
 }
 
 export interface BuildSessionParams {
@@ -1526,178 +1716,25 @@ function buildSession(
     // targetMuscle), а не по композитной группе каталога. Это устраняет
     // неверную атрибуцию (leg curl → «calves», farmer walk → «biceps»,
     // good morning → «quads») и исключает ПЛ-движения (carry/hinge/становая).
+    // 3.1 — вынесенный слой selection: buildExercisePool (пул + fallback + скор + generic-фильтр)
     const roleMuscles = musclesForRole(repKey);
-    const pushDay = isPushDayTag(sched.sessionTag || '');
     const tag = (sched.sessionTag || '').toLowerCase();
     const isPurePull = /pull|back/.test(tag) && !/push|chest/.test(tag);
-    let pool = EXERCISE_CATALOG.filter((ex: any) => {
-      const tm = trueMuscleOf(ex);
-      if (tm === null || !roleMuscles.includes(tm)) return false;
-      if (isBBJunk(ex)) return false;
-      { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
-      // Становая/сумо/жим стоя — только в силовом цикле и по кнопке пользователя.
-      if (allowStrengthLifts !== true) {
-        const n = (ex.name || '').toLowerCase();
-        if (n.includes('становая') || n.includes('сумо') || n.includes('армейский') || n.includes('жим стоя') || n.includes('швунг') || n.includes('мертв')) return false;
-      }
-      if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
-      if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
-      if (mobilityRestrictions && isMobilityRestricted(ex, mobilityRestrictions)) return false;
-      // Bodyweight capability: подтягивания не ставятся без подтверждённой
-      // способности ни в какую роль — заменяются pulldown/машиной.
-      if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
-        const cap = bodyweightCapability;
-        const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
-        if (!canPullUp) return false;
-      }
-      if (equipmentList.length > 0) {
-        const rawEq = ex.equipment;
-        const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-        if (exEq.length > 0 && !exEq.some(eq => equipmentList.includes(eq))) return false;
-      }
-      if (excludeIds.includes(ex.id) || excludeIds.includes(ex.name)) return false;
-      return true;
-    });
-    // Фильтр по контексту сессии (доп. страховка, в основном инертен после
-    // фильтрации по истинной мышце)
-    pool = pool.filter(ex => {
-      const n = (ex.name || '').toLowerCase();
-      if (tag.includes('push') || tag === 'chest' || tag === 'shoulders') {
-        if (n.includes('тяга')||n.includes('становая')||n.includes('мёртвая')||n.includes('мертвая')||n.includes('гиперэкстенз')||n.includes('фермер')||n.includes('carry')||n.includes('rdl')||n.includes('romanian')||n.includes('deadlift')||n.includes('good morning')||n.includes('гудморнинг')) return false;
-      }
-      if (tag.includes('pull') || tag === 'back') {
-        if (n.includes('жим')&&!n.includes('ногами')||n.includes('press')||n.includes('разгиб')||n.includes('extension')) return false;
-      }
-      if (tag === 'legs' || tag === 'lower') {
-        // Раньше: `n.includes('тяга')` блокировало ВСЕ тяги для ножного дня (включая RDL).
-        // Теперь релей-блокировка 'тяга' для всего что НЕ относится к ББ-поза-цепи (RDL/мёртвая
-        // на прямых ногах/гудморнинг/гиперэкстензия/обратная гипер). Эти лифты разрешены в
-        // хамстринг/поясничных днях — иначе хамстринги остаются только с leg_curl (изоляция).
-        // Паттерн `Тяга штанги в наклоне` (row) → всё ещё блокируется (BB-posterior не совпадает).
-        const isBbPosteriorChain = /румын|мёртв|stiff.?leg|мёртв.*в смите|мёртв.*на прям|мёртв.*на одной|гудморнинг|good.?morning|rdl|гиперэкстенз|обратн.*гипер|reverse.?hyper/.test(n);
-        if ((n.includes('жим') && !n.includes('ногами')) || (!isBbPosteriorChain && n.includes('тяга')) || n.includes('подтяг') || n.includes('бицепс') || n.includes('трицепс')) return false;
-      }
-      return true;
-    });
-    // Если после фильтра пул опустел — fallback на тот же истинный-мышечный пул
-    if (pool.length === 0) pool = EXERCISE_CATALOG.filter((ex: any) => {
-      const tm = trueMuscleOf(ex);
-      if (tm === null || !roleMuscles.includes(tm)) return false;
-      if (isBBJunk(ex)) return false;
-      { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
-      // B12: equipment-fallback ТОЛЬКО если оборудование НЕ указано или совпадает (иначе — нет упражнений).
-      if (equipmentList.length > 0) {
-        const rawEq = ex.equipment;
-        const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-        if (exEq.length > 0 && !exEq.some(eq => equipmentList.includes(eq))) return false;
-      }
-      // B5: avAxial — даже в fallback НЕ берём осевые упражнения
-      if (avoidAxialLoad && ex.name && isAxialLoadExercise(ex)) return false;
-      // Bodyweight capability — и в fallback не берём подтягивания без способности.
-      if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
-        const cap = bodyweightCapability;
-        const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
-        if (!canPullUp) return false;
-      }
-      if (!isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
-      if (mobilityRestrictions && isMobilityRestricted(ex, mobilityRestrictions)) return false;
-      if (excludeIds.includes(ex.id) || excludeIds.includes(ex.name)) return false;
-      return true;
+    let pool = buildExercisePool(muscle, role, {
+      level, roleMuscles, sessionTag: sched.sessionTag, allowExotic,
+      allowStrengthLifts, isPurePull, equipmentList, excludeIds,
+      avoidAxialLoad, mobilityRestrictions, bodyweightCapability,
+      favoriteIds, muscle, focusGroup, weakPoints, fewerCompound,
     });
 
-    // ━━━ BB: минимальный фильтр non-BB упражнений (всегда, не только generic) ━━━
-    // trueMuscleOf уже отсекает deadlift/snatch/clean/jerk/carry (~80 упражнений).
-    // bbExerciseTier отсекает tier 3-4: доски/пины/спото/цепи/кольца/TRX/strongman (~60).
-    // Здесь — только 2 известных просачивающихся упражнения, проходящих tier=1:
-    // overhead squat и pistol squat (имеют "присед"/"squat" в имени → tier canonical).
-    pool = pool.filter((ex: any) => {
-      const n = (ex.name || '').toLowerCase();
-      const id = (ex.id || '').toLowerCase();
-      if (/над голов|overhead.*squat|пистол.*присед|pistol.*squat/i.test(n)) return false;
-      return true;
-    });
-
-    // ━━━ _score: BB-приоритет ВСЕГДА (не только generic) ━━━
-    // Гакк/Смит > свободный присед, наклонный жим > плоский, стандартные
-    // compound'ы приоритетны. Этот скор используется multi-angle diversity
-    // для выбора лучшего упражнения из каждого угла.
-    pool = pool.map((ex: any) => {
-      let score = 0;
-      const n = (ex.name || '').toLowerCase();
-      const id = (ex.id || '').toLowerCase();
-      if (PREFERRED_BB_EXERCISES.has(ex.id)) score += 50;
-      else if (favoriteIds.includes(ex.id)) score += 20;
-      if (id.includes('incline') || n.includes('наклон')) score += 15;
-      if (id.includes('hack') || n.includes('гакк')) score += 15;
-      if (id.includes('smith') && id.includes('squat')) score += 10;
-      // Бодибилдинг-основы: наклонный жим (штанга) — главный для груди; широкий хват
-      // вертикальной тяги — для широчайших. Повышаем их приоритет.
-      if (muscle === 'chest' && /наклон|incline/.test(n) && /штанг|barbell|гантел|dumbbell/.test(n)) score += 12;
-      if (muscle === 'back' && /верхи|верхн.*блок|пуллдаун|pulldown|подтяг/.test(n) && /широк|wide/.test(n)) score += 12;
-      // Меньше многосуставных (кнопка пользователя): машина/Смит/поддержанные выше,
-      // свободные compound ниже — присед → гакк/жим ногами, тяга штанги → Смит и т.д.
-      if (fewerCompound) {
-        if (/машин|тренаж|machine|гакк|hack|смит|smith|поддержан|chest.?supported|seal/.test(n)) score += 20;
-        if (/присед|squat|тяга.*штанг|тяга.*наклон|row.*barbell|жим.*штанг|bench.*press/.test(n)) score -= 25;
-      }
-      if ((id === 'bench_press' || id === 'barbell_bench_press') && !id.includes('incline')) score -= 10;
-      if ((id === 'squat' || id === 'barbell_squat' || id === 'back_squat') && !id.includes('hack') && !id.includes('smith')) score -= 10;
-      // Редкие/специфичные вариации (не для массонабора)
-      if (n.includes('обратн') || n.includes('обрат') || n.includes('reverse')) score -= 10;
-      if (n.includes('узкий') || n.includes('узк') || n.includes('narrow')) score -= 5;
-      // Односторонние варианты (румынская на одной ноге, тяга одной рукой) —
-      // менее приоритетны для мужчин/массы: классические двусторонние
-      // дают больше механического натяжения и стабильной прогрессии.
-      if (/на одной ног|одной ногой|single.?leg|one.?leg/i.test(n)) score -= 20;
-      if (/одной рук|одной рукой|one.?arm|single.?arm/i.test(n) && !muscle.includes('back')) score -= 10;
-      // Брусья — не приоритет груди (трицепс-доминантны, перегружают плечо);
-      // для растяжки приоритетны разводки и кроссовер.
-      if (muscle === 'chest' && /брус|dip/i.test(n)) score -= 20;
-      // Армейский жим стоя — ПЛ-движение: предпочтительны классические жимы
-      // перед собой (Smith широким хватом, жимы гантелей).
-      if (/армейск|жим.*стоя|standing.*press|military/i.test(n)) score -= 25;
-      return { ...ex, _score: score };
-    }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
-
-    // Generic-план (без специализации/слабых точек): убираем слишком специфичные вариации
-    // (обратный хват, узкая стойка) — они уже оштрафованы в _score, но при generic
-    // без weak-point лучше их полностью исключить.
-    const isGeneric = !focusGroup && !weakPoints.some(wp => {
-      const parent = WEAK_TO_MUSCLE[wp];
-      return wp === muscle || (parent && parent === muscle);
-    });
-    if (isGeneric) {
-      pool = pool.filter((ex: any) => {
-        const id = (ex.id || '').toLowerCase();
-        const n = (ex.name || '').toLowerCase();
-        const isBlacklisted = Array.from(BLACKLIST_GENERIC).some(bid =>
-          id.includes(bid) || n.includes(bid.replace(/_/g, ' ')));
-        if (isBlacklisted) return false;
-        // Пуловер — это тяга (широчайшие), а не грудная изоляция: не ставим в грудь.
-        // (каталог-group 'chest', но по движению — lat-упражнение; дублирует грудные изоляции)
-        if (muscle === 'chest' && /пуловер|pullover/.test(n)) return false;
-        // Грудь: брусья не приоритет (трицепс-доминантны, перегружают плечо).
-        // Для растяжки приоритетны разводки и кроссовер.
-        if (muscle === 'chest' && /брус|dip/i.test(n)) return false;
-        // Бицепс бедра: классическая румынская тяга двумя ногами приоритетна;
-        // односторонний вариант — специфичная вариация, не для generic-массы.
-        if (muscle === 'hamstrings' && /на одной ног|одной ногой|single.?leg|one.?leg/i.test(n)) return false;
-        return true;
-      });
-    }
-
-    let selected = selectExercisesSmart({
-      candidates: pool, muscleGroup: muscle, count: exerciseCount,
-      selectedIds: sessionSelectedIds, selectedNames: sessionSelectedNames,
-      equipment: equipmentList, weakZones: weakPoints, level, injuryProfile, type: effectiveSelType,
-      targetRir: rir,
-      preferBB: true,
-      favoriteIds, excludeIds,
-      avoidAxialLoad,
-      // P7: equipment приоритезируется по фазе (cable для accumulation, barbell для peaking)
+    // 3.1 — вынесенный слой selection: selectExercisesForMuscle (selectExercisesSmart + фиксация выбора)
+    let selected = selectExercisesForMuscle(pool, muscle, exerciseCount, {
+      sessionSelectedIds, sessionSelectedNames,
+      equipment: equipmentList, weakZones: weakPoints, level, injuryProfile,
+      type: effectiveSelType, targetRir: rir,
+      favoriteIds, excludeIds, avoidAxialLoad,
       preferEquipment: PHASE_EQUIPMENT_PREF[phase],
     });
-    for (const s of selected) { if (s && s.id) sessionSelectedIds.push(s.id); if (s && s.name) sessionSelectedNames.push(s.name); }
     let exDatas = selected.length > 0 ? selected : [pool[0] || { id: muscle, name: muscle, fatigueCost: 5, _score: 0 }];
     // Keep the first compound stable for the same session slot across weeks;
     // accessory movements remain eligible for phase rotation.

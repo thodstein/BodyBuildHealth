@@ -6,6 +6,7 @@
  * Дизайн-токены: тёмный фон + зелёный акцент #00e68a, цвета фаз.
  */
 import React from 'react';
+import { EQUIP_RU } from './ExerciseLabShared';
 
 export const ACCENT = '#00e68a';
 
@@ -127,7 +128,7 @@ export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
       {hasExtra && (
         <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
           {ex.muscleTarget && <span style={{ fontSize: 11, color: '#fff' }}>🎯 {ex.muscleTarget}</span>}
-          {ex.equipment && <span style={{ fontSize: 11, color: '#fff' }}>🏋️ {ex.equipment}</span>}
+          {ex.equipment && <span style={{ fontSize: 11, color: '#fff' }}>🏋️ {EQUIP_RU[ex.equipment] || ex.equipment}</span>}
         </div>
       )}
       {hasMeta && (
@@ -192,10 +193,10 @@ export const PhaseBanner: React.FC<{ phase: PhaseKey; desc?: string }> = ({ phas
 /** Сетка выбора недель (кликабельные номера) */
 export const WeekStrip: React.FC<{
   weeks: number; phaseForНеделя: (w: number) => PhaseKey; activeНеделя: number; onPick: (w: number) => void;
-}> = ({ weeks, phaseForWeek, activeWeek, onPick }) => (
+}> = ({ weeks, phaseForНеделя, activeНеделя, onPick }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: 4 }}>
     {Array.from({ length: weeks }, (_, i) => {
-      const w = i + 1; const ph = phaseForWeek(w); const active = w === activeWeek;
+      const w = i + 1; const ph = phaseForНеделя(w); const active = w === activeНеделя;
       return (
         <button key={w} onClick={() => onPick(w)} title={'Неделя ' + w}
           style={{

@@ -164,9 +164,9 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.18)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>🏁 Соревнования сезона + тапер</div>
-        {builtSrc && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
+        {builtSrc && <span style={{ fontSize: 10, color: '#fff' }}>план: {builtSrc.weeks.length} нед · тапер добавлен: {taperNote ? 'да' : 'нет'}</span>}
         {builtSrc && (
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', marginLeft: 8 }}>
+          <span style={{ fontSize: 10, color: '#fff', marginLeft: 8 }}>
             {autoRegMode === 'auto' && '🤖 auto'}{autoRegMode === 'diary' && '📓 diary'}{autoRegMode === 'off' && '⚠ off'}
           </span>
         )}
@@ -194,10 +194,10 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               <button
                 onClick={() => { setMainMeetId(m.id); applyMainMeet(m); }}
                 title={isMain ? 'Главное соревнование — по нему строится тапер-план' : 'Сделать главным'}
-                style={{ minHeight: 34, minWidth: 38, padding: '4px 8px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: isMain ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.12)', background: isMain ? 'rgba(234,179,8,0.2)' : 'transparent', color: isMain ? '#eab308' : 'rgba(255,255,255,0.4)', alignSelf: 'flex-start' }}
+                style={{ minHeight: 34, minWidth: 38, padding: '4px 8px', borderRadius: 8, fontSize: 13, cursor: 'pointer', border: isMain ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.12)', background: isMain ? 'rgba(234,179,8,0.2)' : 'transparent', color: isMain ? '#eab308' : '#fff', alignSelf: 'flex-start' }}
               >{isMain ? '⭐' : '☆'}</button>
               <div style={{ flex: 1, minWidth: 170 }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 3, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase' }}>Название соревнования</div>
+                <div style={{ fontSize: 9, color: '#fff', marginBottom: 3, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase' }}>Название соревнования</div>
                 <input
                   value={m.name}
                   onChange={e => setMeetList(cur => cur.map(x => x.id === m.id ? { ...x, name: e.target.value } : x))}
@@ -241,7 +241,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
             </div>
           );
         })}
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 6, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 9, color: '#fff', marginTop: 6, lineHeight: 1.4 }}>
           ⭐ Главное — полный тапер/пик-план (ниже). Остальные — контрольные старты: прикиды по их данным показываются в карточке «Тапер-план» → «Сезон». Стратегия, план ПМ и факт ПМ ниже относятся к ГЛАВНОМУ.
         </div>
       </div>
@@ -253,7 +253,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
       </div>
       {/* P2-6: реальная дата старта (реверс календарной разметки) */}
       <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <label style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>📅 Дата старта:</label>
+        <label style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>📅 Дата старта:</label>
         <input
           type="date"
           value={meetDateInput}
@@ -261,7 +261,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#fff', fontSize: 12, minHeight: 34, boxSizing: 'border-box' }}
           title="Реальная дата соревнования — от неё строится календарная разметка недель пик-блока"
         />
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>
+        <span style={{ fontSize: 9, color: '#fff' }}>
           {meetDateInput ? `неделя старта заканчивается ${meetRef}` : 'не задана — по умолчанию через ' + weeksToMeet + ' нед от сегодня'}
         </span>
       </div>
@@ -271,7 +271,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         {peakPreview.warnings.map((w, i) => (
           <div key={i} style={{ fontSize: 10, color: '#fbbf24', lineHeight: 1.4 }}>⚠ {w}</div>
         ))}
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 3, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 9, color: '#fff', marginTop: 3, lineHeight: 1.4 }}>
           «Недель до старта» = окно пик-блока: вход в пик (объём плавно ↓) → mock meet → глубокий тапер → соревнования{postMeetOn ? ' → пост-старт' : ''}. Блок строится кнопкой «🗓 Пик-блок на окно» ниже.
         </div>
       </div>
@@ -370,17 +370,17 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           title="Печать тапер-плана (PDF) — таблицы недель блока с датами, объёмом, интенсивностью, RIR и прикидами"
         >🖨 Тапер-план (PDF)</button>
         <button
-          style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: mockMeetOn ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: mockMeetOn ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: mockMeetOn ? '#a78bfa' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
+          style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: mockMeetOn ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: mockMeetOn ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: mockMeetOn ? '#a78bfa' : '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
           title="Имитация соревнований за 10-14 дней до старта: неделя перед тапером с прикидами-синглами (опенер RIR2 → вторая RIR1 → третья RIR0)"
         >🎯 Имитация соревнований (mock meet){mockMeetOn ? ' ✓' : ''}</button>
         <button
           onClick={() => setMeetWeekOn(v => !v)}
-          style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: meetWeekOn ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.08)', background: meetWeekOn ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.02)', color: meetWeekOn ? '#eab308' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
+          style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: meetWeekOn ? '1px solid #eab308' : '1px solid rgba(255,255,255,0.08)', background: meetWeekOn ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.02)', color: meetWeekOn ? '#eab308' : '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
           title="Неделя соревнований В КОНЦЕ плана: прикиды (опенер/вторая/третья ×1) как подходы дня старта — план готов полностью"
         >🏁 Неделя соревнований в конце{meetWeekOn ? ' ✓' : ''}</button>
         <button
           onClick={() => setPostMeetOn(v => !v)}
-          style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: postMeetOn ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: postMeetOn ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: postMeetOn ? '#34d399' : 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
+          style={{ alignSelf: 'flex-end', minHeight: 44, borderRadius: 8, border: postMeetOn ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: postMeetOn ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: postMeetOn ? '#34d399' : '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '8px 12px' }}
           title="Восстановительная неделя ПОСЛЕ соревнований: объём ×0.5, RIR +3 — полная разгрузка после прикидок"
         >🔄 Пост-старт неделя{postMeetOn ? ' ✓' : ''}</button>
         <button
@@ -396,17 +396,17 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           <button
             onClick={() => setAutoRegMode('diary')}
-            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'diary' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'diary' ? '#000' : 'rgba(255,255,255,0.6)' }}>
+            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'diary' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'diary' ? '#000' : '#fff' }}>
             📓 Авто-дневник
           </button>
           <button
             onClick={() => setAutoRegMode('auto')}
-            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'auto' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'auto' ? '#000' : 'rgba(255,255,255,0.6)' }}>
+            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'auto' ? '#60a5fa' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'auto' ? '#000' : '#fff' }}>
             🤖 Авто
           </button>
           <button
             onClick={() => setAutoRegMode('off')}
-            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'off' ? '#71717a' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'off' ? '#000' : 'rgba(255,255,255,0.6)' }}>
+            style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === 'off' ? '#71717a' : 'rgba(255,255,255,0.08)', color: autoRegMode === 'off' ? '#000' : '#fff' }}>
             ВЫКЛ
           </button>
         </div>
@@ -425,14 +425,14 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 6 }}>
               {(rec.toCut > 0 ? rec.recommendations : rec.toGain > 0 ? rec.gainRecommendations : rec.recommendations).map((r, i) => (
-                <div key={i} style={{ fontSize: 10, color: r.startsWith('❌') ? '#f87171' : r.startsWith('⚠') ? '#fbbf24' : r.startsWith('✅') ? '#4ade80' : 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>{r}</div>
+                <div key={i} style={{ fontSize: 10, color: r.startsWith('❌') ? '#f87171' : r.startsWith('⚠') ? '#fbbf24' : r.startsWith('✅') ? '#4ade80' : '#fff', lineHeight: 1.4 }}>{r}</div>
               ))}
             </div>
             {(rec.toCut > 0 ? rec.timeline : rec.toGain > 0 ? rec.gainTimeline : rec.timeline).length > 0 && (
               <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
                 {(rec.toCut > 0 ? rec.timeline : rec.toGain > 0 ? rec.gainTimeline : rec.timeline).map(t => (
                   <div key={t.week} title={t.note} style={{ padding: '3px 6px', borderRadius: 6, fontSize: 9, background: t.week === weeksToMeet ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${t.week === weeksToMeet ? 'rgba(245,158,11,0.4)' : 'rgba(255,255,255,0.08)'}` }}>
-                    <b style={{ color: t.week === weeksToMeet ? '#f59e0b' : 'rgba(255,255,255,0.8)' }}>Н{t.week}</b> {t.weight.toFixed(1)} кг
+                    <b style={{ color: t.week === weeksToMeet ? '#f59e0b' : '#fff' }}>Н{t.week}</b> {t.weight.toFixed(1)} кг
                   </div>
                 ))}
               </div>
@@ -451,10 +451,10 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               {peakCut.warnings.map((w, i) => (
                 <div key={i} style={{ fontSize: 10, color: '#fbbf24', lineHeight: 1.4, marginBottom: 4 }}>⚠ {w}</div>
               ))}
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, marginBottom: 6 }}>{peakCut.summary}</div>
+              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4, marginBottom: 6 }}>{peakCut.summary}</div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+                  <tr style={{ fontSize: 9, color: '#fff' }}>
                     <th style={{ textAlign: 'left', padding: '4px 6px' }}>День</th>
                     <th style={{ textAlign: 'left', padding: '4px 6px' }}>Вода</th>
                     <th style={{ textAlign: 'left', padding: '4px 6px' }}>Натрий</th>
@@ -464,10 +464,10 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 <tbody>
                   {peakCut.days.map(d => (
                     <tr key={d.day} style={{ fontSize: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                      <td style={{ padding: '4px 6px', fontWeight: 700, color: d.day === 7 ? '#f59e0b' : 'rgba(255,255,255,0.85)' }}>{d.label}</td>
-                      <td style={{ padding: '4px 6px', color: 'rgba(255,255,255,0.7)' }}>{d.waterMl}</td>
-                      <td style={{ padding: '4px 6px', color: 'rgba(255,255,255,0.7)' }}>{d.sodiumMg}</td>
-                      <td style={{ padding: '4px 6px', color: 'rgba(255,255,255,0.7)' }}>{d.carbsG}</td>
+                      <td style={{ padding: '4px 6px', fontWeight: 700, color: d.day === 7 ? '#f59e0b' : '#fff' }}>{d.label}</td>
+                      <td style={{ padding: '4px 6px', color: '#fff' }}>{d.waterMl}</td>
+                      <td style={{ padding: '4px 6px', color: '#fff' }}>{d.sodiumMg}</td>
+                      <td style={{ padding: '4px 6px', color: '#fff' }}>{d.carbsG}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -527,7 +527,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               onNote('↺ Тапер уже в плане — сгенерируйте план заново, чтобы убрать.');
             }
           }}
-          style={{ ...BTN_GHOST, minHeight: 44, fontSize: 11, border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', display: taperNote ? 'inline-flex' : 'none' }}
+          style={{ ...BTN_GHOST, minHeight: 44, fontSize: 11, border: '1px solid rgba(255,255,255,0.08)', color: '#fff', display: taperNote ? 'inline-flex' : 'none' }}
           title="Тапер уже добавлен — пересоберите план, чтобы начать заново"
         >ℹ️ в плане</button>
         <button
@@ -545,7 +545,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 weekCount: builtSrc.weeks.length,
                 taperWeeks: taperWeeksToAdd,
                 mockMeet: mockMeetOn,
-                meetWeek: meetWeekOn,
+                meetНеделя: meetWeekOn,
                 weights: { squat: pmSquat, bench: pmBench, deadlift: pmDead },
                 meetAttempts: lastAttempts?.lifts ?? [],
                 plan: builtSrc,
@@ -580,7 +580,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           ? `${taperPlan.weeks.length} нед · ${mockMeetOn ? '🎯 mock · ' : ''}📉 тапер ×${taperWeeksToAdd}${meetWeekOn ? ' · 🏁 соревнования' : ''}${Object.values(taperActualPm).some(v => v > 0) ? ' · веса от факт. ПМ' : ''}${Object.values(taperPlannedPm).some(v => v > 0) ? ' · прикиды от плана' : ''} — раскройте для деталей`
           : 'Не сгенерирован — кнопка «📋 Сгенерировать тапер-план» выше. Отдельная карточка, weeks цикла не изменяются.'}
         full={!taperPlan ? (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5 }}>
             Сгенерируйте тапер-план кнопкой выше — он появится здесь отдельной карточкой, не изменяя weeks цикла (календарь не захламится). Тапер строится под разницу ПМ: тренировочные веса — от фактического ПМ после цикла, прикиды/попытки — от планируемого ПМ в федерации.
           </div>
         ) : (() => {
@@ -619,7 +619,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   w.meetWeek ? '🏁' : w.mockMeet ? '🎯' : w.postMeet ? '🔄' : w.rampWeek ? '📈' : '📉';
                 return (
                   <div style={{ marginTop: 8, marginBottom: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>🗺 Пик-блок ({tail.length} нед)</div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 6 }}>🗺 Пик-блок ({tail.length} нед)</div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                       {tail.map(w => {
                         const c = colorOf(w);
@@ -627,12 +627,12 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                         return (
                           <div key={w.week} title={`Нед ${w.week}${date ? ' · ' + date : ''}`} style={{ flex: '1 1 60px', minWidth: 56, padding: '6px 8px', borderRadius: 8, textAlign: 'center', background: c + '1a', border: `1px solid ${c}55`, fontSize: 11, fontWeight: 700, color: c }}>
                             <div>{labelOf(w)}</div>
-                            <div style={{ fontSize: 9, fontWeight: 400, color: 'rgba(255,255,255,0.5)' }}>нед {w.week}</div>
+                            <div style={{ fontSize: 9, fontWeight: 400, color: '#fff' }}>нед {w.week}</div>
                           </div>
                         );
                       })}
                     </div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6, fontSize: 9, color: '#fff' }}>
                       <span>📈 Вход в пик</span><span>🎯 Mock</span><span>📉 Тапер</span><span>🏁 Соревнования</span><span>🔄 Пост</span>
                     </div>
                   </div>
@@ -651,21 +651,21 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                       <div key={m.id} style={{ marginTop: 4, padding: 6, borderRadius: 8, background: isMain ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${isMain ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.08)'}` }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 10 }}>
                           <b style={{ color: isMain ? '#fbbf24' : '#93c5fd' }}>{isMain ? '⭐' : '·'} {m.name}</b>
-                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>через {m.weeksToStart} нед</span>
-                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>{fedRu[m.fed] || m.fed}</span>
-                          <span style={{ color: 'rgba(255,255,255,0.5)' }}>{MEET_STRATEGY_PCT_LABEL[m.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}</span>
+                          <span style={{ color: '#fff' }}>через {m.weeksToStart} нед</span>
+                          <span style={{ color: '#fff' }}>{fedRu[m.fed] || m.fed}</span>
+                          <span style={{ color: '#fff' }}>{MEET_STRATEGY_PCT_LABEL[m.strategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}</span>
                           {!isMain && <span style={{ fontSize: 9, color: '#93c5fd', padding: '1px 6px', borderRadius: 5, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.25)' }}>контрольный: сокращённый пик 1-2 нед перед стартом</span>}
                         </div>
                         {attempts ? (
                           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                             {attempts.lifts.map(l => (
-                              <span key={l.name} style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
+                              <span key={l.name} style={{ fontSize: 9, color: '#fff' }}>
                                 <b>{l.name}</b>: {Math.round(l.opener * 10) / 10} / {Math.round(l.second * 10) / 10} / {Math.round(l.third * 10) / 10}
                               </span>
                             ))}
                           </div>
                         ) : (
-                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>Задайте план ПМ (выше) — прикиды появятся автоматически.</div>
+                          <div style={{ fontSize: 9, color: '#fff', marginTop: 3 }}>Задайте план ПМ (выше) — прикиды появятся автоматически.</div>
                         )}
                       </div>
                     );
@@ -683,16 +683,16 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                   const vsForecast = actual > 0 && forecast > 0 ? actual - forecast : 0;
                   return (
                     <div key={name} style={{ padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 10 }}>
-                      <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{name === 'Присед' ? 'Присед' : name === 'Жим лежа' ? 'Жим' : 'Тяга'}</div>
-                      <div style={{ marginTop: 2 }}><span style={{ color: 'rgba(255,255,255,0.45)' }}>факт: </span><b style={{ color: actual > 0 ? '#22c55e' : 'rgba(255,255,255,0.4)' }}>{actual > 0 ? actual : '—'}</b></div>
-                      <div><span style={{ color: 'rgba(255,255,255,0.45)' }}>план: </span><b style={{ color: planned > 0 ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>{planned > 0 ? planned : '—'}</b></div>
+                      <div style={{ fontWeight: 700, color: '#fff' }}>{name === 'Присед' ? 'Присед' : name === 'Жим лежа' ? 'Жим' : 'Тяга'}</div>
+                      <div style={{ marginTop: 2 }}><span style={{ color: '#fff' }}>факт: </span><b style={{ color: actual > 0 ? '#22c55e' : '#fff' }}>{actual > 0 ? actual : '—'}</b></div>
+                      <div><span style={{ color: '#fff' }}>план: </span><b style={{ color: planned > 0 ? '#f59e0b' : '#fff' }}>{planned > 0 ? planned : '—'}</b></div>
                       {diff !== 0 && <div style={{ fontSize: 9, fontWeight: 800, color: diff > 0 ? '#fbbf24' : '#60a5fa' }}>{diff > 0 ? '▲ +' + diff : '▼ ' + diff} кг к старту</div>}
                       {vsForecast !== 0 && <div style={{ fontSize: 9, fontWeight: 800, color: vsForecast > 0 ? '#22c55e' : '#f87171' }}>vs прогноз цикла {vsForecast > 0 ? '▲ +' + Math.round(vsForecast) : '▼ ' + Math.round(vsForecast)} кг</div>}
                     </div>
                   );
                 })}
                 <div style={{ padding: 6, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 10 }}>
-                  <div style={{ fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>Федерация</div>
+                  <div style={{ fontWeight: 700, color: '#fff' }}>Федерация</div>
                   <div style={{ marginTop: 2 }}>{fedRu[taperFed] || taperFed} · стратегия {MEET_STRATEGY_PCT_LABEL[attemptStrategy] ?? MEET_STRATEGY_PCT_LABEL.balanced}</div>
                 </div>
               </div>
@@ -790,13 +790,13 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                     const opener = scale(att.lifts[0].opener);
                     if (!opener) return null;
                     const steps = MEET_WARMUP_STEPS.map(p => ({ pct: p, weight: Math.round(opener * p * 2) / 2, reps: p < 0.7 ? 5 : p < 0.85 ? 3 : 1 }));
-                    return <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>🔥 Разминка: {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)</div>;
+                    return <div style={{ marginTop: 4, fontSize: 9, color: '#fff' }}>🔥 Разминка: {steps.map(s => `${Math.round(s.pct * 100)}%×${s.reps}`).join(' → ')} ({steps.map(s => s.weight).join('/')} кг)</div>;
                   })()}
                 </div>
                 );
               })())}
               {/* Последние тяжёлые */}
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.5 }}>
                 ⏱ Последние тяжёлые до старта: присед — {LAST_HEAVY_DAYS.squat} дн. · жим — {LAST_HEAVY_DAYS.bench} дн. · тяга — {LAST_HEAVY_DAYS.deadlift} дн.
               </div>
               {/* 📅 Таймлайн дня соревнований (по регламенту федерации) */}
@@ -811,7 +811,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                 ].map(([t, d], i) => (
                   <div key={i} style={{ display: 'flex', gap: 6, fontSize: 9, lineHeight: 1.4, marginTop: 3 }}>
                     <b style={{ color: '#eab308', width: 80, flexShrink: 0 }}>{t}</b>
-                    <span style={{ color: 'rgba(255,255,255,0.6)' }}>{d}</span>
+                    <span style={{ color: '#fff' }}>{d}</span>
                   </div>
                 ))}
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
@@ -838,7 +838,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
                         weekCount: taperPlan.weeks.length,
                         taperWeeks: taperWeeksToAdd,
                         mockMeet: mockMeetOn,
-                        meetWeek: meetWeekOn,
+                        meetНеделя: meetWeekOn,
                         weights: { squat: pmSquat, bench: pmBench, deadlift: pmDead },
                         meetAttempts: lastAttempts?.lifts ?? [],
                         plan: taperPlan,
