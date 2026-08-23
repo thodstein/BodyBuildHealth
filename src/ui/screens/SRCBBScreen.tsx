@@ -1759,10 +1759,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         </div>
       )}
 
-      {/* 🔧 Корректор движений — единый готовый инструмент (вместо легаси «Слабые точки + 10 калькуляторов») */}
+      {/* 🔧 Корректор движений — единый готовый инструмент 9 лифтов + видео (вместо легаси 4 слоя) */}
       {mainTab === 'pl' && subView === 'diagnostics' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
-          <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
+          <LiftMasterCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>← 1 Настройки</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>3 План →</button>
