@@ -2687,7 +2687,7 @@ ull → default. Реальные значения лежат в UnifiedSettings
 ### Инструкции — честный source (lab/catalog/generic)
 - **Баг**: `getExerciseBio` имеет generic-fallback → `source` был 'exercise-lab' для ВСЕХ 562 (UI врал «лаборатория»).
 - **Фикс**: NEW `hasExerciseBioEntry(id)` в exercise-biomechanics-db; `findBio` возвращает `hasLabBio`; `buildExerciseInstructions` даёт 'exercise-lab' ТОЛЬКО при реальной записи/маппинге/целевой мышце, иначе 'catalog' (техника каталога) / 'generic'.
-- **Покрытие**: NEW ~230 записей в `exercise-id-mapping.ts` (bio → реальные записи БД): глобально 143→**385/562**; **упражнения реальных ББ-планов 228/228 — 100% exercise-lab** (было 86/228).
+- **Покрытие**: NEW ~230 записей в `exercise-id-mapping.ts` (bio → реальные записи БД): глобально 143→**385/562**; **упражнения реальных ББ-планов 228/228 — 100% exercise-lab** (было 84/228).
 - **Тесты**: NEW `bb-instructions-source.test.ts` — 4 (все план-упражнения lab / экзотика kb_tgu → честно 'catalog' / неизвестное → 'generic' / классика → lab).
 
 ### Качество — единый score (проверено, уже unified)
