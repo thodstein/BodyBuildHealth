@@ -6,7 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   spreadSessionsAcrossDays, DAY_LABELS_RU, CARDIO_PHASE_LABELS,
-  type CardioCycle, type CardioType,
+  type CardioCycle, type CardioType, type CardioPhase,
 } from '../../../engines/lms/cardio.engine';
 import { CARD, ROW, LABEL, BTN, BTN_SMALL, PHASE_COLOR, PHASE_BG, TYPE_COLOR } from './CardioUI';
 
@@ -96,19 +96,19 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
               key={idx}
               style={{
                 minHeight: 66, borderRadius: 10, padding: '5px 6px', display: 'flex', flexDirection: 'column', gap: 3,
-                background: isToday ? 'linear-gradient(180deg, rgba(0,230,138,0.14), rgba(0,230,138,0.04))' : hasSessions ? (PHASE_BG[info!.phase] ?? 'rgba(255,255,255,0.03)') : 'rgba(255,255,255,0.025)',
-                border: isToday ? '1px solid rgba(0,230,138,0.45)' : isLegConflict ? '1px solid rgba(239,68,68,0.35)' : hasSessions ? `1px solid ${PHASE_COLOR[info!.phase] ?? 'rgba(255,255,255,0.07)'}44` : '1px solid rgba(255,255,255,0.06)',
+                background: isToday ? 'linear-gradient(180deg, rgba(0,230,138,0.14), rgba(0,230,138,0.04))' : hasSessions ? ((PHASE_BG as Record<string, string>)[info!.phase] ?? 'rgba(255,255,255,0.03)') : 'rgba(255,255,255,0.025)',
+                border: isToday ? '1px solid rgba(0,230,138,0.45)' : isLegConflict ? '1px solid rgba(239,68,68,0.35)' : hasSessions ? `1px solid ${((PHASE_COLOR as Record<string, string>)[info!.phase] ?? 'rgba(255,255,255,0.07)')}44` : '1px solid rgba(255,255,255,0.06)',
                 boxShadow: isToday ? '0 0 10px rgba(0,230,138,0.18)' : 'none',
                 opacity: inMonth ? 1 : 0.3,
               }}
-              title={info ? `${dateIso} · ${CARDIO_PHASE_LABELS[info.phase] ?? info.phase}${info.sessions.length ? ' · ' + info.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}м`).join(', ') : ' · отдых'}` : dateIso}
+              title={info ? `${dateIso} · ${(CARDIO_PHASE_LABELS as Record<string, string>)[info.phase] ?? info.phase}${info.sessions.length ? ' · ' + info.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}м`).join(', ') : ' · отдых'}` : dateIso}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: isToday ? 900 : 700, color: isToday ? '#00e68a' : 'rgba(255,255,255,0.75)' }}>{dayNum}</span>
                 {info?.isLegDay && <span style={{ fontSize: 9 }} title="День ног">🦵</span>}
                 {isToday && <span style={{ fontSize: 8, fontWeight: 800, color: '#00e68a', background: 'rgba(0,230,138,0.15)', borderRadius: 4, padding: '1px 4px' }}>сегодня</span>}
                 <span style={{ flex: 1 }} />
-                {info && <span style={{ width: 6, height: 6, borderRadius: 3, background: PHASE_COLOR[info.phase] ?? '#888' }} />}
+                {info && <span style={{ width: 6, height: 6, borderRadius: 3, background: (PHASE_COLOR as Record<string, string>)[info.phase] ?? '#888' }} />}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                 {info?.sessions.map((s, j) => (
@@ -118,7 +118,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
                 ))}
                 {hasSessions === false && info && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>отдых</span>}
               </div>
-              {info?.weekNo && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.32)', marginTop: 'auto' }}>нед {info.weekNo} · {CARDIO_PHASE_LABELS[info.phase] ?? info.phase}</div>}
+              {info?.weekNo && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.32)', marginTop: 'auto' }}>нед {info.weekNo} · {(CARDIO_PHASE_LABELS as Record<string, string>)[info.phase] ?? info.phase}</div>}
             </div>
           );
         })}

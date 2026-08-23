@@ -97,11 +97,12 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90 }}>
             {series.map((s, i) => {
-              const h = Math.max(2, Math.round((s[metric] / max) * 78));
+              const val = (s as unknown as Record<string, number>)[metric] ?? 0;
+              const h = Math.max(2, Math.round((val / max) * 78));
               const phaseLabel = CARDIO_PHASE_LABELS[s.phase] ?? s.phase;
               const fVal = factValues[i] ?? 0;
               const fh = fVal > 0 ? Math.max(2, Math.round((fVal / max) * 78)) : 0;
-              const tip = 'Нед ' + s.week + ': план ' + s[metric] + ' ' + label + ' · ' + phaseLabel + (s.taper ? ' · taper/делод' : '') + (fVal > 0 ? ' · факт ' + fVal + ' ' + label : '');
+              const tip = 'Нед ' + s.week + ': план ' + val + ' ' + label + ' · ' + phaseLabel + (s.taper ? ' · taper/делод' : '') + (fVal > 0 ? ' · факт ' + fVal + ' ' + label : '');
               return (
                 <div key={s.week} title={tip} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                   <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end', height: 82 }}>
