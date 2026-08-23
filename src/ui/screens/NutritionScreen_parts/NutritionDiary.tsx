@@ -260,8 +260,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       setOcrError('Фото больше 15 МБ. Сделайте скриншот экрана или уменьшите изображение и повторите.');
       return;
     }
-    try { 
-      const result = await processUploadedFile(file); 
+    try {
+      const result = await Promise.race([
+        processUploadedFile(file),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), 45_000)),
+      ]);
       if (result.meals.length > 0) setParsedItems(prev => [...prev, ...convertOCRItems(result.meals, usdaFoods)]); 
       if (result.meals.length === 0 && result.labs.length === 0) setOcrError(result.warnings[0] || 'Не удалось распознать данные питания.'); 
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } 
