@@ -611,9 +611,10 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         </div>
       )}
       {isHybrid && (
-        <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', fontSize: 10, color: '#fff', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', fontSize: 10, color: '#fff', display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
           <span>🔀 Гибрид: оцените обе вкладки — <b>ББ</b> и <b>ПЛ</b> отдельно, затем сравните PRO-корректировки.</span>
           <span style={{ color: '#a78bfa', fontWeight: 700 }}>{division === 'bb' ? 'ББ вид' : 'ПЛ вид'}</span>
+          <button onClick={() => setDivision(d => d === 'bb' ? 'pl' : 'bb')} style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.12)', color: '#a78bfa', cursor: 'pointer', fontSize: 9, fontWeight: 700 }}>⇄ Сравнить гибрид</button>
         </div>
       )}
 
@@ -864,14 +865,32 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         <button
           onClick={() => {
             const header = `Калькулятор качества — ${division === 'bb' ? 'ББ' : 'ПЛ'} — ${selectedProgram?.meta.title || ''}`;
-            const linesCsv = [
+            const proScore = pro ? Math.max(0, Math.min(100, analysis.score + pro.scoreDelta)) : analysis.score;
+            const linesCsv: string[][] = [
               ['Программа', selectedProgram?.meta.title || '', selectedProgram?.meta.direction || '', effectiveLevel, division],
-              ['Оценка', String(analysis.score), analysis.grade, `PRO ${pro ? Math.max(0, Math.min(100, analysis.score + pro.scoreDelta)) : analysis.score}`],
+              ['Оценка', String(analysis.score), analysis.grade, `PRO ${proScore}`],
               ['Уровень', effectiveLevel, pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2)}` : 'Натурал', `Лаб ×${labMult.toFixed(2)}`],
               [],
               ['Мышца', 'Пик', 'MEV', 'MAV', 'MRV', 'Статус', '%MRV', 'Ср/нед'],
               ...analysis.perMuscle.map(p => [ru(p.muscle), String(p.peakSets), String(p.mev), String(p.mav), String(p.mrv), p.status, String(p.mrv ? Math.round((p.peakSets / p.mrv) * 100) : 0), String(p.avgSets)]),
             ];
+            // PRO-детали
+            if (pro) {
+              linesCsv.push([], ['PRO — Паттерны'], ...pro.patterns.map(p => [ru(p.muscle), p.patterns.join('|') || '—', `${p.distinct}/${p.expected.length}`, p.ok ? 'OK' : '⚠']));
+              linesCsv.push([], ['PRO — Углы'], ...pro.angles.map(a => [ru(a.muscle), a.angles.join('|') || '—', `${Math.round(a.coverage * 100)}%`, a.ok ? 'OK' : '⚠']));
+              linesCsv.push([], ['PRO — Растяжка'], ...pro.stretches.map(s => [ru(s.muscle), s.stretchExercises.join('|') || '—', s.ok ? 'есть' : 'нет']));
+              linesCsv.push([], ['PRO — Техника', `${pro.technique.pct}%`, pro.technique.distinct.join('|') || 'нет', pro.technique.ok ? 'OK' : pro.technique.issue || '']);
+              linesCsv.push([], ['PRO — Цель', pro.goalAlignment.goal, `${pro.goalAlignment.volumePctAvg}% MRV`, `${pro.goalAlignment.techniquePct}%`, `${Math.round(pro.goalAlignment.stretchCoverage * 100)}%`, pro.goalAlignment.ok ? 'OK' : pro.goalAlignment.issue || '']);
+            }
+            if (division === 'bb' && bbReportExtras) {
+              linesCsv.push([], ['BB-отчет — Фазы', ...Object.entries(bbReportExtras.phaseCount).map(([k, v]) => `${k}×${v}`)]);
+              linesCsv.push(['BB-отчет — Баланс', `${bbReportExtras.pull}/${bbReportExtras.press}`, `ratio ${bbReportExtras.ratio}`]);
+              linesCsv.push(['BB-отчет — Методики', `superset ${bbReportExtras.superset}`, `tech ${bbReportExtras.tech}`, bbReportExtras.dup ? `DUP ${bbReportExtras.dup}` : '']);
+            }
+            if (division === 'pl' && plReportExtras) {
+              linesCsv.push([], ['ПЛ-отчет — Фазы', ...Object.entries(plReportExtras.phaseCount).map(([k, v]) => `${k}×${v}`)]);
+              linesCsv.push(['ПЛ-отчет — Пик КПШ', String(plReportExtras.peakK), `прогрессия ${plReportExtras.progPct}%`]);
+            }
             const csv = linesCsv.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blobCsv = new Blob([csv], { type: 'text/csv;charset=utf-8' });
             const urlCsv = URL.createObjectURL(blobCsv);
