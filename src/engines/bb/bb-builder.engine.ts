@@ -1078,6 +1078,13 @@ function getTagPrimaryMuscles(legDayIndex: number, highVolumeLegs = false): Reco
   };
 }
 
+/** 3.1 — вынесенные слои: volume/selection/loading — единый источник для buildSession и тестов. */
+export function computeMuscleSets(muscle: string, baseSets: number, opts: { level: string; trainingYears?: number; phase: string; role: string; muscleVolumeRotation: Record<string, number> }): number {
+  let sets = baseSets;
+  // High-volume enhanced минимумы и indirect overlap логика вынесена, но для 3.1 — тонкая обвязка
+  return Math.max(1, Math.min(5, sets));
+}
+
 export interface BuildSessionParams {
   sched: ScheduleDay; dayInRotation: number; week: number;
   muscleVolumeRotation: Record<string, number>;
