@@ -15,7 +15,7 @@ export interface PlanQualityResult {
 export function computePlanQualityFor(
   program: UserProgram,
   level: string,
-  opts?: { onCourse?: boolean; courseIntensity?: string; labMult?: number },
+  opts?: { onCourse?: boolean; courseIntensity?: string; labMult?: number; division?: 'bb'|'pl' },
 ): PlanQualityResult {
   const BASE_MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
   const weeklySetsByMuscle: Record<string, number[]> = {};
@@ -74,6 +74,8 @@ export function computePlanQualityFor(
   const onCourse = opts?.onCourse ?? false;
   const courseIntensity = opts?.courseIntensity ?? 'moderate';
   const labMult = opts?.labMult ?? 1;
+  const division = opts?.division || (program.meta.direction === 'pl' ? 'pl' : program.meta.direction === 'bb' ? 'bb' : undefined);
+  const isPL = division === 'pl' || (!division && !!program.pl?.customWeeks && !program.bb);
 
   for (const [muscle, peak] of Object.entries(setsByMuscle)) {
     const lm = getVolumeLandmarks(level, muscle);
@@ -96,11 +98,14 @@ export function computePlanQualityFor(
     let status: 'over' | 'high' | 'ok' | 'low';
     if (peak > mrv) {
       status = 'over'; totalScore -= 8; issues.push(`⚠ ${muscle}: пик ${peak} > MRV (${mrv}) — перетрен`);
-    } else if (avg < mev) {
-      // Пик может быть высоким, но средний ниже MEV — недогруз по мезоциклу
+    } else if (!isPL && avg < mev) {
+      // ББ: недогруз по среднему — Schoenfeld 2016 (нужна частота). ПЛ — не штрафуем low (Прилепин: низкий объём = высокая интенсивность)
       status = 'low'; totalScore -= 3; issues.push(`⬇ ${muscle}: средний ${avg} < MEV (${mev}) — недогруз`);
+    } else if (isPL && avg < Math.round(mev * 0.5)) {
+      // ПЛ: только критический недогруз <50% MEV
+      status = 'low'; totalScore -= 1; issues.push(`⬇ ${muscle}: средний ${avg} < 50% MEV (${mev}) — критический недогруз`);
     } else if (peak >= mav) {
-      status = 'high'; totalScore -= 2;
+      status = 'high'; totalScore -= isPL ? 1 : 2;
     } else {
       status = 'ok';
     }

@@ -127,6 +127,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       onCourse: usePed,
       courseIntensity: courseIntensity as any,
       labMult: labMult,
+      division,
     });
   }, [selectedProgram, effectiveLevel, usePed, courseIntensity, labMult, division]);
 
@@ -156,7 +157,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     if (division === 'bb' && selectedProgram.meta.direction === 'hybrid' && !progForCalc.bb && progForCalc.hybrid?.bbWeeks) {
       progForCalc = { ...progForCalc, bb: { direction: 'bb', weeks: progForCalc.hybrid.bbWeeks as any, volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] }, constraints: { equipment: [] }, microcycleTemplate: { daySlots: [] } } as any } as UserProgram;
     }
-    return computePlanQualityFor(progForCalc, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1 });
+    return computePlanQualityFor(progForCalc, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1, division });
   }, [selectedProgram, effectiveLevel, usePed, useLab, labMult, division]);
 
   const pro = useMemo(() => {
@@ -248,18 +249,31 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     } catch { return null; }
   }, [selectedProgram, division, analysis]);
 
-  // BB недельная прогрессия — тоннаж и эфф. сеты по неделям (для графика)
+  // BB недельная прогрессия — тоннаж и эфф. сеты по неделям (передискретизация PM×% — C)
   const bbWeeklyChart = useMemo(() => {
     if (division !== 'bb' || !selectedProgram?.bb) return null;
     try {
       const weeks: any[] = (selectedProgram.bb as any).weeks || [];
       if (!weeks.length) return null;
+      const profileWorkMax: Record<string, number> = (() => {
+        try { const p = loadTrainingProfile() as any; return p?.workMax || {}; } catch { return {}; }
+      })();
+      const muscleWorkMaxMap: Record<string, number> = {
+        chest: profileWorkMax.chest || 100, back: profileWorkMax.back || 110, quads: profileWorkMax.quads || 140,
+        hamstrings: profileWorkMax.hamstrings || 90, glutes: profileWorkMax.glutes || 160, shoulders: profileWorkMax.shoulders || 60,
+        biceps: profileWorkMax.biceps || 50, triceps: profileWorkMax.triceps || 60, calves: profileWorkMax.calves || 120, abs: profileWorkMax.abs || 60,
+        legs: profileWorkMax.quads || 120, arms: profileWorkMax.biceps || 50,
+      };
       return weeks.map((w: any, wi: number) => {
         let ton = 0, eff = 0, sets = 0;
         for (const s of (w.sessions || [])) {
           for (const b of (s.blocks || [])) {
+            const muKey = String(b.muscle || '').toLowerCase();
+            const fallback = muscleWorkMaxMap[muKey] || 60;
             for (const st of (b.sets || [])) {
-              const wgt = (st as any).weight || 60;
+              const pct = (st as any).pctOf1RM ?? (st as any).pct ?? 0;
+              const baseW = (st as any).weight;
+              const wgt = Number.isFinite(baseW) && baseW > 0 ? baseW : (pct > 0 ? Math.round(fallback * pct) : fallback);
               const reps = Number(st.reps) || 8;
               ton += wgt * reps;
               sets += 1;
@@ -281,6 +295,19 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       const freq: Record<string, number> = {};
       let hardSets = 0, totalSets = 0, rirSum = 0, rirN = 0, tonnage = 0, effectiveSets = 0;
       const perMuscleSets: Record<string, number> = {};
+      // B: реальный workMax из профиля (а не 60) — как в bb-builder
+      const profileWorkMax: Record<string, number> = (() => {
+        try {
+          const p = loadTrainingProfile() as any;
+          return p?.workMax || {};
+        } catch { return {}; }
+      })();
+      const muscleWorkMaxMap: Record<string, number> = {
+        chest: profileWorkMax.chest || 100, back: profileWorkMax.back || 110, quads: profileWorkMax.quads || 140,
+        hamstrings: profileWorkMax.hamstrings || 90, glutes: profileWorkMax.glutes || 160, shoulders: profileWorkMax.shoulders || 60,
+        biceps: profileWorkMax.biceps || 50, triceps: profileWorkMax.triceps || 60, calves: profileWorkMax.calves || 120, abs: profileWorkMax.abs || 60,
+        legs: profileWorkMax.quads || 120, arms: profileWorkMax.biceps || 50,
+      };
       for (const w of weeks) {
         for (const s of (w.sessions || [])) {
           const musclesInSess = new Set<string>();
@@ -293,7 +320,12 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             const sets = (b.sets?.length || 0);
             totalSets += sets;
             for (const st of (b.sets || [])) {
-              const wgt = (st as any).weight || 60;
+              // B: вес из workMax с учётом pctOf1RM, иначе профиль по мышце
+              const pct = (st as any).pctOf1RM ?? (st as any).pct ?? 0;
+              const baseW = (st as any).weight;
+              const muKey = String(b.muscle || '').toLowerCase();
+              const fallback = muscleWorkMaxMap[muKey] || 60;
+              const wgt = Number.isFinite(baseW) && baseW > 0 ? baseW : (pct > 0 ? Math.round(fallback * pct) : fallback);
               const reps = Number(st.reps) || 8;
               tonnage += wgt * reps;
               if ((st.rir ?? 2) <= 3 && reps >= 5) effectiveSets += 1;
