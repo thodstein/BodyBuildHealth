@@ -80,6 +80,7 @@ const GRP_RU: Record<string, string> = {
   triceps: 'трицепс', forearms: 'предплечья', traps: 'трапеции', abs: 'пресс',
 };
 
+const toLocalIso = (d: Date): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const weekStart = (d: Date): Date => { const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; };
 
 /** Недельные прямые сеты по мышцам за последние N недель (факт из дневника). */
@@ -90,7 +91,7 @@ export function weeklySetsByMuscle(workouts: WorkoutLog[], weeks = 3): Record<st
   const res: Record<string, number[]> = {};
   starts.forEach((s, wi) => {
     const e = new Date(s); e.setDate(e.getDate() + 6);
-    const ss = s.toISOString().slice(0, 10), ee = e.toISOString().slice(0, 10);
+    const ss = toLocalIso(s), ee = toLocalIso(e);
     workouts.forEach(w => {
       if (w.date < ss || w.date > ee) return;
       (w.exercises || []).forEach(ex => {
@@ -127,7 +128,7 @@ function lastAvgRir(workouts: WorkoutLog[] | undefined): number | null {
 function sessionsLast7(workouts: WorkoutLog[] | undefined): number {
   if (!workouts?.length) return 0;
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
-  const key = cutoff.toISOString().slice(0, 10);
+  const key = toLocalIso(cutoff);
   return workouts.filter(w => w.date >= key).length;
 }
 

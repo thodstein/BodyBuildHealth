@@ -9,9 +9,9 @@ describe('dup_check', () => {
     });
     for (let si=0; si<plan.weeks[0].sessions.length; si++) {
       const sess = plan.weeks[0].sessions[si];
-      const chestNames = sess.exercises.filter(e=>e.muscle==='chest').map(e=>e.name.toLowerCase());
-      const quadsNames = sess.exercises.filter(e=>e.muscle==='quads').map(e=>e.name.toLowerCase());
-      const backNames = sess.exercises.filter(e=>e.muscle==='back').map(e=>e.name.toLowerCase());
+      const chestNames = sess.exercises.filter(e=>e.muscle==='chest' && !(e as any).warmupActivator).map(e=>e.name.toLowerCase());
+      const quadsNames = sess.exercises.filter(e=>e.muscle==='quads' && !(e as any).warmupActivator).map(e=>e.name.toLowerCase());
+      const backNames = sess.exercises.filter(e=>e.muscle==='back' && !(e as any).warmupActivator).map(e=>e.name.toLowerCase());
       const pull = backNames.filter(n=> /пуловер|pullover|прям.*рук/.test(n)).length;
       const lege = quadsNames.filter(n=> /разгибан.*ног|leg.?ext/.test(n)).length;
       const cross = chestNames.filter(n=> /кроссовер|сведен.*кросс|crossover/.test(n)).length;

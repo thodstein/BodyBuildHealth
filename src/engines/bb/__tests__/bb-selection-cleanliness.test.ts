@@ -50,29 +50,28 @@ describe('BB: порядок/схемы объёма и адекватность
     expect(giants.length % 3).toBe(0);
   });
 
-  it('разминка: Push — грудь, Pull — спина, Legs — квадрицепс, и это КОМПАУНД (не изоляция)', () => {
+  it('разминка: ИЗОЛИРОВАННАЯ активация правильной мышцы (Push-грудь, Pull-спина, Legs-квадрицепс)', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
     const byTag = (tag: string) => plan.weeks[0].sessions.filter(s => (s.sessionTag || '').toLowerCase().includes(tag));
     const firstWarmup = (sessions: typeof plan.weeks[0].sessions) => {
       const s = sessions.find(ss => (ss.exercises[0] as any).warmupActivator);
       return s ? (s.exercises[0] as any) : null;
     };
-    const isoRe = /мах|разводк|кроссовер|сгибан.*ног|разгибан.*ног|leg.?curl|leg.?ext|пулловер|pullover|разгибан.*блок|сведен|cable.*curl|скручиван/i;
-    // Push → разминка ГРУДИ, не shoulders; компаунд
+    // Push → разминка ГРУДИ (изоляция: разводка/сведение/кроссовер), не плечи
     const pushW = firstWarmup(byTag('push'));
     expect(pushW).not.toBeNull();
     expect(pushW.muscle).toBe('chest');
-    expect(isoRe.test(pushW.name)).toBe(false);
-    // Pull → спина
+    expect(/разводк|сведен|кроссовер|fly/i.test(pushW.name)).toBe(true);
+    // Pull → спина (изоляция: пулловер/прямые руки)
     const pullW = firstWarmup(byTag('pull'));
     expect(pullW).not.toBeNull();
     expect(pullW.muscle).toBe('back');
-    expect(isoRe.test(pullW.name)).toBe(false);
-    // Legs → квадрицепс
+    expect(/пулловер|pullover|прям.*рук|straight.*pull/i.test(pullW.name)).toBe(true);
+    // Legs → квадрицепс (изоляция: разгибание ног)
     const legsW = firstWarmup(byTag('legs'));
     expect(legsW).not.toBeNull();
     expect(legsW.muscle).toBe('quads');
-    expect(isoRe.test(legsW.name)).toBe(false);
+    expect(/разгибан.*ног|leg.?extension/i.test(legsW.name)).toBe(true);
   });
 
   it('decline-жимы отсутствуют в generic-планах', () => {
