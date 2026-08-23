@@ -84,7 +84,7 @@ const getTempo = (exerciseName: string, goal: string, isMainLift: boolean): RepT
 type Mode = 'pl' | 'bb' | 'manual';
 
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.6)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.04)', padding: '12px', margin: '6px 0' };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.55)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.4 };
 const cardBg = CARD;
 const ACCENT = 'var(--accent)';
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
@@ -92,7 +92,7 @@ const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', colo
 const PILL = (active: boolean) => ({ padding:'7px 12px', borderRadius:20, fontSize:11, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
-const LABEL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '6px 0 3px' };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 8 };
 
 function getRecoveryMetrics(linked: any): Pick<LMSBuildInput, 'bodyFat' | 'leanMass' | 'hrvMs' | 'sleepHours' | 'stressLevel'> {
@@ -602,9 +602,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     if (!ctx || (mainTab === 'bb') !== ctx.isBB) return null;
     return (
       <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5, minWidth: 0 }}>
+        <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5, minWidth: 0 }}>
           ✏️ Правка блока годового плана: {ctx.weeks} нед · фаза «{ctx.phase}»{!ctx.isBB && ctx.cycleId ? ` · цикл «${getCycleById(ctx.cycleId)?.meta.title ?? ctx.cycleId}»` : ''}
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Соберите план с нужным числом недель и нажмите «💾 Сохранить в годовой план».</div>
+          <div style={{ fontSize: 10, color: '#fff' }}>Соберите план с нужным числом недель и нажмите «💾 Сохранить в годовой план».</div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           <button type="button" onClick={saveMacroEdit} style={{ ...BTN, minHeight: 36, fontSize: 10, padding: '6px 12px' }}>💾 Сохранить в годовой план</button>
@@ -1333,7 +1333,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {applyPayload && (
         <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--accent-dim)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 10, fontSize: 11, color: 'var(--accent)', fontWeight: 700, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ Применено: {applyPayload.label}</span>
-          <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontSize: 10, cursor: 'pointer', flexShrink: 0 }}>✕</button>
+          <button onClick={() => { clearPlannerApply(); setApplyPayload(null); }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontSize: 10, cursor: 'pointer', flexShrink: 0 }}>✕</button>
         </div>
       )}
       {methodNote && (
@@ -1394,7 +1394,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             }
             return (
               <>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>
                   Цикл использует {exs.length} упражнений. Укажите ПМ для каждого:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 6, boxSizing: 'border-box' }}>
@@ -1414,7 +1414,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           {(() => {
             const sourceCycle = getCycleById(selectedCycleId);
             const sourceWeeks = sourceCycle ? originalCycleWeeks(sourceCycle) : cycleWeeks;
-            return <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)', fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>
+            return <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)', fontSize: 11, color: '#fff' }}>
               📅 Оригинальная длина цикла: <b style={{ color: '#60a5fa' }}>{sourceWeeks} нед.</b> · календарь берётся из исходной раскладки СРЦ.
             </div>;
           })()}
@@ -1428,13 +1428,13 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               courseIntensity={courseIntensity}
               onIntensity={setCourseIntensity}
               headerExtra={
-                <button onClick={() => setPedAuto(a => !a)} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : 'var(--text-dim)', flexShrink: 0, minHeight: 32 }}>
+                <button onClick={() => setPedAuto(a => !a)} style={{ padding:'5px 12px', borderRadius:8, fontSize:10, fontWeight:800, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : '#fff', flexShrink: 0, minHeight: 32 }}>
                   АВТО {pedAuto ? 'ON' : 'OFF'}
                 </button>
               }
             />
-            {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⚡ Авто-прогрессия ПМ включена: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} интенсивность → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
-            {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
+            {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⚡ Авто-прогрессия ПМ включена: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} интенсивность → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
+            {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
             <PedAdaptationCard adaptation={pedAdapt} />
             {/* 🥗 Питание (как в ББ-авто): профицит калорий + белок → MRV soft-cap (Helms 2022) */}
             <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)' }}>
@@ -1456,9 +1456,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 const adjCal = n.cal.replace(/\d+/, m => String(Math.round(Number(m) * calMult)));
                 return (
                   <div style={{ marginTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
-                    <div><span style={{ color: 'rgba(255,255,255,0.5)' }}>Рекомендация: </span><span style={{ fontWeight: 700, color: '#f59e0b' }}>{adjCal}</span></div>
-                    <div><span style={{ color: 'rgba(255,255,255,0.5)' }}>Белок: </span><span style={{ fontWeight: 700, color: '#22c55e' }}>{n.pro}</span></div>
-                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'rgba(255,255,255,0.5)' }}>💡 </span><span style={{ color: 'rgba(255,255,255,0.7)' }}>{n.tip}</span></div>
+                    <div><span style={{ color: '#fff' }}>Рекомендация: </span><span style={{ fontWeight: 700, color: '#f59e0b' }}>{adjCal}</span></div>
+                    <div><span style={{ color: '#fff' }}>Белок: </span><span style={{ fontWeight: 700, color: '#22c55e' }}>{n.pro}</span></div>
+                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: '#fff' }}>💡 </span><span style={{ color: '#fff' }}>{n.tip}</span></div>
                     {pedAdapt.combinedMrvMultiplier > 1 && (
                       <div style={{ gridColumn: '1/-1', marginTop: 4, fontSize: 10, color: '#f59e0b' }}>
                         💉 PED увеличивают потребность в калориях и белке — значения скорректированы.
@@ -1476,11 +1476,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                       🏁 Тапер{taperNote ? ' применён' : ' включён'}{mockMeetOn ? ' · 🎯 mock meet' : ''}{meetWeekOn ? ' · 🏁 соревнования' : ''} — питание по фазе
                     </div>
                     {losing ? (
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                         <b style={{ color: '#f59e0b' }}>Сброс веса к старту</b> ({bw} → {targetBw} кг): дефицит 300-500 ккал, белок 2.2-2.8 г/кг (сохранить мышцы), клетчатка 30+ г. За 48-24ч — сгонка воды: вода+натрий → вода-натрий, взвешивание утром. MRV ниже при дефиците — объём ассистентов уже скорректирован.
                       </div>
                     ) : (
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                         <b style={{ color: '#f59e0b' }}>Набор к старту</b> (вес в категории): профицит 200-400 ккал, белок 1.8-2.2 г/кг. За 48-72ч до прикидок — углеводная нагрузка 4-7 г/кг (гликоген к попыткам), соль по плану. Тапер = разгрузка, питание = заправка.
                       </div>
                     )}
@@ -1501,7 +1501,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           {renderMacroEditBanner()}
           <div style={H}>🧩 Сезон по микроциклам</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 11, color: '#fff', marginBottom: 8, lineHeight: 1.5 }}>
             Постройте сезон из периодов-микроциклов (выносливость 6–20 / сила 6–12 / скорость+координация 6–10 / пик 8–10 нед) — авто-подбор или ручной выбор каждого цикла из базы; задайте соревнования, чтобы между стартами циклы ужимались под окно и у каждого старта был пик/тапер.
           </div>
           <PLSeasonBuilder
@@ -1536,7 +1536,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       {mainTab === 'pl' && subView === 'plan' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           {renderMacroEditBanner()}
-          {plSeasonMode !== 'season' && best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
+          {plSeasonMode !== 'season' && best && <ExpandableCard title={`🏆 Рекомендован: ${best.cycle.meta.title}`} icon="🏆" short={best.cycle.meta.description} full={<><div style={{ marginBottom: 8 }}><b>Почему этот цикл:</b> {explainSelection(best)}</div><div style={{ fontSize: 11, color: "#fff" }}>{best.cycle.meta.howItWorks}</div><button onClick={() => { try { setSelectedCycleId(best.cycle.meta.id); buildSrc(best.cycle.meta.id); } catch (error) { setMethodNote(`⚠ План не собран: ${(error as Error).message}`); } }} style={{ marginTop: 10, width: "100%", padding: 10, borderRadius: 8, border: "none", cursor: "pointer", background: "linear-gradient(135deg,var(--accent),#00c853)", color: "#000", fontWeight: 700, fontSize: 12 }}>✅ Применить цикл и собрать план</button></>} />}
           {plSeasonMode !== 'season' && (
             <>
               <div style={H}>📂 Каталог силовых циклов ({filteredPlCycles.length})</div>
@@ -1546,9 +1546,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 <PopupMultiSelect label="📶 Уровень" options={levelOptions} selected={filterLevels} onChange={setFilterLevels} hint="Уровень спортсмена (новичок, II-КМС, КМС-МС и т.д.)" />
               </div>
               {hasActiveFilters && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 6, fontSize: 10, color: '#fff' }}>
                   <span>Фильтр активен · найдено {filteredPlCycles.length}</span>
-                  <button onClick={resetAllFilters} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer' }}>↺ Сбросить фильтры</button>
+                  <button onClick={resetAllFilters} style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer' }}>↺ Сбросить фильтры</button>
                 </div>
               )}
               <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={filteredPlCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${directionLabelRu(c.meta.direction)} · ${periodLabelRu(c.meta.period)} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
@@ -1651,7 +1651,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📈 Тренды e1RM (из дневника тренировок)</div>
             {e1rmSeries.length === 0 ? (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Нет данных дневника — выполняйте тренировки, и здесь появятся графики приседа/жима/тяги.</div>
+              <div style={{ fontSize: 11, color: '#fff' }}>Нет данных дневника — выполняйте тренировки, и здесь появятся графики приседа/жима/тяги.</div>
             ) : (
               <div style={{ marginBottom: 8 }}>
                 {e1rmSeries.map(s => {
@@ -1678,14 +1678,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             )}
             {exerciseE1rm.length > 0 && (
               <>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 4 }}>Тренд по упражнению:</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Тренд по упражнению:</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
                   {exerciseE1rm.slice(0, 15).map(e => (
                     <button key={e.name} onClick={() => setSelectedTrendEx(selectedTrendEx === e.name ? null : e.name)} style={{
                       padding: '4px 9px', borderRadius: 14, cursor: 'pointer', fontWeight: 600, fontSize: 10,
                       border: selectedTrendEx === e.name ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
                       background: selectedTrendEx === e.name ? 'var(--accent-dim)' : 'rgba(255,255,255,0.03)',
-                      color: selectedTrendEx === e.name ? 'var(--accent)' : 'rgba(255,255,255,0.65)',
+                      color: selectedTrendEx === e.name ? 'var(--accent)' : '#fff',
                     }}>{e.name} · {e.e1} кг</button>
                   ))}
                 </div>
@@ -1788,10 +1788,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
            <div style={H}>💉 Фармакология (PED-адаптация объёмов)</div>
            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
              {(['AAS','insulin','MGF','IGF1','GH'] as PED[]).map(p => <button key={p} style={peds.includes(p) ? BTN : BTN_GHOST} onClick={() => togglePed(p)}>{p}{peds.includes(p) ? ' ✓' : ''}</button>)}
-             <button onClick={() => setPedAuto(a => !a)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : 'var(--text-dim)', marginLeft: 'auto' }}>АВТО {pedAuto ? 'ON' : 'OFF'}</button>
+             <button onClick={() => setPedAuto(a => !a)} style={{ padding:'4px 10px', borderRadius:6, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: pedAuto ? '#00e68a' : 'rgba(255,255,255,0.1)', color: pedAuto ? '#000' : '#fff', marginLeft: 'auto' }}>АВТО {pedAuto ? 'ON' : 'OFF'}</button>
            </div>
-           {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⚡ Авто-прогрессия ПМ: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
-           {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
+           {pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⚡ Авто-прогрессия ПМ: {courseIntensity === 'heavy' ? 'Тяжёлая' : courseIntensity === 'moderate' ? 'Умеренная' : 'Лёгкая'} → {courseIntensity === 'heavy' ? '+2.5%' : courseIntensity === 'moderate' ? '+2%' : '+1.5%'}/нед</div>}
+           {!pedAuto && peds.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>⏸ Авто-прогрессия выключена → базовая progression цикла</div>}
            <PedAdaptationCard adaptation={pedAdapt} />
           <div style={{ ...H, marginTop: 10 }}>💪 Рабочие максимумы (кг) — для расчёта весов</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 6, boxSizing: 'border-box' }}>
@@ -1801,7 +1801,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
             💪 ББ: pump-finisher (3×15 @ RIR 4) для каждой слабой группы; +accessoryCompound-первым.
           </div>
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : "rgba(255,255,255,0.6)", minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : '#fff', minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
           <button style={{ ...BTN, width: '100%', marginTop: 10 }} onClick={buildBb}>Сгенерировать BB-план ({bbWeeks} нед)</button>
           {builtBb && Array.isArray(builtBb.weeks) && builtBb.weeks.length > 0 && (() => {
             const W = builtBb.weeks;
@@ -1817,7 +1817,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                  const stt = shouldTrainToday({ readiness: linked.readiness?.recovery ?? 80, acwr: autoRegResult.deload ? { ratio: 1.8, zone: 'dangerous' } : { ratio: 1.0, zone: 'optimal' }, fatigue: linked.readiness?.fatigue ?? 30, hrvRatio: linked.profile?.settings?.baselineHrvRatio ?? 1.0, combinedRirShift: autoRegMode === 'auto' ? autoRegResult.rirShift + bridgeRir : bridgeRir });
                 const modeColor = autoRegMode === 'auto' ? '#60a5fa' : autoRegMode === 'diary' ? '#22c55e' : '#71717a';
                 const segBtn = (m: AutoRegMode, label: string) => (
-                  <button onClick={() => setAutoRegMode(m)} style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : 'rgba(255,255,255,0.6)' }}>{label}</button>
+                  <button onClick={() => setAutoRegMode(m)} style={{ padding:'4px 8px', borderRadius:5, fontSize:10, fontWeight:700, cursor:'pointer', border:'none', background: autoRegMode === m ? modeColor : 'rgba(255,255,255,0.08)', color: autoRegMode === m ? '#000' : '#fff' }}>{label}</button>
                 );
                 return (
                   <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 10, background: autoRegMode === 'off' ? 'rgba(255,255,255,0.02)' : autoRegResult.deload ? 'rgba(239,68,68,0.08)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)', border: '1px solid ' + (autoRegMode === 'off' ? 'rgba(255,255,255,0.06)' : autoRegResult.deload ? 'rgba(239,68,68,0.25)' : autoRegMode === 'diary' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.2)') }}>
@@ -1830,13 +1830,13 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                       <div style={{ display: 'flex', gap: 3 }}>{segBtn('off', 'ВЫКЛ')}{segBtn('auto', 'АВТО')}{segBtn('diary', 'ДНЕВНИК')}</div>
                     </div>
                     {autoRegMode === 'auto' && (
-                      <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                      <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
                         <div>Топ-сет ×{autoRegResult.topSetPctMultiplier} · объём ×{autoRegResult.volumeMultiplier} · RIR +{autoRegResult.rirShift}{autoRegResult.deload ? ' · 🔴 DELOAD' : ''}</div>
-                        {autoRegResult.decisions.slice(0, 3).map((d, i) => <div key={i} style={{ marginTop: 2, color: 'rgba(255,255,255,0.55)' }}>• {d}</div>)}
+                        {autoRegResult.decisions.slice(0, 3).map((d, i) => <div key={i} style={{ marginTop: 2, color: '#fff' }}>• {d}</div>)}
                       </div>
                     )}
                     {autoRegMode === 'diary' && diaryAutoreg && (
-                      <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                      <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
                         <div style={{ fontWeight: 700, color: '#22c55e' }}>✓ {diaryAutoreg.summary.adjusted} скорректировано · {diaryAutoreg.summary.unchanged} в норме · {diaryAutoreg.summary.noData} без данных</div>
                         {diaryAutoreg.summary.noData > 0 && <div style={{ marginTop: 2, color: '#f59e0b' }}>⚠ {diaryAutoreg.summary.noData} упражнений без данных — плановые веса</div>}
                         {diaryAutoreg.plateauWarnings.slice(0, 2).map((w, i) => <div key={'pw'+i} style={{ marginTop: 2, color: '#ef4444' }}>🔴 {w}</div>)}
@@ -1850,9 +1850,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               {builtBb.rationale.map((r, i) => <div key={i} style={{ ...SMALL, marginTop: 4 }}>{r}</div>)}
               {/* Выбор недели */}
               <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}{(wk as any).peakWeek ? ' · 🎭 пик-неделя' : ''}</div>
+                <div style={{ fontSize:11, color:'#fff', marginBottom:6, fontWeight:700 }}>Неделя {wk.week} из {W.length}{(wk as any).peakWeek ? ' · 🎭 пик-неделя' : ''}</div>
                 {(wk as any).peakWeek && (
-                  <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.3)', fontSize: 10, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                  <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.3)', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
                       <span>🎭 <b style={{ color: '#ec4899' }}>Пик-неделя (тапер ББ)</b>{(builtBb as any)?.contestPrep?.showDate ? ` · шоу ${(builtBb as any).contestPrep.showDate}` : ''}</span>
                       {(() => {
@@ -1877,8 +1877,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                         } catch { return null; }
                       })()}
                     </div>
-                    {(wk as any).prepProtocol ? <div style={{ color: 'rgba(255,255,255,0.55)' }}>{(wk as any).prepProtocol}</div> : null}
-                    <div style={{ color: 'rgba(255,255,255,0.55)' }}>День 1–2: памп-деплеция (верх/низ) · день 3: лёгкий full-body · далее отдых и позы. Питание по дням (карбс/вода/натрий) — блок «Питание → 🏁 Тапер ББ».</div>
+                    {(wk as any).prepProtocol ? <div style={{ color: '#fff' }}>{(wk as any).prepProtocol}</div> : null}
+                    <div style={{ color: '#fff' }}>День 1–2: памп-деплеция (верх/низ) · день 3: лёгкий full-body · далее отдых и позы. Питание по дням (карбс/вода/натрий) — блок «Питание → 🏁 Тапер ББ».</div>
                   </div>
                 )}
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
@@ -1887,15 +1887,15 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               </div>
               {/* Визуальный календарь ББ: недели × дни (объём по сетам) */}
               <div style={{ marginTop: 8, padding: 8, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, объём сетов)</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📅 Календарь мезоцикла (нед × дни, объём сетов)</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {W.map(w => { const active = w.week === wk.week; const daySets = w.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)); const maxD = Math.max(1, ...W.flatMap(ww => ww.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0)))); return (
                     <div key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 6px', borderRadius: 6, cursor: 'pointer', background: active ? 'var(--accent-dim)' : 'transparent', border: active ? '1px solid rgba(0,230,138,0.3)' : '1px solid transparent' }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--accent)' : 'rgba(255,255,255,0.7)', minWidth: 26 }}>Н{w.week}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: active ? 'var(--accent)' : '#fff', minWidth: 26 }}>Н{w.week}</span>
                       <div style={{ flex: 1, display: 'flex', gap: 2 }}>
                         {daySets.map((ds, di) => <div key={di} title={'Д' + (di+1) + ': ' + ds + ' сетов'} style={{ flex: 1, height: 14, borderRadius: 3, background: ds > 0 ? 'linear-gradient(180deg,var(--accent),#00c853)' : 'rgba(255,255,255,0.04)', opacity: 0.35 + 0.65 * (ds / maxD) }} />)}
                       </div>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', minWidth: 30, textAlign: 'right' }}>{daySets.reduce((a, b) => a + b, 0)}</span>
+                      <span style={{ fontSize: 11, color: '#fff', minWidth: 30, textAlign: 'right' }}>{daySets.reduce((a, b) => a + b, 0)}</span>
                     </div>
                   ); })}
                 </div>
@@ -1909,7 +1909,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                       <span style={{ fontSize:10, color:ACCENT, fontWeight:700 }}>{s.sessionTag}</span>
                     </div>
                     {s.exercises.length === 0 ? (
-                      <div style={{ padding: '10px 12px', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                      <div style={{ padding: '10px 12px', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
                         😴 Полный отдых — позирование {(s as any).peakWeekRest ? '60 мин' : '—'}, растяжка, сон 8–9 ч.{(s as any).comment ? ` ${(s as any).comment}` : ''}
                       </div>
                     ) : (
@@ -1925,9 +1925,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                         const adjSets = Math.max(1, Math.round(adjSets0 * bridgeMult));
                         const tmpo = getTempo(e.muscle, bbGoal, e.character === 'тяж');
                         return (
-                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.7fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr)', gap:2, padding:'5px 10px', fontSize:10, color:'rgba(255,255,255,0.85)', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                        <div key={ei} style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.7fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr)', gap:2, padding:'5px 10px', fontSize:10, color:'#fff', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
                           <span style={{ fontWeight:600, whiteSpace:'normal', overflowWrap:'anywhere' }}>{e.muscle}</span>
-                          <span style={{ color:'rgba(255,255,255,0.6)' }}>{e.character}</span>
+                          <span style={{ color:'#fff' }}>{e.character}</span>
                           <span>{adjSets}×{e.workSets[0].reps}</span>
                           <span style={{ color:'#f59e0b' }}>{peakRirTarget != null ? peakRirTarget : Math.max(0, e.rir + bridgeRir + diaryRirAdd)}{autoRegMode === 'auto' && autoRegResult?.rirShift ? `+${autoRegResult.rirShift}` : ''}</span>
                           <span style={{ color: adjW !== rawW ? '#f59e0b' : ACCENT, fontWeight:700 }}>{adjW} кг{adjW !== rawW ? (autoRegMode === 'diary' ? ' 📒' : ' ⚡') : ''}</span>
@@ -1956,12 +1956,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                   <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
                 </div>
                 {m.perMuscle.map(mm => { const over = mm.totalSets > (mm.mrv || 999); return (
-                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr)', gap:2, fontSize:10, color:'rgba(255,255,255,0.85)', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                  <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr)', gap:2, fontSize:10, color:'#fff', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
                     <span style={{ fontWeight:600 }}>{mm.muscle}{over ? ' ⚠' : ''}</span>
                     <span style={{ color: over ? '#ef4444' : ACCENT, fontWeight:700 }}>{mm.totalSets}</span>
                     <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
                     <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
-                    <span style={{ color:'rgba(255,255,255,0.5)' }}>{mm.mrv}</span>
+                    <span style={{ color:'#fff' }}>{mm.mrv}</span>
                   </div>
                 ); })}
               </div>
@@ -1979,7 +1979,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         <div style={{ ...CARD, padding: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🛠️</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)', marginBottom: 8 }}>Ручной конструктор переехал</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 16, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 11, color: '#fff', marginBottom: 16, lineHeight: 1.6 }}>
             Полный ручной конструктор теперь доступен в разделе <b style={{ color: 'var(--accent)' }}>📐 Планирование → 🛠️ Ручной конструктор</b>.<br />
             Там вас ждёт: авто-подбор сплита, генерация плана, оценка качества, MRV-guardrails,<br />
             применение методик, экспорт в PDF, выполнение через SessionPlayer и многое другое.
@@ -2054,7 +2054,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                   icon={s.source === 'SRC' ? '🏋️' : '💪'}
                   short={`${s.totalSets} сетов · ${Math.round(s.totalVolume)} кг·пов${s.planned ? ' · запланировано' : ''}${s.meetWeek ? ' · 🏁 прикиды' : s.mockMeet ? ' · 🎯 прикиды-синглы' : s.postMeet ? ' · 🔄 восстановление' : s.taperWeek ? ' · 📉 разгрузка' : ''}`}
                   full={
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.8 }}>
+                    <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.8 }}>
                       {s.exercises.map((e, ei) => (
                         <div key={ei} style={{
                           marginBottom: 6, padding: '6px 8px', borderRadius: 6,
@@ -2062,7 +2062,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                         }}>
                           <div style={{ fontWeight: 700, color: '#fff', marginBottom: 2 }}>
                             {e.exerciseName}
-                            <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>
+                            <span style={{ fontWeight: 400, color: '#fff', marginLeft: 6 }}>
                               ({e.muscleGroup}) · ПМ {e.best1RM}кг
                             </span>
                           </div>
@@ -2071,7 +2071,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                               <span key={si} style={{
                                 display: 'inline-block', padding: '2px 6px', borderRadius: 4, fontSize: 11,
                                 background: 'var(--accent-dim)', border: '1px solid rgba(0,230,138,0.12)',
-                                color: 'rgba(255,255,255,0.8)'
+                                color: '#fff'
                               }}>
                                 {set.reps}×{set.weightKg}кг
                                 {set.rir > 0 ? ` · RIR ${set.rir}` : ''}
@@ -2091,7 +2091,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               {bridgeAutoreg && (
                 <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.2)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>🧠 Авторегуляция (мост)</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                  <div style={{ fontSize: 10, color: '#fff' }}>
                     {bridgeAutoreg.summary}
                     {bridgeAutoreg.sessionDowngraded && ' · ⬇ понижение нагрузки'}
                     {bridgeAutoreg.sessionCancelled && ' · ⛔ отмена сессии'}
@@ -2102,7 +2102,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.2)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', marginBottom: 4 }}>📈 Прогресс (лучшие подходы)</div>
                   {progressSnap.slice(0, 5).map((p, i) => (
-                    <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>{p.exercise}: {p.lastWeight}кг×{p.lastReps} → e1RM {p.estimated1RM.toFixed(1)}кг</div>
+                    <div key={i} style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>{p.exercise}: {p.lastWeight}кг×{p.lastReps} → e1RM {p.estimated1RM.toFixed(1)}кг</div>
                   ))}
                 </div>
               )}
@@ -2122,10 +2122,10 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               style={{ minHeight: 40, borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', padding: '8px 12px', border: '1px solid rgba(167,139,250,0.4)', color: '#a78bfa', background: 'rgba(139,92,246,0.1)' }}
               title="Подобрать схему/весовую цель тапера макроцикла под усталость, ACWR, вес и план ПМ"
             >🤖 Подобрать</button>
-            <button onClick={() => setMacroMockMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 40, fontSize: 10, border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: macroMockMeet ? '#a78bfa' : 'rgba(255,255,255,0.6)' }}>🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}</button>
+            <button onClick={() => setMacroMockMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 40, fontSize: 10, border: macroMockMeet ? '1px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)', background: macroMockMeet ? 'rgba(139,92,246,0.15)' : 'rgba(255,255,255,0.02)', color: macroMockMeet ? '#a78bfa' : '#fff' }}>🎯 Mock meet перед стартом{macroMockMeet ? ' ✓' : ''}</button>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, flex: 1, minWidth: 180, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : 'rgba(255,255,255,0.6)' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
+            <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, flex: 1, minWidth: 180, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : '#fff' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
             <span style={{ alignSelf: 'center', fontSize: 10, color: 'rgba(255,255,255,0.45)', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
           </div>
         </div>
@@ -2223,11 +2223,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           onClick={() => setResetAsk(false)}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 400, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.12)', padding: 16, boxSizing: 'border-box', boxShadow: '0 20px 60px rgba(0,0,0,0.6)' }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#fb7185', marginBottom: 8 }}>🔄 Начать заново?</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, color: '#fff', lineHeight: 1.5, marginBottom: 12 }}>
               Собранный план и все правки будут сброшены. Параметры останутся на месте — можно собрать план заново.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setResetAsk(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>Отмена</button>
+              <button onClick={() => setResetAsk(false)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>Отмена</button>
               <button onClick={resetBuild} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#f43f5e,#e11d48)', color: '#fff', fontWeight: 800, fontSize: 12, minHeight: 44 }}>🔄 Сбросить</button>
             </div>
           </div>

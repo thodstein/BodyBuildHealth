@@ -8,7 +8,7 @@ import { getMobilityFlows, getAllCorrectives } from '../../../engines/federation
 import { DeloadProtocolCard } from '../TrainingScreen_parts/DeloadProtocolCard';
 import { getProfile, updateSection } from '../../../core/profile-manager';
 
-const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const SEL: React.CSSProperties = { ...IN, minHeight: 40 };

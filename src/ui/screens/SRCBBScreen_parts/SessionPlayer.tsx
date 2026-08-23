@@ -27,7 +27,7 @@ import { MobilitySessionPanel, MobilityPostPanel } from './MobilitySessionPanel'
 import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
 import { techniqueLabel, techniqueChainParts } from '../TrainingScreen_parts/bb-technique-display';
 
-  const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
+  const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
   const ACCENT = '#00e68a';
   
   // CSS анимация для таймера
@@ -59,7 +59,7 @@ const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; l
   const [reason, setReason] = useState(reasons[0] || 'другое');
   return (
     <div style={{ marginTop: 8 }}>
-      <button type="button" style={{ ...BTN_GHOST, width: '100%', color: 'var(--text-dim)', borderColor: 'var(--border)' }} onClick={() => setOpen(v => !v)}>
+      <button type="button" style={{ ...BTN_GHOST, width: '100%', color: '#fff', borderColor: 'rgba(255,255,255,0.08)' }} onClick={() => setOpen(v => !v)}>
         ⏭ Пропустить {label} {open ? '▲' : '▼'}
       </button>
       {open && (
@@ -76,10 +76,10 @@ const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; l
     </div>
   );
 };
-const IN: React.CSSProperties = { background: 'var(--input-bg)', color: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
-const LABEL: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 11, margin: '4px 0 2px' };
+const IN: React.CSSProperties = { background: 'var(--input-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
+const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '4px 0 2px' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
-const SMALL: React.CSSProperties = { color: 'var(--text-dim)', fontSize: 12, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 12, lineHeight: 1.4 };
 const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' };
 
 export interface PlayerSet { weight: number; reps: number; rir: number; technique?: string }
@@ -783,9 +783,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               onClick={() => goPhase(p.id)}
               style={{
                 flex: 1, minWidth: 56, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 700,
-                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-                background: active ? 'rgba(0,230,138,0.14)' : doneStep ? 'rgba(34,197,94,0.08)' : 'var(--bg-secondary)',
-                color: active ? 'var(--accent)' : doneStep ? '#22c55e' : 'var(--text-dim)',
+                border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+                background: active ? 'rgba(0,230,138,0.14)' : doneStep ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)',
+                color: active ? 'var(--accent)' : doneStep ? '#22c55e' : '#fff',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
               }}>
               <span style={{ fontSize: 13 }}>{doneStep && !active ? '✓' : p.icon}</span>
@@ -805,7 +805,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             const estMin = Math.round((totalSets * (45 + avgRest) + 300) / 60); // 45с на подход + отдых + 5 мин разминка
             return (
               <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                <span style={{ fontSize: 10, color: '#fff' }}>
                   📋 {day.exercises.length} упр. · {totalSets} сетов · ~{estMin} мин
                 </span>
                 {last && last.durationMin > 0 && (
@@ -821,21 +821,21 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               <div style={LABEL}>⏱ Последняя сессия</div>
               <div style={SMALL}>{last.date} {last.startTime}–{last.endTime} · {last.focus} · {last.exercises.length} упр.</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginTop: 6 }}>
-                <div style={{ padding: 4, borderRadius: 4, background: 'var(--bg-secondary)' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тоннаж</div>
+                <div style={{ padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: 9, color: '#fff' }}>Тоннаж</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{last.totalVolume.toLocaleString()} кг</div>
                 </div>
-                <div style={{ padding: 4, borderRadius: 4, background: 'var(--bg-secondary)' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Подходы</div>
+                <div style={{ padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: 9, color: '#fff' }}>Подходы</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{last.totalSets}</div>
                 </div>
-                <div style={{ padding: 4, borderRadius: 4, background: 'var(--bg-secondary)' }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Длительность</div>
+                <div style={{ padding: 4, borderRadius: 4, background: 'rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: 9, color: '#fff' }}>Длительность</div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{last.durationMin} мин</div>
                 </div>
               </div>
               {planned.volume > 0 && last.totalVolume > 0 && (
-                <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-dim)' }}>
+                <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
                   План сегодня: {planned.volume.toLocaleString()} кг · {planned.sets} сетов
                   {last.totalVolume > 0 && (
                     <span style={{ color: planned.volume > last.totalVolume ? '#f59e0b' : '#22c55e', marginLeft: 4 }}>
@@ -862,7 +862,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                   aria-label={`Детали дня ${day.label}`}
                 >
                   <div style={LABEL}>📋 Детали дня — {day.exercises.length} упр. · {totalSets} сетов · {tonnage.toLocaleString()} кг · ~{avgRest}с отдых</div>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{dayDetailsOpen ? '▲' : '▼'}</span>
+                  <span style={{ color: '#fff', fontSize: 11 }}>{dayDetailsOpen ? '▲' : '▼'}</span>
                 </div>
                 {dayDetailsOpen && (
                   <div style={{ marginTop: 2 }}>
@@ -891,13 +891,13 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                           <div style={{ fontSize: 10, color: ACCENT, fontWeight: 700, whiteSpace: 'nowrap' }}>
                             {ex.targetSets.length}×{setsStr}
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 10, color: '#fff', whiteSpace: 'nowrap' }}>
                             {firstW ? `${firstW} кг` : 'вес тела'}
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 10, color: '#fff', whiteSpace: 'nowrap' }}>
                             RIR {rirStr ?? '—'}
                           </div>
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 10, color: '#fff', whiteSpace: 'nowrap' }}>
                             ~{ex.restSec || 90}с
                           </div>
                         </div>
@@ -947,9 +947,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             <div key={i} style={{ ...CARD, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
                 {b.type === 'general' ? 'Кардио' : b.type === 'mobility' ? 'Суставная разминка' : b.type === 'activation' ? 'Активация мышц' : 'Специальная'}
-                <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{b.durationSec}с</span>
+                <span style={{ fontWeight: 400, fontSize: 10, color: '#fff', marginLeft: 6 }}>{b.durationSec}с</span>
               </div>
-              {b.notes && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{b.notes}</div>}
+              {b.notes && <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>{b.notes}</div>}
               <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
                 {b.exercises.map((ex, j) => {
                   const isDone = warmupDone[`w_${i}_${j}`];
@@ -983,7 +983,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
            
            {/* таймер сессии */}
            <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-             <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>Время сессии:</span>
+             <span style={{ fontSize: 10, color: '#fff' }}>Время сессии:</span>
              <span style={{ fontSize: 14, fontWeight: 600, color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>
                {String(Math.floor(sessionTimerSec / 60)).padStart(2, '0')}:{String(sessionTimerSec % 60).padStart(2, '0')}
              </span>
@@ -1004,9 +1004,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
                      <span style={{ fontSize: 26, fontWeight: 800, color: pct === 100 ? '#22c55e' : ACCENT, fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
-                     <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{doneSets}/{totalSets} подходов</span>
+                     <span style={{ fontSize: 11, color: '#fff' }}>{doneSets}/{totalSets} подходов</span>
                    </div>
-                   <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--text-dim)' }}>
+                   <div style={{ display: 'flex', gap: 10, fontSize: 10, color: '#fff' }}>
                      <span>⚡ {doneVol.toLocaleString()} / {planned.volume.toLocaleString()} кг</span>
                      <span>⏱ <b style={{ color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(sessionTimerSec / 60)).padStart(2, '0')}:{String(sessionTimerSec % 60).padStart(2, '0')}</b></span>
                    </div>
@@ -1020,18 +1020,18 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
 
            {/* режимы суперсета и круга */}
            <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-             <span style={{ fontSize: 9, color: 'var(--text-dim)', alignSelf: 'center' }}>Режим:</span>
-             <button onClick={toggleSupersetMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: supersetMode?'1px solid #f59e0b':'1px solid var(--border)', background: supersetMode?'rgba(245,158,11,0.12)':'var(--bg-secondary)', color: supersetMode?'#f59e0b':'var(--text-dim)' }}>
+             <span style={{ fontSize: 9, color: '#fff', alignSelf: 'center' }}>Режим:</span>
+             <button onClick={toggleSupersetMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: supersetMode?'1px solid #f59e0b':'1px solid rgba(255,255,255,0.08)', background: supersetMode?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', color: supersetMode?'#f59e0b':'#fff' }}>
                🔄 Суперсет
              </button>
-             <button onClick={toggleCircuitMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: circuitMode?'1px solid #8b5cf6':'1px solid var(--border)', background: circuitMode?'rgba(139,92,246,0.12)':'var(--bg-secondary)', color: circuitMode?'#8b5cf6':'var(--text-dim)' }}>
+             <button onClick={toggleCircuitMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: circuitMode?'1px solid #8b5cf6':'1px solid rgba(255,255,255,0.08)', background: circuitMode?'rgba(139,92,246,0.12)':'rgba(255,255,255,0.04)', color: circuitMode?'#8b5cf6':'#fff' }}>
                ⭕ Круг
              </button>
-             <button onClick={() => setPlateOpen(v => !v)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: plateOpen?'1px solid #00e68a':'1px solid var(--border)', background: plateOpen?'rgba(0,230,138,0.12)':'var(--bg-secondary)', color: plateOpen?'#00e68a':'var(--text-dim)' }}>
+             <button onClick={() => setPlateOpen(v => !v)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: plateOpen?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: plateOpen?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: plateOpen?'#00e68a':'#fff' }}>
                🧮 Блины
              </button>
              {(supersetMode || circuitMode) && (
-               <span style={{ fontSize: 9, color: 'var(--text-dim)', alignSelf: 'center' }}>
+               <span style={{ fontSize: 9, color: '#fff', alignSelf: 'center' }}>
                  {supersetMode ? 'Выберите 2+ упражнения' : 'Минимальный отдых между упражнениями'}
                </span>
              )}
@@ -1044,7 +1044,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                { key: 'R', label: 'таймер отдыха' },
              ].map(h => (
                <span key={h.key} style={{ fontSize: 8, color: 'var(--text-faint)' }}>
-                 <kbd style={{ padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', fontSize: 8, fontFamily: 'monospace' }}>{h.key}</kbd> {h.label}
+                 <kbd style={{ padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', fontSize: 8, fontFamily: 'monospace' }}>{h.key}</kbd> {h.label}
                </span>
              ))}
            </div>
@@ -1052,9 +1052,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
            <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
           {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>sRPE сессии:</span>
-            {[6,7,8,9,10].map(r => <button key={r} onClick={() => setSessionRPE(r)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: sessionRPE===r?'1px solid #00e68a':'1px solid var(--border)', background: sessionRPE===r?'rgba(0,230,138,0.12)':'var(--bg-secondary)', color: sessionRPE===r?'#00e68a':'var(--text-dim)' }}>{r}</button>)}
-            <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>· длительность, мин:</span>
+            <span style={{ fontSize: 10, color: '#fff' }}>sRPE сессии:</span>
+            {[6,7,8,9,10].map(r => <button key={r} onClick={() => setSessionRPE(r)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: sessionRPE===r?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: sessionRPE===r?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff' }}>{r}</button>)}
+            <span style={{ fontSize: 10, color: '#fff' }}>· длительность, мин:</span>
             <input style={{ ...IN, width: 64 }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
           </div>
           {/* 🧮 Калькулятор блинов: подкладка с выбором упражнения текущей сессии */}
@@ -1062,7 +1062,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             <div style={{ ...CARD, marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>🧮 Калькулятор блинов</div>
-                <button onClick={() => setPlateOpen(false)} style={{ padding: '2px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 11, minHeight: 28 }} aria-label="Закрыть калькулятор блинов">✕</button>
+                <button onClick={() => setPlateOpen(false)} style={{ padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: 11, minHeight: 28 }} aria-label="Закрыть калькулятор блинов">✕</button>
               </div>
               <PlateCalcTab
                 exerciseOptions={day.exercises.map((ex, ei) => ({ id: String(ei), label: ex.name, weight: ex.targetSets[0]?.weight || 0 }))}
@@ -1072,7 +1072,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             </div>
           )}
           {day.exercises.map((ex, ei) => (
-               <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid var(--bg-secondary)', 
+               <div key={ei} style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid rgba(255,255,255,0.04)', 
                  background: supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.05)' : 'rgba(139,92,246,0.05)') : 'transparent',
                  borderRadius: supersetExercises.includes(ei) ? 8 : 0,
                  paddingLeft: supersetExercises.includes(ei) ? 8 : 0,
@@ -1084,7 +1084,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                        style={{ cursor: 'pointer', width: 16, height: 16 }} />
                    )}
                    <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, flex: 1 }}>
-                     {ex.name} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({ex.muscleGroup})</span>
+                     {ex.name} <span style={{ color: '#fff', fontWeight: 400 }}>({ex.muscleGroup})</span>
                      {(() => {
                        const t = ex.targetSets[ex.targetSets.length - 1]?.technique;
                        const lbl = techniqueLabel(t);
@@ -1110,7 +1110,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                         transition: 'background 0.3s ease'
                       }} />
                     ))}
-                     <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 4 }}>
+                     <span style={{ fontSize: 9, color: '#fff', marginLeft: 4 }}>
                        {Object.keys(actual).filter(k => k.startsWith(`${ei}_`)).length}/{ex.targetSets.length}
                      </span>
                     </div>
@@ -1127,8 +1127,8 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                  const nextR = a.rpe > 0 ? (rpeDelta > 1 ? Math.max(1, a.reps - 1) : a.reps) : a.reps;
                  return (
                    <div key={si} style={{ ...ROW, flexWrap: 'wrap', gap: 6 }}>
-                     <span style={{ color: 'var(--text-dim)', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
-                     <span style={{ color: 'var(--text-dim)', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
+                     <span style={{ color: '#fff', fontSize: 11, width: 52 }}>Сет {si + 1}</span>
+                     <span style={{ color: '#fff', fontSize: 11, width: 90 }}>цель {t.weight}кг×{t.reps}@RIR{t.rir}</span>
                      {t.technique && (
                        <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title={techniqueChainParts({ workSets: [{ reps: t.reps, weight: t.weight, rir: t.rir, technique: t.technique }] })?.parts.join(' → ') || ''}>💥 {techniqueLabel(t.technique)}</span>
                      )}
@@ -1161,12 +1161,12 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                         );
                       })()}
                        {logged && (
-                         <div style={{ width: '100%', fontSize: 10, color: 'var(--text-dim)', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                         <div style={{ width: '100%', fontSize: 10, color: '#fff', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                            <span style={{ color: '#fff' }}>🏋️ {formatPlates(a.weight)}</span>
                            <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
-                           <span style={{ color: dW === 0 ? 'var(--text-dim)' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
-                           <span style={{ color: dR === 0 ? 'var(--text-dim)' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
-                           {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : 'var(--text-dim)' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
+                           <span style={{ color: dW === 0 ? '#fff' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
+                           <span style={{ color: dR === 0 ? '#fff' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
+                           {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : '#fff' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
                            {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
                              <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
                            )}
@@ -1178,9 +1178,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                              {([['mmc','🧠 MMC',7],['pump','💪 Пампинг',6],['joint','🦵 Суставы',0],['energy','⚡ Энергия',7]] as any[]).map((item: any[]) => {
                                const f = item[0]; const label = item[1]; const def = item[2];
                                const valKey = k + '_' + f;
-                               return <label key={f} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9, color:'var(--text-dim)' }}>
+                               return <label key={f} style={{ display:'flex', alignItems:'center', gap:4, fontSize:9, color:'#fff' }}>
                                  <span style={{minWidth:42}}>{label}</span>
-                                 <input style={{width:32,padding:'2px 4px',borderRadius:4,border:'1px solid var(--border)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:9,textAlign:'center'}}
+                                 <input style={{width:32,padding:'2px 4px',borderRadius:4,border:'1px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.04)',color:'#fff',fontSize:9,textAlign:'center'}}
                                    type="number" min={0} max={10} value={mmcVals[valKey] ?? def}
                                    onChange={e => setMMCVals(p => ({...p, [valKey]: +e.target.value}))} />
                                </label>
@@ -1202,20 +1202,20 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 const zone = velocityLossZone(vl.lossPct);
                 return <div style={{ marginTop: 6, padding: '6px 10px', borderRadius: 8, background: vl.exceeded ? 'rgba(239,68,68,0.1)' : 'rgba(0,230,138,0.08)', border: '1px solid ' + (vl.exceeded ? 'rgba(239,68,68,0.3)' : 'rgba(0,230,138,0.2)') }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: vl.exceeded ? '#ef4444' : ACCENT }}>⚡ VBT: потеря скорости {vl.lossPct}% ({vl.bestVelocity}→{vl.lastVelocity} м/с, порог {thr}%)</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{vl.exceeded ? '🔴 СТОП — порог превышен, заканчивайте сет' : '🟢 ещё ~' + vl.remainingReps + ' повторов до порога'} · {zone}</div>
+                  <div style={{ fontSize: 10, color: '#fff' }}>{vl.exceeded ? '🔴 СТОП — порог превышен, заканчивайте сет' : '🟢 ещё ~' + vl.remainingReps + ' повторов до порога'} · {zone}</div>
                 </div>;
               })()}
               <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>VBT-интент:</span>
+                <span style={{ fontSize: 9, color: '#fff' }}>VBT-интент:</span>
                 {(['strength','hypertrophy','power_heavy','speed'] as VBTIntent[]).map(it => (
-                  <button key={it} onClick={() => setVbtIntent(it)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: vbtIntent===it?'1px solid #00e68a':'1px solid var(--border)', background: vbtIntent===it?'rgba(0,230,138,0.12)':'var(--bg-secondary)', color: vbtIntent===it?'#00e68a':'var(--text-dim)' }}>{it}</button>
+                  <button key={it} onClick={() => setVbtIntent(it)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: vbtIntent===it?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: vbtIntent===it?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: vbtIntent===it?'#00e68a':'#fff' }}>{it}</button>
                 ))}
               </div>
                {/* таймер отдыха для этого упражнения */}
                {timerRunning && timerExIdx === ei && (
                  <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>⏱ Отдых</span>
+                     <span style={{ fontSize: 11, color: '#fff' }}>⏱ Отдых</span>
                      <span style={{ 
                        fontSize: 20, 
                        fontWeight: 700, 
@@ -1225,7 +1225,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                      }}>
                        {String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}
                      </span>
-                     <button onClick={skipRestTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
+                     <button onClick={skipRestTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
                    </div>
                    <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                      <div style={{ height: '100%', width: `${Math.min(100, timerPct)}%`, borderRadius: 2, background: timerSec <= 10 ? '#f59e0b' : ACCENT, transition: 'width 1s linear' }} />
@@ -1236,13 +1236,13 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 
                 {/* пресеты таймера отдыха */}
                <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-                 <span style={{ fontSize: 9, color: 'var(--text-dim)', alignSelf: 'center' }}>Таймер:</span>
+                 <span style={{ fontSize: 9, color: '#fff', alignSelf: 'center' }}>Таймер:</span>
                  {(['compound','isolation','pump'] as const).map(p => (
-                   <button key={p} onClick={() => setTimerPreset(p)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset===p?'1px solid #00e68a':'1px solid var(--border)', background: timerPreset===p?'rgba(0,230,138,0.12)':'var(--bg-secondary)', color: timerPreset===p?'#00e68a':'var(--text-dim)' }}>
+                   <button key={p} onClick={() => setTimerPreset(p)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset===p?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: timerPreset===p?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: timerPreset===p?'#00e68a':'#fff' }}>
                      {p === 'compound' ? 'Силовой' : p === 'isolation' ? 'Изоляция' : 'Пампинг'}
                    </button>
                  ))}
-                 <button onClick={() => { setTimerPreset('custom'); }} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset==='custom'?'1px solid #00e68a':'1px solid var(--border)', background: timerPreset==='custom'?'rgba(0,230,138,0.12)':'var(--bg-secondary)', color: timerPreset==='custom'?'#00e68a':'var(--text-dim)' }}>
+                 <button onClick={() => { setTimerPreset('custom'); }} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset==='custom'?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: timerPreset==='custom'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: timerPreset==='custom'?'#00e68a':'#fff' }}>
                    {customRestSec}с
                  </button>
                  {timerPreset === 'custom' && (
@@ -1250,9 +1250,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                  )}
                  <button onClick={() => setAutoStartRest(!autoStartRest)} style={{ 
                    padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', 
-                   border: autoStartRest ? '1px solid #00e68a' : '1px solid var(--border)', 
-                   background: autoStartRest ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)', 
-                   color: autoStartRest ? '#00e68a' : 'var(--text-dim)' 
+                   border: autoStartRest ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', 
+                   background: autoStartRest ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', 
+                   color: autoStartRest ? '#00e68a' : '#fff' 
                  }}>
                    {autoStartRest ? '▶ Авто-старт' : '⏸ Ручной'}
                  </button>
@@ -1283,7 +1283,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                        </span>
                      ))}
                    </div>
-                   <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 6 }}>
+                   <div style={{ fontSize: 9, color: '#fff', marginTop: 6 }}>
                      {supersetMode 
                        ? `Короткий отдых (${getSupersetRestTime()}с) между упражнениями, полный отдых после всех`
                        : 'Минимальный отдых между упражнениями, отдых после завершения круга'
@@ -1296,11 +1296,11 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                {interExTimerRunning && (
                  <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                     <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>⏱ Переход к следующему</span>
+                     <span style={{ fontSize: 11, color: '#fff' }}>⏱ Переход к следующему</span>
                      <span style={{ fontSize: 20, fontWeight: 700, color: interExTimerSec <= 10 ? '#f59e0b' : '#60a5fa' }}>
                        {String(Math.floor(interExTimerSec / 60)).padStart(2, '0')}:{String(interExTimerSec % 60).padStart(2, '0')}
                      </span>
-                     <button onClick={skipInterExTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
+                     <button onClick={skipInterExTimer} style={{ fontSize: 10, padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff', cursor: 'pointer', minHeight: 28 }}>Пропустить</button>
                    </div>
                    <div style={{ marginTop: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                      <div style={{ height: '100%', width: `${Math.min(100, (120 - interExTimerSec) / 120 * 100)}%`, borderRadius: 2, background: interExTimerSec <= 10 ? '#f59e0b' : '#60a5fa', transition: 'width 1s linear' }} />
@@ -1342,9 +1342,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             <div key={i} style={{ ...CARD, marginBottom: 8 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
                 {b.type === 'cardio' ? 'Лёгкое кардио' : b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
-                <span style={{ fontWeight: 400, fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>{b.durationSec}с</span>
+                <span style={{ fontWeight: 400, fontSize: 10, color: '#fff', marginLeft: 6 }}>{b.durationSec}с</span>
               </div>
-              {b.notes && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>{b.notes}</div>}
+              {b.notes && <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>{b.notes}</div>}
               <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
                 {b.exercises.map((ex, j) => {
                   const isDone = cooldownDone[`c_${i}_${j}`];
@@ -1355,7 +1355,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                       <span style={{ flex: 1 }}>
                         <span>
                           {cooldownLabel(ex.exerciseId)}
-                          <span style={{ color: 'var(--text-dim)', fontSize: 10 }}> · {ex.durationSec}с</span>
+                          <span style={{ color: '#fff', fontSize: 10 }}> · {ex.durationSec}с</span>
                         </span>
                         {'note' in ex && ex.note ? <span style={{ display: 'block', fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>{ex.note}</span> : null}
                       </span>
@@ -1398,7 +1398,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>🎯 Оценка 1RM (Epley) по лучшему сету</div>
               <div style={{ ...SMALL, marginTop: 4 }}><b style={{ color: '#fff' }}>{topE1RM.exercise}</b>: {topE1RM.weight}кг×{topE1RM.reps} → e1RM ≈ <b style={{ color: '#60a5fa' }}>{topE1RM.e1rm} кг</b></div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>Обновите workMax для этой группы в профиле, если e1RM выше текущего — веса в плане пересчитаются.</div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Обновите workMax для этой группы в профиле, если e1RM выше текущего — веса в плане пересчитаются.</div>
             </div>
           )}
           {nextSuggestions.length > 0 && (
@@ -1407,7 +1407,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               {anyDeload && <div style={{ fontSize: 10, color: '#fca5a5', marginBottom: 6 }}>Высокий RPE на нескольких сетах — рассмотрите делод-неделю (−15-20% объём, удержание интенсивности) перед следующей прогрессией.</div>}
               {nextSuggestions.map((s, i) => (
                 <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (s.deload ? '#ef4444' : 'rgba(0,230,138,0.4)') }}>
-                  <b style={{ color: '#fff' }}>{s.name}</b> → след. {s.nextWeight}кг×{s.nextReps}. <span style={{ color: 'var(--text-dim)' }}>{s.note}</span>
+                  <b style={{ color: '#fff' }}>{s.name}</b> → след. {s.nextWeight}кг×{s.nextReps}. <span style={{ color: '#fff' }}>{s.note}</span>
                 </div>
               ))}
             </div>
@@ -1417,15 +1417,15 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: rirFeedback.sessionQuality === 'отлично' ? 'rgba(0,230,138,0.06)' : rirFeedback.sessionQuality === 'плохо' ? 'rgba(239,68,68,0.06)' : 'rgba(234,179,8,0.06)', border: '1px solid ' + (rirFeedback.sessionQuality === 'отлично' ? 'rgba(0,230,138,0.2)' : rirFeedback.sessionQuality === 'плохо' ? 'rgba(239,68,68,0.25)' : 'rgba(234,179,8,0.25)') }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: rirFeedback.sessionQuality === 'отлично' ? '#00e68a' : rirFeedback.sessionQuality === 'плохо' ? '#ef4444' : '#eab308', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span>🎯 RIR-калибровка: {rirFeedback.sessionQuality}</span>
-                <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-dim)' }}>bias {rirFeedback.overallBias > 0 ? '+' : ''}{rirFeedback.overallBias} RIR</span>
+                <span style={{ fontSize: 10, fontWeight: 400, color: '#fff' }}>bias {rirFeedback.overallBias > 0 ? '+' : ''}{rirFeedback.overallBias} RIR</span>
               </div>
               {rirFeedback.exerciseFeedbacks.map((f, i) => (
                 <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginBottom: 4, paddingLeft: 4, borderLeft: '2px solid ' + (Math.abs(f.bias) > 1 ? '#ef4444' : Math.abs(f.bias) > 0.3 ? '#eab308' : 'rgba(0,230,138,0.4)') }}>
                   <b style={{ color: '#fff' }}>{f.name}</b>
-                  <span style={{ color: 'var(--text-dim)' }}> bias {f.bias > 0 ? '+' : ''}{f.bias} · согласованность {f.consistency}% — {f.recommendation}</span>
+                  <span style={{ color: '#fff' }}> bias {f.bias > 0 ? '+' : ''}{f.bias} · согласованность {f.consistency}% — {f.recommendation}</span>
                 </div>
               ))}
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 6 }}>
+              <div style={{ fontSize: 9, color: '#fff', marginTop: 6 }}>
                 RIR-калибровка накапливается: чем больше подходов с RPE, тем точнее рекомендации.
               </div>
             </div>
@@ -1450,7 +1450,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
              <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
                <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                  <span>⏱ История отдыха</span>
-                 <button onClick={() => setRestHistory([])} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }}>Очистить</button>
+                 <button onClick={() => setRestHistory([])} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff', cursor: 'pointer' }}>Очистить</button>
                </div>
                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, marginBottom: 6 }}>
                  <div style={SMALL}>Всего отдыха: <b style={{ color: '#fff' }}>{Math.floor(restHistory.reduce((s, r) => s + r.duration, 0) / 60)}</b> мин</div>
@@ -1462,7 +1462,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff', padding: '2px 4px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                      <span style={{ flex: 1 }}>{r.exercise}</span>
                      <span style={{ color: ACCENT, fontVariantNumeric: 'tabular-nums' }}>{Math.floor(r.duration / 60)}:{String(r.duration % 60).padStart(2, '0')}</span>
-                     <span style={{ color: 'var(--text-dim)', marginLeft: 8 }}>{r.timestamp}</span>
+                     <span style={{ color: '#fff', marginLeft: 8 }}>{r.timestamp}</span>
                    </div>
                  ))}
                </div>
@@ -1484,10 +1484,10 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                    const pct = item.prev > 0 ? Math.round(delta / item.prev * 100) : 0;
                    const positive = delta > 0;
                    return (
-                     <div key={item.label} style={{ padding: 6, borderRadius: 6, background: 'var(--bg-secondary)' }}>
-                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{item.label}</div>
+                     <div key={item.label} style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.04)' }}>
+                       <div style={{ fontSize: 9, color: '#fff' }}>{item.label}</div>
                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{Math.round(item.cur)}{item.unit}</div>
-                       <div style={{ fontSize: 9, color: positive ? '#22c55e' : delta < 0 ? '#ef4444' : 'var(--text-dim)' }}>
+                       <div style={{ fontSize: 9, color: positive ? '#22c55e' : delta < 0 ? '#ef4444' : '#fff' }}>
                          {delta > 0 ? '+' : ''}{item.isKg ? Math.round(delta) : delta} ({pct > 0 ? '+' : ''}{pct}%)
                        </div>
                      </div>
@@ -1504,8 +1504,8 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                {exerciseBestDeltas.map((d, i) => (
                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: i < exerciseBestDeltas.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                    <span style={{ fontSize: 10, color: 'var(--text)', flex: 1 }}>{d.name}</span>
-                   <span style={{ fontSize: 10, color: 'var(--text-dim)', marginRight: 6 }}>{d.prevBest} → {d.currentBest}кг</span>
-                   <span style={{ fontSize: 10, fontWeight: 700, color: d.delta > 0 ? '#22c55e' : d.delta < 0 ? '#ef4444' : 'var(--text-dim)', minWidth: 50, textAlign: 'right' }}>
+                   <span style={{ fontSize: 10, color: '#fff', marginRight: 6 }}>{d.prevBest} → {d.currentBest}кг</span>
+                   <span style={{ fontSize: 10, fontWeight: 700, color: d.delta > 0 ? '#22c55e' : d.delta < 0 ? '#ef4444' : '#fff', minWidth: 50, textAlign: 'right' }}>
                      {d.delta > 0 ? '+' : ''}{d.delta}кг
                    </span>
                  </div>

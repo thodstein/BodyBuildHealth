@@ -36,9 +36,9 @@ export const WarmupCheckinInline: React.FC<{ date: string; sessionId?: string; o
 
   const selectStyle: React.CSSProperties = {
     width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--input-bg)',
-    border: '1px solid var(--border)', color: '#fff', fontSize: 11, minHeight: 32, boxSizing: 'border-box',
+    border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, minHeight: 32, boxSizing: 'border-box',
   };
-  const labelStyle: React.CSSProperties = { fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 };
+  const labelStyle: React.CSSProperties = { fontSize: 9, color: '#fff', marginBottom: 3 };
 
   return (
     <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.2)' }}>
@@ -54,9 +54,9 @@ export const WarmupCheckinInline: React.FC<{ date: string; sessionId?: string; o
               <button key={String(v)} type="button" onClick={() => { setDone(v); setSaved(false); }}
                 style={{
                   flex: 1, padding: '5px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 600, minHeight: 32,
-                  border: done === v ? (v === false ? '1px solid #ef4444' : '1px solid #f97316') : '1px solid var(--border)',
-                  background: done === v ? (v === false ? 'rgba(239,68,68,0.12)' : 'rgba(249,115,22,0.15)') : 'var(--bg-secondary)',
-                  color: done === v ? (v === false ? '#ef4444' : '#f97316') : 'var(--text-dim)',
+                  border: done === v ? (v === false ? '1px solid #ef4444' : '1px solid #f97316') : '1px solid rgba(255,255,255,0.08)',
+                  background: done === v ? (v === false ? 'rgba(239,68,68,0.12)' : 'rgba(249,115,22,0.15)') : 'rgba(255,255,255,0.04)',
+                  color: done === v ? (v === false ? '#ef4444' : '#f97316') : '#fff',
                 }}>
                 {v === true ? '✓ да' : v === false ? '✕ нет' : '—'}
               </button>

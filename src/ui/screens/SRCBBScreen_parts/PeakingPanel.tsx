@@ -289,7 +289,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             <div>
               <div style={{ width: '100%', minHeight: 40, boxSizing: 'border-box', borderRadius: 8, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
-                <span style={{ fontSize: 8.5, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: 0.4 }}>📅 Дата шоу</span>
+                <span style={{ fontSize: 8.5, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.4 }}>📅 Дата шоу</span>
                 <input type="date" value={bbCfg.showDate} onChange={e => bbPatch({ showDate: e.target.value })}
                   style={{ width: '100%', border: 'none', background: 'transparent', color: '#ec4899', fontSize: 12, fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: 0 }} />
               </div>
@@ -370,7 +370,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
                 <div key={t.weekOffset} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11, alignItems: 'center' }}>
                   <span style={{ color: '#a855f7', fontWeight: 700 }}>Нед {t.weekOffset}</span>
                   <span style={{ color: '#fff' }}>{t.label}</span>
-                  <span style={{ color: 'var(--text-dim)', fontSize: 10 }}>объём {Math.round(t.volumePct * 100)}% · вес {Math.round(t.intensityPct * 100)}% · RIR {t.rirMin}–{t.rirMax}</span>
+                  <span style={{ color: '#fff', fontSize: 10 }}>объём {Math.round(t.volumePct * 100)}% · вес {Math.round(t.intensityPct * 100)}% · RIR {t.rirMin}–{t.rirMax}</span>
                 </div>
               ))}
             </CalcSection>
@@ -386,7 +386,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
               <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, minWidth: 460 }}>
                   <thead>
-                    <tr style={{ color: 'var(--text-dim)', textAlign: 'left', background: 'rgba(255,255,255,0.03)' }}>
+                    <tr style={{ color: '#fff', textAlign: 'left', background: 'rgba(255,255,255,0.03)' }}>
                       <th style={{ padding: '5px 6px' }}>День</th>
                       <th style={{ padding: '5px 6px' }}>Фаза</th>
                       <th style={{ padding: '5px 6px', textAlign: 'right' }}>Ккал</th>
@@ -405,15 +405,15 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
                           borderLeft: `3px solid ${phColor}`,
                           background: d.day === 7 ? 'linear-gradient(90deg, rgba(251,191,36,0.12), rgba(251,191,36,0.03))' : undefined,
                         }}>
-                          <td style={{ padding: '5px 6px', fontWeight: 700, color: d.day === 7 ? '#fbbf24' : '#fff' }}>{d.day === 7 ? '🎬' : `D-${7 - d.day}`}<div style={{ fontSize: 8, color: 'var(--text-dim)', fontWeight: 400 }}>{d.date.slice(5).replace('-', '.')}</div></td>
+                          <td style={{ padding: '5px 6px', fontWeight: 700, color: d.day === 7 ? '#fbbf24' : '#fff' }}>{d.day === 7 ? '🎬' : `D-${7 - d.day}`}<div style={{ fontSize: 8, color: '#fff', fontWeight: 400 }}>{d.date.slice(5).replace('-', '.')}</div></td>
                           <td style={{ padding: '5px 6px' }}>
                             <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 8, fontWeight: 700, background: phColor + '18', color: phColor, border: `1px solid ${phColor}40` }}>{PHASE_LABELS_RU[d.phase]}</span>
                           </td>
                           <td style={{ padding: '5px 6px', textAlign: 'right', fontWeight: 700 }}>{d.kcal}</td>
-                          <td style={{ padding: '5px 6px', textAlign: 'right', color: 'var(--text-dim)' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
+                          <td style={{ padding: '5px 6px', textAlign: 'right', color: '#fff' }}>{d.proteinG}/{d.carbsG}/{d.fatG}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.waterLiters}</td>
                           <td style={{ padding: '5px 6px', textAlign: 'right' }}>{d.sodiumMg}</td>
-                          <td style={{ padding: '5px 6px', color: 'var(--text-dim)' }}>{d.training.type === 'Отдых' ? '—' : d.training.type.split(' ')[0]}</td>
+                          <td style={{ padding: '5px 6px', color: '#fff' }}>{d.training.type === 'Отдых' ? '—' : d.training.type.split(' ')[0]}</td>
                         </tr>
                       );
                     })}
@@ -475,7 +475,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
             {bbCopyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
           </button>
         )}
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.5, textAlign: 'center' }}>
+        <div style={{ fontSize: 9, color: '#fff', marginTop: 8, lineHeight: 1.5, textAlign: 'center' }}>
           Сохранение пишет конфиг в профиль (goals.bbPeakConfig): сборка плана ББ наложит тапер на последние недели,
           блок «Питание → 🏁 Тапер ББ» применит пик-неделю к рациону по дате шоу.
         </div>
@@ -514,14 +514,14 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
               {t.label && <span style={{ fontSize: 9, color: '#fff' }}>{t.label}{t.focus ? `: ${t.focus}` : ''}</span>}
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ width: 48, fontSize: 9, color: 'var(--text-dim)' }}>Объём</span>
+                <span style={{ width: 48, fontSize: 9, color: '#fff' }}>Объём</span>
                 <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
                   <div style={{ width: `${t.volumePct * 100}%`, height: '100%', borderRadius: 2, background: '#3b82f6' }} />
                 </div>
                 <span style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', minWidth: 32, textAlign: 'right' }}>{Math.round(t.volumePct * 100)}%</span>
               </div>
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ width: 48, fontSize: 9, color: 'var(--text-dim)' }}>Интенс.</span>
+                <span style={{ width: 48, fontSize: 9, color: '#fff' }}>Интенс.</span>
                 <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)' }}>
                   <div style={{ width: `${t.intensityPct * 100}%`, height: '100%', borderRadius: 2, background: '#ef4444' }} />
                 </div>
@@ -534,7 +534,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
       </CalcSection>
 
       <CalcSection icon="📋" title={`Стратегия подходов — ${MEET_STRATEGY_LABEL[strategy]}`} accent="#f59e0b">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2, fontWeight: 700, fontSize: 9, color: 'var(--text-dim)', padding: '4px 8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 2, fontWeight: 700, fontSize: 9, color: '#fff', padding: '4px 8px' }}>
           <span>Движение</span><span style={{textAlign:'center'}}>1-й</span><span style={{textAlign:'center'}}>2-й</span><span style={{textAlign:'center'}}>3-й</span>
         </div>
         {attempts.map(a => (
@@ -560,7 +560,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
       <CalcSection icon="🔄" title="Протоколы восстановления" accent="#22c55e">
         <div style={{ display: 'grid', gap: 4 }}>
           {RECOVERY_PROTOCOLS.map(p => (
-            <ExpandableCard key={p.type} title={`${p.type} (${p.duration})`} short={p.instructions} full={<div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Применять {p.duration} · {p.instructions}</div>} />
+            <ExpandableCard key={p.type} title={`${p.type} (${p.duration})`} short={p.instructions} full={<div style={{ fontSize: 10, color: '#fff' }}>Применять {p.duration} · {p.instructions}</div>} />
           ))}
         </div>
       </CalcSection>
@@ -571,7 +571,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
             <div key={m.step} style={{ display: 'flex', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(168,85,247,0.04)', border: '1px solid rgba(168,85,247,0.1)', fontSize: 10, alignItems: 'center' }}>
               <span style={{ flex: 1, color: '#fff' }}>{m.step}</span>
               <span style={{ color: '#a855f7', fontWeight: 700, whiteSpace: 'nowrap' }}>{m.duration}</span>
-              <span style={{ color: 'var(--text-dim)', fontSize: 9, whiteSpace: 'nowrap' }}>{m.when}</span>
+              <span style={{ color: '#fff', fontSize: 9, whiteSpace: 'nowrap' }}>{m.when}</span>
             </div>
           ))}
         </div>
@@ -605,7 +605,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         </button>
       </div>
       {lastSavedAt && (
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, textAlign: 'center' }}>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6, textAlign: 'center' }}>
           ✓ ПМ сохранены: {new Date(lastSavedAt).toLocaleTimeString('ru')}
         </div>
       )}

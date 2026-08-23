@@ -12,7 +12,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { PL_NORM_TABLES, classifyTotal, findCategory, findCategoryByLabel, classifyTotalForCategory, getNormTable, RANK_ORDER, RANK_LABELS, NORM_EXPLANATIONS, CATEGORY_EXPLANATION, type ClassificationResult, type NormTable, type Federation, type Discipline, type Sex } from '../../../engines/pl-norms.engine';
 import { getProfile } from '../../../core/profile-manager';
 
-const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
 const SMALL: React.CSSProperties = { color: '#fff', fontSize: 12, lineHeight: 1.4 };
@@ -336,7 +336,7 @@ export const ProMetricsPanel: React.FC = () => {
       <div style={CARD}>
         <div style={{ ...SEC, borderLeftColor: '#f59e0b' }}>📈 Прогрессии ({schemes.length} схем)</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, marginBottom: 6 }}>
-          {schemes.map(sc => <button key={sc.id} onClick={() => setSchemeId(sc.id)} style={{ padding: '5px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: schemeId===sc.id?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: schemeId===sc.id?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: schemeId===sc.id?'#00e68a':'var(--text-dim)' }}>{sc.name}</button>)}
+          {schemes.map(sc => <button key={sc.id} onClick={() => setSchemeId(sc.id)} style={{ padding: '5px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: schemeId===sc.id?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: schemeId===sc.id?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.02)', color: schemeId===sc.id?'#00e68a':'#fff' }}>{sc.name}</button>)}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}><div style={LABEL}>e1RM:</div><input style={{ ...IN, width: 80 }} type="number" value={e1rm} onChange={e => setE1rm(+e.target.value)} /></div>
         {prog && <div style={SMALL}>TM = {prog[0].trainingMax} кг · {prog.length} нед</div>}

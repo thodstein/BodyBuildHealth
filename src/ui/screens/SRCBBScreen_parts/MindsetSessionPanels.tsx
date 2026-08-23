@@ -19,9 +19,9 @@ import {
   type MindsetDayType,
 } from '../../../engines/mindset-protocol.engine';
 
-const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
+const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
 const ACCENT = '#00e68a';
-const DIM = 'var(--text-dim)';
+const DIM = '#fff';
 const KIND_ICON: Record<string, string> = { pre: '🌅', approach: '🎯', post: '🌙' };
 
 function runtimeTrack(): string | undefined {
@@ -94,7 +94,7 @@ export const MindsetPreSessionCard: React.FC<{ focus: string; dayLabel: string }
                 <div style={{ fontSize: 10, fontWeight: 600, color: done ? '#fff' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
                   {KIND_ICON[it.kind]} {it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>({KIND_LABELS[it.kind]} · {it.durationMin} мин)</span>
                 </div>
-                {!done && <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}
+                {!done && <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}
               </div>
             </div>
           );
@@ -116,7 +116,7 @@ export const MindsetApproachHint: React.FC<{ focus: string; exerciseStarted: boo
   return (
     <div style={{ margin: '6px 0', padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)' }}>
       <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b' }}>🎯 Перед первым подходом: {hint.title} (~{hint.durationMin} мин)</span>
-      <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6 }}>{hint.script.length > 140 ? hint.script.slice(0, 140) + '…' : hint.script}</span>
+      <span style={{ fontSize: 9, color: '#fff', marginLeft: 6 }}>{hint.script.length > 140 ? hint.script.slice(0, 140) + '…' : hint.script}</span>
     </div>
   );
 };
@@ -153,9 +153,9 @@ export const MindsetCheckinCard: React.FC<{ sessionId?: string }> = ({ sessionId
           <button key={v} type="button" role="radio" aria-checked={value === v} aria-label={`${label} ${v}`} onClick={() => onChange(v)}
             style={{
               flex: 1, minHeight: 32, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
-              border: value === v ? '1px solid rgba(0,230,138,0.5)' : '1px solid var(--border)',
-              background: value === v ? 'rgba(0,230,138,0.15)' : 'var(--bg-secondary)',
-              color: value === v ? ACCENT : 'var(--text-dim)',
+              border: value === v ? '1px solid rgba(0,230,138,0.5)' : '1px solid rgba(255,255,255,0.08)',
+              background: value === v ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
+              color: value === v ? ACCENT : '#fff',
             }}>
             {v}
           </button>
@@ -179,9 +179,9 @@ export const MindsetCheckinCard: React.FC<{ sessionId?: string }> = ({ sessionId
           <button key={String(v)} type="button" onClick={() => setFollowed(v)}
             style={{
               padding: '3px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 9, fontWeight: 600, minHeight: 28,
-              border: followed === v ? (v === false ? '1px solid #ef4444' : '1px solid #a78bfa') : '1px solid var(--border)',
-              background: followed === v ? (v === false ? 'rgba(239,68,68,0.12)' : 'rgba(167,139,250,0.15)') : 'var(--bg-secondary)',
-              color: followed === v ? (v === false ? '#ef4444' : '#a78bfa') : 'var(--text-dim)',
+              border: followed === v ? (v === false ? '1px solid #ef4444' : '1px solid #a78bfa') : '1px solid rgba(255,255,255,0.08)',
+              background: followed === v ? (v === false ? 'rgba(239,68,68,0.12)' : 'rgba(167,139,250,0.15)') : 'rgba(255,255,255,0.04)',
+              color: followed === v ? (v === false ? '#ef4444' : '#a78bfa') : '#fff',
             }}>
             {v === true ? '✓ Протокол выполнен' : v === false ? '✕ Не выполнен' : '— Не отмечать'}
           </button>
@@ -189,7 +189,7 @@ export const MindsetCheckinCard: React.FC<{ sessionId?: string }> = ({ sessionId
       </div>
       <input type="text" aria-label="Заметка чек-ина" placeholder="заметка: что сработало…" value={note}
         onChange={e => setNote(e.target.value)}
-        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--input-bg)', color: '#fff', fontSize: 11 }} />
+        style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'var(--input-bg)', color: '#fff', fontSize: 11 }} />
       <button type="button" onClick={save} disabled={saved}
         style={{ width: '100%', marginTop: 8, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', minHeight: 40,
           background: saved ? 'rgba(255,255,255,0.08)' : 'linear-gradient(135deg,#a78bfa,#8b5cf6)', color: saved ? DIM : '#000', fontWeight: 700, fontSize: 11 }}>
@@ -227,9 +227,9 @@ export const MindsetCheckinInline: React.FC<{ date: string; sessionId?: string; 
 
   const selectStyle: React.CSSProperties = {
     width: '100%', padding: '5px 6px', borderRadius: 6, background: 'var(--input-bg)',
-    border: '1px solid var(--border)', color: '#fff', fontSize: 11, minHeight: 32, boxSizing: 'border-box',
+    border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, minHeight: 32, boxSizing: 'border-box',
   };
-  const labelStyle: React.CSSProperties = { fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 };
+  const labelStyle: React.CSSProperties = { fontSize: 9, color: '#fff', marginBottom: 3 };
 
   return (
     <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.05)', border: '1px solid rgba(167,139,250,0.2)' }}>
@@ -263,9 +263,9 @@ export const MindsetCheckinInline: React.FC<{ date: string; sessionId?: string; 
               <button key={String(v)} type="button" onClick={() => { setFollowed(v); setSaved(false); }}
                 style={{
                   flex: 1, padding: '5px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 600, minHeight: 32,
-                  border: followed === v ? (v === false ? '1px solid #ef4444' : '1px solid #a78bfa') : '1px solid var(--border)',
-                  background: followed === v ? (v === false ? 'rgba(239,68,68,0.12)' : 'rgba(167,139,250,0.15)') : 'var(--bg-secondary)',
-                  color: followed === v ? (v === false ? '#ef4444' : '#a78bfa') : 'var(--text-dim)',
+                  border: followed === v ? (v === false ? '1px solid #ef4444' : '1px solid #a78bfa') : '1px solid rgba(255,255,255,0.08)',
+                  background: followed === v ? (v === false ? 'rgba(239,68,68,0.12)' : 'rgba(167,139,250,0.15)') : 'rgba(255,255,255,0.04)',
+                  color: followed === v ? (v === false ? '#ef4444' : '#a78bfa') : '#fff',
                 }}>
                 {v === true ? '✓ да' : v === false ? '✕ нет' : '—'}
               </button>

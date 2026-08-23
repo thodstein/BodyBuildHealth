@@ -193,7 +193,7 @@ function BBChart({ data }: { data: BBMuscleMetric[] }) {
       ctx.quadraticCurveTo(bx + bw, yT, bx + bw, yT + 3);
       ctx.lineTo(bx + bw, pad.top + drawH);
       ctx.closePath(); ctx.fill();
-      if (over) { ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1; ctx.stroke(); }
+      if (over) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke(); }
       // памп поверх
       const yP = yV(d.тяж + d.памп);
       const g2 = ctx.createLinearGradient(bx, yP, bx, yT);

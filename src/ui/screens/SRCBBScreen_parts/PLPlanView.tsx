@@ -696,14 +696,14 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                       {e1rmSeries.map(s => s.pts.map((p, i) => <circle key={s.lift + i} cx={px(i)} cy={py(p.val)} r={2} fill={s.color} />))}
                     </svg>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 4 }}>{e1rmSeries.map(s => <span key={s.lift} style={{ fontSize: 11, color: s.color }}>● {s.label} {s.pts[s.pts.length - 1].val} кг</span>)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>PM0 плана: присед {pmSquat} · жим {pmBench} · становая {pmDead} кг</div>
+                    <div style={{ fontSize: 11, color: '#fff', marginTop: 4, textAlign: 'center' }}>PM0 плана: присед {pmSquat} · жим {pmBench} · становая {pmDead} кг</div>
                     {exerciseE1rm.length > 0 && (
                       <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Личные 1ПМ по упражнениям (из дневника):</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Личные 1ПМ по упражнениям (из дневника):</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: '3px 8px', fontSize: 11, alignItems: 'center' }}>
-                          <div style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Упражнение</div>
-                          <div style={{ color: 'var(--text-dim)', fontWeight: 600, textAlign: 'right' }}>1ПМ</div>
-                          <div style={{ color: 'var(--text-dim)', fontWeight: 600, textAlign: 'right' }}>подход</div>
+                          <div style={{ color: '#fff', fontWeight: 600 }}>Упражнение</div>
+                          <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>1ПМ</div>
+                          <div style={{ color: '#fff', fontWeight: 600, textAlign: 'right' }}>подход</div>
                           {exerciseE1rm.slice(0, 15).map((e) => (
                             <React.Fragment key={e.name}>
                               <div style={{ color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{e.name}</div>
@@ -712,12 +712,12 @@ export const PLPlanView: React.FC<{ api: PLPlanViewApi }> = ({ api }) => {
                             </React.Fragment>
                           ))}
                         </div>
-                        {exerciseE1rm.length > 15 && <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4, textAlign: 'center' }}>показано 15 из {exerciseE1rm.length}</div>}
+                        {exerciseE1rm.length > 15 && <div style={{ fontSize: 10, color: '#fff', marginTop: 4, textAlign: 'center' }}>показано 15 из {exerciseE1rm.length}</div>}
                       </div>
                     )}
                     {exerciseE1rm.length > 0 && (
                       <div style={{ marginTop: 10, borderTop: '1px solid var(--accent-dim)', paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 4 }}>Тренд 1ПМ по упражнению (график во времени):</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Тренд 1ПМ по упражнению (график во времени):</div>
                         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
                           {exerciseE1rm.slice(0, 10).map((e) => (
                             <button key={e.name} onClick={() => setSelectedTrendEx(s => s === e.name ? null : e.name)}

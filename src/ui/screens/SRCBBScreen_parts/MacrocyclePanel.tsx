@@ -247,7 +247,7 @@ const LABEL: React.CSSProperties = { ...SMALL, fontSize: 11, margin: '4px 0 2px'
 const SectionHead: React.FC<{ icon: string; title: string; right?: React.ReactNode }> = ({ icon, title, right }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 6 }}>
     <span style={{ fontSize: 13 }}>{icon}</span>
-    <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.3, color: 'rgba(255,255,255,0.72)', flex: 1, minWidth: 0 }}>{title}</span>
+    <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.3, color: '#fff', flex: 1, minWidth: 0 }}>{title}</span>
     {right}
   </div>
 );
@@ -1687,7 +1687,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                   className="macrocycle-week-card"
                   style={{
                     background: `linear-gradient(180deg, ${phaseColor}30, ${phaseColor}10)`,
-                    border: isSel ? `1.5px solid ${phaseColor}` : isCurrent ? `1px solid rgba(255,255,255,0.55)` : `1px solid ${phaseColor}40`,
+                    border: isSel ? `1.5px solid ${phaseColor}` : isCurrent ? `1px solid #fff` : `1px solid ${phaseColor}40`,
                     borderRadius: 12, cursor: 'pointer', padding: '8px 10px', position: 'relative',
                     boxShadow: isSel ? `0 3px 14px ${phaseColor}40` : 'none',
                     outline: isCurrent ? '1.5px solid rgba(255,255,255,0.28)' : 'none',
@@ -1704,7 +1704,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                       {cycTitle}
                     </div>
                   )}
-                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.62)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 9.5, color: '#fff', lineHeight: 1.4 }}>
                     Нед {b.weekOffset}–{b.weekOffset + b.weeks - 1} ({b.weeks}н) · 📅 {formatMacroDate(macroWeekStartDate(b.weekOffset))}
                   </div>
                   {isCurrent && (
@@ -2253,7 +2253,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                       {scenarioCompare.diffs.length === 0 && <div style={{ fontSize: 10, color: '#fff' }}>идентичны — изменений нет</div>}
                       {scenarioCompare.diffs.map(d => (
                         <div key={d.blockKey} style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
-                          <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>Нед {d.startWeek}:</span> {d.phase}
+                          <span style={{ fontWeight: 700, color: '#fff' }}>Нед {d.startWeek}:</span> {d.phase}
                           {d.kindA && d.kindB && <span> · {d.kindA}→{d.kindB}</span>}
                           {d.statusA && d.statusB && <span> · {d.statusA}→{d.statusB}</span>}
                           {d.configChanged && d.configFields && d.configFields.length > 0 && (
@@ -2650,7 +2650,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                 <div style={{ marginTop: 8 }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>✅ Что учтено в расчёте</div>
                   {rationale.length > 0 ? rationale.map((r, i) => (
-                    <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.72)', lineHeight: 1.55, padding: '2px 0 2px 14px', position: 'relative' }}>
+                    <div key={i} style={{ fontSize: 10, color: '#fff', lineHeight: 1.55, padding: '2px 0 2px 14px', position: 'relative' }}>
                       <span style={{ position: 'absolute', left: 2, top: 4, color: '#00e68a', fontSize: 10 }}>▸</span>
                       {r}
                     </div>
@@ -2926,7 +2926,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
                         <div style={{ width: 6, borderRadius: 3, background: color, minHeight: 20, flexShrink: 0 }} />
                         <div onClick={() => setSelectedBlockIdx(i)} role="button" tabIndex={0}
                           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedBlockIdx(i); } }}
-                          style={{ flex: 1, minWidth: 0, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', background: `${color}14`, border: `1px solid ${isCurrent ? 'rgba(255,255,255,0.6)' : `${color}30`}`, outline: isCurrent ? '1.5px solid rgba(255,255,255,0.25)' : 'none' }}
+                          style={{ flex: 1, minWidth: 0, padding: '6px 10px', borderRadius: 8, cursor: 'pointer', background: `${color}14`, border: `1px solid ${isCurrent ? '#fff' : `${color}30`}`, outline: isCurrent ? '1.5px solid rgba(255,255,255,0.25)' : 'none' }}
                           title={`${label}: нед ${b.weekOffset}-${b.weekOffset + b.weeks - 1}`}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', alignItems: 'baseline' }}>
                             <span style={{ fontSize: 11, fontWeight: 800, color }}>{icon} {label}</span>

@@ -391,7 +391,7 @@ export const PopupExerciseList: React.FC<{
               style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 14, boxSizing: 'border-box', marginBottom: 10 }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {results.map(e => (
-                <button key={e.id} onClick={() => add(e.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.9)' }}>
+                <button key={e.id} onClick={() => add(e.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '9px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>
                   <span>{e.name}</span>
                   <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>+ добавить</span>
                 </button>
