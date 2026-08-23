@@ -54,56 +54,69 @@ const ExerciseLabMerged: React.FC<{
   // Вычисляем шаги для прогресс-линии
   const stepIndex = useMemo(() => MODE_DEFS.findIndex(d => d.m === mode), [mode]);
 
+  const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
+  const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' } as any;
   return (
-    <div style={{ padding: 12, color: '#fff' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
-        <span style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>🧬 Лаборатория упражнений</span>
-        <span style={{ fontSize: 10, color: DIM, background: 'rgba(0,230,138,0.1)', padding: '1px 8px', borderRadius: 10, fontWeight: 700 }}>PRO · ЕДИНЫЙ</span>
-        {onSelectExercise && (
-          <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '1px 8px', borderRadius: 10, fontWeight: 700, marginLeft: 'auto' }}>
-            Режим выбора
-          </span>
-        )}
-        {onClose && (
-          <button onClick={onClose} style={{ marginLeft: 'auto', padding: '4px 10px', fontSize: 11, borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: DIM, cursor: 'pointer' }}>
-            ✕ Закрыть
-          </button>
-        )}
-      </div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>
-        Единый инструмент без дублей: подбор + блины + тоннаж + 1RM + VBT + ББ-темп/техники — внутри Шага 1; техника — Шаг 2; ПРО+замена — Шаг 3; сравнение — Шаг 4. Каталог — drawer.
-        {onSelectExercise && ' Выберите упражнение из каталога.'}
+    <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(0,230,138,0.10),rgba(96,165,250,0.07))', border:'1px solid rgba(0,230,138,0.18)', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(0,230,138,0.16),transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+          <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:16 }}>🧬</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Лаборатория упражнений — единый центр</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Подбор → техника → PRO+замена → сравнение. Каталог — быстрый drawer с поиском, избранным и недавними.</div>
+          </div>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>PRO · ЕДИНЫЙ</span>
+          {onSelectExercise && (
+            <span style={{ fontSize:9, color:'#f59e0b', background:'rgba(245,158,11,0.12)', padding:'4px 8px', borderRadius:20, fontWeight:800, border:'1px solid rgba(245,158,11,0.22)' }}>
+              Режим выбора
+            </span>
+          )}
+          {onClose && (
+            <button onClick={onClose} style={{ padding:'6px 10px', fontSize:11, borderRadius:8, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontWeight:700 }}>
+              ✕ Закрыть
+            </button>
+          )}
+        </div>
+        <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
+          <b style={{ color:'#fff' }}>Как работает:</b> <span style={{ color:ACCENT }}>Шаг 1</span> — подбор + блины + тоннаж + 1RM + VBT + ББ-темп/техники внутри, <span style={{ color:'#60a5fa' }}>Шаг 2</span> — разбор техники (биомеханика/подсказки/ошибки), <span style={{ color:'#a78bfa' }}>Шаг 3</span> — force-векторы + замены, <span style={{ color:'#f59e0b' }}>Шаг 4</span> — сравнение. Каталог — drawer с поиском, группами и избранным.
+        </div>
       </div>
       {/* Прогресс-линия 4 шагов */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
         {MODE_DEFS.map((d, i) => (
-          <div key={d.m} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= stepIndex ? ACCENT : 'rgba(255,255,255,0.08)' }} />
+          <div key={d.m} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= stepIndex ? `linear-gradient(90deg, ${ACCENT}, #00c853)` : 'rgba(255,255,255,0.08)', boxShadow: i <= stepIndex ? `0 0 6px ${ACCENT}55` : 'none', transition:'all 0.2s' }} />
         ))}
       </div>
 
-      {/* Единая шапка: выбор упражнения + глобальные действия */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={() => setCatalogOpen(true)} style={{ flex: '0 0 auto', padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.08)', color: ACCENT, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-          📚 Каталог {selectedId ? '· выбрано' : ''}
+      {/* Единая шапка: выбор упражнения + глобальные действия — удобно, 0-кликов лишних */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center', ...CARD, marginBottom:10 }}>
+        <button onClick={() => setCatalogOpen(true)} style={{ flex: '0 0 auto', padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.30)', background: 'linear-gradient(135deg,rgba(0,230,138,0.14),rgba(0,200,83,0.08))', color: ACCENT, cursor: 'pointer', fontSize: 11, fontWeight: 800, boxShadow:'0 2px 8px rgba(0,230,138,0.15)' }}>
+          📚 Каталог {selectedId ? '· выбрано ✓' : '· выбрать'}
         </button>
-        {selectedId && <span style={{ fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.04)', padding: '4px 8px', borderRadius: 6 }}>ID: {selectedId}</span>}
-        <button onClick={() => setCompareIds(prev => prev.length ? [] : prev)} style={{ marginLeft: 'auto', padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'transparent', color: DIM, cursor: 'pointer', fontSize: 10 }}>
-          Сброс сравнения {compareIds.length > 0 ? `(${compareIds.length})` : ''}
+        {selectedId ? (
+          <span style={{ fontSize: 10, color: '#fff', background: 'rgba(0,230,138,0.12)', padding: '6px 10px', borderRadius: 8, border:'1px solid rgba(0,230,138,0.20)', fontWeight:700 }}>✓ {selectedId}</span>
+        ) : (
+          <span style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.04)', padding: '6px 10px', borderRadius: 8, border:'1px solid rgba(255,255,255,0.06)' }}>Выбери упражнение — все расчёты подтянутся</span>
+        )}
+        <div style={{ flex:1 }} />
+        <button onClick={() => setCompareIds(prev => prev.length ? [] : prev)} style={{ padding: '7px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, fontWeight:700 }}>
+          ⇆ Сравнение {compareIds.length > 0 ? `· ${compareIds.length}` : ''}
         </button>
       </div>
 
-      {/* 4 шага */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+      {/* 4 шага — sticky, удобно */}
+      <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 12px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({ m, label, icon, desc }) => {
           const active = mode === m;
           return (
             <button key={m} onClick={() => setMode(m)} title={desc}
               style={{
-                flex: '1 1 auto', padding: '8px 10px', borderRadius: 10,
+                flex:'0 0 auto', padding: '7px 12px', borderRadius: 20,
                 border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
-                background: active ? 'rgba(0,230,138,0.14)' : 'rgba(0,0,0,0.25)',
-                color: active ? ACCENT : DIM, cursor: 'pointer', fontSize: 11, fontWeight: 800,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                background: active ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)',
+                color: active ? ACCENT : '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 800,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace:'nowrap', transition:'all 0.16s',
               }}
             >
               {icon} {label}
