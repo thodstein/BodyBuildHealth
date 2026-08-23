@@ -9,7 +9,7 @@
  * цикла (rankPLAssistanceForIssue) + SVG-схема траектории. Добавление в ПЛ-авто —
  * одно на выбор / все рекомендуемые / все сразу.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   diagnoseMovement, barPathAnalysis, barPathIssuesForLift, BAR_PATH_ISSUES, phaseForReps,
   type BarPathIssue,
@@ -22,9 +22,12 @@ import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
 import { applyToPlanner } from './planner-bridge';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
+import { RIRCalibrationCard } from './RIRCalibrationCard';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.55)';
+const DIM = '#fff';
+const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
+const POLISHED_CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginTop: 8 } as any;
 
 /** Слабые мышцы: группы → подробные подгруппы (по паттернам ПЛ-пула). */
 const WEAK_MUSCLE_DETAIL: Array<{ id: string; label: string; subs: Array<{ sub: string; label: string; patterns: string[]; nameRe?: RegExp }> }> = [
@@ -102,6 +105,17 @@ const PHASE_RU: Record<string, string> = {
   sumo_mid: 'Сумо: середина (проход коленей)',
   biceps_start: 'Сгибание: старт', biceps_mid: 'Сгибание: середина', biceps_top: 'Сгибание: пик (сокращение)',
 };
+/** Перевод упражнений срывов на русский (если в каталоге английский). */
+const EX_RU: Record<string,string> = {
+  'Board Press': 'Жим с досок', 'Floor Press': 'Жим с пола', 'Spoto Press': 'Жим Спото', 'Pin Press': 'Жим с упоров',
+  'Pause Squat': 'Присед с паузой', 'Box Squat': 'Присед на ящик', 'Front Squat': 'Фронтальный присед', 'Good Morning': 'Наклоны со штангой',
+  'Deficit Deadlift': 'Тяга с дефицита', 'Block Pull': 'Тяга с плинтов', 'Rack Pull': 'Тяга с упоров', 'Paused Deadlift': 'Тяга с паузой',
+  'Close Grip Bench': 'Жим узким хватом', 'Incline Dumbbell Press': 'Жим гантелей на наклонной', 'Dumbbell Fly': 'Разводка гантелей',
+  'Lat Pulldown': 'Тяга верхнего блока', 'Seated Row': 'Тяга горизонтального блока', 'Barbell Row': 'Тяга штанги в наклоне',
+  'Overhead Press': 'Жим стоя', 'Push Press': 'Швунг', 'Pull-up': 'Подтягивания', 'Chin-up': 'Подтягивания обратным хватом',
+};
+const ruExerciseName = (name: string) => EX_RU[name] || EX_RU[name.trim()] || name;
+
 /** Все фазы в порядке, типичном для каждого движения. */
 const LIFT_PHASES: Record<Lift, WeakPoint[]> = {
   bench: ['off_chest', 'mid', 'lockout', 'start'],
@@ -294,6 +308,27 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   useEffect(() => {
     saveDiagnosticCardState({ lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days, asymSide, vbtBest, vbtLast, vbtWeight });
   }, [lift, phase, issues, planWeakPoints, weakMuscleGroups, weakMuscleSubs, selected, days, asymSide, vbtBest, vbtLast, vbtWeight]);
+  // — навигация корректора (4 блока + срывы + RIR)
+  const [activeSec, setActiveSec] = useState('sec-weak-muscle');
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({} as any);
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const obs = new IntersectionObserver((entries) => {
+      const vis = entries.filter(e=> e.isIntersecting).sort((a,b)=> b.intersectionRatio - a.intersectionRatio)[0];
+      if (vis?.target?.id) setActiveSec(vis.target.id);
+    }, { rootMargin: '-18% 0px -68% 0px', threshold: [0,0.2,0.6,1] });
+    ['sec-weak-muscle','sec-weak-point','sec-sticking','sec-barpath','sec-sryvy','sec-rir'].forEach(id=> { const el = sectionRefs.current[id]; if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, []);
+  const scrollTo = (id:string) => document.getElementById(id)?.scrollIntoView({ behavior:'smooth', block:'start' });
+  const CORRECTOR_SECTIONS = [
+    {id:'sec-weak-muscle', label:'1 Слабые мышцы', icon:'💪', accent:'#4ade80'},
+    {id:'sec-weak-point', label:'2 Слабые точки', icon:'🎯', accent:'#a855f7'},
+    {id:'sec-sticking', label:'3 Мёртвые точки', icon:'🧱', accent:'#60a5fa'},
+    {id:'sec-barpath', label:'4 Движение штанги', icon:'📈', accent:'#f59e0b'},
+    {id:'sec-sryvy', label:'5 Срывы', icon:'💥', accent:'#ef4444'},
+    {id:'sec-rir', label:'6 RIR', icon:'🎚️', accent:'#00e68a'},
+  ] as const;
   const toggleWeakMuscle = (g: string) => setWeakMuscleGroups(cur => {
     if (cur.includes(g)) return cur.filter(x => x !== g);
     return [...cur, g];
@@ -452,22 +487,44 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   };
 
   return (
-    <div style={{ padding: 12, color: '#fff' }}>
-      <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT }}>🎯 Слабые мышцы → Слабые точки → Мёртвые точки → Движение штанги</div>
-      <div style={{ fontSize: 10, color: DIM, marginTop: 3, lineHeight: 1.45 }}>
-        Выберите движение, фазу срыва и отклонения траектории. Для каждого параметра — упражнения из раскладки цикла и анализ, какое оптимально.
+    <div style={{ padding: '10px 8px 18px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
+      <div style={{ ...POLISHED_CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(168,85,247,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(168,85,247,0.18)', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(168,85,247,0.14),transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+          <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a855f7,#7c3aed)', color:'#fff', fontWeight:900, fontSize:16 }}>🔧</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Корректор движений — единый инструмент</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Слабые мышцы → слабые точки → мёртвые точки → движение штанги. Один выбор — все коррекции.</div>
+          </div>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', color:'#a78bfa', fontWeight:800, whiteSpace:'nowrap' }}>{LIFT_RU[lift]}</span>
+        </div>
+        <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
+          <b style={{ color:'#fff' }}>Как работает:</b> выбери движение, фазу срыва и отклонения — все 4 блока ниже пересчитаются от одного диагноза. <span style={{ color:'#a78bfa' }}>Слабая мышца</span> → <span style={{ color:'#c084fc' }}>слабая точка</span> → <span style={{ color:'#60a5fa' }}>мёртвая точка</span> → <span style={{ color:'#f59e0b' }}>траектория</span>. Итог — одна кнопка «Применить».
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
         {(Object.keys(LIFT_RU) as Lift[]).map(item => (
-          <button key={item} onClick={() => changeLift(item)} style={{ minHeight: 38, padding: '5px 9px', borderRadius: 8, cursor: 'pointer', border: lift === item ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.1)', background: lift === item ? 'rgba(0,230,138,0.12)' : 'transparent', color: lift === item ? ACCENT : DIM, fontWeight: 700, fontSize: 10 }}>
+          <button key={item} onClick={() => changeLift(item)} style={{ minHeight: 38, padding:'5px 9px', borderRadius:8, cursor:'pointer', border: lift === item ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.1)', background: lift === item ? 'rgba(0,230,138,0.12)' : 'transparent', color: lift === item ? ACCENT : DIM, fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
             {LIFT_RU[item]}
           </button>
         ))}
       </div>
 
+      <div style={{ position:'sticky', top:0, zIndex:5, margin:'8px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
+        {CORRECTOR_SECTIONS.map(s=> (
+          <button key={s.id} onClick={()=> scrollTo(s.id)} style={{
+            flex:'0 0 auto', display:'flex', alignItems:'center', gap:5, padding:'6px 10px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:800, whiteSpace:'nowrap',
+            border: activeSec===s.id ? `1px solid ${s.accent}` : '1px solid rgba(255,255,255,0.08)',
+            background: activeSec===s.id ? `${s.accent}18` : 'rgba(255,255,255,0.04)',
+            color: activeSec===s.id ? s.accent : '#fff', transition:'all 0.16s',
+          }}><span>{s.icon}</span> {s.label}</button>
+        ))}
+      </div>
+
       {/* ═══ 1. Слабые мышцы (по циклу) ═══ */}
-      <div style={CARD}>
+      <section id="sec-weak-muscle" ref={el=> sectionRefs.current['sec-weak-muscle']=el} style={{ scrollMarginTop:56 }}>
+      <div style={{ ...CARD, borderLeft:'3px solid #4ade80' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#4ade80' }}>1 · Слабые мышцы</div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
           Выберите слабую мышцу — 5 ассистентов из раскладки цикла (%ПМ/повторы/подходы — как у аксессуара недели). Основные жим/присед/становая и их дубли исключены.
@@ -523,6 +580,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                     <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                       <button onClick={() => addToPlan(key, analysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                       <button onClick={() => addToPlan(key, analysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+                      <button onClick={() => { const n=prompt('Название упражнения (рус):','Жим с паузой'); if(n) addToPlan(key,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
                     </div>
                   </div>
                 );
@@ -531,9 +589,11 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           );
         })}
       </div>
+      </section>
 
       {/* ═══ 2. Слабые точки ═══ */}
-      <div style={CARD}>
+      <section id="sec-weak-point" ref={el=> sectionRefs.current['sec-weak-point']=el} style={{ scrollMarginTop:56 }}>
+      <div style={{ ...CARD, borderLeft:'3px solid #a855f7' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>2 · Слабые точки</div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6, marginBottom: 4 }}>Фаза (срыв / слабое место) — выберите чип:</div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
@@ -567,6 +627,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                 <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                   <button onClick={() => addToPlan(keyForPhase, phaseAnalysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                   <button onClick={() => addToPlan(keyForPhase, phaseAnalysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+                  <button onClick={() => { const n=prompt('Название упражнения (рус):','Жим с паузой'); if(n) addToPlan(keyForPhase,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
                 </div>
               </div>
             )}
@@ -584,9 +645,11 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           {savedFocus ? '✓ Фокус-группа сохранена в профиль' : '💾 Сохранить фокус-группу в профиль'}
         </button>
       </div>
+      </section>
 
       {/* ═══ 3. Мёртвые точки (та же фаза — углы суставов) ═══ */}
-      <div style={CARD}>
+      <section id="sec-sticking" ref={el=> sectionRefs.current['sec-sticking']=el} style={{ scrollMarginTop:56 }}>
+      <div style={{ ...CARD, borderLeft:'3px solid #60a5fa' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>3 · Мёртвые точки {effectivePhase ? `· ${LIFT_RU[lift]} / ${PHASE_RU[effectivePhase] || effectivePhase}` : ''}</div>
         {movement?.sticking ? (
           <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
@@ -614,6 +677,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <button onClick={() => addToPlan(stickingKey, stickingAnalysis.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
               <button onClick={() => addToPlan(stickingKey, stickingAnalysis.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+              <button onClick={() => { const n=prompt('Название упражнения (рус):','Жим с паузой'); if(n) addToPlan(stickingKey,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
             </div>
           </div>
         )}
@@ -623,9 +687,11 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           </div>
         )}
       </div>
+      </section>
 
-      {/* ═══ 3.5. VBT: скорость штанги (ручной ввод) ═══ */}
-      <div style={CARD}>
+      {/* ═══ 3.5. VBT: скорость штанги (ручной ввод) — СРЫВЫ ═══ */}
+      <section id="sec-sryvy" ref={el=> sectionRefs.current['sec-sryvy']=el} style={{ scrollMarginTop:56 }}>
+      <div style={{ ...CARD, borderLeft:'3px solid #ef4444' }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#f472b6' }}>3.5 · ⚡ VBT: скорость штанги (м/с) · {LIFT_RU[lift]}</div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
           Введите скорость лучшего и последнего повтора (м/с) — потерю скорости и вероятную фазу срыва. План не меняется, это диагностика.
@@ -684,6 +750,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                   <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
                     <button onClick={() => addToPlan(vbtKey, vbtSticking.items.filter(i => i.optimal).map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                     <button onClick={() => addToPlan(vbtKey, vbtSticking.items.map(i => i.exercise.name))} style={{ ...btn, background: 'rgba(244,114,182,0.12)', color: '#f472b6', border: '1px solid rgba(244,114,182,0.3)' }}>➕ Все</button>
+                    <button onClick={() => { const n=prompt('Название упражнения (рус):','Тяга с паузой'); if(n) addToPlan(vbtKey,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
                   </div>
                 </div>
               )}
@@ -696,10 +763,12 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           );
         })()}
       </div>
+      </section>
 
       {/* ═══ 4. Движение штанги (bar-path) ═══ */}
+      <section id="sec-barpath" ref={el=> sectionRefs.current['sec-barpath']=el} style={{ scrollMarginTop:56 }}>
       {applicableIssues.length > 0 && (
-        <div style={CARD}>
+        <div style={{ ...CARD, borderLeft:'3px solid #f59e0b' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>4 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
             {applicableIssues.map(issue => {
@@ -721,11 +790,11 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           <BarPathSvg lift={lift} issues={issues} onIssue={toggleIssue} onPhase={p => setPhase(p)} activePhase={effectivePhase} phases={phases} />
           {barPath && barPath.diagnoses.map(item => (
             <div key={item.issue} style={{ marginTop: 6, padding: 7, borderRadius: 8, background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#c084fc' }}>{ISSUE_RU[item.issue]}{item.relatedPhase ? ` · связана с фазой ${item.relatedPhase}` : ''}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#c084fc' }}>{ISSUE_RU[item.issue]}{item.relatedPhase ? ` · связана с фазой ${PHASE_RU[item.relatedPhase] || item.relatedPhase}` : ''}</div>
               {item.issue === 'asymmetric' && asymSide && (
                 <div style={{ fontSize: 10, color: '#f59e0b', marginTop: 2 }}>⚖️ Слабее: {asymSide === 'left' ? 'левая' : 'правая'} сторона → приоритет унилатеральной работе (выпады, тяга гантели одной рукой, болгарские сплит-приседы).</div>
               )}
-              <div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>{item.cause} <span style={{ color: ACCENT }}>→ {item.correction}</span></div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{item.cause} <span style={{ color: ACCENT }}>→ {item.correction}</span></div>
               <div style={{ marginTop: 4 }}>
                 {issueAnalyses[item.issue]?.items.map((a, idx) => (
                   <ExerciseRow key={idx} item={a} selected={selected[`${lift}|barpath|${item.issue}`]?.includes(a.exercise.name) ?? false}
@@ -735,11 +804,34 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
               <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
                 <button onClick={() => addToPlan(`${lift}|barpath|${item.issue}`, issueAnalyses[item.issue]?.items.filter(i => i.optimal).map(i => i.exercise.name) ?? [])} style={{ ...btn, background: 'rgba(0,230,138,0.15)', color: ACCENT, border: '1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
                 <button onClick={() => addToPlan(`${lift}|barpath|${item.issue}`, issueAnalyses[item.issue]?.items.map(i => i.exercise.name) ?? [])} style={{ ...btn, background: 'rgba(96,165,250,0.12)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+                <button onClick={() => { const n=prompt('Название упражнения (рус):','Тяга с паузой'); if(n) addToPlan(`${lift}|barpath|${item.issue}`,[n]); }} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)' }}>➕ Своё</button>
               </div>
             </div>
           ))}
         </div>
+        </div>
+      </section>
       )}
+
+      {/* 🎯 Слабые точки плана ПЛ (ассистенты при сборке; дни — свои или Авто) */}
+      <section id="sec-rir" ref={el=> sectionRefs.current['sec-rir']=el} style={{ scrollMarginTop:56 }}>
+      <div style={{ ...POLISHED_CARD, borderLeft:'3px solid #00e68a' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginBottom:4 }}>6 · RIR-калибровка — проверка формул (исправлено)</div>
+        <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>Формулы пересчитаны: <b style={{ color:ACCENT }}>actualRIR = 10 − RPE</b>, <b style={{ color:ACCENT }}>bias = plannedRIR − actualRIR</b> (planned из программы/типа упражнения, не константа 2). Среднее по всем подходам + MAD-консистентность, тренд(last ⅓ vs first ⅓). Ручной ввод теперь требует план RIR. Ниже — живые данные из дневника.</div>
+        <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', fontSize:10, color:'#fff' }}>
+          <div>Проверь: выбери упражнение из списка ниже, добавь своё через «➕ Добавить упражнение» — оно появится в выбранных и учтётся при сборке.</div>
+          <button onClick={() => {
+            const name = prompt('Название упражнения (рус):','Жим гантелей лёжа');
+            if (!name) return;
+            const key = `${lift}|custom|${Date.now()}`;
+            addToPlan(keyForPhase, [name]);
+          }} style={{ marginTop:6, padding:'5px 10px', borderRadius:7, cursor:'pointer', fontSize:10, fontWeight:700, border:'1px solid #00e68a', background:'rgba(0,230,138,0.12)', color:ACCENT }}>➕ Добавить своё упражнение (как в калькуляторе)</button>
+        </div>
+      </div>
+      <div style={{ marginTop:8 }}>
+        <RIRCalibrationCard />
+      </div>
+      </section>
 
       {/* 🎯 Слабые точки плана ПЛ (ассистенты при сборке; дни — свои или Авто) */}
       {planWeakPoints.length > 0 && (
@@ -860,12 +952,13 @@ const SOURCE_TAG: Record<string, { label: string; color: string; bg: string }> =
 
 const ExerciseRow: React.FC<{ item: any; selected: boolean; onToggle: () => void; onAdd: () => void }> = ({ item, selected, onToggle, onAdd }) => {
   const tag = SOURCE_TAG[item.source] || SOURCE_TAG.sticking;
+  const displayName = ruExerciseName(item.exercise.name);
   return (
   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 6px', marginTop: 3, borderRadius: 6, background: selected ? 'rgba(0,230,138,0.1)' : 'rgba(255,255,255,0.02)', border: selected ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.05)' }}>
     <button onClick={onToggle} style={{ minWidth: 24, height: 24, borderRadius: 5, cursor: 'pointer', border: 'none', background: selected ? ACCENT : 'rgba(255,255,255,0.1)', color: selected ? '#000' : DIM, fontWeight: 800, fontSize: 12 }}>{selected ? '✓' : '＋'}</button>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: '#fff' }}>
-        {item.optimal ? '⭐ ' : ''}{item.exercise.name} <span style={{ color: ACCENT, fontWeight: 800 }}>{item.protocol.sets}×{item.protocol.reps} @{Math.round(item.protocol.pct * 100)}% RIR {item.protocol.rir ?? 2}</span>{' '}
+        {item.optimal ? '⭐ ' : ''}{displayName} <span style={{ color: ACCENT, fontWeight: 800 }}>{item.protocol.sets}×{item.protocol.reps} @{Math.round(item.protocol.pct * 100)}% RIR {item.protocol.rir ?? 2}</span>{' '}
         <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 4, color: tag.color, background: tag.bg, fontWeight: 700 }}>{tag.label}</span>
       </div>
       <div style={{ fontSize: 9, color: DIM, lineHeight: 1.3, marginTop: 1 }}>{item.rationale}</div>

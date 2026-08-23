@@ -15,6 +15,7 @@ export const RIRCalibrationCard: React.FC = () => {
   const [manualWeight, setManualWeight] = useState('100');
   const [manualReps, setManualReps] = useState('5');
   const [manualRpe, setManualRpe] = useState('8');
+  const [manualPlannedRir, setManualPlannedRir] = useState('2');
   const [refresh, setRefresh] = useState(0);
   const [reprocessing, setReprocessing] = useState(false);
   const [applyOn, setApplyOn] = useState(false);
@@ -30,12 +31,18 @@ export const RIRCalibrationCard: React.FC = () => {
       const sessions = loadSessions();
       sessions.forEach(s => {
         try {
-          // План-заглушка: запланированный RIR = 2 (базовый) для каждого подхода.
-          // Это позволяет пересчитать калибровку из истории (bias = запланир.2 − факт.из RPE).
+          // План-заглушка: пытаемся взять реальный запланированный RIR из сета (s.rir) или типа упражнения, иначе 2.
+          // Ранее всегда 2 — давало одинаковый bias (бред). Теперь per-set и по типу.
           const planFallback = {
             exercises: (s.exercises || []).map(ex => ({
               name: ex.exerciseName || ex.exerciseId || '',
-              targetSets: (ex.sets || []).map(() => ({ rir: 2 })),
+              targetSets: (ex.sets || []).map((set:any) => {
+                const planned = typeof set.rir === 'number' ? set.rir : (typeof (set as any).plannedRir === 'number' ? (set as any).plannedRir : undefined);
+                if (planned != null) return { rir: planned };
+                // эвристика по типу: база 2, изоляция 3
+                const isCompound = !/сгибан|разгибан|махи|подъём|отведен|скручив/i.test(ex.exerciseName || '');
+                return { rir: isCompound ? 2 : 3 };
+              }),
             })),
           };
           recordSessionRIR(s, planFallback);
@@ -54,16 +61,18 @@ export const RIRCalibrationCard: React.FC = () => {
         </div>
         {mode==='manual' ? (
           <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Введите подход вручную — bias посчитается сразу (без дневника).</div>
+            <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Введите подход вручную — bias = план RIR − факт (10−RPE). План берём из программы, не константу.</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
               <label style={{fontSize:10,color:'var(--text-dim)'}}>Упр <input value={manualEx} onChange={e=>setManualEx(e.target.value)} style={{width:110,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
               <label style={{fontSize:10,color:'var(--text-dim)'}}>Вес <input value={manualWeight} onChange={e=>setManualWeight(e.target.value)} style={{width:56,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
               <label style={{fontSize:10,color:'var(--text-dim)'}}>Повт <input value={manualReps} onChange={e=>setManualReps(e.target.value)} style={{width:36,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+              <label style={{fontSize:10,color:'var(--text-dim)'}}>План RIR <input value={manualPlannedRir} onChange={e=>setManualPlannedRir(e.target.value)} style={{width:36,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
               <label style={{fontSize:10,color:'var(--text-dim)'}}>RPE <input value={manualRpe} onChange={e=>setManualRpe(e.target.value)} style={{width:32,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
             </div>
             {(()=>{
               const rpe = parseFloat(manualRpe)||0, weight=parseFloat(manualWeight)||0, reps=parseInt(manualReps)||0;
-              const bias = 2 - (10 - rpe); // план 2 vs факт 10-rpe
+              const planned = parseFloat(manualPlannedRir)||0;
+              const bias = planned - (10 - rpe);
               if (!weight||!reps||!rpe) return null;
               return <div style={{ marginTop:6, padding:6, borderRadius:6, background: Math.abs(bias)>1?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:'1px solid '+(Math.abs(bias)>1?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)') }}>
                 <div style={{fontSize:10,fontWeight:700,color: Math.abs(bias)>1?'#f87171':'#4ade80'}}>Bias: {bias>0?`+${bias.toFixed(1)}`:`${bias.toFixed(1)}`} — {bias>0.5?'тяжелее чем думаете': bias<-0.5?'легче чем думаете':'точно'}</div>
@@ -97,16 +106,18 @@ export const RIRCalibrationCard: React.FC = () => {
       </div>
       {mode==='manual' && (
         <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', marginBottom:8 }}>
-          <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Ручной тест: введите подход и сразу видите bias.</div>
+          <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:6 }}>Ручной тест: план RIR vs факт (10−RPE) → bias.</div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
             <label style={{fontSize:10,color:'var(--text-dim)'}}>Упр <input value={manualEx} onChange={e=>setManualEx(e.target.value)} style={{width:110,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
             <label style={{fontSize:10,color:'var(--text-dim)'}}>Вес <input value={manualWeight} onChange={e=>setManualWeight(e.target.value)} style={{width:56,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
             <label style={{fontSize:10,color:'var(--text-dim)'}}>Повт <input value={manualReps} onChange={e=>setManualReps(e.target.value)} style={{width:36,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
+            <label style={{fontSize:10,color:'var(--text-dim)'}}>План RIR <input value={manualPlannedRir} onChange={e=>setManualPlannedRir(e.target.value)} style={{width:36,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
             <label style={{fontSize:10,color:'var(--text-dim)'}}>RPE <input value={manualRpe} onChange={e=>setManualRpe(e.target.value)} style={{width:32,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:10}} /></label>
           </div>
           {(()=>{
             const rpe = parseFloat(manualRpe)||0, weight=parseFloat(manualWeight)||0, reps=parseInt(manualReps)||0;
-            const bias = 2 - (10 - rpe);
+            const planned = parseFloat(manualPlannedRir)||0;
+            const bias = planned - (10 - rpe);
             if (!weight||!reps||!rpe) return null;
             return <div style={{ marginTop:6, padding:6, borderRadius:6, background: Math.abs(bias)>1?'rgba(239,68,68,0.08)':'rgba(34,197,94,0.08)', border:'1px solid '+(Math.abs(bias)>1?'rgba(239,68,68,0.2)':'rgba(34,197,94,0.2)') }}>
               <div style={{fontSize:10,fontWeight:700,color: Math.abs(bias)>1?'#f87171':'#4ade80'}}>Bias: {bias>0?`+${bias.toFixed(1)}`:`${bias.toFixed(1)}`} — {bias>0.5?'тяжелее': bias<-0.5?'легче':'точно'}</div>

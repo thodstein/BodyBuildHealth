@@ -123,7 +123,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['settings', '1 ⚙️ Настройки'], ['season', '🧩 Сезон'], ['diagnostics', '2 🎯 Слабые точки + 🧮'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['settings', '1 ⚙️ Настройки'], ['season', '🧩 Сезон'], ['diagnostics', '2 🔧 Корректор движений'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -1751,36 +1751,18 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               >📥 Excel (.xlsx)</button>
             </div>
           )}
-          {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
-          <div style={{ marginTop: 8 }}><PlannerToolsPanel mode="pl" /></div>
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+           {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
+           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('charts')}>← 4 Графики</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>🏁 Соревнования →</button>
           </div>
         </div>
       )}
 
-      {/* 🎯 Диагностика (дашборд): лимитирующие факторы + слабые мышцы → слабые точки → мёртвые точки → VBT → движение штанги */}
+      {/* 🔧 Корректор движений — единый готовый инструмент (вместо легаси «Слабые точки + 10 калькуляторов») */}
       {mainTab === 'pl' && subView === 'diagnostics' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
-          <div style={H}>2 🎯 Слабые точки + 10 калькуляторов</div>
-          <div style={{ fontSize: 11, color: '#ffffff', marginBottom: 8, lineHeight: 1.5 }}>
-            Калькулятор лимитирующих факторов (скорость/дожимы/стабилизация/режимы сокращения/
-            гипертрофия/антропометрия/тип старта/хват/координация/выносливость) + «Слабые мышцы → Слабые точки →
-            Мёртвые точки → VBT → Движение штанги». Исходный цикл не изменяется; отмеченные упражнения добавляются
-            при сборке плана.
-          </div>
-          <LimiterCalculatorCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} />
-          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ marginBottom: 8, padding: '7px 9px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', fontSize: 10, color: '#00e68a' }}>🏋️ Мастер движений — единый инструмент (9 лифтов · 8 блоков) — замена «мёртвые·слабые точки»</div>
-            <LiftMasterCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions as any} />
-            <details style={{ marginTop: 8 }}>
-              <summary style={{ fontSize: 10, color: '#ffffff', cursor: 'pointer' }}>Показать легаси «Слабые мышцы → мёртвые точки» (PlDeadpointsBarPathCard)</summary>
-              <div style={{ marginTop: 6 }}>
-                <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
-              </div>
-            </details>
-          </div>
+          <PlDeadpointsBarPathCard dayCount={getCycleById(selectedCycleId)?.week1?.length || 3} template={getCycleById(selectedCycleId) ?? null} sessions={diarySessions} />
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>← 1 Настройки</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>3 План →</button>
@@ -2202,6 +2184,16 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         setSubView('plan');
       }} />}
       {subView === 'macro' && <div style={{ marginTop: 8 }}><CardioLinkCard /></div>}
+      {mainTab === 'pl' && subView === 'tools' && (
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          <div style={H}>🔧 Инструменты планирования</div>
+          <PlannerToolsPanel mode="pl" />
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('macro')}>← 🗓 Годовой план</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('competition')}>🏁 Соревнования →</button>
+          </div>
+        </div>
+      )}
       {subView === 'competition' && <PLCompetitionTab api={{
         builtSrc,
         setBuiltSrc: p => setBuiltSrc(p),
