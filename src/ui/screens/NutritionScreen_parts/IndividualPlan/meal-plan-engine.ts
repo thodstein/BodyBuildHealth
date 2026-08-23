@@ -609,10 +609,7 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
   // даже если они прошли фильтр по ключевым словам — тест «в завтрак не попадают макароны»
   const BREAKFAST_FORBIDDEN_RE = /pasta|noodle|macaroni|spaghetti|couscous/i;
   const _forbiddenIds = new Set(['rice_white', 'quinoa', 'rice_noodles', 'spaghetti', 'couscous']);
-  const _beforeForbid = [...carbs];
   carbs = carbs.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id));
-  // eslint-disable-next-line no-console
-  if (carbs.some(f=>f.id==='rice_noodles') || _beforeForbid.some(f=>f.id==='rice_noodles')) console.log('[forbid-debug]', style, 'before', _beforeForbid.map(c=>c.id), 'after', carbs.map(c=>c.id), 'oatFamily', oatFamily.map(c=>c.id));
   if (carbs.length === 0) {
     // fallback к овсяному семейству из FOOD_DB
     const fb = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
@@ -1049,9 +1046,10 @@ function buildWholeMeal(
   const pool = (() => {
     if (!_needPortable) return _poolIn;
     const portableFilter = (arr: FoodItem[]) => arr.filter(isPortableFood);
+    // FIX: строгий portable — не фолбэчим к не-портативному, иначе "Только порошок/хлопья" пропускает макароны/супы
     const pf = (arr: FoodItem[]) => {
       const filtered = portableFilter(arr);
-      return filtered.length > 0 ? filtered : arr;
+      return filtered;
     };
     return {
       ..._poolIn,
@@ -1189,7 +1187,8 @@ function buildWholeMeal(
       let dense = carbPickPool.filter(f => (f.carbs || 0) >= 40);
       if (dense.length < 2) {
         // дополняем из FOOD_DB (иначе variety-лимит мог выбросить плотные) — любые плотные, не только common
-        const extraDense = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 40 && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && !dense.some(d => d.id === f.id) && !carbPickPool.some(c => c.id === f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
+        // FIX portable: extraDense должен уважать portableMode, иначе в рабочее окно попадает рисовая лапша
+        const extraDense = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 40 && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && !dense.some(d => d.id === f.id) && !carbPickPool.some(c => c.id === f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)) && (!_needPortable || isPortableFood(f)));
         dense = [...dense, ...extraDense].slice(0, 3);
       }
       if (dense.length >= 2) carbPickPool = dense;
