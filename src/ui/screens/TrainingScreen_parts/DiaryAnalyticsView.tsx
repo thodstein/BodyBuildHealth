@@ -125,7 +125,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тренировок</div>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{twWorkouts} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>vs {lwWorkouts}</span></div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{twWorkouts} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>vs {lwWorkouts}</span></div>
                       </div>
                       <div style={{ textAlign: 'center' }}>
                         <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Тоннаж</div>
@@ -200,7 +200,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   </div>
                   {/* Week labels */}
                   <div style={{ display: 'flex', gap: 2, marginBottom: 6 }}>
-                    {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Н{wi + 1}</span>)}
+                    {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Н{wi + 1}</span>)}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
                     {groups.filter(g => (wsg[g]?.reduce((s: number, x: number) => s + x, 0) || 0) > 0).map(g => (
@@ -276,7 +276,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const bw = measurements.length > 0 ? (measurements[measurements.length - 1].weightKg || 0) : 0;
                 return (
                   <div style={style.card}>
-                    <div style={style.label}>🏆 Расчётный 1RM {bw > 0 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 400, textTransform: 'none', marginLeft: 6 }}>вес тела: {bw} кг</span>}</div>
+                    <div style={style.label}>🏆 Расчётный 1RM {bw > 0 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', fontWeight: 400, textTransform: 'none', marginLeft: 6 }}>вес тела: {bw} кг</span>}</div>
                     {Object.entries(analytics.strength.estimated1RM).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 5).map(([exId2, rm]) => {
                       const trend = analytics.strength.strengthTrend[exId2] || 0;
                       const ex = EXERCISE_CATALOG.find((e2: any) => e2.id === exId2);
@@ -285,7 +285,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         <div key={exId2} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, fontSize: 11 }}>
                           <span style={{ color: 'var(--text-dim)' }}>{ex?.name || exId2}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {ratio && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>×{ratio} МТ</span>}
+                            {ratio && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>×{ratio} МТ</span>}
                             <span><strong style={{ color: ACCENT }}>{Math.round(rm as number)} кг</strong><span style={{ marginLeft: 6, fontSize: 10, color: trend >= 0 ? '#22c55e' : '#ef4444' }}>{trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}%</span></span>
                           </span>
                         </div>
@@ -314,7 +314,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 return (
                   <div style={style.card}>
                     <div style={style.label}>🏅 Нормативы ПЛ ({sex === 'female' ? '♀ WRPF, женщины' : 'WRPF, raw'} · {bw} кг · {sex === 'female' ? '43-84+ кат.' : '60-140+ кат.'})</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginBottom: 6, lineHeight: 1.4 }}>e1RM из дневника → разряд по ближайшей категории (WRPF без ДК). Пол берётся из профиля ({sex === 'female' ? 'женские пороги ~60% от мужских' : 'мужские'}). Для точного выбора федерации/категории — «Анализ силы → Единый».</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.4 }}>e1RM из дневника → разряд по ближайшей категории (WRPF без ДК). Пол берётся из профиля ({sex === 'female' ? 'женские пороги ~60% от мужских' : 'мужские'}). Для точного выбора федерации/категории — «Анализ силы → Единый».</div>
                     {lifts.map(({ id, rm, disc }) => {
                       const perTable = getNormTable(fedForDiary, disc as Discipline, sex);
                       if (!perTable) return null;
@@ -323,11 +323,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, fontSize: 11 }}>
                           <span style={{ color: 'var(--text-dim)' }}>{EXERCISE_CATALOG.find(e => e.id === id)?.name || id}</span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{Math.round(rm)} кг</span>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{Math.round(rm)} кг</span>
                             {cls.achievedRank ? (
                               <span style={{ fontSize: 10, fontWeight: 800, color: cls.achievedRank === 'kms' ? '#22c55e' : cls.achievedRank === 'ms' ? '#60a5fa' : '#f59e0b', padding: '1px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)' }}>{RANK_LABELS[cls.achievedRank as keyof typeof RANK_LABELS]}</span>
                             ) : (
-                              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>до {RANK_LABELS[cls.nextRank as keyof typeof RANK_LABELS]}: {cls.kgToNext} кг</span>
+                              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>до {RANK_LABELS[cls.nextRank as keyof typeof RANK_LABELS]}: {cls.kgToNext} кг</span>
                             )}
                           </span>
                         </div>
@@ -428,7 +428,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         </div>
                       );
                     })}
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
                       Группы ниже 70% среднего объёма за последние 12 сессий + слабые точки из профиля; упражнения — из каталога.
                     </div>
                   </div>
@@ -457,12 +457,12 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     {prs.map((pr, i) => (
                       <div key={pr.name + i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3, fontSize: 10 }}>
                         <div style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          <span style={{ color: 'rgba(255,255,255,0.4)', marginRight: 4 }}>#{i + 1}</span>
+                          <span style={{ color: 'rgba(255,255,255,0.85)', marginRight: 4 }}>#{i + 1}</span>
                           <span style={{ color: 'var(--text-dim)' }}>{pr.name}</span>
                         </div>
                         <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <strong style={{ color: ACCENT }}>{pr.weight}кг×{pr.reps}</strong>
-                          <span style={{ marginLeft: 4, color: 'rgba(255,255,255,0.3)' }}>e1RM {pr.e1rm}</span>
+                          <span style={{ marginLeft: 4, color: 'rgba(255,255,255,0.85)' }}>e1RM {pr.e1rm}</span>
                           <span style={{ marginLeft: 6, fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>{pr.date.slice(5)}</span>
                         </div>
                       </div>
@@ -564,7 +564,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 const lastRPE = rpes[rpes.length - 1];
                 const trend = lastRPE > avgRPE * 1.15 ? 'high' : lastRPE < avgRPE * 0.85 ? 'low' : 'normal';
                 const trendLabel = trend === 'high' ? '⚠ выше нормы' : trend === 'low' ? '✓ ниже нормы' : 'в норме';
-                const trendColor = trend === 'high' ? '#ef4444' : trend === 'low' ? '#22c55e' : 'rgba(255,255,255,0.4)';
+                const trendColor = trend === 'high' ? '#ef4444' : trend === 'low' ? '#22c55e' : 'rgba(255,255,255,0.85)';
                 return (
                   <div style={style.card}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -602,14 +602,14 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const color = b <= 6 ? '#22c55e' : b <= 7 ? '#60a5fa' : b <= 8 ? '#f59e0b' : '#ef4444';
                         return (
                           <div key={b} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{pct}%</div>
+                            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>{pct}%</div>
                             <div style={{ width: '100%', height: h, background: color, borderRadius: 2 }} />
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>{b}</div>
+                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{b}</div>
                           </div>
                         );
                       })}
                     </div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4, textAlign: 'center' }}>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 4, textAlign: 'center' }}>
                       Всего {total} замеров RPE
                     </div>
                   </div>
@@ -698,12 +698,12 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <div key={p.name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '3px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                         <div>
                           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{p.name}</span>
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginLeft: 4 }}>{p.sessions} сессий</span>
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginLeft: 4 }}>{p.sessions} сессий</span>
                         </div>
                         <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>{p.best}кг</span>
                       </div>
                     ))}
-                    <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+                    <div style={{ marginTop: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
                       💡 Попробуйте: изменить хват, темп, диапазон повторов или добавить assistance
                     </div>
                   </div>
@@ -755,7 +755,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const color = w.count >= 4 ? '#22c55e' : w.count >= 3 ? '#f59e0b' : w.count >= 1 ? '#ef4444' : 'rgba(255,255,255,0.05)';
                         return (
                           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>{w.count}</div>
+                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{w.count}</div>
                             <div style={{ width: '100%', height: `${h}%`, minHeight: 2, background: color, borderRadius: 2 }} />
                           </div>
                         );
@@ -802,7 +802,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>🏆 Макс. серия</div>
                     </div>
                     <div style={{ ...style.card, textAlign: 'center' }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: recentPRs > 0 ? '#a855f7' : 'rgba(255,255,255,0.3)' }}>{recentPRs}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: recentPRs > 0 ? '#a855f7' : 'rgba(255,255,255,0.85)' }}>{recentPRs}</div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>⭐ PR за 7д</div>
                     </div>
                   </div>
@@ -843,7 +843,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={style.label}>💪 Частота по группам (подходы/нед)</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '86px repeat(8, 1fr)', gap: '2px 4px', alignItems: 'center' }}>
                       <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', textAlign: 'right' }}>Н-8…Н-1</span>
-                      {Array.from({ length: weeks }, (_, i) => <span key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>{i + 1}</span>)}
+                      {Array.from({ length: weeks }, (_, i) => <span key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>{i + 1}</span>)}
                       {groups.map(({ group, total, data }) => (
                         <React.Fragment key={group}>
                           <span style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'right' }}>{GRP_RU[group] || group}</span>
@@ -852,11 +852,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               {v > 0 && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)' }}>{v}</span>}
                             </div>
                           ))}
-                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', textAlign: 'right' }}>{total}</span>
+                          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textAlign: 'right' }}>{total}</span>
                         </React.Fragment>
                       ))}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
                       <span>меньше</span>
                       {[0.1, 0.3, 0.6, 1].map(t => <span key={t} style={{ width: 10, height: 10, borderRadius: 2, background: heat(maxSets * t) }} />)}
                       <span>больше</span>
@@ -890,8 +890,8 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                           <div key={i} style={{ textAlign: 'center', padding: '6px 2px', borderRadius: 6, background: bg }}>
                             <div style={{ fontSize: 10, fontWeight: 700, color: d.workouts > 0 ? '#00e68a' : 'rgba(255,255,255,0.2)' }}>{d.name}</div>
                             <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', margin: '2px 0' }}>{d.workouts}</div>
-                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>{d.sets} сетов</div>
-                            {d.topGroup !== '—' && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{d.topGroup}</div>}
+                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{d.sets} сетов</div>
+                            {d.topGroup !== '—' && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{d.topGroup}</div>}
                           </div>
                         );
                       })}
@@ -922,12 +922,12 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         const color = data.group ? (GRP_RU[data.group] ? '#00e68a' : '#60a5fa') : '#a855f7';
                         return (
                           <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', width: 14, textAlign: 'right' }}>{i + 1}</div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', width: 14, textAlign: 'right' }}>{i + 1}</div>
                             <div style={{ flex: 1, height: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
                               <div style={{ height: '100%', width: `${pct * 100}%`, background: `${color}33`, borderRadius: 3, transition: 'width 0.3s' }} />
                               <span style={{ position: 'absolute', left: 4, top: 1, fontSize: 8, color: 'rgba(255,255,255,0.7)', lineHeight: 12 }}>{name}</span>
                             </div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', width: 30, textAlign: 'right' }}>{data.count}×</div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', width: 30, textAlign: 'right' }}>{data.count}×</div>
                             <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', width: 24, textAlign: 'right' }}>{data.sets}с</div>
                           </div>
                         );
@@ -992,13 +992,13 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>⚡ Плотность</div>
                       <div style={{ fontSize: 16, fontWeight: 800, color: trend ? '#f59e0b' : ACCENT }}>{avgSetsPerMin.toFixed(2)}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>сетов/мин (avg)</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>сетов/мин (avg)</div>
                       <Sparkline data={densities.map(d => d.setsPerMin)} width={60} height={14} color={trend ? '#f59e0b' : '#00e68a'} showDots={false} />
                     </div>
                     <div>
                       <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 2 }}>📊 Объём/мин</div>
                       <div style={{ fontSize: 16, fontWeight: 800, color: '#60a5fa' }}>{Math.round(avgVolPerMin)}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>кг/мин (avg)</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>кг/мин (avg)</div>
                       <Sparkline data={densities.map(d => d.volPerMin)} width={60} height={14} color="#60a5fa" showDots={false} />
                     </div>
                   </div>
@@ -1020,7 +1020,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         return (
                           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                             <div style={{ width: '100%', height: h, borderRadius: 2, background: isMax ? '#22c55e' : isMin ? '#ef4444' : '#00e68a', opacity: isMax ? 1 : 0.6 }} />
-                            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{(v / 1000).toFixed(1)}т</div>
+                            <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>{(v / 1000).toFixed(1)}т</div>
                           </div>
                         );
                       })}
@@ -1148,19 +1148,19 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       </div>
                     </div>
                     {sorted.length > 0 && (
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
-                        <span style={{ color: 'rgba(255,255,255,0.3)' }}>Топ: </span>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+                        <span style={{ color: 'rgba(255,255,255,0.85)' }}>Топ: </span>
                         {sorted.map(([name, data], i) => (
                           <span key={i}>
                             {i > 0 && ' · '}
                             <span style={{ color: '#fff' }}>{name}</span>
-                            <span style={{ color: 'rgba(255,255,255,0.4)' }}> ({Math.round(data.vol).toLocaleString()} кг)</span>
+                            <span style={{ color: 'rgba(255,255,255,0.85)' }}> ({Math.round(data.vol).toLocaleString()} кг)</span>
                           </span>
                         ))}
                       </div>
                     )}
                     {bestPR && bestPR.e1rm > 0 && (
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
                         🏆 Лучший e1RM: <span style={{ color: ACCENT, fontWeight: 700 }}>{bestPR.name}</span> {Math.round(bestPR.e1rm)} кг
                       </div>
                     )}
@@ -1224,7 +1224,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                                 <g key={wk}>
                                   <rect x={x} y={h - bh - 8} width={bw} height={bh} rx={3} fill={data.vol >= volMax * 0.8 ? '#22c55e' : data.vol >= volMax * 0.5 ? '#60a5fa' : 'rgba(255,255,255,0.15)'} />
                                   <text x={x + bw / 2} y={h - bh - 10} textAnchor="middle" fill="rgba(255,255,255,0.6)" fontSize={7}>{data.vol >= 1000 ? `${(data.vol / 1000).toFixed(1)}т` : data.vol}</text>
-                                  <text x={x + bw / 2} y={h - 1} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={6}>{wk.slice(5, 10)}</text>
+                                  <text x={x + bw / 2} y={h - 1} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={6}>{wk.slice(5, 10)}</text>
                                 </g>
                               );
                             })}
@@ -1247,11 +1247,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                         <div style={style.card}>
                           <div style={style.label}>📅 {now.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })} (итого)</div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>{monthW.length}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>тренировок</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{(totalVol / 1000).toFixed(1)}т</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>тоннаж</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#a855f7' }}>{totalSets}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>подходов</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>{avgRPE}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>RPE avg</div></div>
-                            <div><div style={{ fontSize: 14, fontWeight: 800, color: prCount > 0 ? '#22c55e' : 'rgba(255,255,255,0.3)' }}>{prCount}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>PR</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: ACCENT }}>{monthW.length}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>тренировок</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{(totalVol / 1000).toFixed(1)}т</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>тоннаж</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#a855f7' }}>{totalSets}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>подходов</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>{avgRPE}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>RPE avg</div></div>
+                            <div><div style={{ fontSize: 14, fontWeight: 800, color: prCount > 0 ? '#22c55e' : 'rgba(255,255,255,0.85)' }}>{prCount}</div><div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>PR</div></div>
                           </div>
                         </div>
                       );
@@ -1288,13 +1288,13 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               const label = avg < mev ? 'Ниже MEV' : avg < mrv * 0.7 ? 'Оптимально' : avg < mrv ? 'Выше нормы' : 'Over MRV';
                               return (
                                 <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                                  <span style={{ width: 70, color: 'rgba(255,255,255,0.5)', textAlign: 'right' }}>{GRP_RU[m] || m}</span>
+                                  <span style={{ width: 70, color: 'rgba(255,255,255,0.85)', textAlign: 'right' }}>{GRP_RU[m] || m}</span>
                                   <div style={{ flex: 1, height: 8, borderRadius: 3, background: 'rgba(255,255,255,0.06)', position: 'relative', overflow: 'hidden' }}>
                                     <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: `${Math.min(100, ratio * 100)}%`, background: color, borderRadius: 3 }} />
-                                    <div style={{ position: 'absolute', left: `${(mev / mrv) * 100}%`, top: -1, width: 1, height: 10, background: 'rgba(255,255,255,0.4)' }} />
+                                    <div style={{ position: 'absolute', left: `${(mev / mrv) * 100}%`, top: -1, width: 1, height: 10, background: 'rgba(255,255,255,0.85)' }} />
                                   </div>
                                   <span style={{ minWidth: 35, textAlign: 'right', fontWeight: 600, color }}>{Math.round(avg)}</span>
-                                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)', minWidth: 55 }}>/ {mrv} MRV</span>
+                                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', minWidth: 55 }}>/ {mrv} MRV</span>
                                   <span style={{ fontSize: 8, color }}>{label}</span>
                                 </div>
                               );
@@ -1371,9 +1371,9 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                           <div style={{ display: 'grid', gap: 3 }}>
                             {velocities.map(v => (
                               <div key={v.group} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
-                                <span style={{ width: 70, color: 'rgba(255,255,255,0.5)', textAlign: 'right' }}>{GRP_RU[v.group] || v.group}</span>
-                                <span style={{ fontWeight: 700, color: v.velocity > 0 ? '#22c55e' : v.velocity < 0 ? '#ef4444' : 'rgba(255,255,255,0.4)', minWidth: 40 }}>{v.velocity > 0 ? '+' : ''}{v.velocity}</span>
-                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>кг/нед ({v.first}→{v.last}кг, {v.sessions} упр.)</span>
+                                <span style={{ width: 70, color: 'rgba(255,255,255,0.85)', textAlign: 'right' }}>{GRP_RU[v.group] || v.group}</span>
+                                <span style={{ fontWeight: 700, color: v.velocity > 0 ? '#22c55e' : v.velocity < 0 ? '#ef4444' : 'rgba(255,255,255,0.85)', minWidth: 40 }}>{v.velocity > 0 ? '+' : ''}{v.velocity}</span>
+                                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>кг/нед ({v.first}→{v.last}кг, {v.sessions} упр.)</span>
                               </div>
                             ))}
                           </div>
@@ -1436,12 +1436,12 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, textAlign: 'center' }}>
                             {[4, 6, 8].map(n => (
                               <div key={n} style={{ padding: 6, borderRadius: 6, background: 'rgba(255,255,255,0.03)' }}>
-                                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{n} упр.</div>
+                                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{n} упр.</div>
                                 <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>{predictByExercises(n)}<span style={{ fontSize: 10, fontWeight: 400 }}> мин</span></div>
                               </div>
                             ))}
                           </div>
-                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 4, textAlign: 'center' }}>Ср. {avgSets} подходов / {avgExercises} упр. / {avgDuration} мин</div>
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 4, textAlign: 'center' }}>Ср. {avgSets} подходов / {avgExercises} упр. / {avgDuration} мин</div>
                         </div>
                       );
                     })()}

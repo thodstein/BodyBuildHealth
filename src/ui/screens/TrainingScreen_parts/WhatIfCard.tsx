@@ -36,14 +36,14 @@ export const WhatIfCard: React.FC<{ baseRisk: number; baseReadiness: number }> =
       <MetricCard title="Прогноз изменения" icon="🔮">
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Δ Риск</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Δ Риск</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: riskColor }}>{res.riskDelta > 0 ? '+' : ''}{res.riskDelta}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{Math.round(baseRisk + res.riskDelta)} итог</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{Math.round(baseRisk + res.riskDelta)} итог</div>
           </div>
           <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Δ Готовность</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Δ Готовность</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: readColor }}>{res.readinessDelta > 0 ? '+' : ''}{res.readinessDelta}</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{Math.round(baseReadiness + res.readinessDelta)} итог</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{Math.round(baseReadiness + res.readinessDelta)} итог</div>
           </div>
         </div>
         <div style={{ ...SMALL, marginTop: 8, padding: 6, background: 'rgba(0,230,138,0.04)', borderRadius: 6 }}>{res.note}</div>

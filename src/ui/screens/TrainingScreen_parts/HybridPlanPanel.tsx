@@ -153,7 +153,7 @@ export const HybridPlanPanel: React.FC<{
               {days.map((d: HybridDay, di) => (
                 <div key={di} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.02)', marginBottom: 6, borderLeft: `3px solid ${LIFT_COLOR[d.mainLift]}` }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: LIFT_COLOR[d.mainLift], marginBottom: 4 }}>{LIFT_LABEL[d.mainLift]} — день {d.dayIdx + 1}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>🏋 Сила (цикл):</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>🏋 Сила (цикл):</div>
                   {d.heavy.exercises.map((ex, ei) => (
                     <div key={ei} style={{ fontSize: 11, color: DIM_STRONG, padding: '2px 0 2px 8px' }}><b>{ex.name}</b> — {fmtHeavy(ex)}</div>
                   ))}

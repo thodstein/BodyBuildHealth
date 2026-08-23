@@ -32,7 +32,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             <div style={style.label}>📥 Экспорт CSV</div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>Экспорт всех тренировок в CSV (совместим с импортом)</div>
             {historyWorkouts.length === 0 ? (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', padding: 8 }}>Нет данных для экспорта</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', padding: 8 }}>Нет данных для экспорта</div>
             ) : (
               <button onClick={() => {
                 const rows: string[] = ['date,exercise,set,weight,reps,rpe,rir,notes'];
@@ -151,7 +151,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', marginBottom: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{t.exercises.slice(0, 3).join(', ')}{t.exercises.length > 3 ? ` +${t.exercises.length - 3}` : ''}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{t.sets} сетов · {t.date}</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{t.sets} сетов · {t.date}</div>
                     </div>
                     <button onClick={() => {
                       const wo = recent.find((w: any) => {

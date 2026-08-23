@@ -45,7 +45,7 @@ const MuscleProgressCardBase: React.FC<{ sessions: Session[]; level: string }> =
         {[ref.mev, ref.mav, ref.mrv].map((v, i) => v > 0 && <line key={i} x1={P} x2={W - P} y1={yline(v)} y2={yline(v)} stroke={['#f59e0b', '#22c55e', '#ef4444'][i]} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />)}
         <polyline points={linePts} fill="none" stroke={COLORS[group]} strokeWidth={2} />
         {weekly.map((w, i) => <circle key={i} cx={x(i)} cy={y(w.vol)} r={2.5} fill={COLORS[group]} />)}
-        {weekly.map((w, i) => <text key={i} x={x(i)} y={H - 6} fontSize={7} fill="rgba(255,255,255,0.4)" textAnchor="middle">{w.label}</text>)}
+        {weekly.map((w, i) => <text key={i} x={x(i)} y={H - 6} fontSize={7} fill="rgba(255,255,255,0.85)" textAnchor="middle">{w.label}</text>)}
       </svg>
       <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4, flexWrap: 'wrap' }}>
         <span>🟡 MEV {ref.mev}</span><span>🟢 MAV {ref.mav}</span><span>🔴 MRV {ref.mrv}</span>

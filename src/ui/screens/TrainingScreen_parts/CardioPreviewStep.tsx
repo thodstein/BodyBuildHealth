@@ -15,7 +15,7 @@ import {
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioProgressCard } from './CardioProgressCard';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, PHASE_COLOR, PHASE_BG, TYPE_COLOR, Badge, ProgressBar, Stepper } from './CardioUI';
-import { CardioCalendar } from './CardioCalendar';
+const CardioCalendar = React.lazy(() => import('./CardioCalendar').then(m => ({ default: m.CardioCalendar })) );
 
 const VARIANT_BTN: React.CSSProperties = {
   flex: '1 1 100px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
@@ -181,12 +181,12 @@ export const CardioPreviewStep: React.FC<{
       <div style={CARD} id="sec-overview">
         <div style={ROW}>
           <span style={{ fontSize: 13, fontWeight: 800 }}>{cycle.name}</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>создан {new Date(cycle.createdAt).toLocaleDateString('ru-RU')}</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {metrics.map(m => (
             <div key={m.label} style={{ flex: '1 1 90px', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 0.3 }}>{m.label}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: 0.3 }}>{m.label}</div>
               <div style={{ fontSize: 15, fontWeight: 800, color: m.color }}>{m.value}</div>
             </div>
           ))}
@@ -265,7 +265,7 @@ export const CardioPreviewStep: React.FC<{
           </div>
           <ProgressBar value={quality.score} color={quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444'} height={8} />
           {quality.findings.map((f, i) => (
-            <div key={i} style={{ fontSize: 10, lineHeight: 1.4, color: f.level === 'warn' ? '#fbbf24' : f.level === 'ok' ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.5)' }}>
+            <div key={i} style={{ fontSize: 10, lineHeight: 1.4, color: f.level === 'warn' ? '#fbbf24' : f.level === 'ok' ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.85)' }}>
               {f.level === 'warn' ? '⚠ ' : f.level === 'ok' ? '✅ ' : '💡 '}{f.text}
             </div>
           ))}
@@ -301,7 +301,7 @@ export const CardioPreviewStep: React.FC<{
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
               Прогноз адаптации: <b style={{ color: '#60a5fa' }}>+{forecast.vo2GainPct}% VO2max</b> за цикл ({forecast.effectiveWeeks} рабочих нед)
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{forecast.note}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.5 }}>{forecast.note}</div>
             {tests.length > 0 && (
               <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 8, padding: '6px 8px' }}>
                 🔬 Контрольные замеры: недели {tests.map(t => t.week).join(', ')} — 30 мин на комфортном темпе, сравните пульс/ощущения с прошлым замером.
@@ -384,7 +384,7 @@ export const CardioPreviewStep: React.FC<{
             const sess = weekDays.filter(s => s.dayOfWeek === i);
             return (
               <div key={d} style={{ ...DAY_CELL, ...(isLeg ? { background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)' } : {}) }}>
-                <div style={{ color: isLeg ? '#fbbf24' : 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 3 }}>{d}{isLeg ? ' 🦵' : ''}</div>
+                <div style={{ color: isLeg ? '#fbbf24' : 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 3 }}>{d}{isLeg ? ' 🦵' : ''}</div>
                 {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.2)' }}>—</div> : sess.map((s, j) => (
                   <button
                     key={j}
@@ -496,7 +496,7 @@ export const CardioPreviewStep: React.FC<{
         <div style={CARD} id="sec-rationale">
           <div style={LABEL}>💡 Обоснование</div>
           {cycle.rationale.map((r, i) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.45 }}>• {r}</div>
+            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>• {r}</div>
           ))}
         </div>
       )}

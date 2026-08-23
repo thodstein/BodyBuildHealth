@@ -10,7 +10,7 @@ import { getMappedIds } from '../../../data/exercise-id-mapping';
 import type { Exercise } from '../../../core/types';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = 'rgba(255,255,255,0.85)';
 const BG = 'rgba(24,24,27,0.15)';
 const BORDER = 'rgba(255,255,255,0.05)';
 
@@ -264,7 +264,7 @@ export const TechniqueCalcTab: React.FC = () => {
                       <div style={{ height: '100%', width: `${(b.value / b.max) * 100}%`, borderRadius: 4, background: lvl(b.value, b.max), transition: 'width 0.3s' }} />
                     </div>
                     <div style={{ width: 32, textAlign: 'right', fontWeight: 700, color: lvl(b.value, b.max) }}>{b.value}</div>
-                    <div style={{ width: 22, color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>/ {b.max}</div>
+                    <div style={{ width: 22, color: 'rgba(255,255,255,0.85)', fontSize: 10 }}>/ {b.max}</div>
                   </div>
                 ))}
 
@@ -437,7 +437,7 @@ export const TechniqueCalcTab: React.FC = () => {
                     return (
                       <div key={i} style={{ flex: 1, textAlign: 'center', background: `${colors[i]}14`, borderRadius: 8, padding: '6px 4px', border: `1px solid ${colors[i]}22` }}>
                         <div style={{ fontSize: 18, fontWeight: 800, color: colors[i] }}>{sec === 0 ? 'X' : sec}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{labels[i]}</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{labels[i]}</div>
                         <div style={{ fontSize: 10, color: colors[i] }}>{i === 0 ? `${sec}c` : i === 2 ? (sec === 0 ? 'взрыв' : `${sec}c`) : `${sec}c`}</div>
                       </div>
                     );

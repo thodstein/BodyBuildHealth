@@ -331,7 +331,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Отдых</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Отдых</div>
             <div style={{ fontSize: 24, fontWeight: 800, color: restTimer <= 10 ? '#ef4444' : ACCENT }}>
               {Math.floor(restTimer / 60)}:{(restTimer % 60).toString().padStart(2, '0')}
             </div>
@@ -348,12 +348,12 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>⚡ Быстрый ввод</div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {undoRef.current.length > 0 && (
-            <button onClick={undo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10 }}>↩</button>
+            <button onClick={undo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10 }}>↩</button>
           )}
           {redoRef.current.length > 0 && (
-            <button onClick={redo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10 }}>↷</button>
+            <button onClick={redo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10 }}>↷</button>
           )}
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
             {totalSets} сетов · {totalVolume.toLocaleString()} кг
           </div>
         </div>
@@ -415,7 +415,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                 }}
               >
                 <span style={{ fontSize: 13, color: '#fff' }}>{ex.name}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{ex.group}</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{ex.group}</span>
               </div>
             ))}
           </div>
@@ -435,7 +435,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         if (recent.length === 0) return null;
         return (
           <div style={{ marginTop: 8, marginBottom: 8 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Недавние:</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Недавние:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {recent.map(r => (
                 <button key={r.name} onClick={() => { const ex = EXERCISE_CATALOG.find((c: any) => c.name === r.name); if (ex) addExercise(ex); }}
@@ -455,7 +455,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)',
         }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>🏋️</div>
-          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
             Начните с поиска упражнения выше
           </div>
         </div>
@@ -479,7 +479,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
             >
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{ex.exerciseName}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
                   {ex.sets.filter(s => s.completed).length}/{ex.sets.length} подходов
                   {prevData && (
                     <span style={{ marginLeft: 6, color: ACCENT }}>
@@ -592,7 +592,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
 
       {/* Rest timer settings */}
       {exercises.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
           <span>Отдых:</span>
           {[60, 90, 120, 180].map(sec => (
             <button
@@ -602,7 +602,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
                 padding: '4px 10px', borderRadius: 6,
                 border: `1px solid ${restTarget === sec ? ACCENT : 'rgba(255,255,255,0.1)'}`,
                 background: restTarget === sec ? 'rgba(0,230,138,0.1)' : 'transparent',
-                color: restTarget === sec ? ACCENT : 'rgba(255,255,255,0.5)',
+                color: restTarget === sec ? ACCENT : 'rgba(255,255,255,0.85)',
                 cursor: 'pointer', fontSize: 10,
               }}
             >{sec}с</button>
@@ -615,9 +615,9 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
         <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>✅ Тренировка сохранена!</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11 }}>
-            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.4)' }}>Упр.</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.exercises}</div></div>
-            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.4)' }}>Сетов</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.sets}</div></div>
-            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.4)' }}>Тоннаж</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.volume.toLocaleString()} кг</div></div>
+            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.85)' }}>Упр.</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.exercises}</div></div>
+            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.85)' }}>Сетов</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.sets}</div></div>
+            <div style={{ textAlign: 'center' }}><div style={{ color: 'rgba(255,255,255,0.85)' }}>Тоннаж</div><div style={{ fontWeight: 700, color: '#fff' }}>{savedSummary.volume.toLocaleString()} кг</div></div>
           </div>
         </div>
       ) : exercises.length > 0 && (
@@ -649,7 +649,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
           style={{
             width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer',
             background: totalSets > 0 ? 'linear-gradient(135deg, #00e68a, #00c853)' : 'rgba(255,255,255,0.05)',
-            color: totalSets > 0 ? '#000' : 'rgba(255,255,255,0.3)',
+            color: totalSets > 0 ? '#000' : 'rgba(255,255,255,0.85)',
             fontWeight: 700, fontSize: 14, minHeight: 48,
           }}
         >

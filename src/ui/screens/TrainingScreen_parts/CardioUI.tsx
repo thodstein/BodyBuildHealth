@@ -36,7 +36,7 @@ export const CARD_SOFT: React.CSSProperties = {
 export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' };
 export const ROW_TIGHT: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
 export const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1 };
-export const LABEL_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 };
+export const LABEL_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 };
 export const HINT: React.CSSProperties = { fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.55 };
 export const HINT_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 };
 export const BTN: React.CSSProperties = {
@@ -251,7 +251,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
             background: error ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.05)',
           }}
         />
-        {suffix && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{suffix}</span>}
+        {suffix && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>{suffix}</span>}
       </div>
       {error && <span style={{ fontSize: 10, color: '#f87171' }}>⚠ {error}</span>}
     </div>
@@ -334,7 +334,7 @@ export const Stepper: React.FC<{
     >
       +
     </button>
-    {suffix && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{suffix}</span>}
+    {suffix && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{suffix}</span>}
   </div>
 );
 
@@ -379,7 +379,7 @@ export const EmptyState: React.FC<{ icon: string; title: string; desc?: string; 
   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 12px', textAlign: 'center' }}>
     <div style={{ fontSize: 28 }}>{icon}</div>
     <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{title}</div>
-    {desc && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', maxWidth: 340, lineHeight: 1.5 }}>{desc}</div>}
+    {desc && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', maxWidth: 340, lineHeight: 1.5 }}>{desc}</div>}
     {action}
   </div>
 );

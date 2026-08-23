@@ -182,7 +182,7 @@ export const CardioParamsStep: React.FC<{
         <InfoBanner tone="info">👋 Подсказка: выберите цель (например, Сушка) → пресет «Сушка 16 нед» → проверьте предпросмотр (фазы + прогноз VO2max) → «Далее» и соберите цикл. Taper и дни ног подстроятся сами.</InfoBanner>
       )}
 
-      <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{age}л · {bodyWeight}кг{CARDIO_LEVEL_LABELS[level]}</span>}>
+      <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{age}л · {bodyWeight}кг{CARDIO_LEVEL_LABELS[level]}</span>}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={BTN_SMALL} onClick={onFromProfile} title="Загрузить из профиля">📋 Из профиля</button>
           <button style={BTN_SMALL} onClick={onFromDiaryHr} title="ЧСС покоя из дневника АД">❤️ Из АД</button>

@@ -63,7 +63,7 @@ export const LiftHistoryCard: React.FC<{ sessions: Session[] }> = ({ sessions })
                 {prDates.has(p.date) && <text x={x(i)} y={yE(p.e1rm) - 6} fontSize={7} fill="#f59e0b" textAnchor="middle">🏆</text>}
               </g>
             ))}
-            {series.map((p, i) => <text key={i} x={x(i)} y={H - 6} fontSize={6} fill="rgba(255,255,255,0.4)" textAnchor="middle">{p.date.slice(5)}</text>)}
+            {series.map((p, i) => <text key={i} x={x(i)} y={H - 6} fontSize={6} fill="rgba(255,255,255,0.85)" textAnchor="middle">{p.date.slice(5)}</text>)}
           </svg>
           <div style={{ display: 'flex', gap: 12, fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4, flexWrap: 'wrap' }}>
             <span>🟢 e1RM</span><span>🔵 тоннаж</span><span>🏆 PR</span>

@@ -374,8 +374,8 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
                     {(appliedMethods[r.method!.category] === r.method!.name) ? '✓ ' : ''}{r.method.name}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{r.reason}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{r.method.description}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{r.method.description}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
                     Протокол: {r.method.example} | Уровень доказательности: {r.method.evidenceLevel}
                   </div>
                   {(appliedMethods[r.method!.category] === r.method!.name) ? (
@@ -400,9 +400,9 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
       <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:10, color:'var(--text-dim)' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
       <div style={{ fontSize:10, color:'var(--text-light)', marginTop:2 }}>{m.description}</div>
       <div style={{ fontSize:10, color:'var(--text-dim)' }}>Лучше всего для: {m.bestFor}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>Как работает: {m.howItWorks}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>Протокол: {m.example}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.3)', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}>Как работает: {m.howItWorks}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}>Протокол: {m.example}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginTop:1 }}>Док-во: {m.evidenceLevel} | Авторы: {m.popularizedBy}</div>
       {m.caveats?.length > 0 && <div style={{ fontSize:10, color:'#f87171', marginTop:2, padding:'4px 6px', background:'rgba(239,68,68,0.06)', borderRadius:4 }}>⚠ {m.caveats.join(' | ')}</div>}
       {(appliedMethods[m.category] === m.name) ? (
         <div style={{ marginTop:4, fontSize:10, color:'#00e68a', fontWeight:600 }}>✅ Применена к плану</div>
@@ -439,12 +439,12 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
         <span style={{ fontSize:10, color:'#00e68a' }}>{expandedSplit===i?'▲':'▼'}</span>
       </div>
       <div style={{ fontSize:10, color:'var(--text-dim)', marginTop:2 }}>📊 {s.totalVolume} · 🔁 {s.totalFrequency}</div>
-      <div style={{ fontSize:10, color:'rgba(255,255,255,0.4)', marginTop:1 }}>✅ Подходит: {s.suitability.join(', ')}</div>
+      <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)', marginTop:1 }}>✅ Подходит: {s.suitability.join(', ')}</div>
       {expandedSplit===i && <div style={{ marginTop:8, borderTop:'1px solid rgba(255,255,255,0.06)', paddingTop:8 }}>
         {s.days.map((d,di) => <div key={di} style={{ background:'rgba(255,255,255,0.02)', borderRadius:6, padding:'6px 8px', marginBottom:4, borderLeft:'2px solid #00e68a' }}>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, fontWeight:700, color:'#fff' }}>
             <span>Д{d.day}: {d.name}</span>
-            <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{d.volume} объём · {d.intensity} инт.</span>
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}>{d.volume} объём · {d.intensity} инт.</span>
           </div>
           <div style={{ fontSize:10, color:'rgba(0,230,138,0.8)', marginTop:2 }}>🎯 {d.focus}</div>
           <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:2 }}>Шаблоны: {d.patterns.join(' · ')}</div>

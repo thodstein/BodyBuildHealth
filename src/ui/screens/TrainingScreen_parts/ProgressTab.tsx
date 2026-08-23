@@ -126,7 +126,7 @@ export const ProgressTab: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ histo
         {wkArr.length >= 2 && <>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8, marginBottom: 4 }}>Тоннаж по неделям:</div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
-            {wkArr.map(([wk, v], i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)' }} /><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{wk.slice(5)}</span></div>)}
+            {wkArr.map(([wk, v], i) => <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}><div style={{ width: '100%', maxWidth: 28, height: Math.max(2, (v / maxWk) * 48), borderRadius: 3, background: 'linear-gradient(180deg,#00e68a,#00c853)' }} /><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{wk.slice(5)}</span></div>)}
           </div>
         </>}
       </div>;

@@ -91,8 +91,8 @@ export const RirWaveChart: React.FC<RirWaveChartProps> = ({ program }) => {
         {points.map(([x, y], i) => (
           <circle key={i} cx={x} cy={y} r={2.5} fill={stroke} />
         ))}
-        <text x={4} y={10} fontSize="8" fill="rgba(255,255,255,0.4)">RIR0</text>
-        <text x={chartW - 24} y={10} fontSize="8" fill="rgba(255,255,255,0.4)">RIR5</text>
+        <text x={4} y={10} fontSize="8" fill="rgba(255,255,255,0.85)">RIR0</text>
+        <text x={chartW - 24} y={10} fontSize="8" fill="rgba(255,255,255,0.85)">RIR5</text>
         {wave.map((r, i) => r === 4 && i > 0 && (i - 1) > 0 ? (
           <line key={'d' + i} x1={points[i][0]} x2={points[i][0]} y1={6} y2={chartH - 6}
             stroke={isMass ? '#f59e0b' : '#22c55e'} strokeDasharray="2 2" opacity="0.6" />

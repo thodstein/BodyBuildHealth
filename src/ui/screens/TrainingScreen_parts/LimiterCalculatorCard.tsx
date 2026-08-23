@@ -162,7 +162,7 @@ const OptionBlock: React.FC<{
       <div style={{ fontSize: 9, color: '#fbbf24', marginTop: 4, lineHeight: 1.4 }}>📋 {o.method}</div>
       <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginTop: 3, lineHeight: 1.4 }}>🧠 {o.rationale}</div>
       {o.references.length > 0 && (
-        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>📚 {o.references.join(' · ')}</div>
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>📚 {o.references.join(' · ')}</div>
       )}
       {analysis.items.map((item, idx) => (
         <ExerciseRow key={idx} item={item} selected={selected[keyOf]?.includes(item.exercise.name) ?? false}

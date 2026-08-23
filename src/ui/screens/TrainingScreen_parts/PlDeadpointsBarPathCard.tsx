@@ -271,7 +271,7 @@ const BarPathSvg: React.FC<{
         const isActive = activePhase === zone;
         return <g key={zone} onClick={e => { e.stopPropagation(); onPhase(zone); }} style={{ cursor: 'pointer' }}>
           <rect x={PAD - 4} y={y0} width={W - 2 * PAD + 8} height={y1 - y0} fill={isActive ? 'rgba(0,230,138,0.12)' : 'rgba(0,230,138,0.03)'} stroke={isActive ? 'rgba(0,230,138,0.4)' : 'transparent'} strokeWidth={1} rx={3} />
-          <text x={W - PAD - 2} y={(y0 + y1) / 2 + 3} fontSize={8} fill={isActive ? ACCENT : 'rgba(255,255,255,0.4)'} textAnchor="end">{PHASE_RU[zone] || zone}</text>
+          <text x={W - PAD - 2} y={(y0 + y1) / 2 + 3} fontSize={8} fill={isActive ? ACCENT : 'rgba(255,255,255,0.85)'} textAnchor="end">{PHASE_RU[zone] || zone}</text>
         </g>;
       })}
       {/* идеальная линия */}
@@ -281,7 +281,7 @@ const BarPathSvg: React.FC<{
       {/* точки */}
       {ideal.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={2.5} fill="#22c55e" />)}
       {issues.length > 0 && deviated.map((p, i) => <circle key={'d' + i} cx={p[0]} cy={p[1]} r={2.5} fill="#ef4444" />)}
-      <text x={PAD} y={12} fontSize={8} fill="rgba(255,255,255,0.5)">кл.зона = фаза · кл.кривая = отклонение{issues.length ? ` (${issues.map(i => ISSUE_RU[i]).join(', ')})` : ''}</text>
+      <text x={PAD} y={12} fontSize={8} fill="rgba(255,255,255,0.85)">кл.зона = фаза · кл.кривая = отклонение{issues.length ? ` (${issues.map(i => ISSUE_RU[i]).join(', ')})` : ''}</text>
     </svg>
   );
 };
@@ -551,7 +551,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           </div>
         )}
         {!template && (
-          <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>
+          <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>
         )}
         {weakMuscleGroups.map(group => {
           const detail = WEAK_MUSCLE_DETAIL.find(d => d.id === group);
@@ -711,7 +711,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           const best = parseFloat(vbtBest);
           const last = parseFloat(vbtLast);
           if (!Number.isFinite(best) || !Number.isFinite(last) || best <= 0 || last <= 0 || last > best) {
-            return <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Введите скорости (последний повтор не может быть быстрее лучшего).</div>;
+            return <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Введите скорости (последний повтор не может быть быстрее лучшего).</div>;
           }
           const weight = parseFloat(vbtWeight);
           const d = diagnoseVelocity(lift, best, last, Number.isFinite(weight) && weight > 0 ? weight : undefined);
@@ -755,7 +755,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
                 </div>
               )}
               {(!vbtSticking || vbtSticking.items.length === 0) && (
-                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
                   Коррекции для фазы «{vbtPhase ? (PHASE_RU[vbtPhase] || vbtPhase) : '—'}» не найдены в пуле — используйте слабые точки (раздел 2).
                 </div>
               )}
@@ -867,7 +867,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           По умолчанию — «Авто» (тяжёлый + памп-день). Для выбранных упражнений можно задать свои дни:
         </div>
         {Object.keys(selected).length === 0 && (
-          <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+          <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
             Сначала отметьте упражнения кнопками «＋»/«➕» — появятся чипы дней.
           </div>
         )}

@@ -79,7 +79,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
     <div style={CARD}>
       <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>
         {isSourceCalendar ? '📅' : '📈'} {title || 'Прогрессия мезоцикла'}
-        <div style={{ marginLeft: 8, fontSize: 10, color: 'rgba(255,255,255,0.4)', fontWeight: 400, marginTop: 2 }}>
+        <div style={{ marginLeft: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 400, marginTop: 2 }}>
           {isSourceCalendar
             ? `Источник: ${progression.length} недель, без типовой фазовой генерации`
             : `Трек Мезо 1→2→3: ${interMeso.map((m, i) => `${m.mesoIndex}: ${m.startVolumeSets}с / ${Math.round(m.startIntensityPct * 100)}%`).join(' → ')}`}
@@ -93,7 +93,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             <div key={phase} style={{ gridColumn: '1 / -1', padding: 8, borderRadius: 8, background: `${ACCENT}10`, border: `1px solid ${ACCENT}25`, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color: ACCENT, fontWeight: 700 }}>Оригинальная раскладка</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{progression.length}н</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>недели источника СРЦ</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>недели источника СРЦ</div>
             </div>
           );
           const count = dist[phase] || 0;
@@ -103,7 +103,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             <div key={phase} style={{ padding: 8, borderRadius: 8, background: `${color}10`, border: `1px solid ${color}25`, textAlign: 'center' }}>
               <div style={{ fontSize: 10, color, fontWeight: 700 }}>{PHASE_RU[phase]}</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{count}н</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{pct}%</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{pct}%</div>
               <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', marginTop: 4, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: pct + '%', borderRadius: 2, background: color }} />
               </div>
@@ -123,7 +123,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             const isDeload = phase === 'deload';
             return (
               <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 22 }}>
-                <div style={{ fontSize: 10, color: p.intensityPct > 0.85 ? '#ef4444' : 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
+                <div style={{ fontSize: 10, color: p.intensityPct > 0.85 ? '#ef4444' : 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
                   {Math.round(p.intensityPct * 100)}%
                 </div>
                 <div style={{
@@ -137,7 +137,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
           })}
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
         <span>▮ Объём (сетов)</span>
         <span style={{ color: '#ef4444' }}>% 1RM</span>
         <span>— {isSourceCalendar ? 'оригинал' : 'разгрузка'}</span>
@@ -146,7 +146,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
       {/* Таблица прогрессии */}
       <div style={{ marginTop: 10 }}>
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-         <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2, padding: '4px 8px', fontSize:10, fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', minWidth: 340 }}>
+         <div style={{ display: 'grid', gridTemplateColumns: '0.4fr 1fr 0.6fr 0.6fr 0.5fr 0.6fr', gap: 2, padding: '4px 8px', fontSize:10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', minWidth: 340 }}>
           <span>Нед</span><span>Фаза</span><span>Объём×</span><span>Сетов</span><span>%1RM</span><span>RIR</span>
         </div>
         {progression.map((p, i) => {
@@ -223,7 +223,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
             );
           })()}
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 8, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 8, lineHeight: 1.4 }}>
           После делода — старт нового мезоцикла с возросшей работоспособностью.
           Объём и интенсивность сбрасываются к базовым значениям начала нового мезоцикла,
           но с поправкой на прогресс ПМ за предыдущий цикл.

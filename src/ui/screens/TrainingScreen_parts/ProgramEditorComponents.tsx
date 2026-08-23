@@ -94,7 +94,7 @@ const DayOfWeekPicker: React.FC<{
                       style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: isOcc ? 'not-allowed' : 'pointer', textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
                         background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                         border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : isOcc ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)' }}>
+                        color: isSel ? ACCENT : isOcc ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.85)' }}>
                       <span>{d}{isOcc ? ' · занято' : ''}</span>
                       {isSel && <span style={{ fontSize: 10 }}>✓</span>}
                     </button>
@@ -510,7 +510,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               return (
                 <span style={{ fontSize: 10, color: ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>
                   🎯 RIR {phaseRir[w.phase] ?? '—'}
-                  {actual !== null && <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 400 }}> · факт {actual}</span>}
+                  {actual !== null && <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 400 }}> · факт {actual}</span>}
                 </span>
               );
             })()}

@@ -130,7 +130,7 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
             <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="rgba(255,255,255,0.65)">{SPORT_LABELS[link.sport]}</Badge>
           </>
         ) : (
-          <Badge bg="rgba(255,255,255,0.04)" border="rgba(255,255,255,0.08)" color="rgba(255,255,255,0.45)">Не подключено</Badge>
+          <Badge bg="rgba(255,255,255,0.04)" border="rgba(255,255,255,0.08)" color="rgba(255,255,255,0.85)">Не подключено</Badge>
         )}
       </div>
       {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }} role="status">{flash}</div>}

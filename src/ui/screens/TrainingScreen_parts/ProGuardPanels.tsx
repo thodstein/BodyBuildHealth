@@ -634,8 +634,8 @@ export const ReadinessForecastPanel: React.FC<GuardPanelProps> = () => {
         <line x1={4} x2={chartW - 4} y1={chartH - 6 - ((40 - minVal) / range) * (chartH - 12)} y2={chartH - 6 - ((40 - minVal) / range) * (chartH - 12)} stroke="rgba(239,68,68,0.2)" strokeDasharray="2 2" />
         <path d={pathD} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         {points.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2.5} fill={stroke} />)}
-        <text x={4} y={10} fontSize="8" fill="rgba(255,255,255,0.4)">день+1</text>
-        <text x={chartW - 30} y={10} fontSize="8" fill="rgba(255,255,255,0.4)">день+5</text>
+        <text x={4} y={10} fontSize="8" fill="rgba(255,255,255,0.85)">день+1</text>
+        <text x={chartW - 30} y={10} fontSize="8" fill="rgba(255,255,255,0.85)">день+5</text>
       </svg>
       <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
         {forecast.values.map((v, i) => (

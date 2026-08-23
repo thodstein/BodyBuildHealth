@@ -53,7 +53,7 @@ export const PedInputPanel: React.FC<{
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>💉 PED / Курс</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1, lineHeight: 1.35 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1, lineHeight: 1.35 }}>
             Адаптация объёмов (MRV) и восстановления под фармакологию{active ? ` · активных: ${peds.length}` : ''}
           </div>
         </div>
@@ -93,7 +93,7 @@ export const PedInputPanel: React.FC<{
       {/* Дозировки */}
       {active && (
         <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
             Дозировки
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
@@ -104,7 +104,7 @@ export const PedInputPanel: React.FC<{
                 <div key={p} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>
                     {meta.emoji} {meta.label}
-                    <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}> · {meta.unit}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}> · {meta.unit}</span>
                   </label>
                   <input
                     type="number"
@@ -123,7 +123,7 @@ export const PedInputPanel: React.FC<{
                       outline: 'none', minHeight: 38,
                     }}
                   />
-                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', lineHeight: 1.3 }}>{meta.hint}</span>
+                  <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>{meta.hint}</span>
                   {val > meta.cap && (
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', lineHeight: 1.3 }}>
                       ⚠ Выше {meta.cap} {meta.unit} — кап: дальнейшее повышение дозы НЕ увеличивает MRV/восстановление
@@ -139,7 +139,7 @@ export const PedInputPanel: React.FC<{
       {/* Интенсивность курса */}
       {active && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
             Интенсивность курса
           </div>
           <div role="radiogroup" aria-label="Интенсивность курса" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
@@ -178,9 +178,9 @@ export const PedInputPanel: React.FC<{
 
 const Tile: React.FC<{ label: string; value: string; color: string; hint?: string }> = ({ label, value, color, hint }) => (
   <div style={{ padding: '8px 6px', borderRadius: 10, background: color + '10', border: '1px solid ' + color + '28', textAlign: 'center' }}>
-    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{label}</div>
+    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>{label}</div>
     <div style={{ fontSize: 16, fontWeight: 900, color, lineHeight: 1.2, marginTop: 2 }}>{value}</div>
-    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{hint}</div>}
   </div>
 );
 
@@ -193,11 +193,11 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#a855f7' }}>{title || '📊 Расчёт адаптации под PED'}</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>Пороги MEV/MAV/MRV увеличены на суммарный множитель</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>Пороги MEV/MAV/MRV увеличены на суммарный множитель</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: '#a855f7', lineHeight: 1.1 }}>×{a.combinedMrvMultiplier.toFixed(2)}</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>итог MRV</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>итог MRV</div>
         </div>
       </div>
 
@@ -227,7 +227,7 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>
                     {meta ? meta.label : pp.ped}
-                    {pp.dose > 0 && <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}> · {pp.dose} {meta ? meta.unit : ''}</span>}
+                    {pp.dose > 0 && <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}> · {pp.dose} {meta ? meta.unit : ''}</span>}
                     {pp.dose > (meta ? meta.cap : getPedCap(pp.ped as PED)) && (
                       <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 800, color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 5, padding: '1px 5px' }}>
                         кап
@@ -262,7 +262,7 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
       {/* Как считается */}
       {a.rationale.length > 0 && (
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Как считается</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Как считается</div>
           {a.rationale.map((r, i) => (
             <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, paddingLeft: 10, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 0, color: '#a855f7' }}>•</span>

@@ -1154,7 +1154,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     return (
                       <g key={t}>
                         <line x1={pad} y1={y} x2={svgW - pad} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
-                        <text x={pad - 4} y={y + 3} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize={6}>{val}</text>
+                        <text x={pad - 4} y={y + 3} textAnchor="end" fill="rgba(255,255,255,0.85)" fontSize={6}>{val}</text>
                       </g>
                     );
                   })}
@@ -1164,7 +1164,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     <g key={i}>
                       <circle cx={toX(i)} cy={toY(p.weight, wMax)} r={2} fill="#60a5fa" />
                       {i % Math.max(1, Math.ceil(projections.length / 10)) === 0 && (
-                        <text x={toX(i)} y={svgH - pad + 10} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={6}>{p.w}</text>
+                        <text x={toX(i)} y={svgH - pad + 10} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={6}>{p.w}</text>
                       )}
                     </g>
                   ))}
@@ -1180,7 +1180,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     const x = toX(p.w) - 8;
                     return <rect key={`dl-${i}`} x={x} y={pad - 4} width={16} height={svgH - pad * 2 + 4} fill="rgba(239,68,68,0.12)" rx={2} />;
                   })}
-                  <text x={svgW / 2} y={svgH - 2} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize={7}>Неделя</text>
+                  <text x={svgW / 2} y={svgH - 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={7}>Неделя</text>
                 </svg>
                 <div style={{ display: 'flex', gap: 10, fontSize: 10, marginTop: 2, flexWrap: 'wrap' }}>
                   <span style={{ color: '#60a5fa' }}>— Вес (кг)</span>
@@ -1510,7 +1510,7 @@ export const ExerciseCalcTab: React.FC = () => {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 4 }}>
                 {warmupRamp.steps.map((s, i) => (
                   <div key={i} style={{ padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 4, borderLeft: i === warmupRamp.steps.length - 1 ? `2px solid ${ACCENT}` : '2px solid transparent' }}>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{s.label}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{s.label}</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: i === warmupRamp.steps.length - 1 ? ACCENT : '#fb923c' }}>{s.weight} кг</div>
                     <div style={{ ...SMALL, fontSize: 10 }}>{s.reps} повт · {s.pct}% раб. веса</div>
                   </div>
@@ -1563,7 +1563,7 @@ export const ExerciseCalcTab: React.FC = () => {
           {oneRMHistory && (
             <div style={{ marginTop: 14, padding: 12, background: 'rgba(34,197,94,0.06)', borderRadius: 8, border: '1px solid rgba(34,197,94,0.2)' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginBottom: 6 }}>📈 Тренд 1ПМ — {ex?.name}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
                 {oneRMHistory.length} записей · {oneRMHistory[0].date} → {oneRMHistory[oneRMHistory.length - 1].date}
                 · {(() => { const d = oneRMHistory[oneRMHistory.length - 1].oneRM - oneRMHistory[0].oneRM; return `${d >= 0 ? '+' : ''}${d.toFixed(1)} кг`; })()}
               </div>
@@ -1585,7 +1585,7 @@ export const ExerciseCalcTab: React.FC = () => {
                     {pts.filter((_, i) => i % Math.max(1, Math.floor(pts.length / 6)) === 0 || i === pts.length - 1).map((p, i) => (
                       <g key={i}>
                         <circle cx={toX(pts.indexOf(p))} cy={toY(p.oneRM)} r={2.5} fill="#22c55e" />
-                        <text x={toX(pts.indexOf(p))} y={svgH - pad + 10} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={6}>{p.date.slice(5)}</text>
+                        <text x={toX(pts.indexOf(p))} y={svgH - pad + 10} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={6}>{p.date.slice(5)}</text>
                       </g>
                     ))}
                   </svg>

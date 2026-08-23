@@ -45,9 +45,9 @@ export const ReadinessForecastCard: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 8 }}>
         {forecast?.values.map((v: number, i: number) => (
           <div key={i} style={{ background: 'rgba(0,230,138,0.06)', borderRadius: 8, padding: 6, textAlign: 'center' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>+{i + 1} дн</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>+{i + 1} дн</div>
             <div style={{ fontSize: 14, fontWeight: 800, color: v >= 70 ? '#22c55e' : v >= 50 ? '#eab308' : '#ef4444' }}>{Math.round(v)}</div>
-            {forecast.ci95[i] && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>ДИ {Math.round(forecast.ci95[i][0])}-{Math.round(forecast.ci95[i][1])}</div>}
+            {forecast.ci95[i] && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>ДИ {Math.round(forecast.ci95[i][0])}-{Math.round(forecast.ci95[i][1])}</div>}
           </div>
         ))}
       </div>

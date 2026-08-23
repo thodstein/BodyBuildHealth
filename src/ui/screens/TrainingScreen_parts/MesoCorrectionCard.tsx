@@ -50,32 +50,32 @@ const MesoCorrectionCard: React.FC<Props> = ({
   return (
     <div style={GLASS}>
       <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🔄 Анализ и коррекция мезоцикла</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>{output.comment}</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>{output.comment}</div>
 
       {/* Итоговые параметры */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Объём</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Объём</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: output.recommendedVolume > currentVolume ? ACCENT : '#ff4444' }}>
-            {output.recommendedVolume} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>сетов</span>
+            {output.recommendedVolume} <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>сетов</span>
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>было {currentVolume}</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>было {currentVolume}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>RIR</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>RIR</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: output.recommendedRir !== currentRir ? '#ffaa00' : ACCENT }}>
             {output.recommendedRir}
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>было {currentRir}</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>было {currentRir}</div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Делоад</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Делоад</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: output.needsDeloadFirst ? '#ff4444' : ACCENT }}>
             {output.needsDeloadFirst ? '⚠ Нужен' : output.recommendedDeloadFreq + ' нед'}
           </div>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>Прогрессия</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Прогрессия</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>
             +{output.recommendedProgressionPct}%
           </div>

@@ -111,7 +111,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
                 const better = eff.type === 'sleep' ? eff.delta > 0 : eff.delta < 0;
                 const arrow = eff.delta === 0 ? '→' : (better ? '↑' : '↓');
                 return (
-                  <div style={{ fontSize: 10, color: better ? '#00e68a' : eff.delta === 0 ? 'rgba(255,255,255,0.5)' : '#f59e0b', marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: better ? '#00e68a' : eff.delta === 0 ? 'rgba(255,255,255,0.85)' : '#f59e0b', marginTop: 2 }}>
                     📈 {eff.label}: {eff.before} → {eff.after} {eff.type === 'sleep' ? 'ч' : 'кг'} ({arrow} {Math.abs(eff.delta)}) {eff.samplesAfter === 0 ? `· данных после: ${eff.samplesBefore} зап. до` : ''}
                   </div>
                 );

@@ -117,15 +117,15 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
           </div>
           <div style={{ display: 'flex', gap: 2 }}>
             {series.map(s => (
-              <div key={s.week} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>{s.week}</div>
+              <div key={s.week} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{s.week}</div>
             ))}
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
             Пик: {peak} {label} (нед {peakWeek}) · Средняя: {avg} {label}
-            {fact && <span style={{ color: fact.pct != null && fact.pct < 60 ? '#f87171' : 'rgba(255,255,255,0.35)' }}> · Выполнение прошедших недель: {fact.pct}% (сессий {fact.doneS}/{fact.plannedS})</span>}
+            {fact && <span style={{ color: fact.pct != null && fact.pct < 60 ? '#f87171' : 'rgba(255,255,255,0.85)' }}> · Выполнение прошедших недель: {fact.pct}% (сессий {fact.doneS}/{fact.plannedS})</span>}
             {fact && fact.factKcal > 0 && <span> · Факт: {fact.factKcal} ккал{fact.factKm > 0 ? ` · ${fact.factKm} км` : ''}</span>}
           </div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3b82f6', marginRight: 4 }} />план</span>
             {fact && <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#f8fafc', marginRight: 4 }} />факт (дневник)</span>}
           </div>

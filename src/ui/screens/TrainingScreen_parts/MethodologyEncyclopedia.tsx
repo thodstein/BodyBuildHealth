@@ -61,7 +61,7 @@ export const MethodologyEncyclopedia: React.FC = () => {
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Как работает:</b> {m.howItWorks}</div>
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Кому подходит:</b> {m.bestFor}</div>
             <div style={{ marginBottom: 6 }}><b style={{ color: '#00e68a' }}>Пример:</b> {m.example}</div>
-            {m.popularizedBy && <div style={{ marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Популяризатор: {m.popularizedBy}</div>}
+            {m.popularizedBy && <div style={{ marginBottom: 6, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Популяризатор: {m.popularizedBy}</div>}
             {m.caveats.length > 0 && <div><b style={{ color: '#ef4444' }}>Осторожно:</b> <ul style={{ margin: '4px 0 0 16px', padding: 0, fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{m.caveats.map((c, j) => <li key={j}>{c}</li>)}</ul></div>}
             {m.name.toLowerCase().includes('westside') ? (
               <div style={{ marginTop: 8, padding: 10, background: 'rgba(255,107,53,0.06)', borderRadius: 10, border: '1px solid rgba(255,107,53,0.15)' }}>

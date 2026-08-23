@@ -58,7 +58,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
   }, [cycle, offset]);
 
   if (!cycle || !data) {
-    return <div style={CARD}><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Календарь появится после сборки цикла.</div></div>;
+    return <div style={CARD}><div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>Календарь появится после сборки цикла.</div></div>;
   }
 
   const monthLabel = data.monthStart.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
@@ -81,7 +81,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
         <>
           <div role="grid" aria-label={`Календарь ${monthLabel}`} className="cardio-calendar-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {DAY_LABELS_RU.map(d => (
-              <div key={d} role="columnheader" style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{d}</div>
+              <div key={d} role="columnheader" style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.85)', padding: '4px 0' }}>{d}</div>
             ))}
         {Array.from({ length: data.rows * 7 }).map((_, idx) => {
           const dayNum = idx - data.firstDow + 1;
@@ -128,7 +128,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
           );
         })}
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
         <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: PHASE_COLOR.base, marginRight: 4, verticalAlign: 'middle' }} />база</span>
         <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: PHASE_COLOR.build, marginRight: 4 }} />build</span>
         <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: PHASE_COLOR.taper, marginRight: 4 }} />taper</span>

@@ -176,7 +176,7 @@ export const WeeklyTargetsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({
     <div style={style.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={style.label}>🎯 Цели недели</div>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Эта неделя</span>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Эта неделя</span>
       </div>
       {items.map(item => {
         const p = pct(item.actual, item.target);
@@ -187,10 +187,10 @@ export const WeeklyTargetsCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: p >= 100 ? '#22c55e' : '#fff' }}>
                   {item.key === 'tonnage' ? (item.actual / 1000).toFixed(1) + 'т' : item.actual}
-                  <span style={{ color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}> / {item.key === 'tonnage' ? (item.target / 1000).toFixed(1) + 'т' : item.target}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 400 }}> / {item.key === 'tonnage' ? (item.target / 1000).toFixed(1) + 'т' : item.target}</span>
                 </span>
                 <input type="number" value={item.target} onChange={e => saveTarget({ [item.key]: Math.max(1, +e.target.value || 1) })}
-                  style={{ width: 40, padding: '1px 3px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.4)', fontSize: 9, textAlign: 'right' }} />
+                  style={{ width: 40, padding: '1px 3px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', fontSize: 9, textAlign: 'right' }} />
               </div>
             </div>
             <div style={{ height: 6, background: 'rgba(255,255,255,0.04)', borderRadius: 3, overflow: 'hidden' }}>
@@ -289,7 +289,7 @@ export const WorkoutComparisonCard: React.FC<{ historyWorkouts: WorkoutLog[] }> 
         <select value={cmpA} onChange={e => setCmpA(+e.target.value)} style={{ ...style.input, flex: 1, fontSize: 10, padding: '4px' }}>
           {historyWorkouts.slice(0, 20).map((w: any, i: number) => <option key={i} value={i}>{(w.date || '').slice(0, 10)} ({w.split || '—'})</option>)}
         </select>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>vs</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>vs</span>
         <select value={cmpB} onChange={e => setCmpB(+e.target.value)} style={{ ...style.input, flex: 1, fontSize: 10, padding: '4px' }}>
           {historyWorkouts.slice(0, 20).map((w: any, i: number) => <option key={i} value={i}>{(w.date || '').slice(0, 10)} ({w.split || '—'})</option>)}
         </select>
@@ -297,28 +297,28 @@ export const WorkoutComparisonCard: React.FC<{ historyWorkouts: WorkoutLog[] }> 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 4, fontSize: 10, marginBottom: 4 }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700, color: '#00e68a' }}>{(volA / 1000).toFixed(1)}т</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>объём</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>объём</div>
         </div>
-        <div style={{ color: volA > volB ? '#22c55e' : volA < volB ? '#ef4444' : 'rgba(255,255,255,0.3)', fontSize: 10 }}>
+        <div style={{ color: volA > volB ? '#22c55e' : volA < volB ? '#ef4444' : 'rgba(255,255,255,0.85)', fontSize: 10 }}>
           {volA > volB ? '◀' : volA < volB ? '▶' : '='}
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700, color: '#60a5fa' }}>{(volB / 1000).toFixed(1)}т</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>объём</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>объём</div>
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700, color: '#00e68a' }}>{setsA}</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>сетов</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>сетов</div>
         </div>
-        <div style={{ color: setsA > setsB ? '#22c55e' : setsA < setsB ? '#ef4444' : 'rgba(255,255,255,0.3)' }}>
+        <div style={{ color: setsA > setsB ? '#22c55e' : setsA < setsB ? '#ef4444' : 'rgba(255,255,255,0.85)' }}>
           {setsA > setsB ? '◀' : setsA < setsB ? '▶' : '='}
         </div>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontWeight: 700, color: '#60a5fa' }}>{setsB}</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>сетов</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>сетов</div>
         </div>
       </div>
-      {shared.length > 0 && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>🔄 Совпадение: {shared.join(', ')}</div>}
+      {shared.length > 0 && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>🔄 Совпадение: {shared.join(', ')}</div>}
       {onlyA.length > 0 && <div style={{ fontSize: 9, color: '#00e68a' }}>🟢 Только A: {onlyA.join(', ')}</div>}
       {onlyB.length > 0 && <div style={{ fontSize: 9, color: '#60a5fa' }}>🔵 Только B: {onlyB.join(', ')}</div>}
     </div>
@@ -363,7 +363,7 @@ export const SectionHeader: React.FC<{ icon: string; title: string; hint?: strin
     <span style={{ fontSize: 13 }}>{icon}</span>
     <span style={{ fontSize: 12, fontWeight: 800, color: '#fff', letterSpacing: '0.2px' }}>{title}</span>
     <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-    {hint && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>{hint}</span>}
+    {hint && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{hint}</span>}
   </div>
 );
 
@@ -379,7 +379,7 @@ export const DiaryEmptyState: React.FC<{
   <div style={{ ...style.card, textAlign: 'center', padding: 24 }}>
     <div style={{ fontSize: 36, marginBottom: 8 }}>{icon}</div>
     <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>{title}</div>
-    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 12, lineHeight: 1.5 }}>{description}</div>
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginBottom: 12, lineHeight: 1.5 }}>{description}</div>
     <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
       {onRecord && (
         <button onClick={onRecord} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.1)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}>
@@ -412,9 +412,9 @@ export const WarmupRampCard: React.FC = () => {
         <div style={{ display: 'grid', gap: 2 }}>
           {ramp.map((r, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '2px 0' }}>
-              <span style={{ minWidth: 30, color: i === ramp.length - 1 ? ACCENT : 'rgba(255,255,255,0.4)', fontWeight: i === ramp.length - 1 ? 700 : 400 }}>{r.bar ? '—' : `${Math.round(r.pct * 100)}%`}</span>
+              <span style={{ minWidth: 30, color: i === ramp.length - 1 ? ACCENT : 'rgba(255,255,255,0.85)', fontWeight: i === ramp.length - 1 ? 700 : 400 }}>{r.bar ? '—' : `${Math.round(r.pct * 100)}%`}</span>
               <span style={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>{r.bar ? 'Пустой гриф (20 кг)' : `${r.load}кг`}</span>
-              <span style={{ color: 'rgba(255,255,255,0.35)' }}>{r.reps} повт</span>
+              <span style={{ color: 'rgba(255,255,255,0.85)' }}>{r.reps} повт</span>
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '3px 0', fontWeight: 700 }}>
@@ -484,7 +484,7 @@ export const HabitWeekCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ his
     <div style={style.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={style.label}>📋 Недельный пульс привычек</div>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>сегодня: {todayDone}/{HABIT_ROWS.length}</span>
+        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>сегодня: {todayDone}/{HABIT_ROWS.length}</span>
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6 }}>
         Тренировки и восстановление за эту неделю — из дневников.
@@ -513,7 +513,7 @@ export const HabitWeekCard: React.FC<{ historyWorkouts: WorkoutLog[] }> = ({ his
                 );
               })}
             </div>
-            <span style={{ minWidth: 24, textAlign: 'right', color: row.count >= 3 ? '#22c55e' : row.count > 0 ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontWeight: 700 }}>
+            <span style={{ minWidth: 24, textAlign: 'right', color: row.count >= 3 ? '#22c55e' : row.count > 0 ? '#f59e0b' : 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
               {row.count}/7
             </span>
           </div>

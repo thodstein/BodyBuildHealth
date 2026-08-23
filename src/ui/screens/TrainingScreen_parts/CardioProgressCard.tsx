@@ -91,7 +91,7 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
             <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[s.type] ?? '#4ade80', background: `${TYPE_COLOR[s.type] ?? '#4ade80'}14`, border: `1px solid ${TYPE_COLOR[s.type] ?? '#4ade80'}28`, borderRadius: 20, padding: '2px 8px' }}>{TYPE_LABEL[s.type]} {s.durationMin}м</span>
             {s.equipment && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{cardioEquipmentLabel(s.equipment)}</span>}
             {s.targetHr?.max && <span style={{ fontSize: 10, color: '#60a5fa' }}>ЧСС {s.targetHr.min}-{s.targetHr.max}</span>}
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginLeft: 'auto' }}>{DAY_LABELS_RU[dow]} {data.nextSession!.date.slice(5)} · нед {data.nextSession!.week}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginLeft: 'auto' }}>{DAY_LABELS_RU[dow]} {data.nextSession!.date.slice(5)} · нед {data.nextSession!.week}</span>
           </div>
         );
       })()}

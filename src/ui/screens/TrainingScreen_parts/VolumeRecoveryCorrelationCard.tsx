@@ -126,8 +126,8 @@ const VolumeRecoveryCorrelationCard: React.FC<{ sessions: WorkoutLog[] }> = ({ s
           />
         ))}
         {/* Labels */}
-        <text x={W / 2} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={7}>Объём (тыс. кг)</text>
-        <text x={6} y={H / 2} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize={7} transform={`rotate(-90, 6, ${H / 2})`}>Готовность (%)</text>
+        <text x={W / 2} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={7}>Объём (тыс. кг)</text>
+        <text x={6} y={H / 2} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={7} transform={`rotate(-90, 6, ${H / 2})`}>Готовность (%)</text>
       </svg>
       {estimatedMRV && estimatedMRV > 0 && (
         <div style={{ marginTop: 4, fontSize: 10, padding: '4px 6px', borderRadius: 4, background: 'rgba(0,230,138,0.06)' }}>

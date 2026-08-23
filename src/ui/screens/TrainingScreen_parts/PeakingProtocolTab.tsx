@@ -31,7 +31,7 @@ const PeakingProtocolTab: React.FC = () => {
     <div>
       <div style={GLASS}>
         <div style={H}>📈 Протоколы пиковой фазы</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
           Пиковая фаза — последние 3-4 недели перед целью (соревнования/фотосессия/пляж).
           Цель: максимальная производительность при минимальной усталости.
         </div>
@@ -57,12 +57,12 @@ const PeakingProtocolTab: React.FC = () => {
               <span>Неделя {w.week}: {w.label}</span>
               <span style={{ color: ACCENT }}>RIR {w.rirMin}-{w.rirMax}</span>
             </div>
-            <div style={{ display: 'flex', gap: 12, color: 'rgba(255,255,255,0.45)' }}>
+            <div style={{ display: 'flex', gap: 12, color: 'rgba(255,255,255,0.85)' }}>
               <span>Объём {Math.round(w.volumePct * 100)}%</span>
               <span>Интенсивность {Math.round(w.intensityPct * 100)}%</span>
               {w.deloadBefore && <span style={{ color: '#ffaa00' }}>⚠ После делода</span>}
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{w.focus}</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>{w.focus}</div>
           </div>
         ))}
       </div>

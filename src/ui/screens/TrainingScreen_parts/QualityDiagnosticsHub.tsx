@@ -11,7 +11,7 @@ import type { WorkoutLog } from '../../../core/types';
 import type { TrainingProfile } from './training-profile';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = 'rgba(255,255,255,0.85)';
 
 type HubMode = 'quality' | 'diagnostics';
 

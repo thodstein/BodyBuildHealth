@@ -18,9 +18,9 @@ import { CardioSessionTimer } from './CardioSessionTimer';
 import { CardioProgressCard } from './CardioProgressCard';
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioDayCard } from './CardioDayCard';
-import { CardioImportPanel } from './CardioImportPanel';
-import { CardioAnalyticsDashboard } from './CardioAnalyticsDashboard';
 import { Tabs } from './CardioUI';
+const CardioImportPanel = React.lazy(() => import('./CardioImportPanel').then(m => ({ default: m.CardioImportPanel })));
+const CardioAnalyticsDashboard = React.lazy(() => import('./CardioAnalyticsDashboard').then(m => ({ default: m.CardioAnalyticsDashboard })));
 
 function todayIso(): string {
   const d = new Date();
@@ -89,9 +89,13 @@ export const CardioDiaryStep: React.FC<{
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
         <CardioVolumeChart cycle={localCycle} log={log} />
-        <CardioAnalyticsDashboard cycle={localCycle} log={log} />
+        <React.Suspense fallback={<div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>Загрузка аналитики...</div>}>
+          <CardioAnalyticsDashboard cycle={localCycle} log={log} />
+        </React.Suspense>
         <CardioAutoTunePanel cycle={localCycle} acwr={acwr} onChanged={reloadLog} />
-        <CardioImportPanel onImported={reloadLog} />
+        <React.Suspense fallback={null}>
+          <CardioImportPanel onImported={reloadLog} />
+        </React.Suspense>
         <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />
       </div>
     </div>

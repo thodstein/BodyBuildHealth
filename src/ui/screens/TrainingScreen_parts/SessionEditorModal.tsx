@@ -114,19 +114,19 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
 
         {/* Meta */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Дата</label><input type="date" value={log.date} onChange={e => patch({ date: e.target.value })} style={IN} /></div>
-          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Длительность (мин)</label><input type="number" min={0} value={log.duration || 0} onChange={e => patch({ duration: parseInt(e.target.value) || 0 })} style={IN} /></div>
-          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Сплит</label>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Дата</label><input type="date" value={log.date} onChange={e => patch({ date: e.target.value })} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Длительность (мин)</label><input type="number" min={0} value={log.duration || 0} onChange={e => patch({ duration: parseInt(e.target.value) || 0 })} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Сплит</label>
             <select value={log.split || ''} onChange={e => patch({ split: e.target.value })} style={IN}>
               {FELT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           </div>
-          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>RPE</label><input type="number" min={1} max={10} value={log.overallRPE || 7} onChange={e => patch({ overallRPE: parseInt(e.target.value) || 7 })} style={IN} /></div>
-          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Восстановление</label><input type="number" min={1} max={10} value={log.recoveryBefore || 5} onChange={e => patch({ recoveryBefore: parseInt(e.target.value) || 5 })} style={IN} /></div>
-          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Неделя</label><input type="number" min={1} value={log.weekNumber || 1} onChange={e => patch({ weekNumber: parseInt(e.target.value) || 1 })} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>RPE</label><input type="number" min={1} max={10} value={log.overallRPE || 7} onChange={e => patch({ overallRPE: parseInt(e.target.value) || 7 })} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Восстановление</label><input type="number" min={1} max={10} value={log.recoveryBefore || 5} onChange={e => patch({ recoveryBefore: parseInt(e.target.value) || 5 })} style={IN} /></div>
+          <div><label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Неделя</label><input type="number" min={1} value={log.weekNumber || 1} onChange={e => patch({ weekNumber: parseInt(e.target.value) || 1 })} style={IN} /></div>
         </div>
         <div style={{ marginBottom: 10 }}>
-          <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Заметки</label>
+          <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Заметки</label>
           <input type="text" value={log.notes || ''} onChange={e => patch({ notes: e.target.value })} placeholder="Самочувствие, особенности..." style={IN} />
         </div>
 
@@ -143,8 +143,8 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
                 </div>
                 <button onClick={() => removeExercise(ei)} style={{ padding: '3px 8px', borderRadius: 5, fontSize: 10, background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer' }}>Удалить</button>
               </div>
-              {ex.note ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>📝 {ex.note}</div> : null}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 56px 28px', gap: 4, marginBottom: 4, fontSize: 9, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+              {ex.note ? <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>📝 {ex.note}</div> : null}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 56px 28px', gap: 4, marginBottom: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase' }}>
                 <span>кг</span><span>повт</span><span>RPE</span><span>RIR</span><span style={{ textAlign: 'center' }}>техника</span><span></span>
               </div>
               {ex.sets.map((s, si) => (
@@ -159,7 +159,7 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
                   }}
                     style={{ height: 36, borderRadius: 5, border: 'none', cursor: 'pointer', fontSize: 11,
                       background: s.techniqueScore ? (s.techniqueScore === 5 ? 'rgba(34,197,94,0.15)' : s.techniqueScore === 4 ? 'rgba(96,165,250,0.15)' : 'rgba(239,68,68,0.15)') : 'rgba(255,255,255,0.05)',
-                      color: s.techniqueScore ? (s.techniqueScore === 5 ? '#22c55e' : s.techniqueScore === 4 ? '#60a5fa' : '#ef4444') : 'rgba(255,255,255,0.3)' }}
+                      color: s.techniqueScore ? (s.techniqueScore === 5 ? '#22c55e' : s.techniqueScore === 4 ? '#60a5fa' : '#ef4444') : 'rgba(255,255,255,0.85)' }}
                     title={s.techniqueScore ? `Техника: ${s.techniqueScore}/5` : 'Оценить технику'}>
                     {s.techniqueScore ? (s.techniqueScore === 5 ? '✅' : s.techniqueScore === 4 ? '🎯' : '⚠️') : '🎯'}
                   </button>
@@ -171,7 +171,7 @@ export const SessionEditorModal: React.FC<Props> = ({ workout, onClose, onSave }
           );
         })}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 10 }}>
           <span>{log.exercises.length} упр. · {totalSets} подходов · {totalVolume.toLocaleString()} кг</span>
         </div>
 

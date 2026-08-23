@@ -39,11 +39,11 @@ const MicrocyclePlannerCardBase: React.FC = () => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Недель: <b style={{ color: ACCENT }}>{weeks}</b></label>
+          <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Недель: <b style={{ color: ACCENT }}>{weeks}</b></label>
           <input type="range" min={4} max={16} step={1} value={weeks} onChange={e => setWeeks(+e.target.value)} style={{ width: '100%' }} />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Цель</label>
+          <label style={{ display: 'block', fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Цель</label>
           <select value={selGoal} onChange={e => setSelGoal(e.target.value as GoalType)} style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 8, fontSize: 11 }}>
             {GOAL_OPTS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
@@ -74,12 +74,12 @@ const MicrocyclePlannerCardBase: React.FC = () => {
 
       {/* Per-week timeline */}
       <div style={{ marginTop: 10 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Таймлайн по неделям</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Таймлайн по неделям</div>
         <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
           {rows.map(r => (
             <div key={r.week} title={`Нед ${r.week}: ${PHASE_LABELS[r.phase] || r.phase} · объём ${r.params.volumeLevel}`} style={{ flex: '1 0 28px', minWidth: 28, padding: '6px 4px', borderRadius: 6, textAlign: 'center', background: phaseColor[r.phase] + '18', border: `1px solid ${phaseColor[r.phase]}40` }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: phaseColor[r.phase] }}>{r.week}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{PHASE_LABELS[r.phase] || ''}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{PHASE_LABELS[r.phase] || ''}</div>
             </div>
           ))}
         </div>

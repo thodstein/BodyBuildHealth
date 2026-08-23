@@ -273,7 +273,7 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
       {!active && !finished && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {todaySessions.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)' }}>По плану на сегодня кардио нет.</div>}
+          {todaySessions.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>По плану на сегодня кардио нет.</div>}
           {todaySessions.map((s, i) => (
             <div key={i} style={ROW}>
               <span style={{ fontSize: 12, flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>

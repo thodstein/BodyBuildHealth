@@ -85,7 +85,7 @@ export const EditorPopupSelect: React.FC<{
                         <span style={{ minWidth: 0 }}>{o.label}</span>
                         {isSel && <span style={{ fontSize: 10 }}>✓</span>}
                       </span>
-                      {o.desc && <span style={{ fontSize: 10, color: isSel ? 'rgba(0,230,138,0.75)' : 'rgba(255,255,255,0.45)', fontWeight: 400, marginTop: 2 }}>{o.desc}</span>}
+                      {o.desc && <span style={{ fontSize: 10, color: isSel ? 'rgba(0,230,138,0.75)' : 'rgba(255,255,255,0.85)', fontWeight: 400, marginTop: 2 }}>{o.desc}</span>}
                     </button>
                   );
                 })}

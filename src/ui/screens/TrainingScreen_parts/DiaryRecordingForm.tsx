@@ -373,12 +373,12 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
     <div style={{ padding: 12, borderRadius: 14, background: 'rgba(24,24,27,0.12)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase' }}>📝 Записать тренировку</div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase' }}>📝 Записать тренировку</div>
         <div style={{ display: 'flex', gap: 4 }}>
           {undoRef.current.length > 0 && (
-            <button onClick={undo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10 }}>↩</button>
+            <button onClick={undo} style={{ padding: '3px 8px', borderRadius: 5, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10 }}>↩</button>
           )}
-          {totalSets > 0 && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{totalSets} сетов · {totalVolume.toLocaleString()} кг</span>}
+          {totalSets > 0 && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{totalSets} сетов · {totalVolume.toLocaleString()} кг</span>}
         </div>
       </div>
 
@@ -429,7 +429,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
             }} style={{
               padding: '2px 6px', borderRadius: 10, fontSize: 9,
               background: logNotes.includes(qt.tag) ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
-              color: logNotes.includes(qt.tag) ? '#00e68a' : 'rgba(255,255,255,0.4)',
+              color: logNotes.includes(qt.tag) ? '#00e68a' : 'rgba(255,255,255,0.85)',
               border: `1px solid ${logNotes.includes(qt.tag) ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
               cursor: 'pointer', whiteSpace: 'nowrap',
             }}>{qt.emoji} {qt.tag}</button>
@@ -463,7 +463,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {draftRestored && exercises.length > 0 && (
         <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)', marginBottom: 8, fontSize: 10, color: '#60a5fa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>📋 Черновик восстановлен ({exercises.length} упр.)</span>
-          <button onClick={() => { setExercises([]); clearDraft(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 10 }}>✕ очистить</button>
+          <button onClick={() => { setExercises([]); clearDraft(); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10 }}>✕ очистить</button>
         </div>
       )}
 
@@ -471,12 +471,12 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {planApplied && exercises.length > 0 && (
         <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 8, fontSize: 10, color: '#00e68a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>🎯 План загружен: {exercises.length} упр. — заполните веса и повторы</span>
-          <button onClick={() => { setExercises([]); setPlanApplied(false); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 10 }}>✕</button>
+          <button onClick={() => { setExercises([]); setPlanApplied(false); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10 }}>✕</button>
         </div>
       )}
 
       {/* Exercise search */}
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase', marginBottom: 8 }}>🏋️ Упражнения</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 500, letterSpacing: '0.3px', textTransform: 'uppercase', marginBottom: 8 }}>🏋️ Упражнения</div>
       {/* Muscle group quick filter */}
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
         {[
@@ -501,7 +501,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
           }} style={{
             padding: '3px 8px', borderRadius: 10, fontSize: 9,
             background: searchQuery === g.label ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
-            color: searchQuery === g.label ? '#00e68a' : 'rgba(255,255,255,0.4)',
+            color: searchQuery === g.label ? '#00e68a' : 'rgba(255,255,255,0.85)',
             border: `1px solid ${searchQuery === g.label ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
             cursor: 'pointer',
           }}>{g.label}</button>
@@ -521,7 +521,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
             {searchResults.map(ex => (
               <div key={ex.id} onClick={() => addExercise(ex)} style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: '#fff' }}>{ex.name}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{ex.group}</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{ex.group}</span>
               </div>
             ))}
           </div>
@@ -540,7 +540,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         if (recent.length === 0) return null;
         return (
           <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginBottom: 4 }}>Недавние:</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>Недавние:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {recent.map(r => {
                 const cat = EXERCISE_CATALOG.find((c: any) => c.name === r.name);
@@ -560,15 +560,15 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {exercises.length === 0 && (
         <div style={{ textAlign: 'center', padding: 24, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', marginBottom: 8 }}>
           <div style={{ fontSize: 24, marginBottom: 6 }}>🏋️</div>
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Начните с поиска упражнения выше</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>Начните с поиска упражнения выше</div>
         </div>
       )}
 
       {/* Expand/collapse all exercises */}
       {exercises.length >= 2 && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4, gap: 6 }}>
-          <button onClick={() => setCurrentExIdx(-1)} style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▾ Все свернуть</button>
-          <button onClick={() => setCurrentExIdx(0)} style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▸ Первое</button>
+          <button onClick={() => setCurrentExIdx(-1)} style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▾ Все свернуть</button>
+          <button onClick={() => setCurrentExIdx(0)} style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}>▸ Первое</button>
         </div>
       )}
 
@@ -593,7 +593,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                   {ex.isSuperset && <span style={{ fontSize: 9, color: '#a855f7', fontWeight: 700 }}>🔗</span>}
                   {cat?.name || ex.exerciseName}
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
                   {ex.sets.length} подходов
                   {prev && <span style={{ marginLeft: 6, color: ACCENT }}>прошлый: {prev.weight}кг×{prev.reps}</span>}
                 </div>
@@ -610,7 +610,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                     width: 28, height: 28, borderRadius: 6,
                     border: `1px solid ${ex.notes !== undefined ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
                     background: ex.notes !== undefined ? 'rgba(168,85,247,0.15)' : 'transparent',
-                    color: ex.notes !== undefined ? '#a855f7' : 'rgba(255,255,255,0.4)',
+                    color: ex.notes !== undefined ? '#a855f7' : 'rgba(255,255,255,0.85)',
                     cursor: 'pointer', fontSize: 11,
                   }} title="Заметка">📝</button>
                 {exIdx > 0 && (
@@ -619,7 +619,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                       width: 28, height: 28, borderRadius: 6,
                       border: `1px solid ${ex.isSuperset ? '#a855f7' : 'rgba(255,255,255,0.1)'}`,
                       background: ex.isSuperset ? 'rgba(168,85,247,0.15)' : 'transparent',
-                      color: ex.isSuperset ? '#a855f7' : 'rgba(255,255,255,0.4)',
+                      color: ex.isSuperset ? '#a855f7' : 'rgba(255,255,255,0.85)',
                       cursor: 'pointer', fontSize: 12,
                     }} title="Суперсет с предыдущим">🔗</button>
                 )}
@@ -640,7 +640,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                     setExercises(updated);
                   }}
                   placeholder="заметка к упражнению..."
-                  style={{ width: '100%', padding: '4px 8px', borderRadius: 5, background: 'transparent', border: '1px solid rgba(168,85,247,0.15)', color: 'rgba(255,255,255,0.5)', fontSize: 10, boxSizing: 'border-box' as any }} />
+                  style={{ width: '100%', padding: '4px 8px', borderRadius: 5, background: 'transparent', border: '1px solid rgba(168,85,247,0.15)', color: 'rgba(255,255,255,0.85)', fontSize: 10, boxSizing: 'border-box' as any }} />
               </div>
             )}
 
@@ -651,7 +651,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                 ? { sets: 4, reps: '6-8', rir: 2, rest: 180, note: 'Базовое: 4×6-8, отдых 2-3 мин' }
                 : { sets: 3, reps: '10-12', rir: 2, rest: 60, note: 'Изоляция: 3×10-12, отдых 60-90 сек' };
               return (
-                <div style={{ padding: '4px 10px', marginBottom: 4, fontSize: 9, color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.02)', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.06)' }}>
+                <div style={{ padding: '4px 10px', marginBottom: 4, fontSize: 9, color: 'rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.02)', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.06)' }}>
                   💡 {suggested.note}
                 </div>
               );
@@ -669,7 +669,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}>
                     <div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Отдых</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Отдых</div>
                       <div style={{ fontSize: 20, fontWeight: 800, color: restTimer <= 10 ? '#ef4444' : ACCENT }}>
                         {Math.floor(restTimer / 60)}:{(restTimer % 60).toString().padStart(2, '0')}
                       </div>
@@ -682,7 +682,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                 )}
 
                 {/* Set header */}
-                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', paddingLeft: 2 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr 1fr 1fr 96px', gap: 3, marginBottom: 4, fontSize: 10, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', paddingLeft: 2 }}>
                   <span>#</span><span style={{ textAlign: 'center' }}>кг</span><span style={{ textAlign: 'center' }}>повт</span><span style={{ textAlign: 'center' }}>RPE</span><span style={{ textAlign: 'center' }}>RIR</span><span></span>
                 </div>
                 {ex.sets.map((set, setIdx) => (
@@ -713,7 +713,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                         <button onClick={() => setMmcOpen(prev => ({ ...prev, [`${exIdx}_${setIdx}`]: !prev[`${exIdx}_${setIdx}`] }))}
                           style={{ width: 22, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 9,
                             background: mmcOpen[`${exIdx}_${setIdx}`] ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
-                            color: mmcOpen[`${exIdx}_${setIdx}`] ? '#00e68a' : 'rgba(255,255,255,0.3)' }}
+                            color: mmcOpen[`${exIdx}_${setIdx}`] ? '#00e68a' : 'rgba(255,255,255,0.85)' }}
                           title="MMC/Пампинг/Суставы/Энергия">
                           🧠
                         </button>
@@ -724,7 +724,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                         }}
                           style={{ width: 22, height: 22, borderRadius: 4, border: 'none', cursor: 'pointer', fontSize: 10,
                             background: set.technique ? (set.technique === 5 ? 'rgba(34,197,94,0.15)' : set.technique === 4 ? 'rgba(96,165,250,0.15)' : 'rgba(239,68,68,0.15)') : 'rgba(255,255,255,0.05)',
-                            color: set.technique ? (set.technique === 5 ? '#22c55e' : set.technique === 4 ? '#60a5fa' : '#ef4444') : 'rgba(255,255,255,0.3)' }}
+                            color: set.technique ? (set.technique === 5 ? '#22c55e' : set.technique === 4 ? '#60a5fa' : '#ef4444') : 'rgba(255,255,255,0.85)' }}
                           title={set.technique ? `Техника: ${set.technique}/5` : 'Оценить технику (нет)'}>
                           {set.technique ? (set.technique === 5 ? '✅' : set.technique === 4 ? '🎯' : '⚠️') : '🎯'}
                         </button>
@@ -737,7 +737,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                           updated[exIdx] = ex2;
                           setExercises(updated);
                         }}
-                          style={{ width: 22, height: 22, borderRadius: 4, border: 'none', background: set.notes ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.05)', color: set.notes ? '#a855f7' : 'rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: 9 }}>📝</button>
+                          style={{ width: 22, height: 22, borderRadius: 4, border: 'none', background: set.notes ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.05)', color: set.notes ? '#a855f7' : 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 9 }}>📝</button>
                         <button onClick={() => removeSet(exIdx, setIdx)}
                           style={{ width: 22, height: 22, borderRadius: 4, border: 'none', background: 'rgba(239,68,68,0.1)', color: '#ef4444', cursor: 'pointer', fontSize: 10 }}>✕</button>
                       </div>
@@ -746,7 +746,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                       <input type="text" value={set.notes || ''}
                         onChange={e => updateSet(exIdx, setIdx, { notes: e.target.value })}
                         placeholder="заметка к подходу..."
-                        style={{ width: '100%', padding: '3px 6px', borderRadius: 4, background: 'transparent', border: '1px solid rgba(168,85,247,0.15)', color: 'rgba(255,255,255,0.5)', fontSize: 9, marginBottom: 3, boxSizing: 'border-box' as any }} />
+                        style={{ width: '100%', padding: '3px 6px', borderRadius: 4, background: 'transparent', border: '1px solid rgba(168,85,247,0.15)', color: 'rgba(255,255,255,0.85)', fontSize: 9, marginBottom: 3, boxSizing: 'border-box' as any }} />
                     )}
                     {mmcOpen[`${exIdx}_${setIdx}`] && (
                       <div style={{ marginBottom: 3 }}>
@@ -759,7 +759,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                   <button onClick={addSet}
                     style={{ flex: 1, padding: '6px', borderRadius: 6, border: '1px dashed rgba(0,230,138,0.3)', background: 'transparent', color: ACCENT, cursor: 'pointer', fontSize: 10 }}>+ Добавить подход</button>
                   <button onClick={() => setRestTimer(restTarget)}
-                    style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 10 }}>⏱ {restTarget}с</button>
+                    style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 10 }}>⏱ {restTarget}с</button>
                 </div>
               </div>
             )}
@@ -769,7 +769,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
 
       {/* Rest target selector */}
       {exercises.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
           <span>Отдых:</span>
           {[60, 90, 120, 180].map(sec => (
             <button key={sec} onClick={() => setRestTarget(sec)}
@@ -777,7 +777,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                 padding: '3px 8px', borderRadius: 5,
                 border: `1px solid ${restTarget === sec ? ACCENT : 'rgba(255,255,255,0.1)'}`,
                 background: restTarget === sec ? 'rgba(0,230,138,0.1)' : 'transparent',
-                color: restTarget === sec ? ACCENT : 'rgba(255,255,255,0.5)',
+                color: restTarget === sec ? ACCENT : 'rgba(255,255,255,0.85)',
                 cursor: 'pointer', fontSize: 10,
               }}>{sec}с</button>
           ))}
@@ -809,9 +809,9 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         <div style={{ padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>✅ Тренировка сохранена!</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
-            <div><span style={{ color: 'rgba(255,255,255,0.4)' }}>Упражнения:</span> <strong style={{ color: '#fff' }}>{savedSummary.exercises}</strong></div>
-            <div><span style={{ color: 'rgba(255,255,255,0.4)' }}>Подходы:</span> <strong style={{ color: '#fff' }}>{savedSummary.sets}</strong></div>
-            <div><span style={{ color: 'rgba(255,255,255,0.4)' }}>Тоннаж:</span> <strong style={{ color: '#fff' }}>{savedSummary.volume.toLocaleString()} кг</strong></div>
+            <div><span style={{ color: 'rgba(255,255,255,0.85)' }}>Упражнения:</span> <strong style={{ color: '#fff' }}>{savedSummary.exercises}</strong></div>
+            <div><span style={{ color: 'rgba(255,255,255,0.85)' }}>Подходы:</span> <strong style={{ color: '#fff' }}>{savedSummary.sets}</strong></div>
+            <div><span style={{ color: 'rgba(255,255,255,0.85)' }}>Тоннаж:</span> <strong style={{ color: '#fff' }}>{savedSummary.volume.toLocaleString()} кг</strong></div>
           </div>
         </div>
       ) : (
@@ -822,7 +822,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
         </div>
       )}
       <button onClick={handleSaveWorkout} disabled={exercises.length === 0}
-        style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: exercises.length > 0 ? 'linear-gradient(135deg,var(--accent),#00cc7a)' : 'rgba(255,255,255,0.05)', color: exercises.length > 0 ? '#000' : 'rgba(255,255,255,0.3)', fontWeight: 700, fontSize: 12, opacity: exercises.length === 0 ? 0.4 : 1 }}>
+        style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: exercises.length > 0 ? 'linear-gradient(135deg,var(--accent),#00cc7a)' : 'rgba(255,255,255,0.05)', color: exercises.length > 0 ? '#000' : 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12, opacity: exercises.length === 0 ? 0.4 : 1 }}>
         💾 Сохранить тренировку
       </button>
     </div>

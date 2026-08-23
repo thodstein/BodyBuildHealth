@@ -57,7 +57,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>План на сегодня</div>
           {load.planned.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px' }}>Кардио не запланировано — отдых.</div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px' }}>Кардио не запланировано — отдых.</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {load.planned.map((s, i) => (
@@ -112,7 +112,7 @@ export const CardioDayCard: React.FC<{ cycle?: CardioCycle | null; onOpen?: () =
             <div style={{ width: cardioPct + '%', background: '#00e68a', transition: 'width 0.3s ease' }} title={`кардио ${cardioPct}%`} />
             <div style={{ width: strengthPct + '%', background: '#f59e0b', transition: 'width 0.3s ease' }} title={`сила ${strengthPct}%`} />
           </div>
-          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+          <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#00e68a', marginRight: 4 }} />кардио {load.cardioMinutes}м</span>
             <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#f59e0b', marginRight: 4 }} />сила {load.strengthSessions} сесс</span>
           </div>

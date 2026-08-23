@@ -13,7 +13,7 @@ import { PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/Tr
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = 'rgba(255,255,255,0.85)';
 const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
@@ -169,7 +169,7 @@ export const MRVEstimatorTab: React.FC = () => {
             {/* y-grid для recovery (40-100) */}
             {[60, 80, 100].map(yv => {
               const y = 80 - ((yv - 40) / 60) * 70;
-              return <g key={yv}><line x1="0" y1={y} x2="360" y2={y} stroke="rgba(255,255,255,0.04)" /><text x="4" y={y - 3} fontSize="8" fill="rgba(255,255,255,0.3)">{yv}</text></g>;
+              return <g key={yv}><line x1="0" y1={y} x2="360" y2={y} stroke="rgba(255,255,255,0.04)" /><text x="4" y={y - 3} fontSize="8" fill="rgba(255,255,255,0.85)">{yv}</text></g>;
             })}
             {(() => {
               const bw = 360 / Math.max(1, weeks.length);
@@ -184,7 +184,7 @@ export const MRVEstimatorTab: React.FC = () => {
                   <g key={i}>
                     <rect x={i * bw + 1} y={barY} width={bw - 2} height={barH} fill={isDecl ? '#ef4444' : `${ACCENT}88`} />
                     <text x={i * bw + bw / 2} y={barY - 2} fontSize="7" fill="rgba(255,255,255,0.6)" textAnchor="middle">{w.volume}</text>
-                    <text x={i * bw + bw / 2} y={158} fontSize="6" fill="rgba(255,255,255,0.35)" textAnchor="middle">Н{i + 1}</text>
+                    <text x={i * bw + bw / 2} y={158} fontSize="6" fill="rgba(255,255,255,0.85)" textAnchor="middle">Н{i + 1}</text>
                     {recoveryPt != null && <circle cx={i * bw + bw / 2} cy={recoveryPt} r="3" fill="#3b82f6" />}
                     {est.firstDeclineIdx > 0 && i > 0 && !isNaN(weeks[i - 1].meanRecovery) && !isNaN(weeks[i].meanRecovery) && (() => {
                       const px = (i - 1) * bw + bw / 2;

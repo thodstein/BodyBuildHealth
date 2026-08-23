@@ -104,7 +104,7 @@ const Badge: React.FC<{ label: string; color: string }> = ({ label, color }) => 
   }}>{label}</span>
 );
 
-const charColor = (c?: string): string => c === 'тяж' ? '#ef4444' : c === 'памп' ? '#3b82f6' : c === 'лёг' ? '#6b7280' : 'rgba(255,255,255,0.5)';
+const charColor = (c?: string): string => c === 'тяж' ? '#ef4444' : c === 'памп' ? '#3b82f6' : c === 'лёг' ? '#6b7280' : 'rgba(255,255,255,0.85)';
 
 export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
   const rc = roleStyle(ex.role);
@@ -126,8 +126,8 @@ export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
       </div>
       {hasExtra && (
         <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
-          {ex.muscleTarget && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>🎯 {ex.muscleTarget}</span>}
-          {ex.equipment && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>🏋️ {ex.equipment}</span>}
+          {ex.muscleTarget && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>🎯 {ex.muscleTarget}</span>}
+          {ex.equipment && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>🏋️ {ex.equipment}</span>}
         </div>
       )}
       {hasMeta && (
@@ -136,12 +136,12 @@ export const ExerciseRow: React.FC<{ ex: PlanExerciseView }> = ({ ex }) => {
           <span style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
             {ex.rir !== undefined && ex.rir !== '' && <Badge label={'RIR ' + ex.rir} color="#a855f7" />}
             {ex.tempo && <Badge label={ex.tempo} color="#a855f7" />}
-            {ex.rest && <Badge label={ex.rest} color="rgba(255,255,255,0.5)" />}
+            {ex.rest && <Badge label={ex.rest} color="rgba(255,255,255,0.85)" />}
           </span>
         </div>
       )}
       {ex.rationale && <div style={{ fontSize: 11, color: '#60a5fa', marginTop: 3, lineHeight: 1.4 }}>📝 {ex.rationale}</div>}
-      {ex.warmupSets && ex.warmupSets > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>🔥 Разминка: {ex.warmupSets} подх.</div>}
+      {ex.warmupSets && ex.warmupSets > 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>🔥 Разминка: {ex.warmupSets} подх.</div>}
       {ex.note && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 4, lineHeight: 1.4 }}>{ex.note}</div>}
       {ex.actions && <div style={{ marginTop: 6 }}>{ex.actions}</div>}
     </div>

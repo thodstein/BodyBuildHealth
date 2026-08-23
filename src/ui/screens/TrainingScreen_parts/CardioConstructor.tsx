@@ -968,7 +968,7 @@ export const CardioConstructor: React.FC = () => {
       {/* Навигация v2 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: 12, borderRadius: 14, background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))', border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 4px 16px rgba(0,0,0,0.18)' }}>
         <button style={{ ...NAV_BTN, minWidth: 110 }} onClick={goPrev} disabled={stepIdx === 0} aria-label="Назад">← Назад</button>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{stepIdx + 1} / {STEPS.length}</div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{stepIdx + 1} / {STEPS.length}</div>
         {stepIdx < STEPS.length - 1 && (
           <button style={{ ...NAV_BTN_PRIMARY, minWidth: 160, boxShadow: '0 4px 14px rgba(0,230,138,0.22)' }} onClick={goNext} aria-label="Далее">
             {step === 'preview' && !cycle ? '🛠 Собрать и далее →' : `Далее: ${STEPS[stepIdx + 1].label} →`}

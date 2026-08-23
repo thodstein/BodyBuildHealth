@@ -453,7 +453,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
             <div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Текущая программа</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{macrocycle.totalWeeks}-нед макроцикл</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>Фаза: <b>{PHASE_RU[curPhase.type] || curPhase.type}</b> · Нед {selectedWeek}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>Фаза: <b>{PHASE_RU[curPhase.type] || curPhase.type}</b> · Нед {selectedWeek}</div>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Сплит</div>
@@ -505,11 +505,11 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                 <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 200 }}>
                     <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Неделя объём</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Неделя объём</div>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{(weekVol / 1000).toFixed(1)}т</div>
                     </div>
                     <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Всего сессий</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Всего сессий</div>
                       <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{historyWorkouts.length}</div>
                     </div>
                   </div>
@@ -550,9 +550,9 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                             <circle cx="17" cy="17" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
                             <circle cx="17" cy="17" r={r} fill="none" stroke={color} strokeWidth="3.5" strokeLinecap="round"
                               strokeDasharray={`${d} ${c - d}`} transform="rotate(-90 17 17)" opacity={pct === null ? 0.25 : 1} />
-                            <text x="17" y="20" textAnchor="middle" fontSize="9" fontWeight="700" fill={pct === null ? 'rgba(255,255,255,0.35)' : color}>{pct === null ? '·' : v + '%'}</text>
+                            <text x="17" y="20" textAnchor="middle" fontSize="9" fontWeight="700" fill={pct === null ? 'rgba(255,255,255,0.85)' : color}>{pct === null ? '·' : v + '%'}</text>
                           </svg>
-                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)' }}>{label}</span>
+                          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{label}</span>
                         </button>
                       );
                     };
@@ -582,7 +582,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                       {planned.exercises.slice(0, 6).map(e => e.name).join(' · ')}{planned.exercises.length > 6 ? ` +${planned.exercises.length - 6}` : ''}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>~{planned.duration} мин</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>~{planned.duration} мин</div>
                       <button onClick={() => setPlanToRecord({ day: planned, nonce: Date.now() })}
                         style={{ padding: '6px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: 'var(--accent)', color: '#000', border: 'none', cursor: 'pointer' }}>
                         ✍️ Записать по плану
@@ -591,7 +591,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
                   </div>
                 )}
                 {last && (
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
                     {/* legacy-запись без exercises или с exercises={} не должна ронять «Сегодня» */}
                     Последняя: <span style={{ color: '#fff' }}>{last.split || 'Тренировка'}</span> · {(Array.isArray(last.exercises) ? last.exercises : []).length} упр. · {((Array.isArray(last.exercises) ? last.exercises : []).reduce((s, e) => s + e.totalVolume, 0) / 1000).toFixed(1)}т
                   </div>

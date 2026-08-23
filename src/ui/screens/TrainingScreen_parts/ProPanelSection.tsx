@@ -126,13 +126,13 @@ export const ProPanelCollapsible: React.FC<{
           {section.title}
         </span>
         {section.hasData === false && (
-          <span style={{ fontSize: 10, color: 'var(--text-faint, rgba(255,255,255,0.35))', padding: '2px 6px', borderRadius: 4, background: 'var(--hover-bg, rgba(255,255,255,0.04))' }}>нет данных</span>
+          <span style={{ fontSize: 10, color: 'var(--text-faint, rgba(255,255,255,0.85))', padding: '2px 6px', borderRadius: 4, background: 'var(--hover-bg, rgba(255,255,255,0.04))' }}>нет данных</span>
         )}
         <span
           aria-hidden
           style={{
             fontSize: 10,
-            color: 'var(--text-dim, rgba(255,255,255,0.5))',
+            color: 'var(--text-dim, rgba(255,255,255,0.85))',
             transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
             transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             display: 'inline-block',

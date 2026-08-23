@@ -147,7 +147,7 @@ export const CardioManageStep: React.FC<{
           <GroupHeading icon="🔗" text="Интеграции" desc="Подключите кардио-цикл к силовому плану ссылкой (без копии) или к годовому плану." />
           <SectionCard id="sec-integrations" title="Силовой план (ссылка, не копия)">
         {cycle && (
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
             Активный цикл: <b style={{ color: '#4ade80' }}>{cycle.name}</b> — будет подключаться к конструкторам.
           </div>
         )}
@@ -198,7 +198,7 @@ export const CardioManageStep: React.FC<{
               const c = library.find(x => x.id === cycleId);
               if (!c) {
                 return (
-                  <div key={blockKey} style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+                  <div key={blockKey} style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
                     ⚠ Блок {blockKey}: цикл {cycleId} не найден в библиотеке
                   </div>
                 );
@@ -206,16 +206,16 @@ export const CardioManageStep: React.FC<{
               const cs = cardioCycleSummary(c);
               return (
                 <div key={blockKey} style={ROW}>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{CARDIO_GOAL_LABELS[c.goal]} · {c.totalWeeks} нед</span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{cs.avgMinutesPerWeek} мин/нед · {cs.avgKcalPerWeek} ккал</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{CARDIO_GOAL_LABELS[c.goal]} · {c.totalWeeks} нед</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{cs.avgMinutesPerWeek} мин/нед · {cs.avgKcalPerWeek} ккал</span>
                 </div>
               );
             })}
           </div>
         ) : (
           onBuildAnnualCardio && (
-            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+            <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
               Кардио-циклы года не собраны: постройте макроцикл (ПЛ/ББ-авто, «Годовой план»), затем соберите кардио по блокам — каждый блок получит цикл по фазе (prep/taper/пик у стартов).
             </div>
           )
@@ -264,17 +264,17 @@ export const CardioManageStep: React.FC<{
                 <div key={b.cycle.id} style={ROW}>
                   <span style={{ width: 40, fontSize: 11, fontWeight: 800, color: GOAL_COLOR[b.cycle.goal] ?? '#888' }}>нед {b.startWeek}</span>
                   <span style={{ flex: 1, fontSize: 11, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.cycle.name}</span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{CARDIO_GOAL_LABELS[b.cycle.goal]} · {b.totalWeeks} нед</span>
-                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{b.summary.avgMinutesPerWeek} мин/нед</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{CARDIO_GOAL_LABELS[b.cycle.goal]} · {b.totalWeeks} нед</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{b.summary.avgMinutesPerWeek} мин/нед</span>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
               Итого: {yearPlan.totalWeeks} нед · в среднем {yearPlan.avgMinutesPerWeek} мин/нед · {yearPlan.avgKcalPerWeek} ккал/нед
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>
             Циклов в библиотеке пока нет — соберите и сохраните циклы, чтобы увидеть их последовательность за год.
           </div>
         )}
@@ -287,7 +287,7 @@ export const CardioManageStep: React.FC<{
 
           <GroupHeading icon="📚" text="Библиотека циклов" desc="Сохранённые циклы: активировать, копировать, сравнить, экспортировать." />
           <SectionCard id="sec-library" title={`Библиотека (${library.length})`}>
-        {library.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Пока пусто — соберите первый цикл на шаге «Предпросмотр».</div>}
+        {library.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>Пока пусто — соберите первый цикл на шаге «Предпросмотр».</div>}
         {library.map(c => {
           const s = cardioCycleSummary(c);
           return (
@@ -296,7 +296,7 @@ export const CardioManageStep: React.FC<{
                 <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {cycle?.id === c.id ? '⭐ ' : ''}{c.name}
                 </span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{c.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {CARDIO_GOAL_LABELS[c.goal]}</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{c.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {CARDIO_GOAL_LABELS[c.goal]}</span>
               </div>
               <div style={ROW}>
                 {cycle?.id !== c.id && <button style={{ ...BTN_PRIMARY, minHeight: 32, padding: '5px 10px' }} onClick={() => onActivate(c)}>Активировать</button>}
@@ -316,14 +316,14 @@ export const CardioManageStep: React.FC<{
           <SectionCard id="sec-scenarios" title={`Сценарии (${scenarios.length}/6)`} right={
             <button style={BTN_PRIMARY} onClick={onSaveScenario} title="Сохранить текущий активный цикл как сценарий">💾 Сохранить сценарий</button>
           }>
-        {scenarios.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Сценариев нет — сохраните текущий цикл для сравнения вариантов.</div>}
+        {scenarios.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>Сценариев нет — сохраните текущий цикл для сравнения вариантов.</div>}
         {scenarios.map(sc => {
           const s = cardioCycleSummary(sc.cycle);
           return (
             <div key={sc.id} className="ck-week" style={{ padding: 8, borderRadius: 10, background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)', borderLeft: '3px solid rgba(167,139,250,0.55)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={ROW}>
                 <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.name}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{new Date(sc.savedAt).toLocaleDateString('ru-RU')} · {sc.cycle.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {s.hiitWeeks} HIIT</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{new Date(sc.savedAt).toLocaleDateString('ru-RU')} · {sc.cycle.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {s.hiitWeeks} HIIT</span>
               </div>
               <div style={ROW}>
                 <button style={{ ...BTN_PRIMARY, minHeight: 32, padding: '5px 10px' }} onClick={() => onLoadScenario(sc)}>Загрузить</button>

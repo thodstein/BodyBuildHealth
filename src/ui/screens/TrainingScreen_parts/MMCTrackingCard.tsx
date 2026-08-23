@@ -57,7 +57,7 @@ const MMCTrackingCard: React.FC = () => {
             date={new Date().toISOString().split('T')[0]}
           />
         )}
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 6 }}>
           Шкалы 0–10: 🧠 MMC — связь мозг-мышцы, 💪 Пампинг, 🦵 Суставы — дискомфорт, ⚡ Энергия. Запись сразу попадает в агрегаты ниже.
         </div>
       </div>
@@ -65,14 +65,14 @@ const MMCTrackingCard: React.FC = () => {
       {log.length === 0 ? (
         <div style={GLASS}>
           <div style={H}>🔄 MMC/Пампинг/Суставы</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
             Нет данных MMC. Заполните форму выше или кнопку 🧠 у подхода в дневнике тренировок / в окне выполнения тренировки.
           </div>
         </div>
       ) : (
         <div style={GLASS}>
           <div style={H}>🔄 MMC/Пампинг/Суставы ({log.length} записей)</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
             Статистика по каждому упражнению: связь мозг-мышцы, пампинг, дискомфорт в суставах, энергия.
           </div>
         </div>
@@ -85,7 +85,7 @@ const MMCTrackingCard: React.FC = () => {
             <div key={i} style={{ marginBottom: 10, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
                 <span>{a.exerciseName} {TREND_ICON[a.trend]}</span>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{a.totalSets} сетов</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{a.totalSets} сетов</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, fontSize: 10 }}>
                 <div style={LABEL}>MMC: {a.avgMmc.toFixed(1)}/10{bar(a.avgMmc)}</div>

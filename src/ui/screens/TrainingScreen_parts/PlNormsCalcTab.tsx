@@ -253,13 +253,13 @@ export const PlNormsCalcTab: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 6, height: 28, borderRadius: 6, background: rankColor[r.label] || '#555', opacity: isEligible ? (isAchieved ? 1 : 0.6) : 0.2 }} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: !isEligible ? 'rgba(255,255,255,0.35)' : isAchieved ? ACCENT : isNext ? '#f59e0b' : 'var(--text-dim)' }}>{isAchieved ? '✓ ' : ''}{r.label} {isNext && isEligible ? '← цель' : ''} {!isEligible ? '⛔' : ''}</div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: !isEligible ? 'rgba(255,255,255,0.85)' : isAchieved ? ACCENT : isNext ? '#f59e0b' : 'var(--text-dim)' }}>{isAchieved ? '✓ ' : ''}{r.label} {isNext && isEligible ? '← цель' : ''} {!isEligible ? '⛔' : ''}</div>
                         <div style={{ fontSize: 10, color: '#fff' }}>{RANK_DESCRIPTIONS[r.key]} {!isEligible ? '— недоступен для выбранного возраста' : ''}</div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: !isEligible ? 'rgba(255,255,255,0.35)' : isAchieved ? ACCENT : isNext ? '#f59e0b' : '#fff' }}>{r.threshold} кг</div>
-                      <div style={{ fontSize: 10, color: !isEligible ? 'rgba(255,255,255,0.25)' : isAchieved ? '#22c55e' : isNext ? '#f59e0b' : 'rgba(255,255,255,0.35)' }}>{!isEligible ? 'недоступен' : isAchieved ? `выполнен (+${(displayTotal - r.threshold).toFixed(1)} кг)` : `нужно +${(r.threshold - displayTotal).toFixed(1)} кг`}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: !isEligible ? 'rgba(255,255,255,0.85)' : isAchieved ? ACCENT : isNext ? '#f59e0b' : '#fff' }}>{r.threshold} кг</div>
+                      <div style={{ fontSize: 10, color: !isEligible ? 'rgba(255,255,255,0.25)' : isAchieved ? '#22c55e' : isNext ? '#f59e0b' : 'rgba(255,255,255,0.85)' }}>{!isEligible ? 'недоступен' : isAchieved ? `выполнен (+${(displayTotal - r.threshold).toFixed(1)} кг)` : `нужно +${(r.threshold - displayTotal).toFixed(1)} кг`}</div>
                     </div>
                   </div>
                 );
@@ -384,7 +384,7 @@ export const PlNormsCalcTab: React.FC = () => {
                           <td style={{ padding: '6px 8px', color: clr(cat.ranks.ms, 'ms'), opacity: cellOpacity('ms') }} title={!eligibleSet.has('ms') ? '⛔ недоступен для возраста' : undefined}>{cat.ranks.ms !== undefined ? (eligibleSet.has('ms') ? cat.ranks.ms : `${cat.ranks.ms} ⛔`) : '—'}</td>
                           <td style={{ padding: '6px 8px', color: clr(cat.ranks.msmk, 'msmk'), opacity: cellOpacity('msmk') }} title={!eligibleSet.has('msmk') ? '⛔ недоступен для возраста' : undefined}>{cat.ranks.msmk !== undefined ? (eligibleSet.has('msmk') ? cat.ranks.msmk : `${cat.ranks.msmk} ⛔`) : '—'}</td>
                           {hasEliteCol && <td style={{ padding: '6px 8px', color: clr(cat.ranks.elite, 'elite'), opacity: cellOpacity('elite') }} title={!eligibleSet.has('elite') ? '⛔ недоступен для возраста' : undefined}>{cat.ranks.elite !== undefined ? (eligibleSet.has('elite') ? cat.ranks.elite : `${cat.ranks.elite} ⛔`) : '—'}</td>}
-                          <td style={{ padding: '6px 8px', fontWeight: 700, color: isCurrent ? '#fff' : 'rgba(255,255,255,0.35)' }}>{isCurrent ? `${displayTotal} кг` : '—'}</td>
+                          <td style={{ padding: '6px 8px', fontWeight: 700, color: isCurrent ? '#fff' : 'rgba(255,255,255,0.85)' }}>{isCurrent ? `${displayTotal} кг` : '—'}</td>
                         </tr>
                       );
                     })}

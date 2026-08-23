@@ -112,7 +112,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
               fontSize: 10, fontWeight: 700, color: cat.color,
               textTransform: 'uppercase', letterSpacing: 0.4, flex: 1,
             }}>{cat.label}</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{cat.tools.length}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{cat.tools.length}</span>
           </div>
 
           {/* Tool cards grid */}
@@ -144,7 +144,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
                     </span>
                   )}
                 </div>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>
                   {t.desc}
                 </span>
               </button>

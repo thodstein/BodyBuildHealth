@@ -33,14 +33,14 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           {/* Кнопка возврата к записи (История — подвкладка дневника) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
             <button onClick={() => setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.7)' }}>← В запись</button>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>История тренировок и сводка недели</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>История тренировок и сводка недели</span>
           </div>
           {/* Предупреждение о срезе истории из-за переполнения хранилища */}
           {trimWarning && (
             <div style={{ ...style.card, border: '1px solid rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.06)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚠️ История частично обрезана из-за переполнения хранилища</div>
-                <button onClick={() => { clearStorageTrimWarning(); setTrimWarning(null); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                <button onClick={() => { clearStorageTrimWarning(); setTrimWarning(null); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 12 }}>✕</button>
               </div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
                 Осталось {trimWarning.kept} последних сессий ({new Date(trimWarning.at).toLocaleString('ru-RU')}). Сделайте экспорт CSV/JSON в «Инструментах» и удалите старые записи.
@@ -90,22 +90,22 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Сессий (план/факт)</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{plannedDays.length}<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}> / {factWeek.length}</span></div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Сессий (план/факт)</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{plannedDays.length}<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}> / {factWeek.length}</span></div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Подходов (план/факт)</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{plannedSets}<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}> / {factSets}</span></div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Подходов (план/факт)</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{plannedSets}<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}> / {factSets}</span></div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнение</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Выполнение</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color }}>{adherence}%</div>
                   </div>
                 </div>
                 <div style={{ height: 6, background: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${adherence}%`, background: color, borderRadius: 3, transition: 'width 0.3s' }} />
                 </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>
                   Упражнений плана выполнено: {matched} из {plannedNames.size} ({matchPct}%)
                 </div>
                 {(() => {
@@ -183,7 +183,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 { label: 'Объём', value: diaryProgress.length > 0 ? `${(diaryProgress[diaryProgress.length - 1]?.totalVolume / 1000).toFixed(1)}т` : '—', color: '#f59e0b' },
                 { label: 'ACWR', value: (() => { try { const s = loadSRPESessions(); if (s.length < 2) return '—'; return acuteChronicRatio(toDailyLoads(s)).ratio.toFixed(2); } catch { return '—'; } })(), color: '#22c55e' },
               ].map((s, i) => <div key={i} style={{ flex: 1, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px', textAlign: 'center' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>{s.label}</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{s.label}</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: s.color }}>{s.value}</div>
               </div>)}
             </div>
@@ -221,19 +221,19 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               });
               return (
                 <div style={{ marginBottom: 8, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 700, marginBottom: 6 }}>🔥 Тепловая карта (12 нед)</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 6 }}>🔥 Тепловая карта (12 нед)</div>
                   {/* Month labels row */}
                   <div style={{ display: 'flex', gap: 3, marginBottom: 2 }}>
                     {weeks.map((_, wi) => {
                       const ml = monthLabels.find(m => m.week === wi);
-                      return <div key={wi} style={{ flex: 1, fontSize: 9, color: ml ? 'rgba(255,255,255,0.45)' : 'transparent', fontWeight: ml ? 600 : 400, textAlign: 'center' }}>{ml?.label || ''}</div>;
+                      return <div key={wi} style={{ flex: 1, fontSize: 9, color: ml ? 'rgba(255,255,255,0.85)' : 'transparent', fontWeight: ml ? 600 : 400, textAlign: 'center' }}>{ml?.label || ''}</div>;
                     })}
                   </div>
                   {/* Day labels + grid */}
                   <div style={{ display: 'flex', gap: 3 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginRight: 2 }}>
                       {['Пн', '', 'Ср', '', 'Пт', '', 'Вс'].map((d, i) => (
-                        <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', height: 12, display: 'flex', alignItems: 'center' }}>{d}</div>
+                        <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', height: 12, display: 'flex', alignItems: 'center' }}>{d}</div>
                       ))}
                     </div>
                     {weeks.map((wk, wi) => (
@@ -246,7 +246,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     ))}
                   </div>
                   {/* Legend */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.35)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginTop: 6, fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
                     <span>меньше</span>
                     {[0.1, 0.3, 0.5, 0.8].map((t, i) => (
                       <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: heatColor(maxVol * t) }} />
@@ -318,7 +318,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       const delta = prev > 0 ? Math.round((latest - prev) / prev * 100) : 0;
                       return (
                         <div key={name} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '4px 6px' }}>
-                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
+                          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <Sparkline data={sorted.map(p => p.e1rm)} width={40} height={14} color={delta >= 0 ? '#22c55e' : '#ef4444'} showDots={false} />
                             <span style={{ fontSize: 10, fontWeight: 700, color: delta >= 0 ? '#22c55e' : '#ef4444' }}>
@@ -409,7 +409,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               return <div key={g} style={{ height: segH, background: GROUP_COLORS[g] || '#888', opacity: 0.8 }} />;
                             })}
                           </div>
-                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>{wg.week}</span>
+                          <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>{wg.week}</span>
                         </div>
                       );
                     })}
@@ -432,11 +432,11 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <div style={{ marginTop: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>⏱ Длительность сессий</span>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>avg {avgDuration} мин</span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>avg {avgDuration} мин</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Sparkline data={durations} width={80} height={18} color="#60a5fa" />
-                    <span style={{ fontSize: 10, fontWeight: 600, color: durDelta > 10 ? '#f59e0b' : durDelta < -10 ? '#22c55e' : 'rgba(255,255,255,0.4)' }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: durDelta > 10 ? '#f59e0b' : durDelta < -10 ? '#22c55e' : 'rgba(255,255,255,0.85)' }}>
                       {durDelta > 0 ? '+' : ''}{durDelta}%
                     </span>
                   </div>
@@ -470,7 +470,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       {trend ? '↑ растёт' : '↓ падает'}
                     </span>
                   </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>выполнение + RPE + объём</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>выполнение + RPE + объём</div>
                 </div>
               );
             })()}
@@ -714,19 +714,19 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Чек-инов · 14д</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Чек-инов · 14д</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{trends.count}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Приверженность</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: adh.pct >= 80 ? '#22c55e' : adh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{adh.total > 0 ? `${adh.pct}%` : '—'}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Фокус · 14д</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Фокус · 14д</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{avg(trends.averages.focus)}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Уверенность · 14д</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Уверенность · 14д</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{avg(trends.averages.confidence)}</div>
                   </div>
                 </div>
@@ -749,19 +749,19 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Чек-инов · 30д</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Чек-инов · 30д</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>{mtr.count}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Приверженность</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: madh.pct >= 70 ? '#22c55e' : madh.pct >= 40 ? '#f59e0b' : '#ef4444' }}>{madh.total > 0 ? `${madh.pct}%` : '—'}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Средний ROM</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Средний ROM</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{mtr.avgRom > 0 ? mtr.avgRom.toFixed(1) : '—'}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Выполнено дней</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{madh.done}</div>
                   </div>
                 </div>
@@ -783,19 +783,19 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Записей · 30д</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Записей · 30д</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#f97316' }}>{wadh.total}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Приверженность</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: wadh.pct >= 80 ? '#22c55e' : wadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{wadh.total > 0 ? `${wadh.pct}%` : '—'}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Ср. качество</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Ср. качество</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{wq.count > 0 ? wq.avg.toFixed(1) : '—'}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Выполнено дней</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{wadh.done}</div>
                   </div>
                 </div>
@@ -817,19 +817,19 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Записей · 30д</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Записей · 30д</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#38bdf8' }}>{cadh.total}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Приверженность</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Приверженность</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: cadh.pct >= 80 ? '#22c55e' : cadh.pct >= 50 ? '#f59e0b' : '#ef4444' }}>{cadh.total > 0 ? `${cadh.pct}%` : '—'}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Ср. качество</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Ср. качество</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa' }}>{cq.count > 0 ? cq.avg.toFixed(1) : '—'}</div>
                   </div>
                   <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Выполнено дней</div>
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Выполнено дней</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{cadh.done}</div>
                   </div>
                 </div>

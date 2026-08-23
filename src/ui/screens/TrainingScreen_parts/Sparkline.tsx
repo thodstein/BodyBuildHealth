@@ -43,7 +43,7 @@ export const Sparkline: React.FC<SparklineProps> = ({
       <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
       {showDots && points.length <= 12 && points.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r={i === points.length - 1 ? 2.5 : 1.5}
-          fill={i === points.length - 1 ? color : 'rgba(255,255,255,0.3)'}
+          fill={i === points.length - 1 ? color : 'rgba(255,255,255,0.85)'}
           stroke={i === points.length - 1 ? '#000' : 'none'}
           strokeWidth={i === points.length - 1 ? 0.5 : 0}
         />

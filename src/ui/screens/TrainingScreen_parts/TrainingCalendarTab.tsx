@@ -15,7 +15,7 @@ import { StrengthDiary } from '../../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../../core/types';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = 'rgba(255,255,255,0.85)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 
 const STATUS_COLORS: Record<string, string> = {

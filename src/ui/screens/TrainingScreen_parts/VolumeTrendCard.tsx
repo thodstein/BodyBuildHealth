@@ -31,7 +31,7 @@ export const VolumeTrendCard: React.FC<{ sessions: WorkoutLog[]; weeks?: number 
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
         {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center' }}>Н{wi + 1}</span>)}
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>

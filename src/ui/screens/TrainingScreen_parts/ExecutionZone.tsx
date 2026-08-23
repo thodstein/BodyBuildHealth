@@ -307,7 +307,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       });
                       return (
                         <div style={{ marginBottom: 12, textAlign: 'left' }}>
-                          <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>📊 Сводка по упражнениям</div>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>📊 Сводка по упражнениям</div>
                           {comparisons.map((c, i) => (
                             <div key={i} style={{
                               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -318,10 +318,10 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                               <span style={{ color: 'var(--accent)', fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
                                 {c.sets}×{c.currentMaxW}кг
                               </span>
-                              <span style={{ color: 'rgba(255,255,255,0.4)', minWidth: 50, textAlign: 'right' }}>
+                              <span style={{ color: 'rgba(255,255,255,0.85)', minWidth: 50, textAlign: 'right' }}>
                                 {c.currentVol.toLocaleString()}кг
                               </span>
-                              <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: 50, textAlign: 'right' }}>
+                              <span style={{ color: 'rgba(255,255,255,0.85)', minWidth: 50, textAlign: 'right' }}>
                                 1RM {c.current1RM}
                               </span>
                             </div>

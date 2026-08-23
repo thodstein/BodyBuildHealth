@@ -1296,7 +1296,7 @@ return (
                         textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
                         background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                         border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : isOcc ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)',
+                        color: isSel ? ACCENT : isOcc ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.85)',
                         minHeight: 44,
                       }}
                     >

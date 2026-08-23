@@ -54,8 +54,8 @@ export const ManualProgramWizard: React.FC<Props> = ({
           const done = s < step;
           return (
             <div key={s} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 22, height: 22, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: active ? '#a78bfa' : done ? '#22c55e' : 'rgba(255,255,255,0.08)', color: active || done ? '#fff' : 'rgba(255,255,255,0.5)', border: active ? '2px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)' }}>{done ? '✓' : s}</div>
-              <div style={{ fontSize: 10, color: active ? '#a78bfa' : done ? '#22c55e' : 'rgba(255,255,255,0.4)', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' }}>{STEP_TITLES[s-1]}</div>
+              <div style={{ width: 22, height: 22, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: active ? '#a78bfa' : done ? '#22c55e' : 'rgba(255,255,255,0.08)', color: active || done ? '#fff' : 'rgba(255,255,255,0.85)', border: active ? '2px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)' }}>{done ? '✓' : s}</div>
+              <div style={{ fontSize: 10, color: active ? '#a78bfa' : done ? '#22c55e' : 'rgba(255,255,255,0.85)', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' }}>{STEP_TITLES[s-1]}</div>
               {s < 4 && <div style={{ flex: 1, height: 2, background: s < step ? '#22c55e' : 'rgba(255,255,255,0.08)', borderRadius: 1, marginLeft: 4 }} />}
             </div>
           );

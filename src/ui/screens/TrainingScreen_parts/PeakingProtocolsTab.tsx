@@ -6,7 +6,7 @@ import type { RecoveryProtocol, MentalRoutine } from '../../../engines/gym-compe
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = 'rgba(255,255,255,0.85)';
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.5)', borderRadius: 10, padding: 12, border: '1px solid rgba(255,255,255,0.05)', marginBottom: 10 };
 
 const PROTOCOL_COLORS: Record<string, string> = { pl: '#3b82f6', bb: '#a855f7', classic: '#f59e0b' };

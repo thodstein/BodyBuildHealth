@@ -17,7 +17,7 @@ import type { ManualResult, ManualDay } from './program-types';
 import { GROUP_RU, LEVELS, GOALS } from './program-types';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = 'rgba(255,255,255,0.85)';
 const CARD: React.CSSProperties = {
   background: 'rgba(24,24,27,0.5)',
   borderRadius: 12,

@@ -132,7 +132,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
         border: activeCount > 0 ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.06)',
         color: activeCount > 0 ? '#ef4444' : 'rgba(255,255,255,0.7)',
       }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 2 }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 2 }}>
           🤕 Травмы / ограничения
         </div>
         <div style={{ fontSize: 12 }}>
@@ -174,7 +174,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                     <b>⚡ Щадящая</b><br />мышца остаётся, но вес/объём/повторы снижаются{mode === 'graded' ? ' — выбран' : ''}
                   </button>
                 </div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, marginTop: 6 }}>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4, marginTop: 6 }}>
                   Режим применяется к <b style={{ color: 'rgba(255,255,255,0.7)' }}>новым</b> травмам (в списке ниже его можно поменять у каждой). Даты «с/до» = период активности; после заживления нагрузка плавно возвращается (50% → 75% → 100%).
                 </div>
               </div>
@@ -231,14 +231,14 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                   style={{
                     padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
                     background: customMuscle.trim() ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.05)',
-                    border: 'none', color: customMuscle.trim() ? '#000' : 'rgba(255,255,255,0.3)',
+                    border: 'none', color: customMuscle.trim() ? '#000' : 'rgba(255,255,255,0.85)',
                   }}>+ Добавить</button>
               </div>
 
               {/* Date range for custom */}
               <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Начало</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Начало</div>
                   <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
                     style={{
                       width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 10,
@@ -247,7 +247,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                     }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Окончание (необяз.)</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Окончание (необяз.)</div>
                   <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
                     style={{
                       width: '100%', padding: '6px 8px', borderRadius: 6, fontSize: 10,
@@ -274,10 +274,10 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                           border: '1px solid ' + (active ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.04)'),
                         }}>
                           <div style={{ flex: 1 }}>
-                            <span style={{ fontWeight: 700, fontSize: 11, color: active ? '#ef4444' : 'rgba(255,255,255,0.5)' }}>
+                            <span style={{ fontWeight: 700, fontSize: 11, color: active ? '#ef4444' : 'rgba(255,255,255,0.85)' }}>
                               {inj.muscle}
                             </span>
-                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginLeft: 6 }}>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginLeft: 6 }}>
                               {inj.from || '?'}{inj.to ? ' → ' + inj.to : ''}
                             </span>
                             {!active && <span style={{ fontSize: 10, color: '#22c55e', marginLeft: 6 }}>✓ истекла</span>}
@@ -315,7 +315,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                               style={{
                                 padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer',
                                 background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                                color: 'rgba(255,255,255,0.5)',
+                                color: 'rgba(255,255,255,0.85)',
                               }}>✕</button>
                           </div>
                         </div>
@@ -323,7 +323,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                         {active && isGraded && (
                           <div style={{ padding: '6px 8px 2px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                             <div>
-                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 1 }}>Вес: {Math.round((inj.weightPct ?? 0.6) * 100)}%</div>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 1 }}>Вес: {Math.round((inj.weightPct ?? 0.6) * 100)}%</div>
                               <input type="range" min={30} max={100} step={5}
                                 value={Math.round((inj.weightPct ?? 0.6) * 100)}
                                 onChange={e => {
@@ -334,7 +334,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                                 style={{ width: '100%', height: 3 }} />
                             </div>
                             <div>
-                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 1 }}>Объём: {Math.round((inj.volumePct ?? 0.6) * 100)}%</div>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 1 }}>Объём: {Math.round((inj.volumePct ?? 0.6) * 100)}%</div>
                               <input type="range" min={30} max={100} step={5}
                                 value={Math.round((inj.volumePct ?? 0.6) * 100)}
                                 onChange={e => {
@@ -345,7 +345,7 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
                                 style={{ width: '100%', height: 3 }} />
                             </div>
                             <div>
-                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginBottom: 1 }}>Повт: макс {inj.repsCap ?? 15}</div>
+                              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 1 }}>Повт: макс {inj.repsCap ?? 15}</div>
                               <input type="range" min={8} max={30} step={1}
                                 value={inj.repsCap ?? 15}
                                 onChange={e => {

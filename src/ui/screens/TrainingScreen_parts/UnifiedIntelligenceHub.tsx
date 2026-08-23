@@ -667,7 +667,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           <div style={{ background:'rgba(168,85,247,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
             <div style={{ fontSize:9, color:DIM }}>PRI/autoReg</div>
             <div style={{ fontSize:13, fontWeight:900, color:'#a855f7' }}>×{autoReg.volumeMultiplier} · +{autoReg.rirShift}</div>
-            <div style={{ fontSize:9, color: autoReg.deload? '#ef4444':'rgba(255,255,255,0.5)' }}>{autoReg.deload? 'deload' : 'применить'}</div>
+            <div style={{ fontSize:9, color: autoReg.deload? '#ef4444':'rgba(255,255,255,0.85)' }}>{autoReg.deload? 'deload' : 'применить'}</div>
           </div>
         </div>
         <div style={{ ...SMALL, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10, lineHeight:1.45 }}>

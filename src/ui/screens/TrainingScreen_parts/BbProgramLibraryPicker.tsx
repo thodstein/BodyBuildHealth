@@ -122,10 +122,10 @@ export const BbProgramLibraryPicker: React.FC<{
   return <>
     <button onClick={() => setOpen(true)} style={{ ...cardBtnStyle(!!value), width: '100%' }}>
       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.4)' }}>
+      <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.85)' }}>
         {sel ? `${sel.name} · ${sel.durationWeeks} нед · ${sel.daysPerWeek}×/нед · ${sel.level}` : 'Выбрать программу...'}
       </div>
-      {value && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>Всего в библиотеке: {deduped.length}</div>}
+      {value && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>Всего в библиотеке: {deduped.length}</div>}
     </button>
     {open && (
       <PortalOverlay onClose={() => setOpen(false)}>
@@ -142,7 +142,7 @@ export const BbProgramLibraryPicker: React.FC<{
                 color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}>✕</button>
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
               Библиотека: {deduped.length} программ · фильтр: {filtered.length}
             </div>
             <input type='text' value={search} onChange={e => setSearch(e.target.value)} placeholder='🔍 Поиск: название, автор, цель...'
@@ -165,7 +165,7 @@ export const BbProgramLibraryPicker: React.FC<{
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {filtered.length === 0 && (
-                <div style={{ padding: '20px 12px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+                <div style={{ padding: '20px 12px', textAlign: 'center', color: 'rgba(255,255,255,0.85)', fontSize: 11 }}>
                   Ничего не найдено. Сбросьте фильтр или измените запрос.
                 </div>
               )}
@@ -179,7 +179,7 @@ export const BbProgramLibraryPicker: React.FC<{
                     fontSize: 11, fontWeight: isSel ? 700 : 500,
                     background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
                     border: isSel ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.06)',
-                    color: isSel ? ACCENT : isDisabled ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)',
+                    color: isSel ? ACCENT : isDisabled ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.85)',
                   }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <span style={{ flex: 1 }}>
@@ -187,17 +187,17 @@ export const BbProgramLibraryPicker: React.FC<{
                       {p.name}
                       {isSel && <span style={{ fontSize: 10, marginLeft: 4 }}>✓</span>}
                     </span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', whiteSpace: 'nowrap' }}>
                       {p.durationWeeks} нед · {p.daysPerWeek}× · {p.level}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>
                     {p.type && <span>📋 {p.type}</span>}
                     {p.goal && <span>🎯 {p.goal}</span>}
                     {p.direction && <span>🗺️ {p.direction}</span>}
                   </div>
                   {p.description && (
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 3, lineHeight: 1.4 }}>
                       {p.description.slice(0, 140)}{p.description.length > 140 ? '…' : ''}
                     </div>
                   )}

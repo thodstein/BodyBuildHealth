@@ -922,7 +922,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                   <div style={{ padding: 12, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>Добавьте блоки в дизайн — микроциклы появятся здесь</div>
                 ) : (
                   <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 70px 60px', gap: 4, padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 360 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 70px 60px', gap: 4, padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', minWidth: 360 }}>
                       <span>Нед</span><span>Фаза</span><span>Объём</span><span>Нагрузка</span>
                     </div>
                     {getDesignVolumeCurve(current).slice(0, Math.min(24, current.totalWeeks)).map(pt => {

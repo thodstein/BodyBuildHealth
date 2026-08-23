@@ -94,7 +94,7 @@ export const Chip: React.FC<{ label: string; value: string; color: string }> = (
     display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center',
     minWidth: 56,
   }}>
-    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.3 }}>{label}</span>
+    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.3 }}>{label}</span>
     <span style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1.1 }}>{value}</span>
   </div>
 );

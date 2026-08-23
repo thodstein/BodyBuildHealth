@@ -41,12 +41,12 @@ export const PlanFeedbackCard: React.FC<{
     <div style={{ ...CARD, padding: 10, marginBottom: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>↻ Дневник → план (прогрессия по факту)</span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{withFact.length} из {feedback.length} с данными{noData > 0 ? ` · ${noData} без лога` : ''}</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{withFact.length} из {feedback.length} с данными{noData > 0 ? ` · ${noData} без лога` : ''}</span>
         <button style={{ ...btn, marginLeft: 'auto' }} onClick={apply} disabled={withFact.length === 0}>↻ Применить факт → нед. {plan.weeks[plan.weeks.length-1].week + 1}</button>
       </div>
 
       {withFact.length === 0 ? (
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', padding: '8px 0' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', padding: '8px 0' }}>
           Нет выполненных тренировок в дневнике. Проведите тренировку по плану — здесь появится факт и рекомендация на следующую неделю.
         </div>
       ) : (
@@ -58,7 +58,7 @@ export const PlanFeedbackCard: React.FC<{
             return (
               <div key={f.planKey} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', fontSize: 11 }}>
                 <span style={{ flex: '0 0 110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>{f.planExerciseName}</span>
-                <span style={{ flex: '0 0 70px', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{GROUP_RU[f.muscle] || f.muscle}</span>
+                <span style={{ flex: '0 0 70px', fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{GROUP_RU[f.muscle] || f.muscle}</span>
                 <span style={{ flex: '0 0 130px', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
                   Факт: <b style={{ color: 'rgba(255,255,255,0.9)' }}>{f.last!.topWeight}×{f.last!.topReps}</b> RIR{f.last!.actualRir}
                   <span style={{ opacity: 0.6 }}> · e1RM {f.last!.e1rm}</span>
@@ -73,7 +73,7 @@ export const PlanFeedbackCard: React.FC<{
           })}
         </div>
       )}
-      <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+      <div style={{ marginTop: 6, fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
         RIR-дельта = факт − цель. Отрицательная (тяжелее цели) → вес растём осторожнее; положительная (легче) → +вес. Стратегия: {strategy}.
       </div>
     </div>

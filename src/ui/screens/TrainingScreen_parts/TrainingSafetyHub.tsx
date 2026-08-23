@@ -32,7 +32,7 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
   return (
     <div style={{ color: '#fff', padding: 4 }}>
       <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginBottom: 2 }}>🛡 Безопасность и нагрузка</div>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 12, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 12, lineHeight: 1.4 }}>
         Единый контейнер без дублей формул: ортопедия (быстрый чек) + нагрузка + авторегуляция + восстановление. Полный разбор сустава и техники упражнения → <b style={{ color: '#fff' }}>«Суставы и ортопедия»</b> (вкладка рядом, единый инструмент). Кардио-цикл → <b style={{ color: '#fff' }}>Кардио-конструктор</b> (Планировщик), объём → <b style={{ color: '#fff' }}>Объём-хаб</b> (MEV/MAV/MRV). Источники: Foster/Banister/Helms/McGill.
       </div>
 
@@ -50,7 +50,7 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
         ))}
       </div>
 
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 8 }}>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
         {SECTIONS.find(s => s.id === section)?.desc}
       </div>
 
