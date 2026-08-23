@@ -481,8 +481,24 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
   const usedEquipment = new Set<string>();
   let cableCount = 0;
 
-  /** Detector: слишком похожие упражнения (одинаковый угол + оборудование). */
+  /** Detector: слишком похожие упражнения (одинаковый угол + оборудование).
+   * Иерархия: ANGLE_CLASSES (bb-exercise-selection) — primary для BB (1 упр/класс), isTooSimilar — вторичный
+   * для общего каталога. Если упражнения из разных ANGLE_CLASSES одного мышца — не считаются похожими,
+   * даже если isTooSimilar вернёт true (разные углы приоритетнее дедупа). */
   function isTooSimilar(ex: Exercise, selected: SelectedExercise[]): boolean {
+    // Проверка ANGLE_CLASSES: разные углы одной мышцы — не похожи
+    try {
+      const { ANGLE_CLASSES } = require('./bb/bb-exercise-selection.engine');
+      const exMuscle = (ex as any).muscle || (ex as any).group || '';
+      for (const s of selected) {
+        const sMuscle = (s as any).muscle || (s as any).group || '';
+        if (exMuscle && sMuscle && exMuscle === sMuscle && ANGLE_CLASSES[exMuscle]) {
+          const exClass = ANGLE_CLASSES[exMuscle].find((ac: any) => ac.match(ex));
+          const sClass = ANGLE_CLASSES[sMuscle].find((ac: any) => ac.match(s));
+          if (exClass && sClass && exClass.name !== sClass.name) continue; // разные углы — не похожи
+        }
+      }
+    } catch {}
     const exName = (ex.name || '').toLowerCase();
     for (const s of selected) {
       const sName = (s.name || '').toLowerCase();

@@ -32,7 +32,7 @@ export const BBFeedbackCard: React.FC = () => {
     return (
       <div style={{ ...diaryCard, border: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ ...diaryLabel, color: 'rgba(255,255,255,0.6)' }}>📊 Фидбек ББ-плана</div>
-        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>Нет плана и логов — создайте план в ББ-авто и начните логировать тренировки.</div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 4 }}>Нет плана и логов — создайте план в ББ-авто и начните логировать тренировки.</div>
       </div>
     );
   }
@@ -49,19 +49,19 @@ export const BBFeedbackCard: React.FC = () => {
       {/* Adherence */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         <div style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 10px' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>Adherence (сессии)</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Adherence (сессии)</div>
           <div style={{ fontSize: 16, fontWeight: 800, color: barColor(fb.adherencePct) }}>{fb.adherencePct != null ? `${fb.adherencePct}%` : '—'}</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{fb.totalCompletedSets} / {fb.totalPlannedSets} сетов</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{fb.totalCompletedSets} / {fb.totalPlannedSets} сетов</div>
         </div>
         <div style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '8px 10px' }}>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>ACWR (нагрузка)</div>
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>ACWR (нагрузка)</div>
           {fb.acwr ? (
             <>
               <div style={{ fontSize: 14, fontWeight: 800, color: zoneColor[fb.acwr.zone] || '#fff' }}>{fb.acwr.ratio} · {fb.acwr.zone}</div>
               <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{fb.acwr.zone === 'optimal' ? 'в норме' : fb.acwr.zone === 'dangerous' ? 'перегруз' : fb.acwr.zone === 'caution' ? 'осторожно' : 'недотрен'}</div>
             </>
           ) : (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>недостаточно sRPE данных (≥14д)</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>недостаточно sRPE данных (≥14д)</div>
           )}
         </div>
       </div>
@@ -73,10 +73,10 @@ export const BBFeedbackCard: React.FC = () => {
           <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
             {fb.weekly.slice(0, 12).map(w => (
               <div key={w.week} style={{ minWidth: 48, textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: '6px 4px', border: `1px solid ${barColor(w.adherencePct)}40` }}>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>Н{w.week}</div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{w.phase || ''}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Н{w.week}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{w.phase || ''}</div>
                 <div style={{ fontSize: 10, fontWeight: 700, color: barColor(w.adherencePct) }}>{w.adherencePct != null ? `${w.adherencePct}%` : '—'}</div>
-                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>{w.completedSets}/{w.plannedSets}</div>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>{w.completedSets}/{w.plannedSets}</div>
               </div>
             ))}
           </div>
@@ -92,7 +92,7 @@ export const BBFeedbackCard: React.FC = () => {
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', borderRadius: 8, background: a.status === 'up' ? 'rgba(34,197,94,0.08)' : a.status === 'down' ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)', border: `1px solid ${a.status === 'up' ? 'rgba(34,197,94,0.25)' : a.status === 'down' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)'}` }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{a.exercise}</div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{a.muscle} · {a.e1rmBefore}→{a.e1rmAfter} кг</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{a.muscle} · {a.e1rmBefore}→{a.e1rmAfter} кг</div>
                 </div>
                 <div style={{ fontSize: 11, fontWeight: 800, color: a.status === 'up' ? '#22c55e' : a.status === 'down' ? '#ef4444' : '#f59e0b' }}>{a.deltaPct > 0 ? '+' : ''}{a.deltaPct}% · {a.status === 'up' ? '↗' : a.status === 'down' ? '↘' : '→'}</div>
               </div>
@@ -118,7 +118,7 @@ export const BBFeedbackCard: React.FC = () => {
       )}
 
       {!fb.hasPlan && fb.hasSessions && (
-        <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>Подсказка: создайте ББ-план в Конструкторе → он попадёт в фидбек автоматически.</div>
+        <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>Подсказка: создайте ББ-план в Конструкторе → он попадёт в фидбек автоматически.</div>
       )}
     </div>
   );
