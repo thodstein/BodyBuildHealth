@@ -10,11 +10,11 @@ import { calculatePlates, getPlateLoadingOrder, warmupPlateSequence, type Weight
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
+const DIM = '#fff';
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.45 };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
-const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: 'rgba(255,255,255,0.8)' };
+const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: '#fff' };
 
 type Unit = 'metric' | 'imperial';
 
@@ -148,7 +148,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
           </button>
         )}
       </div>
-      <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+      <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Расчёт набора блинов на гриф под рабочий вес. Все системы единиц, 8 типов грифов,
         1ПМ-пресеты, SVG-визуализация, разминка, порядок навешивания, экспорт.
         {initialWeight && <span style={{ color: ACCENT }}> · Вес из плана: {initialWeight} {unitLabel}</span>}
@@ -318,7 +318,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
         {warmup.map(w => (
           <div key={w.set} style={ROW}>
             <span>Сет {w.set}: <b style={{ color: ACCENT }}>{w.weight} {unitLabel}</b> × {w.reps}</span>
-            <span style={{ color: 'rgba(255,255,255,0.5)' }}>{w.plates} · отдых {w.restMin} мин</span>
+            <span style={{ color: '#fff' }}>{w.plates} · отдых {w.restMin} мин</span>
           </div>
         ))}
         <div style={{ ...SMALL, marginTop: 6 }}>Рабочий: <b style={{ color: ACCENT }}>{targetWeight} {unitLabel}</b></div>
@@ -367,7 +367,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
                   if (p.plates) setCustomPlates(p.plates);
                 }} style={{ flex: 1, textAlign: 'left', background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 11 }}>
                   <strong style={{ color: ACCENT }}>{p.name}</strong>
-                  <span style={{ color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>{p.targetWeight} {p.unit === 'metric' ? 'кг' : 'фн'} · гриф {p.barWeight}</span>
+                  <span style={{ color: '#fff', marginLeft: 6 }}>{p.targetWeight} {p.unit === 'metric' ? 'кг' : 'фн'} · гриф {p.barWeight}</span>
                 </button>
                 <button onClick={() => {
                   const arr = savedPresets.filter(x => x.id !== p.id);

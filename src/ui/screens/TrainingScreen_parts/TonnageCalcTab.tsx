@@ -9,7 +9,7 @@ const CARD: React.CSSProperties = {
   background: 'rgba(24,24,27,0.15)', border: '1px solid rgba(255,255,255,0.04)',
   marginBottom: 10,
 };
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.4 };
 
 interface Row { id: string; exerciseId: string; weight: number; reps: number; sets: number; oneRM?: number; }
 
@@ -74,7 +74,7 @@ export const TonnageCalcTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>📦 Тоннаж калькулятор</div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>Ввод упражнений → тоннаж, КПШ, средний вес, УОИ, разбивка по мышцам и зонам интенсивности.</div>
+      <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>Ввод упражнений → тоннаж, КПШ, средний вес, УОИ, разбивка по мышцам и зонам интенсивности.</div>
 
       <div style={CARD}>
         <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -134,14 +134,14 @@ export const TonnageCalcTab: React.FC = () => {
           <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>📊 Тоннаж по мышцам</div>
           {Object.entries(memo.byMuscle).map(([m, t]) => (
             <div key={m} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginBottom: 3 }}>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{m}</span>
+              <span style={{ color: '#fff' }}>{m}</span>
               <span style={{ color: ACCENT, fontWeight: 700 }}>{t.toLocaleString()} кг·повт</span>
             </div>
           ))}
           <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginTop: 8, marginBottom: 6 }}>📊 КПШ по мышцам</div>
           {Object.entries(memo.kpshByMuscle).map(([m, k]) => (
             <div key={m} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, marginBottom: 3 }}>
-              <span style={{ color: 'rgba(255,255,255,0.7)' }}>{m}</span>
+              <span style={{ color: '#fff' }}>{m}</span>
               <span style={{ color: '#60a5fa', fontWeight: 700 }}>{k.toFixed(0)}</span>
             </div>
           ))}
@@ -153,9 +153,9 @@ export const TonnageCalcTab: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {[['light', 'Легкая (<60%)', '#22c55e'], ['medium', 'Средняя (60-80%)', '#f59e0b'], ['heavy', 'Тяжёлая (>80%)', '#ef4444']].map(([key, label, color]) => (
             <div key={key} style={{ background: `${color}0f`, border: `1px solid ${color}33`, borderRadius: 8, padding: 10, textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>{label}</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>{label}</div>
               <div style={{ fontSize: 18, fontWeight: 800, color }}>{(memo.byZone[key as keyof typeof memo.byZone] ?? 0).toLocaleString()}</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>кг·повт</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>кг·повт</div>
             </div>
           ))}
         </div>

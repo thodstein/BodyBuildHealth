@@ -27,12 +27,12 @@ import { applyToPlanner } from './planner-bridge';
 import { MetricCard, ExpandableCard, PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.52)';
+const DIM = '#fff';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' };
 const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' };
 const H: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: ACCENT, margin: '0 0 6px', letterSpacing: 0.2 };
-const SMALL: React.CSSProperties = { fontSize: 10, color: DIM, lineHeight: 1.45 };
-const HINT: React.CSSProperties = { ...SMALL, color: 'rgba(255,255,255,0.55)' };
+const SMALL: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
+const HINT: React.CSSProperties = { ...SMALL, color: '#fff' };
 
 const ZONE_META: Record<string, { label: string; color: string; short: string }> = {
   undertrained: { label: 'Недотрен', color: '#3b82f6', short: 'недо' },
@@ -221,7 +221,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:16 }}>⚡</div>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Интеллект тренировки</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', lineHeight:1.3 }}>Единый пульт: нагрузка → восстановление → авторегуляция → прогноз. Один расчёт, без дублей.</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Единый пульт: нагрузка → восстановление → авторегуляция → прогноз. Один расчёт, без дублей.</div>
           </div>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>без дублей</span>
         </div>
@@ -363,7 +363,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               <div style={{ marginTop:8, height:8, borderRadius:99, background:'linear-gradient(90deg,#3b82f6 0 20%,#22c55e 20% 62%,#eab308 62% 78%,#ef4444 78% 100%)', position:'relative' }}>
                 <div style={{ position:'absolute', top:-4, width:3, height:16, background:'#fff', borderRadius:2, left:`${Math.min(100, Math.max(0, (acwr.ratio/2)*100))}%`, boxShadow:'0 1px 6px rgba(0,0,0,0.4)' }} />
               </div>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:2 }}><span>0.0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0</span></div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:'#fff', marginTop:2 }}><span>0.0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0</span></div>
 
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, marginTop:10 }}>
                 <MetricCard title="Нагрузка 7д" accent="#3b82f6"><div style={{ fontSize:16, fontWeight:900, color:'#3b82f6' }}>{monotony.weeklyLoad}</div><div style={SMALL}>AU</div></MetricCard>
@@ -388,7 +388,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                   {last7.map((d,i)=> (
                     <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <div style={{ width:'100%', maxWidth:28, height: Math.max(2, (d.load/maxLoad)*52), borderRadius:6, background: d.load>0? 'linear-gradient(180deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)', transition:'height 0.2s' }} />
-                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.38)' }}>{d.date.slice(5)}</span>
+                      <span style={{ fontSize:9, color:'#fff' }}>{d.date.slice(5)}</span>
                     </div>
                   ))}
                 </div>
@@ -399,7 +399,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                   {weeks.map((w,i)=> (
                     <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
                       <div style={{ width:'100%', maxWidth:36, height: Math.max(2, (w.load/maxW)*52), borderRadius:6, background: i===weeks.length-1? 'linear-gradient(180deg,#00e68a,#00c853)' : 'rgba(96,165,250,0.55)' }} />
-                      <span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{w.label}</span>
+                      <span style={{ fontSize:9, color:'#fff' }}>{w.label}</span>
                       <span style={{ fontSize:9, color:'#fff', fontWeight:800 }}>{w.load}</span>
                     </div>
                   ))}
@@ -409,14 +409,14 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               <ExpandableCard title={`Журнал sRPE · ${sessions.length}`} short={`${sessions.length} записей · ACWR ${acwr.ratio.toFixed(2)} · ${ZONE_META[acwr.zone].label}`} full={
                 <div>
                   {sessions.slice().reverse().slice(0,30).map((s,i)=> (
-                    <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 0.6fr 0.7fr 0.6fr', gap:4, fontSize:10, padding:'5px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.82)' }}>
+                    <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 0.6fr 0.7fr 0.6fr', gap:4, fontSize:10, padding:'5px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>
                       <span>{s.date}</span><span>RPE {s.sRPE}</span><span>{s.durationMin} мин</span><span style={{ color:ACCENT, fontWeight:800 }}>{sessionLoad(s.sRPE,s.durationMin)} AU</span>
                     </div>
                   ))}
                 </div>
               } />
 
-              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.14)', fontSize:10, color:'rgba(255,255,255,0.62)', lineHeight:1.45 }}>
+              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.14)', fontSize:10, color:'#fff', lineHeight:1.45 }}>
                 {report.recommendations.map((r,i)=> <div key={i} style={{ marginTop: i?4:0 }}>• {r}</div>)}
               </div>
             </>
@@ -460,7 +460,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               </div>
 
               <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10 }}>
-                <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.7)' }}>HRV-score <b style={{ color:'#fff' }}>{recoveryOut.hrvScore}</b> · сон <b style={{ color:'#fff' }}>{recoveryOut.sleepScore}</b> · readiness <b style={{ color:'#fff' }}>{recoveryOut.readinessScore}</b></div>
+                <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>HRV-score <b style={{ color:'#fff' }}>{recoveryOut.hrvScore}</b> · сон <b style={{ color:'#fff' }}>{recoveryOut.sleepScore}</b> · readiness <b style={{ color:'#fff' }}>{recoveryOut.readinessScore}</b></div>
                 <div style={{ padding:'8px 10px', borderRadius:10, background: recoveryOut.deloadRecommended? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border:`1px solid ${recoveryOut.deloadRecommended? 'rgba(245,158,11,0.18)' : 'rgba(34,197,94,0.14)'}`, color: recoveryOut.deloadRecommended? '#f59e0b' : '#22c55e', fontWeight:700 }}>
                   {recoveryOut.deloadRecommended ? `⚠ ${recoveryOut.deloadReason}` : `✓ ${recoveryOut.deloadReason}`}
                 </div>
@@ -469,7 +469,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               {recoveryOut.recommendations.length>0 && (
                 <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize:10, fontWeight:800, color:ACCENT, marginBottom:4 }}>📋 Рекомендации восстановления</div>
-                  {recoveryOut.recommendations.map((r,i)=> <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.72)', marginTop:2, lineHeight:1.4 }}>• {r}</div>)}
+                  {recoveryOut.recommendations.map((r,i)=> <div key={i} style={{ fontSize:10, color:'#fff', marginTop:2, lineHeight:1.4 }}>• {r}</div>)}
                 </div>
               )}
 
@@ -521,7 +521,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               </div>
             </div>
             <div style={{ marginTop:6, display:'grid', gap:3 }}>
-              {autoReg.decisions.map((d,i)=> <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.68)', lineHeight:1.4 }}>• {d}</div>)}
+              {autoReg.decisions.map((d,i)=> <div key={i} style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>• {d}</div>)}
             </div>
             {autoReg.adjustedTopSetPct!=null && <div style={{ marginTop:6, fontSize:10, color:DIM }}>Топ-сет: {(topPct*100).toFixed(0)}% → <b style={{ color:'#fff' }}>{(autoReg.adjustedTopSetPct*100).toFixed(1)}%</b> · RIR: {planRIR} → <b style={{ color:'#fff' }}>{autoReg.adjustedRIR}</b></div>}
           </div>
@@ -558,7 +558,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                 <div>Системное смещение: <b style={{ color: Math.abs(rirCalib.overallAvgBias)>1? '#ef4444' : '#22c55e' }}>{rirCalib.overallAvgBias>0?'+':''}{rirCalib.overallAvgBias.toFixed(2)}</b> {rirCalib.overallAvgBias>0.5? '— тяжелее чем думаете' : rirCalib.overallAvgBias<-0.5? '— легче чем думаете' : '— в цели'}</div>
                 {rirCalib.exercises.slice(0,5).map(ex=> (
                   <div key={ex.exerciseId} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ color:'rgba(255,255,255,0.78)' }}>{ex.exerciseName}</span>
+                    <span style={{ color:'#fff' }}>{ex.exerciseName}</span>
                     <span style={{ fontWeight:800, color: Math.abs(ex.avgBias)>1?'#ef4444':'#eab308' }}>{ex.avgBias>0?'+':''}{ex.avgBias.toFixed(1)} (n={ex.totalPoints})</span>
                   </div>
                 ))}
@@ -618,7 +618,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
                   <div key={i} style={{ background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.12)', borderRadius:10, padding:'8px 8px', textAlign:'center' }}>
                     <div style={{ fontSize:9, color:DIM }}>+{i+1} дн</div>
                     <div style={{ fontSize:14, fontWeight:900, color: v>=70?'#22c55e': v>=50?'#eab308':'#ef4444' }}>{Math.round(v)}</div>
-                    {forecast.ci95[i] && <div style={{ fontSize:9, color:'rgba(255,255,255,0.42)' }}>ДИ {Math.round(forecast.ci95[i][0])}–{Math.round(forecast.ci95[i][1])}</div>}
+                    {forecast.ci95[i] && <div style={{ fontSize:9, color:'#fff' }}>ДИ {Math.round(forecast.ci95[i][0])}–{Math.round(forecast.ci95[i][1])}</div>}
                   </div>
                 ))}
               </div>
@@ -637,12 +637,12 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
                 <div style={{ fontSize:9, color:DIM }}>Δ Риск</div>
                 <div style={{ fontSize:18, fontWeight:900, color: whatIf.riskDelta>0?'#ef4444': whatIf.riskDelta<0?'#22c55e':'rgba(255,255,255,0.6)' }}>{whatIf.riskDelta>0?'+':''}{whatIf.riskDelta}</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{Math.round((recoveryOut?.overtrainingRisk ?? 22)+whatIf.riskDelta)} итог</div>
+                <div style={{ fontSize:9, color:'#fff' }}>{Math.round((recoveryOut?.overtrainingRisk ?? 22)+whatIf.riskDelta)} итог</div>
               </div>
               <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
                 <div style={{ fontSize:9, color:DIM }}>Δ Готовность</div>
                 <div style={{ fontSize:18, fontWeight:900, color: whatIf.readinessDelta>0?'#22c55e': whatIf.readinessDelta<0?'#ef4444':'rgba(255,255,255,0.6)' }}>{whatIf.readinessDelta>0?'+':''}{whatIf.readinessDelta}</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{Math.round(readiness+whatIf.readinessDelta)} итог</div>
+                <div style={{ fontSize:9, color:'#fff' }}>{Math.round(readiness+whatIf.readinessDelta)} итог</div>
               </div>
             </div>
             <div style={{ ...SMALL, marginTop:8, padding:'7px 10px', borderRadius:9, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)' }}>{whatIf.note}</div>

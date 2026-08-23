@@ -13,7 +13,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
 
 const ACCENT = '#00e68a';
-const DIM_ = 'rgba(255,255,255,0.5)';
+const DIM_ = '#fff';
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '7px 8px', width: '100%', boxSizing: 'border-box' as const, fontSize: 11, textAlign: 'center' as const };
 const CARD: React.CSSProperties = { background: 'rgba(24,24,27,0.5)', borderRadius: 10, padding: 12, border: '1px solid rgba(255,255,255,0.05)' };
 const BADGE = (color: string): React.CSSProperties => ({ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, color: '#000', background: color });
@@ -286,7 +286,7 @@ export const VolumeOptimizerTab: React.FC = () => {
             <span style={{ fontSize: 13, fontWeight: 800, color: qualityColor }}>🎯 Качество программы</span>
             <span style={{ fontSize: 22, fontWeight: 800, color: qualityColor }}>{quality.score}/100</span>
           </div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 6 }}>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 4 }}>
               {quality.over.length > 0 && <div style={{ color: '#ef4444' }}>⚠ Превышение MRV: {quality.over.map(g => GROUP_RU[g] || g).join(', ')}</div>}
               {quality.weakMissed.length > 0 && <div style={{ color: '#f59e0b' }}>⚠ Слабые не покрыты: {quality.weakMissed.map(g => GROUP_RU[g] || g).join(', ')}</div>}
@@ -664,7 +664,7 @@ export const VolumeOptimizerTab: React.FC = () => {
       {/* ── Apply to planner ── */}
       {analysis && (
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
             🔗 Применить к планировщику: целевой объём (MAV) по группам мышц.
           </div>
           <button onClick={() => {
