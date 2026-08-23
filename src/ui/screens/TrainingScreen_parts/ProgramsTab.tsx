@@ -91,7 +91,7 @@ export const ProgramsTab: React.FC<{
     try {
       const prog = {
         id: expandedSelected.id, name: expandedSelected.name, goal: expandedSelected.goal, level: expandedSelected.level,
-        daysPerНеделя: expandedSelected.daysPerWeek, durationWeeks: expandedSelected.durationWeeks,
+        daysPerWeek: expandedSelected.daysPerWeek, durationWeeks: expandedSelected.durationWeeks,
         description: expandedSelected.description, weeks: expandedSelected.weeks,
         loadedAt: new Date().toISOString(),
       };

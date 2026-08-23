@@ -192,11 +192,11 @@ export const PhaseBanner: React.FC<{ phase: PhaseKey; desc?: string }> = ({ phas
 
 /** Сетка выбора недель (кликабельные номера) */
 export const WeekStrip: React.FC<{
-  weeks: number; phaseForНеделя: (w: number) => PhaseKey; activeНеделя: number; onPick: (w: number) => void;
-}> = ({ weeks, phaseForНеделя, activeНеделя, onPick }) => (
+  weeks: number; phaseForWeek: (w: number) => PhaseKey; activeWeek: number; onPick: (w: number) => void;
+}> = ({ weeks, phaseForWeek, activeWeek, onPick }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: 4 }}>
     {Array.from({ length: weeks }, (_, i) => {
-      const w = i + 1; const ph = phaseForНеделя(w); const active = w === activeНеделя;
+      const w = i + 1; const ph = phaseForWeek(w); const active = w === activeWeek;
       return (
         <button key={w} onClick={() => onPick(w)} title={'Неделя ' + w}
           style={{

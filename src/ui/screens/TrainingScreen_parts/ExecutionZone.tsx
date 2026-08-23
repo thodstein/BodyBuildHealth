@@ -23,9 +23,9 @@ interface Props {
   goal: string; level: string; recovery: number;
   trainingOutput: TrainingOutput | null;
   macrocycle: MacrocyclePlan | null;
-  selectedНеделя: number;
+  selectedWeek: number;
   currentMicrocycle: Microcycle | null;
-  runtimeДень: number; setRuntimeДень: React.Dispatch<React.SetStateAction<number>>;
+  runtimeDay: number; setRuntimeDay: React.Dispatch<React.SetStateAction<number>>;
   runtimeExIdx: number; setRuntimeExIdx: React.Dispatch<React.SetStateAction<number>>;
   runtimeLogs: Record<string, RuntimeLogEntry>; setRuntimeLogs: React.Dispatch<React.SetStateAction<Record<string, RuntimeLogEntry>>>;
   runtimeStarted: boolean; setRuntimeStarted: React.Dispatch<React.SetStateAction<boolean>>;

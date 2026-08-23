@@ -50,7 +50,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
         if (!logs || logs.length === 0) { setProgressData({ noData: true }); return; }
         const sorted = [...logs].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
         const e1rmByExercise: Record<string, { date: string; e1rm: number }[]> = {};
-        const tonnageByНеделя: Record<string, number> = {};
+        const tonnageByWeek: Record<string, number> = {};
         let totalTonnageAll = 0;
         for (const log of sorted) {
           for (const ex of (log as any).exercises || []) {

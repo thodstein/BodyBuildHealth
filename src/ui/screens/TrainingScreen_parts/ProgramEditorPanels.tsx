@@ -242,10 +242,10 @@ export const PlanSummaryTable: React.FC<{
 /* ───── Панель автопериодизации ───── */
 export const AutoPeriodizationPanel: React.FC<{
   weeks: number; goal: string; level: string;
-  onApply?: (phases: Array<{ startНеделя: number; endНеделя: number; phase: string }>) => void;
+  onApply?: (phases: Array<{ startWeek: number; endWeek: number; phase: string }>) => void;
 }> = ({ weeks, goal, level, onApply }) => {
   if (weeks < 2) return null;
-  let phases: Array<{ startНеделя: number; endНеделя: number; phase: string }> = [];
+  let phases: Array<{ startWeek: number; endWeek: number; phase: string }> = [];
   try { phases = distributePhases(weeks, 0, goal === 'powerlifting' ? 'strength' : 'bulk') || []; } catch { return null; }
   if (!phases.length) return null;
   const pc: Record<string, string> = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' };
@@ -326,7 +326,7 @@ export const SplitConsultant: React.FC<PanelProps> = ({ program, dir, onChange, 
   const prof = loadTrainingProfile();
   let candidates: any[] = [];
   try {
-    candidates = (selectSplit({ goal: program.meta.goal, level: program.meta.level, daysPerНеделя: program.meta.daysPerWeek, recovery: prof.recovery ?? 70, fatigue: prof.fatigue ?? 30, sleep: prof.sleepHours ?? 7, stress: prof.stressLevel ?? 30, weakPoints: (prof.weakPoints ?? []) as string[], injuries: [], onCourse: prof.onCourse ?? false, equipment: (prof.equipment ?? []) as string[] } as any) as any[]).slice(0, 4);
+    candidates = (selectSplit({ goal: program.meta.goal, level: program.meta.level, daysPerWeek: program.meta.daysPerWeek, recovery: prof.recovery ?? 70, fatigue: prof.fatigue ?? 30, sleep: prof.sleepHours ?? 7, stress: prof.stressLevel ?? 30, weakPoints: (prof.weakPoints ?? []) as string[], injuries: [], onCourse: prof.onCourse ?? false, equipment: (prof.equipment ?? []) as string[] } as any) as any[]).slice(0, 4);
   } catch { return null; }
   if (!candidates || candidates.length === 0) return null;
   return (

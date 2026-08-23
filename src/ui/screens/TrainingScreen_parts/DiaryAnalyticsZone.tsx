@@ -19,13 +19,13 @@ interface Props {
   diaryProgress: WeeklyProgress[];
   historyWorkouts: WorkoutLog[];
   macrocycle: MacrocyclePlan | null;
-  selectedНеделя: number;
+  selectedWeek: number;
   level: string;
   onRefresh: () => void;
   onTabChange?: (tab: TrainingTab) => void;
   trainingOutput: TrainingOutput | null;
   goal: string;
-  daysPerНеделя: number;
+  daysPerWeek: number;
   splitType: string;
   periodizationType: string;
   mesoLength: number;

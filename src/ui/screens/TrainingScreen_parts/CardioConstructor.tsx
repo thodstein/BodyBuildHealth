@@ -74,7 +74,7 @@ interface WizardState {
   bodyWeight: number;
   taperWeeks: number;
   taperEnabled: boolean;
-  peakНеделя: boolean;
+  peakWeek: boolean;
   phaseAuto: boolean;
   phaseBase: number;
   phaseBuild: number;

@@ -117,7 +117,7 @@ export const SplitGenCard: React.FC = () => {
   // Split generation
   const out: SplitOutput | null = useMemo(() => {
     const input: SplitInput = {
-        daysPerНеделя: days, goal, weakPoints: weak,
+        daysPerWeek: days, goal, weakPoints: weak,
         equipmentAvailable: prof.equipment || ['barbell'],
         injuryType: injury || undefined,
     };
@@ -156,7 +156,7 @@ export const SplitGenCard: React.FC = () => {
     const visCat = SPLIT_CATALOG.find(s => s.id === visType);
     if (!visCat || visType === 'auto') return null;
     const input: SplitInput = {
-      daysPerНеделя: visDays, goal: visGoal, weakPoints: weak,
+      daysPerWeek: visDays, goal: visGoal, weakPoints: weak,
       equipmentAvailable: prof.equipment || ['barbell'],
     };
     try {
@@ -185,14 +185,14 @@ export const SplitGenCard: React.FC = () => {
   const [cmpGoal, setCmpGoal] = useState<SplitGoal>('hypertrophy');
   const [cmpDays, setCmpDays] = useState(4);
   const cmpOutA = useMemo(() => {
-    const input: SplitInput = { daysPerНеделя:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
+    const input: SplitInput = { daysPerWeek:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
     try {
       const fns: Record<string, (i:SplitInput)=>SplitOutput> = { fbw:generateFBWSplit, ul:generateUpperLowerSplit, ppl:generatePPLSplit, pb:generatePowerbuildingSplit, sm:generateStrongmanSplit, wl:generateWeightliftingSplit, cf:generateCrossFitSplit, rehab:generateRehabSplit };
       return (fns[cmpA] || generateSplit)(input);
     } catch { return null; }
   }, [cmpA, cmpGoal, cmpDays, weak, prof.equipment]);
   const cmpOutB = useMemo(() => {
-    const input: SplitInput = { daysPerНеделя:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
+    const input: SplitInput = { daysPerWeek:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
     try {
       const fns: Record<string, (i:SplitInput)=>SplitOutput> = { fbw:generateFBWSplit, ul:generateUpperLowerSplit, ppl:generatePPLSplit, pb:generatePowerbuildingSplit, sm:generateStrongmanSplit, wl:generateWeightliftingSplit, cf:generateCrossFitSplit, rehab:generateRehabSplit };
       return (fns[cmpB] || generateSplit)(input);

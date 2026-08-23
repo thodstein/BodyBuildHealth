@@ -16,7 +16,7 @@ type UserLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'interme
 interface Props {
   goal: string;
   level: string;
-  daysPerНеделя: number;
+  daysPerWeek: number;
   linked?: unknown;
 }
 
@@ -206,7 +206,7 @@ export const CycleCatalog: React.FC<Props> = (p) => {
     const ranked = rankCycles({
       goal: normalizeGoal(p.goal),
       level: normalizeLevel(p.level),
-      daysPerНеделя: p.daysPerWeek,
+      daysPerWeek: p.daysPerWeek,
       direction: cat === 'strength' ? 'powerlifting' : cat === 'bodybuilding' ? 'bodybuilding' : undefined,
     });
     return ranked.filter(r => r.score > 0).slice(0, 5);

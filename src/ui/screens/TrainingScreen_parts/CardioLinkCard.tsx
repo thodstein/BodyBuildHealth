@@ -94,7 +94,7 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
         legDaysNote = legDays > 0 ? ` · дней ног: ${legDays}` : '';
       }
     } catch { /* ignore */ }
-    const adapted = adaptCardioToStrength(c, { acwr, legDaysPerНеделя: legDays });
+    const adapted = adaptCardioToStrength(c, { acwr, legDaysPerWeek: legDays });
     const cmp = compareCardioCycles(c, adapted);
     const unchanged = cmp.diffs.length === 0;
     setPendingDiff({
