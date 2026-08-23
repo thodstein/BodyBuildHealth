@@ -1685,7 +1685,9 @@ export function foodStateLabel(s?: FoodItem['foodState']): string {
       continue;
     }
     if (cat === 'protein') { f.foodState = 'cooked'; continue; }
-    if (id.includes('drink') || id.includes('isotonic') || id.includes('isoton') || id.includes('water') || id.includes('juice') || id.includes('kvas') || id.includes('kombucha')) { f.foodState = 'liquid'; continue; }
+    if ((id.includes('drink') || id.includes('isotonic') || id.includes('isoton') || id.includes('water') || id.includes('juice') || id.includes('kvas') || id.includes('kombucha')) && !id.includes('amylopectin') && !id.includes('maltodextrin') && !id.includes('vitargo') && !id.includes('dextrose')) { f.foodState = 'liquid'; continue; }
+    // carb powder / isoton powder — 30г скуп, не жидкость
+    if (id.includes('amylopectin') || id.includes('amylop') || id.includes('maltodextrin') || id.includes('vitargo') || id.includes('dextrose') || id.includes('isoton')) { f.foodState = 'powder'; continue; }
     if (cat === 'dairy' || cat === 'carb') {
       if (id.includes('milk') || id.includes('kefir') || id.includes('yogurt') || id.includes('ryazhen') || id.includes('ayran') || id.includes('cream') || id.includes('drink')) f.foodState = 'liquid';
       else f.foodState = 'as_is';

@@ -176,7 +176,7 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
   casein: 140, casein_micellar: 140, bcaa: 20, supp_eaa: 20,
   glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
   supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
-  amylopectin: 80, dextrose: 80, collagen_hydrolysate: 20,
+  amylopectin: 90, dextrose: 90, maltodextrin: 90, vitargo: 90, isoton: 90, isotonic: 90, drink_isotonic: 90, collagen_hydrolysate: 20,
 };
 // Глобальный лимит на одну порцию любого продукта (г)
 // Этап 6: для уровня «Максимум»/enhanced лимиты выше, чтобы высококалорийные планы
@@ -772,12 +772,14 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   };
   const id = (food.id || '').toLowerCase();
   const cat = food.category;
+  const isAmylo = id.includes('amylopectin') || id.includes('amylop') || id.includes('dextrose') || id.includes('maltodextrin') || id.includes('vitargo') || id.includes('waxy');
+  const isIsotonicPowder = id.includes('isotonic') || id.includes('isoton') || id.includes('isodrink') || id.includes('electrolyte') || (id.includes('drink') && cat === 'supplement');
   const isOil = id.includes('oil') || id.includes('масло') || (cat === 'fat' && (food.fat || 0) >= 90);
   const isAvocado = id.includes('avocado') || id.includes('авокадо');
-  const isLiquid = food.foodState === 'liquid' || id.includes('drink') || id.includes('isotonic') || id.includes('isoton') || id.includes('water') || id.includes('kefir') || id.includes('milk') || id.includes('yogurt') || id.includes('ayran') || id.includes('cream') || (cat === 'dairy' && (id.includes('milk') || id.includes('kefir') || id.includes('yogurt')));
+  const isLiquid = !isAmylo && !isIsotonicPowder && (food.foodState === 'liquid' || id.includes('kefir') || id.includes('milk') || id.includes('yogurt') || id.includes('ayran') || id.includes('cream') || id.includes('water') || (cat === 'dairy' && (id.includes('milk') || id.includes('kefir') || id.includes('yogurt'))));
   const isNutDry = !isOil && !isAvocado && (cat === 'fat' || id.includes('nut') || id.includes('almond') || id.includes('cashew') || id.includes('walnut') || id.includes('hazel') || id.includes('pistach') || id.includes('peanut') || id.includes('dried') || id.includes('raisin') || id.includes('goji') || id.includes('chia') || id.includes('seed') || id.includes('apricot') || id.includes('prune') || id.includes('date'));
   const isPorridge = cat === 'grain' || cat === 'carb';
-  const isProteinPowder = cat === 'supplement' && (id.includes('whey') || id.includes('casein') || id.includes('isolate') || id.includes('protein') || id.includes('bcaa') || id.includes('eaa') || id.includes('creatine') || id.includes('collagen'));
+  const isProteinPowder = isAmylo || isIsotonicPowder || (cat === 'supplement' && (id.includes('whey') || id.includes('casein') || id.includes('isolate') || id.includes('protein') || id.includes('bcaa') || id.includes('eaa') || id.includes('creatine') || id.includes('collagen')));
   const isMeatFish = cat === 'protein';
   const isFruitVegFresh = cat === 'veg_fruit';
   const isDairy = cat === 'dairy';
