@@ -231,7 +231,7 @@ const PREMIUM_OR_EXOTIC = ['abalone','sea_urchin','caviar','roe','truffle','maca
   'sea_cucumber','whale','bear','chestnut','pine_nut','oil_hemp_organic','oil_rice_bran_organic','oil_grapeseed_cold'];
 const isPremiumOrExotic = (id: string): boolean => {
   const lid = id.toLowerCase();
-  return PREMIUM_OR_EXOTIC.some(k => lid.includes(k)) || lid.startsWith('lamb');
+  return PREMIUM_OR_EXOTIC.some(k => lid.includes(k)) || lid === 'lamb' || lid.startsWith('lamb_');
 };
 
 // D-28 (жалоба «еда на работе пулит всё подряд»): портативная еда — то, что можно взять
@@ -884,7 +884,8 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
     dairy: byBudget(basePool.filter(f => f.category === 'dairy' && (f.fat || 0) <= 10)),
     // Д-5: vegetarian protein pool — relaxed thresholds so tofu/tempeh/seitan and carb-category
     // legumes (lentils, chickpeas, edamame) actually enter the rotation (not only dairy).
-    vegProteinExtra: basePool.filter(f => !isPremiumOrExotic(f.id) && (
+    // P2-fix: на max/enhanced не режем премиум (вегану нужен выбор).
+    vegProteinExtra: basePool.filter(f => (budget === 'max' || budget === 'enhanced' || !isPremiumOrExotic(f.id)) && (
       (f.category === 'protein' && (f.protein || 0) >= 8) ||
       (f.id === 'tofu' || f.id === 'tempeh' || f.id === 'seitan' || f.id === 'edamame' ||
        f.id === 'lentils' || f.id === 'chickpeas' || f.id === 'hummus')
