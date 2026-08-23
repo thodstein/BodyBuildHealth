@@ -46,12 +46,16 @@ const CATEGORY_LABELS_RU: Record<string, string> = {
 
 // ─── Main component ───
 
+const AAS_CATEGORY_SET = new Set(['anabolic','androgen','aas_derivative','steroidal','ai','aromatase_inhibitor','estrogen','androgen_receptor','mTOR','gh_releasing','gh_secretagogue']);
+const isAAS = (e: EnrichedEntry) => e.category.some(c => AAS_CATEGORY_SET.has(c.toLowerCase())) || /тестостерон|нандролон|тренболон|болденон|станозолол|оксандролон|метандростенолон|туринабол|мастерон|примоболан/i.test(e.nameRu + ' ' + e.nameEn);
+
 export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [tab, setTab] = useState<'catalog'>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'bio' | 'name' | 'forms'>('bio');
+  const [showAAS, setShowAAS] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(() => localStorage.getItem('he_bio_selected'));
   const [compareIds, setCompareIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('he_bio_compare') || '[]'); } catch { return []; } });
   const [showCompare, setShowCompare] = useState(compareIds.length > 0);
@@ -63,11 +67,12 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
     if (q) list = list.filter(e => e.nameRu.toLowerCase().includes(q) || e.nameEn.toLowerCase().includes(q) || e.description.toLowerCase().includes(q) || e.category.some(c => c.toLowerCase().includes(q)));
     if (categoryFilter !== 'all') list = list.filter(e => e.category.includes(categoryFilter));
     if (sourceFilter !== 'all') list = list.filter(e => e.source === sourceFilter);
+    if (!showAAS) list = list.filter(e => !isAAS(e));
     if (sortBy === 'bio') list.sort((a, b) => b.maxBio - a.maxBio);
     else if (sortBy === 'name') list.sort((a, b) => a.nameRu.localeCompare(b.nameRu));
     else list.sort((a, b) => b.forms.length - a.forms.length);
     return list;
-  }, [catalog, searchQuery, categoryFilter, sourceFilter, sortBy]);
+  }, [catalog, searchQuery, categoryFilter, sourceFilter, sortBy, showAAS]);
   const selected = selectedId ? catalog.find(e => e.id === selectedId) : null;
   const handleSelect = useCallback((id: string | null) => { setSelectedId(id); if (id) localStorage.setItem('he_bio_selected', id); else localStorage.removeItem('he_bio_selected'); }, []);
   const handleCompare = useCallback((id: string) => { let next: string[]; if (compareIds.includes(id)) next = compareIds.filter(x => x !== id); else if (compareIds.length < 4) next = [...compareIds, id]; else return; setCompareIds(next); localStorage.setItem('he_bio_compare', JSON.stringify(next)); }, [compareIds]);
@@ -86,18 +91,18 @@ export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s
         <div style={{ marginBottom: 8 }}>
           <div style={S.h2}>🧬 Калькулятор биодоступности</div>
           <div style={{ ...S.sub, marginBottom: 6 }}>
-            Сравнение форм, расчёт эффективной дозы, стратегии улучшения всасывания · {stats.total} веществ
+            Сравнение форм, расчёт эффективной дозы, стратегии улучшения всасывания · {stats.total} веществ · ААС вынесены отдельно
           </div>
         </div>
-<CatalogTab catalog={catalog} filtered={filtered} allCategories={allCategories} searchQuery={searchQuery} setSearchQuery={setSearchQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} sortBy={sortBy} setSortBy={setSortBy} selectedId={selectedId} handleSelect={handleSelect} compareIds={compareIds} handleCompare={handleCompare} showCompare={showCompare} setShowCompare={setShowCompare} compareEntries={compareEntries} />
+<CatalogTab catalog={catalog} filtered={filtered} allCategories={allCategories} searchQuery={searchQuery} setSearchQuery={setSearchQuery} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} sortBy={sortBy} setSortBy={setSortBy} selectedId={selectedId} handleSelect={handleSelect} compareIds={compareIds} handleCompare={handleCompare} showCompare={showCompare} setShowCompare={setShowCompare} compareEntries={compareEntries} showAAS={showAAS} setShowAAS={setShowAAS} />
       </div>
     </InfoErrorBoundary>
   );
 };
 
 // ─── Catalog tab ───
-interface CatalogTabProps { catalog: EnrichedEntry[]; filtered: EnrichedEntry[]; allCategories: string[]; searchQuery: string; setSearchQuery: (v: string) => void; categoryFilter: string; setCategoryFilter: (v: string) => void; sourceFilter: string; setSourceFilter: (v: string) => void; sortBy: 'bio' | 'name' | 'forms'; setSortBy: (v: 'bio' | 'name' | 'forms') => void; selectedId: string | null; handleSelect: (id: string | null) => void; compareIds: string[]; handleCompare: (id: string) => void; showCompare: boolean; setShowCompare: (v: boolean) => void; compareEntries: EnrichedEntry[]; }
-const CatalogTab: React.FC<CatalogTabProps> = ({ catalog, filtered, allCategories, searchQuery, setSearchQuery, categoryFilter, setCategoryFilter, sourceFilter, setSourceFilter, sortBy, setSortBy, selectedId, handleSelect, compareIds, handleCompare, showCompare, setShowCompare, compareEntries }) => {
+interface CatalogTabProps { catalog: EnrichedEntry[]; filtered: EnrichedEntry[]; allCategories: string[]; searchQuery: string; setSearchQuery: (v: string) => void; categoryFilter: string; setCategoryFilter: (v: string) => void; sourceFilter: string; setSourceFilter: (v: string) => void; sortBy: 'bio' | 'name' | 'forms'; setSortBy: (v: 'bio' | 'name' | 'forms') => void; selectedId: string | null; handleSelect: (id: string | null) => void; compareIds: string[]; handleCompare: (id: string) => void; showCompare: boolean; setShowCompare: (v: boolean) => void; compareEntries: EnrichedEntry[]; showAAS: boolean; setShowAAS: (v:boolean)=>void; }
+const CatalogTab: React.FC<CatalogTabProps> = ({ catalog, filtered, allCategories, searchQuery, setSearchQuery, categoryFilter, setCategoryFilter, sourceFilter, setSourceFilter, sortBy, setSortBy, selectedId, handleSelect, compareIds, handleCompare, showCompare, setShowCompare, compareEntries, showAAS, setShowAAS }) => {
   const selected = selectedId ? catalog.find(e => e.id === selectedId) : null;
   if (selected) return <DetailView entry={selected} onBack={() => handleSelect(null)} catalog={catalog} />;
   return (
@@ -112,6 +117,13 @@ const CatalogTab: React.FC<CatalogTabProps> = ({ catalog, filtered, allCategorie
           <PopupSelect label="📂 Категория" value={categoryFilter} options={[{id:'all',label:'Все категории'},...allCategories.map(c => ({id:c,label:CATEGORY_LABELS_RU[c] || c}))]} onChange={setCategoryFilter} />
           <PopupSelect label="📦 Тип" value={sourceFilter} options={[{id:'all',label:'Все типы'},{id:'catalog',label:'БАД'},{id:'pharma',label:'Фарма'},{id:'peptide',label:'Пептиды'}]} onChange={setSourceFilter} />
           <PopupSelect label="🔀 Сортировка" value={sortBy} options={[{id:'bio',label:'По биодоступности'},{id:'name',label:'По алфавиту'},{id:'forms',label:'По числу форм'}]} onChange={v => setSortBy(v as any)} />
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6, padding:'7px 10px', borderRadius:8, background: showAAS ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)', border: showAAS ? '1px solid rgba(239,68,68,0.22)' : '1px solid rgba(255,255,255,0.06)' }}>
+          <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:10, color: showAAS ? '#f87171' : '#fff', fontWeight:700 }}>
+            <input type="checkbox" checked={showAAS} onChange={e=> setShowAAS(e.target.checked)} style={{ accentColor:'#ef4444' }} />
+            {showAAS ? '✓ ААС показаны отдельно' : 'ААС скрыты (не смешиваются с БАД/фармой)'}
+          </label>
+          <span style={{ marginLeft:'auto', fontSize:9, color:'rgba(255,255,255,0.5)' }}>{showAAS ? 'ААС в списке — помечены 🔴' : 'Включите, чтобы увидеть ААС отдельно'}</span>
         </div>
       </div>
       {/* Compare card-button */}
