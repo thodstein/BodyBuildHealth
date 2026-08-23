@@ -4,8 +4,26 @@
   "installCommand": "npm ci",
   "outputDirectory": "dist",
   "functions": {
-    "api/ocr-scanned-pdf.ts": { "maxDuration": 300, "memory": 2048 },
-    "api/ocr-image.ts": { "maxDuration": 300, "memory": 2048 }
+    "api/ocr-scanned-pdf.ts": {
+      "maxDuration": 300,
+      "memory": 2048,
+      "includeFiles": [
+        "node_modules/tesseract.js/src/**",
+        "node_modules/tesseract.js-core/**",
+        "node_modules/@tesseract.js-data/rus/**",
+        "node_modules/@tesseract.js-data/eng/**"
+      ]
+    },
+    "api/ocr-image.ts": {
+      "maxDuration": 300,
+      "memory": 2048,
+      "includeFiles": [
+        "node_modules/tesseract.js/src/**",
+        "node_modules/tesseract.js-core/**",
+        "node_modules/@tesseract.js-data/rus/**",
+        "node_modules/@tesseract.js-data/eng/**"
+      ]
+    }
   },
   "headers": [
     {
