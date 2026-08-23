@@ -59,7 +59,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     subtitle: 'Единый пульт: нагрузка → восстановление → авторегуляция → прогноз (без дублей)',
     tabs: [
       'intelligence_hub', 'strength_analysis', 'quality_hub', 'diagnostics_hub', 'joints_ortho', 'periodization_taper_hub',
-      'exercise_lab', 'volume_hub', 'mix_hub',
+      'exercise_lab', 'volume_hub', 'mix_hub', 'metabolic_hub',
     ],
   },
   library: {
@@ -125,6 +125,7 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 (TAB_TO_ZONE as Record<string, TrainingZone>)['load_safety'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['load_management'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['intelligence_hub'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['metabolic_hub'] = 'calculators';
 
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';

@@ -19,6 +19,7 @@ import { DailyQuests } from './NutritionScreen_parts/DailyQuests';
 import { PeriWorkoutCard } from './NutritionScreen_parts/PeriWorkoutCard';
 import { NutritionWeeklyComparison } from './NutritionScreen_parts/NutritionWeeklyComparison';
 import { readDiaryV2, onDiaryChangeV2 } from './NutritionScreen_parts/diary-storage-v2';
+import { MetabolicHub } from './Shared/MetabolicHub';
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
@@ -29,14 +30,14 @@ import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 interface DiaryEntry { name: string; kcal: number; p: number; f: number; c: number; date?: string; }
 type NutritionPage = 'hero' | 'tabs';
 type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
-type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri';
+type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests'],
+  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic'],
   analytics: ['charts', 'reports'],
   diary: ['diary', 'charts', 'reports', 'peri'],
-  planning: ['mealplan', 'catalog', 'favorites', 'reference', 'info', 'usefulness', 'recipes'],
-  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri'],
+  planning: ['mealplan', 'catalog', 'favorites', 'reference', 'info', 'usefulness', 'recipes', 'metabolic'],
+  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -53,6 +54,7 @@ const TAB_LABELS: Record<string, string> = {
   achievements: '🏆 Достижения',
   quests: '🎯 Квесты',
   peri: '🥤 Пери-воркаут',
+  metabolic: '⚖️ Метаболика',
 };
 
 const cardBg = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
@@ -1586,6 +1588,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
       case 'quests': return <InfoErrorBoundary label="Квесты"><DailyQuests /></InfoErrorBoundary>;
       case 'peri': return <InfoErrorBoundary label="Пери-воркаут"><PeriWorkoutCard /></InfoErrorBoundary>;
       case 'usefulness': return <InfoErrorBoundary label="Полезность"><ProductUsefulnessPlanner /></InfoErrorBoundary>;
+      case 'metabolic': return <InfoErrorBoundary label="Метаболика"><MetabolicHub /></InfoErrorBoundary>;
       default: return null;
     }
   };

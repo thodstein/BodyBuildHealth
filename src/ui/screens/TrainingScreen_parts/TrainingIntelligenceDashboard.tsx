@@ -50,6 +50,8 @@ export default function TrainingIntelligenceDashboard(p: Props) {
         { icon: '⚡', label: 'Интеллект — единый пульт', desc: 'Нагрузка → восстановление → авторегуляция → прогноз. Один расчёт, без дублей (ACWR/Banister + PRI + прогноз)', tab: 'intelligence_hub' as any,
           badge: { text: `${p.readinessRecovery}% · ACWR ${acwr ? acwr.ratio.toFixed(1) : '—'}`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
         { icon: '🦴', label: 'Суставы и ортопедия', desc: 'Единый инструмент: JSI теплокарта + анатомия риска + нагрузка + геометрия + недельный план + прехаб/FMS + замены (9 калькуляторов)', tab: 'joints_ortho' as any },
+        { icon: '⚖️', label: 'Метаболика', desc: 'Вода/шаги/КБЖУ/жир/кортизол — с/без ААС, один снапшот (EFSA/Helms/Navy)', tab: 'metabolic_hub' as any,
+          badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
       ],
     },
     {

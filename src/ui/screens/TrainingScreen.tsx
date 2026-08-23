@@ -44,6 +44,7 @@ import { TaperPlannerTab } from './TrainingScreen_parts/TaperPlannerTab';
 import { ExecutionZone } from './TrainingScreen_parts/ExecutionZone';
 import { TrainingDiaryHub } from './TrainingScreen_parts/TrainingDiaryHub';
 import { UnifiedIntelligenceHub } from './TrainingScreen_parts/UnifiedIntelligenceHub';
+import { MetabolicHub } from './Shared/MetabolicHub';
 
 import {
   GOALS, LEVELS, MUSCLE_GROUPS, GROUP_LABELS, EQUIP_LABELS, JOINT_LABELS,
@@ -673,7 +674,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ ⚡ ИНТЕЛЛЕКТ ТРЕНИРОВКИ (дашборд вместо пилюль) ═══════════ */}
       {zone === 'calculators' && (() => {
-        const CALC_TABS = new Set(['intelligence_hub','strength_analysis','load_safety','joints_ortho','quality_hub','diagnostics_hub','periodization_taper_hub','exercise_lab','volume_hub','tools_hub','rir_forecast_hub','mix_hub']);
+        const CALC_TABS = new Set(['intelligence_hub','strength_analysis','load_safety','joints_ortho','quality_hub','diagnostics_hub','periodization_taper_hub','exercise_lab','volume_hub','tools_hub','rir_forecast_hub','mix_hub','metabolic_hub']);
         // Качество и диагностика — РАЗДЕЛЬНО (бывший quality_joint_hub 2-в-1)
         const effectiveTab = tab === 'load_management' || tab === 'load_safety' ? 'intelligence_hub' as const
           : tab === 'rir_calibration' || tab === 'readiness_forecast' || tab === 'rir_forecast_hub' ? 'intelligence_hub' as const
@@ -706,6 +707,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {(effectiveTab as any) === 'tools_hub' && <InfoErrorBoundary label="PRI/схема повторов"><ToolsHub /></InfoErrorBoundary>}
             {(effectiveTab as any) === 'rir_forecast_hub' && <InfoErrorBoundary label="RIR + Прогноз — единый хаб"><RirForecastHub initialMode={tab === 'readiness_forecast' ? 'forecast' : 'rir'} /></InfoErrorBoundary>}
             {effectiveTab === 'mix_hub' && <InfoErrorBoundary label="Миксы"><MixHub initialMode={tab === 'mix_presets' ? 'health' : 'training'} /></InfoErrorBoundary>}
+            {effectiveTab === 'metabolic_hub' && <InfoErrorBoundary label="Метаболика"><MetabolicHub /></InfoErrorBoundary>}
           </>);
         }
         return <TrainingIntelligenceDashboard
