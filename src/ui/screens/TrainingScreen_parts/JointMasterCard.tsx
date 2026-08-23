@@ -26,6 +26,7 @@ const LEVEL_RU: Record<string,string> = { critical: 'Критично', high: '�
 const PHASE_RU: Record<string,string> = { acute: 'Острая', subacute: 'Подострая', chronic: 'Хроническая', normal: 'Норма', stable: 'Стабильная' };
 const DIFF_RU: Record<string,string> = { hard: 'Тяжёлая', medium: 'Средняя', light: 'Лёгкая', off: 'Отдых' };
 const LIFT_RU_ALL: Record<string,string> = { squat: 'Присед', deadlift: 'Становая (классика)', bench: 'Жим лёжа', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга блока', incline_press: 'Жим наклонный', sumo: 'Сумо', biceps: 'Бицепс' };
+const PATTERN_RU: Record<string,string> = { squat: 'Присед', hinge: 'Наклон', horizontal_push: 'Жим горизонтально', horizontal_pull: 'Тяга горизонтально', vertical_push: 'Жим вертикально', vertical_pull: 'Тяга вертикально', lunge: 'Выпад', carry: 'Перенос', rotation: 'Ротация', anti_rotation: 'Антиротация', accessory: 'Изоляция' };
 
 export const JointMasterCard: React.FC = () => {
   const [sub, setSub] = useState<'ortho' | 'safety'>('ortho');
@@ -96,16 +97,32 @@ export const JointMasterCard: React.FC = () => {
         <div style={{ fontSize:10, color:'#fff', marginTop:4, lineHeight:1.5 }}>{diag.joint.description}</div>
         <div style={{ fontSize:10, color:'#fbbf24', marginTop:4 }}>Опасные структуры: {diag.joint.dangerous.join(' · ')}</div>
         <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Связанные движения: {diag.joint.relatedLifts.join(', ')}</div>
-        {joint==='spine' && <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontSize:10 }}>🦴 Поясница выделена: диск L4-S1 не терпит округления + shear. Нейтраль + брейсинг + ограничение глубины — база.</div>}
+        {joint==='spine' && <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontSize:10 }}>🦴 Поясница выделена: диск L4-S1 не терпит округления + сдвиг. Нейтраль + брейсинг + ограничение глубины — база.</div>}
+        <button onClick={() => {
+          const flow = diag.flows[0];
+          if (flow) applyToPlanner({ kind:'limiter', label:`Мобильность ${diag.joint.label}: ${flow.name}`, data:{ limiterExerciseMap:{ [diag.joint.id+'|mobility|'+flow.id]: flow.exercises || [] }, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+          else applyToPlanner({ kind:'limiter', label:`Анатомия ${diag.joint.label}: прехаб`, data:{ limiterExerciseMap:{ [diag.joint.id+'|prehab|anat']: diag.mobilityTests.map(t=>t.title) }, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#fff', color:'#000', fontWeight:800, fontSize:10 }}>🛠 Добавить прехаб для {diag.joint.label}</button>
       </div>
 
       {/* 2 нагрузка */}
       <div style={CARD}>
         <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>2 · Текущая нагрузка из плана (нагрузка на сустав)</div>
-        <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>Фаза ортопедии: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Разрешённые паттерны: {diag.allowedPatterns.join(', ') || '—'} · Заблокированы: <span style={{color:'#f87171'}}>{diag.blockedPatterns.join(', ') || 'нет'}</span></div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>Фаза ортопедии: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Разрешено: {diag.allowedPatterns.map(p=>PATTERN_RU[p]||p).join(', ') || '—'} · Заблокировано: <span style={{color:'#f87171'}}>{diag.blockedPatterns.map(p=>PATTERN_RU[p]||p).join(', ') || 'нет'}</span></div>
         <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Лимиты амплитуды: {Object.keys(diag.romLimits).length? Object.entries(diag.romLimits).map(([k,v])=>`${k} ${v.min}-${v.max}°`).join(', ') : 'нет'} · Стресс-лимиты: {Object.entries(diag.stressLimits).slice(0,3).map(([k,v])=>`${k}:${v}`).join(', ')}</div>
         <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Пример упражнений с высокой нагрузкой на сустав:</div>
         <div style={{ fontSize:10, color:'#fff' }}>{EXERCISE_CATALOG.filter(e=>e.jointStress==='high' && (e.group==='legs' && joint==='knee' || e.group==='back' && joint==='spine' || e.group==='chest' && joint==='shoulder')).slice(0,3).map(e=>e.name).join(' · ') || '—'}</div>
+        <button onClick={() => {
+          if (diag.blockedPatterns.length) {
+            const map: Record<string,string[]> = {};
+            diag.blockedPatterns.forEach(p => { map[diag.joint.id+'|blocked|'+p] = [PATTERN_RU[p]||p]; });
+            applyToPlanner({ kind:'limiter', label:`Разгрузка ${diag.joint.label}: ${diag.blockedPatterns.length} паттернов`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+          } else {
+            applyToPlanner({ kind:'pri', label:`Статус ${diag.joint.label}: норма`, data:{ volumeMult: 1, rirShift: 0 } as any });
+          }
+        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#fff', color:'#000', fontWeight:800, fontSize:10 }}>
+          {diag.blockedPatterns.length ? `🛠 Разгрузить ${diag.joint.label} — исключить ${diag.blockedPatterns.length} паттерна` : `✓ ${diag.joint.label}: ограничений нет — применить норму`}
+        </button>
       </div>
 
       {/* 3 геометрия → сустав */}
@@ -180,7 +197,7 @@ export const JointMasterCard: React.FC = () => {
           {weekPlan.weekPlan.map(d=>(
             <div key={d.day} style={{ padding:'6px 4px', borderRadius:6, background: d.difficulty==='hard'?'rgba(239,68,68,0.12)': d.difficulty==='medium'?'rgba(251,191,36,0.12)': d.difficulty==='light'?'rgba(56,189,248,0.12)': d.difficulty==='rehab'?'rgba(167,139,250,0.12)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
               <div style={{ fontSize:8, color:'#fff' }}>Д{d.day}</div>
-              <div style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{d.difficulty==='off'?'—':`V${d.volumeTarget}`}</div>
+              <div style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{d.difficulty==='off'?'—':`О${d.volumeTarget}`}</div>
               <div style={{ fontSize:8, color:'#fff' }}>{DIFF_RU[d.difficulty] || d.focus}</div>
               <div style={{ fontSize:7, color:'#fff' }}>{d.intensityTarget ? `${Math.round(d.intensityTarget*100)}%` : ''}</div>
             </div>
