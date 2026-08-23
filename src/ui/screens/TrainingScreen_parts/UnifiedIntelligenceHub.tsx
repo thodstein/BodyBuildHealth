@@ -239,7 +239,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             flex:'0 0 auto', display:'flex', alignItems:'center', gap:6, padding:'7px 11px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:800, whiteSpace:'nowrap',
             border: active===s.id ? `1px solid ${s.accent}` : '1px solid rgba(255,255,255,0.08)',
             background: active===s.id ? `${s.accent}18` : 'rgba(255,255,255,0.04)',
-            color: active===s.id ? s.accent : 'rgba(255,255,255,0.62)', transition:'all 0.16s',
+            color: active===s.id ? s.accent : '#fff', transition:'all 0.16s',
           }}>
             <span>{s.icon}</span> {s.label}
           </button>
@@ -442,7 +442,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 <div style={{ background:`${RECOVERY_LABEL_COLOR(recoveryOut.readinessLabel)}14`, border:`1px solid ${RECOVERY_LABEL_COLOR(recoveryOut.readinessLabel)}33`, borderRadius:10, padding:'10px 10px', textAlign:'center' }}>
                   <div style={{ fontSize:9, color:DIM, letterSpacing:0.3, textTransform:'uppercase' }}>Recovery index</div>
-                  <div style={{ fontSize:20, fontWeight:900, color: RECOVERY_LABEL_COLOR(recoveryOut.readinessLabel) }}>{recoveryOut.overallRecoveryIndex}<span style={{ fontSize:10, opacity:0.7 }}> /100</span></div>
+                  <div style={{ fontSize:20, fontWeight:900, color: RECOVERY_LABEL_COLOR(recoveryOut.readinessLabel) }}>{recoveryOut.overallRecoveryIndex}<span style={{ fontSize:10 }}> /100</span></div>
                   <div style={{ fontSize:10, color: RECOVERY_LABEL_COLOR(recoveryOut.readinessLabel), fontWeight:800 }}>{recoveryOut.readinessLabel}</div>
                 </div>
                 <div style={{ background: verdict.train? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', border:`1px solid ${verdict.train? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)'}`, borderRadius:10, padding:'10px 10px', textAlign:'center' }}>
@@ -636,12 +636,12 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
               <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
                 <div style={{ fontSize:9, color:DIM }}>Δ Риск</div>
-                <div style={{ fontSize:18, fontWeight:900, color: whatIf.riskDelta>0?'#ef4444': whatIf.riskDelta<0?'#22c55e':'rgba(255,255,255,0.6)' }}>{whatIf.riskDelta>0?'+':''}{whatIf.riskDelta}</div>
+                <div style={{ fontSize:18, fontWeight:900, color: whatIf.riskDelta>0?'#ef4444': whatIf.riskDelta<0?'#22c55e':'#fff' }}>{whatIf.riskDelta>0?'+':''}{whatIf.riskDelta}</div>
                 <div style={{ fontSize:9, color:'#fff' }}>{Math.round((recoveryOut?.overtrainingRisk ?? 22)+whatIf.riskDelta)} итог</div>
               </div>
               <div style={{ background:'rgba(255,255,255,0.04)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
                 <div style={{ fontSize:9, color:DIM }}>Δ Готовность</div>
-                <div style={{ fontSize:18, fontWeight:900, color: whatIf.readinessDelta>0?'#22c55e': whatIf.readinessDelta<0?'#ef4444':'rgba(255,255,255,0.6)' }}>{whatIf.readinessDelta>0?'+':''}{whatIf.readinessDelta}</div>
+                <div style={{ fontSize:18, fontWeight:900, color: whatIf.readinessDelta>0?'#22c55e': whatIf.readinessDelta<0?'#ef4444':'#fff' }}>{whatIf.readinessDelta>0?'+':''}{whatIf.readinessDelta}</div>
                 <div style={{ fontSize:9, color:'#fff' }}>{Math.round(readiness+whatIf.readinessDelta)} итог</div>
               </div>
             </div>
@@ -667,7 +667,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
           <div style={{ background:'rgba(168,85,247,0.08)', borderRadius:10, padding:'10px 8px', textAlign:'center' }}>
             <div style={{ fontSize:9, color:DIM }}>PRI/autoReg</div>
             <div style={{ fontSize:13, fontWeight:900, color:'#a855f7' }}>×{autoReg.volumeMultiplier} · +{autoReg.rirShift}</div>
-            <div style={{ fontSize:9, color: autoReg.deload? '#ef4444':'rgba(255,255,255,0.85)' }}>{autoReg.deload? 'deload' : 'применить'}</div>
+            <div style={{ fontSize:9, color: autoReg.deload? '#ef4444':'#fff' }}>{autoReg.deload? 'deload' : 'применить'}</div>
           </div>
         </div>
         <div style={{ ...SMALL, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10, lineHeight:1.45 }}>
@@ -683,7 +683,7 @@ export const UnifiedIntelligenceHub: React.FC = () => {
         <div style={{ ...SMALL, textAlign:'center', marginTop:6 }}>Источники: Foster/Impellizzeri sRPE, Gabbett/Rollinson ACWR, Banister FF, Helms RIR/RPE, Zatsiorsky, Holt (1957). Без выдумок.</div>
       </div>
 
-      <div style={{ ...SMALL, textAlign:'center', marginTop:10, opacity:0.55 }}>
+      <div style={{ ...SMALL, textAlign:'center', marginTop:10 }}>
         Единый хаб без дублей — ACWR только в «Нагрузке», recovery/shouldTrain только в «Восстановлении», PRI/вес только в «Авторегуляции», Хольт/what-if только в «Прогнозе». Связный конвейер, а не 4 разрозненных вкладки.
       </div>
     </div>

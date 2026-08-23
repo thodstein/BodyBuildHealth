@@ -760,7 +760,33 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   // tighter cap (e.g. maxGrainPerMeal for cooked grains so a 140g-carb target doesn't
   // produce a 600g bowl of buckwheat).
   const ceiling = Math.min(maxGramPerItem(_currentBudget), capG ?? maxGramPerItem(_currentBudget));
-  const base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
+  let base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
+  // Человеческие порции — snap к сетке (каша 50-100-125-150-200-250, жидкость 250-500, орехи/сухофрукты 25-50-75-100, протеин 30-60-90, мясо/рыба 100-150-200-250)
+  const snap = (v: number, brackets: number[]): number => {
+    if (v <= 0) return v;
+    // если вне сетки — не снапим (для 110кг 666г каши не режем до 250)
+    if (v < brackets[0] || v > brackets[brackets.length - 1]) return v;
+    let best = brackets[0]; let bestDiff = Math.abs(v - best);
+    for (const b of brackets) { const d = Math.abs(v - b); if (d < bestDiff || (d === bestDiff && b > best)) { bestDiff = d; best = b; } }
+    return best;
+  };
+  const id = (food.id || '').toLowerCase();
+  const cat = food.category;
+  const isLiquid = food.foodState === 'liquid' || (cat === 'dairy' && (id.includes('milk') || id.includes('kefir') || id.includes('yogurt') || id.includes('drink') || id.includes('ayran') || id.includes('cream')));
+  const isNutDry = cat === 'fat' || id.includes('nut') || id.includes('almond') || id.includes('cashew') || id.includes('walnut') || id.includes('hazel') || id.includes('pistach') || id.includes('peanut') || id.includes('dried') || id.includes('raisin') || id.includes('goji') || id.includes('chia') || id.includes('seed') || id.includes('apricot') || id.includes('prune') || id.includes('date');
+  const isPorridge = cat === 'grain' || cat === 'carb';
+  const isProteinPowder = cat === 'supplement' || id.includes('whey') || id.includes('casein') || id.includes('isolate');
+  const isMeatFish = cat === 'protein';
+  const isFruitVegFresh = cat === 'veg_fruit';
+  const isDairy = cat === 'dairy';
+  if (isPorridge) base = snap(base, [50, 100, 125, 150, 200, 250]);
+  else if (isLiquid) base = snap(base, [250, 500]);
+  else if (isNutDry) base = snap(base, [25, 50, 75, 100]);
+  else if (isProteinPowder) base = snap(base, [30, 60, 90]);
+  else if (isMeatFish) base = snap(base, [100, 150, 200, 250]);
+  else if (isFruitVegFresh) base = snap(base, [100, 150, 200, 250]);
+  else if (isDairy) base = snap(base, [100, 150, 200, 250]);
+  else base = snap(base, [50, 100, 150, 200]);
   const supplementCap = SUPPLEMENT_MAX_G[food.id];
   return supplementCap ? Math.min(supplementCap, base) : base;
 }
