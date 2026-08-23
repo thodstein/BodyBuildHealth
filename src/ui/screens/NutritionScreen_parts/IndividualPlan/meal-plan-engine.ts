@@ -204,6 +204,8 @@ function carbPortionCap(food: FoodItem): number {
   const _budget = _currentBudget;
   if (carbPer100 >= 55) return maxDryGrainPerMeal(_budget);   // dry grains/pasta
   if (carbPer100 > 0 && carbPer100 < 30) return maxGrainPerMeal(_budget); // cooked starch (potato)
+  // medium density 30-55 (oat bran, muesli, bread) — realistic bowl ~300g (max 350 for max budget)
+  if (carbPer100 >= 30 && carbPer100 < 55) return _budget === 'max' || _budget === 'enhanced' ? 350 : 300;
   return maxGramPerItem(_budget);
 }
 
@@ -260,10 +262,27 @@ function isPortableFood(f: FoodItem): boolean {
   if (f.category === 'protein') return true;            // после проверки NON_PORTABLE — любой белок портативен (консервы/вареное/нарезка)
   if (f.category === 'grain' || f.category === 'carb') {
     // готовые к употреблению злаки (хлопья/мюсли/хлеб/рисовый крем/хлебцы) — портативны
-    // buckwheat (гречка горячая) — НЕ портативна, требует варки
-    return ['oats','cereal','muesli','rice_cream','bread','rice_cake','crispbread','bar','flakes','cream_of_rice'].some(k => lid.includes(k) || lname.includes(k));
+    // buckwheat/barley (гречка/ячка — горячие) — НЕ портативны, требуют варки
+    // 'bar' убран — иначе barley ложно портативен (barley contains 'bar')
+    return ['oats','cereal','muesli','rice_cream','bread','rice_cake','crispbread','flakes','cream_of_rice'].some(k => lid.includes(k) || lname.includes(k));
   }
   return false;
+}
+
+// ─── Per-meal portable helper (работа: только приёмы в окне смены — портативные) ──
+function timeStrToMinutes(t: string): number | null {
+  if (!t || typeof t !== 'string' || !t.includes(':')) return null;
+  const [h, m] = t.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m) || h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+function isTimeInWorkWindow(timeStr: string, ws: number, we: number): boolean {
+  const tm = timeStrToMinutes(timeStr);
+  if (tm === null || !Number.isFinite(ws) || !Number.isFinite(we)) return false;
+  if (ws === we) return false;
+  if (we > ws) return tm >= ws && tm <= we;
+  // night shift wrap-around (e.g. 22:00-06:00)
+  return tm >= ws || tm <= we;
 }
 
 // ─── Lab-driven dietary adjustments ─────────────────────────────────────
@@ -404,7 +423,7 @@ function pickRotation(dayOffset: number): { label: string; ids: string[]; note: 
 }
 
 // ─── Preference: common bodybuilding carbs get selection bonus ───
-const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_boiled','pasta_durum','quinoa','barley','cereal','millet','couscous','noodle','bulgur','chickpea','lentil','beans','corn','bread']);
+const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_boiled','pasta_durum','quinoa','barley','cereal','millet','couscous','noodle','bulgur','chickpea','lentil','beans','corn','bread','oats','oats_dry']);
 
 // ─── E1: Продуктовая типология приёмов ────────────────────────────────
 // Завтрак ≠ ужин: подбор продуктов по типу приёма, а не из общего пула.
@@ -416,7 +435,7 @@ const BREAKFAST_FRUIT_KEYWORDS = ['ягод','банан','черник','клу
 // курируемый fallback «завтрашних» углеводов — если по ключевым словам ничего не нашлось,
 // НЕ льём весь пул медленных углеводов (туда входят макароны/рис-гарниры/кус-кус).
 // Используем только явно «завтрашние» id (каши/хлопья/мюсли/рисовый крем/тост).
-const BREAKFAST_CARB_FALLBACK_IDS = ['oats','rice_cream','cereal','muesli','buckwheat','cereal_oat_bran','bread_white','bread_rye','bread_protein','rice_brown','millet','grain_spelt','grain_kamut','grain_einkorn','cream_of_rice','porridge_oat','porridge_buckwheat'];
+const BREAKFAST_CARB_FALLBACK_IDS = ['oats','oats_dry','rice_cream','cereal','muesli','buckwheat','cereal_oat_bran','bread_white','bread_rye','bread_protein','rice_brown','millet','grain_spelt','grain_kamut','grain_einkorn','cream_of_rice','porridge_oat','porridge_buckwheat'];
 // Курируемый fallback «завтрашних» фруктов (ягоды/банан/сухофрукты), а не весь плодовый пул.
 const BREAKFAST_FRUIT_FALLBACK_IDS = ['banana','apple','berries','blueberries','strawberries','raspberries','blackberries','gooseberries','cranberries','kiwi','dried_apricots','dates','raisins','prunes','dried_berries','fruit_goji_berries'];
 // D-28 fix (жалоба «логика завтрака не читается»): «завтрашний» белок —
@@ -541,14 +560,14 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
   if (carbs.length === 0) {
     carbs = source.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id));
     if (carbs.length === 0) {
-      carbs = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id));
+      carbs = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
     }
   }
   let fruits = pool.carbFruit.filter((f) => match(f, BREAKFAST_FRUIT_KEYWORDS));
   if (fruits.length === 0) {
     fruits = pool.carbFruit.filter((f) => BREAKFAST_FRUIT_FALLBACK_IDS.includes(f.id));
     if (fruits.length === 0) {
-      fruits = FOOD_DB.filter(f => BREAKFAST_FRUIT_FALLBACK_IDS.includes(f.id));
+      fruits = FOOD_DB.filter(f => BREAKFAST_FRUIT_FALLBACK_IDS.includes(f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
     }
   }
   // D-28 П10: овсяная основа — «завтрашние» злаки ранжируем: овсянка/хлопья/рисовый крем/мюсли
@@ -563,8 +582,45 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
   };
   const oatFamily = carbs.filter((f) => oatScore(f) >= 2);
   if (oatFamily.length >= 2) carbs = oatFamily; // овсяное семейство приоритетно (≥2 вариантов)
+  // D-28+1: если oatFamily <2 из-за variety-лимита, дополняем из FOOD_DB (иначе flakes/завтрак может дать лапшу)
+  // Распространяем на любой завтрак (включая auto), иначе generic завтрак ловит rice_noodles
+  if (carbs.length > 0 && oatFamily.length < 2) {
+    const styleKwsForOat = style !== 'auto' ? BREAKFAST_STYLE_CARBS[style] : BREAKFAST_CARB_KEYWORDS;
+    const matchOat = (f: FoodItem) => {
+      const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
+      return styleKwsForOat.some(k => name.includes(k) || id.includes(k));
+    };
+    const extra = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && oatScore(f) >= 2 && matchOat(f) && !carbs.some(c => c.id === f.id) && (f.carbs || 0) >= 15 && (f.gi || 0) <= 55 && !(_currentExcludedIds && _currentExcludedIds.has(f.id))).slice(0, 2 - oatFamily.length);
+    if (extra.length > 0) {
+      carbs = [...oatFamily, ...extra];
+      if (carbs.length < 2) {
+        carbs = [...carbs, ...FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_currentExcludedIds && _currentExcludedIds.has(f.id))).slice(0, 2 - carbs.length)];
+      }
+      if (carbs.length >= 2) {
+        // oatFamily дополнен — теперь приоритетно, исключаем не-овсяные (лапшу)
+        // carb уже = oatFamily+extra, без исходных не-овсяных
+      }
+    } else if (oatFamily.length > 0) {
+      // есть хотя бы 1 овсяный, но не 2 — всё равно оставляем только овсяные, без лапши
+      carbs = [...oatFamily];
+    }
+  }
+  // D-28: для завтрака никогда не используем обеденные гарниры (макароны/лапша/кус-кус/киноа)
+  // даже если они прошли фильтр по ключевым словам — тест «в завтрак не попадают макароны»
+  const BREAKFAST_FORBIDDEN_RE = /pasta|noodle|macaroni|spaghetti|couscous/i;
+  const _forbiddenIds = new Set(['rice_white', 'quinoa', 'rice_noodles', 'spaghetti', 'couscous']);
+  const _beforeForbid = [...carbs];
+  carbs = carbs.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id));
+  // eslint-disable-next-line no-console
+  if (carbs.some(f=>f.id==='rice_noodles') || _beforeForbid.some(f=>f.id==='rice_noodles')) console.log('[forbid-debug]', style, 'before', _beforeForbid.map(c=>c.id), 'after', carbs.map(c=>c.id), 'oatFamily', oatFamily.map(c=>c.id));
+  if (carbs.length === 0) {
+    // fallback к овсяному семейству из FOOD_DB
+    const fb = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
+    if (fb.length > 0) carbs = fb.slice(0, 2);
+    else carbs = source.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id)).slice(0, 3);
+  }
   return {
-    carbs: carbs.length > 0 ? carbs : [...source],
+    carbs: carbs.length > 0 ? carbs : [...source.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id))],
     fruits: fruits.length > 0 ? fruits : [...pool.carbFruit],
   };
 }
@@ -678,6 +734,7 @@ let _deprioritizedIds: Set<string> | undefined = undefined;
 let _categoryPref: any = undefined;
 let _qualityMode: 'full' | 'basic' = 'full';
 let _currentBudget: string = 'medium';
+let _currentExcludedIds: Set<string> | undefined = undefined;
 
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
@@ -814,11 +871,14 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
 function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPlanInput['budget'], varietyPoolSize?: number, preferredIds?: Set<string>, opts?: { specificity?: Specificity; categoryPref?: CategoryPref; intolerances?: Intolerances; tasteProfile?: TasteProfile; deprioritizedIds?: Set<string>; allergenTags?: Set<string>; portableMode?: boolean }) {
   const isMealFood = (f: FoodItem) =>
     f.category !== 'supplement' || ['whey_protein', 'whey_isolate', 'whey_concentrate', 'casein', 'casein_micellar', 'supp_pea_protein', 'supp_soy_isolate', 'supp_rice_protein', 'supp_eaa', 'bcaa'].includes(f.id);
-  // D-28: «еда на работе» — если portableMode, убираем не-портативные продукты из базового пула.
-  const _portable = !!opts?.portableMode;
+  // D-28+1: «еда на работе» теперь per-meal (окно смены), а не глобально basePool.
+  // Глобальный фильтр отключён — buildFoodPools всегда строит полный пул (portable-фильтр
+  // применяется позже в buildWholeMeal для приёмов внутри рабочего окна). Сохранён
+  // _portable для теста без work-контекста (legacy: portableMode без isWorkDay).
+  const _globalPortable = false;
   const _isMealFoodOk = (f: FoodItem): boolean => {
     if (!isMealFood(f)) return false;
-    if (_portable && !isPortableFood(f)) return false;
+    if (_globalPortable && !isPortableFood(f)) return false;
     return true;
   };
   // Д-3: build basePoolRaw first, then exclude premium/exotic at the source for low/medium budgets so
@@ -885,10 +945,10 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const pFatty = byBudget(basePool.filter(f => f.category === 'protein' && (f.fat || 0) > 8 && (f.protein || 0) >= 12));
   const pLean = byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.fat || 0) <= 3 && (f.protein || 0) >= 11));
   const anyProtein = pSolid.length > 0 ? pSolid : pLean.length > 0 ? pLean : pFatty.length > 0 ? pFatty : byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.protein || 0) >= 12));
-  // Хлопья на работе (oats 12г) — для portable снижаем порог до 10, иначе oats выпадает
-  const cSlowRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && (f.carbs || 0) >= (_portable ? 10 : 15) && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
+  // Хлопья: сухой овёс 60г (oats_dry) проходит порог 15, варёный oats 12 — нет, но есть fallback oats_dry
+  const cSlowRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && (f.carbs || 0) >= 15 && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
   const cSlowBud = byBudget(cSlowRaw);
-  const cFastRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb' || f.category === 'veg_fruit') && (f.gi || 0) >= 60 && (f.carbs || 0) >= (_portable ? 10 : 15) && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
+  const cFastRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb' || f.category === 'veg_fruit') && (f.gi || 0) >= 60 && (f.carbs || 0) >= 15 && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
   const cFastBud = byBudget(cFastRaw);
   const cFruitRaw = basePool.filter(f => f.category === 'veg_fruit' && (f.carbs || 0) >= 8 && (f.gi || 0) <= 55 && (f.fiber || 0) >= 1.5 && (f.protein || 0) < 15);
   const cFruitBud = byBudget(cFruitRaw);
@@ -964,9 +1024,50 @@ function buildWholeMeal(
     snack?: boolean; // E7: перекус-типология (протеин-порошок + хлопья + сухофрукты + орехи)
     breakfastStyle?: BreakfastStyle; // N1: основа завтрака (каша/хлопья/яйца/творог)
     extraLiquids?: { food: FoodItem; grams: number; role?: MealItem['role'] }[]; // E8: молоко/кокосовое масло в завтрак
+    // D-28+1: работа — per-meal portable (окно смены)
+    isWorkDay?: boolean;
+    workStartMin?: number;
+    workEndMin?: number;
+    portableMode?: boolean;
   }
 ): Meal {
-  const { label, time, type, proteinG, carbG, fatG, pool, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, breakfastStyle, extraLiquids } = params;
+  const { label, time, type, proteinG, carbG, fatG, pool: _poolIn, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, breakfastStyle, extraLiquids, isWorkDay, workStartMin, workEndMin, portableMode } = params;
+  // D-28+1: per-meal portable — только приёмы внутри рабочего окна фильтруются по isPortableFood
+  const _needPortable = (() => {
+    if (!portableMode) return false;
+    // legacy: portableMode без work-контекста → все приёмы портативные (для тестов/совместимости)
+    if (isWorkDay === undefined && workStartMin === undefined && workEndMin === undefined) return true;
+    if (!isWorkDay) return false;
+    if (!Number.isFinite(workStartMin) || !Number.isFinite(workEndMin)) return false;
+    return isTimeInWorkWindow(time, workStartMin!, workEndMin!);
+  })();
+  const pool = (() => {
+    if (!_needPortable) return _poolIn;
+    const portableFilter = (arr: FoodItem[]) => arr.filter(isPortableFood);
+    const pf = (arr: FoodItem[]) => {
+      const filtered = portableFilter(arr);
+      return filtered.length > 0 ? filtered : arr;
+    };
+    return {
+      ..._poolIn,
+      proteinSolid: pf(_poolIn.proteinSolid),
+      proteinFatty: pf(_poolIn.proteinFatty),
+      proteinLean: pf(_poolIn.proteinLean),
+      fastProtein: pf(_poolIn.fastProtein),
+      slowProtein: pf(_poolIn.slowProtein),
+      carbSlow: pf(_poolIn.carbSlow),
+      carbFast: pf(_poolIn.carbFast),
+      carbFruit: pf(_poolIn.carbFruit),
+      fats: pf(_poolIn.fats),
+      vegGreen: pf(_poolIn.vegGreen),
+      vegColor: pf(_poolIn.vegColor),
+      dairy: pf(_poolIn.dairy),
+      vegProteinExtra: pf((_poolIn as any).vegProteinExtra || []),
+      eaa: _poolIn.eaa,
+      dextrin: _poolIn.dextrin,
+      isotonic: _poolIn.isotonic,
+    } as ReturnType<typeof buildFoodPools>;
+  })();
   // E1: завтрак использует собственный продуктовый пул (каши/хлопья + ягоды/банан/сухофрукты).
   const _breakfastPools = breakfast ? breakfastCarbPool(pool, breakfastStyle || 'auto') : null;
   // N1: предпочтение белковой основы завтрака по стилю (яйца/творог).
@@ -1076,6 +1177,18 @@ function buildWholeMeal(
     // чтобы удержать пер-приёмную гликемическую нагрузку (GL = GI×carbs/100) в зелёной зоне (<25).
     // На рефид-дне GL-сужение отключаем — высокая GI здесь намеренна.
     let carbPickPool = commonCarbs.length > 0 ? commonCarbs : carbPool;
+    // D-28+1: при высокой углеводной цели (>=80г) — предпочитаем высоко-плотные углеводы (>=40г/100г),
+    // иначе низко-плотная гречка 20*350=70г не закрывает цель и даёт недобор.
+    // Для завтрака не применяем — у него свой oatFamily-логика (овсянка), плотные generic ломают завтрак.
+    if (!breakfast && carbTarget >= 80) {
+      let dense = carbPickPool.filter(f => (f.carbs || 0) >= 40);
+      if (dense.length < 2) {
+        // дополняем из FOOD_DB (иначе variety-лимит мог выбросить плотные) — любые плотные, не только common
+        const extraDense = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 40 && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && !dense.some(d => d.id === f.id) && !carbPickPool.some(c => c.id === f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
+        dense = [...dense, ...extraDense].slice(0, 3);
+      }
+      if (dense.length >= 2) carbPickPool = dense;
+    }
     // FIX favorite-breakfast: любимые углеводы (например rice_cream, GI 82) всегда в пуле
     // выбора — раньше добавлялись только при carbTarget >= 60, поэтому завтрак в трен-день
     // никогда не получал «рисовый крем + протеин» даже если он в любимых.
@@ -1582,6 +1695,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   _qualityMode = input.quality === 'basic' ? 'basic' : 'full';
   _currentBudget = input.budget || 'medium';
+  _currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
   const tBreakfast = input.wakeTime || '07:30';
@@ -1970,6 +2084,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       'Ягоды — антоцианы, защита от свободных радикалов',
       _seed ? `Семена (${_seed.name}) — омега-3 ALA + клетчатка` : '',
     ].filter(Boolean),
+    isWorkDay: input.isWorkDay, workStartMin: input.workStartMin, workEndMin: input.workEndMin, portableMode: input.portableMode,
   });
   }
   meals.push(breakfast);
@@ -1994,6 +2109,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       `Обед: цельная пища (${lunchRot.label} + злак + овощи + жиры)`,
       'Поддержание MPS — четверть суточного белка',
     ],
+    isWorkDay: input.isWorkDay, workStartMin: input.workStartMin, workEndMin: input.workEndMin, portableMode: input.portableMode,
   });
   meals.push(lunch);
   markUsed(lunch);
@@ -2017,6 +2133,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         `Полдник: лёгкий белок (${snackRot.label}) + фрукт — поддержание MPS (интервал 3ч от обеда)`,
         'Заполняет окно 6.5ч между обедом и ужином — предотвращает катаболизм',
       ],
+      isWorkDay: input.isWorkDay, workStartMin: input.workStartMin, workEndMin: input.workEndMin, portableMode: input.portableMode,
     });
     meals.push(snack);
     markUsed(snack);
@@ -2035,6 +2152,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       includeVeg: false, includeFruit: true, snack: true,
       preferredIds: effectivePreferred, dayUsedPreferredIds, lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
       rationales: ['Второй перекус: поддержка MPS + углеводное окно при большом числе приёмов'],
+      isWorkDay: input.isWorkDay, workStartMin: input.workStartMin, workEndMin: input.workEndMin, portableMode: input.portableMode,
     });
     meals.push(snack2); markUsed(snack2);
   }
@@ -2058,6 +2176,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           includeVeg: false, includeFruit: true, snack: true,
           preferredIds: effectivePreferred, dayUsedPreferredIds, lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds,
           rationales: [`${s.label}: поддержка MPS при большом числе приёмов (равномерное распределение белка)`],
+          isWorkDay: input.isWorkDay, workStartMin: input.workStartMin, workEndMin: input.workEndMin, portableMode: input.portableMode,
         });
         meals.push(m); markUsed(m);
       }
@@ -2113,6 +2232,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       'Поддержание MPS — обязательный приём после 4–5 ч без белка',
       'Овощи — клетчатка + витамины K/C + фитонутриенты',
     ],
+    isWorkDay: input.isWorkDay, workStartMin: input.workStartMin, workEndMin: input.workEndMin, portableMode: input.portableMode,
   });
   meals.push(dinner);
   markUsed(dinner);
@@ -2207,9 +2327,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // не достигнута — «некуда впихнуть продукты». Подсказываем увеличить число приёмов.
   {
     const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return h * 60 + m; };
-    const grainCap = maxGrainPerMeal(input.budget);
-    const overloaded = meals.filter(m => m.items.some(it => it.role === 'carb_slow' && (it.amount || 0) >= grainCap));
+    const overloaded = meals.filter(m => m.items.some(it => {
+      if (it.role !== 'carb_slow') return false;
+      const food = FOOD_DB.find(f => f.id === it.id);
+      if (!food) return (it.amount || 0) >= maxGrainPerMeal(input.budget);
+      const cap = carbPortionCap(food);
+      return (it.amount || 0) >= cap - 1;
+    }));
     if (overloaded.length > 0) {
+      const grainCap = maxGrainPerMeal(input.budget);
       const names = overloaded.map(m => m.label).join(', ');
       notes.push(`⚠ Перегрузка приёма: в «${names}» порция каши/крупы упёрлась в лимит ${grainCap} г. Углеводы дня не добиваются — увеличьте число приёмов пищи (сейчас ${input.mealsCount}, минимум ${Math.min(6, input.mealsCount + 1)}), чтобы распределить нагрузку.`);
     }
@@ -2795,6 +2921,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     _deprioritizedIds = undefined;
     _categoryPref = undefined;
     _qualityMode = 'full';
+    _currentExcludedIds = undefined;
   }
 }
 
