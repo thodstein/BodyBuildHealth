@@ -140,6 +140,33 @@ describe('nutrition-ocr-parser', () => {
       expect(items.map(item => item.name)).toEqual(['Кокосовое масло', 'Рисовая манка', 'Яичный протеин']);
     });
 
+    it('ignores FatSecret chrome and deduplicates a repeated screen capture', () => {
+      const screen = [
+        'Сегодня',
+        'СВЕРНУТЬ ^',
+        'Жиры Углев Белк РСК ккал',
+        '3®: Завтрак +',
+        'Калории',
+        'ВорОгорз Кокосовое Масло — 180',
+        'для Кулинарии ›',
+        '20 г',
+        '19,98 0,00 0,00 6%',
+        'Гарнец Рисовая Манка 525 ‹',
+        '150 г',
+        '0,75 117,00 10,50 17%',
+        'Стоинг Яичный Протеин 90',
+        'Ваниль ›',
+        'З0 г',
+        '0,09 0,51 21,00 3%',
+        'Общество Дневник Отчеты Premium',
+      ].join('\n');
+      const items = parseNutritionText(`${screen}\n${screen}`).flatMap(meal => meal.items);
+
+      expect(items).toHaveLength(3);
+      expect(items.every(item => !/Дневник|Premium|СВЕРНУТЬ|Общество/i.test(item.name))).toBe(true);
+      expect(items.map(item => item.foodId)).toEqual(['coconut_oil', 'cereal_semolina', 'supp_egg_white_powder']);
+    });
+
     it('keeps a food and its quantity when OCR has no calories row', () => {
       const items = parseNutritionText('Обед\nОгурец\n100 г').flatMap(meal => meal.items);
 
