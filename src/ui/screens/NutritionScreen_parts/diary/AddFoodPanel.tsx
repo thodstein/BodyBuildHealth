@@ -202,13 +202,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
               opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500 }}>
-             {ocrFileLoading ? '⏳' : '📸 Фото/файл'}
+             {ocrFileLoading ? '⏳ Распознаём' : '📸 Фото/файл'}
            </button>
            <button onClick={() => ocrCameraRef.current?.click()} disabled={ocrFileLoading} aria-label="Камера"
              style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
                background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
                opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500 }}>
-             📷 Камера
+              {ocrFileLoading ? '⏳ Ждём ответ' : '📷 Камера'}
            </button>
           <button onClick={onShowOCR} aria-label="Текст"
             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
@@ -217,7 +217,13 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               color: '#fff', minHeight: 44, fontWeight: 500 }}>
             📋 Текст
           </button>
-        </div>
+         </div>
+
+         {ocrError && !showOCR && (
+           <div role="alert" style={{ padding: '9px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35 }}>
+             {ocrError}
+           </div>
+         )}
 
          <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }} 
            onChange={e => { const f = e.target.files?.[0]; e.currentTarget.value = ''; if (f) onOcrFile(f); }} />

@@ -254,14 +254,19 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   }, [diaryData, selectedDate, saveDiary, showToast]);
 
   const handleOcrFileUpload = useCallback(async (file: File) => { 
-    setOcrFileLoading(true); setOcrError(''); 
+    setOcrFileLoading(true); setOcrError('');
+    if (file.size > 15 * 1024 * 1024) {
+      setOcrFileLoading(false);
+      setOcrError('Фото больше 15 МБ. Сделайте скриншот экрана или уменьшите изображение и повторите.');
+      return;
+    }
     try { 
       const result = await processUploadedFile(file); 
       if (result.meals.length > 0) setParsedItems(prev => [...prev, ...convertOCRItems(result.meals, usdaFoods)]); 
       if (result.meals.length === 0 && result.labs.length === 0) setOcrError(result.warnings[0] || 'Не удалось распознать данные питания.'); 
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } 
     finally { setOcrFileLoading(false); } 
-  }, [convertOCRItems, usdaFoods]);
+   }, [convertOCRItems, usdaFoods]);
 
   const handleOCR = useCallback(() => { 
     if (!ocrText.trim()) return; 
