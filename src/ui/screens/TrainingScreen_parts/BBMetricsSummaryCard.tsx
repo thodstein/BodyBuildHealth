@@ -59,7 +59,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
         <Tile label="Сетов/ротацию" value={String(metrics.totalSets)} color="#fff" hint="direct, пик-неделя" />
         <Tile label="Тяж" value={(metrics.тяжPct * 100).toFixed(0) + '%'} color="#ef4444" />
         <Tile label="Памп" value={(metrics.пампPct * 100).toFixed(0) + '%'} color="#60a5fa" />
-        <Tile label="Лёг" value={лёгPct.toFixed(0) + '%'} color="rgba(255,255,255,0.6)" />
+        <Tile label="Лёг" value={лёгPct.toFixed(0) + '%'} color="rgba(255,255,255,0.85)" />
         <Tile label="Ср. RIR" value={metrics.avgRir.toFixed(1)} color="#f59e0b" />
         <Tile
           label="Hard-сеты"
@@ -92,7 +92,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
                   {st.label} · {m.effectiveSets}с
                 </span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
                 <span>direct {m.directSets}</span>
                 <span style={{ opacity: 0.5 }}>·</span>
                 <span style={{ color: '#ef4444' }}>тяж {m.тяжSets}</span>

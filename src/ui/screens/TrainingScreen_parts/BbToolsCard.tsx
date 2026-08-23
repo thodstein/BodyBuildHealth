@@ -66,7 +66,7 @@ export const BbToolsCard: React.FC = () => {
         </div>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Эксцентрик {tempo.eccentric}с · пауза {tempo.pause}с · концентрика {tempo.concentric}с.</div>
         <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить темп «{tempo.notation}» ({character}) к планировщику — все упражнения получат этот темп.</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>🔗 Применить темп «{tempo.notation}» ({character}) к планировщику — все упражнения получат этот темп.</div>
           <button onClick={() => applyToPlanner({ kind: 'tempo', label: 'Темп ' + tempo.notation + ' (' + CHAR_LABEL[character] + ')', data: { eccentric: tempo.eccentric, bottomPause: tempo.pause, concentric: tempo.concentric, topPause: 0, label: tempo.notation } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить темп к планировщику</button>
         </div>
       </div>
@@ -88,7 +88,7 @@ export const BbToolsCard: React.FC = () => {
             </div>
           ))}
         <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить техники интенсификации ({techs.length} шт) к планировщику как рекомендацию — планер учтёт их при подборе методов.</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>🔗 Применить техники интенсификации ({techs.length} шт) к планировщику как рекомендацию — планер учтёт их при подборе методов.</div>
           <button onClick={() => applyToPlanner({ kind: 'volume', label: 'Техники ({level}): ' + techs.map((t: TechniqueSpec) => t.name).join(', '), data: { sets: {}, techniques: techs.map((t: TechniqueSpec) => t.technique) } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить техники к планировщику</button>
         </div>
       </div>
@@ -128,7 +128,7 @@ export const BbToolsCard: React.FC = () => {
           </div>
         )}
         <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить демографическую корректировку к планировщику: MRV груди → {demoVol?.mrv ?? 20} сет/нед (для {demo === 'female' ? 'женщин' : demo === 'masters' ? 'мастеров ' + age + '+' : 'базовой группы'}).</div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>🔗 Применить демографическую корректировку к планировщику: MRV груди → {demoVol?.mrv ?? 20} сет/нед (для {demo === 'female' ? 'женщин' : demo === 'masters' ? 'мастеров ' + age + '+' : 'базовой группы'}).</div>
           <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Демография: MRV ' + (demoVol?.mrv ?? 20) + ' сет/нед (' + (demo === 'female' ? 'женщины' : demo === 'masters' ? 'мастера ' + age + '+' : 'базовая') + ')', data: { mrv: demoVol?.mrv ?? 20 } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить демографию к планировщику</button>
         </div>
       </div>

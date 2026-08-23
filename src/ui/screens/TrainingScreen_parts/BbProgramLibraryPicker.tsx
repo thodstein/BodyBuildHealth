@@ -121,7 +121,7 @@ export const BbProgramLibraryPicker: React.FC<{
 
   return <>
     <button onClick={() => setOpen(true)} style={{ ...cardBtnStyle(!!value), width: '100%' }}>
-      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 12, color: value ? ACCENT : 'rgba(255,255,255,0.85)' }}>
         {sel ? `${sel.name} · ${sel.durationWeeks} нед · ${sel.daysPerWeek}×/нед · ${sel.level}` : 'Выбрать программу...'}
       </div>
@@ -208,7 +208,7 @@ export const BbProgramLibraryPicker: React.FC<{
             <button onClick={() => setOpen(false)} style={{
               width: '100%', marginTop: 12, padding: '10px', borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.12)', background: 'transparent',
-              color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              color: 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
             }}>Закрыть</button>
           </div>
         </div>

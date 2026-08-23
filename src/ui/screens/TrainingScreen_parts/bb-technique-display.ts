@@ -22,7 +22,7 @@ export type ExLike = {
 export const TECHNIQUE_LABELS: Record<string, string> = {
   drop_set: 'Дроп-сет',
   dropset: 'Дроп-сет',
-  rest_pause: 'Rest-pause',
+  rest_pause: 'Отдых-пауза',
   myo_reps: 'Myo-reps',
   myo_rep: 'Myo-reps',
   twenty_ones: '21s (7-7-7)',
@@ -108,7 +108,7 @@ export function techniqueChainParts(ex: ExLike, editedWeight?: number): ChainRes
       };
     case 'rest_pause':
       return {
-        label: 'Rest-pause',
+        label: 'Отдых-пауза',
         parts: [`${reps}×${round(w)}`, '15с', `3-4×${round(w)}`, '15с', `3-4×${round(w)}`],
       };
     case 'myo_reps':
