@@ -1,18 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
-import handler from './ocr-image';
+import handler from '../../../api/ocr-image';
 
 function invoke(req: any) {
   const state: { status: number; body: unknown } = { status: 200, body: undefined };
   const response = {
-    status(code: number) {
-      state.status = code;
-      return response;
-    },
-    json(body: unknown) {
-      state.body = body;
-      return response;
-    },
+    status(code: number) { state.status = code; return response; },
+    json(body: unknown) { state.body = body; return response; },
   };
   return handler(req, response as any).then(() => state);
 }
@@ -36,8 +30,6 @@ describe('api/ocr-image', () => {
       const result = await invoke({ method: 'POST', body: { data: 'not base64!' } });
       expect(result.status).toBe(422);
       expect(result.body).toMatchObject({ ok: false, error: 'Image data must be valid base64' });
-    } finally {
-      errorSpy.mockRestore();
-    }
+    } finally { errorSpy.mockRestore(); }
   });
 });

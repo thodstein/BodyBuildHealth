@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const MAX_BYTES = 12 * 1024 * 1024;
-const OCR_TIMEOUT_MS = 240_000;
+const OCR_TIMEOUT_MS = 90_000;
 
 const TESSERACT_WORKER_PATH = require.resolve('tesseract.js/src/worker-script/node/index.js');
 const TESSERACT_CORE_PATH = dirname(require.resolve('tesseract.js-core'));
@@ -43,30 +43,9 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
 }
 
 async function recognizeImage(buffer: Buffer): Promise<string> {
-  const errors: string[] = [];
-
-  // Most users have the Russian FatSecret UI. Return a good Russian result
-  // immediately so a mobile request does not wait for a second full WASM OCR
-  // pass. English is retained as a fallback for English-only screenshots.
-  try {
-    const russianText = (await recognizePass(buffer, 'rus')).trim();
-    if (russianText && nutritionOcrScore(russianText, 'rus') >= 18) return russianText;
-    if (russianText) errors.push('rus: low confidence');
-  } catch (error: any) {
-    errors.push(`rus: ${error?.message || String(error)}`);
-  }
-
-  try {
-    const englishText = (await recognizePass(buffer, 'eng')).trim();
-    if (englishText) return englishText;
-  } catch (error: any) {
-    errors.push(`eng: ${error?.message || String(error)}`);
-  }
-
-  if (errors.length === 0) {
-    throw new Error('OCR returned empty text');
-  }
-  throw new Error(`OCR failed for all language passes: ${errors.join('; ')}`);
+  const text = (await recognizePass(buffer, 'rus')).trim();
+  if (text) return text;
+  throw new Error('OCR returned empty text');
 }
 
 function nutritionOcrScore(text: string, language: keyof typeof TESSERACT_LANG_PATHS): number {
