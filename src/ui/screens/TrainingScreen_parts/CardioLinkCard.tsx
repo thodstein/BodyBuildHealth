@@ -23,7 +23,7 @@ import { cardioDayLoad, loadCardioLog } from '../../../engines/lms/cardio-diary.
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { loadSavedBBPlans } from './bb-plans-store';
-import { CARD, ROW, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, Badge, TYPE_COLOR } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
 
@@ -121,19 +121,19 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
   }, [pendingDiff]);
 
   return (
-    <div style={CARD}>
+    <div style={{ ...CARD, gap: 10 }}>
       <div style={ROW}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)' }}>❤️ Кардио</span>
+        <span style={LABEL}>❤️ Кардио</span>
         {link ? (
           <>
-            <span style={{ fontSize: 11, color: '#4ade80' }}>Подключено: {cycleName ?? link.cycleId}</span>
-            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>(к {SPORT_LABELS[link.sport]})</span>
+            <Badge bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.24)" color="#4ade80">Подключено: {cycleName ?? link.cycleId}</Badge>
+            <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="rgba(255,255,255,0.65)">{SPORT_LABELS[link.sport]}</Badge>
           </>
         ) : (
-          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Не подключено</span>
+          <Badge bg="rgba(255,255,255,0.04)" border="rgba(255,255,255,0.08)" color="rgba(255,255,255,0.45)">Не подключено</Badge>
         )}
       </div>
-      {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}
+      {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }} role="status">{flash}</div>}
       {pendingDiff && !pendingDiff.unchanged && (
         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.35)', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ fontWeight: 700, color: '#93c5fd' }}>🔄 Пересчёт под ACWR{pendingDiff.acwr != null ? ` (${pendingDiff.acwr.toFixed(2)})` : ''}{pendingDiff.legDaysNote} — что изменится:</div>
@@ -145,27 +145,31 @@ export const CardioLinkCard: React.FC<{ onOpenCardio?: () => void }> = ({ onOpen
         </div>
       )}
       {todayText && (
-        <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', borderRadius: 8, padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span>🔔 Сегодня: {todayText}</span>
-          <button style={{ ...BTN_PRIMARY, minHeight: 26, padding: '3px 8px', fontSize: 10 }} onClick={openCardio} aria-label="Начать сессию в дневнике">▶ Старт</button>
+        <div style={{ fontSize: 11, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', borderRadius: 10, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', lineHeight: 1.45 }}>
+          <span style={{ fontWeight: 700 }}>🔔 Сегодня:</span>
+          <span style={{ flex: 1 }}>{todayText}</span>
+          <button style={{ ...BTN_PRIMARY, minHeight: 28, padding: '4px 10px', fontSize: 11 }} onClick={openCardio} aria-label="Начать сессию в дневнике">▶ Старт</button>
         </div>
       )}
       {nextText && (
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '6px 10px' }}>
           ⏭ Следующая сессия: {nextText}
         </div>
       )}
       {dayLoad && (dayLoad.cardioMinutes > 0 || dayLoad.strengthSessions > 0) && (
-        <div style={{ fontSize: 10, color: '#fbbf24' }}>
-          🔥 Нагрузка дня: кардио {dayLoad.cardioMinutes} мин · сила {dayLoad.strengthSessions} сесс. · итого {dayLoad.totalLoad}
+        <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.14)', borderRadius: 10, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700 }}>🔥 Нагрузка дня:</span>
+          <Badge bg="rgba(0,230,138,0.10)" border="rgba(0,230,138,0.20)" color="#4ade80">кардио {dayLoad.cardioMinutes} мин</Badge>
+          <Badge bg="rgba(245,158,11,0.10)" border="rgba(245,158,11,0.20)" color="#f59e0b">сила {dayLoad.strengthSessions} сесс</Badge>
+          <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="#fff">итого {dayLoad.totalLoad}</Badge>
         </div>
       )}
       <div style={ROW}>
-        <button style={BTN} onClick={openCardio}>🛠 Открыть кардио-конструктор</button>
+        <button style={BTN_SMALL} onClick={openCardio}>🛠 Открыть кардио-конструктор</button>
         {link && (
           <>
-            <button style={BTN} onClick={recalc} title="Адаптировать кардио-цикл под текущий ACWR (без изменения силового плана)">🔄 Пересчитать под ACWR</button>
-            <button style={BTN_DANGER} onClick={() => { clearCardioLink(); flashMsg('🔓 Кардио отключено'); }}>Отключить</button>
+            <button style={BTN_SMALL} onClick={recalc} title="Адаптировать под текущий ACWR">🔄 Пересчитать под ACWR</button>
+            <button style={{ ...BTN_DANGER, minHeight: 30, padding: '5px 10px', fontSize: 11 }} onClick={() => { clearCardioLink(); flashMsg('🔓 Кардио отключено'); }}>Отключить</button>
           </>
         )}
       </div>

@@ -9,7 +9,7 @@ import {
   cardioCoachHints, type CardioCycle, type CardioType,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioWeekFact, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
-import { CARD, ROW, LABEL } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, Badge, ProgressBar, PHASE_COLOR, TYPE_COLOR } from './CardioUI';
 
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
 
@@ -56,20 +56,22 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
   if (!cycle || !data) return null;
 
   return (
-    <div style={CARD}>
-      <div style={LABEL}>📍 Прогресс цикла</div>
+    <div style={{ ...CARD, gap: 10 }}>
       <div style={ROW}>
-        <span style={{ fontSize: 12 }}>Неделя {data.current || '—'} из {data.totalWeeks}</span>
-        {data.currentPhase && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>· {CARDIO_PHASE_LABELS[data.currentPhase]}</span>}
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>· осталось {data.left} нед</span>
+        <span style={LABEL}>📍 Прогресс цикла</span>
+        <Badge bg={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '22') : 'rgba(255,255,255,0.06)'} border={PHASE_COLOR[data.currentPhase ?? ''] ? (PHASE_COLOR[data.currentPhase ?? ''] + '44') : 'rgba(255,255,255,0.08)'} color={PHASE_COLOR[data.currentPhase ?? ''] ?? 'rgba(255,255,255,0.6)'}>{data.currentPhase ? CARDIO_PHASE_LABELS[data.currentPhase] : '—'}</Badge>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>осталось {data.left} нед</span>
       </div>
-      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-        <div style={{ width: data.pct + '%', height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #22c55e, #00e68a)' }} />
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Неделя {data.current || '—'} из {data.totalWeeks}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a', marginLeft: 'auto' }}>{data.pct}%</span>
       </div>
+      <ProgressBar value={data.pct} color="#00e68a" height={8} />
       <div style={ROW}>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{data.pct}% пройдено</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{data.pct}% пройдено</span>
         {data.adherence != null && (
-          <span style={{ fontSize: 10, color: data.adherence >= 80 ? '#4ade80' : data.adherence >= 50 ? '#fbbf24' : '#f87171' }}>
+          <span style={{ fontSize: 11, color: data.adherence >= 80 ? '#4ade80' : data.adherence >= 50 ? '#fbbf24' : '#f87171' }}>
             · выполнение прошлых недель: {data.adherence}%{data.factKcal > 0 ? ` · факт ${data.factKcal} ккал` : ''}{data.factKm > 0 ? ` · ${data.factKm} км` : ''}
           </span>
         )}
@@ -84,14 +86,20 @@ export const CardioProgressCard: React.FC<{ cycle: CardioCycle | null; log?: Car
         const dow = (d.getDay() + 6) % 7;
         const s = data.nextSession!.session;
         return (
-          <div style={{ fontSize: 10, color: '#4ade80', background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 8, padding: '5px 8px' }}>
-            ⏭ Следующая сессия: {TYPE_LABEL[s.type]} {s.durationMin} мин{s.equipment ? ` · ${cardioEquipmentLabel(s.equipment)}` : ''}{s.targetHr?.max ? ` · ЧСС ${s.targetHr.min}-${s.targetHr.max}` : ''} — {DAY_LABELS_RU[dow]} {data.nextSession!.date.slice(5)} (нед {data.nextSession!.week})
+          <div style={{ fontSize: 11, color: '#4ade80', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', borderRadius: 10, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800 }}>⏭ Следующая:</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_COLOR[s.type] ?? '#4ade80', background: `${TYPE_COLOR[s.type] ?? '#4ade80'}14`, border: `1px solid ${TYPE_COLOR[s.type] ?? '#4ade80'}28`, borderRadius: 20, padding: '2px 8px' }}>{TYPE_LABEL[s.type]} {s.durationMin}м</span>
+            {s.equipment && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{cardioEquipmentLabel(s.equipment)}</span>}
+            {s.targetHr?.max && <span style={{ fontSize: 10, color: '#60a5fa' }}>ЧСС {s.targetHr.min}-{s.targetHr.max}</span>}
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginLeft: 'auto' }}>{DAY_LABELS_RU[dow]} {data.nextSession!.date.slice(5)} · нед {data.nextSession!.week}</span>
           </div>
         );
       })()}
       {data.nextStart && (
-        <div style={{ fontSize: 10, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, padding: '5px 8px' }}>
-          🏁 Ближайший старт: нед {data.nextStart.week} ({CARDIO_PHASE_LABELS[data.nextStart.phase]}) — через {data.nextStart.week - data.current} нед
+        <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 10, padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontWeight: 800 }}>🏁 Старт:</span>
+          <span>нед {data.nextStart.week} ({CARDIO_PHASE_LABELS[data.nextStart.phase]})</span>
+          <Badge bg="rgba(245,158,11,0.12)" border="rgba(245,158,11,0.28)" color="#fbbf24">через {data.nextStart.week - data.current} нед</Badge>
         </div>
       )}
     </div>
