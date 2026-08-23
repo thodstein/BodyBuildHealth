@@ -71,16 +71,16 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
         <span style={LABEL}>🗓 Календарь цикла</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', textTransform: 'capitalize' }}>{monthLabel}</span>
         <span style={{ flex: 1 }} />
-        <button style={BTN_SMALL} onClick={() => setOpen(v => !v)}>{open ? '▾ Скрыть' : '▸ Календарь'}</button>
-        <button style={BTN_SMALL} disabled={!canPrev} onClick={() => setOffset(o => o - 1)}>←</button>
-        <button style={BTN_SMALL} onClick={() => setOffset(0)} title="К месяцу старта">●</button>
-        <button style={BTN_SMALL} disabled={!canNext} onClick={() => setOffset(o => o + 1)}>→</button>
+        <button style={BTN_SMALL} onClick={() => setOpen(v => !v)} aria-expanded={open} aria-label={open ? 'Скрыть календарь' : 'Показать календарь'}>{open ? '▾ Скрыть' : '▸ Календарь'}</button>
+        <button style={BTN_SMALL} disabled={!canPrev} onClick={() => setOffset(o => o - 1)} aria-label="Предыдущий месяц">←</button>
+        <button style={BTN_SMALL} onClick={() => setOffset(0)} title="К месяцу старта" aria-label="К месяцу старта">●</button>
+        <button style={BTN_SMALL} disabled={!canNext} onClick={() => setOffset(o => o + 1)} aria-label="Следующий месяц">→</button>
       </div>
       {open && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          <div role="grid" aria-label={`Календарь ${monthLabel}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
             {DAY_LABELS_RU.map(d => (
-              <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{d}</div>
+              <div key={d} role="columnheader" style={{ textAlign: 'center', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', padding: '4px 0' }}>{d}</div>
             ))}
         {Array.from({ length: data.rows * 7 }).map((_, idx) => {
           const dayNum = idx - data.firstDow + 1;
@@ -94,6 +94,10 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
           return (
             <div
               key={idx}
+              role="gridcell"
+              aria-label={inMonth ? `${dateIso} ${info ? (info.sessions.length ? info.sessions.map(s => `${TYPE_LABEL[s.type]} ${s.durationMin}м`).join(', ') : 'отдых') : ''}${isToday ? ' сегодня' : ''}${info?.isLegDay ? ' день ног' : ''}` : undefined}
+              aria-selected={isToday || undefined}
+              tabIndex={inMonth ? 0 : -1}
               style={{
                 minHeight: 66, borderRadius: 10, padding: '5px 6px', display: 'flex', flexDirection: 'column', gap: 3,
                 background: isToday ? 'linear-gradient(180deg, rgba(0,230,138,0.14), rgba(0,230,138,0.04))' : hasSessions ? ((PHASE_BG as Record<string, string>)[info!.phase] ?? 'rgba(255,255,255,0.03)') : 'rgba(255,255,255,0.025)',

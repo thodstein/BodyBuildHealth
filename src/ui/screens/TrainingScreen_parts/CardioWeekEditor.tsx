@@ -196,10 +196,10 @@ export const CardioWeekEditor: React.FC<{ cycle: CardioCycle | null; onChanged?:
       </div>
 
       {editSessions && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={HINT_SM}>Перетащите строку на день недели выше, или выберите день в селекте. DnD — быстрый перенос.</div>
+        <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={HINT_SM}>Перетащите строку на день недели выше, или выберите день в селекте. DnD — быстрый перенос. Клавиатура: ←/→ перемещает день.</div>
           {week.sessions.map((s, idx) => (
-            <div key={idx} style={{ ...ROW, opacity: dragIdx === idx ? 0.6 : 1, border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid transparent', borderRadius: 8, padding: '4px 0' }} draggable onDragStart={() => onDragStart(idx)} onDragEnd={() => setDragIdx(null)} title="Перетащите на день недели">
+            <div key={idx} role="listitem" aria-grabbed={dragIdx === idx} tabIndex={0} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const cur = s.dayOfWeek ?? 0; const next = (cur + (e.key === 'ArrowLeft' ? -1 : 1) + 7) % 7; updateSession(idx, { dayOfWeek: next }); } }} style={{ ...ROW, opacity: dragIdx === idx ? 0.6 : 1, border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid transparent', borderRadius: 8, padding: '4px 0' }} draggable onDragStart={() => onDragStart(idx)} onDragEnd={() => setDragIdx(null)} title="Перетащите на день недели или используйте ←/→ для перемещения">
               <span style={{ cursor: 'grab', fontSize: 12, color: 'rgba(255,255,255,0.35)', padding: '0 4px', userSelect: 'none' }} aria-hidden>⋮⋮</span>
               <select value={s.type} onChange={e => updateSession(idx, { type: e.target.value as CardioType })} style={SEL} aria-label={`Тип сессии ${idx + 1}`}>
                 {TYPES.map(t => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}

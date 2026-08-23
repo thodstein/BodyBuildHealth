@@ -211,8 +211,8 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
             <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700 }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</span>
             {active.targetHr?.max && <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.28)', borderRadius: 20, padding: '2px 8px' }}>🎯 ЧСС {active.targetHr.min}-{active.targetHr.max}</span>}
           </div>
-          <div style={{ fontSize: 44, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1 }}>{fmt(active.remainingSec)}</div>
-          <div style={{ width: '100%', maxWidth: 340 }}>
+          <div role="timer" aria-live="polite" aria-atomic="true" style={{ fontSize: 44, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1 }}>{fmt(active.remainingSec)}</div>
+          <div style={{ width: '100%', maxWidth: 340 }} role="progressbar" aria-valuenow={active.durationMin * 60 - active.remainingSec} aria-valuemin={0} aria-valuemax={active.durationMin * 60} aria-label="Прогресс сессии">
             <ProgressBar value={active.durationMin * 60 - active.remainingSec} max={active.durationMin * 60} color={active.remainingSec < 60 ? '#ef4444' : '#00e68a'} height={8} />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 4 }}>
               <span>прошло {fmt(active.durationMin * 60 - active.remainingSec)}</span>
