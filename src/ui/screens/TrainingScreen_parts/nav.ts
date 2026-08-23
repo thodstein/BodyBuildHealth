@@ -57,10 +57,8 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     icon: '⚡',
     color: '#3b82f6',
     subtitle: 'Единый пульт: нагрузка → восстановление → авторегуляция → прогноз (без дублей)',
-    // Единый интеллект-хаб: intelligence_hub объединяет load_safety + tools_hub + rir_forecast_hub (4 блока в одном конвейере без дублей).
-    // Остальные хабы — без изменений (аналог VolumeHub/PeriodizationHub).
     tabs: [
-      'intelligence_hub', 'strength_analysis', 'quality_joint_hub', 'joints_ortho', 'periodization_taper_hub',
+      'intelligence_hub', 'strength_analysis', 'quality_hub', 'diagnostics_hub', 'joints_ortho', 'periodization_taper_hub',
       'exercise_lab', 'volume_hub', 'mix_hub',
     ],
   },
@@ -101,6 +99,8 @@ const TAB_TO_ZONE: Partial<Record<TrainingTab, TrainingZone>> = {};
 for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 // алиасы для депрекейтнутых дублей (удалены из ZONES.tabs, но должны резолвиться)
 (TAB_TO_ZONE as Record<string, TrainingZone>)['diagnostics'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['diagnostics_hub'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['quality_hub'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['calc_quality'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['volume'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['tonnage'] = 'calculators';
