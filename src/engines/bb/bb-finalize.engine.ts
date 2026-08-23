@@ -653,22 +653,26 @@ function ensureGlutesBlock(session: any, options: BBFinalizeOptions, target: num
 }
 
 function allocateExperiencedLegSession(session: any, week: any, options: BBFinalizeOptions): void {
-  if (options.preserveSource || options.level !== 'enhanced' || (options.trainingYears ?? 0) < 3) return;
+  if (options.preserveSource) return;
   const legDonors = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
   if (['quads', 'hamstrings', 'glutes', 'calves'].some(m => legDonors.has(m))) return;
   if (!/Legs|Lower|LowerPower|LowerHyp/.test(session.sessionTag || '')) return;
   const years = options.trainingYears ?? 0;
-  // Ноги 2×/нед: нечётный день = тяж quads + памп hams; чётный = тяж hams + памп quads.
-  const heavyQuads = (session.day ?? 1) % 2 === 1;
+  const level = options.level || 'intermediate';
+  // Ноги 2×/нед для ВСЕХ уровней: нечётный Legs-день = тяж quads + памп hams + икры; чётный = тяж hams + памп quads + икры.
+  // Считаем Legs-дни в неделе, а не dayInRotation (исправляет баг upper_lower_4: оба Lower были hamstrings).
+  const weekLegs = (week.sessions || []).filter((s: any) => /Legs|Lower|LowerPower|LowerHyp/.test(s.sessionTag || ''));
+  const legIndex = weekLegs.findIndex((s: any) => s === session);
+  const heavyQuads = legIndex >= 0 ? legIndex % 2 === 0 : (session.day ?? 1) % 2 === 1;
   const heavyMuscle = heavyQuads ? 'quads' : 'hamstrings';
   const pumpMuscle = heavyQuads ? 'hamstrings' : 'quads';
-  const heavyTarget = years >= 6 ? 16 : 12;
+  const heavyTarget = level === 'enhanced' ? (years >= 6 ? 16 : 12) : level === 'advanced' ? 12 : level === 'intermediate' ? 10 : 8;
   ensureLegHeavyBlock(session, options, heavyMuscle, heavyTarget, heavyQuads);
   ensureLegPumpBlock(session, options, pumpMuscle, 4);
-  ensureGlutesBlock(session, options, years >= 6 ? 12 : 10, heavyQuads);
-  // Повторная переработка памп-мышцы: поздние добавления (добивки) тоже
-  // становятся лёгкими (12-20 reps, RIR 3) — в памп-день нет тяжёлой работы.
+  ensureGlutesBlock(session, options, level === 'enhanced' ? (years >= 6 ? 12 : 10) : 8, heavyQuads);
+  // Повторная переработка памп-мышцы: поздние добавления (добивки) тоже становятся лёгкими
   ensureLegPumpBlock(session, options, pumpMuscle, 4);
+  // Икры — каждый Legs-день обеспечивает ensureSmallMuscleQuality (pump 3-4 сета)
 }
 
 /** Гарантирует в Push/Chest-дне грудь с разными углами, а не 4 одинаковых жима.
@@ -1975,16 +1979,22 @@ function enrichExerciseRationale(plan: BBPlan): void {
     const contributions = exerciseVolumeContributions(exercise);
     const direct = contributions.find(item => item.source === 'direct');
     const indirect = contributions.filter(item => item.source === 'indirect').map(item => `${item.muscle} +${item.effectiveSets.toFixed(1)}`).join(', ');
-    const tags = [exercise.role === 'primary' ? 'primary' : 'accessory', `direct ${direct?.directSets ?? exercise.sets} sets`];
-    if (indirect) tags.push(`effective overlap: ${indirect}`);
-    if ((exercise as any).substituted) tags.push(`замена: ${(exercise as any).originalName || 'исходное упражнение'}`);
-    // Per-session explain: угол/паттерн и почему выбрано (Фаза 3.3)
+    // Человеко-читаемая логика: почему упражнение в программе
+    const why: string[] = [];
+    if (exercise.role === 'primary') why.push('Основное — максимальный механический стимул для гипертрофии');
+    else why.push('Добивка — памп для слабой зоны/баланса углов');
+    why.push(`прямые сеты: ${direct?.directSets ?? exercise.sets}`);
+    if (indirect) why.push(`косвенная нагрузка: ${indirect} (учитывается в бюджете)`);
+    if ((exercise as any).substituted) why.push(`замена исходного «${(exercise as any).originalName}» по оборудованию/безопасности`);
     const angleEntry = ANGLE_CLASSES[exercise.muscle]?.find(ac => ac.match(exercise as any));
-    if (angleEntry) tags.push(`угол: ${angleEntry.name}`);
-    if (lengthenedBonus(exercise.name || '')) tags.push('lengthened +10');
-    if ((exercise as any).supersetWith) tags.push(`суперсет: ${(exercise as any).supersetWith}`);
-    const position = index === 0 ? 'primary/lead' : exercise.role === 'primary' ? 'secondary compound' : exercise.character === 'памп' ? 'pump finisher' : 'accessory';
-    exercise.rationale = [exercise.rationale, tags.join('; '), `final position: ${position} (#${index + 1})`].filter(Boolean).join(' | ');
+    if (angleEntry) why.push(`угол: ${angleEntry.name} — покрытие отстающего пучка`);
+    if (lengthenedBonus(exercise.name || '')) why.push('растянутая позиция — приоритет гипертрофии (Schoenfeld 2022)');
+    if ((exercise as any).supersetWith) why.push(`суперсет с «${(exercise as any).supersetWith}» для плотности`);
+    // Позиция в сессии
+    const position = index === 0 ? 'ведущее (первое, тяжёлое)' : exercise.role === 'primary' ? 'второе базовое' : exercise.character === 'памп' ? 'финишер памп' : 'добивка';
+    why.push(`позиция в сессии: ${position} (#${index + 1})`);
+    // Сохраняем предыдущий rationale (если был) + добавляем почему
+    exercise.rationale = [exercise.rationale, why.join('; ')].filter(Boolean).join(' | ');
   }
 }
 

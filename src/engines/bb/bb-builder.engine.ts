@@ -1048,9 +1048,9 @@ export const defaultWorkMax = (key: string): number => {
  * Зависит только от dayInRotation (для чередования quads/hamstrings на Legs-днях).
  * Ранее реконструировалось при каждом вызове buildSession (~100+ раз на план).
  */
-function getTagPrimaryMuscles(dayInRotation: number, highVolumeLegs = false): Record<string, Set<string>> {
-  const legPrimary = highVolumeLegs ? new Set(['quads', 'hamstrings', 'glutes']) : (dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes']) : new Set(['quads', 'glutes']));
-  const lowerPrimary = highVolumeLegs ? new Set(['quads', 'hamstrings', 'glutes', 'calves']) : (dayInRotation % 2 === 0 ? new Set(['hamstrings', 'glutes', 'calves']) : new Set(['quads', 'glutes', 'calves']));
+function getTagPrimaryMuscles(legDayIndex: number, highVolumeLegs = false): Record<string, Set<string>> {
+  const legPrimary = highVolumeLegs ? new Set(['quads', 'hamstrings', 'glutes']) : (legDayIndex % 2 === 0 ? new Set(['quads', 'glutes']) : new Set(['hamstrings', 'glutes']));
+  const lowerPrimary = highVolumeLegs ? new Set(['quads', 'hamstrings', 'glutes', 'calves']) : (legDayIndex % 2 === 0 ? new Set(['quads', 'glutes', 'calves']) : new Set(['hamstrings', 'glutes', 'calves']));
   return {
     Chest: new Set(['chest']),
     Back: new Set(['back']),
@@ -1124,6 +1124,7 @@ export interface BuildSessionParams {
   allowStrengthLifts?: boolean;
   rotationMode?: 'forbid' | 'strict' | 'variety';
   intensityLevel?: 'light' | 'moderate' | 'high';
+  legDayIndex?: number;
 }
 
 function buildSession(
@@ -1172,6 +1173,7 @@ function buildSession(
   allowStrengthLifts?: boolean,
   rotationMode?: 'forbid' | 'strict' | 'variety',
   intensityLevel?: 'light' | 'moderate' | 'high',
+  legDayIndex: number = 0,
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -1203,10 +1205,10 @@ function buildSession(
     Push: 'chest', Pull: 'back', ChestBack: 'chest', ShouldersArms: 'shoulders',
     Upper: 'chest', UpperPower: 'chest', UpperHyp: 'chest',
     Torso: 'chest', Limbs: 'quads', LegsBiceps: 'quads', Glutes: 'glutes', GlutesHams: 'glutes',
-    Legs: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
-    Lower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
-    LowerPower: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
-    LowerHyp: dayInRotation % 2 === 0 ? 'hamstrings' : 'quads',
+    Legs: legDayIndex % 2 === 0 ? 'quads' : 'hamstrings',
+    Lower: legDayIndex % 2 === 0 ? 'quads' : 'hamstrings',
+    LowerPower: legDayIndex % 2 === 0 ? 'quads' : 'hamstrings',
+    LowerHyp: legDayIndex % 2 === 0 ? 'quads' : 'hamstrings',
     FullBody: '', // FullBody — особый случай: primary определяется по musclePrimaryAssigned
   };
   const sessionLeadMuscle = LEAD_MUSCLE[sched.sessionTag || ''] || ((musclePlans[0] as any)?.group || '');
@@ -1253,13 +1255,19 @@ function buildSession(
     const isGraded = gradedInjuries.some(inj => collapseKey(inj.muscle) === muscle);
     const injuryFactor = gradedInjuries.find(inj => collapseKey(inj.muscle) === muscle);
 
-    const resolved = resolveCharacter(repKey, character);
+    let resolved = resolveCharacter(repKey, character);
+    // Legs 2×/нед для ВСЕХ уровней: тяж одной + памп другой + икры (фикс по ТЗ)
+    if (/Legs|Lower/.test(sched.sessionTag || '') && (muscle === 'quads' || muscle === 'hamstrings')) {
+      const isHeavyQuadsDay = legDayIndex % 2 === 0;
+      const shouldBeHeavy = (muscle === 'quads' && isHeavyQuadsDay) || (muscle === 'hamstrings' && !isHeavyQuadsDay);
+      if (!shouldBeHeavy) resolved = 'памп';
+    }
     let role: 'primary' | 'accessory' = 'accessory';
     // Какие мышцы являются "главными" для каждого тега сессии.
     // Остальные мышцы тега — добивочные (accessory), даже если тяж-день.
     // Это предотвращает: delt_front=primary в Chest-дне → блокирует Shoulders-день.
     // C10: вынесено в getTagPrimaryMuscles (модульный уровень) — без реконструкции на каждый вызов.
-    const TAG_PRIMARY_MUSCLES = getTagPrimaryMuscles(dayInRotation, level === 'enhanced' && (trainingYears ?? 0) >= 3);
+    const TAG_PRIMARY_MUSCLES = getTagPrimaryMuscles(legDayIndex, level === 'enhanced' && (trainingYears ?? 0) >= 3);
     const tagPrimaries = sched.sessionTag ? TAG_PRIMARY_MUSCLES[sched.sessionTag] : undefined;
     // Glute priority для женщин ИЛИ при focusGroup='glutes': glutes всегда primary в любом ножном дне.
     // Также для FullBody — glutes добавляется в fbPrimaryToday при focus.
@@ -2372,7 +2380,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.specialization, p.pedDoses, p.courseIntensity, p.onCourse, p.sex,
     p.weekLocalUsed, p.primaryBySlot, p.trainingFocus, p.eccentricMult,
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
-    p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel,
+    p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
   );
 }
 
@@ -2809,7 +2817,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
        const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: undefined, courseIntensity: undefined, onCourse: false, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel });
+        const legDayIndex = sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: undefined, courseIntensity: undefined, onCourse: false, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {

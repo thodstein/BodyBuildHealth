@@ -450,11 +450,11 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     if (level === 'beginner' && ex.difficulty && ex.difficulty === 'advanced') score -= 10;
     if (level === 'advanced' && ex.difficulty && ex.difficulty === 'beginner') score -= 3;
 
-    // 7. Техника/образовательная ценность
+    // 7. Техника/образовательная ценность — детальное описание помогает освоить движение без травм
     const hasTechnique = !!(ex as any).technique;
-    if (hasTechnique) { score += 5; rationales.push('Есть техника +5'); }
+    if (hasTechnique) { score += 5; rationales.push('Детальная техника выполнения (+5): есть пошаговое описание, легче освоить без ошибок'); }
     const hasComments = !!(ex as any).comments || !!(ex as any).description;
-    if (hasComments) { score += 3; rationales.push('Есть описание +3'); }
+    if (hasComments) { score += 3; rationales.push('Методическое сопровождение (+3): есть комментарии по прогрессии и ошибкам'); }
 
     // 8. Уровень-сложность: совпадение даёт +5
     if (ex.difficulty === level) { score += 5; rationales.push('Сложность~уровню +5'); }

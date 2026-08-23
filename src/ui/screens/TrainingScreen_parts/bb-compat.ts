@@ -132,8 +132,9 @@ export function getBBSuggestions(
   const deloadType = new Set(g.deloadType);
   // Пересечение для volumeGoal
   const volumeGoal = new Set(g.volumeGoal.filter(v => l.volumeGoal.includes(v)));
-  // Пересечение для splitHints
-  const splitHints = new Set(g.splitHints.filter(s => l.splitHints.includes(s)));
+  // Объединение для splitHints (показываем все релевантные, а не только пересечение)
+  // Ранее пересечение давало 1-2 ★, остальные казались не рекомендованными — теперь показываем все подходящие
+  const splitHints = new Set([...g.splitHints, ...l.splitHints]);
   return {
     loadStrategy,
     deloadType,

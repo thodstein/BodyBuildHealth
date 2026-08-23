@@ -2805,20 +2805,21 @@ export const BbAutoConstructor: React.FC = () => {
           const sel = selectedSplitId === r.pattern.id;
           const mf = getMuscleFrequencies(r.pattern);
           const isSugSplit = bbSuggest.splitHints.has(r.pattern.id);
-          return <div key={r.pattern.id} onClick={() => setSelectedSplitId(r.pattern.id)}
-            style={{ padding:'10px 12px', borderRadius:10, cursor:'pointer', border:sel?'1px solid #00e68a':isSugSplit?'1px solid rgba(245,158,11,0.25)':'1px solid rgba(255,255,255,0.06)', background:sel?'rgba(0,230,138,0.08)':isSugSplit?'rgba(245,158,11,0.04)':'rgba(255,255,255,0.02)' }}>
+          return <div key={r.pattern.id}
+            style={{ padding:'10px 12px', borderRadius:10, border:sel?'1px solid #00e68a':isSugSplit?'1px solid rgba(245,158,11,0.25)':'1px solid rgba(255,255,255,0.06)', background:sel?'rgba(0,230,138,0.08)':isSugSplit?'rgba(245,158,11,0.04)':'rgba(255,255,255,0.02)' }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span style={{ fontWeight:700, fontSize:12, color:sel?'#00e68a':isSugSplit?'#f59e0b':'#fff' }}>{isSugSplit ? '★ ' : ''}{r.pattern.name}</span>
               <span style={{ fontSize:11, color:ACCENT, fontWeight:700, background:'rgba(0,230,138,0.12)', padding:'2px 8px', borderRadius:8 }}>скор {r.score}</span>
             </div>
             <div style={{ ...SMALL, marginTop:4 }}>{r.pattern.description}</div>
-            {isSugSplit && !sel && <div style={{ fontSize:10, color:'#f59e0b', marginTop:2 }}>★ Рекомендован для цели «{bbGoal}» + уровня «{bbLevel}»</div>}
+            {isSugSplit && <div style={{ fontSize:10, color:'#f59e0b', marginTop:2 }}>★ Совместим с целью «{bbGoal}» + уровнем «{bbLevel}» — рекомендован, но можно выбрать любой</div>}
             {sel && <div style={{ marginTop:6, fontSize:11, color:'rgba(255,255,255,0.7)' }}>{r.rationale.map((x,i) => <div key={i}>✓ {x}</div>)}</div>}
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
               {mf.map(f => (
                 <span key={f.tag} style={{ fontSize:11, padding:'1px 6px', borderRadius:4, background:f.freq >= 2 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', color:f.freq >= 2 ? '#00e68a' : 'rgba(255,255,255,0.4)' }}>{TAG_LABELS_RU[f.tag] || f.tag} ~ {f.freq}×/нед</span>
               ))}
             </div>
+            <button onClick={() => setSelectedSplitId(r.pattern.id)} style={{ marginTop:8, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', background:sel?'#00e68a':'rgba(255,255,255,0.06)', color:sel?'#000':'#fff', border:'1px solid '+(sel?'#00e68a':'rgba(255,255,255,0.1)'), width:'100%' }}>{sel ? '✓ Выбран' : 'Выбрать этот сплит'}</button>
           </div>;
         })}
       </div>
@@ -3666,7 +3667,6 @@ export const BbAutoConstructor: React.FC = () => {
                           <Chip label="Подходы" value={edit.sets + '×' + edit.reps} color="#22c55e" />
                           <Chip label="RIR" value={String(e.rir)} color="#f59e0b" />
                           <Chip label="Вес" value={edit.weight + ' кг'} color="#60a5fa" />
-                          {e.workSets[0]?.tempo && <Chip label="Темп" value={`${e.workSets[0].tempo}${tempoExplain(e.workSets[0].tempo) ? ` (${tempoExplain(e.workSets[0].tempo)})` : ''}`} color="#a855f7" />}
                           {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="rgba(255,255,255,0.55)" />}
                           <Chip label="Группа" value={muscleLabel(e.muscle)} color="rgba(255,255,255,0.55)" />
                         </div>
@@ -3731,11 +3731,18 @@ export const BbAutoConstructor: React.FC = () => {
                           </details>
                         )}
 
-                        {/* Rationale */}
+                        {/* Rationale — реальная логика, не "есть описание +5" */}
                         {e.rationale && (
                           <details style={{ marginTop:4 }}>
-                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему это упражнение и позиция?</summary>
-                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', padding:'2px 6px', lineHeight:1.4, marginTop:2 }}>{e.rationale}</div>
+                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему это упражнение в программе?</summary>
+                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', padding:'4px 8px', lineHeight:1.5, marginTop:2, whiteSpace:'pre-wrap' }}>{e.rationale}</div>
+                          </details>
+                        )}
+                        {/* Темп — внизу карты */}
+                        {e.workSets[0]?.tempo && (
+                          <details style={{ marginTop:4 }}>
+                            <summary style={{ fontSize:11, fontWeight:600, color:'#a855f7', cursor:'pointer' }}>⏱ Темп: {e.workSets[0].tempo}</summary>
+                            <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', padding:'4px 8px', lineHeight:1.4, marginTop:2 }}>{tempoExplain(e.workSets[0].tempo) ? `${e.workSets[0].tempo} — ${tempoExplain(e.workSets[0].tempo)}` : e.workSets[0].tempo}</div>
                           </details>
                         )}
                       </div>
@@ -3841,6 +3848,15 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         {/* Объём vs MRV (volume-landmarks, единый источник) */}
         {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
+        {/* Логика построения — реальные изменения, а не шаблон */}
+        <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.65)', lineHeight:1.5 }}>
+            {builtPlan.rationale.slice(0, 12).map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
+            {builtPlan.rationale.length > 12 && <div style={{ marginTop:4, fontSize:10, color:'rgba(255,255,255,0.4)' }}>+ ещё {builtPlan.rationale.length - 12} пунктов — см. вкладку «План»</div>}
+          </div>
+          <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.45)', fontStyle:'italic' }}>Изменения отражают цель «{bbGoal}», уровень «{bbLevel}», сплит «{builtPlan.pattern.name}», методики «{bbMethodology}» + «{supersetMode}» + «{volumeScheme}», специализацию {weakPoints.join(', ') || 'нет'}.</div>
+        </div>
         {/* Прогноз пиковой загрузки */}
         {(() => {
           const peakWeek = W.reduce((best, w, i) => {
