@@ -808,7 +808,7 @@ export const BbAutoConstructor: React.FC = () => {
     }
   };
 
-  // ── Test Peak Week: тестовый прогон НЕ меняет основной план ──
+  // ── Test Peak Неделя: тестовый прогон НЕ меняет основной план ──
   const [testRatings, setTestRatings] = useState<Record<string, number>>({});
   const [testWeightDelta, setTestWeightDelta] = useState<number>(0);
   const [lastTest, setLastTest] = useState<ReturnType<typeof latestTestPeakWeek>>(null);
@@ -846,7 +846,7 @@ export const BbAutoConstructor: React.FC = () => {
       preparation: {
         ...prepPlan.preparation,
         currentCalories: Math.max(1200, prepPlan.preparation.currentCalories + caloriesDelta),
-        cardioMinutesPerWeek: Math.max(0, prepPlan.preparation.cardioMinutesPerWeek + cardioDelta),
+        cardioMinutesPerНеделя: Math.max(0, prepPlan.preparation.cardioMinutesPerWeek + cardioDelta),
       },
       adjustments: [
         ...(prepPlan.adjustments ?? []),
@@ -1078,7 +1078,7 @@ export const BbAutoConstructor: React.FC = () => {
   const ranked = useMemo(() => rankBBSplits({
     level: bbLevel,
     goal: bbGoal as any,
-    daysPerWeek: bbDays,
+    daysPerНеделя: bbDays,
     weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
     sex: linked.profile?.settings?.personal?.sex,
     focusGroup: specTargets[0] || undefined,
@@ -1407,7 +1407,7 @@ export const BbAutoConstructor: React.FC = () => {
             labMrvMultiplier: labAdjust.mrvMultiplier,
             labWarnings: labAdjust.warnings,
             labIntensityNote: labAdjust.intensityNote,
-            planStartWeek: new Date().toISOString().slice(0, 10),
+            planStartНеделя: new Date().toISOString().slice(0, 10),
             supersetMode,
             volumeScheme: effectiveVolumeScheme,
             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
@@ -1467,7 +1467,7 @@ export const BbAutoConstructor: React.FC = () => {
              labMrvMultiplier: labAdjust.mrvMultiplier,
              labWarnings: labAdjust.warnings,
              labIntensityNote: labAdjust.intensityNote,
-             planStartWeek: new Date().toISOString().slice(0, 10),
+             planStartНеделя: new Date().toISOString().slice(0, 10),
              supersetMode,
              volumeScheme: effectiveVolumeScheme,
              previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
@@ -1491,7 +1491,7 @@ export const BbAutoConstructor: React.FC = () => {
           specialization: specializationMode,
           specializationSchedule: buildSpecBlocks,
          injuries,
-         planStartWeek: new Date().toISOString().slice(0, 10),
+         planStartНеделя: new Date().toISOString().slice(0, 10),
          favoriteExercises: bbFavEx,
          excludedExercises: bbExclEx,
          avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
@@ -1743,7 +1743,7 @@ export const BbAutoConstructor: React.FC = () => {
            equipment: bbEquipment.slice(),
            specialization: specializationMode,
            specBlocks: buildSpecBlocks,
-           daysPerWeek: bbDays,
+           daysPerНеделя: bbDays,
            source: bbSource,
            programPath: bbProgramPath,
             programId: selectedProgramId || undefined,
@@ -1752,12 +1752,12 @@ export const BbAutoConstructor: React.FC = () => {
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
            avgRir: exportMetrics.avgRir,
-           sessionsPerWeek: exportPlan.pattern.sessionsPerRotation,
+           sessionsPerНеделя: exportPlan.pattern.sessionsPerRotation,
           phases: phases.map(p => p.phase),
            qualityScore: exportQuality.score,
            muscleCount: Object.keys(exportPlan.muscleFrequency || {}).length,
           mrvMult: pedAdapt.combinedMrvMultiplier,
-           peakWeek: exportPlan.report?.peakWeek,
+           peakНеделя: exportPlan.report?.peakWeek,
            peakDirectSets: exportPlan.report?.peakDirectSets,
             peakEffectiveSets: exportPlan.report
               ? Object.values(exportPlan.report.peakVolume as Record<string, { effectiveSets: number }>)
@@ -3290,7 +3290,7 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* Week selector with phase colors */}
+        {/* Неделя selector with phase colors */}
         <div style={{ marginTop:10 }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginBottom:6, fontWeight:700 }}>
             Неделя {wk.week} из {W.length} · <span style={{ color:PHASE_COLORS[currentPhase] }}>{PHASE_LABELS[currentPhase]}</span>
@@ -3761,7 +3761,7 @@ export const BbAutoConstructor: React.FC = () => {
         {(() => {
           const ws = weeklySetsFromBBPlan(W);
           const b = validatePlan({
-            weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints,
+            weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerНеделя: bbDays, weakPoints,
             readiness: ((prof.recovery ?? 7) * 10),
             trainingYears: bbTrainingYears,
             mrvMultiplier: pedAdapt.combinedMrvMultiplier,
@@ -4160,7 +4160,7 @@ export const BbAutoConstructor: React.FC = () => {
               profile={{
                 level: bbLevel,
                 goal: bbGoal,
-                daysPerWeek: bbDays,
+                daysPerНеделя: bbDays,
                 bodyWeight: prof.bodyWeight,
                 pmSquat: prof.pmSquat,
                 pmBench: prof.pmBench,
@@ -4831,9 +4831,9 @@ export const BbAutoConstructor: React.FC = () => {
               } catch { return null; }
             })()}
 
-            {/* 🧪 Test Peak Week */}
+            {/* 🧪 Test Peak Неделя */}
             <div style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧪 Test Peak Week (не меняет основной план)</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧪 Test Peak Неделя (не меняет основной план)</div>
               <div style={{ fontSize:10, color:'rgba(255,255,255,0.9)', marginBottom:8 }}>
                 Прогоните протокол за 3–4 недели до шоу и зафиксируйте реакцию — результат сохраняется ({'testPeakWeekId'}) и влияет на стратегию основной пик-недели.
               </div>
@@ -4989,9 +4989,9 @@ export const BbAutoConstructor: React.FC = () => {
               )}
             </div>
 
-            {/* 🎬 Таймлайн Show Day */}
+            {/* 🎬 Таймлайн Show День */}
             <div style={{ marginTop:10 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fbbf24', marginBottom:4 }}>🎬 Таймлайн Show Day</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#fbbf24', marginBottom:4 }}>🎬 Таймлайн Show День</div>
               <div style={{ background:'rgba(251,191,36,0.04)', border:'1px solid rgba(251,191,36,0.12)', borderRadius:8, padding:8 }}>
                 {buildShowTimeline(configFromPlan(prepPlan)).map((t, i) => (
                   <div key={i} style={{ display:'grid', gridTemplateColumns:'80px 1fr', gap:8, padding:'4px 0', borderBottom: i < buildShowTimeline(configFromPlan(prepPlan)).length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', fontSize:10 }}>

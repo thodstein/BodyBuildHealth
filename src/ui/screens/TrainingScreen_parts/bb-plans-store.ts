@@ -50,7 +50,7 @@ export interface SavedBBPlan {
   metrics: {
     totalSets: number;
     avgRir: number;
-    sessionsPerWeek: number;
+    sessionsPerНеделя: number;
     phases: string[];
     qualityScore: number;
     muscleCount: number;
@@ -114,7 +114,7 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       trainingFocus: validFocus, methodology: validMethodology,
       equipment: Array.isArray(rawParams.equipment) ? rawParams.equipment.filter((item: any) => typeof item === 'string') : undefined,
       specialization: rawParams.specialization == null ? undefined : Boolean(rawParams.specialization),
-      daysPerWeek: Number.isInteger(rawParams.daysPerWeek) && rawParams.daysPerWeek > 0 ? rawParams.daysPerWeek : undefined,
+      daysPerНеделя: Number.isInteger(rawParams.daysPerWeek) && rawParams.daysPerWeek > 0 ? rawParams.daysPerWeek : undefined,
       source: validSource, programPath: validProgramPath,
       programId: typeof rawParams.programId === 'string' ? rawParams.programId : undefined,
       planMode: rawParams.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split',
@@ -122,7 +122,7 @@ function migrateSavedPlan(value: any): SavedBBPlan {
     },
     metrics: {
       totalSets: Number(value.metrics?.totalSets) || 0, avgRir: Number(value.metrics?.avgRir) || 0,
-      sessionsPerWeek: Number(value.metrics?.sessionsPerWeek) || value.plan.pattern?.sessionsPerRotation || 0,
+      sessionsPerНеделя: Number(value.metrics?.sessionsPerWeek) || value.plan.pattern?.sessionsPerRotation || 0,
       phases: Array.isArray(value.metrics?.phases) ? value.metrics.phases.filter((item: any) => typeof item === 'string') : [], qualityScore: Number(value.metrics?.qualityScore) || 0,
       muscleCount: Number(value.metrics?.muscleCount) || 0, mrvMult: Number(value.metrics?.mrvMult) || 1,
     },

@@ -52,7 +52,7 @@ export const CardioPreviewStep: React.FC<{
   const [nameDraft, setNameDraft] = useState('');
   const [weekNo, setWeekNo] = useState(1);
   const [improve, setImprove] = useState<{ changes: CardioTuneChange[]; cycle: CardioCycle } | null>(null);
-  const [selectedSession, setSelectedSession] = useState<{ week: number; dayOfWeek: number } | null>(null);
+  const [selectedSession, setSelectedSession] = useState<{ week: number; dayOfНеделя: number } | null>(null);
   const [kcalFlash, setKcalFlash] = useState(false);
 
   const summary = useMemo(() => (cycle ? cardioCycleSummary(cycle) : null), [cycle]);
@@ -159,7 +159,7 @@ export const CardioPreviewStep: React.FC<{
   if (!cycle || !summary) {
     return (
       <div style={CARD}>
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color:'rgba(255,255,255,0.9)', lineHeight: 1.5 }}>
           Соберите кардио-цикл из параметров и стартов — появится предпросмотр по неделям.
         </div>
         <button style={BTN_PRIMARY} onClick={onBuild}>🛠 Собрать и сохранить цикл</button>
@@ -308,7 +308,7 @@ export const CardioPreviewStep: React.FC<{
               </div>
             )}
             {hints.filter(h => h.kind !== 'work').slice(0, 4).map(h => (
-              <div key={h.week} style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45 }}>
+              <div key={h.week} style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.45 }}>
                 • Нед {h.week} ({CARDIO_PHASE_LABELS[h.phase]}): {h.text}
               </div>
             ))}
@@ -353,7 +353,7 @@ export const CardioPreviewStep: React.FC<{
           {taperPlan.map(w => (
             <div key={w.week} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
               <span style={{ width: 44, fontWeight: 800, color: PHASE_COLOR[w.phase] }}>нед {w.week}</span>
-              <span style={{ width: 90, color: 'rgba(255,255,255,0.6)' }}>{CARDIO_PHASE_LABELS[w.phase]}</span>
+              <span style={{ width: 90, color:'rgba(255,255,255,0.9)' }}>{CARDIO_PHASE_LABELS[w.phase]}</span>
               <span style={{ color: 'rgba(255,255,255,0.55)' }}>{w.minutes} мин · {w.sessions} сессий</span>
               <span style={{ flex: 1 }} />
               <span style={{ color: w.hiit ? '#f87171' : '#4ade80', fontWeight: 700 }}>{w.hiit ? 'есть HIIT' : 'без HIIT'}</span>
@@ -388,7 +388,7 @@ export const CardioPreviewStep: React.FC<{
                 {sess.length === 0 ? <div style={{ color: 'rgba(255,255,255,0.2)' }}>—</div> : sess.map((s, j) => (
                   <button
                     key={j}
-                    onClick={() => setSelectedSession({ week: Math.min(cycle.totalWeeks, Math.max(1, weekNo)), dayOfWeek: i })}
+                    onClick={() => setSelectedSession({ week: Math.min(cycle.totalWeeks, Math.max(1, weekNo)), dayOfНеделя: i })}
                     title="Показать протокол сессии"
                     style={{ color: isLeg ? '#f87171' : '#4ade80', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'nowrap', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontSize: 10 }}
                     aria-label={`Протокол: ${TYPE_LABEL[s.type]} ${d}`}

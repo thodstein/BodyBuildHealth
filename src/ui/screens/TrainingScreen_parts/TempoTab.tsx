@@ -287,7 +287,7 @@ export const TempoTab: React.FC = () => {
       {/* Как использовать */}
       <div style={{ ...CARD, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', marginBottom: 4 }}>💡 Как применять темп в плане</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.6 }}>
           • <b>Сила (2-1-1-0):</b> контролируй эксцентрику, пауза для снятия инерции, взрывной подъём.<br />
           • <b>Гипертрофия (3-1-1-0):</b> медленный негатив + пауза в растяжении = макс. микротравмы.<br />
           • <b>Мощность (1-0-0-0):</b> компенсаторное ускорение, никаких пауз, макс. скорость.<br />

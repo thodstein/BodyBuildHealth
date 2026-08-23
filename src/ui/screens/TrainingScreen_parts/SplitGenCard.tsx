@@ -117,7 +117,7 @@ export const SplitGenCard: React.FC = () => {
   // Split generation
   const out: SplitOutput | null = useMemo(() => {
     const input: SplitInput = {
-        daysPerWeek: days, goal, weakPoints: weak,
+        daysPerНеделя: days, goal, weakPoints: weak,
         equipmentAvailable: prof.equipment || ['barbell'],
         injuryType: injury || undefined,
     };
@@ -156,7 +156,7 @@ export const SplitGenCard: React.FC = () => {
     const visCat = SPLIT_CATALOG.find(s => s.id === visType);
     if (!visCat || visType === 'auto') return null;
     const input: SplitInput = {
-      daysPerWeek: visDays, goal: visGoal, weakPoints: weak,
+      daysPerНеделя: visDays, goal: visGoal, weakPoints: weak,
       equipmentAvailable: prof.equipment || ['barbell'],
     };
     try {
@@ -185,14 +185,14 @@ export const SplitGenCard: React.FC = () => {
   const [cmpGoal, setCmpGoal] = useState<SplitGoal>('hypertrophy');
   const [cmpDays, setCmpDays] = useState(4);
   const cmpOutA = useMemo(() => {
-    const input: SplitInput = { daysPerWeek:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
+    const input: SplitInput = { daysPerНеделя:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
     try {
       const fns: Record<string, (i:SplitInput)=>SplitOutput> = { fbw:generateFBWSplit, ul:generateUpperLowerSplit, ppl:generatePPLSplit, pb:generatePowerbuildingSplit, sm:generateStrongmanSplit, wl:generateWeightliftingSplit, cf:generateCrossFitSplit, rehab:generateRehabSplit };
       return (fns[cmpA] || generateSplit)(input);
     } catch { return null; }
   }, [cmpA, cmpGoal, cmpDays, weak, prof.equipment]);
   const cmpOutB = useMemo(() => {
-    const input: SplitInput = { daysPerWeek:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
+    const input: SplitInput = { daysPerНеделя:cmpDays, goal:cmpGoal, weakPoints:weak, equipmentAvailable:prof.equipment||['barbell'] };
     try {
       const fns: Record<string, (i:SplitInput)=>SplitOutput> = { fbw:generateFBWSplit, ul:generateUpperLowerSplit, ppl:generatePPLSplit, pb:generatePowerbuildingSplit, sm:generateStrongmanSplit, wl:generateWeightliftingSplit, cf:generateCrossFitSplit, rehab:generateRehabSplit };
       return (fns[cmpB] || generateSplit)(input);
@@ -413,7 +413,7 @@ export const SplitGenCard: React.FC = () => {
                 <div style={{ marginTop:8, padding:10, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
                   <div style={{ fontSize:10, fontWeight:700, color:'#f87171', marginBottom:4 }}>⚠️ Низкий интервал восстановления</div>
                   {overlaps.map((o, i) => (
-                    <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.6)' }}>
+                    <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.9)' }}>
                       {GROUP_RU[o.group]}: дни {o.days.join(', ')} — интервал {o.gap} дн (рекомендуется ≥2 дн). Добавьте день отдыха между этими тренировками.
                     </div>
                   ))}

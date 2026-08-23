@@ -47,18 +47,16 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '🏋️', label: 'Сила', desc: '1RM, VBT, нормативы, относительная сила, аналитика', tab: 'strength_analysis',
           badge: acwr ? { text: `ACWR ${acwr.ratio.toFixed(1)}`, color: acwrColor } : undefined },
-        { icon: '⚡', label: 'Интеллект — единый пульт', desc: 'Нагрузка → восстановление → авторегуляция → прогноз. Один расчёт, без дублей (ACWR/Banister + PRI + прогноз)', tab: 'intelligence_hub' as any,
-          badge: { text: `${p.readinessRecovery}% · ACWR ${acwr ? acwr.ratio.toFixed(1) : '—'}`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
-        { icon: '🦴', label: 'Суставы и ортопедия', desc: 'Единый инструмент: JSI теплокарта + анатомия риска + нагрузка + геометрия + недельный план + прехаб/FMS + замены (9 калькуляторов)', tab: 'joints_ortho' as any },
-        { icon: '⚖️', label: 'Метаболика', desc: 'Вода/шаги/КБЖУ/жир/кортизол — с/без ААС, один снапшот (EFSA/Helms/Navy)', tab: 'metabolic_hub' as any,
+        { icon: '📈', label: 'Безопасность и нагрузка', desc: 'Безопасность (оценка упражнения), sRPE/ACWR/Banister, авторегуляция, восстановление', tab: 'load_safety' as any,
           badge: { text: `${p.readinessRecovery}%`, color: p.readinessRecovery >= 70 ? '#22c55e' : '#eab308' } },
+        { icon: '🦴', label: 'Суставы и ортопедия', desc: 'Единый инструмент: JSI теплокарта + анатомия риска + нагрузка + геометрия + недельный план + прехаб/FMS + замены (9 калькуляторов)', tab: 'joints_ortho' as any },
+        { icon: '🎯', label: 'RIR + Прогноз', desc: 'Единый хаб: RIR bias/калибровка + Хольт-прогноз готовности — аналог Микс-хаба', tab: 'rir_forecast_hub' as any },
       ],
     },
     {
       icon: '🎯', label: 'Качество и диагностика', color: '#a855f7',
       tools: [
-        { icon: '⭐', label: 'Качество программы', desc: 'PRO 0-100: ББ/ПЛ/Гибрид, MEV/MAV/MRV (Israetel), PED dose-aware, лаб 0.7-1.0, PRO паттерны/углы/растяжка/техника/цель ~ Schoenfeld, графики тоннаж/КПШ/UOI', tab: 'quality_hub' as any },
-        { icon: '🔬', label: 'Диагностика движения', desc: 'Мастер движения 9 лифтов × 10 блоков: слабые мышцы → точки → мёртвые точки → bar-path → геометрия → VBT → срывы RPE≥8 → RIR → мезо', tab: 'diagnostics_hub' as any },
+        { icon: '🎯', label: 'Качество + Диагностика', desc: 'Единый хаб: 0-100 + MEV/MAV/MRV и мастер движения (9 лифтов)/срывы (дневник) — аналог Объём-хаба', tab: 'quality_joint_hub' as any },
       ],
     },
     {
@@ -66,6 +64,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '📐', label: 'Объём-хаб', desc: 'Единый: MEV/MAV/MRV + тоннаж/КПШ + блины', tab: 'volume_hub' as any },
         { icon: '🏋️', label: 'Лаборатория упражнений', desc: 'Каталог, биомеханика, подбор по группе', tab: 'exercise_lab' },
+        { icon: '🧠', label: 'PRI / схема повторов', desc: 'PRI готовность → объём/RIR + схема повторов', tab: 'tools_hub' as any },
       ],
     },
     {
@@ -112,7 +111,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
               fontSize: 10, fontWeight: 700, color: cat.color,
               textTransform: 'uppercase', letterSpacing: 0.4, flex: 1,
             }}>{cat.label}</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{cat.tools.length}</span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{cat.tools.length}</span>
           </div>
 
           {/* Tool cards grid */}
@@ -144,7 +143,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
                     </span>
                   )}
                 </div>
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 10, color:'rgba(255,255,255,0.85)', lineHeight: 1.3 }}>
                   {t.desc}
                 </span>
               </button>

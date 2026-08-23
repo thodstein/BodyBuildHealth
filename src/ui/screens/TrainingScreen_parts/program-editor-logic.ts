@@ -34,14 +34,14 @@ export function sessionUsesRecommendedDay(session: Pick<UserSession, 'dayOfWeek'
 
 /** Перенос сессии (по индексу) на день недели ВО ВСЕ недели (шаблон повторяется).
  *  Не мутирует исходные недели; несуществующий индекс — без изменений. */
-export function moveWeekScheduleDay(weeks: UserWeek[], sessionIdx: number, dayOfWeek: number): UserWeek[] {
+export function moveWeekScheduleDay(weeks: UserWeek[], sessionIdx: number, dayOfНеделя: number): UserWeek[] {
   const validIdx = Number.isInteger(sessionIdx) && sessionIdx >= 0;
   const normalized = Number.isInteger(dayOfWeek) && dayOfWeek >= 0 && dayOfWeek <= 6
     ? dayOfWeek
     : trainingDayForIndex(validIdx ? sessionIdx : 0);
   return weeks.map(w => ({
     ...w,
-    sessions: w.sessions.map((s, i) => i === sessionIdx ? { ...s, dayOfWeek: normalized } : s),
+    sessions: w.sessions.map((s, i) => i === sessionIdx ? { ...s, dayOfНеделя: normalized } : s),
   }));
 }
 
@@ -49,7 +49,7 @@ export function moveWeekScheduleDay(weeks: UserWeek[], sessionIdx: number, dayOf
 export function resetScheduleToRecommended(weeks: UserWeek[]): UserWeek[] {
   return weeks.map(w => ({
     ...w,
-    sessions: w.sessions.map((s, i) => ({ ...s, dayOfWeek: trainingDayForIndex(i) })),
+    sessions: w.sessions.map((s, i) => ({ ...s, dayOfНеделя: trainingDayForIndex(i) })),
   }));
 }
 
@@ -67,7 +67,7 @@ export function resizeTrainingSessions(sessions: UserSession[], target: number, 
     result.push({
       id: newId('ses'),
       name: deload ? `Разгрузка ${dayNumber}` : `День ${dayNumber}`,
-      dayOfWeek: firstFreeTrainingDay(result),
+      dayOfНеделя: firstFreeTrainingDay(result),
       focus: deload ? 'deload' : '',
       blocks: deload ? [{
         id: newId('blk'),

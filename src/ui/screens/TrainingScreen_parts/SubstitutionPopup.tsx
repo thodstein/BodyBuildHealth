@@ -206,7 +206,7 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
                   </div>
                 )}
                 {opt.description && (
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 1, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 1, lineHeight: 1.4 }}>
                     📝 {opt.description}
                   </div>
                 )}

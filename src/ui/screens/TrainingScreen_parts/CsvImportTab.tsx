@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { importSessionsFromCSV } from '../../../engines/workout-logger.engine';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color:'rgba(255,255,255,0.9)', fontSize: 11, lineHeight: 1.4 };
 
 type ImportFormat = 'csv' | 'hevy' | 'strong' | 'mesomorph';
 
@@ -21,7 +21,7 @@ const SAMPLES: Record<ImportFormat, string> = {
 2026-06-03,Тяга штанги,1,60,8,7,2`,
   hevy: `[
   {
-    "title": "Push Day",
+    "title": "Push День",
     "start_time": "2026-06-01T10:00:00Z",
     "exercises": [
       {
@@ -50,7 +50,7 @@ const SAMPLES: Record<ImportFormat, string> = {
   mesomorph: `[
   {
     "date": "2026-06-01",
-    "name": "Push Day",
+    "name": "Push День",
     "exercises": [
       {
         "name": "Bench Press",

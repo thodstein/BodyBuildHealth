@@ -321,7 +321,7 @@ export const MesocycleTrackerTab: React.FC = () => {
       {/* Инфо о стратегии */}
       <div style={{ ...CARD, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.15)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>💡 Стратегия прогрессии мезоциклов</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.6 }}>
           • <b>Гипертрофия:</b> +8% объёма, +2% интенсивности между мезо. Объём — главный драйвер роста.<br />
           • <b>Сила:</b> +5% объёма, +3% интенсивности. Интенсивность растёт быстрее объёма.<br />
           • <b>Мощность:</b> +2% объёма, +4% интенсивности. Минимум объёма, максимум качества движений.<br />

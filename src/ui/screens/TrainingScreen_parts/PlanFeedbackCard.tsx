@@ -59,7 +59,7 @@ export const PlanFeedbackCard: React.FC<{
               <div key={f.planKey} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 7, background: 'rgba(255,255,255,0.02)', fontSize: 11 }}>
                 <span style={{ flex: '0 0 110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>{f.planExerciseName}</span>
                 <span style={{ flex: '0 0 70px', fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{GROUP_RU[f.muscle] || f.muscle}</span>
-                <span style={{ flex: '0 0 130px', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                <span style={{ flex: '0 0 130px', fontSize: 10, color:'rgba(255,255,255,0.9)' }}>
                   Факт: <b style={{ color: 'rgba(255,255,255,0.9)' }}>{f.last!.topWeight}×{f.last!.topReps}</b> RIR{f.last!.actualRir}
                   <span style={{ opacity: 0.6 }}> · e1RM {f.last!.e1rm}</span>
                 </span>

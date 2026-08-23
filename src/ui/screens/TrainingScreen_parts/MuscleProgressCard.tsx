@@ -47,7 +47,7 @@ const MuscleProgressCardBase: React.FC<{ sessions: Session[]; level: string }> =
         {weekly.map((w, i) => <circle key={i} cx={x(i)} cy={y(w.vol)} r={2.5} fill={COLORS[group]} />)}
         {weekly.map((w, i) => <text key={i} x={x(i)} y={H - 6} fontSize={7} fill="rgba(255,255,255,0.85)" textAnchor="middle">{w.label}</text>)}
       </svg>
-      <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 4, flexWrap: 'wrap' }}>
         <span>🟡 MEV {ref.mev}</span><span>🟢 MAV {ref.mav}</span><span>🔴 MRV {ref.mrv}</span>
         <span>· текущий нед: <b style={{ color: COLORS[group] }}>{Math.round((weekly[weekly.length - 1]?.vol || 0) / 1000)}т</b></span>
       </div>

@@ -341,7 +341,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           for (const mu of musclesInSess) freq[mu] = (freq[mu] || 0) + 1;
         }
       }
-      const freqPerWeek: Record<string, number> = {};
+      const freqPerНеделя: Record<string, number> = {};
       for (const [k, v] of Object.entries(freq)) freqPerWeek[k] = Math.round((v / totalWeeks) * 10) / 10;
       const avgFreq = Object.values(freqPerWeek).length ? (Object.values(freqPerWeek).reduce((a,b)=>a+b,0)/Object.values(freqPerWeek).length) : 0;
       return { freqPerWeek, hardSets, totalSets, avgRir: rirN ? rirSum / rirN : 0, tonnage: Math.round(tonnage), effectiveSets, perMuscleSets, avgFreq: Math.round(avgFreq*10)/10 };
@@ -437,7 +437,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       });
       const peakIdx = tonPerWeek.indexOf(Math.max(...tonPerWeek));
       const progPct = tonPerWeek[0] > 0 ? Math.round(((tonPerWeek[peakIdx] / tonPerWeek[0]) - 1) * 100) : 0;
-      return { phaseCount, pull, press, ratio: Math.round(ratio * 100) / 100, superset, tech, dup, progPct, peakWeek: peakIdx + 1 };
+      return { phaseCount, pull, press, ratio: Math.round(ratio * 100) / 100, superset, tech, dup, progPct, peakНеделя: peakIdx + 1 };
     } catch { return null; }
   }, [selectedProgram, division]);
 
@@ -857,7 +857,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
               </div>
             </div>
           )}
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 6, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 9, color:'rgba(255,255,255,0.9)', marginTop: 6, lineHeight: 1.4 }}>
             Тоннаж = Σвес×пов×под×Множ · КПШ = Σпов×под · Ср.вес = Тоннаж/КПШ · Инт.отн = Ср.вес/(PM×Множ) · УОИ = ΣКПШ×Коэф/ΣКПШ · Инт.Ф+Б = Σk(вес/PM)×вес×пов×под×Множ×Коэф. По Прилепину: оптимум 60-70% — КПШ 18-30, 70-80% — 12-24 и т.д.
           </div>
         </div>

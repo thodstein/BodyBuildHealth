@@ -4,7 +4,7 @@ import { PHASE_LABELS, PHASE_HINTS } from './shared';
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color:'rgba(255,255,255,0.9)', fontSize: 11, lineHeight: 1.4 };
 
 const GOAL_OPTS: { id: GoalType; label: string }[] = [
   { id: 'hypertrophy', label: 'Масса' },
@@ -61,7 +61,7 @@ const MicrocyclePlannerCardBase: React.FC = () => {
               <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>нед {rows.filter(r => r.phase === ph.phase)[0]?.week}–{rows.filter(r => r.phase === ph.phase).slice(-1)[0]?.week} ({ph.weeks} нед)</span>
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 4, lineHeight: 1.5 }}>{PHASE_HINTS[ph.phase] || ''}</div>
-            <div style={{ display: 'flex', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 6, flexWrap: 'wrap' }}>
               <span>📊 Объём: <b style={{ color: volColor[ph.params.volumeLevel] }}>{ph.params.volumeLevel}</b></span>
               <span>🔥 Интенсивность: <b>{ph.params.intensityLevel}</b></span>
               <span>🔁 Частота: <b>{ph.params.frequencyLevel}</b></span>

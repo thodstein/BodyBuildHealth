@@ -29,7 +29,7 @@ const editorSheet: React.CSSProperties = {
 const editorSheetCloseBtn: React.CSSProperties = {
   width: '100%', marginTop: 12, padding: '10px', minHeight: 44, borderRadius: 8,
   border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-  color: 'rgba(255,255,255,0.6)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+  color:'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 12, cursor: 'pointer',
   touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent',
 };
 

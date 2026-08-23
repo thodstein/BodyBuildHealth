@@ -209,7 +209,7 @@ export const FatigueIndexTab: React.FC = () => {
               const pct = (w.load / max) * 100;
               return (
                 <div key={w.weekIdx} style={{ marginBottom: 4 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 2 }}>
                     <span>Нед {w.weekIdx} (с {w.start})</span>
                     <span><b style={{ color: ACCENT }}>{w.load} AU</b> · {w.days} трен.дн.</span>
                   </div>

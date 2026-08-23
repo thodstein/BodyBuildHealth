@@ -27,7 +27,7 @@ const ACCENT = '#00e68a';
 interface QuickEntryProps {
   diary: StrengthDiary;
   historyWorkouts: WorkoutLog[];
-  selectedWeek: number;
+  selectedНеделя: number;
   onSave: () => void;
 }
 
@@ -317,7 +317,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
             <div style={{ fontSize: 20, fontWeight: 800, color: ACCENT, marginBottom: 8 }}>НОВЫЙ ПМ!</div>
             <div style={{ fontSize: 14, color: '#fff', marginBottom: 4 }}>{showPR.exercise}</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: '#fff' }}>{showPR.weight}кг × {showPR.reps}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>e1RM: {Math.round(showPR.e1rm)}кг</div>
+            <div style={{ fontSize: 12, color:'rgba(255,255,255,0.9)', marginTop: 4 }}>e1RM: {Math.round(showPR.e1rm)}кг</div>
           </div>
         </div>
       )}
@@ -439,7 +439,7 @@ export const QuickEntry: React.FC<QuickEntryProps> = ({
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {recent.map(r => (
                 <button key={r.name} onClick={() => { const ex = EXERCISE_CATALOG.find((c: any) => c.name === r.name); if (ex) addExercise(ex); }}
-                  style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 10 }}>
+                  style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 10 }}>
                   {r.name}
                 </button>
               ))}

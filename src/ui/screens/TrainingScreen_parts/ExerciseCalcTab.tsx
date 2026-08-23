@@ -11,7 +11,7 @@ import { getTargetMuscleForExercise, getTargetMusclesByGroup } from '../../../da
 import type { Exercise } from '../../../core/types';
 
 const ACCENT = '#00e68a';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
+const SMALL: React.CSSProperties = { color:'rgba(255,255,255,0.9)', fontSize: 11, lineHeight: 1.4 };
 const CARD: React.CSSProperties = { padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' };
 
 const GROUPS = ['all', 'chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;

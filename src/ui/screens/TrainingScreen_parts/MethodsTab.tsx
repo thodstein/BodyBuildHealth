@@ -30,7 +30,7 @@ import {
 } from './shared';
 
 
-export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOutput: TrainingOutput | null; diaryStats: StrengthStats[]; historyWorkouts: WorkoutLog[]; goal: string; level: string; daysPerWeek: number; recovery: number; fatigue: number; appliedMethods: Record<string, string>; onToggleMethod: (name: string, category: string) => void; onApplyComposition: () => void }> = ({ linked, trainingOutput, diaryStats, historyWorkouts, goal, level, daysPerWeek, recovery, fatigue, appliedMethods, onToggleMethod, onApplyComposition }) => {
+export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trainingOutput: TrainingOutput | null; diaryStats: StrengthStats[]; historyWorkouts: WorkoutLog[]; goal: string; level: string; daysPerНеделя: number; recovery: number; fatigue: number; appliedMethods: Record<string, string>; onToggleMethod: (name: string, category: string) => void; onApplyComposition: () => void }> = ({ linked, trainingOutput, diaryStats, historyWorkouts, goal, level, daysPerWeek, recovery, fatigue, appliedMethods, onToggleMethod, onApplyComposition }) => {
   const methods = React.useMemo(() => getTrainingMethods(), []);
   const volumes = React.useMemo(() => getVolumeReferences(), []);
   const visuals = React.useMemo(() => getSplitVisuals(), []);

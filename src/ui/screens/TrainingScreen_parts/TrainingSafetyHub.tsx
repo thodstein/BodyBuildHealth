@@ -56,7 +56,7 @@ export const TrainingSafetyHub: React.FC<{ initialSection?: SectionId; sessions?
 
       {section === 'ortho' && (
         <>
-          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.14)', fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(244,63,94,0.06)', border: '1px solid rgba(244,63,94,0.14)', fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.4 }}>
             🦴 Глубокий анализ сустава (JSI, 8 блоков, FMS) и оценка техники упражнения — во вкладке <b style={{ color: '#f43f5e' }}>«Суставы и ортопедия»</b> (единый инструмент, без дублей). Здесь — быстрый орто-чек.
           </div>
           <LoadSafetyCard initialSubTab="ortho" />

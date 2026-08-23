@@ -413,7 +413,7 @@ export const WarmupRampCard: React.FC = () => {
           {ramp.map((r, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, padding: '2px 0' }}>
               <span style={{ minWidth: 30, color: i === ramp.length - 1 ? ACCENT : 'rgba(255,255,255,0.85)', fontWeight: i === ramp.length - 1 ? 700 : 400 }}>{r.bar ? '—' : `${Math.round(r.pct * 100)}%`}</span>
-              <span style={{ flex: 1, color: 'rgba(255,255,255,0.6)' }}>{r.bar ? 'Пустой гриф (20 кг)' : `${r.load}кг`}</span>
+              <span style={{ flex: 1, color:'rgba(255,255,255,0.9)' }}>{r.bar ? 'Пустой гриф (20 кг)' : `${r.load}кг`}</span>
               <span style={{ color: 'rgba(255,255,255,0.85)' }}>{r.reps} повт</span>
             </div>
           ))}

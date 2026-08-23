@@ -220,7 +220,7 @@ export const VolumeOptimizerTab: React.FC = () => {
 
   const qualityColor = quality ? quality.score >= 80 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' : DIM_;
 
-  // ── Week tabs ──
+  // ── Неделя tabs ──
   const weekTabs = [];
   for (let w = 1; w <= mesoWeeks; w++) {
     weekTabs.push(

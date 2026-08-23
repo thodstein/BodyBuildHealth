@@ -52,7 +52,7 @@ export const LoadRadarCard: React.FC<{ sessions: WorkoutLog[]; level: string }> 
           return <text key={i} x={lx} y={ly} fontSize={8} fill="rgba(255,255,255,0.6)" textAnchor="middle" dominantBaseline="middle">{GRP_RU[d.g] || d.g}</text>;
         })}
       </svg>
-      <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
         <span>🟢 в зоне MAV</span><span>🟡 &lt; MEV (недотрен)</span><span>🔴 &gt; MRV (перетрен)</span>
         <span>· макс. отношение: <b style={{ color: maxRatio > 1 ? '#ef4444' : ACCENT }}>{maxRatio.toFixed(2)}× MRV</b></span>
       </div>

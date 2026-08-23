@@ -102,7 +102,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   </div>
                 );
               })()}
-              {/* Week-over-week comparison */}
+              {/* Неделя-over-week comparison */}
               {historyWorkouts.length >= 2 && (() => {
                 const sorted = [...historyWorkouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 const now = new Date();
@@ -198,11 +198,11 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       ))}
                     </div>
                   </div>
-                  {/* Week labels */}
+                  {/* Неделя labels */}
                   <div style={{ display: 'flex', gap: 2, marginBottom: 6 }}>
                     {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center', fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Н{wi + 1}</span>)}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color:'rgba(255,255,255,0.9)' }}>
                     {groups.filter(g => (wsg[g]?.reduce((s: number, x: number) => s + x, 0) || 0) > 0).map(g => (
                       <span key={g} style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: 1, background: GROUP_COLORS[g] || '#888', display: 'inline-block' }} />{GRP_RU[g] || g}</span>
                     ))}
@@ -211,7 +211,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   {barTooltip && (
                     <div style={{ position: 'fixed', left: barTooltip.x + 8, top: barTooltip.y - 30, background: '#18181b', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, padding: '4px 8px', fontSize: 10, color: '#fff', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
                       <span style={{ color: GROUP_COLORS[barTooltip.group] || '#888', fontWeight: 700 }}>{GRP_RU[barTooltip.group] || barTooltip.group}</span>
-                      <span style={{ marginLeft: 6, color: 'rgba(255,255,255,0.6)' }}>Н{barTooltip.week}: {barTooltip.sets} сетов</span>
+                      <span style={{ marginLeft: 6, color:'rgba(255,255,255,0.9)' }}>Н{barTooltip.week}: {barTooltip.sets} сетов</span>
                     </div>
                   )}
                 </div>
@@ -366,7 +366,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                     <div style={style.label}>🔀 Прогресс по мезоциклам (e1RM)</div>
                     {exercises.map(ex => (
                       <div key={ex.name} style={{ marginBottom: 8 }}>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{ex.name}</div>
+                        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 2 }}>{ex.name}</div>
                         <MiniLineChart
                           data={[]}
                           series={ex.mesos.map(m => ({ name: m.name, color: m.color, data: m.pts.map(p => p.e1rm), labels: m.pts.map(p => p.date) }))}
@@ -421,7 +421,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                               : <span style={{ fontSize: 9, color: '#60a5fa' }}>из профиля</span>}
                           </div>
                           {picks.length > 0 && (
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                            <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 2 }}>
                               {picks.map((e, i) => `${i > 0 ? ' · ' : ''}${e.name}`)}
                             </div>
                           )}
@@ -518,7 +518,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       </span>
                     </div>
                     {risks.map((r, i) => (
-                      <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 3, paddingLeft: 8, borderLeft: `2px solid ${level === 'high' ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)'}` }}>• {r}</div>
+                      <div key={i} style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 3, paddingLeft: 8, borderLeft: `2px solid ${level === 'high' ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)'}` }}>• {r}</div>
                     ))}
                     {level === 'high' && (
                       <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', fontSize: 10, color: '#ef4444' }}>
@@ -547,7 +547,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       <span style={{ fontSize: 14 }}>📉</span>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>Рекомендация: разгрузочная неделя</span>
                     </div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.5 }}>
                       {weeksSinceDeload} недель подряд без снижения объёма. Тренд объёма растёт ({Math.round(trend)} → {Math.round(avgVol)} сетов). Рекомендуется неделя объёмом ~50% ({Math.round(avgVol * 0.5)} сетов) с RIR 3-4.
                     </div>
                     <div style={{ marginTop: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.08)', fontSize: 9, color: '#60a5fa' }}>
@@ -864,7 +864,7 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   </div>
                 );
               })()}
-              {/* Day-of-week training heatmap */}
+              {/* День-of-week training heatmap */}
               {historyWorkouts.length >= 3 && (() => {
                 const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
                 const dayData = dayNames.map((name, idx) => {

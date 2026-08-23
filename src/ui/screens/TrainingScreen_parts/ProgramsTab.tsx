@@ -91,7 +91,7 @@ export const ProgramsTab: React.FC<{
     try {
       const prog = {
         id: expandedSelected.id, name: expandedSelected.name, goal: expandedSelected.goal, level: expandedSelected.level,
-        daysPerWeek: expandedSelected.daysPerWeek, durationWeeks: expandedSelected.durationWeeks,
+        daysPerНеделя: expandedSelected.daysPerWeek, durationWeeks: expandedSelected.durationWeeks,
         description: expandedSelected.description, weeks: expandedSelected.weeks,
         loadedAt: new Date().toISOString(),
       };
@@ -281,7 +281,7 @@ export const ProgramsTab: React.FC<{
           {myProgMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6', fontSize:11, marginBottom:6, textAlign:'center' }}>{myProgMsg}</div>}
           {myTrainingMsg && <div style={{ padding:'6px 10px', borderRadius:6, background:'rgba(255,215,0,0.1)', border:'1px solid rgba(255,215,0,0.3)', color:'#ffd700', fontSize:11, marginBottom:6, textAlign:'center' }}>{myTrainingMsg}</div>}
 
-          {/* Week-by-week detail */}
+          {/* Неделя-by-week detail */}
           <h4 style={{ margin: '0 0 6px', fontSize: 13, color: '#fff' }}>
             Программа по неделям ({expandedSelected.weeks.length} из {expandedSelected.durationWeeks} нед{expandedSelected.weeks.length >= expandedSelected.durationWeeks ? ' ✅' : ' ⚠️'})
           </h4>

@@ -93,7 +93,7 @@ export const BulkApplyCard: React.FC<Props> = ({ program, onChange, showToast })
         <span style={{ fontSize: 11, color: DIM, marginLeft: 6, fontWeight: 500 }}>(сейчас: {INTENSITY_TECHNIQUES[curIntensity as IntensityTechnique]?.label ?? curIntensity})</span>
       </div>
 
-      {/* P2-3: Week-range selector */}
+      {/* P2-3: Неделя-range selector */}
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 10, color: DIM }}>Диапазон:</span>
         <button onClick={() => setWeekRange('all')} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: weekRange === 'all' ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', background: weekRange === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent', color: weekRange === 'all' ? '#00e68a' : DIM, fontWeight: 700, minHeight: 30 }}>Все недели</button>

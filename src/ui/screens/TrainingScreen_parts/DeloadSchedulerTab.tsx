@@ -140,7 +140,7 @@ export const DeloadSchedulerTab: React.FC = () => {
   };
 
   const loadSession = (s: any) => {
-    const { goal: g, level: l, weeksUntilGoal: w, currentWeek: cw, manualOverrides: mo } = s.config;
+    const { goal: g, level: l, weeksUntilGoal: w, currentНеделя: cw, manualOverrides: mo } = s.config;
     setGoal(g); setLevel(l); setWeeksUntilGoal(w); setCurrentWeek(cw); setManualOverrides(mo);
   };
 

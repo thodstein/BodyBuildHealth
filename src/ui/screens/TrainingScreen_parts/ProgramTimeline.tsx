@@ -69,7 +69,7 @@ export const ProgramTimeline: React.FC<Props> = ({ program, selectedWeek, onSele
         <span style={{ fontSize: 10, color: DIM, fontWeight: 500 }}>({weeks.length} нед · {muscles.length} групп)</span>
       </div>
 
-      {/* Week headers */}
+      {/* Неделя headers */}
       <div style={{ display: 'flex', marginBottom: 4 }}>
         <div style={{ width: labelW, flexShrink: 0 }} />
         {weeks.map((w, wi) => (

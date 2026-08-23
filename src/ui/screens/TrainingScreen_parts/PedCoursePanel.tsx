@@ -264,7 +264,7 @@ export const PedAdaptationCard: React.FC<{ adaptation: PEDAdaptation | null; tit
         <div style={{ marginBottom: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Как считается</div>
           {a.rationale.map((r, i) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.45, paddingLeft: 10, position: 'relative' }}>
+            <div key={i} style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.45, paddingLeft: 10, position: 'relative' }}>
               <span style={{ position: 'absolute', left: 0, color: '#a855f7' }}>•</span>
               {r}
             </div>

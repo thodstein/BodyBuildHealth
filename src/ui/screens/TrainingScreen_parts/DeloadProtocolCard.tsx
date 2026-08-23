@@ -106,12 +106,12 @@ export const DeloadProtocolCard: React.FC<Props> = ({ ctx, overrideProtocol }) =
             >
               <span>{DAY_ICONS[day.type] || '📌'}</span>
               <span style={{ fontWeight: 600, minWidth: 20 }}>Д{day.day}</span>
-              <span style={{ color: 'rgba(255,255,255,0.6)', flex: 1 }}>{day.description}</span>
+              <span style={{ color:'rgba(255,255,255,0.9)', flex: 1 }}>{day.description}</span>
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>{expandedDay === day.day ? '▲' : '▼'}</span>
             </button>
 
             {expandedDay === day.day && (
-              <div style={{ padding: '6px 10px 6px 36px', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+              <div style={{ padding: '6px 10px 6px 36px', fontSize: 10, color:'rgba(255,255,255,0.9)' }}>
                 {day.notes && <div style={{ marginBottom: 4, fontStyle: 'italic' }}>{day.notes}</div>}
                 {day.exercises && day.exercises.length > 0 && (
                   <div style={{ marginTop: 4 }}>
@@ -133,7 +133,7 @@ export const DeloadProtocolCard: React.FC<Props> = ({ ctx, overrideProtocol }) =
         <div style={{ marginTop: 6, padding: 8, borderRadius: 6, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', marginBottom: 6 }}>
           <div style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>⚠️</div>
           {protocol.warnings.map((w, i) => (
-            <div key={i} style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 2 }}>{w}</div>
+            <div key={i} style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 2 }}>{w}</div>
           ))}
         </div>
       )}

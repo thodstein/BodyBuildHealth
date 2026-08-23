@@ -42,7 +42,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>⚠️ История частично обрезана из-за переполнения хранилища</div>
                 <button onClick={() => { clearStorageTrimWarning(); setTrimWarning(null); }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.85)', cursor: 'pointer', fontSize: 12 }}>✕</button>
               </div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 4 }}>
+              <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 4 }}>
                 Осталось {trimWarning.kept} последних сессий ({new Date(trimWarning.at).toLocaleString('ru-RU')}). Сделайте экспорт CSV/JSON в «Инструментах» и удалите старые записи.
               </div>
             </div>
@@ -56,7 +56,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <div style={{ fontSize: 11, fontWeight: 700, color: a.type === 'plateau' ? '#f59e0b' : a.type === 'volume_peak' ? '#ef4444' : '#60a5fa' }}>
                     {a.type === 'plateau' ? '⏸' : a.type === 'volume_peak' ? '📈' : '📉'} {a.message}
                   </div>
-                  {a.type === 'volume_peak' && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Рекомендуется разгрузочная неделя или снижение объёма.</div>}
+                  {a.type === 'volume_peak' && <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 2 }}>Рекомендуется разгрузочная неделя или снижение объёма.</div>}
                 </div>
               ))}
             </div>
@@ -189,13 +189,13 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
             {/* Heatmap — redesigned with month labels + tooltips */}
             {historyWorkouts.length > 0 && (() => {
-              const byDay: Record<string, number> = {};
+              const byДень: Record<string, number> = {};
               historyWorkouts.forEach((w: any) => { byDay[w.date] = (byDay[w.date] || 0) + (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || 0), 0); });
-              const cells: { date: string; vol: number; dayOfWeek: number }[] = [];
+              const cells: { date: string; vol: number; dayOfНеделя: number }[] = [];
               const today = new Date();
               for (let i = 83; i >= 0; i--) {
                 const d = new Date(today); d.setDate(d.getDate() - i);
-                cells.push({ date: d.toISOString().slice(0, 10), vol: byDay[d.toISOString().slice(0, 10)] || 0, dayOfWeek: (d.getDay() + 6) % 7 });
+                cells.push({ date: d.toISOString().slice(0, 10), vol: byDay[d.toISOString().slice(0, 10)] || 0, dayOfНеделя: (d.getDay() + 6) % 7 });
               }
               const maxVol = Math.max(1, ...cells.map(c => c.vol));
               const heatColor = (v: number) => {
@@ -207,7 +207,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 return 'rgba(0,230,138,0.9)';
               };
               // Group by weeks (columns)
-              const weeks: { date: string; vol: number; dayOfWeek: number }[][] = [];
+              const weeks: { date: string; vol: number; dayOfНеделя: number }[][] = [];
               for (let w = 0; w < 12; w++) weeks.push(cells.slice(w * 7, w * 7 + 7));
               // Month labels: find first day of each week column
               const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
@@ -229,7 +229,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                       return <div key={wi} style={{ flex: 1, fontSize: 9, color: ml ? 'rgba(255,255,255,0.85)' : 'transparent', fontWeight: ml ? 600 : 400, textAlign: 'center' }}>{ml?.label || ''}</div>;
                     })}
                   </div>
-                  {/* Day labels + grid */}
+                  {/* День labels + grid */}
                   <div style={{ display: 'flex', gap: 3 }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginRight: 2 }}>
                       {['Пн', '', 'Ср', '', 'Пт', '', 'Вс'].map((d, i) => (
@@ -475,7 +475,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               );
             })()}
           </div>
-          {/* Week-to-week comparison card */}
+          {/* Неделя-to-week comparison card */}
           {groupedHistory.length >= 2 && (() => {
             const [curWeek, curWorkouts] = groupedHistory[0];
             const [prevWeek, prevWorkouts] = groupedHistory[1];

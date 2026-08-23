@@ -191,12 +191,12 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const today = new Date();
             const calStart = new Date(today);
             calStart.setDate(calStart.getDate() - (weeks * 7) + 1 - calStart.getDay());
-            const days: { date: string; hasPR: boolean; dayOfWeek: number; weekIdx: number }[] = [];
+            const days: { date: string; hasPR: boolean; dayOfНеделя: number; weekIdx: number }[] = [];
             for (let w = 0; w < weeks; w++) {
               for (let d = 0; d < 7; d++) {
                 const dt = new Date(calStart); dt.setDate(dt.getDate() + w * 7 + d);
                 const ds = dt.toISOString().slice(0, 10);
-                days.push({ date: ds, hasPR: prDays.has(ds), dayOfWeek: d, weekIdx: w });
+                days.push({ date: ds, hasPR: prDays.has(ds), dayOfНеделя: d, weekIdx: w });
               }
             }
             const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];

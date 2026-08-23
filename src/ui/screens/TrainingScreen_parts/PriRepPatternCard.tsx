@@ -51,7 +51,7 @@ export const PriRepPatternCard: React.FC = () => {
   const applyPri = () => { applyToPlanner({ kind: 'pri', label: `PRI ×${thr.volumeMod} (${thr.label})`, data: { volumeMult: thr.volumeMod, rirShift: thr.rirAdd } }); setApplied(true); setTimeout(() => setApplied(false), 2500); };
   const auto = useMemo(() => {
     try {
-      const plannedWeek: CycleWeekPlan = { week: 1, phase: 'accumulation', phaseWeek: 1, volumeMultiplier: 1, intensityMultiplier: 1, rirBase: 2, rirPhase: 'base', isDeload: false, progressionType: 'linear' };
+      const plannedНеделя: CycleWeekPlan = { week: 1, phase: 'accumulation', phaseНеделя: 1, volumeMultiplier: 1, intensityMultiplier: 1, rirBase: 2, rirPhase: 'base', isDeload: false, progressionType: 'linear' };
       const input: AutoregulationInput = {
         readiness, trainingLoadRatio: 1, plannedWeek, plannedExercises: [], goal, level: 'intermediate', weakPoints: [], doms, sleepQuality: sleep, stress,
       };

@@ -335,7 +335,7 @@ export const TrainingCalendarTab: React.FC = () => {
             </div>
           </div>
 
-          {/* Day-of-week headers */}
+          {/* День-of-week headers */}
           <div style={{ display: 'grid', gridTemplateColumns: '32px repeat(7, 1fr)', gap: 2, marginBottom: 4 }}>
             <div />
             {DAY_NAMES_RU.map((d, i) => (
@@ -363,7 +363,7 @@ export const TrainingCalendarTab: React.FC = () => {
         </>
       )}
 
-      {/* Week detail view */}
+      {/* Неделя detail view */}
       {view === 'week' && (
         <>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -526,7 +526,7 @@ export const TrainingCalendarTab: React.FC = () => {
               </div>
             )}
 
-            {/* Week-by-week compliance */}
+            {/* Неделя-by-week compliance */}
             {overview.weekCompliance.length > 0 && (
               <div style={CARD}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Compliance по неделям</div>

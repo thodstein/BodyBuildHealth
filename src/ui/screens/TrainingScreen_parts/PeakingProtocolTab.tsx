@@ -47,7 +47,7 @@ const PeakingProtocolTab: React.FC = () => {
 
       <div style={GLASS}>
         <div style={H}>{protocol.name}</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginBottom: 10 }}>{protocol.description}</div>
+        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginBottom: 10 }}>{protocol.description}</div>
 
         {/* Таблица понедельно */}
         <div style={STYLES.label}>Понедельное расписание</div>
@@ -69,7 +69,7 @@ const PeakingProtocolTab: React.FC = () => {
 
       <div style={GLASS}>
         <div style={H}>📋 Как интегрировать в план</div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.6 }}>
           <p>1. Постройте мезоцикл обычным образом.</p>
           <p>2. За {protocol.durationWeeks} нед до цели переключитесь на пиковый протокол:</p>
           <p>   • Объём: −{Math.round((1 - protocol.weeks[protocol.weeks.length - 1].volumePct) * 100)}% на финальной неделе</p>

@@ -43,7 +43,7 @@ interface ExerciseRecord {
 
 interface DiaryRecordingFormProps {
   diary: any;
-  selectedWeek: number;
+  selectedНеделя: number;
   onSave: () => void;
   historyWorkouts?: WorkoutLog[];
   /** План дня для предзаполнения (кнопка «Записать по плану»). */
@@ -546,7 +546,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
                 const cat = EXERCISE_CATALOG.find((c: any) => c.name === r.name);
                 return (
                   <button key={r.name} onClick={() => { const ex = EXERCISE_CATALOG.find((c: any) => c.name === r.name); if (ex) addExercise(ex); }}
-                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 10 }}>
+                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.9)', cursor: 'pointer', fontSize: 10 }}>
                     {r.name}
                   </button>
                 );
@@ -808,7 +808,7 @@ export const DiaryRecordingForm: React.FC<DiaryRecordingFormProps> = ({ diary, s
       {savedSummary ? (
         <div style={{ padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>✅ Тренировка сохранена!</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, color:'rgba(255,255,255,0.9)' }}>
             <div><span style={{ color: 'rgba(255,255,255,0.85)' }}>Упражнения:</span> <strong style={{ color: '#fff' }}>{savedSummary.exercises}</strong></div>
             <div><span style={{ color: 'rgba(255,255,255,0.85)' }}>Подходы:</span> <strong style={{ color: '#fff' }}>{savedSummary.sets}</strong></div>
             <div><span style={{ color: 'rgba(255,255,255,0.85)' }}>Тоннаж:</span> <strong style={{ color: '#fff' }}>{savedSummary.volume.toLocaleString()} кг</strong></div>

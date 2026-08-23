@@ -34,7 +34,7 @@ export const VolumeTrendCard: React.FC<{ sessions: WorkoutLog[]; weeks?: number 
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
         {totals.map((_, wi) => <span key={wi} style={{ flex: 1, textAlign: 'center' }}>Н{wi + 1}</span>)}
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color:'rgba(255,255,255,0.9)' }}>
         {groups.filter(g => (wsg[g]?.reduce((s: number, x: number) => s + x, 0) || 0) > 0).map(g => (
           <span key={g} style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: GROUP_COLORS[g] || '#888', display: 'inline-block' }} />{GRP_RU[g] || g}</span>
         ))}

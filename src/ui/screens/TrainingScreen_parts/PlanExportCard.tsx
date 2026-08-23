@@ -226,7 +226,7 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
     return {
       score: 0, grade: '—', issues: [], muscles: [],
       summary: ['Нет плана для оценки'], recommendations: [],
-      metadata: { totalExercises: 0, totalSets: 0, totalVolume: 0, avgSetsPerDay: 0, pushPullRatio: '0:0', hasDeload: false, weakPointCoverage: 0 },
+      metadata: { totalExercises: 0, totalSets: 0, totalVolume: 0, avgSetsPerДень: 0, pushPullRatio: '0:0', hasDeload: false, weakPointCoverage: 0 },
     };
   }, [manualResult, bbPlan, level, weakPoints, hasDeload, profile?.onCourse, profile?.injuries, meta?.weeks]);
 
@@ -337,7 +337,7 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
           {criticals.length > 0 && (
             <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginBottom: 4 }}>
               🔴 {criticals.length} критических:
-              {criticals.slice(0, 3).map((c, i) => <div key={i} style={{ fontSize: 10, fontWeight: 400, color: 'rgba(255,255,255,0.6)', marginLeft: 12 }}>{c.message}</div>)}
+              {criticals.slice(0, 3).map((c, i) => <div key={i} style={{ fontSize: 10, fontWeight: 400, color:'rgba(255,255,255,0.9)', marginLeft: 12 }}>{c.message}</div>)}
             </div>
           )}
           {warnings.length > 0 && (

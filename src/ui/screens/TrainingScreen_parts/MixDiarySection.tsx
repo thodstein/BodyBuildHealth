@@ -83,7 +83,7 @@ export const MixDiarySection: React.FC<{ hasTrainingToday?: boolean }> = ({ hasT
     <div style={CARD}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#a78bfa' }}>💊 Тренировочные миксы и пресеты ({records.length})</div>
-        <button onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', background: 'none', border: 'none', cursor: 'pointer' }}>
+        <button onClick={() => setExpanded(e => !e)} style={{ fontSize: 11, color:'rgba(255,255,255,0.9)', background: 'none', border: 'none', cursor: 'pointer' }}>
           {expanded ? 'Свернуть ▲' : 'Все ▼'}
         </button>
       </div>

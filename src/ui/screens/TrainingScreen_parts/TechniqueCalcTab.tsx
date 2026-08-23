@@ -321,7 +321,7 @@ export const TechniqueCalcTab: React.FC = () => {
                     {errors.map((e: any, i: number) => (
                       <div key={i} style={{ marginBottom: 6, padding: '8px 10px', background: 'rgba(239,68,68,0.05)', borderRadius: 6, border: '1px solid rgba(239,68,68,0.1)' }}>
                         <div style={{ fontSize: 10, fontWeight: 700, color: '#f87171' }}>{e.error}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Причина: {e.cause}</div>
+                        <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', marginTop: 2 }}>Причина: {e.cause}</div>
                         <div style={{ fontSize: 10, color: '#22c55e', marginTop: 2 }}>Исправление: {e.fix}</div>
                       </div>
                     ))}
@@ -503,7 +503,7 @@ export const TechniqueCalcTab: React.FC = () => {
                 {ex.comments && (
                   <>
                     <div style={sectionTitle}>💬 Комментарий</div>
-                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5, fontStyle: 'italic' }}>{ex.comments}</div>
+                    <div style={{ fontSize: 10, color:'rgba(255,255,255,0.9)', lineHeight: 1.5, fontStyle: 'italic' }}>{ex.comments}</div>
                   </>
                 )}
 

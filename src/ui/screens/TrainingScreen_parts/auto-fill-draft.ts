@@ -45,7 +45,7 @@ export function buildBBUserProgramFromProfile(options: {
   const bbPlan = autodraftBBPlan({
     level,
     goal,
-    daysPerWeek: days,
+    daysPerНеделя: days,
     weeks,
     equipment: prof.equipment ?? [],
     weakPoints: prof.weakPoints ?? [],
@@ -155,7 +155,7 @@ export function autoFillPLDraft(ctx: AutoFillCtx): boolean {
     pl: {
       ...program.pl,
       sourceCycleId: foundCycle ? foundCycle.meta.id : program.pl.sourceCycleId,
-      schedule: Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfWeek: i })),
+      schedule: Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfНеделя: i })),
       workMax: { squat: prof.pmSquat, bench: prof.pmBench, dead: prof.pmDead },
       weakPoints: (prof.weakPoints ?? []) as string[],
       notes: foundCycle

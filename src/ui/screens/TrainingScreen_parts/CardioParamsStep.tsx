@@ -81,8 +81,8 @@ export const CardioParamsStep: React.FC<{
   setTaperWeeks: (n: number) => void;
   taperEnabled: boolean;
   setTaperEnabled: (v: boolean) => void;
-  peakWeek: boolean;
-  setPeakWeek: (v: boolean) => void;
+  peakНеделя: boolean;
+  setPeakНеделя: (v: boolean) => void;
   previewFactors?: CardioPreviewFactors;
   level: CardioLevel;
   setLevel: (l: CardioLevel) => void;
