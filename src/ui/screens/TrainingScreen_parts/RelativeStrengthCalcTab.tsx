@@ -19,7 +19,7 @@ import { applyToPlanner } from './planner-bridge';
 import { getProfile } from '../../../core/profile-manager';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.6)';
+const DIM = '#fff';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const LABEL: React.CSSProperties = { fontSize: 11, color: DIM, marginBottom: 3 };
 const ROW: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' };
@@ -85,9 +85,9 @@ export const RelativeStrengthCalcTab: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-      <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', marginBottom: 10, fontSize: 11, color: 'rgba(255,255,255,0.7)', lineHeight: 1.45 }}>
+      <div style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)', marginBottom: 10, fontSize: 11, color: '#fff', lineHeight: 1.45 }}>
         <b style={{ color: '#a855f7' }}>🔀 Единый калькулятор:</b> вся информация этого экрана теперь собрана в <b style={{ color: '#fff' }}>«Анализ силы → Единый»</b> (PlNormsCalcTab): пол, весовые категории (авто + ручной просмотр), DOTS/Wilks/IPF GL, прогресс-бары, пояснения к каждому графику + режим «по движениям». Этот таб оставлен для совместимости и детального разбора ×BW по трём движениям.<br />
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Итоговое решение по чистке: если «Единый» покрывает все сценарии (что сейчас так — проверьте режим «по движениям»), этот таб можно скрыть из навигации, оставив только «Единый» как канон. Код deduplicated через общие движки <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 4 }}>pl-norms.engine</code>/<code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 4 }}>relative-strength.engine</code>.</span>
+        <span style={{ fontSize: 10, color: '#fff' }}>Итоговое решение по чистке: если «Единый» покрывает все сценарии (что сейчас так — проверьте режим «по движениям»), этот таб можно скрыть из навигации, оставив только «Единый» как канон. Код deduplicated через общие движки <code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 4 }}>pl-norms.engine</code>/<code style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 4px', borderRadius: 4 }}>relative-strength.engine</code>.</span>
       </div>
       <div style={{ fontSize: 15, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>🏋️ Калькулятор «сила / масса тела» — относительная сила и нормативы</div>
       <div style={{ fontSize: 11, color: DIM, marginBottom: 10, lineHeight: 1.45, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.12)', borderRadius: 8, padding: 8 }}>
@@ -110,7 +110,7 @@ export const RelativeStrengthCalcTab: React.FC = () => {
             <div style={{ fontSize: 26, fontWeight: 800, color: ACCENT }}>{total}<span style={{ fontSize: 12, fontWeight: 400, color: DIM }}> кг</span></div>
           </div>
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 6, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.4 }}>
           Тотал = присед + жим + тяга. Меняется автоматически. Вес тела влияет на все графики: относительную силу, DOTS, Wilks, IPF GL и категорию.
         </div>
       </div>
@@ -140,7 +140,7 @@ export const RelativeStrengthCalcTab: React.FC = () => {
                   return <div key={clsKey} style={{ position: 'absolute', left: `${pct}%`, top: 0, width: 1, height: '100%', background: 'rgba(255,255,255,0.22)' }} />;
                 })}
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: 'rgba(255,255,255,0.3)', marginTop: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#fff', marginTop: 2 }}>
                 <span>0×</span><span>{sex === 'female' ? 'пороги ниже на 30%' : 'мужские пороги'}</span><span>{maxVal}×</span>
               </div>
             </div>
@@ -156,11 +156,11 @@ export const RelativeStrengthCalcTab: React.FC = () => {
       {/* Коэффициенты тотала */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🏆 Коэффициенты относительной силы (тотал) — DOTS, Wilks, IPF GL</div>
-        <div style={ROW}><span style={{ color: DIM }}>Относительная сила (тотал/bw) <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>— простой: тотал ÷ вес</span></span><b style={{ color: '#fff' }}>{report.relative}× <span style={{ color: CLASS_COLORS[report.classification.class], fontSize: 10 }}>{report.classification.label}</span></b></div>
-        <div style={ROW}><span style={{ color: DIM }}>DOTS (IPF 2019) <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>— актуальный полином 4 степени</span></span><b style={{ color: ACCENT }}>{report.dots}</b></div>
-        <div style={ROW}><span style={{ color: DIM }}>Wilks (IPF до 2019) <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>— старый, завышает лёгких</span></span><b style={{ color: '#fff' }}>{report.wilks}</b></div>
-        <div style={ROW}><span style={{ color: DIM }}>IPF GL Points <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>— GoodLift 0-120, 100+ элита</span></span><b style={{ color: '#fff' }}>{report.ipfGL}</b></div>
-        <div style={ROW}><span style={{ color: DIM }}>Allometric (×bw<sup>⅔</sup>) <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>— аллометрия 2/3</span></span><b style={{ color: '#fff' }}>{report.allometric}</b></div>
+        <div style={ROW}><span style={{ color: DIM }}>Относительная сила (тотал/bw) <span style={{ fontSize: 9, color: '#fff' }}>— простой: тотал ÷ вес</span></span><b style={{ color: '#fff' }}>{report.relative}× <span style={{ color: CLASS_COLORS[report.classification.class], fontSize: 10 }}>{report.classification.label}</span></b></div>
+        <div style={ROW}><span style={{ color: DIM }}>DOTS (IPF 2019) <span style={{ fontSize: 9, color: '#fff' }}>— актуальный полином 4 степени</span></span><b style={{ color: ACCENT }}>{report.dots}</b></div>
+        <div style={ROW}><span style={{ color: DIM }}>Wilks (IPF до 2019) <span style={{ fontSize: 9, color: '#fff' }}>— старый, завышает лёгких</span></span><b style={{ color: '#fff' }}>{report.wilks}</b></div>
+        <div style={ROW}><span style={{ color: DIM }}>IPF GL Points <span style={{ fontSize: 9, color: '#fff' }}>— GoodLift 0-120, 100+ элита</span></span><b style={{ color: '#fff' }}>{report.ipfGL}</b></div>
+        <div style={ROW}><span style={{ color: DIM }}>Allometric (×bw<sup>⅔</sup>) <span style={{ fontSize: 9, color: '#fff' }}>— аллометрия 2/3</span></span><b style={{ color: '#fff' }}>{report.allometric}</b></div>
         <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)', fontSize: 11, color: DIM, lineHeight: 1.5 }}>
           <b style={{ color: '#fff' }}>Что это:</b> {NORM_EXPLANATIONS.points}<br />
           <b style={{ color: '#fff' }}>Как читать:</b> чем больше число, тем сильнее относительно веса. DOTS 300 — новичок, 380 — опытный, 450 — элита, 520 — мировой. IPF GL 0-120: 60 — КМС, 75 — МС, 85 — МСМК, 100+ — топ. Удобно сравнивать себя с атлетами другого веса.<br />
@@ -189,7 +189,7 @@ export const RelativeStrengthCalcTab: React.FC = () => {
               <div style={{ marginTop: 8, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ height: '100%', width: `${Math.max(4, Math.min(100, progress))}%`, borderRadius: 3, background: classif.kgToNext === 0 ? '#22c55e' : 'linear-gradient(90deg,#60a5fa,#a855f7)', transition: 'width 0.3s' }} />
               </div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 3 }}>Прогресс {Math.round(progress)}% от {classif.achievedRank || '0'} к {classif.nextLabel}</div>
+              <div style={{ fontSize: 9, color: '#fff', marginTop: 3 }}>Прогресс {Math.round(progress)}% от {classif.achievedRank || '0'} к {classif.nextLabel}</div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {classif.allRanks.map(r => (
@@ -215,7 +215,7 @@ export const RelativeStrengthCalcTab: React.FC = () => {
         <div style={{ fontSize: 11, fontWeight: 700, color: DIM, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.3px' }}>Уровни относительной силы — шкала для интерпретации (DOTS/IPF GL + ×BW)</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 4 }}>
           {[
-            { cls: 'novice', label: 'Новичок', color: 'rgba(255,255,255,0.3)', sq: '<1.5', be: '<1.0', dl: '<2.0', dots: '<300' },
+            { cls: 'novice', label: 'Новичок', color: '#fff', sq: '<1.5', be: '<1.0', dl: '<2.0', dots: '<300' },
             { cls: 'intermediate', label: 'Средний', color: '#60a5fa', sq: '1.5-2.0', be: '1.0-1.3', dl: '2.0-2.5', dots: '300-380' },
             { cls: 'advanced', label: 'Опытный', color: '#a855f7', sq: '2.0-2.5', be: '1.3-1.6', dl: '2.5-3.0', dots: '380-450' },
             { cls: 'elite', label: 'Элита', color: '#f59e0b', sq: '2.5-3.0', be: '1.6-2.0', dl: '3.0-3.5', dots: '450-520' },
@@ -233,11 +233,11 @@ export const RelativeStrengthCalcTab: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.32)', marginTop: 8, lineHeight: 1.5, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: 8 }}>
-        <b style={{ color: 'rgba(255,255,255,0.6)' }}>Источники и пределы:</b> DOTS — полином IPF 2019 (коэффициенты разные для ♂/♀), Wilks — старый IPF, IPF GL — GoodLift 0-120. Нормативы — ФПР 2022-2025 (классика) и WRPF. Пол меняет и DOTS/Wilks/GL, и пороги разряда, и категории. Сравнивайте только внутри одной федерации/дисциплины/пола. Для присвоения разряда нужны официальные старты с судьями ВК и допинг-контролем (см. пояснения в «Нормативы» калькулятора).
+      <div style={{ fontSize: 10, color: '#fff', marginTop: 8, lineHeight: 1.5, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 8, padding: 8 }}>
+        <b style={{ color: '#fff' }}>Источники и пределы:</b> DOTS — полином IPF 2019 (коэффициенты разные для ♂/♀), Wilks — старый IPF, IPF GL — GoodLift 0-120. Нормативы — ФПР 2022-2025 (классика) и WRPF. Пол меняет и DOTS/Wilks/GL, и пороги разряда, и категории. Сравнивайте только внутри одной федерации/дисциплины/пола. Для присвоения разряда нужны официальные старты с судьями ВК и допинг-контролем (см. пояснения в «Нормативы» калькулятора).
       </div>
       <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Определить слабейшее движение по относительной силе и применить как слабую группу к планировщику (приоритет объёма + ↓RIR).</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Определить слабейшее движение по относительной силе и применить как слабую группу к планировщику (приоритет объёма + ↓RIR).</div>
         <button onClick={() => { const weak = liftsRs.reduce((a, b) => b.rs < a.rs ? b : a, liftsRs[0]); const g = weak.key === 'squat' ? 'legs' : weak.key === 'bench' ? 'chest' : 'back'; const ru = weak.key === 'squat' ? 'Присед→ноги' : weak.key === 'bench' ? 'Жим→грудь' : 'Тяга→спина'; applyToPlanner({ kind: 'weakpoints', label: 'Слабейшая группа: ' + ru, data: { groups: [g], lift: weak.key } }); }} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Слабейшая группа → планировщик</button>
       </div>
     </div>

@@ -28,8 +28,8 @@ import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBSc
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
-const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.7)', fontSize: 11, lineHeight: 1.45 };
+const DIM = '#fff';
+const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.45 };
 const H: React.CSSProperties = { fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' };
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 const IN: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 10, minHeight: 40, width: '100%', boxSizing: 'border-box' as const, fontSize: 13, textAlign: 'center' as const };
@@ -104,7 +104,7 @@ export const VBTCalcTab: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
       <div style={H}>⚡ ВПТ / Калькулятор скорости штанги (тренировка по скорости, VBT)</div>
-      <div style={{ ...SMALL, color: 'rgba(255,255,255,0.55)', marginBottom: 10 }}>
+      <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
         Тренировка по скорости штанги: нагрузка связана с %1RM через профиль «нагрузка–скорость» (load-velocity profile, Gonzalez-Badillo / Jovanovic).
         <b>1.</b> Целевая установка (цель) → прогнозируемый %1RM, скорость, рабочий вес.<br />
         <b>2.</b> e1RM по измеренной скорости и поднятому весу (через профиль нагрузка–скорость).<br />
@@ -150,7 +150,7 @@ export const VBTCalcTab: React.FC = () => {
         </div>
         {velEst ? (
           <div style={ROWStyle(ACCENT)}>
-            <span style={{ color: 'rgba(255,255,255,0.7)' }}>Прогноз <b style={{ color: ACCENT }}>e1RM</b> (из профиля):</span>
+            <span style={{ color: '#fff' }}>Прогноз <b style={{ color: ACCENT }}>e1RM</b> (из профиля):</span>
             <span><b style={{ color: ACCENT }}>{velEst.e1RM} кг</b> · %1RM = <b>{Math.round(velEst.pct1RM * 100)}%</b></span>
           </div>
         ) : (
@@ -207,7 +207,7 @@ export const VBTCalcTab: React.FC = () => {
           {lvpTable.map(([pct, v], i) => (
             <div key={i} style={{ padding: 6, borderRadius: 6, background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.04)', textAlign: 'center' }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: velColor(v) }}>{Math.round(pct * 100)}%</div>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{v} м/с</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>{v} м/с</div>
             </div>
           ))}
         </div>
@@ -216,7 +216,7 @@ export const VBTCalcTab: React.FC = () => {
       {/* Зоны по цели */}
       <ExpandableCard title="🎯 Зоны по цели" accent={ACCENT} short="Целевые %1RM, скорость, повторы по цели">
         {Object.entries(INTENT_ZONES).map(([k, z]) => (
-          <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(64px,1.2fr) 1fr 1fr 1fr 0.8fr 0.8fr', gap: 4, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10, color: 'rgba(255,255,255,0.6)', minWidth: 340 }}>
+          <div key={k} style={{ display: 'grid', gridTemplateColumns: 'minmax(64px,1.2fr) 1fr 1fr 1fr 0.8fr 0.8fr', gap: 4, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 10, color: '#fff', minWidth: 340 }}>
             <span style={{ color: '#fff', fontWeight: 700, fontSize: 11, overflowWrap: 'anywhere' }}>{INTENT_RU[k as VBTIntent]}</span>
             <span>{(z.pct[0] * 100).toFixed(0)}–{(z.pct[1] * 100).toFixed(0)}%</span>
             <span>{z.velocity[0]}–{z.velocity[1]} м/с</span>
@@ -233,7 +233,7 @@ export const VBTCalcTab: React.FC = () => {
       </div>
 {(lift === 'squat' || lift === 'bench' || lift === 'deadlift') && (
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить e1RM ({LIFT_RU[lift]} = {e1RM} кг) как ПМ движения к планировщику — план пересчитает веса.</div>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить e1RM ({LIFT_RU[lift]} = {e1RM} кг) как ПМ движения к планировщику — план пересчитает веса.</div>
           <button onClick={() => applyToPlanner({ kind: 'pm', label: 'e1RM ' + LIFT_RU[lift] + ' ' + e1RM + ' кг', data: { lift: lift === 'deadlift' ? 'dead' : lift, value: e1RM } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить e1RM к ПМ планировщика</button>
         </div>
       )}
@@ -242,11 +242,11 @@ export const VBTCalcTab: React.FC = () => {
 };
 
 // local helpers
-function ROWStyle(c: string): React.CSSProperties { return { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: 'rgba(255,255,255,0.8)' }; }
+function ROWStyle(c: string): React.CSSProperties { return { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 12, color: '#fff' }; }
 function SmallMetric({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{ padding: 8, borderRadius: 8, textAlign: 'center', background: `${color}0f`, border: `1px solid ${color}33` }}>
-      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>{label}</div>
+      <div style={{ fontSize: 10, color: '#fff' }}>{label}</div>
       <div style={{ fontSize: 13, fontWeight: 800, color }}>{value}</div>
     </div>
   );

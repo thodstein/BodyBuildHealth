@@ -25,10 +25,10 @@ import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { getProfile } from '../../../core/profile-manager';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.65)';
+const DIM = '#fff';
 const SMALL: React.CSSProperties = { color: DIM, fontSize: 12, lineHeight: 1.5 };
 const CARD: React.CSSProperties = { padding: 12, borderRadius: 12, background: 'rgba(24,24,27,0.5)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 10 };
-const SECTION: React.CSSProperties = { fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 };
+const SECTION: React.CSSProperties = { fontSize: 10, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 };
 const rankColor: Record<string, string> = { КМС: '#60a5fa', МС: '#a855f7', МСМК: '#f59e0b', ЭЛИТА: '#ef4444', 'нет разряда': 'var(--text-dim)' };
 
 const FEDS: { id: Federation; label: string }[] = [
@@ -133,7 +133,7 @@ export const PlNormsCalcTab: React.FC = () => {
       <div style={{ fontSize: 15, fontWeight: 800, color: ACCENT, margin: '2px 0 6px' }}>🏆 Калькулятор разрядных нормативов — единый центр</div>
       <div style={{ ...SMALL, marginBottom: 10, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.12)', borderRadius: 8, padding: 8 }}>
         <b style={{ color: '#fff' }}>Что это:</b> единый калькулятор всех разрядных инструментов из приложения — нормативы по федерации/дисциплине/полу/весовой категории + DOTS/Wilks/IPF GL + прогресс до следующего разряда. Выберите пол, федерацию, движение, свой вес и результат — я покажу разряд, сколько до следующего, очки относительной силы и как читать каждый график (разъяснения под каждым блоком).
-        <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+        <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
           Источник: ФПР 2022-2025 приказ Минспорта №6 (классический пауэрлифтинг) — КМС/МС/МСМК; WRPF/СПР — без/с ДК. Женские таблицы добавлены официально (43-84+ кг).
         </div>
       </div>
@@ -155,8 +155,8 @@ export const PlNormsCalcTab: React.FC = () => {
           <PopupNumber label="Собственный вес, кг" value={bw} min={30} max={250} suffix=" кг" onChange={v => setBw(Math.max(30, Math.min(250, v || 30)))} />
           <PopupNumber label="Сумма / результат, кг" value={total} min={0} max={1500} step={2.5} suffix=" кг" onChange={setTotal} />
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 8, lineHeight: 1.45 }}>
-          <b style={{ color: 'rgba(255,255,255,0.7)' }}>Как выбрать категорию:</b> {CATEGORY_EXPLANATION} Переключите «Весовая категория» с Авто на любую для просмотра «что если» — пороги пересчитаются без смены вашего веса. Это удобно, если планируете сгонку/набор к конкретной категории.
+        <div style={{ fontSize: 10, color: '#fff', marginTop: 8, lineHeight: 1.45 }}>
+          <b style={{ color: '#fff' }}>Как выбрать категорию:</b> {CATEGORY_EXPLANATION} Переключите «Весовая категория» с Авто на любую для просмотра «что если» — пороги пересчитаются без смены вашего веса. Это удобно, если планируете сгонку/набор к конкретной категории.
         </div>
         {manualCat && autoCat && manualCat !== autoCat.label && autoResult && result && (
           <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 11, color: '#f59e0b' }}>
@@ -188,7 +188,7 @@ export const PlNormsCalcTab: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>Включите, чтобы разложить тотал на три движения и увидеть относительную силу по каждому (график ×BW) и слабейшее движение.</div>
+              <div style={{ fontSize: 10, color: '#fff', marginTop: 4 }}>Включите, чтобы разложить тотал на три движения и увидеть относительную силу по каждому (график ×BW) и слабейшее движение.</div>
             )}
           </div>
         )}
@@ -198,20 +198,20 @@ export const PlNormsCalcTab: React.FC = () => {
         <>
           {/* ── Главный результат ── */}
           <div style={{ padding: 14, borderRadius: 14, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', marginBottom: 10, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 10, color: '#fff', letterSpacing: 0.3, textTransform: 'uppercase' }}>
               {sex === 'female' ? '♀ Женщины' : '♂ Мужчины'} · {table.federationLabel} · {DISC.find(d => d.id === disc)?.label} · Категория: {effectiveCat.label} {showLifts && disc === 'total' ? `· сумма ${displayTotal} кг (по движениям)` : ''}
             </div>
             <div style={{ fontSize: 30, fontWeight: 900, color: rankColor[displayResult.achievedLabel] || ACCENT, margin: '4px 0 2px' }}>{displayResult.achievedLabel}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>
+            <div style={{ fontSize: 12, color: '#fff' }}>
               {displayResult.achievedRank ? (
-                displayResult.kgToNext > 0 ? <>до <b style={{ color: '#f59e0b' }}>{displayResult.nextLabel}</b>: <b>{displayResult.kgToNext} кг</b> <span style={{ color: 'rgba(255,255,255,0.45)' }}>({displayResult.allRanks.find(r => r.key === displayResult.nextRank)?.threshold} кг порог)</span></> : 'высший разряд норматива — вы на вершине этой категории'
+                displayResult.kgToNext > 0 ? <>до <b style={{ color: '#f59e0b' }}>{displayResult.nextLabel}</b>: <b>{displayResult.kgToNext} кг</b> <span style={{ color: '#fff' }}>({displayResult.allRanks.find(r => r.key === displayResult.nextRank)?.threshold} кг порог)</span></> : 'высший разряд норматива — вы на вершине этой категории'
               ) : (
-                <>до <b style={{ color: '#60a5fa' }}>{displayResult.nextLabel}</b>: <b>{displayResult.kgToNext} кг</b> <span style={{ color: 'rgba(255,255,255,0.45)' }}>({displayResult.allRanks[0]?.threshold} кг порог)</span></>
+                <>до <b style={{ color: '#60a5fa' }}>{displayResult.nextLabel}</b>: <b>{displayResult.kgToNext} кг</b> <span style={{ color: '#fff' }}>({displayResult.allRanks[0]?.threshold} кг порог)</span></>
               )}
             </div>
             {/* Прогресс-бар */}
             <div style={{ marginTop: 10, textAlign: 'left' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginBottom: 3 }}>
                 <span>Прогресс к следующему разряду</span>
                 <span>{displayResult.achievedRank ? displayResult.achievedLabel : 'старт'} → {displayResult.nextLabel} · {Math.round(progress)}%</span>
               </div>
@@ -219,7 +219,7 @@ export const PlNormsCalcTab: React.FC = () => {
                 <div style={{ height: '100%', width: `${Math.min(100, Math.max(2, progress))}%`, borderRadius: 6, background: displayResult.kgToNext === 0 ? '#22c55e' : 'linear-gradient(90deg,#60a5fa,#a855f7)', transition: 'width 0.35s', opacity: displayResult.kgToNext === 0 ? 0.9 : 1 }} />
               </div>
             </div>
-            {table.sourceNote && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', marginTop: 6 }}>{table.sourceNote}</div>}
+            {table.sourceNote && <div style={{ fontSize: 9, color: '#fff', marginTop: 6 }}>{table.sourceNote}</div>}
           </div>
 
           {/* Пояснение к главному графику */}
@@ -254,7 +254,7 @@ export const PlNormsCalcTab: React.FC = () => {
                       <span style={{ width: 6, height: 28, borderRadius: 6, background: rankColor[r.label] || '#555', opacity: isEligible ? (isAchieved ? 1 : 0.6) : 0.2 }} />
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 800, color: !isEligible ? 'rgba(255,255,255,0.35)' : isAchieved ? ACCENT : isNext ? '#f59e0b' : 'var(--text-dim)' }}>{isAchieved ? '✓ ' : ''}{r.label} {isNext && isEligible ? '← цель' : ''} {!isEligible ? '⛔' : ''}</div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{RANK_DESCRIPTIONS[r.key]} {!isEligible ? '— недоступен для выбранного возраста' : ''}</div>
+                        <div style={{ fontSize: 10, color: '#fff' }}>{RANK_DESCRIPTIONS[r.key]} {!isEligible ? '— недоступен для выбранного возраста' : ''}</div>
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -283,8 +283,8 @@ export const PlNormsCalcTab: React.FC = () => {
                 <div key={p.label} style={{ padding: '10px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>{p.label}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{p.scale}</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.32)', marginTop: 2, lineHeight: 1.3 }}>{p.hint}</div>
+                    <div style={{ fontSize: 10, color: '#fff' }}>{p.scale}</div>
+                    <div style={{ fontSize: 9, color: '#fff', marginTop: 2, lineHeight: 1.3 }}>{p.hint}</div>
                   </div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa', marginLeft: 8 }}>{p.value}</div>
                 </div>
@@ -322,7 +322,7 @@ export const PlNormsCalcTab: React.FC = () => {
                   <div key={l.key} style={{ marginBottom: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{label} {weak ? '← слабейшее' : ''}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: weak ? '#f59e0b' : '#fff' }}>{l.rs}× <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>({cls})</span> — {l.value} кг {weak ? '⚠️' : ''}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: weak ? '#f59e0b' : '#fff' }}>{l.rs}× <span style={{ fontSize: 9, color: '#fff' }}>({cls})</span> — {l.value} кг {weak ? '⚠️' : ''}</span>
                     </div>
                     <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)' }}>
                       <div style={{ height: '100%', width: `${barPct}%`, borderRadius: 5, background: `linear-gradient(90deg, ${clr}88, ${clr})`, transition: 'width 0.3s' }} />
@@ -357,7 +357,7 @@ export const PlNormsCalcTab: React.FC = () => {
               <div style={{ overflowX: 'auto', marginTop: 8 }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, minWidth: 520 }}>
                   <thead>
-                    <tr style={{ color: 'rgba(255,255,255,0.45)', textAlign: 'left', fontSize: 10 }}>
+                    <tr style={{ color: '#fff', textAlign: 'left', fontSize: 10 }}>
                       <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Категория</th>
                       <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: eligibleSet.has('kms') ? '#60a5fa' : 'rgba(96,165,250,0.35)', opacity: eligibleSet.has('kms') ? 1 : 0.45 }} title={eligibleSet.has('kms') ? '' : '⛔ недоступен для выбранного возраста'}>КМС {!eligibleSet.has('kms') ? '⛔' : ''}</th>
                       <th style={{ padding: '6px 8px', borderBottom: '1px solid rgba(255,255,255,0.08)', color: eligibleSet.has('ms') ? '#a855f7' : 'rgba(168,85,247,0.35)', opacity: eligibleSet.has('ms') ? 1 : 0.45 }} title={eligibleSet.has('ms') ? '' : '⛔ недоступен для выбранного возраста'}>МС {!eligibleSet.has('ms') ? '⛔' : ''}</th>
@@ -390,12 +390,12 @@ export const PlNormsCalcTab: React.FC = () => {
                     })}
                   </tbody>
                 </table>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 6, lineHeight: 1.4 }}>
-                  Каждая строка — одна весовая категория. Числа — пороги для разряда. Зелёный — ваш тотал выполняет порог в этой категории. <b style={{ color: 'rgba(255,255,255,0.55)' }}>⛔ затемнённые столбцы — недоступны для выбранного возраста</b> (opacity 0.45, кликните заголовок для подсказки). « — » — разряд в этой категории не присваивается (нет нормы). Подсвеченная строка — выбранная для просмотра (авто или ручная).
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 6, lineHeight: 1.4 }}>
+                  Каждая строка — одна весовая категория. Числа — пороги для разряда. Зелёный — ваш тотал выполняет порог в этой категории. <b style={{ color: '#fff' }}>⛔ затемнённые столбцы — недоступны для выбранного возраста</b> (opacity 0.45, кликните заголовок для подсказки). « — » — разряд в этой категории не присваивается (нет нормы). Подсвеченная строка — выбранная для просмотра (авто или ручная).
                 </div>
               </div>
             )}
-            <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.32)', lineHeight: 1.4 }}>
+            <div style={{ marginTop: 8, fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
               Подсказка: если до МСМК не хватает 15 кг, но сгонка 4 кг переводит вас в категорию ниже, где порог ниже на 30 кг — переход выгоден. Сравните строку текущей и целевой категорий. {ageGroup !== 'open' ? 'Фильтр возраста применён ко всей таблице — недоступные разряды блекнут во всех строках.' : ''}
             </div>
           </div>
@@ -440,7 +440,7 @@ export const PlNormsCalcTab: React.FC = () => {
       )}
 
       <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить тотал ({displayTotal} кг{displayTotal !== total ? ` — из режима по движениям (сумма ${squat}+${bench}+${dead})` : ''}) к планировщику как целевые ПМ (разложу 44% присед / 26% жим / 30% тяга — классическое распределение ПЛ, или используйте точные {showLifts ? 'ваши' : 'расчётные'} присед/жим/тягу).</div>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить тотал ({displayTotal} кг{displayTotal !== total ? ` — из режима по движениям (сумма ${squat}+${bench}+${dead})` : ''}) к планировщику как целевые ПМ (разложу 44% присед / 26% жим / 30% тяга — классическое распределение ПЛ, или используйте точные {showLifts ? 'ваши' : 'расчётные'} присед/жим/тягу).</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => { const sq = showLifts && disc === 'total' ? squat : Math.round(displayTotal * 0.44), bn = showLifts && disc === 'total' ? bench : Math.round(displayTotal * 0.26), dl = showLifts && disc === 'total' ? dead : displayTotal - sq - bn; applyToPlanner({ kind: 'pm', label: 'Норматив: тотал ' + displayTotal + ' кг', data: { squat: sq, bench: bn, dead: dl } }); }} style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить ПМ к планировщику</button>
           {showLifts && disc === 'total' && (
