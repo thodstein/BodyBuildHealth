@@ -594,8 +594,7 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             </div>
           );
         })}
-      </div>
-        </div>}
+      </div>}
       </div>
       </section>
 
@@ -784,13 +783,20 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             </div>
           );
         })()}
+      </div>}
       </div>
       </section>
 
       {/* ═══ 4. Движение штанги (bar-path) ═══ */}
       <section id="sec-barpath" ref={el=> sectionRefs.current['sec-barpath']=el} style={{ scrollMarginTop:56 }}>
-      {applicableIssues.length > 0 && (
-        <div style={{ ...CARD, borderLeft:'3px solid #f59e0b' }}>
+      <div style={{ ...CARD, borderLeft:'3px solid #f59e0b', padding:0, overflow:'hidden' }}>
+        <button onClick={()=> toggleCollapse('sec-barpath')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-barpath'] ? 'rgba(245,158,11,0.06)' : 'rgba(245,158,11,0.10)', border:'none', borderBottom: collapsed['sec-barpath'] ? 'none' : '1px solid rgba(245,158,11,0.15)', cursor:'pointer', color:'#f59e0b', textAlign:'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.15)', border:'1px solid rgba(245,158,11,0.25)', fontSize:12 }}>📈</span> 4 · Движение штанги (bar-path) · {LIFT_RU[lift]}</span>
+          <span style={{ fontSize:10, background:'rgba(245,158,11,0.12)', padding:'2px 8px', borderRadius:20, border:'1px solid rgba(245,158,11,0.20)' }}>{collapsed['sec-barpath'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-barpath'] && <div style={{ padding:12 }}>
+        {applicableIssues.length > 0 ? (
+        <div>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>4 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
             {applicableIssues.map(issue => {
@@ -831,9 +837,12 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             </div>
           ))}
         </div>
-        </div>
+        ) : (
+          <div style={{ fontSize:10, color:DIM, padding:8 }}>Нет данных для траектории — выберите движение.</div>
+        )}
+      </div>}
+      </div>
       </section>
-      )}
 
       {/* 🎯 Слабые точки плана ПЛ (ассистенты при сборке; дни — свои или Авто) */}
       <section id="sec-rir" ref={el=> sectionRefs.current['sec-rir']=el} style={{ scrollMarginTop:56 }}>
@@ -853,11 +862,10 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             addToPlan(keyForPhase, [name]);
           }} style={{ marginTop:6, padding:'5px 10px', borderRadius:7, cursor:'pointer', fontSize:10, fontWeight:700, border:'1px solid #00e68a', background:'rgba(0,230,138,0.12)', color:ACCENT }}>➕ Добавить своё упражнение (как в калькуляторе)</button>
         </div>
-      </div>
-      <div style={{ marginTop:8 }}>
-        <RIRCalibrationCard />
-      </div>
-        </div>}
+        <div style={{ marginTop:8 }}>
+          <RIRCalibrationCard />
+        </div>
+      </div>}
       </div>
       </section>
 
