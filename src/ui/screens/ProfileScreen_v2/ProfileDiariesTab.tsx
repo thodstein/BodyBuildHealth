@@ -181,8 +181,6 @@ interface QuickLink {
   desc?: string;
 }
 
-let undoTimer: ReturnType<typeof setTimeout> | null = null;
-
 const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDismiss: () => void }> = ({
   action,
   onUndo,
@@ -809,85 +807,6 @@ const exportAllDiariesPdf = () => {
     setTimeout(() => w.print(), 120);
   };
 
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>Все дневники — PDF экспорт</title>
-<style>
-  body{font:12px 'Segoe UI',Arial,sans-serif;padding:20px;color:#111}
-  h1{color:#0f766e;border-bottom:2px solid #0f766e;padding-bottom:6px}
-  h2{color:#0f766e;margin-top:18px}
-  table{border-collapse:collapse;width:100%;margin:8px 0}
-  td,th{border:1px solid #ccc;padding:4px;text-align:left;font-size:11px}
-  th{background:#e6f4f1}
-  .meta{color:#666;font-size:11px}
-  .cover{page-break-after:always;text-align:center;padding:40px 20px}
-  .cover h1{font-size:28px;margin-bottom:8px}
-  .cover .subtitle{color:#666;font-size:14px;margin-bottom:24px}
-  .cover .stats{display:flex;justify-content:center;gap:24px;margin:24px 0;flex-wrap:wrap}
-  .cover .stat{background:#f0fdfa;border:1px solid #14b8a6;border-radius:8px;padding:12px 20px;min-width:120px}
-  .cover .stat .label{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.5}
-  .cover .stat .value{font-size:20px;font-weight:700;color:#0f766e}
-  .trend-up{color:#22c55e}.trend-down{color:#ef4444}.trend-neutral{color:#666}
-  .qr{float:right;margin-left:20px}
-  @media print{
-    body{padding:8px}
-    .no-print{display:none}
-    .cover{page-break-after:always}
-  }
-</style></head><body>
-<!-- COVER PAGE -->
-<div class="cover">
-  <h1>📓 Все дневники — Экспорт</h1>
-  <div class="subtitle">Полный отчёт по встроенным дневникам Профиля</div>
-  <div class="stats">
-    <div class="stat"><div class="label">Всего записей</div><div class="value">${totalEntries}</div></div>
-    <div class="stat"><div class="label">Период</div><div class="value">${esc(dateRange)}</div></div>
-    <div class="stat"><div class="label">Сон</div><div class="value">${sleepTrend} <span class="${sleepTrend.startsWith('▲') ? 'trend-up' : sleepTrend.startsWith('▼') ? 'trend-down' : 'trend-neutral'}">${sleepTrend}</span></div></div>
-    <div class="stat"><div class="label">Вес</div><div class="value">${weightTrend} <span class="${weightTrend.startsWith('▲') ? 'trend-up' : weightTrend.startsWith('▼') ? 'trend-down' : 'trend-neutral'}">${weightTrend}</span></div></div>
-    <div class="stat"><div class="label">АД (сист.)</div><div class="value">${bpSysTrend} <span class="${bpSysTrend.startsWith('▲') ? 'trend-up' : bpSysTrend.startsWith('▼') ? 'trend-down' : 'trend-neutral'}">${bpSysTrend}</span></div></div>
-  </div>
-  <div style="margin-top:32px"><img src="${qrDataUri}" alt="QR код экспорта" width="120" height="120"/></div>
-  <div style="margin-top:12px;color:#999;font-size:11px">Сканируйте для быстрого доступа к данным</div>
-  <div class="meta" style="margin-top:24px">Сгенерировано: ${new Date().toLocaleString('ru-RU')} · BodyBuildHealth</div>
-</div>
-
-<!-- DATA TABLES -->
-<h1>📓 Все дневники — Детали</h1>
-<p class="meta">Экспорт: ${new Date().toLocaleDateString('ru-RU')} · Записей: ${totalEntries}</p>
-${table('💤 Сон', ['Дата', 'Часы', 'Качество', 'Пробуждений', 'Легли', 'Подъём', 'Заметки'],
-  sortedDesc(sleepEntries).map((e) => [e.date, String(e.hours), String(e.quality), String(e.awakenings), e.bedtime, e.wakeTime, e.notes || '']))}
-${table('❤️ Давление (с ЧСС)', ['Дата', 'Систола', 'Диастола', 'Пульс', 'Время', 'Лекарство', 'Заметки'],
-  sortedDesc(bpEntries).map((e) => [e.date, String(e.systolic), String(e.diastolic), String(e.hr ?? e.pulse ?? ''), e.timeOfDay || '', e.medicationTaken ? 'да' : '', e.notes || '']))}
-${table('⚖️ Вес', ['Дата', 'Вес', 'Жир %', 'Мышцы', 'Талия', 'Заметки'],
-  sortedDesc(weights).map((e) => [e.date, String(e.weight), e.bodyFat !== undefined ? String(e.bodyFat) : '', e.muscleMass !== undefined ? String(e.muscleMass) : '', e.waistCm !== undefined ? String(e.waistCm) : '', e.notes || '']))}
-${table('💉 Инъекции', ['Дата', 'Препарат', 'Доза', 'Зона', 'Сторона', 'Боль', 'PIP', 'Заметки'],
-  sortedDesc(injectionEntries).map((e) => [e.date, e.substance, e.dose, e.zone || '', e.side || '', String(e.painLevel ?? ''), String(e.pipLevel ?? ''), e.notes || '']))}
-${table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', 'Нейро', 'Акне', 'Гемат', 'Заметки'],
-  sortedDesc(healthEntries).map((e) => [
-    e.date,
-    e.pain && e.pain.totalScore > 0 ? `${e.pain.totalScore}/70` : '',
-    Array.isArray(e.symptoms) ? String(e.symptoms.length) : '0',
-    e.neuro && e.neuro.totalScore > 0 ? `${e.neuro.totalScore}/10` : '',
-    e.acne && e.acne.totalScore > 0 ? `${e.acne.totalScore}/12` : '',
-    e.hemato && e.hemato.totalScore > 0 ? `${e.hemato.totalScore}/8` : '',
-    e.notes || '',
-  ]))}
-${table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 'RPE', 'Статус', 'Заметки'],
-  sortedDesc(cardioLog).map((e) => [
-    e.date,
-    String(e.type).toUpperCase(),
-    String(e.durationMin),
-    e.avgHr != null ? String(e.avgHr) : '',
-    e.rpe != null ? String(e.rpe) : '',
-    e.completed ? 'выполнена' : 'пропущена',
-    e.notes || '',
-  ]))}
-</body></html>`;
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 120);
-  };
 
   /** Валидация структуры импортируемых дневников — защита от битых данных. */
   const validateDiaryImport = (data: unknown): { valid: boolean; diaries: Record<string, unknown[]>; goals?: Record<string, unknown>; error?: string } => {

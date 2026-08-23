@@ -48,25 +48,9 @@ export function buildDiariesExportHtml(data: any): string {
     ? new Date(Math.min(...allEntries.map((e: any) => new Date(e.date).getTime()))).toLocaleDateString('ru-RU') + ' — ' + new Date().toLocaleDateString('ru-RU')
     : 'нет данных';
 
-  function trend(arr: any[]): string {
-    if (arr.length < 2) return '—';
-    const sorted = [...arr].sort((a, b) => a.date.localeCompare(b.date));
-    const first = sorted[0].value;
-    const last = sorted[sorted.length - 1].value;
-    const diff = last - first;
-    const pct = first !== 0 ? Math.round((diff / Math.abs(first)) * 100) : 0;
-    return diff > 0 ? '▲ +' + pct + '%' : diff < 0 ? '▼ ' + pct + '%' : '—';
-  }
-
   const sleepTrend = trend(sleepEntries.map((e: any) => ({ date: e.date, value: e.hours })));
   const weightTrend = trend(weights.map((e: any) => ({ date: e.date, value: e.weight })));
-  const bpSysTrend = trend(bpEntries.map((e: any) => ({ date: e.date, value: e.systolic })));
-
-  const totalEntries = sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length + cardioLog.length;
-  const allEntries = [...sleepEntries, ...bpEntries, ...weights, ...injectionEntries, ...healthEntries, ...cardioLog];
-  const dateRange = totalEntries > 0
-    ? new Date(Math.min(...allEntries.map((e: any) => new Date(e.date).getTime()))).toLocaleDateString('ru-RU') + ' — ' + new Date().toLocaleDateString('ru-RU')
-    : 'нет данных';
+  const bpSysTrend = trend(bpEntries.map((e: any) => ({ date: e.date, value: e.systolic})));
 
   const qrData = 'diary-export:' + Date.now() + ':' + totalEntries + 'entries';
   const qrSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="white"/><rect x="8" y="8" width="64" height="64" fill="#0f766e"/><text x="40" y="44" text-anchor="middle" fill="white" font-size="8" font-family="monospace">QR</text><text x="40" y="56" text-anchor="middle" fill="white" font-size="6">' + qrData.slice(0, 20) + '</text></svg>';
@@ -98,9 +82,9 @@ export function buildDiariesExportHtml(data: any): string {
   + '<div class="stats">'
   + '<div class="stat"><div class="label">Всего записей</div><div class="value">' + (sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length + cardioLog.length) + '</div></div>'
   + '<div class="stat"><div class="label">Период</div><div class="value">' + dateRange + '</div></div>'
-  + '<div class="stat"><div class="label">Сон</div><div class="value">' + trend(sleepEntries.map(function(e) { return { date: e.date, value: e.hours }; })) + ' <span class="trend-up">' + trend(sleepEntries.map(function(e) { return { date: e.date, value: e.hours }; })) + '</span></div></div>'
-  + '<div class="stat"><div class="label">Вес</div><div class="value">' + trend(weights.map(function(e) { return { date: e.date, value: e.weight }; })) + ' <span class="' + (trend(weights.map(function(e) { return { date: e.date, value: e.weight }; })).startsWith('▲') ? 'trend-up' : trend(weights.map(function(e) { return { date: e.date, value: e.weight }; })).startsWith('▼') ? 'trend-down' : 'trend-neutral') + '">' + trend(weights.map(function(e) { return { date: e.date, value: e.weight }; })) + '</span></div></div>'
-  + '<div class="stat"><div class="label">АД (сист.)</div><div class="value">' + trend(bpEntries.map(function(e) { return { date: e.date, value: e.systolic }; })) + ' <span class="' + (trend(bpEntries.map(function(e) { return { date: e.date, value: e.systolic }; })).startsWith('▲') ? 'trend-up' : trend(bpEntries.map(function(e) { return { date: e.date, value: e.systolic }; })).startsWith('▼') ? 'trend-down' : 'trend-neutral') + '">' + trend(bpEntries.map(function(e) { return { date: e.date, value: e.systolic }; })) + '</span></div></div>'
+  + '<div class="stat"><div class="label">Сон</div><div class="value">' + trend(sleepEntries.map(function(e: any) { return { date: e.date, value: e.hours }; })) + ' <span class="trend-up">' + trend(sleepEntries.map(function(e: any) { return { date: e.date, value: e.hours }; })) + '</span></div></div>'
+  + '<div class="stat"><div class="label">Вес</div><div class="value">' + trend(weights.map(function(e: any) { return { date: e.date, value: e.weight }; })) + ' <span class="' + (trend(weights.map(function(e: any) { return { date: e.date, value: e.weight }; })).startsWith('▲') ? 'trend-up' : trend(weights.map(function(e: any) { return { date: e.date, value: e.weight }; })).startsWith('▼') ? 'trend-down' : 'trend-neutral') + '">' + trend(weights.map(function(e: any) { return { date: e.date, value: e.weight }; })) + '</span></div></div>'
+  + '<div class="stat"><div class="label">АД (сист.)</div><div class="value">' + trend(bpEntries.map(function(e: any) { return { date: e.date, value: e.systolic }; })) + ' <span class="' + (trend(bpEntries.map(function(e: any) { return { date: e.date, value: e.systolic }; })).startsWith('▲') ? 'trend-up' : trend(bpEntries.map(function(e: any) { return { date: e.date, value: e.systolic }; })).startsWith('▼') ? 'trend-down' : 'trend-neutral') + '">' + trend(bpEntries.map(function(e: any) { return { date: e.date, value: e.systolic }; })) + '</span></div></div>'
   + '</div>'
   + '<div style="margin-top:32px"><img src="data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="white"/><rect x="8" y="8" width="64" height="64" fill="#0f766e"/><text x="40" y="44" text-anchor="middle" fill="white" font-size="8" font-family="monospace">QR</text><text x="40" y="56" text-anchor="middle" fill="white" font-size="6">' + ('diary-export:' + Date.now() + ':' + (sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length + cardioLog.length) + 'entries').slice(0, 20) + '</text></svg>') + '" alt="QR код экспорта" width="120" height="120"/></div>'
   + '<div style="margin-top:12px;color:#999;font-size:11px">Сканируйте для быстрого доступа к данным</div>'
@@ -111,15 +95,15 @@ export function buildDiariesExportHtml(data: any): string {
   + '<h1>📓 Все дневники — Детали</h1>'
   + '<p class="meta">Экспорт: ' + new Date().toLocaleDateString('ru-RU') + ' · Записей: ' + (sleepEntries.length + bpEntries.length + weights.length + injectionEntries.length + healthEntries.length + cardioLog.length) + '</p>'
   + table('💤 Сон', ['Дата', 'Часы', 'Качество', 'Пробуждений', 'Легли', 'Подъём', 'Заметки'],
-    sortedDesc(sleepEntries).map(function(e) { return [e.date, String(e.hours), String(e.quality), String(e.awakenings), e.bedtime, e.wakeTime, e.notes || '']; }))
+    sortedDesc(sleepEntries).map(function(e: any) { return [e.date, String(e.hours), String(e.quality), String(e.awakenings), e.bedtime, e.wakeTime, e.notes || '']; }))
   + table('❤️ Давление (с ЧСС)', ['Дата', 'Систола', 'Диастола', 'Пульс', 'Время', 'Лекарство', 'Заметки'],
-    sortedDesc(bpEntries).map(function(e) { return [e.date, String(e.systolic), String(e.diastolic), String(e.hr ?? e.pulse ?? ''), e.timeOfDay || '', e.medicationTaken ? 'да' : '', e.notes || '']; }))
+    sortedDesc(bpEntries).map(function(e: any) { return [e.date, String(e.systolic), String(e.diastolic), String(e.hr ?? e.pulse ?? ''), e.timeOfDay || '', e.medicationTaken ? 'да' : '', e.notes || '']; }))
   + table('⚖️ Вес', ['Дата', 'Вес', 'Жир %', 'Мышцы', 'Талия', 'Заметки'],
-    sortedDesc(weights).map(function(e) { return [e.date, String(e.weight), e.bodyFat !== undefined ? String(e.bodyFat) : '', e.muscleMass !== undefined ? String(e.muscleMass) : '', e.waistCm !== undefined ? String(e.waistCm) : '', e.notes || '']; }))
+    sortedDesc(weights).map(function(e: any) { return [e.date, String(e.weight), e.bodyFat !== undefined ? String(e.bodyFat) : '', e.muscleMass !== undefined ? String(e.muscleMass) : '', e.waistCm !== undefined ? String(e.waistCm) : '', e.notes || '']; }))
   + table('💉 Инъекции', ['Дата', 'Препарат', 'Доза', 'Зона', 'Сторона', 'Боль', 'PIP', 'Заметки'],
-    sortedDesc(injectionEntries).map(function(e) { return [e.date, e.substance, e.dose, e.zone || '', e.side || '', String(e.painLevel ?? ''), String(e.pipLevel ?? ''), e.notes || '']; }))
+    sortedDesc(injectionEntries).map(function(e: any) { return [e.date, e.substance, e.dose, e.zone || '', e.side || '', String(e.painLevel ?? ''), String(e.pipLevel ?? ''), e.notes || '']; }))
   + table('🩺 Здоровье', ['Дата', 'Боль', 'Симптомы', 'Нейро', 'Акне', 'Гемат', 'Заметки'],
-    sortedDesc(healthEntries).map(function(e) { return [
+    sortedDesc(healthEntries).map(function(e: any) { return [
       e.date,
       e.pain && e.pain.totalScore > 0 ? String(e.pain.totalScore) + '/70' : '',
       Array.isArray(e.symptoms) ? String(e.symptoms.length) : '0',
@@ -129,7 +113,7 @@ export function buildDiariesExportHtml(data: any): string {
       e.notes || '',
     ]; }))
   + table('❤️ Кардио', ['Дата', 'Тип', 'Минуты', 'ЧСС', 'RPE', 'Статус', 'Заметки'],
-    sortedDesc(cardioLog).map(function(e) { return [
+    sortedDesc(cardioLog).map(function(e: any) { return [
       e.date,
       String(e.type).toUpperCase(),
       String(e.durationMin),

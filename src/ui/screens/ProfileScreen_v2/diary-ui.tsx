@@ -122,7 +122,6 @@ export const progressBar = (status: 'met' | 'exceeded' | 'below' | undefined, co
     status === 'below' ? `linear-gradient(180deg, #f59e0b, #d97706)` :
     `linear-gradient(180deg, ${color}, ${color}dd)`,
   opacity: 0.9,
-  transition: 'height 0.3s',
 } as React.CSSProperties);
 
 /* ── Форма-баннеры (warning/info/error) ──────────────────────────────────── */
@@ -167,7 +166,7 @@ export const btnPrimary = (color: string) => ({
   cursor: 'pointer',
   boxShadow: `0 5px 18px ${color}38, inset 0 1px 0 rgba(255,255,255,0.32)`,
   transition: 'transform 0.15s, box-shadow 0.15s, filter 0.15s',
-} as React.CSSProperties;
+} as React.CSSProperties);
 
 export const btnGhost = {
   flex: 1,
@@ -404,6 +403,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
             </button>
           </div>
         </div>
+      </div>
       ) : (
         <div
           onClick={onOpen}
@@ -543,7 +543,6 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
         </div>
       )
     );
-  );
 };
 
 /* ── Export ──────────────────────────────────────────────────────────────── */

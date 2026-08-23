@@ -777,7 +777,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
     return 4;
   });
-  useEffect(() => { if (!wakeTime?.includes(':') || !bedTime?.includes(':')) return; const wMin = parseInt(wakeTime.split(':')[0]) * 60 + parseInt(wakeTime.split(':')[1]); const bMin = parseInt(bedTime.split(':')[0]) * 60 + parseInt(bedTime.split(':')[1]); const awakeHours = (bMin - wMin) / 60; if (awakeHours >= 16) setMealsCount(5); else if (awakeHours >= 14) setMealsCount(4); else setMealsCount(3); }, [wakeTime, bedTime]);
+  // P0-fix Aug 23 2026: не перезаписываем выбор пользователя — awakeHours влияет только на рекомендацию в UI
+  // (раньше сбрасывал mealsCount 8→5 при смене wakeTime). Рекомендация показывается в IndividualPlanSettings.
+  useEffect(() => {}, [wakeTime, bedTime]);
 
   const [allergens, setAllergens] = useState<string[]>(() => {
     // P1-fix: читаем из Profile (UnifiedSettings), а не из мёртвых ключей he_food_allergens/he_contraindications
