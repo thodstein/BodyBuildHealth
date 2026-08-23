@@ -71,6 +71,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
   const touchTimerRef = useRef<number | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [touchActive, setTouchActive] = useState(false);
+  const [dragWeek, setDragWeek] = useState<number | null>(null);
   const { confirm } = useConfirmDialog();
   const [programs, setPrograms] = useState<UserProgram[]>([]);
   const [linkProgramId, setLinkProgramId] = useState('');
@@ -632,40 +633,59 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                       setTouchActive(true);
                       setDragPhase(pkTyped);
                       try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
-                    }, 350);
+                    }, 180);
                   }}
                   onTouchMove={(e) => {
-                    if (!touchStartRef.current || !touchTimerRef.current) return;
+                    if (!touchStartRef.current) return;
                     const touch = e.touches[0];
                     const dx = Math.abs(touch.clientX - touchStartRef.current.x);
                     const dy = Math.abs(touch.clientY - touchStartRef.current.y);
-                    if (dx > 10 || dy > 10) {
-                      window.clearTimeout(touchTimerRef.current);
-                      touchTimerRef.current = null;
-                      if (!touchActive) touchStartRef.current = null;
+                    if (!touchActive) {
+                      if (dx > 8 || dy > 8) {
+                        // moved before long-press fired — treat as scroll, cancel
+                        window.clearTimeout(touchTimerRef.current as number);
+                        touchTimerRef.current = null;
+                        touchStartRef.current = null;
+                      }
+                      return;
                     }
+                    try { e.preventDefault(); } catch { /* ignore */ }
+                    const el = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+                    const week = el?.getAttribute('data-week');
+                    setDragWeek(week != null ? Number(week) : null);
                   }}
-                  onTouchEnd={() => {
+                  onTouchEnd={(e) => {
                     if (touchTimerRef.current) {
                       window.clearTimeout(touchTimerRef.current);
                       touchTimerRef.current = null;
                     }
                     if (touchActive) {
-                      // keep dragPhase for drop
+                      const touch = e.changedTouches[0];
+                      const el = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
+                      const week = el?.getAttribute('data-week');
+                      if (week && dragPhase) handleDropOnCanvas(Number(week), dragPhase);
+                      setDragPhase(null);
                     } else {
-                      // tap = select phase for click-to-place
+                      // tap = select phase for tap-to-place
                       setDragPhase(prev => prev === pkTyped ? null : pkTyped);
                     }
+                    setTouchActive(false);
+                    setDragWeek(null);
                     touchPhaseRef.current = null;
                     touchStartRef.current = null;
                   }}
                   className="pd-palette-chip"
                   style={{
+                    flex: '1 1 130px',
+                    whiteSpace: 'normal',
+                    textAlign: 'left',
+                    lineHeight: 1.3,
+                    alignItems: 'center',
                     background: DESIGNER_PHASE_VISUAL[pkTyped].color + (touchActive && dragPhase === pkTyped ? '44' : '1A'),
                     border: '1px solid ' + DESIGNER_PHASE_VISUAL[pkTyped].color + (dragPhase === pkTyped ? '88' : '38'),
                     color: DESIGNER_PHASE_VISUAL[pkTyped].color,
                     boxShadow: dragPhase === pkTyped ? `0 4px 12px ${DESIGNER_PHASE_VISUAL[pkTyped].color}33` : 'none',
-                    transform: touchActive && dragPhase === pkTyped ? 'scale(1.06)' : 'none',
+                    transform: touchActive && dragPhase === pkTyped ? 'scale(1.03)' : 'none',
                   }}>
                   <span>{DESIGNER_PHASE_VISUAL[pkTyped].icon}</span>
                   <span>{DESIGNER_PHASE_VISUAL[pkTyped].label}</span>
@@ -922,14 +942,14 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                   <div style={{ padding: 12, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>Добавьте блоки в дизайн — микроциклы появятся здесь</div>
                 ) : (
                   <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 70px 60px', gap: 4, padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', minWidth: 360 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '40px 1fr 64px 58px' : '36px 1fr 70px 60px', gap: 4, padding: '8px 8px', fontSize: isMobile ? 11 : 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', minWidth: 0 }}>
                       <span>Нед</span><span>Фаза</span><span>Объём</span><span>Нагрузка</span>
                     </div>
                     {getDesignVolumeCurve(current).slice(0, Math.min(24, current.totalWeeks)).map(pt => {
                       const block = current.blocks.find(b => pt.week >= b.startWeek && pt.week <= b.endWeek);
                       const tmpl = block ? getPhaseTemplate(block.phaseKey) : null;
                       return (
-                        <div key={pt.week} style={{ display: 'grid', gridTemplateColumns: '36px 1fr 70px 60px', gap: 4, padding: '6px 8px', fontSize: 10, borderTop: '1px solid rgba(255,255,255,0.04)', background: pt.week % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent', alignItems: 'center', minWidth: 360 }}>
+                        <div key={pt.week} style={{ display: 'grid', gridTemplateColumns: isMobile ? '40px 1fr 64px 58px' : '36px 1fr 70px 60px', gap: 4, padding: '8px 8px', fontSize: isMobile ? 11 : 10, borderTop: '1px solid rgba(255,255,255,0.04)', background: pt.week % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent', alignItems: 'center', minWidth: 0 }}>
                           <span style={{ fontWeight: 700, color: pt.color }}>{pt.week}</span>
                           <span style={{ color: pt.color, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><span>{block ? PHASE_ICONS[block.phaseKey] : '—'}</span>{pt.label}</span>
                           <span style={{ color: pt.volume >= 4 ? '#f59e0b' : pt.volume >= 3 ? '#22c55e' : '#60a5fa' }}>{tmpl ? `${tmpl.volumeLevel} · ${pt.volume}/5` : '—'}</span>
@@ -1197,20 +1217,22 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                   const colW = isMobile ? 34 : 36;
                   return (
                     <div key={wn}
+                      data-week={wn}
                       onDragOver={e => { e.preventDefault(); }}
                       onClick={() => { if (dragPhase) handleDropOnCanvas(wn, dragPhase); }}
                       onDrop={e => { e.preventDefault(); if (dragPhase) { handleDropOnCanvas(wn, dragPhase); } }}
                       onTouchEnd={() => {
                         if (dragPhase) {
                           handleDropOnCanvas(wn, dragPhase);
+                          setDragPhase(null);
                           setTouchActive(false);
                         }
                       }}
                       aria-label={dragPhase ? `Разместить ${PHASE_LABELS_RU[dragPhase]} на неделе ${wn}` : `Неделя ${wn}`}
                       style={{
                         position: 'absolute', left: 38 + i * colW, top: 0, width: colW, height: '100%',
-                        background: dragPhase ? accent + '14' : 'transparent',
-                        borderLeft: '1px dashed ' + (dragPhase ? accent + '44' : 'rgba(255,255,255,0.10)'),
+                        background: dragWeek === wn ? accent + '2e' : (dragPhase ? accent + '14' : 'transparent'),
+                        borderLeft: '1px dashed ' + (dragWeek === wn ? accent + '88' : (dragPhase ? accent + '44' : 'rgba(255,255,255,0.10)')),
                         borderRadius: 6,
                         cursor: dragPhase ? 'copy' : 'default',
                         zIndex: 1,

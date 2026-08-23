@@ -58,7 +58,7 @@ export const BBContestPrepActiveCard: React.FC<{ onOpen?: () => void }> = ({ onO
           </span>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', color: 'rgba(255,255,255,0.6)' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', color: 'rgba(255,255,255,0.85)' }}>
         <span>Шоу <b style={{ color: '#fff' }}>{plan.showDate}</b> · {CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category}</span>
         <span>Подготовка <b style={{ color: '#fff' }}>{plan.preparation.weeks}</b> нед</span>
         <span>Taper <b style={{ color: '#fff' }}>{plan.taper.weeks}</b> нед</span>

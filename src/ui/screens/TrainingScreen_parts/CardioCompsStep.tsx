@@ -19,6 +19,7 @@ export const CardioCompsStep: React.FC<{
   taperEnabled: boolean;
   peakWeek: boolean;
 }> = ({ comps, setComps, draft, setDraft, totalWeeks, taperWeeks, taperEnabled, peakWeek }) => {
+  const [dragIdx, setDragIdx] = React.useState<number | null>(null);
   const add = () => {
     const wNum = Number(draft.week);
     if (!draft.name.trim() || !Number.isFinite(wNum) || wNum < 1) return;
@@ -45,18 +46,31 @@ export const CardioCompsStep: React.FC<{
         {comps.length === 0 ? (
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>Старты не добавлены — добавьте хотя бы один, чтобы увидеть taper/пик в предпросмотре.</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {comps.map(c => (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px' }}>
-                <span style={{ fontSize: 13, fontWeight: 800, flex: 1, color: '#fff' }}>{c.name}</span>
-                <Badge bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.22)" color="#60a5fa">нед {c.week}</Badge>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
-                  {taperEnabled ? `taper с нед ${Math.max(1, c.week - taperWeeks)}` : peakWeek ? 'пик-неделя' : 'без пика'}
-                </span>
-                <button style={{ ...BTN_DANGER, minHeight: 28, padding: '4px 8px' }} onClick={() => setComps(comps.filter(x => x.id !== c.id))} aria-label={`Удалить ${c.name}`}>✕</button>
-              </div>
-            ))}
-          </div>
+          <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {comps.map((c, idx) => (
+                <div key={c.id} draggable onDragStart={() => setDragIdx(idx)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const next = [...comps]; const [moved] = next.splice(dragIdx, 1); next.splice(idx, 0, moved); setComps(next); setDragIdx(null); }} onDragEnd={() => setDragIdx(null)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: dragIdx === idx ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px', opacity: dragIdx === idx ? 0.6 : 1 }}>
+                  <span style={{ cursor: 'grab', color: 'rgba(255,255,255,0.85)', fontSize: 12, userSelect: 'none' }} aria-hidden>⋮⋮</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, flex: 1, color: '#fff' }}>{c.name}</span>
+                  <Badge bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.22)" color="#60a5fa">нед {c.week}</Badge>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>
+                    {taperEnabled ? `taper с нед ${Math.max(1, c.week - taperWeeks)}` : peakWeek ? 'пик-неделя' : 'без пика'}
+                  </span>
+                  <button style={{ ...BTN_DANGER, minHeight: 28, padding: '4px 8px' }} onClick={() => setComps(comps.filter(x => x.id !== c.id))} aria-label={`Удалить ${c.name}`}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', overflow: 'hidden' }}>
+              {Array.from({ length: totalWeeks }).map((_, i) => {
+                const week = i + 1;
+                const comp = comps.find(c => c.week === week);
+                const isTaper = taperEnabled && comps.some(c => week >= Math.max(1, c.week - taperWeeks) && week < c.week);
+                const isPeak = !!comp && peakWeek;
+                return <div key={week} style={{ flex: 1, background: comp ? '#ef4444' : isPeak ? '#eab308' : isTaper ? 'rgba(234,179,8,0.32)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: comp ? '#fff' : 'transparent', borderLeft: week > 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }} title={comp ? `${comp.name} нед ${week}` : isTaper ? `taper нед ${week}` : `нед ${week}`}>{comp ? '●' : ''}</div>;
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.85)' }}><span>нед 1</span><span>нед {totalWeeks}</span></div>
+          </>
         )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input

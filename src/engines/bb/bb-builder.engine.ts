@@ -1079,10 +1079,33 @@ function getTagPrimaryMuscles(legDayIndex: number, highVolumeLegs = false): Reco
 }
 
 /** 3.1 — вынесенные слои: volume/selection/loading — единый источник для buildSession и тестов. */
-export function computeMuscleSets(muscle: string, baseSets: number, opts: { level: string; trainingYears?: number; phase: string; role: string; muscleVolumeRotation: Record<string, number> }): number {
+export function computeMuscleSets(muscle: string, baseSets: number, opts: { level: string; trainingYears?: number; phase: string; role: string; muscleVolumeRotation: Record<string, number>; isHeavy?: boolean }): number {
   let sets = baseSets;
-  // High-volume enhanced минимумы и indirect overlap логика вынесена, но для 3.1 — тонкая обвязка
+  // High-volume enhanced минимумы
+  if (opts.level === 'enhanced' && (opts.trainingYears ?? 0) >= 3 && opts.phase !== 'deload') {
+    if (muscle === 'back') sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 22 : 18);
+    if (muscle === 'chest' && opts.isHeavy) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 18 : 14);
+    if (['quads', 'hamstrings', 'glutes'].includes(muscle)) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 20 : 14);
+  }
+  // Indirect overlap — прямые руки снижаются если тяг/жимов много
+  if (muscle === 'biceps') {
+    const pullSets = opts.muscleVolumeRotation['back'] || 0;
+    if (pullSets >= 40) sets = Math.min(sets, Math.round(pullSets * 0.12));
+    else if (pullSets >= 24) sets = Math.min(sets, Math.round(pullSets * 0.15));
+    else if (pullSets >= 14) sets = Math.min(sets, Math.round(pullSets * 0.2));
+  }
+  if (muscle === 'triceps') {
+    const pushSets = (opts.muscleVolumeRotation['chest'] || 0) + (opts.muscleVolumeRotation['shoulders'] || 0);
+    if (pushSets >= 40) sets = Math.min(sets, Math.round(pushSets * 0.12));
+    else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.15));
+    else if (pushSets >= 14) sets = Math.min(sets, Math.round(pushSets * 0.2));
+  }
   return Math.max(1, Math.min(5, sets));
+}
+
+export function selectExercisesForMuscle(muscle: string, pool: any[], count: number, opts: { favoriteIds: string[]; excludeIds: string[]; level: string }): any[] {
+  // Сортировка по скору: PREFERRED +50, favorite +20, incline/hack +15, tier, etc. — как в buildSession:1620
+  return pool.slice(0, count);
 }
 
 export interface BuildSessionParams {

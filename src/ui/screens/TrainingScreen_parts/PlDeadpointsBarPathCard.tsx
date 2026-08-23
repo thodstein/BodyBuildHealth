@@ -311,6 +311,8 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
   // — навигация корректора (4 блока + срывы + RIR)
   const [activeSec, setActiveSec] = useState('sec-weak-muscle');
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({} as any);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleCollapse = (id:string) => setCollapsed(prev => ({...prev, [id]: !prev[id]}));
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
     const obs = new IntersectionObserver((entries) => {
@@ -524,8 +526,12 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
 
       {/* ═══ 1. Слабые мышцы (по циклу) ═══ */}
       <section id="sec-weak-muscle" ref={el=> sectionRefs.current['sec-weak-muscle']=el} style={{ scrollMarginTop:56 }}>
-      <div style={{ ...CARD, borderLeft:'3px solid #4ade80' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#4ade80' }}>1 · Слабые мышцы</div>
+      <div style={{ ...CARD, borderLeft:'3px solid #4ade80', padding:0, overflow:'hidden' }}>
+        <button onClick={()=> toggleCollapse('sec-weak-muscle')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-weak-muscle'] ? 'rgba(74,222,128,0.06)' : 'rgba(74,222,128,0.10)', border:'none', borderBottom: collapsed['sec-weak-muscle'] ? 'none' : '1px solid rgba(74,222,128,0.15)', cursor:'pointer', color:'#4ade80', textAlign:'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(74,222,128,0.15)', border:'1px solid rgba(74,222,128,0.25)', fontSize:12 }}>💪</span> 1 · Слабые мышцы</span>
+          <span style={{ fontSize:10, background:'rgba(74,222,128,0.12)', padding:'2px 8px', borderRadius:20, border:'1px solid rgba(74,222,128,0.20)' }}>{collapsed['sec-weak-muscle'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-weak-muscle'] && <div style={{ padding:12 }}>
         <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
           Выберите слабую мышцу — 5 ассистентов из раскладки цикла (%ПМ/повторы/подходы — как у аксессуара недели). Основные жим/присед/становая и их дубли исключены.
         </div>
@@ -589,12 +595,18 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
           );
         })}
       </div>
+        </div>}
+      </div>
       </section>
 
       {/* ═══ 2. Слабые точки ═══ */}
       <section id="sec-weak-point" ref={el=> sectionRefs.current['sec-weak-point']=el} style={{ scrollMarginTop:56 }}>
-      <div style={{ ...CARD, borderLeft:'3px solid #a855f7' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>2 · Слабые точки</div>
+      <div style={{ ...CARD, borderLeft:'3px solid #a855f7', padding:0, overflow:'hidden' }}>
+        <button onClick={()=> toggleCollapse('sec-weak-point')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-weak-point'] ? 'rgba(168,85,247,0.06)' : 'rgba(168,85,247,0.10)', border:'none', borderBottom: collapsed['sec-weak-point'] ? 'none' : '1px solid rgba(168,85,247,0.15)', cursor:'pointer', color:'#a855f7', textAlign:'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.15)', border:'1px solid rgba(168,85,247,0.25)', fontSize:12 }}>🎯</span> 2 · Слабые точки</span>
+          <span style={{ fontSize:10, background:'rgba(168,85,247,0.12)', padding:'2px 8px', borderRadius:20, border:'1px solid rgba(168,85,247,0.20)' }}>{collapsed['sec-weak-point'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-weak-point'] && <div style={{ padding:12 }}>
         <div style={{ fontSize: 10, color: DIM, marginTop: 6, marginBottom: 4 }}>Фаза (срыв / слабое место) — выберите чип:</div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
           {phases.map(item => {
@@ -644,13 +656,18 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
         <button onClick={saveFocus} style={{ width: '100%', minHeight: 40, marginTop: 10, border: 'none', borderRadius: 8, cursor: 'pointer', background: 'rgba(168,85,247,0.15)', color: '#c084fc', fontWeight: 700, fontSize: 11 }}>
           {savedFocus ? '✓ Фокус-группа сохранена в профиль' : '💾 Сохранить фокус-группу в профиль'}
         </button>
+        </div>}
       </div>
       </section>
 
       {/* ═══ 3. Мёртвые точки (та же фаза — углы суставов) ═══ */}
       <section id="sec-sticking" ref={el=> sectionRefs.current['sec-sticking']=el} style={{ scrollMarginTop:56 }}>
-      <div style={{ ...CARD, borderLeft:'3px solid #60a5fa' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>3 · Мёртвые точки {effectivePhase ? `· ${LIFT_RU[lift]} / ${PHASE_RU[effectivePhase] || effectivePhase}` : ''}</div>
+      <div style={{ ...CARD, borderLeft:'3px solid #60a5fa', padding:0, overflow:'hidden' }}>
+        <button onClick={()=> toggleCollapse('sec-sticking')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-sticking'] ? 'rgba(96,165,250,0.06)' : 'rgba(96,165,250,0.10)', border:'none', borderBottom: collapsed['sec-sticking'] ? 'none' : '1px solid rgba(96,165,250,0.15)', cursor:'pointer', color:'#60a5fa', textAlign:'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(96,165,250,0.15)', border:'1px solid rgba(96,165,250,0.25)', fontSize:12 }}>🧱</span> 3 · Мёртвые точки {effectivePhase ? `· ${LIFT_RU[lift]} / ${PHASE_RU[effectivePhase] || effectivePhase}` : ''}</span>
+          <span style={{ fontSize:10, background:'rgba(96,165,250,0.12)', padding:'2px 8px', borderRadius:20, border:'1px solid rgba(96,165,250,0.20)' }}>{collapsed['sec-sticking'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-sticking'] && <div style={{ padding:12 }}>
         {movement?.sticking ? (
           <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
             <div style={{ fontSize: 10, color: DIM }}>📐 Угол: {movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}° · сустав: {movement.sticking.keyJoint}</div>
@@ -686,13 +703,18 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             🔗 Связанные отклонения траектории: {movement.barPathRelated.map(i => ISSUE_RU[i]).join(', ')}
           </div>
         )}
+        </div>}
       </div>
       </section>
 
       {/* ═══ 3.5. VBT: скорость штанги (ручной ввод) — СРЫВЫ ═══ */}
       <section id="sec-sryvy" ref={el=> sectionRefs.current['sec-sryvy']=el} style={{ scrollMarginTop:56 }}>
-      <div style={{ ...CARD, borderLeft:'3px solid #ef4444' }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#f472b6' }}>3.5 · ⚡ VBT: скорость штанги (м/с) · {LIFT_RU[lift]}</div>
+      <div style={{ ...CARD, borderLeft:'3px solid #ef4444', padding:0, overflow:'hidden' }}>
+        <button onClick={()=> toggleCollapse('sec-sryvy')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-sryvy'] ? 'rgba(239,68,68,0.06)' : 'rgba(239,68,68,0.10)', border:'none', borderBottom: collapsed['sec-sryvy'] ? 'none' : '1px solid rgba(239,68,68,0.15)', cursor:'pointer', color:'#f472b6', textAlign:'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.25)', fontSize:12 }}>💥</span> 5 · Срывы — VBT скорость (м/с) · {LIFT_RU[lift]}</span>
+          <span style={{ fontSize:10, background:'rgba(239,68,68,0.12)', padding:'2px 8px', borderRadius:20, border:'1px solid rgba(239,68,68,0.20)' }}>{collapsed['sec-sryvy'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-sryvy'] && <div style={{ padding:12 }}>
         <div style={{ fontSize: 10, color: DIM, marginTop: 2, lineHeight: 1.4 }}>
           Введите скорость лучшего и последнего повтора (м/с) — потерю скорости и вероятную фазу срыва. План не меняется, это диагностика.
         </div>
@@ -766,8 +788,8 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       </section>
 
       {/* ═══ 4. Движение штанги (bar-path) ═══ */}
-      {applicableIssues.length > 0 && (
       <section id="sec-barpath" ref={el=> sectionRefs.current['sec-barpath']=el} style={{ scrollMarginTop:56 }}>
+      {applicableIssues.length > 0 && (
         <div style={{ ...CARD, borderLeft:'3px solid #f59e0b' }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#a855f7' }}>4 · Движение штанги (bar-path) · {LIFT_RU[lift]}</div>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
@@ -809,13 +831,18 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
             </div>
           ))}
         </div>
+        </div>
       </section>
       )}
 
       {/* 🎯 Слабые точки плана ПЛ (ассистенты при сборке; дни — свои или Авто) */}
       <section id="sec-rir" ref={el=> sectionRefs.current['sec-rir']=el} style={{ scrollMarginTop:56 }}>
-      <div style={{ ...POLISHED_CARD, borderLeft:'3px solid #00e68a' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginBottom:4 }}>6 · RIR-калибровка — проверка формул (исправлено)</div>
+      <div style={{ ...POLISHED_CARD, borderLeft:'3px solid #00e68a', padding:0, overflow:'hidden' }}>
+        <button onClick={()=> toggleCollapse('sec-rir')} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 12px', background: collapsed['sec-rir'] ? 'rgba(0,230,138,0.06)' : 'rgba(0,230,138,0.10)', border:'none', borderBottom: collapsed['sec-rir'] ? 'none' : '1px solid rgba(0,230,138,0.15)', cursor:'pointer', color:ACCENT, textAlign:'left' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.25)', fontSize:12 }}>🎚️</span> 6 · RIR-калибровка — проверка формул (исправлено)</span>
+          <span style={{ fontSize:10, background:'rgba(0,230,138,0.12)', padding:'2px 8px', borderRadius:20, border:'1px solid rgba(0,230,138,0.20)' }}>{collapsed['sec-rir'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec-rir'] && <div style={{ padding:12 }}>
         <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>Формулы пересчитаны: <b style={{ color:ACCENT }}>actualRIR = 10 − RPE</b>, <b style={{ color:ACCENT }}>bias = plannedRIR − actualRIR</b> (planned из программы/типа упражнения, не константа 2). Среднее по всем подходам + MAD-консистентность, тренд(last ⅓ vs first ⅓). Ручной ввод теперь требует план RIR. Ниже — живые данные из дневника.</div>
         <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', fontSize:10, color:'#fff' }}>
           <div>Проверь: выбери упражнение из списка ниже, добавь своё через «➕ Добавить упражнение» — оно появится в выбранных и учтётся при сборке.</div>
@@ -829,6 +856,8 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       </div>
       <div style={{ marginTop:8 }}>
         <RIRCalibrationCard />
+      </div>
+        </div>}
       </div>
       </section>
 

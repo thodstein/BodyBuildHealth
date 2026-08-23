@@ -3,7 +3,7 @@
 import React from 'react';
 
 export const ACCENT = '#00e68a';
-export const DIM = 'rgba(255,255,255,0.5)';
+export const DIM = 'rgba(255,255,255,0.85)';
 
 export const GRP_RU: Record<string, string> = {
   chest: 'Грудь', back: 'Спина', legs: 'Ноги', shoulders: 'Плечи', arms: 'Руки',
