@@ -27,6 +27,7 @@ import {
   resolveDesignOverlaps,
   getPLPresetDesigns,
   getBBPresetDesigns,
+  getPresetsForDiscipline,
 } from '../../../engines/periodization-designer.engine';
 import { applyToPlanner } from './planner-bridge';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
@@ -64,6 +65,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [activeDiscipline, setActiveDiscipline] = useState<DesignerDiscipline>('pl');
   const [isMobile, setIsMobile] = useState(false);
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     const check = () => {
@@ -78,7 +80,22 @@ export const PeriodizationDesignerTab: React.FC = () => {
 
   useEffect(() => {
     try { setPrograms(loadUserPrograms()); } catch { setPrograms([]); }
-    const list = loadDesigns();
+    let list = loadDesigns();
+    // Авто-создание демо-дизайна если пусто — чтобы не было ощущения "ничего нет"
+    if (list.length === 0) {
+      try {
+        let demo = createEmptyDesignForDiscipline(activeDiscipline);
+        const starter: PhaseKey = activeDiscipline === 'pl' ? 'gpp' : 'accumulation_hypertrophy';
+        demo = addBlockToDesign(demo, starter, 1);
+        // второй блок для наглядности
+        const second: PhaseKey = activeDiscipline === 'pl' ? 'accumulation_strength' : 'intensification';
+        const secondStart = demo.blocks[0] ? demo.blocks[0].endWeek + 1 : 4;
+        if (secondStart <= demo.totalWeeks) demo = addBlockToDesign(demo, second, secondStart);
+        demo.name = activeDiscipline === 'pl' ? 'Демо ПЛ — старт' : 'Демо ББ — старт';
+        saveDesign(demo);
+        list = [demo];
+      } catch { /* ignore */ }
+    }
     setDesigns(list);
     if (list.length > 0 && !currentId) setCurrentId(list[0].id);
   }, []);
@@ -374,6 +391,22 @@ export const PeriodizationDesignerTab: React.FC = () => {
             ? 'Периоды ПЛ: GPP → Накопление (сила) → Интенсификация → Мощностной/DE → Пик → Разгрузка → Техника → Переход. Без гипертрофийных “памп”-блоков ББ.'
             : 'Периоды ББ: GPP → Накопление (гипертрофия) → Накопление (сила) → Интенсификация → Кондиционный/памп → Пик → Разгрузка → Переход. Без техники/скоростных блоков ПЛ.'}
         </div>
+        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+          <button onClick={() => setShowHelp(v => !v)} style={{ ...btn, minHeight: 36, fontSize: 11, background: showHelp ? accent+'18' : 'rgba(255,255,255,0.04)', borderColor: showHelp ? accent+'44' : 'rgba(255,255,255,0.08)', color: showHelp ? accent : DIM }}>
+            {showHelp ? '✕ Скрыть справку' : '❓ Как пользоваться'}
+          </button>
+          <span style={{ fontSize: 10, color: DIM, alignSelf: 'center', lineHeight: 1.3 }}>{isMobile ? 'Тап по фазе → тап по неделе — быстрый ввод' : 'Drag&Drop фазы на таймлайн, или тап по фазе → клик по неделе'}</span>
+        </div>
+        {showHelp && (
+          <div style={{ marginTop: 8, padding: 12, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11, lineHeight: 1.5, color: 'rgba(255,255,255,0.85)' }}>
+            <div style={{ fontWeight: 800, color: '#fff', marginBottom: 6 }}>📱 Телефон: зажмите фазу 0.35с → вибрация → перетащите на неделю (или тап фаза → тап неделя)</div>
+            <div>• <b>ПЛ</b>: GPP база → сила → DE/скорость → пик к помосту · <b>ББ</b>: гипертрофия объём → интенс → памп → пик формы</div>
+            <div>• Таймлайн — кварталы по {isMobile ? 8 : 13} нед, свайп/кнопки ◀▶ · Список — удобно на узком экране</div>
+            <div>• Тап по блоку — редактирование: длительность, сдвиг, смена фазы, дублирование, заметки</div>
+            <div>• <b>Длительность</b> — слайдер 8-52 нед, чипы 12/16/24/52 · <b>Компакт</b> — убирает наложения</div>
+            <div>• Применить — создаёт программу в ручном конструкторе (скелет или с упражнениями)</div>
+          </div>
+        )}
       </div>
 
       {/* Верх: выбор дизайна + действия */}
@@ -413,9 +446,15 @@ export const PeriodizationDesignerTab: React.FC = () => {
             <button onClick={() => handleNewDesignForDiscipline(effectiveDiscipline)} style={{ ...btn, background: accent + '16', borderColor: accent + '55', color: accent, minHeight: 44 }}>
               ➕ Пустой {effectiveDiscipline === 'pl' ? 'ПЛ' : 'ББ'} дизайн
             </button>
+            <button onClick={() => {
+              const first = getPresetsForDiscipline(effectiveDiscipline)[0];
+              if (first) handleAddPreset(first);
+            }} style={{ ...btn, background: accent + '22', borderColor: accent + '66', color: accent, minHeight: 44, fontWeight: 800 }}>
+              ⚡ Быстрый старт
+            </button>
           </div>
           <div style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8, textAlign: 'center' }}>📋 Готовые пресеты — {disciplineLabel}</div>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8, textAlign: 'center' }}>📋 Готовые пресеты — {disciplineLabel} · тап чтобы загрузить</div>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8 }}>
               {getPresetsForDiscipline(effectiveDiscipline).map((p) => (
                 <button key={p.name} onClick={() => handleAddPreset(p)} style={{ ...btn, background: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.08)' : 'rgba(236,72,153,0.08)', borderColor: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.25)' : 'rgba(236,72,153,0.25)', color: effectiveDiscipline === 'pl' ? '#60a5fa' : '#f472b6', minHeight: 64, textAlign: 'left', lineHeight: 1.3, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'space-between' }}>
