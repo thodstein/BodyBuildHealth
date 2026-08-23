@@ -6,50 +6,78 @@
  */
 import React from 'react';
 
+// ─── Токены дизайна v2 ───
+export const ACCENT = '#00e68a';
+export const ACCENT_SOFT = 'rgba(0,230,138,0.14)';
+export const ACCENT_BORDER = 'rgba(0,230,138,0.45)';
+export const GLASS_BG = 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015))';
+export const GLASS_BORDER = 'rgba(255,255,255,0.08)';
+
 // ─── Единые стили ───
 
 export const CARD: React.CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 16, padding: 12, display: 'flex', flexDirection: 'column', gap: 10,
-  boxShadow: '0 1px 3px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)',
+  background: GLASS_BG,
+  border: `1px solid ${GLASS_BORDER}`,
+  borderRadius: 16, padding: 14, display: 'flex', flexDirection: 'column', gap: 11,
+  boxShadow: '0 4px 20px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05)',
+  backdropFilter: 'blur(6px)',
 };
 export const CARD_ACCENT: React.CSSProperties = {
   ...CARD,
-  borderColor: 'rgba(0,230,138,0.35)',
-  background: 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))',
+  borderColor: ACCENT_BORDER,
+  background: 'linear-gradient(180deg, rgba(0,230,138,0.12), rgba(0,230,138,0.03))',
+  boxShadow: '0 4px 24px rgba(0,230,138,0.12), inset 0 1px 0 rgba(255,255,255,0.06)',
 };
-export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-export const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3 };
-export const HINT: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.45)', lineHeight: 1.5 };
+export const CARD_SOFT: React.CSSProperties = {
+  ...CARD,
+  background: 'rgba(255,255,255,0.02)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+};
+export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' };
+export const ROW_TIGHT: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
+export const LABEL: React.CSSProperties = { fontSize: 11, color: 'var(--text-dim)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1 };
+export const LABEL_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.45)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 };
+export const HINT: React.CSSProperties = { fontSize: 11, color: 'rgba(255,255,255,0.52)', lineHeight: 1.55 };
+export const HINT_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 };
 export const BTN: React.CSSProperties = {
-  padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.04)',
+  padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 750, cursor: 'pointer',
+  border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)',
   color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 6px rgba(0,0,0,0.2)',
+  transition: 'all 0.15s ease',
 };
-export const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.5)', color: '#00e68a' };
-export const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.35)', color: '#f87171' };
-export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 30, padding: '5px 10px', fontSize: 11 };
+export const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'linear-gradient(180deg, rgba(0,230,138,0.22), rgba(0,230,138,0.14))', border: `1px solid ${ACCENT_BORDER}`, color: ACCENT, boxShadow: '0 0 14px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.08)' };
+export const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' };
+export const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.11)', border: '1px solid rgba(239,68,68,0.32)', color: '#f87171' };
+export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 32, padding: '6px 11px', fontSize: 11, borderRadius: 9 };
+export const BTN_XS: React.CSSProperties = { ...BTN, minHeight: 28, padding: '4px 9px', fontSize: 11, borderRadius: 8 };
 export const INPUT: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
-  borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 12,
-  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.15)',
+  background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.13)',
+  borderRadius: 10, padding: '9px 11px', color: '#fff', fontSize: 13,
+  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.18)', outline: 'none',
 };
 export const CHIP: React.CSSProperties = {
-  padding: '6px 12px', borderRadius: 9, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)',
-  color: 'var(--text-dim)', whiteSpace: 'nowrap', minHeight: 34,
+  padding: '7px 13px', borderRadius: 10, fontSize: 12, fontWeight: 650, cursor: 'pointer',
+  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.035)',
+  color: 'var(--text-dim)', whiteSpace: 'nowrap', minHeight: 36,
+  transition: 'all 0.15s ease',
 };
 export const CHIP_ACTIVE: React.CSSProperties = {
   ...CHIP,
-  border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.14)', color: '#fff',
-  boxShadow: '0 0 8px rgba(0,230,138,0.12)',
+  border: `1px solid ${ACCENT_BORDER}`, background: ACCENT_SOFT, color: '#fff',
+  boxShadow: '0 0 10px rgba(0,230,138,0.16), inset 0 1px 0 rgba(255,255,255,0.06)',
+};
+export const CHIP_MUTED: React.CSSProperties = {
+  ...CHIP, opacity: 0.5, cursor: 'not-allowed',
 };
 
 export const PHASE_COLOR: Record<string, string> = {
-  base: '#22c55e', build: '#3b82f6', maintenance: '#8b5cf6', contest_prep: '#f59e0b', taper: '#eab308', peak: '#ef4444', transition: '#71717a',
+  base: '#22c55e', build: '#3b82f6', maintenance: '#8b5cf6', contest_prep: '#f59e0b', taper: '#eab308', peak: '#ef4444', transition: '#64748b',
 };
+export const PHASE_BG: Record<string, string> = {
+  base: 'rgba(34,197,94,0.14)', build: 'rgba(59,130,246,0.14)', maintenance: 'rgba(139,92,246,0.14)', contest_prep: 'rgba(245,158,11,0.14)', taper: 'rgba(234,179,8,0.14)', peak: 'rgba(239,68,68,0.14)', transition: 'rgba(100,116,139,0.14)',
+};
+export const TYPE_COLOR: Record<string, string> = { zone2: '#4ade80', miss: '#60a5fa', hiit: '#a78bfa', recovery: '#94a3b8' };
 
 // ─── Компоненты ───
 
@@ -64,7 +92,7 @@ export const SectionCard: React.FC<{
   <div className="ck-card" style={accent ? CARD_ACCENT : CARD} id={id}>
     {title != null && (
       <div style={ROW}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{title}</span>
+        <span style={{ fontSize: 13, fontWeight: 850, color: '#fff', letterSpacing: 0.1 }}>{title}</span>
         <span style={{ flex: 1 }} />
         {right}
       </div>
@@ -74,10 +102,11 @@ export const SectionCard: React.FC<{
   </div>
 );
 
-export const StatTile: React.FC<{ label: string; value: string; color?: string }> = ({ label, value, color = '#94a3b8' }) => (
-  <div className="ck-tile" style={{ flex: '1 1 84px', padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 2, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)' }}>
-    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: 0.3 }}>{label}</span>
-    <span style={{ fontSize: 15, fontWeight: 800, color }}>{value}</span>
+export const StatTile: React.FC<{ label: string; value: string; color?: string; sub?: string }> = ({ label, value, color = '#94a3b8', sub }) => (
+  <div className="ck-tile" style={{ flex: '1 1 96px', padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.02))', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 3, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700 }}>{label}</span>
+    <span style={{ fontSize: 18, fontWeight: 900, color, lineHeight: 1 }}>{value}</span>
+    {sub && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)' }}>{sub}</span>}
   </div>
 );
 
@@ -115,10 +144,9 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[] }> = 
 };
 
 export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string }> = ({ icon, text, desc }) => (
-  <div className="ck-group-head" style={{ display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 4, borderLeft: '3px solid rgba(0,230,138,0.6)', paddingLeft: 8, borderRadius: 4 }}>
-    <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--accent, #00e68a)' }}>{icon} {text}</span>
-    {desc && <span style={HINT}>{desc}</span>}
-    <div style={{ height: 1, background: 'rgba(255,255,255,0.07)', margin: '2px 0 2px' }} />
+  <div className="ck-group-head" style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingTop: 6, borderLeft: `3px solid ${ACCENT}`, paddingLeft: 10, borderRadius: 4, background: 'linear-gradient(90deg, rgba(0,230,138,0.06), transparent)' }}>
+    <span style={{ fontSize: 13, fontWeight: 850, color: ACCENT, letterSpacing: 0.1 }}>{icon} {text}</span>
+    {desc && <span style={HINT_SM}>{desc}</span>}
   </div>
 );
 
@@ -329,3 +357,75 @@ export const ChipToggle: React.FC<{
     {children}
   </button>
 );
+
+// ─── Новые примитивы v2 ───
+
+export const Badge: React.FC<{ color?: string; bg?: string; border?: string; children: React.ReactNode }> = ({ color = '#fff', bg = 'rgba(255,255,255,0.06)', border = 'rgba(255,255,255,0.12)', children }) => (
+  <span style={{ fontSize: 11, fontWeight: 750, color, background: bg, border: `1px solid ${border}`, borderRadius: 20, padding: '3px 10px', whiteSpace: 'nowrap' }}>{children}</span>
+);
+
+export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 6 }) => {
+  const pct = Math.max(0, Math.min(100, (value / max) * 100));
+  return (
+    <div style={{ height, borderRadius: height / 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+      <div style={{ height, borderRadius: height / 2, width: pct + '%', background: color, transition: 'width 0.35s ease', boxShadow: `0 0 8px ${color}55` }} />
+    </div>
+  );
+};
+
+export const Divider: React.FC = () => <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '2px 0' }} />;
+
+export const EmptyState: React.FC<{ icon: string; title: string; desc?: string; action?: React.ReactNode }> = ({ icon, title, desc, action }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '20px 12px', textAlign: 'center' }}>
+    <div style={{ fontSize: 28 }}>{icon}</div>
+    <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{title}</div>
+    {desc && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', maxWidth: 340, lineHeight: 1.5 }}>{desc}</div>}
+    {action}
+  </div>
+);
+
+export const Tabs: React.FC<{ tabs: { id: string; label: string; icon?: string }[]; active: string; onChange: (id: string) => void }> = ({ tabs, active, onChange }) => (
+  <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto', scrollbarWidth: 'none' }}>
+    {tabs.map(t => {
+      const isActive = active === t.id;
+      return (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          aria-pressed={isActive}
+          style={{
+            flex: '1 0 auto', minWidth: 64, padding: '7px 12px', borderRadius: 9, fontSize: 12, fontWeight: isActive ? 800 : 600,
+            border: isActive ? `1px solid ${ACCENT_BORDER}` : '1px solid transparent',
+            background: isActive ? ACCENT_SOFT : 'transparent',
+            color: isActive ? '#fff' : 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+            boxShadow: isActive ? '0 0 10px rgba(0,230,138,0.12)' : 'none', transition: 'all 0.15s ease',
+          }}
+        >
+          {t.icon ? t.icon + ' ' : ''}{t.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+export const Accordion: React.FC<{ id?: string; title: React.ReactNode; defaultOpen?: boolean; icon?: string; badge?: React.ReactNode; children: React.ReactNode }> = ({ id, title, defaultOpen = false, icon, badge, children }) => {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <div id={id} style={{ ...CARD, padding: 0, overflow: 'hidden', gap: 0, scrollMarginTop: 12 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '12px 14px',
+          background: open ? 'rgba(0,230,138,0.06)' : 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left',
+        }}
+        aria-expanded={open}
+      >
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{open ? '▾' : '▸'}</span>
+        {icon && <span style={{ fontSize: 15 }}>{icon}</span>}
+        <span style={{ fontSize: 13, fontWeight: 850, color: '#fff', flex: 1 }}>{title}</span>
+        {badge}
+      </button>
+      {open && <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 11, borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)' }}>{children}</div>}
+    </div>
+  );
+};

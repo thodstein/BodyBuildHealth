@@ -18,6 +18,8 @@ import { CardioSessionTimer } from './CardioSessionTimer';
 import { CardioProgressCard } from './CardioProgressCard';
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioDayCard } from './CardioDayCard';
+import { CardioImportPanel } from './CardioImportPanel';
+import { Tabs } from './CardioUI';
 
 function todayIso(): string {
   const d = new Date();
@@ -62,21 +64,34 @@ export const CardioDiaryStep: React.FC<{
     return { week: start.week, left: Math.max(0, start.week - current), phase: start.phase, lastWeight };
   }, [localCycle]);
 
+  const [tab, setTab] = useState<'session' | 'analytics' | 'log'>('session');
+  const TABS = [
+    { id: 'session', label: 'Сессия', icon: '⚡' },
+    { id: 'analytics', label: 'Аналитика', icon: '📈' },
+    { id: 'log', label: 'Журнал', icon: '📓' },
+  ] as const;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <CardioDayCard cycle={localCycle} log={log} srpe={srpe} />
-      <CardioProgressCard cycle={localCycle} log={log} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+        <CardioDayCard cycle={localCycle} log={log} srpe={srpe} />
+        <CardioProgressCard cycle={localCycle} log={log} />
+      </div>
       {startInfo && (
-        <div className="ck-week" style={{ fontSize: 11, color: startInfo.left === 0 ? '#f87171' : '#fbbf24', background: 'linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))', border: '1px solid rgba(245,158,11,0.3)', borderLeft: `3px solid ${startInfo.left === 0 ? '#ef4444' : '#f59e0b'}`, borderRadius: 12, padding: '8px 10px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+        <div className="ck-week" style={{ fontSize: 11, color: startInfo.left === 0 ? '#f87171' : '#fbbf24', background: 'linear-gradient(180deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))', border: '1px solid rgba(245,158,11,0.3)', borderLeft: `3px solid ${startInfo.left === 0 ? '#ef4444' : '#f59e0b'}`, borderRadius: 12, padding: '9px 12px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)' }}>
           {startInfo.left === 0
             ? `🏁 Эта неделя — старт (${CARDIO_PHASE_LABELS[startInfo.phase]}): только лёгкое кардио (recovery), без HIIT.`
             : `🏁 Старт через ${startInfo.left} нед (нед ${startInfo.week}, ${CARDIO_PHASE_LABELS[startInfo.phase]}): taper снижает объём — HIIT уже убран; контролируйте вес (темп 0.5-1%/нед) и сон.${startInfo.lastWeight != null ? ` Последний вес: ${startInfo.lastWeight} кг.` : ''}`}
         </div>
       )}
-      <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
-      <CardioAutoTunePanel cycle={localCycle} acwr={acwr} onChanged={reloadLog} />
-      <CardioVolumeChart cycle={localCycle} log={log} />
-      <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />
+      <Tabs tabs={TABS as unknown as { id: string; label: string; icon?: string }[]} active={tab} onChange={v => setTab(v as typeof tab)} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
+        <CardioVolumeChart cycle={localCycle} log={log} />
+        <CardioAutoTunePanel cycle={localCycle} acwr={acwr} onChanged={reloadLog} />
+        <CardioImportPanel onImported={reloadLog} />
+        <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />
+      </div>
     </div>
   );
 };

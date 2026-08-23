@@ -15,7 +15,7 @@ import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
-import { SectionCard, GroupHeading, SectionNav, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, InfoBanner } from './CardioUI';
+import { SectionCard, GroupHeading, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
 
 const GOAL_COLOR: Record<string, string> = {
   health: '#22c55e', mass: '#3b82f6', cut: '#f59e0b', recomp: '#a78bfa',
@@ -131,21 +131,21 @@ export const CardioManageStep: React.FC<{
     } catch { /* ignore */ }
   };
 
-  const NAV = [
-    { id: 'sec-integrations', label: '🔗 Интеграции' },
-    { id: 'sec-export', label: '📤 Экспорт' },
-    { id: 'sec-week', label: '🛠 Неделя' },
-    { id: 'sec-library', label: '📚 Библиотека' },
-    { id: 'sec-scenarios', label: '📸 Сценарии' },
-  ];
+  const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'library' | 'scenarios'>('integrations');
+  const TABS = [
+    { id: 'integrations', label: 'Интеграции', icon: '🔗' },
+    { id: 'export', label: 'Экспорт', icon: '📤' },
+    { id: 'week', label: 'Неделя', icon: '🛠' },
+    { id: 'library', label: 'Библиотека', icon: '📚' },
+    { id: 'scenarios', label: 'Сценарии', icon: '📸' },
+  ] as const;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <SectionNav items={NAV} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
+      <Tabs tabs={TABS as unknown as { id: string; label: string; icon?: string }[]} active={tab} onChange={v => { setTab(v as typeof tab); const el = document.getElementById('sec-' + v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} />
 
-      {/* ── Интеграции ── */}
-      <GroupHeading icon="🔗" text="Интеграции" desc="Подключите кардио-цикл к силовому плану ссылкой (без копии) или к годовому плану." />
-      <SectionCard id="sec-integrations" title="Силовой план (ссылка, не копия)">
+          <GroupHeading icon="🔗" text="Интеграции" desc="Подключите кардио-цикл к силовому плану ссылкой (без копии) или к годовому плану." />
+          <SectionCard id="sec-integrations" title="Силовой план (ссылка, не копия)">
         {cycle && (
           <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
             Активный цикл: <b style={{ color: '#4ade80' }}>{cycle.name}</b> — будет подключаться к конструкторам.
@@ -222,10 +222,9 @@ export const CardioManageStep: React.FC<{
         )}
       </SectionCard>
 
-      {/* ── Экспорт ── */}
-      <GroupHeading icon="📤" text="Экспорт" desc="Календарь, тренировочный файл, печать, сводка и передача расхода в питание." />
-      {cycle && (
-        <SectionCard id="sec-export" title="Экспорт">
+          <GroupHeading icon="📤" text="Экспорт" desc="Календарь, тренировочный файл, печать, сводка и передача расхода в питание." />
+          {cycle && (
+            <SectionCard id="sec-export" title="Экспорт">
           <div style={ROW}>
             <button style={BTN} onClick={() => onExport(cycle)}>📅 Календарь .ics</button>
             <button style={BTN} onClick={downloadTcx} title="Экспорт сессий в .tcx (Garmin Training Center)">📤 .tcx</button>
@@ -245,8 +244,6 @@ export const CardioManageStep: React.FC<{
           </div>
         </SectionCard>
       )}
-
-      {/* ── Год кардио: визуальная последовательность циклов ── */}
       <GroupHeading icon="📆" text="Год кардио" desc="Последовательность циклов из библиотеки (до 4) — как блоки года." />
       <SectionCard id="sec-year" title="📆 Год кардио" right={
         <button style={BTN} onClick={copyYear} title="Сводка «Год кардио» в буфер" aria-label="Год кардио в буфер">
@@ -283,15 +280,13 @@ export const CardioManageStep: React.FC<{
         )}
       </SectionCard>
 
-      {/* ── Ручная настройка недели ── */}
-      <GroupHeading icon="🛠" text="Конструктор недели" desc="Раскладка по дням, ±10% минут и редактор сессий конкретной недели." />
-      <div id="sec-week">
-        <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
-      </div>
+          <GroupHeading icon="🛠" text="Конструктор недели" desc="Раскладка по дням, ±10% минут и редактор сессий конкретной недели." />
+          <div id="sec-week">
+            <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
+          </div>
 
-      {/* ── Библиотека ── */}
-      <GroupHeading icon="📚" text="Библиотека циклов" desc="Сохранённые циклы: активировать, копировать, сравнить, экспортировать." />
-      <SectionCard id="sec-library" title={`Библиотека (${library.length})`}>
+          <GroupHeading icon="📚" text="Библиотека циклов" desc="Сохранённые циклы: активировать, копировать, сравнить, экспортировать." />
+          <SectionCard id="sec-library" title={`Библиотека (${library.length})`}>
         {library.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Пока пусто — соберите первый цикл на шаге «Предпросмотр».</div>}
         {library.map(c => {
           const s = cardioCycleSummary(c);
@@ -314,16 +309,13 @@ export const CardioManageStep: React.FC<{
             </div>
           );
         })}
-        {comparison && (
-          <InfoBanner tone="info">{comparison}</InfoBanner>
-        )}
+        {comparison && <InfoBanner tone="info">{comparison}</InfoBanner>}
       </SectionCard>
 
-      {/* ── Сценарии ── */}
-      <GroupHeading icon="📸" text="Сценарии" desc="Снапшоты циклов для сравнения вариантов (до 6)." />
-      <SectionCard id="sec-scenarios" title={`Сценарии (${scenarios.length}/6)`} right={
-        <button style={BTN_PRIMARY} onClick={onSaveScenario} title="Сохранить текущий активный цикл как сценарий">💾 Сохранить сценарий</button>
-      }>
+          <GroupHeading icon="📸" text="Сценарии" desc="Снапшоты циклов для сравнения вариантов (до 6)." />
+          <SectionCard id="sec-scenarios" title={`Сценарии (${scenarios.length}/6)`} right={
+            <button style={BTN_PRIMARY} onClick={onSaveScenario} title="Сохранить текущий активный цикл как сценарий">💾 Сохранить сценарий</button>
+          }>
         {scenarios.length === 0 && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>Сценариев нет — сохраните текущий цикл для сравнения вариантов.</div>}
         {scenarios.map(sc => {
           const s = cardioCycleSummary(sc.cycle);

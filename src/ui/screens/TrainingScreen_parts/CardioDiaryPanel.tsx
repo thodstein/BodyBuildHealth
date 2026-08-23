@@ -12,7 +12,7 @@ import {
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeightAdvice, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType, type CardioCoachHint } from '../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, INPUT, CHIP, CHIP_ACTIVE } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, Badge } from './CardioUI';
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -77,6 +77,51 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
   const stats28 = useMemo(() => cardioLogStats(log, 28), [log]);
   const advice = useMemo(() => computeCardioAdvice(cycle, log, { acwr, recoveryLow }), [log, cycle, acwr, recoveryLow]);
+  const streak = useMemo(() => {
+    const dates = Array.from(new Set(log.filter(e => e.completed).map(e => e.date))).sort();
+    if (dates.length === 0) return { current: 0, best: 0 };
+    let best = 1, cur = 1;
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(dates[i - 1]).getTime();
+      const curD = new Date(dates[i]).getTime();
+      const diff = Math.round((curD - prev) / 86400000);
+      if (diff === 1) cur++;
+      else { best = Math.max(best, cur); cur = 1; }
+    }
+    best = Math.max(best, cur);
+    // current streak: from today backwards
+    const today = todayIso();
+    let curStreak = 0;
+    let d = new Date(today);
+    const set = new Set(dates);
+    for (let i = 0; i < 30; i++) {
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (set.has(iso)) curStreak++;
+      else if (i === 0) { /* today not done yet, check yesterday */ }
+      else break;
+      d.setDate(d.getDate() - 1);
+      if (i === 0 && curStreak === 0) continue;
+      if (!set.has(iso) && curStreak > 0) break;
+    }
+    // simpler current: consecutive from latest date backwards
+    if (dates.length > 0) {
+      let c = 1;
+      for (let i = dates.length - 1; i > 0; i--) {
+        const diff = Math.round((new Date(dates[i]).getTime() - new Date(dates[i - 1]).getTime()) / 86400000);
+        if (diff === 1) c++; else break;
+      }
+      // if latest date not today, streak is c but may be broken
+      const latest = dates[dates.length - 1];
+      const diffToday = Math.round((new Date(today).getTime() - new Date(latest).getTime()) / 86400000);
+      if (diffToday > 1) curStreak = 0;
+      else curStreak = c;
+    }
+    return { current: curStreak, best };
+  }, [log]);
+  const shareWeek = () => {
+    const txt = `Кардио 7д: ${stats7.sessions} сесс · ${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.avgPace ? ` · ${stats7.avgPace}` : ''} · стрик ${streak.current}д (лучший ${streak.best}д)`;
+    try { navigator.clipboard.writeText(txt).then(() => flashMsg('📋 Недельный отчет скопирован')).catch(() => flashMsg(txt)); } catch { flashMsg(txt); }
+  };
   const adherence = useMemo(() => {
     if (!cycle) return null;
     // Текущая неделя по дате (неделя 1 = cycle.startDate); фоллбек — неделя 1.
@@ -139,11 +184,13 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     <div style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>📓 Дневник выполнения кардио</span>
+        <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : 'rgba(255,255,255,0.55)'}>🔥 стрик {streak.current}д · лучший {streak.best}д</Badge>
+        <button style={BTN_SMALL} onClick={shareWeek} title="Скопировать недельный отчет">📋 Поделиться неделей</button>
         {undoPrev && (
           <button style={{ ...BTN, minHeight: 30, padding: '4px 10px', fontSize: 10 }} onClick={() => { const restored = replaceCardioLog(undoPrev); commitLog(restored); setUndoPrev(null); flashMsg('↩ Отменено'); }} aria-label="Отменить последнее изменение">↩ Отменить</button>
         )}
       </div>
-      {flash && <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 600 }} role="status">{flash}</div>}
+      {flash && <div style={{ color: '#4ade80', fontSize: 12, fontWeight: 700 }} role="status">{flash}</div>}
 
       <div style={ROW}>
         <input type="date" value={date} onChange={e => setDate(e.target.value)} style={INPUT} aria-label="Дата" />

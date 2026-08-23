@@ -11,7 +11,7 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import { saveCardioLogEntry, loadCardioLog, estimateCardioEntryKcal, cardioExpectedDistanceHint, validateCardioLogFields, type CardioLogFieldWarnings } from '../../../engines/lms/cardio-diary.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, ProgressBar } from './CardioUI';
 
 const INPUT: React.CSSProperties = {
   background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
@@ -29,6 +29,23 @@ function fmt(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+function beep(freq = 880, ms = 180) {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    o.connect(g);
+    g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.18, ctx.currentTime);
+    o.start();
+    window.setTimeout(() => { try { o.stop(); ctx.close(); } catch { /* ignore */ } }, ms);
+  } catch { /* ignore */ }
+}
+function vibrate(pattern: number | number[]) {
+  try { if ('vibrate' in navigator) (navigator as unknown as { vibrate: (p: number | number[]) => void }).vibrate(pattern); } catch { /* ignore */ }
 }
 
 interface ActiveSession {
@@ -85,7 +102,12 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
     if (!active) return;
     if (active.remainingSec <= 1) {
       if (timerRef.current != null) window.clearInterval(timerRef.current);
+      beep(880, 300);
+      vibrate([120, 80, 120]);
       setFinished({ type: active.type, durationMin: active.durationMin });
+    } else if (active.remainingSec <= 3 && active.remainingSec > 0 && !active.paused) {
+      beep(660, 120);
+      if (active.remainingSec === 1) vibrate(120);
     }
   }, [active]);
 
@@ -99,6 +121,8 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   const finishNow = () => {
     if (!active) return;
     if (timerRef.current != null) window.clearInterval(timerRef.current);
+    beep(880, 220);
+    vibrate(140);
     setFinished({ type: active.type, durationMin: active.durationMin });
     setActive(null);
   };
@@ -175,13 +199,27 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
 
   return (
     <div style={CARD}>
-      <div style={LABEL}>⚡ Быстрый старт сессии</div>
-      {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 600 }} role="status">{flash}</div>}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={LABEL}>⚡ Быстрый старт сессии</span>
+        <span style={HINT_SM}>таймер · фазы · ЧСС-зона · аудио</span>
+      </div>
+      {flash && <div style={{ color: '#4ade80', fontSize: 11, fontWeight: 700 }} role="status">{flash}</div>}
 
       {active && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', padding: '8px 0' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин{active.targetHr?.max ? ` · 🎯 ЧСС ${active.targetHr.min}-${active.targetHr.max}` : ''}</div>
-          <div style={{ fontSize: 40, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a' }}>{fmt(active.remainingSec)}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 9, alignItems: 'center', padding: '8px 0' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 700 }}>{TYPE_LABEL[active.type]} · {active.durationMin} мин</span>
+            {active.targetHr?.max && <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', background: 'rgba(96,165,250,0.14)', border: '1px solid rgba(96,165,250,0.28)', borderRadius: 20, padding: '2px 8px' }}>🎯 ЧСС {active.targetHr.min}-{active.targetHr.max}</span>}
+          </div>
+          <div style={{ fontSize: 44, fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: active.remainingSec < 60 ? '#ef4444' : '#00e68a', lineHeight: 1, letterSpacing: -1 }}>{fmt(active.remainingSec)}</div>
+          <div style={{ width: '100%', maxWidth: 340 }}>
+            <ProgressBar value={active.durationMin * 60 - active.remainingSec} max={active.durationMin * 60} color={active.remainingSec < 60 ? '#ef4444' : '#00e68a'} height={8} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.40)', marginTop: 4 }}>
+              <span>прошло {fmt(active.durationMin * 60 - active.remainingSec)}</span>
+              <span>{active.paused ? '⏸ пауза' : '▶ в процессе'}</span>
+              <span>осталось {fmt(active.remainingSec)}</span>
+            </div>
+          </div>
           {(() => {
             const protocol = cardioSessionProtocol({ type: active.type, durationMin: active.durationMin });
             const elapsed = active.durationMin * 60 - active.remainingSec;

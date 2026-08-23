@@ -8,11 +8,11 @@ import {
   autoTuneCardioCycle, cardioHeartZones, cardioSessionsForDate, cardioCycleSummary,
   loadCardioCycles, saveCardioCycle, setActiveCardioCycle,
   saveCardioCycleVersion, latestCardioCycleVersion, restoreCardioCycleVersion,
-  lthrZones, runningVdot,
+  lthrZones, runningVdot, menstrualPhaseForDate, cardioCyclePeriodAware,
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, NumberInput } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge } from './CardioUI';
 
 export const CARDIO_AUTO_TUNE_KEY = 'he_cardio_auto_tune';
 export const CARDIO_AUTO_APPLY_KEY = 'he_cardio_auto_apply';
@@ -42,6 +42,9 @@ export const CardioAutoTunePanel: React.FC<{
   const [lthr, setLthr] = useState('');
   const [vdotKm, setVdotKm] = useState('');
   const [vdotMin, setVdotMin] = useState('');
+  const [cooperKm, setCooperKm] = useState('');
+  const [periodStart, setPeriodStart] = useState('');
+  const [periodLen, setPeriodLen] = useState('28');
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -59,6 +62,32 @@ export const CardioAutoTunePanel: React.FC<{
     if (!(km > 0) || !(min > 0)) return null;
     return runningVdot(km, min);
   }, [vdotKm, vdotMin]);
+
+  const cooperVdot = useMemo(() => {
+    const km = Number(cooperKm);
+    if (!(km > 0)) return null;
+    return runningVdot(km, 12);
+  }, [cooperKm]);
+
+  const periodInfo = useMemo(() => {
+    if (!periodStart) return null;
+    const len = Math.max(21, Math.min(35, Number(periodLen) || 28));
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return menstrualPhaseForDate({ lastPeriodStartIso: periodStart, cycleLengthDays: len }, today);
+  }, [periodStart, periodLen]);
+
+  const applyPeriodAware = () => {
+    if (!cycle || !periodStart) { flashMsg('⚠ Укажите дату начала цикла'); return; }
+    const len = Math.max(21, Math.min(35, Number(periodLen) || 28));
+    const r = cardioCyclePeriodAware(cycle, { lastPeriodStartIso: periodStart, cycleLengthDays: len });
+    if (r.changes.length === 0) { flashMsg('✅ Коррекций по циклу не требуется (не лютеиновая фаза или нет HIIT)'); return; }
+    saveCardioCycleVersion(cycle, '🌸 период-коррекция');
+    saveCardioCycle(r.cycle);
+    setActiveCardioCycle(r.cycle);
+    onChanged?.();
+    flashMsg(`🌸 Применено ${r.changes.length} коррекций: ${r.changes.map(c => `нед ${c.week} ${c.label}`).join(', ')}`);
+  };
 
   // Факт-ЧСС против целевых зон плана (28 дней).
   const hrCheck = useMemo(() => {
@@ -232,34 +261,38 @@ export const CardioAutoTunePanel: React.FC<{
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={ROW}>
           <span style={LABEL}>🏃 VDOT (тест: км за минуты)</span>
-          <NumberInput
-            value={vdotKm}
-            onChange={setVdotKm}
-            min={0.1}
-            max={100}
-            step={0.1}
-            placeholder="5"
-            ariaLabel="Дистанция теста км"
-            width={70}
-            suffix="км"
-          />
-          <NumberInput
-            value={vdotMin}
-            onChange={setVdotMin}
-            min={1}
-            max={120}
-            step={1}
-            placeholder="20"
-            ariaLabel="Время теста мин"
-            width={70}
-            suffix="мин"
-          />
+          <NumberInput value={vdotKm} onChange={setVdotKm} min={0.1} max={100} step={0.1} placeholder="5" ariaLabel="Дистанция теста км" width={70} suffix="км" />
+          <NumberInput value={vdotMin} onChange={setVdotMin} min={1} max={120} step={1} placeholder="20" ariaLabel="Время теста мин" width={70} suffix="мин" />
         </div>
-        {vdot && (
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
-            VDOT {vdot.vdot} · темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm} мин/км`).join(' · ')}
+        {vdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)' }}>VDOT {vdot.vdot} · темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm} мин/км`).join(' · ')}</div>}
+      </div>
+
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={ROW}>
+          <span style={LABEL}>🏃 Cooper 12′</span>
+          <NumberInput value={cooperKm} onChange={setCooperKm} min={0.5} max={5} step={0.05} placeholder="2.4" ariaLabel="Дистанция Cooper км" width={80} suffix="км за 12мин" />
+          {cooperVdot && <Badge bg="rgba(96,165,250,0.14)" border="rgba(96,165,250,0.28)" color="#60a5fa">VDOT {cooperVdot.vdot}</Badge>}
+        </div>
+        {cooperVdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)' }}>Темпы Cooper: {cooperVdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')} — бегите по ним Zone2/HIIT.</div>}
+        <div style={HINT_SM}>Cooper: 12 мин максимально, дистанция → VDOT → темпы тренировок (Daniels).</div>
+      </div>
+
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={ROW}>
+          <span style={LABEL}>🌸 Менструальный цикл</span>
+          <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '7px 10px', color: '#fff', fontSize: 12 }} aria-label="Дата начала цикла" />
+          <NumberInput value={periodLen} onChange={setPeriodLen} min={21} max={35} step={1} placeholder="28" ariaLabel="Длина цикла" width={70} suffix="дн" />
+        </div>
+        {periodInfo && (
+          <div style={{ fontSize: 11, padding: '7px 10px', borderRadius: 8, background: periodInfo.phase === 'luteal' ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.07)', border: `1px solid ${periodInfo.phase === 'luteal' ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.18)'}`, color: periodInfo.phase === 'luteal' ? '#f87171' : '#4ade80' }}>
+            День {periodInfo.cycleDay} · {periodInfo.phase === 'follicular' ? 'Фолликулярная' : periodInfo.phase === 'ovulatory' ? 'Овуляция' : 'Лютеиновая'} — {periodInfo.note}
+            {periodInfo.phase === 'luteal' && <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>Рекомендация: HIIT/MISS → zone2 (пульс воспринимается выше, задержка воды).</div>}
           </div>
         )}
+        <div style={ROW}>
+          <button style={BTN_SMALL} onClick={applyPeriodAware} disabled={!periodStart || !cycle} title="Заменить HIIT/MISS на zone2 в лютеиновые недели цикла">🌸 Коррекция по циклу</button>
+          <span style={HINT_SM}>Коррекция одноразовая (с undo), только будущие недели, только HIIT→zone2.</span>
+        </div>
       </div>
     </div>
   );

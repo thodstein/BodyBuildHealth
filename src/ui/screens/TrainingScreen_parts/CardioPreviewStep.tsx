@@ -14,7 +14,8 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioProgressCard } from './CardioProgressCard';
-import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, PHASE_COLOR, Stepper } from './CardioUI';
+import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, PHASE_COLOR, PHASE_BG, TYPE_COLOR, Badge, ProgressBar, Stepper } from './CardioUI';
+import { CardioCalendar } from './CardioCalendar';
 
 const VARIANT_BTN: React.CSSProperties = {
   flex: '1 1 100px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
@@ -258,14 +259,11 @@ export const CardioPreviewStep: React.FC<{
         <div style={CARD} id="sec-quality">
           <div style={ROW}>
             <span style={LABEL}>📊 Качество цикла</span>
-            <span style={{ fontSize: 16, fontWeight: 800, color: quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' }}>{quality.score}</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>/100</span>
+            <Badge bg={quality.score >= 85 ? 'rgba(34,197,94,0.14)' : quality.score >= 60 ? 'rgba(245,158,11,0.14)' : 'rgba(239,68,68,0.14)'} border={quality.score >= 85 ? 'rgba(34,197,94,0.28)' : quality.score >= 60 ? 'rgba(245,158,11,0.28)' : 'rgba(239,68,68,0.28)'} color={quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444'}>{quality.score}/100</Badge>
             <span style={{ flex: 1 }} />
             <button style={{ ...BTN, minHeight: 34, padding: '6px 14px' }} onClick={previewImprove}>✨ Улучшить</button>
           </div>
-          <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-            <div style={{ width: quality.score + '%', height: '100%', borderRadius: 3, background: quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444' }} />
-          </div>
+          <ProgressBar value={quality.score} color={quality.score >= 85 ? '#22c55e' : quality.score >= 60 ? '#f59e0b' : '#ef4444'} height={8} />
           {quality.findings.map((f, i) => (
             <div key={i} style={{ fontSize: 10, lineHeight: 1.4, color: f.level === 'warn' ? '#fbbf24' : f.level === 'ok' ? 'rgba(74,222,128,0.85)' : 'rgba(255,255,255,0.5)' }}>
               {f.level === 'warn' ? '⚠ ' : f.level === 'ok' ? '✅ ' : '💡 '}{f.text}
@@ -430,6 +428,8 @@ export const CardioPreviewStep: React.FC<{
           );
         })()}
       </div>
+
+      <CardioCalendar cycle={cycle} />
 
       <CardioProgressCard cycle={cycle} />
       <CardioVolumeChart cycle={cycle} />
