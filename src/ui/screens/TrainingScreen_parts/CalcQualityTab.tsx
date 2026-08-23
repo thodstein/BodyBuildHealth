@@ -93,15 +93,15 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     try { return adaptForPEDs(peds as any, base, pedDosesEdit, courseIntensity); } catch { return null; }
   }, [usePed, peds, pedDosesEdit, courseIntensity]);
 
-  // Вычисляем анализ для выбранного разделения
+  // Вычисляем анализ для выбранного разделения — с учётом hybrid и PL-синтетики
   const analysis = useMemo(() => {
     if (!selectedProgram) return null;
-    // Для PL-клонов без customWeeks — пробуем собрать синтетику из цикла для отображения (иначе пусто)
     let progForCalc: UserProgram = selectedProgram;
-    if (division === 'pl' && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
+    // hybrid: для BB-анализа берём bb-weeks, для PL — pl-weeks, иначе комбинируем
+    const isHybridProg = selectedProgram.meta.direction === 'hybrid';
+    if ((division === 'pl' || isHybridProg) && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
       const tpl = getCycleById(selectedProgram.pl.sourceCycleId);
       if (tpl) {
-        // Синтетические кастом-недели из шаблона (для оценки объема)
         const synthWeeks = (tpl.weeks && tpl.weeks.length ? tpl.weeks : [tpl.week1]).map((days, wi) => ({
           week: wi + 1,
           phase: 'accumulation' as const,
@@ -119,7 +119,10 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } } as UserProgram;
       }
     }
-    // Для BB используем как есть; для PL также через тот же движок (BASE_MUSCLES 6)
+    // hybrid без bb-weeks — показываем PL-качество даже на BB-вкладке
+    if (division === 'bb' && isHybridProg && !progForCalc.bb && progForCalc.hybrid?.bbWeeks) {
+      progForCalc = { ...progForCalc, bb: { direction: 'bb', weeks: progForCalc.hybrid.bbWeeks as any, volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] }, constraints: { equipment: [] }, microcycleTemplate: { daySlots: [] } } as any } as UserProgram;
+    }
     return computePlanQualityFor(progForCalc, effectiveLevel, {
       onCourse: usePed,
       courseIntensity: courseIntensity as any,
@@ -130,7 +133,7 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
   const analysisNatural = useMemo(() => {
     if (!usePed || !selectedProgram) return null;
     let progForCalc: UserProgram = selectedProgram;
-    if (division === 'pl' && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
+    if ((division === 'pl' || selectedProgram.meta.direction === 'hybrid') && selectedProgram.pl?.sourceCycleId && !selectedProgram.pl.customWeeks) {
       const tpl = getCycleById(selectedProgram.pl.sourceCycleId);
       if (tpl) {
         const synthWeeks = (tpl.weeks && tpl.weeks.length ? tpl.weeks : [tpl.week1]).map((days, wi) => ({
@@ -149,6 +152,9 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         }));
         progForCalc = { ...selectedProgram, pl: { ...selectedProgram.pl, customWeeks: synthWeeks as any } } as UserProgram;
       }
+    }
+    if (division === 'bb' && selectedProgram.meta.direction === 'hybrid' && !progForCalc.bb && progForCalc.hybrid?.bbWeeks) {
+      progForCalc = { ...progForCalc, bb: { direction: 'bb', weeks: progForCalc.hybrid.bbWeeks as any, volumeBudget: {}, progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: [] }, constraints: { equipment: [] }, microcycleTemplate: { daySlots: [] } } as any } as UserProgram;
     }
     return computePlanQualityFor(progForCalc, effectiveLevel, { onCourse: false, courseIntensity: 'moderate', labMult: useLab ? labMult : 1 });
   }, [selectedProgram, effectiveLevel, usePed, useLab, labMult, division]);
@@ -365,7 +371,9 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
     } catch { return null; }
   }, [selectedProgram, division]);
 
-  const hasData = !!(selectedProgram && (division === 'bb' ? selectedProgram.bb : selectedProgram.pl));
+  // hybrid: показываем ББ+ПЛ совместно
+  const isHybrid = selectedProgram?.meta.direction === 'hybrid';
+  const hasData = !!(selectedProgram && (division === 'bb' ? selectedProgram.bb || isHybrid : selectedProgram.pl || isHybrid));
   const hasAnyProgram = programs.length > 0 || !!propsProgram;
 
   if (!hasAnyProgram) {
@@ -434,8 +442,8 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       )}
       {selectedProgram && (
         <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 11, color: '#fff', display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <span><b style={{ color: ACCENT }}>{selectedProgram.meta.title}</b> · {selectedProgram.meta.direction.toUpperCase()} · {selectedProgram.meta.level} · {selectedProgram.meta.weeks} нед</span>
-          <span style={{ color: 'rgba(255,255,255,0.7)' }}>{division === 'bb' ? 'ББ-недель: ' + (selectedProgram.bb?.weeks.length || 0) : 'ПЛ-недель: ' + (selectedProgram.pl?.customWeeks?.length || (selectedProgram.pl?.sourceCycleId ? 1 : 0))}</span>
+          <span><b style={{ color: ACCENT }}>{selectedProgram.meta.title}</b> · {selectedProgram.meta.direction.toUpperCase()} {isHybrid ? '· HYBRID' : ''} · {selectedProgram.meta.level} · {selectedProgram.meta.weeks} нед</span>
+          <span style={{ color: '#fff' }}>{division === 'bb' ? 'ББ-недель: ' + ((selectedProgram.bb?.weeks.length || 0) || (isHybrid ? (selectedProgram.hybrid?.bbWeeks?.length || 0) : 0)) : 'ПЛ-недель: ' + (selectedProgram.pl?.customWeeks?.length || (selectedProgram.pl?.sourceCycleId ? 1 : 0))}</span>
         </div>
       )}
 
@@ -739,8 +747,9 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
             <div style={{ marginBottom: 6 }}><b style={{ color: ACCENT }}>Методология:</b> MEV/MAV/MRV из <i>Israetel Hypertrophy Guide</i> по уровню ({effectiveLevel}) + PED-надбавка {pedOn ? `×${pedAdapt?.combinedMrvMultiplier.toFixed(2)}` : '×1.0'} + лаб-коррекция ×{labMult.toFixed(2)}. Пик — макс недельный объём, среднее — по мезоциклу.</div>
             <div style={{ marginBottom: 6 }}><b>Статусы:</b> <span style={{ color: '#3b82f6' }}>low</span> — ниже MEV (недогруз), <span style={{ color: '#22c55e' }}>ok</span> — оптимум, <span style={{ color: '#f59e0b' }}>high</span> — ≥MAV, <span style={{ color: '#ef4444' }}>over</span> — сверх MRV (перетрен).</div>
             <div style={{ marginBottom: 6 }}><b>ПЛ vs ББ:</b> ББ — 15 групп, акцент на гипертрофию (объём сетов, частота 2×/нед Schoenfeld 2016, hard-cap Helms); ПЛ — те же 6 групп, но акцент на интенсивность (Прилепин КПШ, Фунтиков k, Черняк Инт.отн, УОИ).</div>
-            <div style={{ marginBottom: 6 }}><b>Источники:</b> Israetel Hypertrophy Guide (MEV/MAV/MRV), Schoenfeld 2017 (volume/frequency), Helms 2018 (hard sets), Прилепин 1974 (КПШ зоны), Шейко 2005 (тоннаж), Фунтиков 1979 (k-таблица), Черняк 2003 (Инт.отн).</div>
-            <div style={{ fontSize: 9, color: '#fff' }}>Подсказка: для ББ держите пик 85-95% MRV, для ПЛ — 70-85% (больше интенсивности). PED поднимает MRV dose-aware (AAS/GH/инсулин), лаборатория снижает при воспалении/печени/почках.</div>
+            <div style={{ marginBottom: 6 }}><b>Источники:</b> Israetel Hypertrophy Guide (MEV/MAV/MRV), Schoenfeld 2017 (volume/frequency), Helms 2018 (hard sets), Прилепин 1974 (КПШ зоны), Шейко 2005 (тоннаж), Фунтиков 1979 (k-таблица), Черняк 2003 (Инт.отн), Bondarenko 1982 (УОИ/коэфф.).</div>
+            <div style={{ marginBottom: 6 }}><b>Паттерны/углы:</b> Israetel 2020 (exercise variation), Contreras 2013 (glute), Schoenfeld 2021 (stretch-mediated hypertrophy — удлинённая позиция +10-15% роста).</div>
+            <div style={{ fontSize: 9, color: '#fff' }}>Подсказка: ББ пик 85-95% MRV, ПЛ 70-85% MRV. PED dose-aware (кривая AAS 0-3000мг, GH 0-15МЕ), лаборатория 0.7-1.0 по печени/почкам/воспалению. Техники: ББ 10-30%, ПЛ 5-15%.</div>
           </div>
         } />
       )}

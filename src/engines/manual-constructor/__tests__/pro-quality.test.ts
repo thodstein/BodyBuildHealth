@@ -64,7 +64,18 @@ describe('pro-quality', () => {
     const resStrength = analyzeProQuality(mockBB, 'bb', 'intermediate', 'strength', [{muscle:'chest', peakSets:8,mrv:20}]);
     expect(resMass.goal).toBe('Масса');
     expect(resStrength.goal).toBe('Сила');
-    // different volume windows
     expect(resMass.goalAlignment.volumePctAvg).toBe(resStrength.goalAlignment.volumePctAvg);
+  });
+  it('hybrid — bb/pl both analysable', () => {
+    const hybrid:any = {
+      meta:{ id:'3', title:'Hybrid', direction:'hybrid', level:'intermediate', weeks:4, daysPerWeek:4, goal:'recomp' },
+      hybrid:{ plRef:{ sourceCycleId:'cycle-01', sessionIndices:[0] }, bbWeeks: mockBB.bb.weeks, notes:'', workMax:{}, level:'intermediate' },
+      bb: mockBB.bb,
+      pl: { direction:'pl', sourceCycleId:'cycle-01', schedule:[], weakPoints:[], notes:'', workMax:{}, customWeeks: [{ week:1, phase:'accumulation', deload:false, days:[{ name:'День 1', exercises:[{ name:'Жим лёжа', lift:'bench', muscle:'chest', sets:[{ pct:0.75, reps:5, sets:5, rir:2 }] }]}]}] },
+    };
+    const resBb = analyzeProQuality(hybrid, 'bb', 'intermediate', 'recomp', [{muscle:'chest', peakSets:8,mrv:20}]);
+    const resPl = analyzeProQuality(hybrid, 'pl', 'intermediate', 'strength', [{muscle:'chest', peakSets:8,mrv:20}]);
+    expect(resBb.division).toBe('bb');
+    expect(resPl.division).toBe('pl');
   });
 });
