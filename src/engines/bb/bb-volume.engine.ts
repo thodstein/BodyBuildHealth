@@ -174,8 +174,9 @@ export function sessionLimitsFor(
   else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 40; maxExercises = 14; }
   else { maxWorkingSets = 24; maxExercises = 10; }
   if (input.trainingVolumeMode === 'high') {
-    maxWorkingSets = Math.round(maxWorkingSets * 1.2);
-    maxExercises = Math.min(22, maxExercises + 2);
+    const isMaxExp = input.level === 'enhanced' && (input.trainingYears ?? 0) >= 6;
+    maxWorkingSets = Math.round(maxWorkingSets * (isMaxExp ? 1.3 : 1.2));
+    maxExercises = Math.min(24, maxExercises + (isMaxExp ? 3 : 2));
   }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };
 }

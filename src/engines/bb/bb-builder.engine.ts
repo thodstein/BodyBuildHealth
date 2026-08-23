@@ -2597,8 +2597,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (mesoProgression) {
       v = applyVolumeProgression(m, v, mesoProgression);
     }
-    // Объёмный тренинг — +25% даже для макс опыта (ранее high только ставил volumeGoal=mrv, для max опыта mrv уже был — эффекта 0)
-    if (input.trainingVolumeMode === 'high') v = Math.round(v * 1.25);
+    // Объёмный тренинг — +25-35% даже для макс опыта (ранее high только ставил volumeGoal=mrv, для max опыта mrv уже был — эффекта 0)
+    if (input.trainingVolumeMode === 'high') {
+      const boost = level === 'enhanced' && (input.trainingYears ?? 0) >= 6 ? 1.35 : level === 'enhanced' ? 1.30 : 1.25;
+      v = Math.round(v * boost);
+    }
     return v;
   };
   // Базовый целевой объём мышцы для резолвера (спец-блок или баланс).
@@ -2647,7 +2650,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Единый режим-множитель (×2 на курсе на главные мышцы) — без стэкинга
       // pedAdapt × backProfile/legProfile/torsoProfile capMult.
       let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * legFreqMult);
-      if (input.trainingVolumeMode === 'high') capMrv = Math.round(capMrv * 1.15);
+      if (input.trainingVolumeMode === 'high') {
+        const capBoost = level === 'enhanced' && (input.trainingYears ?? 0) >= 6 ? 1.25 : 1.15;
+        capMrv = Math.round(capMrv * capBoost);
+      }
       // Руки/ягодицы/плечи: при больших тягах/жимах/приседаниях косвенный
       // объём закрывает часть target, но потолок тоже должен расти со стажем
       // (иначе ложный MRV-overflow на enhanced-планах).
@@ -2827,7 +2833,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const weekExcluded = getExcludedMuscles(injuries, weekDate);
       const weekGraded = getGradedInjuries(injuries, weekDate);
        const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
-        const legDayIndex = sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
+        const legDaysInWeek = sessions.filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
+        const legDayIndex = legDaysInWeek === 1 ? (w % 2) : sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
         const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: undefined, courseIntensity: undefined, onCourse: false, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
