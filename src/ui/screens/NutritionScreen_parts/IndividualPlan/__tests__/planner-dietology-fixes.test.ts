@@ -210,6 +210,21 @@ describe('D4/D5: диетологический потолок углеводо�
   });
 });
 
+describe('Хлопья на работе (portable) — завтрак-шаблон с хлопьями', () => {
+  it('portable-режим: хлопья (oats/cereal) доступны и попадают в план', () => {
+    const plan = buildDayPlan(base({ portableMode: true, preferredIds: new Set(['oats']) }));
+    expect(plan.meals.flatMap(m => m.items.map((i: any) => i.id))).toContain('oats');
+  });
+
+  it('portable + шаблон protein_flakes: завтрак содержит хлопья и протеин, без мяса', () => {
+    const plan = buildDayPlan(base({ portableMode: true, breakfastTemplate: 'protein_flakes' as any }));
+    const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
+    expect(breakfast.items.some(it => it.id === 'oats')).toBe(true);
+    expect(breakfast.items.some(it => it.id === 'whey_isolate' || it.id === 'whey_protein')).toBe(true);
+    expect(breakfast.items.some(it => ['beef','pork','chicken','turkey','salmon'].some(k => it.id.includes(k)))).toBe(false);
+  });
+});
+
 describe('КБЖУ-соответствие: план = цель (жалоба «разбег в карточке»)', () => {
   it('жиры НЕ ниже пола 0.8 г/кг — план совпадает с целью, а не «60 → 96» (был разбег до 60%)', () => {
     const w = 120;

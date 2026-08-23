@@ -249,11 +249,13 @@ describe('buildDayPlan — active micro-gap closing (D-23)', () => {
 });
 
 describe('buildDayPlan — mealsCount-aware distribution (D-24)', () => {
-  it('mealsCount контролирует число приёмов (3→3, 8→8 на тренинге)', () => {
+  it('mealsCount контролирует число приёмов (3→3, 8→8 на тренинге) — P0-фикс Aug 22 2026: peri отдельно', () => {
     const m3 = buildDayPlan(baseInput({ mealsCount: 3, isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true }));
     const m8 = buildDayPlan(baseInput({ mealsCount: 8, isTrainingDay: true, trainStartMin: 17 * 60 + 30, trainDurationMin: 90, allowIntraWorkout: true }));
-    expect(m3.meals.length).toBeLessThanOrEqual(3);
-    expect(m8.meals.length).toBe(8);
+    // P0-фикс: пери-тренировочные (pre/post/intra) теперь ADD сверх лимита mealsCount.
+    // 3 рег. (B,L,D) + 3 peri (pre,post,intra) = 6; 8 рег. + 3 peri = 11.
+    expect(m3.meals.length).toBe(6);
+    expect(m8.meals.length).toBe(11);
   });
 
   it('углеводы распределяются полностью (нет недобора) при малом mealsCount', () => {

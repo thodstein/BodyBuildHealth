@@ -579,7 +579,8 @@ describe('P1-6: meal-plan-engine — порядок удаления ролей 
     });
     const plan = buildDayPlan(baseInput());
     const labels = plan.meals.map((m: any) => m.label);
-    // 6 приёмов — intra не помещается (2 удаления: snack2 + intra)
-    expect(labels.some((l: string) => l.includes('Intra') || l.includes('intra'))).toBe(false);
+    // P0-фикс Aug 22 2026: пери-тренировочные теперь ADD сверх лимита mealsCount,
+    // поэтому intra всегда помещается на тренировке (ранее 7 ролей капились к 6 и intra удалялся).
+    expect(labels.some((l: string) => l.includes('Intra') || l.includes('intra'))).toBe(true);
   });
 });

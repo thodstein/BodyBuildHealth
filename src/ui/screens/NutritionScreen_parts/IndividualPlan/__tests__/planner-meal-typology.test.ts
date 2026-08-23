@@ -79,11 +79,11 @@ describe('E6: количество приёмов до 10', () => {
     expect(plan.meals.length).toBeGreaterThanOrEqual(8);
   });
 
-  it('mealsCount=8 включает snack3, но не snack4', () => {
+  it('mealsCount=8 включает snack3 и snack4 (P0-фикс: peri отдельно)', () => {
     const plan = buildDayPlan(base({ mealsCount: 8, isTrainingDay: false }));
     const types = plan.meals.map(m => m.type);
     expect(types).toContain('snack3');
-    expect(types).not.toContain('snack4');
+    expect(types).toContain('snack4');
   });
 });
 

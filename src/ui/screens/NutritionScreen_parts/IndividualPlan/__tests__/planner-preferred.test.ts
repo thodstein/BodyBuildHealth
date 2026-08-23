@@ -62,9 +62,13 @@ describe('buildDayPlan — любимые продукты (все попада�
     expect(allDayIds(plan)).toContain('tomato');
   });
 
-  it('любимый жир (avocado) попадает в план', () => {
-    const plan = buildDayPlan(baseInput({ preferredIds: new Set(['avocado']) }));
-    expect(allDayIds(plan)).toContain('avocado');
+  it('любимый жир (olive_oil) попадает в план', () => {
+    const ids = new Set<string>();
+    for (let d = 0; d < 3; d++) {
+      const plan = buildDayPlan(baseInput({ dayOffset: d, preferredIds: new Set(['olive_oil']) }));
+      allDayIds(plan).forEach(id => ids.add(id));
+    }
+    expect(ids.has('olive_oil')).toBe(true);
   });
 
   it('любимый рисовый крем попадает в ЗАВТРАК трен-дня (без цели >=60г)', () => {

@@ -830,7 +830,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const cFastBud = byBudget(cFastRaw);
   const cFruitRaw = basePool.filter(f => f.category === 'veg_fruit' && (f.carbs || 0) >= 8 && (f.gi || 0) <= 55 && (f.fiber || 0) >= 1.5 && (f.protein || 0) < 15);
   const cFruitBud = byBudget(cFruitRaw);
-  const fatsRaw = basePool.filter(f => f.category === 'fat' && (f.fat || 0) >= 50);
+  const fatsRaw = basePool.filter(f => f.category === 'fat' && (f.fat || 0) >= 10);
   const fatsBud = byBudget(fatsRaw);
   // variety-based pool limiting: перемешиваем и обрезаем для разнообразия
   const limitPoolByVariety = <T>(arr: T[], seed: number): T[] => {
@@ -2785,8 +2785,8 @@ function activelyCloseTopDeficiency(meals: Meal[], isVegetarian: boolean, sex: '
   // D-28+ fix (диетология): также НЕ добавляем в завтрак — иначе «добивка» омега-3 (лосось/
   // печень) попадала в творожную/овсяную кашу («творог + лосось»). Рыбные источники омега-3
   // и так добавляются отдельным Omega-3-проходом в обед; завтрак остаётся «завтрашним».
-  let target = meals.find(m => m.type !== 'presleep' && m.type !== 'breakfast') || meals.find(m => m.type !== 'presleep') || meals[0];
-  for (const m of meals) if (m.type !== 'presleep' && m.type !== 'breakfast' && (m.totals.kcal || 0) < (target.totals.kcal || 0)) target = m;
+  let target = meals.find(m => m.type !== 'presleep' && m.type !== 'breakfast' && !m.type.startsWith('snack')) || meals.find(m => m.type !== 'presleep' && !m.type.startsWith('snack')) || meals.find(m => m.type !== 'presleep') || meals[0];
+  for (const m of meals) if (m.type !== 'presleep' && m.type !== 'breakfast' && !m.type.startsWith('snack') && (m.totals.kcal || 0) < (target.totals.kcal || 0)) target = m;
   const grams = cfg.foodG;
   const item = makeItem(food, grams, 'veg');
   target.items.push(item);

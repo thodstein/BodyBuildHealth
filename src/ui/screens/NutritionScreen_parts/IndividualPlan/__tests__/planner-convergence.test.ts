@@ -88,13 +88,13 @@ describe('Этап 4: синхронизация приёмов с инъекц�
     expect(plan.meals.length).toBeGreaterThan(0);
   });
 
-  it('инсулин в изолированное время (10:00, вне окон) — приём создаётся', () => {
-    const plan = buildDayPlan(trainInput({ injections: [inj({ time: '10:00' })] }));
+  it('инсулин в изолированное время (06:00, вне окон) — приём создаётся', () => {
+    const plan = buildDayPlan(trainInput({ injections: [inj({ time: '06:00' })] }));
     const injMeal = plan.meals.find(m => (m.label || '').includes('инсулин'));
     expect(injMeal).toBeTruthy();
     expect(injMeal!.totals.c).toBeGreaterThan(0);
-    // Время приёма ≈ 10:00.
-    expect((injMeal!.time || '').startsWith('10:')).toBe(true);
+    // Время приёма ≈ 06:00 (изолировано от завтрака 07:30).
+    expect((injMeal!.time || '').startsWith('06:')).toBe(true);
   });
 
   it('ИГФ-1: приём до и/или после тренировки (по trainTiming)', () => {
