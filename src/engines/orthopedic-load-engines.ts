@@ -43,7 +43,7 @@ export interface DailyLoad {
   intensityTarget: number;
   densityTarget: number;
   focus: string;
-  difficulty: 'hard' | 'medium' | 'light' | 'off';
+  difficulty: 'hard' | 'medium' | 'light' | 'off' | 'rehab';
 }
 
 export interface LoadDistributionOutput {

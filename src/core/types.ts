@@ -1277,7 +1277,7 @@ export type MovementPattern =
   | 'incline_push' | 'dip_push' | 'decline_push'
   | 'isolation_chest' | 'isolation_shoulders' | 'isolation_back'
   | 'isolation_arms' | 'isolation_legs_quad' | 'isolation_legs_ham'
-  | 'isolation_calves' | 'glute_squat';
+  | 'isolation_calves' | 'isolation_glutes' | 'glute_squat';
 
 export type ExerciseSlotRole = 'main' | 'secondary' | 'accessory' | 'rehab' | 'warmup';
 

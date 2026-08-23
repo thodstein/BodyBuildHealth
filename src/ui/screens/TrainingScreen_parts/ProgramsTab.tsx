@@ -78,7 +78,7 @@ export const ProgramsTab: React.FC<{
     if (!expandedSelected) return;
     try {
       const cycleTpl = programToCycleTemplate(expandedSelected);
-      applyToPlanner({ kind: 'program', label: expandedSelected.name, data: cycleTpl });
+      applyToPlanner({ kind: 'program', label: expandedSelected.name, data: cycleTpl as any });
       setBbMsg('✅ Отправлено в ББ-авто! Перейдите в Планировщик → ББ-авто.');
       setTimeout(() => setBbMsg(''), 4000);
     } catch (e: any) {
