@@ -873,6 +873,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       });
     } catch {}
   }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, weightLogPeriod, phase, nutrLevel, budget, variety, lunchTime, dinnerTime, workFood, planType, morningTrainLoad]);
+
   // P1-fix: preferredFoods из Profile (UnifiedSettings.nutrition.preferredFoods) + legacy
   const [preferredFoods, setPreferredFoods] = useState<string[]>(() => {
     try {
@@ -1019,11 +1020,58 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { setPlanTargets({ kcal: effectiveKcal, protein: effectiveP, fats: effectiveF, carbs: effectiveC }); }, [effectiveKcal, effectiveP, effectiveF, effectiveC]);
   const [cyclingMode, setCyclingMode] = useState<CycleType>('none');
   const [heavyTrainDay, setHeavyTrainDay] = useState('');
-  const [workScheduleEnabled, setWorkScheduleEnabled] = useState(false);
-  const [workStartTime, setWorkStartTime] = useState('09:00');
-  const [workEndTime, setWorkEndTime] = useState('18:00');
-  const [workDays, setWorkDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
-  const [workScheduleType, setWorkScheduleType] = useState('standard');
+  const [workScheduleEnabledRaw, setWorkScheduleEnabledRaw] = useState<boolean>(typeof _pf.workScheduleEnabled === 'boolean' ? _pf.workScheduleEnabled : false);
+  const [workStartTimeRaw, setWorkStartTimeRaw] = useState<string>(typeof _pf.workStartTime === 'string' && /^\d{2}:\d{2}$/.test(_pf.workStartTime) ? _pf.workStartTime : '09:00');
+  const [workEndTimeRaw, setWorkEndTimeRaw] = useState<string>(typeof _pf.workEndTime === 'string' && /^\d{2}:\d{2}$/.test(_pf.workEndTime) ? _pf.workEndTime : '18:00');
+  const [workDaysRaw, setWorkDaysRaw] = useState<boolean[]>(Array.isArray(_pf.workDays) && _pf.workDays.length === 7 ? (_pf.workDays as any[]).map(Boolean) : [true, true, true, true, true, false, false]);
+  const [workScheduleTypeRaw, setWorkScheduleTypeRaw] = useState<string>(typeof _pf.workScheduleType === 'string' ? _pf.workScheduleType : 'standard');
+  // Wrapped setters with persistence to he_planner_prefs (avoid effect deps array breakage)
+  const workScheduleEnabled = workScheduleEnabledRaw;
+  const workStartTime = workStartTimeRaw;
+  const workEndTime = workEndTimeRaw;
+  const workDays = workDaysRaw;
+  const workScheduleType = workScheduleTypeRaw;
+  const persistWorkPrefs = useCallback((patch: Record<string, any>) => {
+    try {
+      const cur = (() => { try { return JSON.parse(localStorage.getItem('he_planner_prefs') || '{}'); } catch { return {}; } })();
+      safeWriteJSON('he_planner_prefs', { ...cur, ...patch });
+    } catch {}
+  }, []);
+  const setWorkScheduleEnabled = useCallback((v: boolean | ((prev: boolean) => boolean)) => {
+    setWorkScheduleEnabledRaw(prev => {
+      const next = typeof v === 'function' ? (v as any)(prev) : v;
+      persistWorkPrefs({ workScheduleEnabled: next });
+      return next;
+    });
+  }, [persistWorkPrefs]);
+  const setWorkStartTime = useCallback((v: string | ((prev: string) => string)) => {
+    setWorkStartTimeRaw(prev => {
+      const next = typeof v === 'function' ? (v as any)(prev) : v;
+      persistWorkPrefs({ workStartTime: next });
+      return next;
+    });
+  }, [persistWorkPrefs]);
+  const setWorkEndTime = useCallback((v: string | ((prev: string) => string)) => {
+    setWorkEndTimeRaw(prev => {
+      const next = typeof v === 'function' ? (v as any)(prev) : v;
+      persistWorkPrefs({ workEndTime: next });
+      return next;
+    });
+  }, [persistWorkPrefs]);
+  const setWorkDays = useCallback((v: boolean[] | ((prev: boolean[]) => boolean[])) => {
+    setWorkDaysRaw(prev => {
+      const next = typeof v === 'function' ? (v as any)(prev) : v;
+      persistWorkPrefs({ workDays: next });
+      return next;
+    });
+  }, [persistWorkPrefs]);
+  const setWorkScheduleType = useCallback((v: string | ((prev: string) => string)) => {
+    setWorkScheduleTypeRaw(prev => {
+      const next = typeof v === 'function' ? (v as any)(prev) : v;
+      persistWorkPrefs({ workScheduleType: next });
+      return next;
+    });
+  }, [persistWorkPrefs]);
   const [generated, setGenerated] = useState(false);
   // ⏳ Признак неблокирующей генерации (3/7 дней с yield) — кнопки показывают «⏳».
   const [planBusy, setPlanBusy] = useState(false);
@@ -1854,8 +1902,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
      if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
      setWeekEditDay(null); // FIX button-audit: новая генерация сбрасывает редактирование недели
 
-     // ─── Pro Engine path (MPS-based, professional bodybuilding dietology) ───
-     if (useProEngine) {
+       // ─── Pro Engine path (MPS-based, professional bodybuilding dietology) ───
+      // FIX: «Простой» режим генерирует простой рацион (classic), а не полный pro (MPS/micro/V2-скоринг).
+      if (useProEngine && plannerModeRef.current === 'pro') {
        try {
        const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
        const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
@@ -2121,7 +2170,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             // Работа: окно смены для сдвига обеда/ужина (раньше только классика)
             workStartMin: (()=>{ try{ const [h,m]=(workStartTime||'09:00').split(':').map(Number); return h*60+m; }catch{ return 9*60; }})(),
             workEndMin: (()=>{ try{ const [h,m]=(workEndTime||'18:00').split(':').map(Number); return h*60+m; }catch{ return 18*60; }})(),
-            isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return false; const dow=(new Date().getDay()+6)%7; return !!workDays[(dow+offset)%7]; }catch{ return false; }})(),
+            isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return false; const ws = workScheduleType; if (ws === 'shift_day_night') { return (offset % 4) < 2; } if (typeof ws === 'string' && ws.startsWith('shift_')) { const parts = ws.split('_'); const workLen = parseInt(parts[1]) || 1; const offLen = parseInt(parts[2]) || workLen; const cycleLen = workLen + offLen; const pos = ((offset % cycleLen) + cycleLen) % cycleLen; return pos < workLen; } const dow=(new Date().getDay()+6)%7; return !!workDays[(dow+offset)%7]; }catch{ return false; }})(),
           };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
@@ -2568,12 +2617,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const trainMin = linkToTraining && isTrainingDay ? toMin(trainStart) : 0;
 
       // Work schedule: determine if work day + shift anchors
+      // Work schedule: calendar-aware (dow+offset) for weekly, cycle-aware for shifts
       let isWorkDay = false;
       let workStartMin = 0, workEndMin = 0;
       if (workScheduleEnabled) {
         const ws = workScheduleType;
-        if (ws === 'standard') { isWorkDay = dayOffset < 5; }
-        else if (ws === 'sliding' || ws === 'custom') { isWorkDay = workDays[dayOffset % 7]; }
+        const dow0 = (()=>{ try{ return (new Date().getDay()+6)%7; }catch{ return 0; }})();
+        if (ws === 'standard') { isWorkDay = !!workDays[(dow0 + dayOffset) % 7]; }
+        else if (ws === 'sliding' || ws === 'custom') { isWorkDay = !!workDays[(dow0 + dayOffset) % 7]; }
         else if (ws === 'shift_day_night') {
           const cyclePos = dayOffset % 4;
           isWorkDay = cyclePos < 2;
