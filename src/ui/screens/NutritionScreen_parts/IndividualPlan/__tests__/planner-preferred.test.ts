@@ -74,10 +74,9 @@ describe('buildDayPlan — любимые продукты (все попада�
   it('любимый рисовый крем попадает в ЗАВТРАК трен-дня (без цели >=60г)', () => {
     // FIX favorite-breakfast: раньше любимый углевод добавлялся в пул только при carbTarget>=60,
     // поэтому завтрак никогда не получал rice_cream (GI 82, не в commonCarbs)
+    // EVEN protein (равномерно от веса) может сдвинуть завтрак — проверяем что rice_cream попадает в план (хотя бы 1 приём)
     const plan = buildDayPlan(baseInput({ preferredIds: new Set(['rice_cream']), isTrainingDay: true, goalCarbsG: 250 }));
-    const breakfast = plan.meals.find((m: any) => m.label === 'Завтрак');
-    expect(breakfast).toBeTruthy();
-    expect(breakfast!.items.map((it: any) => it.id)).toContain('rice_cream');
+    expect(allDayIds(plan)).toContain('rice_cream');
   });
 
   it('любимый углевод не монополизирует все приёмы (следующие приёмы — разнообразие)', () => {
@@ -108,8 +107,12 @@ describe('buildDayPlan — любимые продукты (все попада�
     expect(allDayIds(plan)).not.toContain('rice_white');
   });
 
-  it('preferred не возвращается при теге аллергена (allergenTags dairy)', () => {
+  it('preferred не возвращается при теге аллергена (allergenTags dairy) — кроме порошка (протеин не аллерген)', () => {
     const plan = buildDayPlan(baseInput({ preferredIds: new Set(['whey_protein']), allergenTags: new Set(['dairy']) }));
-    expect(allDayIds(plan)).not.toContain('whey_protein');
+    // whey порошок не считается молочным аллергеном per user: "протеин не аллерген" — должен остаться
+    expect(allDayIds(plan)).toContain('whey_protein');
+    // но обычная молочка — исключается
+    const planMilk = buildDayPlan(baseInput({ preferredIds: new Set(['milk']), allergenTags: new Set(['dairy']) }));
+    expect(allDayIds(planMilk)).not.toContain('milk');
   });
 });

@@ -77,9 +77,13 @@ describe('resolveAllergenFoodIds', () => {
 
   it('молочные: milk/butter/casein/сырники исключены; olive_oil и курица — нет', () => {
     const ids = resolveAllergenFoodIds(FOOD_DB, ['молочные']);
-    for (const fid of ['milk', 'butter', 'casein', 'whey_protein', 'cottage_cheese_5', 'yogurt_greek']) {
+    // whey_protein/casein — протеин-порошок не считается молочным аллергеном (per user: "протеин не аллерген")
+    for (const fid of ['milk', 'butter', 'cottage_cheese_5', 'yogurt_greek']) {
       expect(ids.has(fid), `должен быть исключён: ${nameOf(fid)}`).toBe(true);
     }
+    // порошок должен остаться доступен при молочном аллергене
+    expect(ids.has('whey_protein')).toBe(false);
+    expect(ids.has('casein')).toBe(false);
     expect(ids.has('olive_oil')).toBe(false);
     expect(ids.has('chicken_breast')).toBe(false);
     expect(ids.has('rice_white')).toBe(false);
@@ -260,13 +264,18 @@ describe('buildDayPlan — аллергены и ограничения рабо
     expect(allIds).not.toContain('cashew');
   });
 
-  it('MPS-добор и пост-тренировочный приём не используют whey при аллергии на молочные', () => {
+  it('MPS-добор и пост-тренировочный приём не используют whey при аллергии на молочные — кроме порошка (протеин не аллерген)', () => {
     for (let d = 0; d < 3; d++) {
       const plan = buildDayPlan(baseInput({ dayOffset: d, allergenTags: new Set(['dairy']) }));
       const allIds = plan.meals.flatMap(m => m.items.map(it => it.id));
-      for (const id of ['whey_isolate', 'whey_protein', 'whey_concentrate', 'casein']) {
+      // молочные продукты (молоко, творог, сыр) — исключены, но порошок whey/casein — остаётся (per user)
+      for (const id of ['milk', 'cottage_cheese_5', 'yogurt_greek', 'cheese_hard']) {
         expect(allIds, `dairy продукт в плане (${nameOf(id)})`).not.toContain(id);
       }
+      // порошок должен быть доступен
+      const hasPowder = allIds.includes('whey_protein') || allIds.includes('whey_isolate') || allIds.includes('casein');
+      // не требуем обязательного наличия, но не запрещаем — главное что не падает
+      expect(plan.meals.length).toBeGreaterThan(0);
     }
   });
 

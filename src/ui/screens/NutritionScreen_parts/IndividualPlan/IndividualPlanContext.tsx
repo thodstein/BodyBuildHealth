@@ -1156,8 +1156,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setUndoStack(prev => prev.slice(1));
   };
 
-  const calcItemTotals = (items: any[]) => ({ kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0), p: items.reduce((s: number, i: any) => s + (i.p || 0), 0), f: items.reduce((s: number, i: any) => s + (i.f || 0), 0), c: items.reduce((s: number, i: any) => s + (i.c || 0), 0), fiber: items.reduce((s: number, i: any) => s + (i.fiber || 0), 0) });
-  const calcMealTotals = (meals: any[]) => ({ kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0) });
+  const calcItemTotals = (items: any[]) => ({ kcal: items.reduce((s: number, i: any) => s + (i.kcal || 0), 0), p: items.reduce((s: number, i: any) => s + (i.p || 0), 0), f: items.reduce((s: number, i: any) => s + (i.f || 0), 0), c: items.reduce((s: number, i: any) => s + (i.c || 0), 0), fiber: items.reduce((s: number, i: any) => s + (i.fiber || 0), 0), leucine_mg: items.reduce((s: number, i: any) => s + (i.leucine_mg || 0), 0) });
+  const calcMealTotals = (meals: any[]) => ({ kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0), leucine_mg: meals.reduce((s: number, m: any) => s + (m.totals?.leucine_mg || 0), 0) });
   const updateMealsInPlan = (prev: any, mealIdx: number, itemsUpdater: (items: any[]) => any[]) => {
     if (!prev) return prev;
     const meals = [...prev.meals];
@@ -1171,7 +1171,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const updated = updateMealsInPlan(days[dayIdx], mealIdx, itemsUpdater);
     if (!updated) return;
     days[dayIdx] = updated;
-    const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+    const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0), fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0), leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0) };
     // P1-fix: используем функциональные updaters вместо сравнения ссылок (===).
     // Раньше `plan === threeDayPlan` сравнивал closure-captured ссылку с текущим state,
     // что могло дать false и тихо потерять правки. Теперь определяем тип плана по
@@ -1199,8 +1199,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (!item) return prev;
         if (!meals[toMealIdx]) return prev;
         meals[toMealIdx].items.push(item);
-        meals.forEach((m: any, i: number) => { meals[i] = { ...m, totals: { kcal: m.items.reduce((s: number, it: any) => s + it.kcal, 0), p: m.items.reduce((s: number, it: any) => s + it.p, 0), f: m.items.reduce((s: number, it: any) => s + it.f, 0), c: m.items.reduce((s: number, it: any) => s + it.c, 0), fiber: m.items.reduce((s: number, it: any) => s + (it.fiber || 0), 0) } }; });
-        const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0) };
+        meals.forEach((m: any, i: number) => { meals[i] = { ...m, totals: { kcal: m.items.reduce((s: number, it: any) => s + it.kcal, 0), p: m.items.reduce((s: number, it: any) => s + it.p, 0), f: m.items.reduce((s: number, it: any) => s + it.f, 0), c: m.items.reduce((s: number, it: any) => s + it.c, 0), fiber: m.items.reduce((s: number, it: any) => s + (it.fiber || 0), 0), leucine_mg: m.items.reduce((s: number, it: any) => s + (it.leucine_mg || 0), 0) } }; });
+        const totals = { kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0), p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0), f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0), c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0), fiber: meals.reduce((s: number, m: any) => s + (m.totals?.fiber || 0), 0), leucine_mg: meals.reduce((s: number, m: any) => s + (m.totals?.leucine_mg || 0), 0) };
         return { ...prev, meals, totals };
       });
       if (weekEditDay !== null && weekPlan?.days?.[weekEditDay] && dayIdx === 0) {
@@ -1245,7 +1245,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (!prev?.days?.[resolved.day]) return prev;
         const days = [...prev.days];
         days[resolved.day] = { ...days[resolved.day], meals: finalMeals, totals };
-        const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+        const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0), fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0), leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0) };
         return { ...prev, days, totals: allTotals };
       });
     } else if (resolved.plan === 'week') {
@@ -1271,7 +1271,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (!prev?.days?.[resolved.day]) return prev;
         const days = [...prev.days];
         days[resolved.day] = { ...days[resolved.day], meals: finalMeals, totals };
-        const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0) };
+        const allTotals = { kcal: days.reduce((s: number, d: any) => s + (d.totals?.kcal || 0), 0), p: days.reduce((s: number, d: any) => s + (d.totals?.p || 0), 0), f: days.reduce((s: number, d: any) => s + (d.totals?.f || 0), 0), c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0), fiber: days.reduce((s: number, d: any) => s + (d.totals?.fiber || 0), 0), leucine_mg: days.reduce((s: number, d: any) => s + (d.totals?.leucine_mg || 0), 0) };
         return { ...prev, days, totals: allTotals };
       });
     }
@@ -1347,15 +1347,28 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
   };
 
-  // FIX button-audit: быстрый «+ Продукт» в любом дне плана (раньше всегда правил dayPlan)
+  // FIX per100 + dedup: честный per100 расчёт + защита от дубля (две каши)
   const addFoodToMeal = (dayIdx: number, mealIdx: number, food: any) => {
     if (!food || !food.name) return;
     const resolved = _resolvePlanDay(dayIdx);
     if (!resolved) return;
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
     if (!dayData?.meals?.[mealIdx]) return;
+    // dedup: тот же id уже в приёме — не плодим дубли, предлагаем изменить граммовку
+    if (dayData.meals[mealIdx].items.some((it: any) => it.id === food.id)) {
+      try { setErrorMsg('Этот продукт уже в приёме — измените граммовку'); setTimeout(() => setErrorMsg(null), 2500); } catch {}
+      return;
+    }
     saveUndo();
-    const item = { name: food.name, id: food.id, amount: 100, kcal: food.kcal || 0, p: food.protein || 0, f: food.fat || 0, c: food.carbs || 0, fiber: food.fiber || 0 };
+    // per100 invariant: граммы из servingSize (30г для порошка) или 100г, spice ≤10г
+    let grams = parseServingSizeGrams(food.servingSize);
+    if (!grams || !Number.isFinite(grams) || grams <= 0) grams = 100;
+    // spice/other limit 10г (корица 247ккал/100г → 37г абсурд)
+    if (food.category === 'other' && grams > 10) grams = 10;
+    if (food.id && String(food.id).startsWith('spice_') && grams > 10) grams = 10;
+    const ratio = grams / 100;
+    const leuPer100 = (food as any).amino_acid_profile_100g?.leucine_mg ?? (food.micros?.Leucine != null ? (food.micros.Leucine as number) : Math.round((food.protein || 0) * 75));
+    const item = { name: food.name, id: food.id, amount: grams, kcal: Math.round((food.kcal || 0) * ratio), p: Math.round((food.protein || 0) * ratio * 10) / 10, f: Math.round((food.fat || 0) * ratio * 10) / 10, c: Math.round((food.carbs || 0) * ratio * 10) / 10, fiber: Math.round((food.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
     if (resolved.plan === 'day') {
       _applyDayPlanMealUpdate(mealIdx, items => [...items, item]);
     } else if (resolved.plan === 'three') {
@@ -1396,8 +1409,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) return;
     saveUndo();
-    const old = dayData.meals[mealIdx].items[itemIdx]; const portion = (old.amount || 100) / 100;
-    const replacement = { ...old, name: newFood.name, id: newFood.id, kcal: Math.round(newFood.kcal * portion), p: Math.round(newFood.protein * portion), f: Math.round(newFood.fat * portion), c: Math.round(newFood.carbs * portion), fiber: Math.round((newFood.fiber || 0) * portion), amount: Math.round(portion * (parseServingSizeGrams(newFood.servingSize) || 100)) };
+    const old = dayData.meals[mealIdx].items[itemIdx];
+    // per100 invariant: сохраняем граммы старого приёма (не servingSize нового), пересчитываем КБЖУ честно per100
+    let grams = old.amount || 100;
+    if (newFood.category === 'other' && grams > 10) grams = 10;
+    if (newFood.id && String(newFood.id).startsWith('spice_') && grams > 10) grams = 10;
+    const ratio = grams / 100;
+    const leuPer100 = (newFood as any).amino_acid_profile_100g?.leucine_mg ?? (newFood.micros?.Leucine != null ? (newFood.micros.Leucine as number) : Math.round((newFood.protein || 0) * 75));
+    const replacement = { ...old, name: newFood.name, id: newFood.id, amount: grams, kcal: Math.round((newFood.kcal || 0) * ratio), p: Math.round((newFood.protein || 0) * ratio * 10) / 10, f: Math.round((newFood.fat || 0) * ratio * 10) / 10, c: Math.round((newFood.carbs || 0) * ratio * 10) / 10, fiber: Math.round((newFood.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
     if (resolved.plan === 'day') {
       _applyDayPlanMealUpdate(mealIdx, items => { items[itemIdx] = replacement; return items; });
     } else if (resolved.plan === 'three') {
@@ -1414,9 +1433,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
     if (!dayData?.meals?.[mealIdx]?.items?.[itemIdx]) { setEditItem(null); return; }
     const it = dayData.meals[mealIdx].items[itemIdx];
-    const amt = Math.max(1, newAmount);
+    // spice hard cap 10г
+    let amt = Math.max(1, newAmount);
+    if (String(it.id || '').startsWith('spice_') && amt > 10) amt = 10;
     const ratio = amt / Math.max(1, it.amount || 1);
-    const scaled = { ...it, amount: amt, kcal: Math.round((it.kcal || 0) * ratio), p: Math.round((it.p || 0) * ratio), f: Math.round((it.f || 0) * ratio), c: Math.round((it.c || 0) * ratio), fiber: Math.round((it.fiber || 0) * ratio) };
+    const scaled = { ...it, amount: amt, kcal: Math.round((it.kcal || 0) * ratio), p: Math.round((it.p || 0) * ratio), f: Math.round((it.f || 0) * ratio), c: Math.round((it.c || 0) * ratio), fiber: Math.round((it.fiber || 0) * ratio), leucine_mg: Math.round((it.leucine_mg || 0) * ratio) };
     if (resolved.plan === 'day') {
       _applyDayPlanMealUpdate(mealIdx, items => { items[itemIdx] = scaled; return items; });
     } else if (resolved.plan === 'three') {

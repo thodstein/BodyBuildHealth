@@ -39,7 +39,8 @@ export const USER_ALLERGEN_TO_TAGS: Record<string, string[]> = {
 export function allergenTextMatches(allergenId: string, foodName: string): boolean {
   const n = (foodName || '').toLowerCase();
   if (allergenId === 'лактоза' || allergenId === 'молочные') {
-    return /молок|сыр|творог|кефир|сливк|йогурт|сметан|морожен|сывороточ|whey|casein|лактоз/.test(n);
+    // whey/casein порошок (сывороточный) — не считается молочным аллергеном per user: "протеин не аллерген"
+    return /молок|сыр|творог|кефир|сливк|йогурт|сметан|морожен|лактоз/.test(n);
   }
   if (allergenId === 'глютен') {
     return /пшениц|мук|хлеб|макарон|пельмен|вареник|пицц|лаваш|булгур|кускус|манк|паниров|сухар|кляр|тест|блин|олад|круасс|багет|чиабат|лепёш|торт|пирож|пончик|печенье|крекер|вафл|глютен/.test(n);
@@ -167,6 +168,9 @@ export function resolveAllExcludedFoodIds(foods: FoodItem[], allergens: string[]
   if (extraTags.length > 0) {
     const tagToAllergen: Record<string, string> = { dairy: 'молочные', gluten: 'глютен' };
     for (const food of foods) {
+      const diet = FOOD_ALLERGEN_DIET[food.id];
+      // no_dairy diet excludes all non-dairyFree (including whey порошок) even if allergen "молочные" doesn't
+      if (extraTags.includes('dairy') && diet && diet.isDairyFree === false) { result.add(food.id); continue; }
       const tags = getFoodAllergenTags(food.id, foods);
       if (extraTags.some(t => tags.includes(t))) { result.add(food.id); continue; }
       for (const t of extraTags) {

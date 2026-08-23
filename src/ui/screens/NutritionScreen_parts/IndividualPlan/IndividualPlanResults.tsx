@@ -164,14 +164,14 @@ export const IndividualPlanResults: React.FC = () => {
         const lowCarbFoods = FOOD_DB.filter(f => f.carbs < 10 && f.protein > 15 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Углеводы ${f.carbs}г/100г, белок ${f.protein}г/100г` }));
         if (lowCarbFoods.length > 0) issues.push({ type: 'high_carb', text: `🍚 Много углеводов (${totalC}г) на сушке`, severity: 'high', suggestion: lowCarbFoods });
       }
-      // Missing mTOR trigger
+      // Missing mTOR trigger — per100 invariant: leucine_mg per100 via AA profile or 75*protein (научно 75-85, было 42 занижало на 44%)
       const totalLeucine = products.reduce((s: number, p: any) => {
-        const leucineMg = p.food?.amino_acid_profile_100g?.leucine_mg;
-        const fallbackLeucine = p.food?.protein ? p.food.protein * 42 : 0;
+        const leucineMg = p.food?.amino_acid_profile_100g?.leucine_mg ?? p.food?.micros?.Leucine;
+        const fallbackLeucine = p.food?.protein ? Math.round(p.food.protein * 75) : 0;
         return s + (leucineMg ?? fallbackLeucine) * (p.amount || 100) / 100;
       }, 0);
       if (totalLeucine < 3000 && totalLeucine > 0) {
-        const getLeucine = (f: any) => f.amino_acid_profile_100g?.leucine_mg ?? (f.protein ? f.protein * 42 : 0);
+        const getLeucine = (f: any) => f.amino_acid_profile_100g?.leucine_mg ?? f.micros?.Leucine ?? (f.protein ? Math.round(f.protein * 75) : 0);
         const leucineFoods = FOOD_DB.filter(f => getLeucine(f) > 250 && !currentFoodIds.has(f.id) && !isFoodBlocked(f.id)).sort((a, b) => getLeucine(b) - getLeucine(a)).slice(0, 3).map(f => ({ foodId: f.id, name: f.name, reason: `Лейцин ${Math.round(getLeucine(f))}мг/100г` }));
         if (leucineFoods.length > 0) issues.push({ type: 'low_leucine', text: `🧬 Нет лейцинового триггера (${Math.round(totalLeucine)}мг)`, severity: 'high', suggestion: leucineFoods });
       }

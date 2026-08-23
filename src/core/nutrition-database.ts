@@ -1,5 +1,19 @@
 import { FOOD_DB_SUPPLEMENT } from './nutrition-database-supplement';
 
+/**
+ * ИНВАРИАНТ per100 — ЕДИНСТВЕННОЕ ПРАВИЛО КБЖУ
+ * ─────────────────────────────────────────────
+ * Все FoodItem хранят КБЖУ на 100 г съедобной части в ЯВНО указанном виде:
+ *  - 'cooked' = готовый продукт (варёный/запечённый): рис белый 130/28/100г готового, гречка 110/20/100г готового, курица 165/31/100г готового
+ *  - 'dry' = сухой/сыпучий (крупа сухая): рис сухой ~360/80/100г сухого, овсяные хлопья сухие 370/83/100г сухого
+ *  - 'raw' = сырой (мясо сырое, овощи сырые): говядина сырая 215/23/100г сырого
+ *  - 'powder' = порошок/концентрат: whey 400/80/100г порошка
+ *  - 'liquid' = жидкость: молоко 52/3/100г (мл≈г), кефир 40/3/100г
+ *  - 'as_is' = как есть (фрукт, орех): банан 89/1/100г как есть
+ * servingSize — только ПОДСКАЗКА порции отображения ("1 шт (60г)", "30 г", "200 мл"), НЕ меняет per100!
+ * Любой расчёт: kcal = kcal_per100 * grams/100. Никаких perServing записей.
+ * При добавлении нового продукта ОБЯЗАТЕЛЬНО указывать foodState и per100 значения.
+ */
 export interface FoodItem {
   id: string;
   name: string;
@@ -11,6 +25,8 @@ export interface FoodItem {
   fiber: number;
   gi: number;
   servingSize: string;
+  /** Вид продукта для per100: cooked/dry/raw/powder/liquid/as_is — отображается на карточке "100г готового/сухого" */
+  foodState?: 'raw' | 'cooked' | 'dry' | 'powder' | 'liquid' | 'as_is';
   description?: string;
   bestFor?: string[];
   timing?: string;
@@ -372,14 +388,14 @@ export const FOOD_DB: FoodItem[] = [
     description: 'Средний — нежирная свинина, богата тиамином (B1), цинком. Хорошая альтернатива курице.',
     bestFor: ['bulk', 'maintenance'], timing: 'lunch', pharmaNote: 'B1 поддерживает нервную систему при курсе ААС', tier: 'mid',
     micros: { Ca: 6, Fe: 0.9, Mg: 28, P: 230, K: 370, Na: 52, Zn: 2.4, Se: 33, VitB1: 0.9, VitB6: 0.5, VitB12: 0.6 } },
-  { id: 'whey_protein', name: 'Протеин сывороточный (1 скуп)', category: 'protein', kcal: 120, protein: 24, fat: 1.5, carbs: 2, fiber: 0, gi: 15, servingSize: '30 г',
-    description: 'Базовая добавка — быстрый аминокислотный пик через 30 мин. Leucine 2.5 г — триггер mTOR для синтеза мышц.',
+  { id: 'whey_protein', name: 'Протеин сывороточный (1 скуп)', category: 'supplement', kcal: 400, protein: 80, fat: 5, carbs: 6.7, fiber: 0, gi: 15, servingSize: '30 г', foodState: 'powder',
+    description: 'Базовая добавка — быстрый аминокислотный пик через 30 мин. Leucine 2.5 г — триггер mTOR для синтеза мышц. per100 порошка.',
     bestFor: ['bulk', 'cut', 'recomp', 'strength'], timing: 'after_train', pharmaNote: 'Усвоение ускоряется при приёме с углеводами', tier: 'basic',
-    micros: { Ca: 267, Fe: 1.0, Mg: 133, P: 533, K: 500, Na: 667, Zn: 5.0, VitB2: 0.67 } },
-  { id: 'casein', name: 'Казеин', category: 'protein', kcal: 110, protein: 22, fat: 1, carbs: 3, fiber: 0, gi: 10, servingSize: '30 г',
-    description: 'Медленный белок — аминокислотный поток 6-8 часов. Защита мышц ночью, анти-катаболизм.',
+    micros: { Ca: 890, Fe: 3.3, Mg: 443, P: 1777, K: 1667, Na: 2223, Zn: 16.7, VitB2: 2.23 } },
+  { id: 'casein', name: 'Казеин', category: 'supplement', kcal: 367, protein: 73.3, fat: 3.3, carbs: 10, fiber: 0, gi: 10, servingSize: '30 г', foodState: 'powder',
+    description: 'Медленный белок — аминокислотный поток 6-8 часов. Защита мышц ночью, анти-катаболизм. per100 порошка.',
     bestFor: ['cut', 'maintenance', 'recomp'], timing: 'before_sleep', pharmaNote: 'Замедляет всасывание — избегать одновременно с препаратами, требующими быстрого действия', tier: 'mid',
-    micros: { Ca: 267, Fe: 0.33, Mg: 53, P: 567, K: 333, Na: 500, Zn: 1.33 } },
+    micros: { Ca: 890, Fe: 1.1, Mg: 177, P: 1890, K: 1110, Na: 1667, Zn: 4.43 } },
 
   { id: 'rice_white', name: 'Рис белый (вареный)', category: 'grain', kcal: 130, protein: 2.7, fat: 0.3, carbs: 28, fiber: 0.4, gi: 73, servingSize: '100 г',
     description: 'Базовый углевод — быстро усваивается, высокий GI. Идеален после тренировки для восстановления гликогена.',
@@ -1639,6 +1655,46 @@ export const FOOD_DB: FoodItem[] = [
 // ─── Merge supplement (510 products) into FOOD_DB ───
 (FOOD_DB as FoodItem[]).push(...FOOD_DB_SUPPLEMENT);
 
+// ─── per100 invariant: auto-fill foodState if missing ───────────────────────
+/** Возвращает подпись вида "100г готового/сухого/сырого/порошка" */
+export function foodStateLabel(s?: FoodItem['foodState']): string {
+  switch (s) {
+    case 'cooked': return '100г готового';
+    case 'dry': return '100г сухого';
+    case 'raw': return '100г сырого';
+    case 'powder': return '100г порошка';
+    case 'liquid': return '100г (мл)';
+    case 'as_is': return '100г как есть';
+    default: return '100г';
+  }
+}
+(function fillFoodState() {
+  for (const f of FOOD_DB as FoodItem[]) {
+    if (f.foodState) continue;
+    const id = (f.id || '').toLowerCase();
+    const cat = f.category;
+    // powder supplements
+    if (cat === 'supplement' && (f.protein > 50 || id.includes('whey') || id.includes('casein') || id.includes('creatine') || id.includes('protein') || id.includes('mass') || id.includes('collagen') || id.includes('pept'))) {
+      f.foodState = 'powder'; continue;
+    }
+    if (cat === 'supplement' && f.kcal < 30) { f.foodState = 'powder'; continue; }
+    if (cat === 'grain') {
+      // dry grains high kcal density >300 vs cooked ~80-130
+      if (f.kcal >= 300) f.foodState = 'dry';
+      else f.foodState = 'cooked';
+      continue;
+    }
+    if (cat === 'protein') { f.foodState = 'cooked'; continue; }
+    if (cat === 'dairy' || cat === 'carb') {
+      if (id.includes('milk') || id.includes('kefir') || id.includes('yogurt') || id.includes('ryazhen') || id.includes('ayran') || id.includes('cream') || id.includes('drink')) f.foodState = 'liquid';
+      else f.foodState = 'as_is';
+      continue;
+    }
+    if (cat === 'fat' || cat === 'veg_fruit' || cat === 'other' || cat === 'fast_food') { f.foodState = 'as_is'; continue; }
+    f.foodState = 'as_is';
+  }
+})();
+
 export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetarian: boolean; isVegan: boolean; isGlutenFree: boolean; isDairyFree: boolean; dietTags: string[] }> = {
   chicken_breast: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   turkey_breast: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
@@ -1648,8 +1704,8 @@ export const FOOD_ALLERGEN_DIET: Record<string, { allergens: string[]; isVegetar
   egg_whole: { allergens: ['eggs'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   egg_white: { allergens: ['eggs'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto'] },
   pork_tenderloin: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
-  whey_protein: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
-  casein: { allergens: ['dairy'], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  whey_protein: { allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
+  casein: { allergens: [], isVegetarian: true, isVegan: false, isGlutenFree: true, isDairyFree: false, dietTags: ['keto'] },
   chicken_thigh: { allergens: [], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   shrimp: { allergens: ['shellfish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo'] },
   tuna_steak: { allergens: ['fish'], isVegetarian: false, isVegan: false, isGlutenFree: true, isDairyFree: true, dietTags: ['keto', 'paleo', 'mediterranean'] },

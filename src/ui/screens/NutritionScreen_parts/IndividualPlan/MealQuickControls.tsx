@@ -228,20 +228,25 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     const itemIdx = popup.selectedItemIdx;
     const oldItem = dayPlan?.meals?.[mealIdx]?.items?.[itemIdx];
     if (!oldItem) { closePopup(); return; }
-    const portion = (oldItem.amount || 100) / 100;
+    // per100 invariant: сохраняем граммы старого приёма, пересчитываем КБЖУ честно per100; spice ≤10г
+    let grams = oldItem.amount || 100;
+    const newFood = FOOD_DB.find((x: any) => x.id === (food.id || food.foodId)) || food;
+    if ((newFood as any).category === 'other' && grams > 10) grams = 10;
+    if (newFood.id && String(newFood.id).startsWith('spice_') && grams > 10) grams = 10;
+    const ratio = grams / 100;
+    const leuPer100 = (newFood as any).amino_acid_profile_100g?.leucine_mg ?? ((newFood as any).micros?.Leucine != null ? (newFood as any).micros.Leucine as number : Math.round(((newFood as any).protein ?? (newFood as any).p ?? 0) * 75));
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
         if (mi !== mealIdx) return m;
         const items = m.items.map((it: any, ii: number) => {
           if (ii !== itemIdx) return it;
-          const newFood = FOOD_DB.find((x: any) => x.id === (food.id || food.foodId)) || food;
-          return { ...it, name: newFood.name || food.foodName, id: newFood.id || food.foodId, kcal: Math.round((newFood.kcal || 0) * portion), p: Math.round((newFood.protein ?? newFood.p ?? 0) * portion), f: Math.round((newFood.fat ?? newFood.f ?? 0) * portion), c: Math.round((newFood.carbs ?? newFood.c ?? 0) * portion), amount: Math.round(portion * (parseServingSizeGrams(newFood.servingSize) || 100)) };
+          return { ...it, name: newFood.name || food.foodName, id: newFood.id || food.foodId, amount: grams, kcal: Math.round(((newFood as any).kcal || 0) * ratio), p: Math.round(((newFood as any).protein ?? (newFood as any).p ?? 0) * ratio * 10) / 10, f: Math.round(((newFood as any).fat ?? (newFood as any).f ?? 0) * ratio * 10) / 10, c: Math.round(((newFood as any).carbs ?? (newFood as any).c ?? 0) * ratio * 10) / 10, fiber: Math.round(((newFood as any).fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
         });
-        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
+        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0), fiber: items.reduce((s: number, x: any) => s + (x.fiber || 0), 0), leucine_mg: items.reduce((s: number, x: any) => s + (x.leucine_mg || 0), 0) };
         return { ...m, items, totals };
       });
-      const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) };
+      const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0), fiber: meals2.reduce((s: number, m2: any) => s + (m2.totals?.fiber || 0), 0), leucine_mg: meals2.reduce((s: number, m2: any) => s + (m2.totals?.leucine_mg || 0), 0) };
       return { ...prev, meals: meals2, totals };
     });
     closePopup();
@@ -250,12 +255,13 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
   const doUpdateWeight = () => {
     if (!popup || popup.selectedMealIdx === undefined || popup.selectedItemIdx === undefined || !popup.editWeight) return;
     saveUndo();
-    // P0-3: санитизация граммовки на границе UI (зеркалит safeWeight движка) —
-    // NaN/0/отрицательное не должны обнулять/инвертировать макросы приёма.
-    const w = Number.isFinite(popup.editWeight) && popup.editWeight > 0
+    let w = Number.isFinite(popup.editWeight) && popup.editWeight > 0
       ? Math.round(Math.min(2000, Math.max(10, popup.editWeight)))
       : 0;
     if (w <= 0) { closePopup(); return; }
+    // spice hard cap 10г
+    const curItem = dayPlan?.meals?.[popup.selectedMealIdx]?.items?.[popup.selectedItemIdx];
+    if (curItem && String(curItem.id || '').startsWith('spice_') && w > 10) w = 10;
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
@@ -263,12 +269,12 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
         const items = m.items.map((it: any, ii: number) => {
           if (ii !== popup.selectedItemIdx) return it;
           const ratio = w / (it.amount || 100);
-          return { ...it, amount: w, kcal: Math.round((it.kcal || 0) * ratio), p: Math.round((it.p || 0) * ratio * 10) / 10, f: Math.round((it.f || 0) * ratio * 10) / 10, c: Math.round((it.c || 0) * ratio * 10) / 10 };
+          return { ...it, amount: w, kcal: Math.round((it.kcal || 0) * ratio), p: Math.round((it.p || 0) * ratio * 10) / 10, f: Math.round((it.f || 0) * ratio * 10) / 10, c: Math.round((it.c || 0) * ratio * 10) / 10, fiber: Math.round((it.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round((it.leucine_mg || 0) * ratio) };
         });
-        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
+        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0), fiber: items.reduce((s: number, x: any) => s + (x.fiber || 0), 0), leucine_mg: items.reduce((s: number, x: any) => s + (x.leucine_mg || 0), 0) };
         return { ...m, items, totals };
       });
-      const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) };
+      const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0), fiber: meals2.reduce((s: number, m2: any) => s + (m2.totals?.fiber || 0), 0), leucine_mg: meals2.reduce((s: number, m2: any) => s + (m2.totals?.leucine_mg || 0), 0) };
       return { ...prev, meals: meals2, totals };
     });
     closePopup();
@@ -276,18 +282,24 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
 
   const doAddProduct = (result: KbjuMatchResult) => {
     if (!popup || popup.selectedMealIdx === undefined) return;
+    const mealIdx = popup.selectedMealIdx;
+    // dedup: две каши в один приём — запрет
+    if (dayPlan?.meals?.[mealIdx]?.items?.some((it: any) => it.id === result.foodId)) return;
     saveUndo();
     const food = FOOD_DB.find(f => f.id === result.foodId);
-    const amount = parseServingSizeGrams(food?.servingSize) || 100;
+    let amount = parseServingSizeGrams(food?.servingSize) || 100;
+    if ((food as any)?.category === 'other' && amount > 10) amount = 10;
+    if (food?.id && String(food.id).startsWith('spice_') && amount > 10) amount = 10;
+    const leuPer100 = (food as any)?.amino_acid_profile_100g?.leucine_mg ?? ((food as any)?.micros?.Leucine != null ? (food as any).micros.Leucine as number : Math.round(((food as any)?.protein || result.protein || 0) * 75));
     setDayPlan((prev: any) => {
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
-        if (mi !== popup.selectedMealIdx) return m;
-        const items = [...m.items, { name: result.foodName, id: result.foodId, amount, kcal: Math.round(result.kcal * amount / 100), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10 }];
-        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0) };
+        if (mi !== mealIdx) return m;
+        const items = [...m.items, { name: result.foodName, id: result.foodId, amount, kcal: Math.round(result.kcal * amount / 100), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10, fiber: Math.round((result.fiber || 0) * amount / 100 * 10) / 10, leucine_mg: Math.round(leuPer100 * amount / 100) }];
+        const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0), fiber: items.reduce((s: number, x: any) => s + (x.fiber || 0), 0), leucine_mg: items.reduce((s: number, x: any) => s + (x.leucine_mg || 0), 0) };
         return { ...m, items, totals };
       });
-      const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) };
+      const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0), fiber: meals2.reduce((s: number, m2: any) => s + (m2.totals?.fiber || 0), 0), leucine_mg: meals2.reduce((s: number, m2: any) => s + (m2.totals?.leucine_mg || 0), 0) };
       return { ...prev, meals: meals2, totals };
     });
     setPopup({ ...popup, step: 'search_product', searchQuery: '', searchResults: [], scoredResults: [] });

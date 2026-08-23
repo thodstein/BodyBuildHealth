@@ -61,6 +61,10 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
     const pKcalPct = totalKcal > 0 ? (totalP * 4 / totalKcal) * 100 : 0; const fKcalPct = totalKcal > 0 ? (totalF * 9 / totalKcal) * 100 : 0; const cKcalPct = totalKcal > 0 ? (totalC * 4 / totalKcal) * 100 : 0;
     return (
       <div>
+        {/* ИНВАРИАНТ per100 — обязательно сверху плана */}
+        <div style={{marginBottom:8,padding:'8px 10px',borderRadius:10,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.18)',fontSize:8,color:'rgba(255,255,255,0.85)',lineHeight:1.4}}>
+          <span style={{fontWeight:800,color:'#00e68a'}}>ⓘ per100</span> — все КБЖУ на <b>100г съедобной части в указанном виде</b>: <span style={{color:'#00e68a'}}>готовый</span> (варёный/запечённый 100г готового), <span style={{color:'#f59e0b'}}>сухой</span> (крупа 100г сухого), <span style={{color:'#a78bfa'}}>порошок</span> (whey 100г порошка), <span style={{color:'#60a5fa'}}>как есть</span> (фрукт/орех). `КБЖУ_порции = per100 × граммы/100`. Граммы в плане — честный вес в этом виде.
+        </div>
         <div style={{marginBottom:10,borderRadius:12,overflow:'hidden',border:d.isTrainingDay?'1px solid rgba(0,230,138,0.2)':'1px solid rgba(255,255,255,0.06)'}}>
           <div style={{padding:'10px 12px',background:d.isTrainingDay?'linear-gradient(135deg, rgba(0,230,138,0.1), rgba(0,200,160,0.03))':'#202023'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>

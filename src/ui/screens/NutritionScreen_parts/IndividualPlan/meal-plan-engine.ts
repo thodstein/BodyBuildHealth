@@ -1673,10 +1673,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const prewMin = trainWindow ? (input.trainStartMin || 0) - 90 : NaN;
   const postwMin = trainWindow ? (input.trainStartMin || 0) + _sessionMin + 30 : NaN;
   // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
-  // Apply plan type multipliers (keto: low carb high fat, highcarb: high carb, etc.)
-  const adjustedCarbsG = Math.round(input.goalCarbsG * ptm.cMult);
-  const adjustedFatG = Math.round(input.goalFatG * ptm.fMult);
-  const adjustedProteinG = Math.round(input.goalProteinG * ptm.pMult);
+  // planType теперь только фильтр пулов (не множитель КБЖУ) — карточка = план; labAdj остаётся
+  const labC = labAdj.macroAdjustments.carbMult || 1.0;
+  const labF = labAdj.macroAdjustments.fatMult || 1.0;
+  const labP = labAdj.macroAdjustments.proteinMult || 1.0;
+  const adjustedCarbsG = Math.round(input.goalCarbsG * labC);
+  const adjustedFatG = Math.round(input.goalFatG * labF);
+  const adjustedProteinG = Math.round(input.goalProteinG * labP);
   // Д-7: Detect physiologically-impossible kcal goals (below protein + min fat/carb floors).
   // When impossible, lower the fat/carb floors toward safe minimums so the plan gets as close
   // to the user's goal as possible WITHOUT sacrificing protein (protein is always preserved).
@@ -1798,20 +1801,37 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const _strictLowGi = pool.carbSlow.filter((f: FoodItem) => (f.gi || 0) <= 50);
     if (_strictLowGi.length >= 3) pool.carbSlow = [..._strictLowGi];
   }
+  // ИНВАРИАНТ БЕЛКА — равномерно от веса: protein = weightKg * gPerKg → делится ПОРОВНУ по основным приёмам
+  // (peri pre/post — фиксированные 25/35 как часть общего пула, остаток делится поровну по regular)
+  const regularCount = _regular.length;
+  const periProteinFixed = trainWindow ? (PREW_PROTEIN_G + POSTW_FAST_PROTEIN_G) : 0;
+  const evenRegularP = (() => {
+    if (regularCount === 0) return 0;
+    if (trainWindow) {
+      const rem = Math.max(0, (adjustedProteinG || input.goalProteinG) - periProteinFixed);
+      return Math.max(20, Math.round(rem / regularCount));
+    }
+    return Math.max(20, Math.round((adjustedProteinG || input.goalProteinG) / Math.max(1, regularCount)));
+  })();
   const mealBudget = {
-    breakfast: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: breakC, f: Math.round(fatTotal * 0.20) },
-    lunch: { p: Math.max(20, Math.round(mpsPerMeal * 1.2)), c: lunchC, f: Math.round(fatTotal * 0.15) },
+    breakfast: { p: evenRegularP, c: breakC, f: Math.round(fatTotal * 0.20) },
+    lunch: { p: evenRegularP, c: lunchC, f: Math.round(fatTotal * 0.15) },
     // D-28: при «загрузке под утреннюю тренировку» ужин — минимум жиров (≤8 г), много углеводов.
-    dinner: { p: Math.max(20, Math.round(mpsPerMeal * 1.2) - preSleepP), c: dinnerC, f: morningTrainLoad ? Math.min(8, Math.round(fatTotal * 0.08)) : Math.max(8, Math.round(fatTotal * 0.22) - preSleepFatG) },
+    dinner: { p: evenRegularP, c: dinnerC, f: morningTrainLoad ? Math.min(8, Math.round(fatTotal * 0.08)) : Math.max(8, Math.round(fatTotal * 0.22) - preSleepFatG) },
     prew: (_keep.has('prew') && trainWindow) ? { p: PREW_PROTEIN_G, c: prewCarbG, f: PREW_FAT_MAX_G } : null,
     postw: (_keep.has('postw') && trainWindow) ? { p: POSTW_FAST_PROTEIN_G, c: postwCarbG, f: 0 } : null,
-    snack: _keep.has('snack') ? { p: snackP, c: snackC, f: snackF } : null,
-    snack2: _keep.has('snack2') ? { p: snackP, c: snack2C, f: snackF } : null,
-    snack3: _keep.has('snack3') ? { p: snackP, c: snack3C, f: snackF } : null,
-    snack4: _keep.has('snack4') ? { p: snackP, c: snack4C, f: snackF } : null,
+    snack: _keep.has('snack') ? { p: evenRegularP, c: snackC, f: snackF } : null,
+    snack2: _keep.has('snack2') ? { p: evenRegularP, c: snack2C, f: snackF } : null,
+    snack3: _keep.has('snack3') ? { p: evenRegularP, c: snack3C, f: snackF } : null,
+    snack4: _keep.has('snack4') ? { p: evenRegularP, c: snack4C, f: snackF } : null,
   };
+  // preSleep — также равномерно (как часть regular), но если wantPreSleep — он уже в evenRegularP; коррекция не нужна
+  if (_keep.has('preSleep') && wantPreSleep) {
+    // preSleep уже получил evenRegularP как часть regular; если он 0 из-за peri вычета — гарантируем минимум 20г
+    (mealBudget as any).preSleep = { p: evenRegularP, c: 0, f: preSleepFatG };
+  }
 
-  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0) + (mealBudget.snack2?.p || 0) + (mealBudget.snack3?.p || 0) + (mealBudget.snack4?.p || 0);
+  const usedP = mealBudget.breakfast.p + mealBudget.lunch.p + mealBudget.dinner.p + (mealBudget.prew?.p || 0) + (mealBudget.postw?.p || 0) + (mealBudget.snack?.p || 0) + (mealBudget.snack2?.p || 0) + (mealBudget.snack3?.p || 0) + (mealBudget.snack4?.p || 0) + ((mealBudget as any).preSleep?.p || 0);
   const goalProteinTarget = adjustedProteinG || input.goalProteinG;
   let residualP = usedP >= goalProteinTarget ? 0 : Math.max(20, goalProteinTarget - usedP);
   // Если pre-sleep исключён (мало приёмов) — остаток белка распределяется между
@@ -1842,7 +1862,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const rotLabels = [...new Set(mealRotations.map(r => r.label))].join(' / ');
   notes.push(
     `Ротация белка: ${rotLabels} — разные группы в каждый приём`,
-    `MPS per meal: ${Math.max(20, Math.round(mpsPerMeal * 1.2))} г (≈${MPS_LBM_LOW} г/кг LBM), интервал 3–5 ч для синтеза`,
+    `Белок равномерно: ${evenRegularP}г/приём (всего ${adjustedProteinG}г / ${_regular.length} основных${trainWindow ? ` + ${periProteinFixed}г peri` : ''} = ${adjustedProteinG}г, per100 invariant)`,
+    `MPS: ≥25г + лейцин 2.5г/приём, интервал 3–5 ч`,
   );
 
   // 1. Завтрак — белок + медленные углеводы + жиры + ягоды ─────────────
@@ -2051,9 +2072,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   meals.push(dinner);
   markUsed(dinner);
 
-  // 7. Pre-sleep — казеин + Mg + мелатонин ───────────────────────────────
+  // 7. Pre-sleep — казеин + Mg + мелатонин — равномерно (evenRegularP), не 0.7*mps
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, preSleepP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags }) : null;
+  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, evenRegularP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // ─── Этап 4: синхронизация приёмов с инъекциями (инсулин/ГР/ИГФ) ─────
