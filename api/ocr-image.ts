@@ -16,8 +16,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number, stage: string): Promise
 const TESSERACT_WORKER_PATH = require.resolve('tesseract.js/src/worker-script/node/index.js');
 const TESSERACT_CORE_PATH = dirname(require.resolve('tesseract.js-core'));
 const TESSERACT_LANG_PATHS = {
-  rus: join(dirname(require.resolve('@tesseract.js-data/rus')), '4.0.0_best_int'),
-  eng: join(dirname(require.resolve('@tesseract.js-data/eng')), '4.0.0_best_int'),
+  // The full 4.0.0 model is larger but materially better at the small Cyrillic
+  // product labels and right-aligned numbers in FatSecret screenshots.
+  rus: join(dirname(require.resolve('@tesseract.js-data/rus')), '4.0.0'),
+  eng: join(dirname(require.resolve('@tesseract.js-data/eng')), '4.0.0'),
 } as const;
 
 export const config = {
@@ -36,7 +38,7 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
   } as any), OCR_TIMEOUT_MS, 'worker initialization');
   try {
     await withTimeout(worker.setParameters({
-      tessedit_pageseg_mode: '6' as any,
+      tessedit_pageseg_mode: '3' as any,
       preserve_interword_spaces: '1',
       user_defined_dpi: '300',
     }), OCR_TIMEOUT_MS, 'worker configuration');
