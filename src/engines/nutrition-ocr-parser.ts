@@ -305,6 +305,8 @@ const UNLABELED_MACRO_ROW_REGEX = /^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(г|мл|шт|g|
 
 const RUSSIAN_FOOD_NAMES: Record<string, string> = {
   'куриная грудка': 'chicken_breast', 'курица': 'chicken_breast', 'грудка куриная': 'chicken_breast',
+  'рисовая манка': 'cereal_semolina', 'манка рисовая': 'cereal_semolina',
+  'яичный протеин': 'supp_egg_white_powder', 'протеин яичный': 'supp_egg_white_powder',
   'говядина': 'beef_lean', 'стейк': 'beef_lean', 'говяжий': 'beef_lean',
   'лосось': 'salmon', 'семга': 'salmon', 'рыба': 'salmon',
   'рис': 'rice_white', 'рис белый': 'rice_white', 'рис бурый': 'rice_brown',
@@ -483,9 +485,17 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   const displayName = name
     .replace(/^(?:завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack)\s*[:\-–—|,]?\s*/i, '')
     .replace(/^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\s*/, '')
+    .replace(/[›>‹<'"]+/g, ' ')
     .trim();
+  const normalizedDisplayName = /кокосов.*масл|coconut\s+oil/i.test(displayName)
+    ? 'Кокосовое масло'
+    : /рисов.*манк|манк.*рисов/i.test(displayName)
+    ? 'Рисовая манка'
+    : /яичн.*протеин|протеин.*яичн/i.test(displayName)
+    ? 'Яичный протеин'
+    : displayName;
   return {
-    name: displayName || food?.name || 'Блюдо',
+    name: normalizedDisplayName || food?.name || 'Блюдо',
     qty,
     qtyGrams: Math.round(weight),
     kcal: hasMacros ? Math.round((kcal || (food?.kcal || 0) * multiplier) / multiplier) : food?.kcal || 0,
