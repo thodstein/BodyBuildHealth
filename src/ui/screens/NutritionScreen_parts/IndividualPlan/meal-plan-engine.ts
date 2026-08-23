@@ -760,9 +760,7 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   // tighter cap (e.g. maxGrainPerMeal for cooked grains so a 140g-carb target doesn't
   // produce a 600g bowl of buckwheat).
   const ceiling = Math.min(maxGramPerItem(_currentBudget), capG ?? maxGramPerItem(_currentBudget));
-  let base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
-  // Нормальная человеческая порция: овсянка/хлопья на работе — минимум 60г сухого (~180г готового), не 15г
-  if ((food.id === 'oats' || food.id === 'oats_dry' || food.id === 'grain_quinoa_flakes') && base < 60) base = 60;
+  const base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
   const supplementCap = SUPPLEMENT_MAX_G[food.id];
   return supplementCap ? Math.min(supplementCap, base) : base;
 }
@@ -855,10 +853,9 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const pFatty = byBudget(basePool.filter(f => f.category === 'protein' && (f.fat || 0) > 8 && (f.protein || 0) >= 12));
   const pLean = byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.fat || 0) <= 3 && (f.protein || 0) >= 11));
   const anyProtein = pSolid.length > 0 ? pSolid : pLean.length > 0 ? pLean : pFatty.length > 0 ? pFatty : byBudget(basePool.filter(f => (f.category === 'protein' || f.category === 'dairy') && (f.protein || 0) >= 12));
-  // Портативные хлопья (oats 12г углеводов) — снижаем порог с 15 до 10 только для portable, иначе oats выпадает и "хлопья на работе" игнор
-  const cSlowRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && (f.carbs || 0) >= (_portable ? 10 : 15) && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
+  const cSlowRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && (f.carbs || 0) >= 15 && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
   const cSlowBud = byBudget(cSlowRaw);
-  const cFastRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb' || f.category === 'veg_fruit') && (f.gi || 0) >= 60 && (f.carbs || 0) >= (_portable ? 10 : 15) && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
+  const cFastRaw = basePool.filter(f => (f.category === 'grain' || f.category === 'carb' || f.category === 'veg_fruit') && (f.gi || 0) >= 60 && (f.carbs || 0) >= 15 && (f.protein || 0) / Math.max(1, f.carbs || 0) < 0.35);
   const cFastBud = byBudget(cFastRaw);
   const cFruitRaw = basePool.filter(f => f.category === 'veg_fruit' && (f.carbs || 0) >= 8 && (f.gi || 0) <= 55 && (f.fiber || 0) >= 1.5 && (f.protein || 0) < 15);
   const cFruitBud = byBudget(cFruitRaw);
