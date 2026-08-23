@@ -43,11 +43,11 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>📊 Бюджет объёма по мышцам</span>
         {mrvMultiplier > 1 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: 4 }}>MRV ×{mrvMultiplier.toFixed(2)}</span>}
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>всего {metrics.totalSets} сетов/нед</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>всего {metrics.totalSets} сетов/нед</span>
       </div>
 
       {/* Легенда */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, fontSize: 11, color: 'rgba(255,255,255,0.85)' }}>
         <span><span style={{ color: '#22c55e' }}>●</span> MEV (минимум)</span>
         <span><span style={{ color: '#f59e0b' }}>●</span> MAV (оптимум)</span>
         <span><span style={{ color: '#ef4444' }}>●</span> MRV (максимум)</span>
@@ -74,7 +74,7 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
               {/* MRV marker */}
               <div title={`MRV ${m.mrv}`} style={{ position: 'absolute', left: pct(m.mrv) + '%', top: -2, bottom: -2, width: 2, background: '#ef4444' }} />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 3 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
               <span>MEV {m.mev} · MAV {m.mav} · MRV {m.mrv}</span>
               <span>частота {m.frequencyPerRotation}×/рот · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
             </div>

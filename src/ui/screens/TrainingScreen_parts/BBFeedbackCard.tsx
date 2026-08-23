@@ -58,7 +58,7 @@ export const BBFeedbackCard: React.FC = () => {
           {fb.acwr ? (
             <>
               <div style={{ fontSize: 14, fontWeight: 800, color: zoneColor[fb.acwr.zone] || '#fff' }}>{fb.acwr.ratio} · {fb.acwr.zone}</div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{fb.acwr.zone === 'optimal' ? 'в норме' : fb.acwr.zone === 'dangerous' ? 'перегруз' : fb.acwr.zone === 'caution' ? 'осторожно' : 'недотрен'}</div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{fb.acwr.zone === 'optimal' ? 'в норме' : fb.acwr.zone === 'dangerous' ? 'перегруз' : fb.acwr.zone === 'caution' ? 'осторожно' : 'недотрен'}</div>
             </>
           ) : (
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>недостаточно sRPE данных (≥14д)</div>

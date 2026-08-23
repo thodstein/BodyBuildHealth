@@ -77,7 +77,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
       )}
 
       {/* Разбивка по мышцам */}
-      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
         Объём на мышцу (vs MEV/MAV/MRV)
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

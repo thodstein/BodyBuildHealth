@@ -28,6 +28,7 @@ import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechni
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
 import { tempoExplain, buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
+import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
 import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
@@ -3886,6 +3887,27 @@ export const BbAutoConstructor: React.FC = () => {
             })()}
           </div>
         </MetricCard>
+        {/* PRO Quality — паттерны/углы/растяжка/техники из интеллектуальных тренировок */}
+        {(() => {
+          try {
+            const dummyProgram: any = { bb: { weeks: builtPlan.weeks.map((w:any) => ({ sessions: w.sessions.map((s:any) => ({ blocks: s.exercises.map((e:any) => ({ exerciseName: e.name, muscle: e.muscle, sets: e.workSets || [{reps: e.repsRange?.[0] || 10, rir: e.rir || 2}] })) })) })) }, pl: { customWeeks: [] }, goal: bbGoal, level: bbLevel };
+            const proQ = analyzeProQuality(dummyProgram, 'bb', bbLevel, bbGoal);
+            return (
+              <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧠 PRO-качество (паттерны/углы/растяжка) — из интеллектуальных тренировок</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
+                  <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} OK {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
+                  <div><b>Углы:</b> {proQ.angles.filter(a=>a.ok).length}/{proQ.angles.length} OK {proQ.angles.filter(a=>!a.ok).map(a=>a.issue).slice(0,2).join('; ') || '—'}</div>
+                  <div><b>Растяжка:</b> {proQ.stretches.filter(s=>s.ok).length}/{proQ.stretches.length} OK</div>
+                  <div><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
+                </div>
+                {proQ.totalIssues.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.7)' }}>{proQ.totalIssues.slice(0,3).map((iss,i)=><div key={i}>• {iss}</div>)}</div>}
+                {proQ.totalRecommendations.length > 0 && <div style={{ marginTop:4, fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec,i)=><div key={i}>→ {rec}</div>)}</div>}
+                <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Δ Score: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (корректировка к базовому)</div>
+              </div>
+            );
+          } catch { return null; }
+        })()}
         {/* Phase distribution */}
         <div style={{ ...CARD, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
           <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📅 Распределение фаз</div>
