@@ -8,7 +8,7 @@ import React, { useEffect, useRef } from 'react';
 
 const CARD: React.CSSProperties = { background: 'linear-gradient(180deg, rgba(24,24,27,0.95), rgba(14,14,16,0.9))', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 12, margin: '8px 0', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04)' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 12, fontWeight: 800, margin: '0 0 2px', letterSpacing: '-0.2px' };
-const SUB: React.CSSProperties = { color: '#fff', fontSize: 9, lineHeight: 1.3, opacity: 0.7 };
+const SUB: React.CSSProperties = { color: '#fff', fontSize: 9, lineHeight: 1.3, opacity: 1 };
 const SMALL: React.CSSProperties = { color: '#fff', fontSize: 10, lineHeight: 1.4 };
 const ACCENT = '#00e68a';
 
@@ -30,7 +30,7 @@ function xlabels(ctx: CanvasRenderingContext2D, data: { week: number }[], pad: a
   ctx.fillStyle = '#fff'; ctx.font = '700 9px sans-serif';
   data.forEach((d, i) => { if (i % Math.ceil(data.length / 8) === 0 || i === data.length - 1) { ctx.fillText(String(d.week), pad.left + i * xStep + xStep / 2 - 3, h - 4); } });
   // ось X подпись
-  ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '7px sans-serif'; ctx.fillText('неделя →', w - pad.right - 32, h - 4);
+  ctx.fillStyle = '#fff'; ctx.font = '700 7px sans-serif'; ctx.fillText('неделя →', w - pad.right - 32, h - 4);
 }
 
 type Point = { week: number; v: number };
@@ -46,7 +46,7 @@ function BarChart({ data, title, color, color2, unit, icon }: { data: Point[]; t
     ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
     // заголовок
     ctx.fillStyle = '#fff'; ctx.font = '800 11px sans-serif'; ctx.fillText(icon + ' ' + title, pad.left, 14);
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '7px sans-serif'; ctx.fillText(unit, pad.left, 22);
+    ctx.fillStyle = '#fff'; ctx.font = '700 7px sans-serif'; ctx.fillText(unit, pad.left, 22);
     if (!data.length) { ctx.fillStyle = '#666'; ctx.font = '12px sans-serif'; ctx.fillText('— нет данных —', w / 2 - 30, h / 2); return; }
     const max = Math.max(...data.map(d => d.v)) * 1.2 || 1; const xStep = drawW / data.length;
     grid(ctx, pad, w, h);
@@ -86,7 +86,7 @@ function BarChart({ data, title, color, color2, unit, icon }: { data: Point[]; t
       }
     });
     // ось Y метки
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '7px sans-serif';
+    ctx.fillStyle = '#fff'; ctx.font = '700 7px sans-serif';
     for (let i = 0; i <= 4; i++) {
       const v = (max * (1 - i / 4));
       const y = pad.top + (drawH / 4) * i;
@@ -165,7 +165,7 @@ function BBChart({ data }: { data: BBMuscleMetric[] }) {
     bg.addColorStop(0, '#1a1a1e'); bg.addColorStop(1, '#121214');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#fff'; ctx.font = '800 11px sans-serif'; ctx.fillText('💪 Сетов/ротация: тяж + памп vs MRV', pad.left, 14);
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '7px sans-serif'; ctx.fillText('тяж — насыщенный, памп — светлый; MRV — красный пунктир', pad.left, 22);
+    ctx.fillStyle = '#fff'; ctx.font = '700 7px sans-serif'; ctx.fillText('тяж — насыщенный, памп — светлый; MRV — красный пунктир', pad.left, 22);
     if (!data.length) { ctx.fillStyle = '#666'; ctx.fillText('—', w / 2, h / 2); return; }
     const maxV = Math.max(...data.map(d => Math.max(d.sets, d.mrv))) * 1.15 || 1; const xStep = drawW / data.length;
     const yV = (v: number) => pad.top + drawH - (v / maxV) * drawH;
@@ -218,7 +218,7 @@ function BBChart({ data }: { data: BBMuscleMetric[] }) {
     // легенда MRV
     ctx.fillStyle = '#ef4444'; ctx.font = '700 8px sans-serif'; ctx.fillText('● MRV', w - pad.right - 30, pad.top + 6);
     // Y ось
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.font = '7px sans-serif';
+    ctx.fillStyle = '#fff'; ctx.font = '700 7px sans-serif';
     for (let i = 0; i <= 4; i++) {
       const v = (maxV * (1 - i / 4));
       const y = pad.top + (drawH / 4) * i;

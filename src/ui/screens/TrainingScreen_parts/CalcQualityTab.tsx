@@ -16,6 +16,10 @@ import { norm } from '../../../engines/norm';
 import { applyToPlanner } from './planner-bridge';
 
 const ACCENT = '#00e68a';
+const DIM = '#fff';
+const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
+const CARD_GLASS: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' } as any;
+const SMALL_W: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
 const ru = (g: string) => GROUP_RU[g] || g;
 
 type Division = 'bb' | 'pl';
@@ -526,9 +530,21 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
   const programOptions = programs.map(p => ({ id: p.meta.id, label: `${p.meta.title} · ${p.meta.direction.toUpperCase()} · ${p.meta.level}`, desc: `${p.meta.weeks} нед · ${p.meta.daysPerWeek} дн/нед` }));
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: 12, color: '#fff' }}>
-      <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, margin: '4px 0 4px' }}>🎯 Калькулятор качества программ — PRO</div>
-      <div style={{ fontSize: 11, color: '#fff', marginBottom: 10, lineHeight: 1.4 }}>Два разделения: <b style={{ color: ACCENT }}>ПЛ — сила</b> (присед/жим/тяга, интенсивность, частота) и <b style={{ color: '#a78bfa' }}>ББ — гипертрофия</b> (MEV/MAV/MRV по мышцам). Кнопка учёта ПЕД + лаборатория + уровень — живой пересчёт, не «черти что».</div>
+    <div style={{ maxWidth: 760, margin: '0 auto', padding: '10px 8px 18px', color: '#fff' }}>
+      <div style={{ ...CARD_GLASS, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(0,230,138,0.10),rgba(167,139,250,0.07))', border:'1px solid rgba(0,230,138,0.18)', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(0,230,138,0.16),transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+          <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:16 }}>🎯</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Качество программ — PRO</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>ПЛ · ББ · Гибрид — один расчёт MEV/MAV/MRV + PED + лаборатория. Без дублей.</div>
+          </div>
+          <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background: sc+'18', border:`1px solid ${sc}55`, color: sc, fontWeight:800, whiteSpace:'nowrap' }}>{analysis.grade} · {analysis.score}/100</span>
+        </div>
+        <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
+          <b style={{ color:'#fff' }}>Как работает:</b> выбери программу и разделение — <b style={{ color:ACCENT }}>ПЛ</b> сила, <b style={{ color:'#a78bfa' }}>ББ</b> гипертрофия. <span style={{ color:ACCENT }}>MEV/MAV/MRV</span> + PED + лаборатория — один живой расчёт.
+        </div>
+      </div>
 
       {/* Выбор программы */}
       {programs.length > 1 && (
@@ -656,8 +672,9 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
           <span style={{ fontSize: 12, fontWeight: 800, color: sc }}>Оценка качества {analysis.grade} · {division === 'bb' ? 'ББ-гипертрофия' : 'ПЛ-сила'}</span>
           <span style={{ fontSize: 22, fontWeight: 800, color: sc }}>{analysis.score}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}>/100</span></span>
         </div>
-        <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 8 }}>
-          <div style={{ height: '100%', width: analysis.score + '%', background: sc, transition: 'width 0.3s' }} />
+        <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 8, border:'1px solid rgba(255,255,255,0.04)', position:'relative' }}>
+          <div style={{ height: '100%', width: analysis.score + '%', background: `linear-gradient(90deg, ${sc}, ${sc}cc)`, transition: 'width 0.35s', boxShadow: `0 0 10px ${sc}66`, borderRadius:6 }} />
+          <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color:'#fff', fontWeight:800, letterSpacing:0.3, textShadow:'0 1px 2px rgba(0,0,0,0.5)' }}>{analysis.score >= 80 ? 'ОТЛИЧНО' : analysis.score >=50 ? 'СРЕДНЕ' : 'ТРЕБУЕТ РАБОТЫ'}</div>
         </div>
         <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
           Уровень <b>{effectiveLevel}</b> · {pedOn ? `ПЕД ×${pedAdapt?.combinedMrvMultiplier.toFixed(2) ?? '1.2'}` : 'Натурал'} · Лаб ×{labMult.toFixed(2)} · {division === 'bb' ? 'ББ-объём по мышцам' : 'ПЛ-объём по группам'} · {analysis.perMuscle.length} групп
@@ -674,25 +691,30 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       </div>
 
       <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>Объём по группам — {division === 'bb' ? 'ББ (гипертрофия)' : 'ПЛ (сила)'} · Сеты · MEV · MAV · MRV · %MRV</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
         {analysis.perMuscle.map(pm => {
           const st = pm.status === 'over' ? '#ef4444' : pm.status === 'low' ? '#3b82f6' : pm.status === 'high' ? '#f59e0b' : '#22c55e';
           const pct = pm.mrv > 0 ? Math.round((pm.peakSets / pm.mrv) * 100) : 0;
           const bar = Math.min(100, pct);
+          const mevPct = pm.mrv > 0 ? (pm.mev / pm.mrv) * 100 : 0;
+          const mavPct = pm.mrv > 0 ? (pm.mav / pm.mrv) * 100 : 0;
           return (
-            <div key={pm.muscle} style={{ padding: '8px 10px', borderRadius: 10, background: st + '10', border: '1px solid ' + st + '30' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, marginBottom: 4 }}>
+            <div key={pm.muscle} style={{ padding: '10px 12px', borderRadius: 12, background: `linear-gradient(135deg, ${st}0f, ${st}06)`, border: `1px solid ${st}30`, boxShadow: `0 2px 12px ${st}0a` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, marginBottom: 6 }}>
                 <span style={{ fontWeight: 800, color: '#fff', minWidth: 90 }}>{ru(pm.muscle)}</span>
-                <span style={{ color: st, fontWeight: 800 }}>{pm.peakSets} сет</span>
-                <span style={{ color: '#fff', fontSize: 10 }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · {pct}%</span>
-                <span style={{ marginLeft: 'auto', padding: '2px 6px', borderRadius: 6, fontSize: 9, fontWeight: 800, background: st, color: pm.status === 'high' || pm.status === 'low' ? '#000' : '#fff' }}>{pm.status === 'over' ? 'ПЕРЕГРУЗ' : pm.status === 'low' ? 'НЕДОГРУЗ' : pm.status === 'high' ? 'ВЫСОКО' : 'ОК'}</span>
+                <span style={{ color: st, fontWeight: 900, fontSize:13 }}>{pm.peakSets}<span style={{ fontSize:9, color:'#fff' }}> сет</span></span>
+                <span style={{ color: '#fff', fontSize: 10 }}>· MEV {pm.mev} · MAV {pm.mav} · MRV {pm.mrv} · <b style={{ color: st }}>{pct}%</b></span>
+                <span style={{ marginLeft: 'auto', padding: '3px 7px', borderRadius: 6, fontSize: 9, fontWeight: 800, background: st, color: pm.status === 'high' || pm.status === 'low' ? '#000' : '#fff', boxShadow: `0 1px 6px ${st}55` }}>{pm.status === 'over' ? 'ПЕРЕГРУЗ' : pm.status === 'low' ? 'НЕДОГРУЗ' : pm.status === 'high' ? 'ВЫСОКО' : 'ОК'}</span>
               </div>
-              <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: bar + '%', background: st }} />
+              <div style={{ height: 10, borderRadius: 6, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', position:'relative', border:'1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ position:'absolute', left:0, width: `${mevPct}%`, height:'100%', background:'rgba(59,130,246,0.14)', borderRight:'1px dashed rgba(59,130,246,0.35)' }} />
+                <div style={{ position:'absolute', left: `${mevPct}%`, width: `${Math.max(0, mavPct-mevPct)}%`, height:'100%', background:'rgba(34,197,94,0.12)', borderRight:'1px dashed rgba(34,197,94,0.35)' }} />
+                <div style={{ height: '100%', width: bar + '%', background: `linear-gradient(90deg, ${st}, ${st}cc)`, borderRadius:6, transition:'width 0.35s', boxShadow: bar>85 ? `0 0 8px ${st}88` : 'none' }} />
+                <div style={{ position:'absolute', right:4, top:0, bottom:0, display:'flex', alignItems:'center', fontSize:7, color:'#fff', opacity:0.6 }}>MEV {pm.mev} · MAV {pm.mav}</div>
               </div>
-              <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff' }}>
-                <span>Средн/нед: {pm.avgSets} сет</span>
-                <span style={{ color: pct > 100 ? '#ef4444' : 'rgba(255,255,255,0.7)' }}>{pct > 100 ? `+${pct - 100}% сверх MRV` : `${100 - pct}% запас до MRV`}</span>
+              <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff' }}>
+                <span>Средн/нед: <b style={{ color: st }}>{pm.avgSets}</b> сет</span>
+                <span style={{ color: pct > 100 ? '#ef4444' : '#fff', fontWeight: pct>100 ? 800: 400 }}>{pct > 100 ? `+${pct - 100}% сверх MRV` : `${100 - pct}% запас до MRV`}</span>
               </div>
             </div>
           );
