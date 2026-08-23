@@ -4,10 +4,13 @@ import {
   type DesignStats,
   type DesignerPhaseBlock,
   type PhaseKey,
+  type DesignerDiscipline,
   PHASE_COLORS,
   PHASE_ICONS,
   PHASE_LABELS_RU,
-  createEmptyDesign,
+  sportToDiscipline,
+  getAllowedPhaseKeysForDiscipline,
+  createEmptyDesignForDiscipline,
   loadDesigns,
   saveDesign,
   deleteDesign,
@@ -18,7 +21,8 @@ import {
   updateBlockNotes,
   getDesignStats,
   resolveDesignOverlaps,
-  getDefaultPresetDesigns,
+  getPLPresetDesigns,
+  getBBPresetDesigns,
 } from '../../../engines/periodization-designer.engine';
 import { applyToPlanner } from './planner-bridge';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
@@ -28,30 +32,45 @@ import { loadUserPrograms, saveUserProgram } from '../../../engines/user-program
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
 
 const ACCENT = '#00e68a';
+const ACCENT_PL = '#3b82f6';
+const ACCENT_BB = '#ec4899';
 const DIM = 'rgba(255,255,255,0.5)';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
 
-const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff' };
+const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', minHeight: 38 };
 
 export const PeriodizationDesignerTab: React.FC = () => {
   const [designs, setDesigns] = useState<MacrocycleDesign[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [editBlockId, setEditBlockId] = useState<string | null>(null);
   const [dragPhase, setDragPhase] = useState<PhaseKey | null>(null);
-  const [viewQuarter, setViewQuarter] = useState(0); // 0-3 for 52-week view
+  const [viewQuarter, setViewQuarter] = useState(0);
   const pastRef = useRef<MacrocycleDesign[]>([]);
   const futureRef = useRef<MacrocycleDesign[]>([]);
   const [, setHistoryTick] = useState(0);
-  // Touch DnD: long-press on palette chip → drag to timeline week
   const touchPhaseRef = useRef<PhaseKey | null>(null);
   const touchTimerRef = useRef<number | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const [touchActive, setTouchActive] = useState(false);
   const { confirm } = useConfirmDialog();
-  // P0-1: «Привязать к программе» — список сохранённых программ ручного конструктора
   const [programs, setPrograms] = useState<UserProgram[]>([]);
   const [linkProgramId, setLinkProgramId] = useState('');
   const [linkMsg, setLinkMsg] = useState('');
+  // ── ПЛ / ББ дисциплина ─────────────────────
+  const [activeDiscipline, setActiveDiscipline] = useState<DesignerDiscipline>('pl');
+  const [isMobile, setIsMobile] = useState(false);
+  const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
+
+  useEffect(() => {
+    const check = () => {
+      const m = typeof window !== 'undefined' ? window.innerWidth < 560 : false;
+      setIsMobile(m);
+      if (m) setViewMode(prev => prev); // keep user choice
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     try { setPrograms(loadUserPrograms()); } catch { setPrograms([]); }
@@ -61,6 +80,18 @@ export const PeriodizationDesignerTab: React.FC = () => {
   }, []);
 
   const current = useMemo(() => designs.find(d => d.id === currentId) || null, [designs, currentId]);
+
+  // синхронизируем сегмент с дизайном
+  useEffect(() => {
+    if (current) {
+      const d = sportToDiscipline(current.sport);
+      setActiveDiscipline(d);
+    }
+  }, [current?.sport]);
+
+  const effectiveDiscipline: DesignerDiscipline = current ? sportToDiscipline(current.sport) : activeDiscipline;
+  const allowedKeys = useMemo(() => getAllowedPhaseKeysForDiscipline(effectiveDiscipline), [effectiveDiscipline]);
+  const allowedSet = useMemo(() => new Set<PhaseKey>(allowedKeys as PhaseKey[]), [allowedKeys]);
 
   const refresh = useCallback(() => {
     const list = loadDesigns();
@@ -115,7 +146,6 @@ export const PeriodizationDesignerTab: React.FC = () => {
 
   const stats: DesignStats | null = useMemo(() => current ? getDesignStats(current) : null, [current]);
 
-  // Resize helpers
   const handleResize = useCallback((blockId: string, newEnd: number) => {
     if (!current) return;
     const updated = resizeBlockInDesign(current, blockId, newEnd);
@@ -141,10 +171,11 @@ export const PeriodizationDesignerTab: React.FC = () => {
 
   const handleDropOnCanvas = useCallback((weekNum: number, phaseKey: PhaseKey) => {
     if (!current) return;
+    if (!allowedSet.has(phaseKey)) return;
     const updated = addBlockToDesign(current, phaseKey, weekNum);
     commitDesign(updated);
     setDragPhase(null);
-  }, [current, commitDesign]);
+  }, [current, commitDesign, allowedSet]);
 
   const handleAddPreset = useCallback((preset: MacrocycleDesign) => {
     saveDesign(preset);
@@ -153,10 +184,18 @@ export const PeriodizationDesignerTab: React.FC = () => {
   }, [refresh]);
 
   const handleNewDesign = useCallback(() => {
-    const d = createEmptyDesign();
+    const d = createEmptyDesignForDiscipline(activeDiscipline);
     saveDesign(d);
     refresh();
     setCurrentId(d.id);
+  }, [refresh, activeDiscipline]);
+
+  const handleNewDesignForDiscipline = useCallback((disc: DesignerDiscipline) => {
+    const d = createEmptyDesignForDiscipline(disc);
+    saveDesign(d);
+    refresh();
+    setCurrentId(d.id);
+    setActiveDiscipline(disc);
   }, [refresh]);
 
   const handleDeleteDesign = useCallback(() => {
@@ -192,6 +231,15 @@ export const PeriodizationDesignerTab: React.FC = () => {
     commitDesign(updated);
   }, [current, commitDesign]);
 
+  const handleDisciplineSwitch = useCallback((disc: DesignerDiscipline) => {
+    setActiveDiscipline(disc);
+    if (!current) return;
+    const targetSport: MacrocycleDesign['sport'] = disc === 'pl' ? 'powerlifting' : 'bodybuilding';
+    if (current.sport !== targetSport) {
+      handleSaveSport(targetSport);
+    }
+  }, [current, handleSaveSport]);
+
   const handleLinkToProgram = useCallback(() => {
     if (!current || !linkProgramId) return;
     const prog = programs.find(p => p.meta.id === linkProgramId);
@@ -210,8 +258,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
     return current.blocks.find(b => b.id === editBlockId) || null;
   }, [editBlockId, current]);
 
-  // Viewport for the timeline
-  const weeksPerQuarter = 13;
+  // Viewport for the timeline — адаптив
+  const weeksPerQuarter = isMobile ? 8 : 13;
   const quarterCount = Math.max(1, Math.ceil((current?.totalWeeks || 52) / weeksPerQuarter));
   const quarterStart = viewQuarter * weeksPerQuarter + 1;
   const quarterEnd = Math.min(quarterStart + weeksPerQuarter - 1, current?.totalWeeks || 52);
@@ -220,35 +268,137 @@ export const PeriodizationDesignerTab: React.FC = () => {
     if (viewQuarter >= quarterCount) setViewQuarter(Math.max(0, quarterCount - 1));
   }, [quarterCount, viewQuarter]);
 
+  // пресеты под дисциплину
+  const plPresets = useMemo(() => getPLPresetDesigns(), []);
+  const bbPresets = useMemo(() => getBBPresetDesigns(), []);
+  const currentPresets = effectiveDiscipline === 'pl' ? plPresets : bbPresets;
+
+  // несовместимые фазы в текущем дизайне
+  const incompatibleBlocks = useMemo(() => {
+    if (!current) return [] as DesignerPhaseBlock[];
+    return current.blocks.filter(b => !allowedSet.has(b.phaseKey));
+  }, [current, allowedSet]);
+
+  const accent = effectiveDiscipline === 'pl' ? ACCENT_PL : ACCENT_BB;
+  const disciplineLabel = effectiveDiscipline === 'pl' ? 'Пауэрлифтинг' : 'Бодибилдинг';
+  const disciplineIcon = effectiveDiscipline === 'pl' ? '🏋️' : '💪';
+  const disciplineHint = effectiveDiscipline === 'pl'
+    ? 'Сила · техника · взрыв (DE) · пик к помосту'
+    : 'Масса · памп · сушка · пик формы';
+
   return (
-    <div className="manual-constructor periodization-designer" style={{ maxWidth: 800, margin: '0 auto', padding: 12, color: '#fff' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 16, fontWeight: 800, color: ACCENT }}>🎨 Дизайнер периодизации</span>
+    <div className="manual-constructor periodization-designer" style={{ maxWidth: 860, margin: '0 auto', padding: 12, color: '#fff' }}>
+      <style>{`
+        .periodization-designer * { box-sizing: border-box; }
+        .pd-segment { display:flex; gap:4px; padding:4px; border-radius:12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);}
+        .pd-seg-btn { flex:1; padding:10px 12px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; border:1px solid transparent; transition:all .18s; min-height:44px; display:flex; align-items:center; justify-content:center; gap:6px; }
+        .pd-seg-btn.active-pl { background:linear-gradient(135deg,#3b82f6,#1e40af); color:#fff; border-color:rgba(59,130,246,0.5); box-shadow:0 4px 14px rgba(59,130,246,0.3); }
+        .pd-seg-btn.active-bb { background:linear-gradient(135deg,#ec4899,#be185d); color:#fff; border-color:rgba(236,72,153,0.5); box-shadow:0 4px 14px rgba(236,72,153,0.3); }
+        .pd-seg-btn.idle { background:rgba(255,255,255,0.04); color:${DIM}; border-color:rgba(255,255,255,0.06); }
+        .pd-palette-chip { min-height:44px; padding:8px 12px; border-radius:10px; font-size:11px; font-weight:700; cursor:grab; display:flex; align-items:center; gap:6px; user-select:none; touch-action:none; transition:transform .12s, box-shadow .12s; }
+        .pd-timeline-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin; }
+        .pd-timeline-scroll::-webkit-scrollbar { height:6px; }
+        .pd-timeline-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:4px; }
+        .pd-week-cell { width:36px; flex-shrink:0; text-align:center; font-size:10px; color:${DIM}; }
+        @media (max-width: 560px) {
+          .periodization-designer { padding:8px !important; }
+          .pd-week-cell { width:34px; }
+          .pd-palette-chip { font-size:11px; padding:10px 12px; }
+          .pd-card-mobile { padding:12px !important; }
+          .pd-header-row { flex-direction:column; align-items:stretch !important; }
+          .pd-header-actions { width:100%; justify-content:space-between; }
+          .pd-quarter-nav button, .pd-quarter-nav select { min-height:44px; }
+        }
+      `}</style>
+
+      {/* Header + дисциплина */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 17, fontWeight: 900, color: accent, letterSpacing: -0.2 }}>🎨 Дизайнер периодизации</span>
+            <span style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, background: accent + '18', border: '1px solid ' + accent + '33', color: accent, fontWeight: 700 }}>{disciplineIcon} {disciplineLabel}</span>
+          </div>
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4, maxWidth: 320 }}>{disciplineHint}</div>
         </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          <button onClick={handleNewDesign} style={btn}>➕ Новый</button>
-          <select value={currentId || ''} onChange={e => setCurrentId(e.target.value || null)} style={{ ...btn, padding: '6px 8px', background: 'rgba(24,24,27,0.6)', fontSize: 10 }}>
+
+        {/* Сегмент ПЛ / ББ */}
+        <div className="pd-segment" role="tablist" aria-label="Дисциплина периодизации">
+          <button
+            role="tab"
+            aria-selected={effectiveDiscipline === 'pl'}
+            onClick={() => handleDisciplineSwitch('pl')}
+            className={`pd-seg-btn ${effectiveDiscipline === 'pl' ? 'active-pl' : 'idle'}`}
+            style={{}}
+          >🏋️ ПЛ <span style={{ opacity: effectiveDiscipline === 'pl' ? 0.9 : 0.6, fontWeight: 600 }}>Пауэрлифтинг</span></button>
+          <button
+            role="tab"
+            aria-selected={effectiveDiscipline === 'bb'}
+            onClick={() => handleDisciplineSwitch('bb')}
+            className={`pd-seg-btn ${effectiveDiscipline === 'bb' ? 'active-bb' : 'idle'}`}
+          >💪 ББ <span style={{ opacity: effectiveDiscipline === 'bb' ? 0.9 : 0.6, fontWeight: 600 }}>Бодибилдинг</span></button>
+        </div>
+        <div style={{ fontSize: 10, color: DIM, marginTop: 6, lineHeight: 1.4 }}>
+          {effectiveDiscipline === 'pl'
+            ? 'Периоды ПЛ: GPP → Накопление (сила) → Интенсификация → Мощностной/DE → Пик → Разгрузка → Техника → Переход. Без гипертрофийных “памп”-блоков ББ.'
+            : 'Периоды ББ: GPP → Накопление (гипертрофия) → Накопление (сила) → Интенсификация → Кондиционный/памп → Пик → Разгрузка → Переход. Без техники/скоростных блоков ПЛ.'}
+        </div>
+      </div>
+
+      {/* Верх: выбор дизайна + действия */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }} className="pd-header-row">
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} className="pd-header-actions">
+          <button onClick={() => handleNewDesignForDiscipline(effectiveDiscipline)} style={{ ...btn, background: accent + '14', borderColor: accent + '55', color: accent, minHeight: 44 }}>➕ Новый {effectiveDiscipline === 'pl' ? 'ПЛ' : 'ББ'}</button>
+          <select value={currentId || ''} onChange={e => setCurrentId(e.target.value || null)} style={{ ...btn, padding: '10px 10px', background: 'rgba(24,24,27,0.6)', fontSize: 11, minHeight: 44, maxWidth: 260 }}>
             <option value="">— выберите дизайн —</option>
-            {designs.map(d => <option key={d.id} value={d.id}>{d.name} ({d.blocks.length} блоков)</option>)}
+            {designs
+              .filter(d => sportToDiscipline(d.sport) === effectiveDiscipline || d.sport === 'general')
+              .map(d => <option key={d.id} value={d.id}>{d.name} ({d.blocks.length} бл · {d.totalWeeks} нед)</option>)}
+            {designs.filter(d => sportToDiscipline(d.sport) !== effectiveDiscipline && d.sport !== 'general').length > 0 && (
+              <optgroup label={`— другие (${effectiveDiscipline === 'pl' ? 'ББ' : 'ПЛ'}) —`}>
+                {designs.filter(d => sportToDiscipline(d.sport) !== effectiveDiscipline && d.sport !== 'general').map(d => <option key={d.id} value={d.id}>{d.name} [{d.sport}]</option>)}
+              </optgroup>
+            )}
           </select>
-          {current && <button onClick={handleDeleteDesign} style={{ ...btn, color: '#ef4444' }}>🗑</button>}
+          {current && <button onClick={handleDeleteDesign} style={{ ...btn, color: '#ef4444', minHeight: 44, minWidth: 44 }}>🗑</button>}
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: DIM }}>{designs.filter(d => sportToDiscipline(d.sport) === effectiveDiscipline).length} {effectiveDiscipline === 'pl' ? 'ПЛ' : 'ББ'} · {designs.length} всего</span>
         </div>
       </div>
 
       {!current && (
-        <div className="constructor-surface" style={CARD}>
-          <div style={{ fontSize: 40, textAlign: 'center', marginBottom: 10 }}>🎨</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 6, textAlign: 'center' }}>Создайте первый дизайн периодизации</div>
-          <div style={{ fontSize: 11, color: DIM, marginBottom: 10, textAlign: 'center' }}>Перетащите фазовые блоки на таймлайн или начните с готового пресета.</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
-            <button onClick={handleNewDesign} style={{ ...btn, background: 'rgba(0,230,138,0.1)', borderColor: ACCENT, color: ACCENT }}>➕ Создать пустой</button>
-            {getDefaultPresetDesigns().map((p, i) => (
-              <button key={i} onClick={() => handleAddPreset(p)} style={{ ...btn, background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.3)', color: '#3b82f6' }}>
-                📋 {p.name}
-              </button>
-            ))}
+        <div className="constructor-surface pd-card-mobile" style={CARD}>
+          <div style={{ fontSize: 36, textAlign: 'center', marginBottom: 8 }}>{effectiveDiscipline === 'pl' ? '🏋️' : '💪'}</div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 6, textAlign: 'center' }}>
+            {effectiveDiscipline === 'pl' ? 'Создайте ПЛ-дизайн: GPP → сила → пик' : 'Создайте ББ-дизайн: масса → интенсификация → сушка'}
+          </div>
+          <div style={{ fontSize: 11, color: DIM, marginBottom: 12, textAlign: 'center', lineHeight: 1.45 }}>
+            {effectiveDiscipline === 'pl'
+              ? 'ПЛ использует технику и мощностной блоки (DE/speed) — гипертрофийный памп исключён.'
+              : 'ББ использует гипертрофию и кондиционный памп — техника/скоростные блоки ПЛ исключены.'}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button onClick={() => handleNewDesignForDiscipline(effectiveDiscipline)} style={{ ...btn, background: accent + '16', borderColor: accent + '55', color: accent, minHeight: 44 }}>
+              ➕ Пустой {effectiveDiscipline === 'pl' ? 'ПЛ' : 'ББ'} дизайн
+            </button>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8, textAlign: 'center' }}>📋 Готовые пресеты — {disciplineLabel}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6 }}>
+              {getPresetsForDiscipline(effectiveDiscipline).map((p) => (
+                <button key={p.name} onClick={() => handleAddPreset(p)} style={{ ...btn, background: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.08)' : 'rgba(236,72,153,0.08)', borderColor: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.25)' : 'rgba(236,72,153,0.25)', color: effectiveDiscipline === 'pl' ? '#60a5fa' : '#f472b6', minHeight: 44, textAlign: 'left', lineHeight: 1.3 }}>
+                  <span style={{ fontWeight: 800 }}>{p.name}</span><br />
+                  <span style={{ fontSize: 10, opacity: 0.75 }}>{p.totalWeeks} нед · {p.blocks.length} фаз</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+              <button onClick={() => {
+                const all = [...getPLPresetDesigns(), ...getBBPresetDesigns()];
+                all.forEach(p => saveDesign(p));
+                refresh();
+              }} style={{ ...btn, minHeight: 38, color: DIM }}>📚 Загрузить все пресеты (ПЛ+ББ)</button>
+            </div>
           </div>
         </div>
       )}
@@ -256,86 +406,92 @@ export const PeriodizationDesignerTab: React.FC = () => {
       {current && (
         <>
           {/* Design info */}
-          <div className="constructor-surface" style={CARD}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
               <input value={current.name} onChange={e => handleSaveName(e.target.value)}
-                style={{ background: 'transparent', border: 'none', borderBottom: '1px dashed rgba(255,255,255,0.2)', color: '#fff', fontSize: 14, fontWeight: 700, width: '60%', outline: 'none' }} />
-              <span style={{ fontSize: 10, color: DIM }}>{current.totalWeeks} нед · {current.blocks.length} блоков</span>
+                style={{ background: 'transparent', border: 'none', borderBottom: '1px dashed rgba(255,255,255,0.2)', color: '#fff', fontSize: 15, fontWeight: 800, flex: 1, minWidth: 180, outline: 'none', paddingBottom: 4 }} />
+              <span style={{ fontSize: 11, color: DIM, whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.04)', padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>{current.totalWeeks} нед · {current.blocks.length} бл</span>
             </div>
-            <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
-              <button onClick={undo} disabled={pastRef.current.length === 0} style={{ ...btn, opacity: pastRef.current.length > 0 ? 1 : 0.4 }}>↶ Отменить</button>
-              <button onClick={redo} disabled={futureRef.current.length === 0} style={{ ...btn, opacity: futureRef.current.length > 0 ? 1 : 0.4 }}>↷ Повторить</button>
-              <span style={{ ...btn, cursor: 'default', color: DIM }}>Ctrl/Cmd+Z</span>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              <button onClick={undo} disabled={pastRef.current.length === 0} style={{ ...btn, minHeight: 44, opacity: pastRef.current.length > 0 ? 1 : 0.4, flex: 1 }}>↶ Отменить</button>
+              <button onClick={redo} disabled={futureRef.current.length === 0} style={{ ...btn, minHeight: 44, opacity: futureRef.current.length > 0 ? 1 : 0.4, flex: 1 }}>↷ Повторить</button>
             </div>
-            {/* Sport selector — определяет направление программы при применении дизайнера */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 10, color: DIM }}>Вид спорта:</span>
-              <select
-                value={current.sport}
-                onChange={e => handleSaveSport(e.target.value as MacrocycleDesign['sport'])}
-                style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer' }}
-              >
-                <option value="powerlifting">Пауэрлифтинг</option>
-                <option value="bodybuilding">Бодибилдинг</option>
-                <option value="general">Общее</option>
-                <option value="weightlifting">Тяжёлая атлетика</option>
-                <option value="crossfit">Crossfit</option>
-              </select>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>Режим:</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: accent, padding: '6px 10px', borderRadius: 8, background: accent + '14', border: '1px solid ' + accent + '33' }}>{disciplineIcon} {disciplineLabel}</span>
+              <span style={{ fontSize: 10, color: DIM }}>{current.blocks.length} фаз · {disciplineHint}</span>
             </div>
-            {stats && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 10, color: DIM }}>
-                <span>📊 Занято: <b style={{ color: ACCENT }}>{stats.usedWeeks}</b> нед</span>
-                <span>🆓 Свободно: <b style={{ color: '#3b82f6' }}>{stats.freeWeeks}</b> нед</span>
-                <span>📦 Блоков: <b>{stats.blockCount}</b></span>
+            {incompatibleBlocks.length > 0 && (
+              <div role="alert" style={{ marginBottom: 10, padding: 10, borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', fontSize: 11, lineHeight: 1.45 }}>
+                <div style={{ fontWeight: 800, color: '#ef4444', marginBottom: 4 }}>⚠ {incompatibleBlocks.length} блок(ов) не из набора {disciplineLabel}</div>
+                <div style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 6 }}>
+                  {incompatibleBlocks.map(b => `${PHASE_ICONS[b.phaseKey]} ${PHASE_LABELS_RU[b.phaseKey]} (${b.startWeek}–${b.endWeek})`).join(' · ')}
+                </div>
+                <div style={{ color: DIM, fontSize: 10 }}>Эти фазы сохранены, но не характерны для {disciplineLabel}. Для чистого плана используйте палитру ниже — лишние можно удалить.</div>
               </div>
             )}
-            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              <button onClick={handleDuplicate} style={{ ...btn, fontSize: 10 }}>📋 Дублировать</button>
+            {stats && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11, color: DIM }}>
+                <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>📊 Занято: <b style={{ color: accent }}>{stats.usedWeeks}</b> нед</span>
+                <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>🆓 Свободно: <b style={{ color: '#3b82f6' }}>{stats.freeWeeks}</b> нед</span>
+                <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>📦 Блоков: <b>{stats.blockCount}</b></span>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              <button onClick={handleDuplicate} style={{ ...btn, fontSize: 11, minHeight: 44 }}>📋 Дублировать</button>
+              <button
+                onClick={() => setViewMode(m => m === 'timeline' ? 'list' : 'timeline')}
+                style={{ ...btn, fontSize: 11, minHeight: 44, background: viewMode === 'list' ? accent + '18' : 'rgba(255,255,255,0.04)', borderColor: viewMode === 'list' ? accent + '44' : 'rgba(255,255,255,0.08)', color: viewMode === 'list' ? accent : '#fff' }}
+              >{viewMode === 'timeline' ? '📋 Список' : '🗓 Таймлайн'}</button>
             </div>
-            {/* P0-1: привязка дизайна к программе ручного конструктора */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 10, color: DIM }}>🔗 К программе:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: DIM, fontWeight: 700 }}>🔗 К программе:</span>
               <select value={linkProgramId} onChange={e => setLinkProgramId(e.target.value)}
-                style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '4px 8px', fontSize: 10, cursor: 'pointer', maxWidth: 240 }}>
+                style={{ background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px', fontSize: 11, cursor: 'pointer', minHeight: 44, flex: 1, minWidth: 180 }}>
                 <option value="">— выберите программу —</option>
                 {programs.map(p => (
                   <option key={p.meta.id} value={p.meta.id}>{p.meta.title} ({p.meta.direction})</option>
                 ))}
               </select>
               <button onClick={handleLinkToProgram} disabled={!linkProgramId}
-                style={{ ...btn, background: 'rgba(0,230,138,0.08)', borderColor: 'rgba(0,230,138,0.3)', color: ACCENT, opacity: linkProgramId ? 1 : 0.4 }}>
+                style={{ ...btn, minHeight: 44, background: 'rgba(0,230,138,0.08)', borderColor: 'rgba(0,230,138,0.3)', color: ACCENT, opacity: linkProgramId ? 1 : 0.4 }}>
                 🔗 Привязать
               </button>
-              {linkMsg && <span style={{ fontSize: 10, color: DIM }}>{linkMsg}</span>}
             </div>
+            {linkMsg && <div style={{ fontSize: 11, color: DIM, marginTop: 6, lineHeight: 1.4 }}>{linkMsg}</div>}
           </div>
 
-          {/* Palette — draggable phase blocks */}
-          <div className="constructor-surface" style={CARD}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>🎨 Палитра блоков (перетащите на таймлайн)</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {(Object.keys(DESIGNER_PHASE_VISUAL) as PhaseKey[]).map(pk => (
+          {/* Palette — draggable phase blocks (PL/BB filtered) */}
+          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>🎨 Палитра — {disciplineLabel} {effectiveDiscipline === 'pl' ? '(сила/техника/DE)' : '(масса/памп/сушка)'}</div>
+              <span style={{ fontSize: 10, color: DIM }}>{allowedKeys.length} фаз</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {allowedKeys.map(pk => {
+                const pkTyped = pk as PhaseKey;
+                return (
                 <div key={pk}
                   draggable
                   role="button"
                   tabIndex={0}
-                  aria-label={`Добавить блок ${PHASE_LABELS_RU[pk]}`}
-                  onDragStart={() => setDragPhase(pk)}
+                  aria-label={`Добавить блок ${PHASE_LABELS_RU[pkTyped]}`}
+                  onDragStart={() => setDragPhase(pkTyped)}
                   onDragEnd={() => setDragPhase(null)}
-                  onClick={() => setDragPhase(previous => previous === pk ? null : pk)}
+                  onClick={() => setDragPhase(previous => previous === pkTyped ? null : pkTyped)}
                   onKeyDown={event => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
-                      setDragPhase(previous => previous === pk ? null : pk);
+                      setDragPhase(previous => previous === pkTyped ? null : pkTyped);
                     }
                   }}
                   onTouchStart={(e) => {
                     const touch = e.touches[0];
                     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-                    touchPhaseRef.current = pk;
+                    touchPhaseRef.current = pkTyped;
                     touchTimerRef.current = window.setTimeout(() => {
                       setTouchActive(true);
-                      setDragPhase(pk);
+                      setDragPhase(pkTyped);
                       try { (navigator as any).vibrate?.(15); } catch { /* ignore */ }
                     }, 350);
                   }}
@@ -356,80 +512,93 @@ export const PeriodizationDesignerTab: React.FC = () => {
                       touchTimerRef.current = null;
                     }
                     if (touchActive) {
-                      setTouchActive(false);
-                      setDragPhase(null);
+                      // keep dragPhase for drop
+                    } else {
+                      // tap = select phase for click-to-place
+                      setDragPhase(prev => prev === pkTyped ? null : pkTyped);
                     }
                     touchPhaseRef.current = null;
                     touchStartRef.current = null;
                   }}
+                  className="pd-palette-chip"
                   style={{
-                    padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 600, cursor: 'grab',
-                    background: DESIGNER_PHASE_VISUAL[pk].color + (touchActive && dragPhase === pk ? '44' : '22'),
-                    border: '1px solid ' + DESIGNER_PHASE_VISUAL[pk].color + (touchActive && dragPhase === pk ? '88' : '55'),
-                    color: DESIGNER_PHASE_VISUAL[pk].color, display: 'flex', alignItems: 'center', gap: 4,
-                    transition: 'transform 0.1s', userSelect: 'none', touchAction: 'none',
-                    transform: touchActive && dragPhase === pk ? 'scale(1.08)' : 'none',
+                    background: DESIGNER_PHASE_VISUAL[pkTyped].color + (touchActive && dragPhase === pkTyped ? '44' : '1A'),
+                    border: '1px solid ' + DESIGNER_PHASE_VISUAL[pkTyped].color + (dragPhase === pkTyped ? '88' : '38'),
+                    color: DESIGNER_PHASE_VISUAL[pkTyped].color,
+                    boxShadow: dragPhase === pkTyped ? `0 4px 12px ${DESIGNER_PHASE_VISUAL[pkTyped].color}33` : 'none',
+                    transform: touchActive && dragPhase === pkTyped ? 'scale(1.06)' : 'none',
                   }}>
-                  <span>{DESIGNER_PHASE_VISUAL[pk].icon}</span>
-                  <span>{DESIGNER_PHASE_VISUAL[pk].label}</span>
+                  <span>{DESIGNER_PHASE_VISUAL[pkTyped].icon}</span>
+                  <span>{DESIGNER_PHASE_VISUAL[pkTyped].label}</span>
+                  {dragPhase === pkTyped && <span style={{ fontSize: 10, opacity: 0.9, marginLeft: 2 }}>→ тап по неделе</span>}
                 </div>
-              ))}
+              )})}
+            </div>
+            <div style={{ fontSize: 10, color: DIM, marginTop: 8, lineHeight: 1.45 }}>
+              {effectiveDiscipline === 'pl'
+                ? 'ПЛ-палитра: техника и мощностной — скоростная/DE работа, нет “гипертрофия/памп” блоков ББ.'
+                : 'ББ-палитра: гипертрофия и кондиционный памп — объём/метабол. стресс, нет техники/скоростных блоков ПЛ.'}
+              {dragPhase && <span style={{ color: accent, marginLeft: 6, fontWeight: 700 }}>Выбрано: {PHASE_LABELS_RU[dragPhase]} — тапните по неделе ниже ↓</span>}
             </div>
           </div>
 
-          {/* Timeline canvas */}
-          <div className="constructor-surface" style={{ ...CARD, padding: 0, overflowX: 'auto' }}>
-            <div style={{ minWidth: 380, padding: 12 }}>
+          {/* Timeline canvas / List view */}
+          {viewMode === 'timeline' ? (
+          <div className="constructor-surface pd-card-mobile pd-timeline-scroll" style={{ ...CARD, padding: 0 }}>
+            <div style={{ minWidth: isMobile ? 360 : 420, padding: 12 }}>
               {/* Quarter nav */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <button aria-label="Предыдущий квартал" onClick={() => setViewQuarter(Math.max(0, viewQuarter - 1))} disabled={viewQuarter === 0} style={{ ...btn, opacity: viewQuarter === 0 ? 0.3 : 1 }}>◀</button>
-                <select aria-label="Квартал таймлайна" value={viewQuarter} onChange={e => setViewQuarter(Number(e.target.value))} style={{ ...btn, flex: 1, textAlign: 'center', background: 'rgba(24,24,27,0.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginBottom: 10 }} className="pd-quarter-nav">
+                <button aria-label="Предыдущий квартал" onClick={() => setViewQuarter(Math.max(0, viewQuarter - 1))} disabled={viewQuarter === 0} style={{ ...btn, minWidth: 44, minHeight: 44, opacity: viewQuarter === 0 ? 0.3 : 1 }}>◀</button>
+                <select aria-label="Квартал таймлайна" value={viewQuarter} onChange={e => setViewQuarter(Number(e.target.value))} style={{ ...btn, flex: 1, textAlign: 'center', background: 'rgba(24,24,27,0.6)', minHeight: 44, fontSize: 11, fontWeight: 700 }}>
                   {Array.from({ length: Math.max(1, Math.ceil((current?.totalWeeks || 52) / weeksPerQuarter)) }, (_, quarter) => {
                     const start = quarter * weeksPerQuarter + 1;
                     const end = Math.min(start + weeksPerQuarter - 1, current?.totalWeeks || 52);
-                    return <option key={quarter} value={quarter}>Недели {start}–{end}</option>;
+                    return <option key={quarter} value={quarter}>Недели {start}–{end} · {weeksPerQuarter} нед</option>;
                   })}
                 </select>
-                <button aria-label="Следующий квартал" onClick={() => setViewQuarter(Math.min(quarterCount - 1, viewQuarter + 1))} disabled={quarterEnd >= (current?.totalWeeks || 52)} style={{ ...btn, opacity: quarterEnd >= (current?.totalWeeks || 52) ? 0.3 : 1 }}>▶</button>
+                <button aria-label="Следующий квартал" onClick={() => setViewQuarter(Math.min(quarterCount - 1, viewQuarter + 1))} disabled={quarterEnd >= (current?.totalWeeks || 52)} style={{ ...btn, minWidth: 44, minHeight: 44, opacity: quarterEnd >= (current?.totalWeeks || 52) ? 0.3 : 1 }}>▶</button>
               </div>
 
               {/* Week column headers */}
-              <div style={{ display: 'flex', gap: 1, marginBottom: 2 }}>
-                <div style={{ width: 44, flexShrink: 0 }} />
+              <div style={{ display: 'flex', gap: 1, marginBottom: 4 }}>
+                <div style={{ width: 38, flexShrink: 0 }} />
                 {Array.from({ length: quarterEnd - quarterStart + 1 }, (_, i) => {
                   const wn = quarterStart + i;
-                  return <div key={wn} style={{ width: 33, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
+                  return <div key={wn} className="pd-week-cell" style={{ width: isMobile ? 34 : 36, fontWeight: dragPhase ? 700 : 400, color: dragPhase ? accent : DIM, background: dragPhase ? accent + '12' : 'transparent', borderRadius: 6, padding: '2px 0' }}>{wn}</div>;
                 })}
               </div>
 
               {/* Block rows */}
               {current.blocks.filter(b => b.startWeek <= quarterEnd && b.endWeek >= quarterStart).length === 0 && (
-                <div style={{ padding: 20, textAlign: 'center', color: DIM, fontSize: 10, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8, marginTop: 4 }}>
-                  Перетащите блоки из палитры на таймлайн
+                <div style={{ padding: 22, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12, marginTop: 4, background: 'rgba(255,255,255,0.02)' }}>
+                  <div style={{ fontSize: 22, marginBottom: 6 }}>📍</div>
+                  Перетащите блоки из палитры {disciplineLabel} на недели {quarterStart}–{quarterEnd}<br />
+                  <span style={{ fontSize: 10 }}>или тапните фазу → тап по неделе</span>
                 </div>
               )}
 
-              <div style={{ position: 'relative', minHeight: 60 }}>
+              <div style={{ position: 'relative', minHeight: 72 }}>
                 {/* Drop zone indicators */}
                 {Array.from({ length: quarterEnd - quarterStart + 1 }, (_, i) => {
                   const wn = quarterStart + i;
+                  const colW = isMobile ? 34 : 36;
                   return (
                     <div key={wn}
                       onDragOver={e => { e.preventDefault(); }}
                       onClick={() => { if (dragPhase) handleDropOnCanvas(wn, dragPhase); }}
                       onDrop={e => { e.preventDefault(); if (dragPhase) { handleDropOnCanvas(wn, dragPhase); } }}
                       onTouchEnd={() => {
-                        if (touchActive && dragPhase) {
+                        if (dragPhase) {
                           handleDropOnCanvas(wn, dragPhase);
                           setTouchActive(false);
-                          setDragPhase(null);
                         }
                       }}
-                      aria-label={dragPhase ? `Разместить блок на неделе ${wn}` : `Неделя ${wn}`}
+                      aria-label={dragPhase ? `Разместить ${PHASE_LABELS_RU[dragPhase]} на неделе ${wn}` : `Неделя ${wn}`}
                       style={{
-                        position: 'absolute', left: 44 + i * 33, top: 0, width: 33, height: '100%',
-                        background: dragPhase ? 'rgba(0,230,138,0.12)' : 'transparent',
-                        borderLeft: '1px dashed rgba(255,255,255,0.12)',
+                        position: 'absolute', left: 38 + i * colW, top: 0, width: colW, height: '100%',
+                        background: dragPhase ? accent + '14' : 'transparent',
+                        borderLeft: '1px dashed ' + (dragPhase ? accent + '44' : 'rgba(255,255,255,0.10)'),
+                        borderRadius: 6,
                         cursor: dragPhase ? 'copy' : 'default',
                         zIndex: 1,
                       }}
@@ -441,9 +610,11 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 {current.blocks.filter(b => b.startWeek <= quarterEnd && b.endWeek >= quarterStart).map(block => {
                   const visStart = Math.max(block.startWeek, quarterStart);
                   const visEnd = Math.min(block.endWeek, quarterEnd);
-                  const left = (visStart - quarterStart) * 33 + 44;
-                  const width = (visEnd - visStart + 1) * 33 - 2;
+                  const colW = isMobile ? 34 : 36;
+                  const left = (visStart - quarterStart) * colW + 38;
+                  const width = (visEnd - visStart + 1) * colW - 3;
                   const color = DESIGNER_PHASE_VISUAL[block.phaseKey]?.color || PHASE_COLORS[block.phaseKey] || '#666';
+                  const isAllowed = allowedSet.has(block.phaseKey);
                   return (
                     <div key={block.id}
                       onClick={() => setEditBlockId(block.id === editBlockId ? null : block.id)}
@@ -457,24 +628,25 @@ export const PeriodizationDesignerTab: React.FC = () => {
                         }
                       }}
                       style={{
-                        position: 'absolute', left, top: 4, width, height: 36,
-                        borderRadius: 6,
-                        background: color + '28',
-                        border: `1px solid ${editBlockId === block.id ? ACCENT : color + '44'}`,
+                        position: 'absolute', left, top: 6, width, height: 44,
+                        borderRadius: 10,
+                        background: isAllowed ? color + '22' : 'rgba(239,68,68,0.12)',
+                        border: `1.5px solid ${editBlockId === block.id ? accent : (isAllowed ? color + '55' : 'rgba(239,68,68,0.35)')}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '0 6px', cursor: 'pointer', zIndex: 2,
-                        transition: 'border 0.15s',
+                        padding: '0 6px 0 8px', cursor: 'pointer', zIndex: 2,
+                        transition: 'border 0.15s, transform 0.12s',
+                        boxShadow: editBlockId === block.id ? `0 4px 12px ${color}22` : 'none',
+                        overflow: 'hidden',
                       }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, color, flex: 1, wordBreak: 'break-word' }}>
-                        {PHASE_ICONS[block.phaseKey]} {PHASE_LABELS_RU[block.phaseKey]}
+                      <span style={{ fontSize: 11, fontWeight: 700, color: isAllowed ? color : '#ef4444', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {PHASE_ICONS[block.phaseKey]} <span style={{ display: isMobile && width < 80 ? 'none' : 'inline' }}>{PHASE_LABELS_RU[block.phaseKey]}</span><span style={{ display: isMobile && width < 80 ? 'inline' : 'none' }}>{DESIGNER_PHASE_VISUAL[block.phaseKey]?.label.split(' ')[0] ?? block.phaseKey}</span>
                       </span>
-                      <div style={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                        {/* Resize handle (drag right edge) */}
-                        <div style={{ fontSize: 10, color: color + '99' }}>
+                      <div style={{ display: 'flex', gap: 2, alignItems: 'center', flexShrink: 0 }}>
+                        <div style={{ fontSize: 10, color: color + 'BB', fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: 'rgba(0,0,0,0.18)' }}>
                           {block.endWeek - block.startWeek + 1}н
                         </div>
                         <button aria-label={`Удалить блок ${PHASE_LABELS_RU[block.phaseKey]}`} onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }}
-                          style={{ fontSize: 12, padding: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', lineHeight: 1, minWidth: 44, minHeight: 44 }}>
+                          style={{ fontSize: 13, padding: 6, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.18)', borderRadius: 8, cursor: 'pointer', color: '#ef4444', lineHeight: 1, minWidth: 34, minHeight: 34 }}>
                           ✕
                         </button>
                       </div>
@@ -484,77 +656,123 @@ export const PeriodizationDesignerTab: React.FC = () => {
               </div>
 
               {/* Bottom week numbers */}
-              <div style={{ display: 'flex', gap: 1, marginTop: 44 }}>
-                <div style={{ width: 44, flexShrink: 0 }} />
+              <div style={{ display: 'flex', gap: 1, marginTop: 54 }}>
+                <div style={{ width: 38, flexShrink: 0 }} />
                 {Array.from({ length: quarterEnd - quarterStart + 1 }, (_, i) => {
                   const wn = quarterStart + i;
-                  return <div key={wn} style={{ width: 33, flexShrink: 0, textAlign: 'center', fontSize: 10, color: DIM }}>{wn}</div>;
+                  return <div key={wn} className="pd-week-cell" style={{ width: isMobile ? 34 : 36 }}>{wn}</div>;
                 })}
+              </div>
+
+              <div style={{ fontSize: 10, color: DIM, marginTop: 8, textAlign: 'center', lineHeight: 1.4 }}>
+                Свайп по таймлайну → квартал · {isMobile ? `показ ${weeksPerQuarter} нед` : `показ ${weeksPerQuarter} нед`} · тап по фазе → тап по неделе — быстрый ввод без drag
               </div>
             </div>
           </div>
+          ) : (
+          // ── LIST VIEW (mobile friendly) ───────────────────────────────
+          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, padding: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8 }}>📋 Список блоков — {disciplineLabel} · {current.blocks.length} шт · {current.totalWeeks} нед</div>
+            {current.blocks.length === 0 && (
+              <div style={{ padding: 16, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10 }}>Пока пусто — добавьте фазы из палитры выше, выбрав неделю старта</div>
+            )}
+            <div style={{ display: 'grid', gap: 8 }}>
+              {[...current.blocks].sort((a, b) => a.startWeek - b.startWeek).map(block => {
+                const color = DESIGNER_PHASE_VISUAL[block.phaseKey]?.color || PHASE_COLORS[block.phaseKey] || '#666';
+                const isAllowed = allowedSet.has(block.phaseKey);
+                return (
+                  <div key={block.id} onClick={() => setEditBlockId(block.id === editBlockId ? null : block.id)} role="button" tabIndex={0}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12,
+                      background: isAllowed ? color + '14' : 'rgba(239,68,68,0.08)',
+                      border: `1px solid ${editBlockId === block.id ? accent : (isAllowed ? color + '30' : 'rgba(239,68,68,0.25)')}`,
+                      cursor: 'pointer',
+                    }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: color + '22', border: `1px solid ${color}44`, flexShrink: 0 }}>
+                      {PHASE_ICONS[block.phaseKey]}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: isAllowed ? color : '#ef4444', lineHeight: 1.2 }}>{PHASE_LABELS_RU[block.phaseKey]}</div>
+                      <div style={{ fontSize: 11, color: DIM, marginTop: 2 }}>нед {block.startWeek}–{block.endWeek} · {block.endWeek - block.startWeek + 1} нед {isAllowed ? '' : '⚠ не из ' + disciplineLabel}</div>
+                      {block.notes && !block.notes.includes('[OVERLAP') && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{block.notes}</div>}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <button aria-label="Удалить" onClick={e => { e.stopPropagation(); handleDeleteBlock(block.id); }} style={{ ...btn, minHeight: 36, color: '#ef4444' }}>✕</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              <button onClick={() => setViewMode('timeline')} style={{ ...btn, minHeight: 44, flex: 1, background: accent + '14', borderColor: accent + '44', color: accent }}>🗓 Показать таймлайн</button>
+            </div>
+          </div>
+          )}
 
           {/* Edit block panel */}
           {editBlock && (
-            <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, border: '1px solid ' + ACCENT + '44' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: PHASE_COLORS[editBlock.phaseKey] }}>
+            <div className="constructor-surface constructor-surface--accent pd-card-mobile" style={{ ...CARD, border: '1px solid ' + accent + '44', background: accent + '06' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: PHASE_COLORS[editBlock.phaseKey] }}>
                   {PHASE_ICONS[editBlock.phaseKey]} {PHASE_LABELS_RU[editBlock.phaseKey]}
                 </span>
-                <button onClick={() => setEditBlockId(null)} style={{ background: 'transparent', border: 'none', color: DIM, cursor: 'pointer', fontSize: 14 }}>✕</button>
+                <button onClick={() => setEditBlockId(null)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14, width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10 }}>
-                <div><span style={{ color: DIM }}>Старт:</span> <b>нед {editBlock.startWeek}</b></div>
-                <div><span style={{ color: DIM }}>Конец:</span> <b>нед {editBlock.endWeek}</b></div>
-                <div><span style={{ color: DIM }}>Длительность:</span> <b>{editBlock.endWeek - editBlock.startWeek + 1} нед</b></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11, marginBottom: 8 }}>
+                <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Старт</div><b>нед {editBlock.startWeek}</b></div>
+                <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Конец</div><b>нед {editBlock.endWeek}</b></div>
+                <div style={{ padding: 8, borderRadius: 8, background: accent + '14', border: '1px solid ' + accent + '22', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Длит.</div><b>{editBlock.endWeek - editBlock.startWeek + 1} нед</b></div>
               </div>
-              <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Длительность (недель):</div>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Длительность (недель):</div>
                 <input type="range" min={1} max={Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)} value={editBlock.endWeek - editBlock.startWeek + 1}
                   onChange={e => handleResize(editBlock.id, editBlock.startWeek + parseInt(e.target.value) - 1)}
-                  style={{ width: '100%' }} />
+                  style={{ width: '100%', accentColor: accent }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginTop: 2 }}><span>1</span><span>{Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)}</span></div>
               </div>
-              <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Сдвинуть на (недель):</div>
-                <div style={{ display: 'flex', gap: 4 }}>
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Сдвинуть:</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
                   {[-4, -2, -1, 1, 2, 4].map(delta => (
                     <button key={delta} onClick={() => {
                       const newStart = Math.max(1, Math.min(current!.totalWeeks - (editBlock.endWeek - editBlock.startWeek), editBlock.startWeek + delta));
                       handleMoveBlock(editBlock.id, newStart);
                     }}
-                      style={{ ...btn, fontSize: 10, padding: '4px 8px' }}>
+                      style={{ ...btn, fontSize: 12, padding: '8px 4px', minHeight: 44, fontWeight: 800 }}>
                       {delta > 0 ? '+' : ''}{delta}
                     </button>
                   ))}
                 </div>
               </div>
-              <div style={{ marginTop: 6 }}>
-                <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Заметки:</div>
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Заметки:</div>
                 <textarea value={editBlock.notes} onChange={e => {
-                const updated = updateBlockNotes(current!, editBlock.id, e.target.value);
+                  const updated = updateBlockNotes(current!, editBlock.id, e.target.value);
                   commitDesign(updated);
                 }}
-                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, color: '#fff', fontSize: 10, padding: 6, resize: 'vertical', minHeight: 44 }} />
+                  placeholder="Цель блока, акценты, RIR, примечания…"
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#fff', fontSize: 12, padding: 10, resize: 'vertical', minHeight: 64 }} />
               </div>
             </div>
           )}
 
           {/* Phase distribution overview */}
           {stats && Object.keys(stats.phaseCount).length > 0 && (
-            <div style={CARD}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📊 Распределение фаз</div>
-              {Object.entries(stats.phaseCount).map(([pk, count]) => {
+            <div style={CARD} className="pd-card-mobile">
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8 }}>📊 Распределение — {disciplineLabel}</div>
+              {Object.entries(stats.phaseCount).map(([pk]) => {
                 const phaseBlocks = current.blocks.filter(b => b.phaseKey === pk);
                 const totalWeeks = phaseBlocks.reduce((s, b) => s + (b.endWeek - b.startWeek + 1), 0);
                 const pct = stats.totalWeeks > 0 ? Math.round((totalWeeks / stats.totalWeeks) * 100) : 0;
+                const color = PHASE_COLORS[pk as PhaseKey] || '#666';
                 return (
-                  <div key={pk} style={{ marginBottom: 4 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginBottom: 2 }}>
-                      <span><span style={{ color: PHASE_COLORS[pk as PhaseKey] }}>{PHASE_ICONS[pk as PhaseKey]}</span> {PHASE_LABELS_RU[pk as PhaseKey]}</span>
-                      <span>{totalWeeks} нед ({pct}%)</span>
+                  <div key={pk} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: DIM, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 700 }}><span style={{ color }}>{PHASE_ICONS[pk as PhaseKey]}</span> {PHASE_LABELS_RU[pk as PhaseKey]}</span>
+                      <span style={{ fontWeight: 700, color: '#fff' }}>{totalWeeks} нед ({pct}%)</span>
                     </div>
-                    <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', borderRadius: 2, width: `${pct}%`, background: PHASE_COLORS[pk as PhaseKey], transition: 'width 0.3s' }} />
+                    <div style={{ height: 6, borderRadius: 4, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 4, width: `${pct}%`, background: color, transition: 'width 0.3s' }} />
                     </div>
                   </div>
                 );
@@ -562,20 +780,20 @@ export const PeriodizationDesignerTab: React.FC = () => {
             </div>
           )}
 
-          {/* P0-2/P1-2: Overlap + gap warnings */}
+          {/* Overlap + gap warnings */}
           {stats && (stats.overlapWeeks > 0 || stats.gapRanges.length > 0) && (
-            <div role="alert" aria-live="polite" style={{ ...CARD, borderLeft: '3px solid #ef4444' }}>
+            <div role="alert" aria-live="polite" style={{ ...CARD, borderLeft: '3px solid #ef4444' }} className="pd-card-mobile">
               <div style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', marginBottom: 6 }}>⚠ Проблемы структуры</div>
               {stats.overlapWeeks > 0 && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginBottom: 6, lineHeight: 1.45 }}>
                   🔴 Перекрытие блоков: {stats.overlapWeeks} нед. Недели с перекрытием получат непредсказуемую фазу при применении.
-                  <button onClick={handleResolveOverlaps} style={{ ...btn, marginLeft: 8, color: '#ef4444', borderColor: 'rgba(239,68,68,0.45)' }}>
+                  <button onClick={handleResolveOverlaps} style={{ ...btn, marginLeft: 8, color: '#ef4444', borderColor: 'rgba(239,68,68,0.45)', minHeight: 36 }}>
                     Исправить автоматически
                   </button>
                 </div>
               )}
               {stats.gapRanges.length > 0 && (
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)' }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45 }}>
                   🟡 Пропуски (недели без блока → accumulation по умолчанию): {stats.gapRanges.join(', ')}
                 </div>
               )}
@@ -583,7 +801,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
           )}
         </>
       )}
-{current && current.blocks.length > 0 && (() => {
+      {current && current.blocks.length > 0 && (() => {
         const fb = current.blocks[0];
         const seq = current.blocks.map(b => (PHASE_LABELS_RU[b.phaseKey] || b.phaseKey) + ' ' + b.startWeek + '-' + b.endWeek).join(' · ');
         const pick = (pk: PhaseKey) => {
@@ -595,16 +813,16 @@ export const PeriodizationDesignerTab: React.FC = () => {
         };
         const r = pick(fb.phaseKey);
         return (
-          <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>🔗 Применить первый блок «{PHASE_LABELS_RU[fb.phaseKey] || fb.phaseKey}» к планировщику. Полная последовательность: {seq}.</div>
-            <button onClick={() => applyToPlanner({ kind: r.kind, label: 'Периодизация: ' + seq, data: r.data })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44, marginBottom: 8 }}>🛠 Применить первый блок к планировщику</button>
-            {/* Новая кнопка: применить весь дизайн как новую программу (через bridge kind='design') */}
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6, marginTop: 4 }}>📥 Применить ВЕСЬ дизайн ({current.blocks.length} блоков, {current.totalWeeks} нед) к ручному планировщику как новую программу с правильными фазами по всем неделям.</div>
+          <div style={{ marginTop: 12, padding: 14, borderRadius: 14, background: accent + '0E', border: '1px solid ' + accent + '22' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: accent, marginBottom: 6 }}>{disciplineIcon} {disciplineLabel} — применение</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 10, lineHeight: 1.45 }}>🔗 Применить первый блок «{PHASE_LABELS_RU[fb.phaseKey] || fb.phaseKey}» к планировщику. Полная последовательность: {seq}.</div>
+            <button onClick={() => applyToPlanner({ kind: r.kind, label: 'Периодизация: ' + seq, data: r.data })} style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,${accent},${accent}CC)`, color: '#000', fontWeight: 800, fontSize: 13, minHeight: 48, marginBottom: 10 }}>🛠 Применить первый блок — {disciplineLabel}</button>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 6, marginTop: 4, lineHeight: 1.4 }}>📥 Весь дизайн ({current.blocks.length} бл · {current.totalWeeks} нед) в ручной планировщик как новая программа.</div>
             <button
               onClick={async () => {
                 const ok = await confirm({
                   title: 'Применить весь дизайн?',
-                  message: `Будет создана новая программа (${current.totalWeeks} нед, ${current.blocks.length} блоков). Текущая программа будет заменена.`,
+                  message: `Будет создана новая программа (${current.totalWeeks} нед, ${current.blocks.length} блоков) — ${disciplineLabel}. Текущая программа будет заменена.`,
                   confirmLabel: 'Применить',
                   cancelLabel: 'Отмена',
                   danger: false,
@@ -616,13 +834,13 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   data: { design: current, fillExercises: false, daysPerWeek: 4 },
                 });
               }}
-              style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 44, marginBottom: 8 }}
-            >📥 Применить к новой программе (скелет)</button>
+              style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 48, marginBottom: 8 }}
+            >📥 В новую программу (скелет) — {disciplineIcon}</button>
             <button
               onClick={async () => {
                 const ok = await confirm({
                   title: 'Применить дизайн с упражнениями?',
-                  message: `Будет создана новая программа с упражнениями (${current.totalWeeks} нед, ${current.blocks.length} блоков). Текущая программа будет заменена. Это может занять несколько секунд.`,
+                  message: `Будет создана новая программа с упражнениями (${current.totalWeeks} нед, ${current.blocks.length} блоков) — ${disciplineLabel}. Это может занять несколько секунд.`,
                   confirmLabel: 'Применить',
                   cancelLabel: 'Отмена',
                   danger: false,
@@ -634,8 +852,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   data: { design: current, fillExercises: true, daysPerWeek: 4 },
                 });
               }}
-              style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', fontWeight: 700, fontSize: 12, minHeight: 44 }}
-            >🏋️ Применить с упражнениями (autodraft)</button>
+              style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,${accent},#0ea5e9)`, color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 48 }}
+            >🏋️ С упражнениями (autodraft) — {disciplineLabel}</button>
           </div>
         );
       })()}

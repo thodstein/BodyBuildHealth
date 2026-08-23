@@ -38,6 +38,14 @@ export const DESIGNER_PHASE_VISUAL = {
   transition:              { color: '#6b7280', icon: '⏸', label: 'Переходный период' },
 } as const;
 
+// ── Разделение ПЛ / ББ — наборы ключей (синхрон с periodization-designer.engine) ─
+export const PL_DESIGNER_KEYS = ['gpp','accumulation_strength','intensification','peaking','deload','power','technique','transition'] as const;
+export const BB_DESIGNER_KEYS = ['gpp','accumulation_hypertrophy','accumulation_strength','intensification','peaking','deload','conditioning','transition'] as const;
+export type DesignerDiscipline = 'pl' | 'bb';
+export function getDesignerKeysForDiscipline(d: DesignerDiscipline): readonly string[] {
+  return d === 'pl' ? PL_DESIGNER_KEYS : BB_DESIGNER_KEYS;
+}
+
 /** Приоритет соревнования → визуальный токен */
 export const COMPETITION_PRIORITY_VISUAL = {
   A: { color: '#ef4444', icon: '🔴', label: 'Главное' },

@@ -56,6 +56,60 @@ export const PHASE_LABELS_RU: Record<PhaseKey, string> = {
   transition: 'Переходный период',
 };
 
+// ── ПЛ vs ББ: разные наборы фаз (пользователь требует разделение) ────────
+// ПЛ (пауэрлифтинг): упор на силу/технику/взрыв — гипертрофия как подсобка исключена,
+// зато есть техника и мощностной (DE/Speed) блоки.  Источники: Bompa, Issurin,
+// Westside (DE), Helms.
+// ББ (бодибилдинг): упор на гипертрофию/качество формы — техника спецухи и
+// мощностной блок паурлифтера исключены, зато есть кондиционный/памп и
+// гипертрофийное накопление.
+export const PL_PHASE_KEYS: PhaseKey[] = [
+  'gpp',
+  'accumulation_strength',
+  'intensification',
+  'peaking',
+  'deload',
+  'power',
+  'technique',
+  'transition',
+];
+export const BB_PHASE_KEYS: PhaseKey[] = [
+  'gpp',
+  'accumulation_hypertrophy',
+  'accumulation_strength',
+  'intensification',
+  'peaking',
+  'deload',
+  'conditioning',
+  'transition',
+];
+/** ПЛ/ББ дисциплина для UI (упрощает sport → набор фаз). */
+export type DesignerDiscipline = 'pl' | 'bb';
+export function sportToDiscipline(sport: MacrocycleDesign['sport']): DesignerDiscipline {
+  if (sport === 'powerlifting' || sport === 'weightlifting') return 'pl';
+  if (sport === 'bodybuilding') return 'bb';
+  // general/crossfit — по умолчанию считаем ББ (масса/памп ближе к запросу),
+  // но допускается ручное переключение в UI.
+  return sport === 'powerlifting' ? 'pl' : 'bb';
+}
+export function getAllowedPhaseKeysForSport(sport: MacrocycleDesign['sport']): PhaseKey[] {
+  return sportToDiscipline(sport) === 'pl' ? PL_PHASE_KEYS : BB_PHASE_KEYS;
+}
+export function getAllowedPhaseKeysForDiscipline(discipline: DesignerDiscipline): PhaseKey[] {
+  return discipline === 'pl' ? PL_PHASE_KEYS : BB_PHASE_KEYS;
+}
+export function isPhaseAllowedForSport(phase: PhaseKey, sport: MacrocycleDesign['sport']): boolean {
+  return getAllowedPhaseKeysForSport(sport).includes(phase);
+}
+export function isPhaseAllowedForDiscipline(phase: PhaseKey, discipline: DesignerDiscipline): boolean {
+  return getAllowedPhaseKeysForDiscipline(discipline).includes(phase);
+}
+/** Человекочитаемая сводка, какие фазы исключены из данного режима (для баннера). */
+export function excludedPhasesForSport(sport: MacrocycleDesign['sport']): PhaseKey[] {
+  const allowed = new Set(getAllowedPhaseKeysForSport(sport));
+  return (Object.keys(PHASE_COLORS) as PhaseKey[]).filter(k => !allowed.has(k));
+}
+
 export interface DesignerPhaseBlock {
   id: string;
   phaseKey: PhaseKey;
@@ -151,14 +205,28 @@ export interface HabitStats {
 
 const STORAGE_KEY = 'he_macrocycle_designs';
 
-export function createEmptyDesign(name?: string): MacrocycleDesign {
+export function createEmptyDesign(name?: string, sport?: MacrocycleDesign['sport']): MacrocycleDesign {
   return {
     id: 'design_' + Date.now(),
     name: name || 'Новый макроцикл',
     totalWeeks: 52,
     blocks: [],
-    sport: 'general',
-    goal: 'strength',
+    sport: sport || 'general',
+    goal: sport === 'bodybuilding' ? 'hypertrophy' : 'strength',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+export function createEmptyDesignForDiscipline(discipline: DesignerDiscipline, name?: string): MacrocycleDesign {
+  const sport: MacrocycleDesign['sport'] = discipline === 'pl' ? 'powerlifting' : 'bodybuilding';
+  const goal: MacrocycleDesign['goal'] = discipline === 'pl' ? 'strength' : 'hypertrophy';
+  return {
+    id: 'design_' + Date.now(),
+    name: name || (discipline === 'pl' ? 'Новый ПЛ-макроцикл' : 'Новый ББ-макроцикл'),
+    totalWeeks: discipline === 'pl' ? 16 : 16,
+    blocks: [],
+    sport,
+    goal,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -335,6 +403,25 @@ export function getDesignStats(design: MacrocycleDesign): DesignStats {
   return { totalWeeks, usedWeeks, freeWeeks, blockCount: design.blocks.length, phaseCount, overlapWeeks, gapRanges };
 }
 
+/** Пресеты для ПЛ (powerlifting): акцент — сила/техника/пик. Без гипертрофийного объёма. */
+export function getPLPresetDesigns(): MacrocycleDesign[] {
+  return [
+    createFromPhases('ПЛ · 12-нед классика (сила)', 12, ['gpp', 'accumulation_strength', 'accumulation_strength', 'deload', 'intensification', 'intensification', 'deload', 'peaking', 'deload'], 'powerlifting', 'strength'),
+    createFromPhases('ПЛ · 16-нед объём → интенсификация', 16, ['gpp', 'accumulation_strength', 'accumulation_strength', 'deload', 'intensification', 'intensification', 'peaking', 'deload', 'accumulation_strength', 'intensification', 'peaking', 'deload'], 'powerlifting', 'strength'),
+    createFromPhases('ПЛ · 8-нед блочная (Issurin)', 8, ['accumulation_strength', 'intensification', 'peaking'], 'powerlifting', 'peaking'),
+    createFromPhases('ПЛ · 52-нед годовой', 52, ['gpp', 'gpp', 'accumulation_strength', 'accumulation_strength', 'deload', 'intensification', 'power', 'deload', 'peaking', 'deload', 'transition', 'gpp', 'accumulation_strength', 'technique', 'deload', 'intensification', 'power', 'peaking', 'deload', 'transition'], 'powerlifting', 'strength'),
+  ];
+}
+/** Пресеты для ББ (bodybuilding): акцент — гипертрофия/памп/сушка. Без техники/мощности ПЛ. */
+export function getBBPresetDesigns(): MacrocycleDesign[] {
+  return [
+    createFromPhases('ББ · 16-нед масса', 16, ['gpp', 'accumulation_hypertrophy', 'accumulation_hypertrophy', 'deload', 'accumulation_hypertrophy', 'intensification', 'deload', 'peaking', 'deload'], 'bodybuilding', 'hypertrophy'),
+    createFromPhases('ББ · 12-нед сушка (памп → пик)', 12, ['accumulation_hypertrophy', 'accumulation_hypertrophy', 'deload', 'conditioning', 'conditioning', 'deload', 'peaking', 'deload'], 'bodybuilding', 'hypertrophy'),
+    createFromPhases('ББ · 8-нед интенсификация', 8, ['accumulation_hypertrophy', 'intensification', 'peaking'], 'bodybuilding', 'hypertrophy'),
+    createFromPhases('ББ · 52-нед годовой (масса → сушка)', 52, ['gpp', 'accumulation_hypertrophy', 'accumulation_hypertrophy', 'deload', 'accumulation_strength', 'intensification', 'deload', 'conditioning', 'conditioning', 'deload', 'peaking', 'transition', 'gpp', 'accumulation_hypertrophy', 'accumulation_hypertrophy', 'deload', 'intensification', 'conditioning', 'peaking', 'transition'], 'bodybuilding', 'hypertrophy'),
+  ];
+}
+/** Универсальные — legacy 4 пресета (для обратной совместимости и тестов). */
 export function getDefaultPresetDesigns(): MacrocycleDesign[] {
   return [
     createFromPhases('Классический 12-нед (сила)', 12, ['accumulation_strength', 'accumulation_strength', 'deload', 'intensification', 'intensification', 'deload', 'peaking', 'deload'], 'powerlifting', 'strength'),
@@ -342,6 +429,13 @@ export function getDefaultPresetDesigns(): MacrocycleDesign[] {
     createFromPhases('52-нед годовой план', 52, ['gpp', 'gpp', 'accumulation_strength', 'accumulation_strength', 'deload', 'intensification', 'intensification', 'deload', 'peaking', 'deload', 'transition', 'gpp', 'accumulation_hypertrophy', 'accumulation_hypertrophy', 'deload', 'intensification', 'intensification', 'deload', 'peaking', 'deload', 'transition'], 'general', 'strength'),
     createFromPhases('Блочная 8-нед (Issurin)', 8, ['accumulation_hypertrophy', 'intensification', 'peaking'], 'powerlifting', 'peaking'),
   ];
+}
+/** Пресеты, отфильтрованные под дисциплину. */
+export function getPresetsForDiscipline(discipline: DesignerDiscipline): MacrocycleDesign[] {
+  return discipline === 'pl' ? getPLPresetDesigns() : getBBPresetDesigns();
+}
+export function getPresetsForSport(sport: MacrocycleDesign['sport']): MacrocycleDesign[] {
+  return getPresetsForDiscipline(sportToDiscipline(sport));
 }
 
 function createFromPhases(name: string, totalWeeks: number, phaseKeys: PhaseKey[], sport: MacrocycleDesign['sport'], goal: MacrocycleDesign['goal']): MacrocycleDesign {
