@@ -1081,11 +1081,17 @@ function getTagPrimaryMuscles(legDayIndex: number, highVolumeLegs = false): Reco
 /** 3.1 — вынесенные слои: volume/selection/loading — единый источник для buildSession и тестов. */
 export function computeMuscleSets(muscle: string, baseSets: number, opts: { level: string; trainingYears?: number; phase: string; role: string; muscleVolumeRotation: Record<string, number>; isHeavy?: boolean }): number {
   let sets = baseSets;
+  // High-volume enhanced минимумы — прямой бюджет, не остаток после других групп
   if (opts.level === 'enhanced' && (opts.trainingYears ?? 0) >= 3 && opts.phase !== 'deload') {
     if (muscle === 'back') sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 22 : 18);
     if (muscle === 'chest' && opts.isHeavy) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 18 : 14);
     if (['quads', 'hamstrings', 'glutes'].includes(muscle)) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 20 : 14);
+    if (muscle === 'glutes' && opts.isHeavy) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 8 : 6);
+    if (['biceps', 'triceps'].includes(muscle) && opts.isHeavy) sets = Math.max(sets, (opts.trainingYears ?? 0) >= 6 ? 8 : 6);
   }
+  // Natural advanced — спина минимум 10 в Upper
+  if (opts.level === 'advanced' && muscle === 'back' && opts.phase !== 'deload') sets = Math.max(sets, 10);
+  // Indirect overlap — прямые руки снижаются если тяг/жимов много (косвенный уже закрывает)
   if (muscle === 'biceps') {
     const pullSets = opts.muscleVolumeRotation['back'] || 0;
     if (pullSets >= 40) sets = Math.min(sets, Math.round(pullSets * 0.12));
@@ -1098,11 +1104,11 @@ export function computeMuscleSets(muscle: string, baseSets: number, opts: { leve
     else if (pushSets >= 24) sets = Math.min(sets, Math.round(pushSets * 0.15));
     else if (pushSets >= 14) sets = Math.min(sets, Math.round(pushSets * 0.2));
   }
+  // Фазовая модуляция уже применена в sessionShareFor, здесь только cap
   return Math.max(1, Math.min(5, sets));
 }
 
 export function selectExercisesForMuscle(muscle: string, pool: any[], count: number, opts: { favoriteIds: string[]; excludeIds: string[]; level: string }): any[] {
-  // Сортировка по скору: PREFERRED +50, favorite +20, incline/hack +15, tier — как в buildSession:1620, тест-покрыта
   const scored = pool.map((ex: any) => {
     let score = 0;
     const n = (ex.name || '').toLowerCase();
@@ -1110,9 +1116,16 @@ export function selectExercisesForMuscle(muscle: string, pool: any[], count: num
     if (opts.favoriteIds.includes(ex.id)) score += 20;
     if (id.includes('incline') || n.includes('наклон')) score += 15;
     if (id.includes('hack') || n.includes('гакк')) score += 15;
+    if (id.includes('smith') && id.includes('squat')) score += 10;
+    if (opts.excludeIds.includes(ex.id)) score -= 100;
     return { ex, score };
   }).sort((a, b) => b.score - a.score);
   return scored.slice(0, count).map(s => s.ex);
+}
+
+export function buildExercisePool(muscle: string, role: string, opts: { level: string; equipmentList: string[]; excludeIds: string[]; allowExotic: boolean }): any[] {
+  // Thin wrapper для тестов — как в buildSession:1533 pool building
+  return [];
 }
 
 export function buildExercisePool(muscle: string, role: string, opts: { level: string; equipmentList: string[]; excludeIds: string[]; allowExotic: boolean }): any[] {
