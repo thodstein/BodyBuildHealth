@@ -88,9 +88,7 @@ export type DesignerDiscipline = 'pl' | 'bb';
 export function sportToDiscipline(sport: MacrocycleDesign['sport']): DesignerDiscipline {
   if (sport === 'powerlifting' || sport === 'weightlifting') return 'pl';
   if (sport === 'bodybuilding') return 'bb';
-  // general/crossfit — по умолчанию считаем ББ (масса/памп ближе к запросу),
-  // но допускается ручное переключение в UI.
-  return sport === 'powerlifting' ? 'pl' : 'bb';
+  return 'bb';
 }
 export function getAllowedPhaseKeysForSport(sport: MacrocycleDesign['sport']): PhaseKey[] {
   return sportToDiscipline(sport) === 'pl' ? PL_PHASE_KEYS : BB_PHASE_KEYS;
@@ -611,6 +609,36 @@ const BLOCK_TEMPLATES: Record<PhaseKey, PeriodizationBlock> = {
     description: 'Активное восстановление после цикла: сниженный объём, лёгкая техника и подготовка к следующему этапу.',
   },
 };
+
+// ── Дисциплинарные подсказки: как фазы дизайнера соотносятся с авто ──
+export const PL_PHASE_GUIDE: Record<PhaseKey, { autoPeriod: string; bbPhase: string; tip: string }> = {
+  gpp: { autoPeriod: 'endurance (LMS)', bbPhase: 'accumulation', tip: 'ПЛ-авто: база GPP → LMS endurance/mixed, как в Макроцикле endurance' },
+  accumulation_strength: { autoPeriod: 'strength (LMS)', bbPhase: 'accumulation', tip: 'ПЛ-авто: накопление силы → LMS strength, 5-8 повт, RIR 2' },
+  intensification: { autoPeriod: 'strength/mixed (LMS)', bbPhase: 'intensification', tip: 'ПЛ-авто: intensification → LMS strength/peak, 3-5 повт, RIR 1' },
+  peaking: { autoPeriod: 'peak (LMS)', bbPhase: 'peaking', tip: 'ПЛ-авто: пик → LMS peak, синглы/двойки, RIR 0.5' },
+  deload: { autoPeriod: 'mixed/deload (LMS)', bbPhase: 'deload', tip: 'ПЛ-авто: разгрузка → LMS mixed, 40-60% веса, как в deload' },
+  power: { autoPeriod: 'strength (DE) (LMS)', bbPhase: 'intensification', tip: 'ПЛ-авто: DE/скоростной → LMS strength, VBT, как в power' },
+  technique: { autoPeriod: 'strength/technique (LMS)', bbPhase: 'accumulation', tip: 'ПЛ-авто: техника → LMS strength/mixed, паузы/темп' },
+  transition: { autoPeriod: 'transition (LMS)', bbPhase: 'deload', tip: 'ПЛ-авто: переход → LMS transition/deload' },
+  accumulation_hypertrophy: { autoPeriod: 'mass (LMS)', bbPhase: 'accumulation', tip: 'ПЛ: гипертрофия как подсобка — в ПЛ-палитре скрыта' },
+  conditioning: { autoPeriod: 'endurance (LMS)', bbPhase: 'accumulation', tip: 'ПЛ: кондиция — в ПЛ-палитре скрыта, в ББ — памп' },
+};
+export const BB_PHASE_GUIDE: Record<PhaseKey, { autoPeriod: string; bbPhase: string; tip: string }> = {
+  gpp: { autoPeriod: 'GPP/база (BB)', bbPhase: 'accumulation', tip: 'ББ-авто: GPP → накопление, объём ×1.0, RIR 3, 8-15 повт' },
+  accumulation_hypertrophy: { autoPeriod: 'hypertrophy (BB)', bbPhase: 'accumulation', tip: 'ББ-авто: накопление гипертрофия → accumulation, объём ×1.0, RIR 2.5' },
+  accumulation_strength: { autoPeriod: 'strength (BB)', bbPhase: 'accumulation', tip: 'ББ-авто: накопление сила → accumulation, 5-8 повт, RIR 2' },
+  intensification: { autoPeriod: 'strength (BB)', bbPhase: 'intensification', tip: 'ББ-авто: intensification → intensification, объём ×0.85, RIR 1' },
+  peaking: { autoPeriod: 'peaking (BB)', bbPhase: 'peaking', tip: 'ББ-авто: пик → peaking, объём ×0.65, RIR 0-1' },
+  deload: { autoPeriod: 'deload (BB)', bbPhase: 'deload', tip: 'ББ-авто: разгрузка → deload, объём ×0.5, RIR 4' },
+  conditioning: { autoPeriod: 'conditioning (BB)', bbPhase: 'accumulation', tip: 'ББ-авто: кондиция/памп → high volume, 5 дн/нед, как в conditioning' },
+  transition: { autoPeriod: 'transition (BB)', bbPhase: 'deload', tip: 'ББ-авто: переход → deload, активное восстановление' },
+  power: { autoPeriod: 'power (BB)', bbPhase: 'intensification', tip: 'ББ: мощностной — в ББ-палитре скрыт, в ПЛ — DE' },
+  technique: { autoPeriod: 'technique (BB)', bbPhase: 'accumulation', tip: 'ББ: техника — в ББ-палитре скрыта, в ПЛ — спецуха' },
+};
+export function getDisciplinePhaseGuide(discipline: DesignerDiscipline, phase: PhaseKey): { autoPeriod: string; bbPhase: string; tip: string } {
+  const map = discipline === 'pl' ? PL_PHASE_GUIDE : BB_PHASE_GUIDE;
+  return map[phase] || { autoPeriod: '-', bbPhase: '-', tip: '' };
+}
 
 const PROGRESSION_MODELS = [
   { id: 'linear', name: 'Линейная периодизация', desc: 'Объём ↓, интенсивность ↑ от блока к блоку' },

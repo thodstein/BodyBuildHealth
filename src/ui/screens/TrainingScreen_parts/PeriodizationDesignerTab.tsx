@@ -29,6 +29,7 @@ import {
   getBBPresetDesigns,
   getPresetsForDiscipline,
   getPhaseTemplate,
+  getDisciplinePhaseGuide,
 } from '../../../engines/periodization-designer.engine';
 import { applyToPlanner } from './planner-bridge';
 import { DESIGNER_PHASE_VISUAL } from './phase-visual-tokens';
@@ -74,6 +75,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [showHelp, setShowHelp] = useState(false);
   const [activePanel, setActivePanel] = useState<'phases' | 'splits'>('phases');
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
+  const [plShowCompare, setPlShowCompare] = useState(false);
+  const [bbShowCompare, setBbShowCompare] = useState(false);
   // — подбор сплитов/циклов —
   const [plLevel, setPlLevel] = useState('intermediate');
   const [plDays, setPlDays] = useState(4);
@@ -212,10 +215,10 @@ export const PeriodizationDesignerTab: React.FC = () => {
     if (!current) return;
     const updated = setDesignTotalWeeks(current, weeks);
     commitDesign(updated);
-    // если квартёр вышел за границу — вернём
-    const newCount = Math.max(1, Math.ceil(updated.totalWeeks / weeksPerQuarter));
+    const wpq = isMobile ? 8 : 13;
+    const newCount = Math.max(1, Math.ceil(updated.totalWeeks / wpq));
     if (viewQuarter >= newCount) setViewQuarter(Math.max(0, newCount - 1));
-  }, [current, commitDesign, viewQuarter, weeksPerQuarter]);
+  }, [current, commitDesign, viewQuarter, isMobile]);
 
   const handleDuplicateBlock = useCallback((blockId: string) => {
     if (!current) return;
@@ -696,6 +699,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                     const tmpl = getPhaseTemplate(pk as PhaseKey);
                     if (!tmpl) return null;
                     const color = PHASE_COLORS[pk as PhaseKey] || '#666';
+                    const guide = getDisciplinePhaseGuide(effectiveDiscipline, pk as PhaseKey);
                     return (
                       <div key={pk} style={{ padding: 10, borderRadius: 10, background: color+'12', border: `1px solid ${color}33`, display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -704,11 +708,11 @@ export const PeriodizationDesignerTab: React.FC = () => {
                           <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM, background: 'rgba(0,0,0,0.18)', padding: '2px 6px', borderRadius: 6 }}>{tmpl.weeks}н · {tmpl.volumeLevel}/{tmpl.intensityLevel}</span>
                         </div>
                         <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', lineHeight: 1.35 }}>{tmpl.description}</div>
+                        <div style={{ fontSize: 9, color: accent, background: accent+'12', border: `1px solid ${accent}22`, borderRadius: 6, padding: '4px 6px', lineHeight: 1.3 }}>{guide.tip} · <span style={{ color: DIM }}>Авто: {guide.autoPeriod} → {guide.bbPhase}</span></div>
                         <div style={{ fontSize: 10, color: DIM, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                           <span>RPE {tmpl.rpeTarget}</span><span>· RIR {tmpl.rirTarget}</span><span>· {tmpl.frequencyDays} дн/нед</span><span>· {tmpl.focus}</span>
                         </div>
                         <button onClick={() => {
-                          // добавить в конец или после последнего блока
                           const nextWeek = current ? Math.max(1, current.blocks.reduce((m, b) => Math.max(m, b.endWeek), 0) + 1) : 1;
                           if (current && nextWeek <= current.totalWeeks) handleDropOnCanvas(nextWeek, pk as PhaseKey);
                         }} style={{ ...btn, minHeight: 36, marginTop: 4, background: color+'18', borderColor: color+'33', color }}>➕ Добавить</button>
@@ -767,31 +771,37 @@ export const PeriodizationDesignerTab: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: DIM, marginBottom: 4 }}>⚖️ Сравнение двух циклов (отдельная кнопка)</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
-                      <select value={plCycleA} onChange={e => setPlCycleA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                        {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
-                      </select>
-                      <select value={plCycleB} onChange={e => setPlCycleB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                        {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
-                      </select>
-                    </div>
-                    {(() => {
-                      const a = LMS_CYCLES.find(c => c.meta.id===plCycleA);
-                      const b = LMS_CYCLES.find(c => c.meta.id===plCycleB);
-                      if (!a || !b) return null;
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
-                          <div style={{ color: DIM, fontWeight: 700 }}>Параметр</div><div style={{ color: '#60a5fa', fontWeight: 700, textAlign: 'center' }}>{a.meta.title.slice(0,18)}</div><div style={{ color: '#a78bfa', fontWeight: 700, textAlign: 'center' }}>{b.meta.title.slice(0,18)}</div>
-                          <div style={{ color: DIM }}>Период</div><div style={{ textAlign: 'center' }}>{a.meta.period}</div><div style={{ textAlign: 'center' }}>{b.meta.period}</div>
-                          <div style={{ color: DIM }}>Уровень</div><div style={{ textAlign: 'center' }}>{a.meta.level}</div><div style={{ textAlign: 'center' }}>{b.meta.level}</div>
-                          <div style={{ color: DIM }}>Направ.</div><div style={{ textAlign: 'center' }}>{a.meta.direction}</div><div style={{ textAlign: 'center' }}>{b.meta.direction}</div>
-                          <div style={{ color: DIM }}>Дн/нед</div><div style={{ textAlign: 'center' }}>{a.meta.sessionsPerWeek}</div><div style={{ textAlign: 'center' }}>{b.meta.sessionsPerWeek}</div>
-                          <div style={{ color: DIM }}>Недель</div><div style={{ textAlign: 'center' }}>{a.meta.weeks}</div><div style={{ textAlign: 'center' }}>{b.meta.weeks}</div>
-                          <div style={{ color: DIM }}>Прогр./нед</div><div style={{ textAlign: 'center' }}>{(a.meta.correctionPct*100).toFixed(2)}%</div><div style={{ textAlign: 'center' }}>{(b.meta.correctionPct*100).toFixed(2)}%</div>
+                    <button onClick={() => setPlShowCompare(v => !v)} style={{ ...btn, width: '100%', minHeight: 44, marginBottom: 6, background: plShowCompare ? accent+'18' : 'rgba(255,255,255,0.04)', borderColor: plShowCompare ? accent+'44' : 'rgba(255,255,255,0.08)', color: plShowCompare ? accent : '#fff', fontWeight: 800 }}>
+                      {plShowCompare ? '✕ Скрыть сравнение' : '⚖️ Сравнить два цикла (отдельная кнопка)'}
+                    </button>
+                    {plShowCompare && (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                          <select value={plCycleA} onChange={e => setPlCycleA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                            {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
+                          </select>
+                          <select value={plCycleB} onChange={e => setPlCycleB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                            {LMS_CYCLES.filter(c => (c.meta.direction as string) !== 'bodybuilding').slice(0,30).map(c => <option key={c.meta.id} value={c.meta.id}>{c.meta.title} ({c.meta.level})</option>)}
+                          </select>
                         </div>
-                      );
-                    })()}
+                        {(() => {
+                          const a = LMS_CYCLES.find(c => c.meta.id===plCycleA);
+                          const b = LMS_CYCLES.find(c => c.meta.id===plCycleB);
+                          if (!a || !b) return null;
+                          return (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+                              <div style={{ color: DIM, fontWeight: 700 }}>Параметр</div><div style={{ color: '#60a5fa', fontWeight: 700, textAlign: 'center' }}>{a.meta.title.slice(0,18)}</div><div style={{ color: '#a78bfa', fontWeight: 700, textAlign: 'center' }}>{b.meta.title.slice(0,18)}</div>
+                              <div style={{ color: DIM }}>Период</div><div style={{ textAlign: 'center' }}>{a.meta.period}</div><div style={{ textAlign: 'center' }}>{b.meta.period}</div>
+                              <div style={{ color: DIM }}>Уровень</div><div style={{ textAlign: 'center' }}>{a.meta.level}</div><div style={{ textAlign: 'center' }}>{b.meta.level}</div>
+                              <div style={{ color: DIM }}>Направ.</div><div style={{ textAlign: 'center' }}>{a.meta.direction}</div><div style={{ textAlign: 'center' }}>{b.meta.direction}</div>
+                              <div style={{ color: DIM }}>Дн/нед</div><div style={{ textAlign: 'center' }}>{a.meta.sessionsPerWeek}</div><div style={{ textAlign: 'center' }}>{b.meta.sessionsPerWeek}</div>
+                              <div style={{ color: DIM }}>Недель</div><div style={{ textAlign: 'center' }}>{a.meta.weeks}</div><div style={{ textAlign: 'center' }}>{b.meta.weeks}</div>
+                              <div style={{ color: DIM }}>Прогр./нед</div><div style={{ textAlign: 'center' }}>{(a.meta.correctionPct*100).toFixed(2)}%</div><div style={{ textAlign: 'center' }}>{(b.meta.correctionPct*100).toFixed(2)}%</div>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -825,32 +835,38 @@ export const PeriodizationDesignerTab: React.FC = () => {
                         </div>
                       ))}
                     </div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: DIM, marginBottom: 4 }}>⚖️ Сравнение двух сплитов (отдельная кнопка)</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
-                      <select value={bbSplitA} onChange={e => setBbSplitA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                        {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
-                      </select>
-                      <select value={bbSplitB} onChange={e => setBbSplitB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
-                        {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
-                      </select>
-                    </div>
-                    {(() => {
-                      const a = SPLIT_PATTERNS.find(p=>p.id===bbSplitA);
-                      const b = SPLIT_PATTERNS.find(p=>p.id===bbSplitB);
-                      if (!a || !b) return null;
-                      const aEff = (a.sessionsPerRotation*7/a.rotationDays).toFixed(1);
-                      const bEff = (b.sessionsPerRotation*7/b.rotationDays).toFixed(1);
-                      return (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
-                          <div style={{ color: DIM, fontWeight: 700 }}>Параметр</div><div style={{ color: '#f472b6', fontWeight: 700, textAlign: 'center' }}>{a.name.slice(0,16)}</div><div style={{ color: '#60a5fa', fontWeight: 700, textAlign: 'center' }}>{b.name.slice(0,16)}</div>
-                          <div style={{ color: DIM }}>Ротация</div><div style={{ textAlign: 'center' }}>{a.rotationDays}д</div><div style={{ textAlign: 'center' }}>{b.rotationDays}д</div>
-                          <div style={{ color: DIM }}>Тр/ротация</div><div style={{ textAlign: 'center' }}>{a.sessionsPerRotation}</div><div style={{ textAlign: 'center' }}>{b.sessionsPerRotation}</div>
-                          <div style={{ color: DIM }}>Эфф. дн/нед</div><div style={{ textAlign: 'center' }}>{aEff}</div><div style={{ textAlign: 'center' }}>{bEff}</div>
-                          <div style={{ color: DIM }}>Направ.</div><div style={{ textAlign: 'center' }}>{a.direction || 'both'}</div><div style={{ textAlign: 'center' }}>{b.direction || 'both'}</div>
-                          <div style={{ color: DIM }}>Уровни</div><div style={{ textAlign: 'center', fontSize: 9 }}>{a.level.join('/')}</div><div style={{ textAlign: 'center', fontSize: 9 }}>{b.level.join('/')}</div>
+                    <button onClick={() => setBbShowCompare(v => !v)} style={{ ...btn, width: '100%', minHeight: 44, marginBottom: 6, background: bbShowCompare ? accent+'18' : 'rgba(255,255,255,0.04)', borderColor: bbShowCompare ? accent+'44' : 'rgba(255,255,255,0.08)', color: bbShowCompare ? accent : '#fff', fontWeight: 800 }}>
+                      {bbShowCompare ? '✕ Скрыть сравнение' : '⚖️ Сравнить два сплита (отдельная кнопка)'}
+                    </button>
+                    {bbShowCompare && (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8, marginBottom: 6 }}>
+                          <select value={bbSplitA} onChange={e => setBbSplitA(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                            {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
+                          </select>
+                          <select value={bbSplitB} onChange={e => setBbSplitB(e.target.value)} style={{ ...btn, minHeight: 44, background: '#18181b', textAlign: 'left' }}>
+                            {SPLIT_PATTERNS.slice(0,24).map(p => <option key={p.id} value={p.id}>{p.name} ({p.sessionsPerRotation}/{p.rotationDays}д)</option>)}
+                          </select>
                         </div>
-                      );
-                    })()}
+                        {(() => {
+                          const a = SPLIT_PATTERNS.find(p=>p.id===bbSplitA);
+                          const b = SPLIT_PATTERNS.find(p=>p.id===bbSplitB);
+                          if (!a || !b) return null;
+                          const aEff = (a.sessionsPerRotation*7/a.rotationDays).toFixed(1);
+                          const bEff = (b.sessionsPerRotation*7/b.rotationDays).toFixed(1);
+                          return (
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8, padding: 8, border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+                              <div style={{ color: DIM, fontWeight: 700 }}>Параметр</div><div style={{ color: '#f472b6', fontWeight: 700, textAlign: 'center' }}>{a.name.slice(0,16)}</div><div style={{ color: '#60a5fa', fontWeight: 700, textAlign: 'center' }}>{b.name.slice(0,16)}</div>
+                              <div style={{ color: DIM }}>Ротация</div><div style={{ textAlign: 'center' }}>{a.rotationDays}д</div><div style={{ textAlign: 'center' }}>{b.rotationDays}д</div>
+                              <div style={{ color: DIM }}>Тр/ротация</div><div style={{ textAlign: 'center' }}>{a.sessionsPerRotation}</div><div style={{ textAlign: 'center' }}>{b.sessionsPerRotation}</div>
+                              <div style={{ color: DIM }}>Эфф. дн/нед</div><div style={{ textAlign: 'center' }}>{aEff}</div><div style={{ textAlign: 'center' }}>{bEff}</div>
+                              <div style={{ color: DIM }}>Направ.</div><div style={{ textAlign: 'center' }}>{a.direction || 'both'}</div><div style={{ textAlign: 'center' }}>{b.direction || 'both'}</div>
+                              <div style={{ color: DIM }}>Уровни</div><div style={{ textAlign: 'center', fontSize: 9 }}>{a.level.join('/')}</div><div style={{ textAlign: 'center', fontSize: 9 }}>{b.level.join('/')}</div>
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
