@@ -2518,7 +2518,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     recoveryScore,
     calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg,
     labMrvMultiplier: input.labMrvMultiplier,
-    level, trainingYears: input.trainingYears,
+    level, trainingYears: input.trainingYears, trainingVolumeMode: input.trainingVolumeMode,
   }, { id: pattern.id, sessionGroups: sessions.length });
 
   const today = todayStr();
@@ -2590,6 +2590,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (mesoProgression) {
       v = applyVolumeProgression(m, v, mesoProgression);
     }
+    // Объёмный тренинг — +25% даже для макс опыта (ранее high только ставил volumeGoal=mrv, для max опыта mrv уже был — эффекта 0)
+    if (input.trainingVolumeMode === 'high') v = Math.round(v * 1.25);
     return v;
   };
   // Базовый целевой объём мышцы для резолвера (спец-блок или баланс).
@@ -2638,6 +2640,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Единый режим-множитель (×2 на курсе на главные мышцы) — без стэкинга
       // pedAdapt × backProfile/legProfile/torsoProfile capMult.
       let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * legFreqMult);
+      if (input.trainingVolumeMode === 'high') capMrv = Math.round(capMrv * 1.15);
       // Руки/ягодицы/плечи: при больших тягах/жимах/приседаниях косвенный
       // объём закрывает часть target, но потолок тоже должен расти со стажем
       // (иначе ложный MRV-overflow на enhanced-планах).

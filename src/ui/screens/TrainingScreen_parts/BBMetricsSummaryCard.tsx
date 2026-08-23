@@ -27,9 +27,9 @@ const STATUS_RU: Record<BBMuscleVolume['status'], { label: string; color: string
 
 const Tile: React.FC<{ label: string; value: string; color?: string; hint?: string }> = ({ label, value, color = 'rgba(255,255,255,0.9)', hint }) => (
   <div style={{ padding: '8px 6px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center', minWidth: 0 }}>
-    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.03em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
     <div style={{ fontSize: 15, fontWeight: 800, color, lineHeight: 1.2, marginTop: 2 }}>{value}</div>
-    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>{hint}</div>}
+    {hint && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{hint}</div>}
   </div>
 );
 
@@ -43,7 +43,7 @@ export const BBMetricsSummaryCard: React.FC<{ metrics: BBPlanMetrics | null }> =
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>📊 Сводка плана</div>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 1 }}>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>
             Метрики по пиковой неделе · {metrics.sessionsPerRotation} сессий/ротацию
           </div>
         </div>

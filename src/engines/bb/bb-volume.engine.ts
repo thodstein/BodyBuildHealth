@@ -160,6 +160,7 @@ export function sessionLimitsFor(
     labMrvMultiplier?: number;
     level?: string;
     trainingYears?: number;
+    trainingVolumeMode?: 'standard' | 'high';
   },
   split?: { id?: string; sessionGroups?: number },
 ): { weeklyWorkingSets: number; maxWorkingSets: number; maxExercises: number } {
@@ -167,11 +168,15 @@ export function sessionLimitsFor(
   const level = input.level || 'intermediate';
   const years = Number.isFinite(input.trainingYears) ? (input.trainingYears as number) : 0;
   const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
-  // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18).
+  // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18) + high-объём +15-20%
   let maxWorkingSets: number; let maxExercises: number;
   if (level === 'enhanced' && years >= 3 || (onCourse && years >= 3)) { maxWorkingSets = 60; maxExercises = 18; }
   else if (level === 'enhanced' || (onCourse && years >= 1)) { maxWorkingSets = 40; maxExercises = 14; }
   else { maxWorkingSets = 24; maxExercises = 10; }
+  if (input.trainingVolumeMode === 'high') {
+    maxWorkingSets = Math.round(maxWorkingSets * 1.2);
+    maxExercises = Math.min(22, maxExercises + 2);
+  }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };
 }
 

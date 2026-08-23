@@ -27,7 +27,7 @@ import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../.
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
-import { tempoExplain } from '../../../engines/bb/bb-exercise-instructions.engine';
+import { tempoExplain, buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
