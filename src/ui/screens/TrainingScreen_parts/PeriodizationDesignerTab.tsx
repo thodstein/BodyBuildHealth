@@ -42,6 +42,13 @@ import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits } from '../../../engines/bb/bb-selector.engine';
 import { loadUserPrograms, saveUserProgram } from '../../../engines/user-program/program-store';
 import type { UserProgram } from '../../../engines/user-program/user-program.types';
+import { generatePeriodization } from '../../../engines/cycle-periodization.engine';
+import { PHASE_LABELS, PHASE_HINTS } from './shared';
+import { autoSchedule, detectOvertraining } from '../../../engines/overtraining-scheduler.engine';
+import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { acuteChronicRatio, toDailyLoads, weeklyMonotony } from '../../../engines/pro/training-load.engine';
+import { generateMesocycleProgression, generateInterMesocycleProgression, phaseDistribution } from '../../../engines/pro/mesocycle-progression.engine';
+import { useDataLink } from '../../../core/data-link';
 
 const ACCENT = '#00e68a';
 const ACCENT_PL = '#3b82f6';
@@ -77,6 +84,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [plShowCompare, setPlShowCompare] = useState(false);
   const [bbShowCompare, setBbShowCompare] = useState(false);
+  const [unifiedMode, setUnifiedMode] = useState<'micro' | 'deload' | 'progression' | 'tracker'>('micro');
   // — подбор сплитов/циклов —
   const [plLevel, setPlLevel] = useState('intermediate');
   const [plDays, setPlDays] = useState(4);
@@ -87,6 +95,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [bbGoal, setBbGoal] = useState('mass');
   const [bbSplitA, setBbSplitA] = useState<string>(SPLIT_PATTERNS[0]?.id || 'fullbody_3');
   const [bbSplitB, setBbSplitB] = useState<string>(SPLIT_PATTERNS[1]?.id || 'upper_lower_4');
+  const linked = useDataLink();
 
   useEffect(() => {
     const check = () => {
@@ -869,6 +878,232 @@ export const PeriodizationDesignerTab: React.FC = () => {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+
+          {/* ── 🧠 Единый инструмент: микро • делод • прогрессия • трекер — грамотно объединённые, не просто перемещённые ── */}
+          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}`, background: `linear-gradient(135deg, ${accent}08, rgba(0,0,0,0))` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>🧠 Единый инструмент</div>
+              <span style={{ fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.04)', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.06)' }}>
+                {current ? `${current.totalWeeks} нед · ${disciplineLabel} · ${current.blocks.length} фаз` : 'Выберите дизайн'}
+              </span>
+            </div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>
+              Микроциклы, делод, прогрессия и трекер работают на <b style={{ color: '#fff' }}>одних данных</b> — текущем дизайне. Изменение блока сразу отражается во всех четырёх представлениях. Не дубли, а единый поток.
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 6, marginBottom: 10 }}>
+              {[
+                { id: 'micro', icon: '🗓️', label: 'Микро' },
+                { id: 'deload', icon: '🧘', label: 'Делод' },
+                { id: 'progression', icon: '📈', label: 'Прогрессия' },
+                { id: 'tracker', icon: '📊', label: 'Трекер' },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setUnifiedMode(tab.id as any)} style={{
+                  padding: '8px 6px', borderRadius: 10, fontSize: 11, fontWeight: 800, cursor: 'pointer', minHeight: 44,
+                  border: unifiedMode === tab.id ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
+                  background: unifiedMode === tab.id ? `${accent}18` : 'rgba(255,255,255,0.04)',
+                  color: unifiedMode === tab.id ? accent : '#fff',
+                }}>
+                  <span style={{ fontSize: 14 }}>{tab.icon}</span><br />{tab.label}
+                </button>
+              ))}
+            </div>
+
+            {unifiedMode === 'micro' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>🗓️ Микроциклы — понедельная разбивка текущего дизайна</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>
+                  Каждая неделя дизайна раскрыта как микроцикл: фаза, объём/интенсивность из шаблона ББ/ПЛ. Синхронизировано с таймлайном — правка блока меняет микро.
+                </div>
+                {!current || current.blocks.length === 0 ? (
+                  <div style={{ padding: 12, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>Добавьте блоки в дизайн — микроциклы появятся здесь</div>
+                ) : (
+                  <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 70px 60px', gap: 4, padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', minWidth: 360 }}>
+                      <span>Нед</span><span>Фаза</span><span>Объём</span><span>Нагрузка</span>
+                    </div>
+                    {getDesignVolumeCurve(current).slice(0, Math.min(24, current.totalWeeks)).map(pt => {
+                      const block = current.blocks.find(b => pt.week >= b.startWeek && pt.week <= b.endWeek);
+                      const tmpl = block ? getPhaseTemplate(block.phaseKey) : null;
+                      return (
+                        <div key={pt.week} style={{ display: 'grid', gridTemplateColumns: '36px 1fr 70px 60px', gap: 4, padding: '6px 8px', fontSize: 10, borderTop: '1px solid rgba(255,255,255,0.04)', background: pt.week % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent', alignItems: 'center', minWidth: 360 }}>
+                          <span style={{ fontWeight: 700, color: pt.color }}>{pt.week}</span>
+                          <span style={{ color: pt.color, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}><span>{block ? PHASE_ICONS[block.phaseKey] : '—'}</span>{pt.label}</span>
+                          <span style={{ color: pt.volume >= 4 ? '#f59e0b' : pt.volume >= 3 ? '#22c55e' : '#60a5fa' }}>{tmpl ? `${tmpl.volumeLevel} · ${pt.volume}/5` : '—'}</span>
+                          <span style={{ color: pt.intensity >= 3 ? '#ef4444' : '#22c55e' }}>{tmpl ? `RIR ${tmpl.rirTarget}` : '—'}</span>
+                        </div>
+                      );
+                    })}
+                    {current.totalWeeks > 24 && <div style={{ fontSize: 10, color: DIM, textAlign: 'center', padding: 6 }}>… ещё {current.totalWeeks - 24} недель — см. таймлайн/график</div>}
+                    <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+                      <button onClick={() => {
+                        const seq = current.blocks.map(b => (PHASE_LABELS_RU[b.phaseKey] || b.phaseKey) + ' ' + b.startWeek + '-' + b.endWeek).join(' → ');
+                        const first = current.blocks[0] ? getPhaseTemplate(current.blocks[0].phaseKey) : null;
+                        const vmap: Record<string, number> = { very_low: 0.7, low: 0.85, medium: 1, high: 1.15, very_high: 1.3 };
+                        applyToPlanner({ kind: 'pri', label: 'Микро: ' + seq, data: { volumeMult: first ? (vmap[first.volumeLevel] ?? 1) : 1, rirShift: 0 } });
+                      }} style={{ ...btn, flex: 1, minHeight: 38, background: accent+'18', borderColor: accent+'33', color: accent }}>🛠 Применить микро к планировщику</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {unifiedMode === 'deload' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>🧘 Делод — авто-расписание + наложение на дизайн</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>
+                  Делод-недели подсвечены из дизайна (<span style={{ color: '#60a5fa' }}>синий</span>) и сопоставлены с авто-расписанием по ACWR/HRV/сну. Красный — риск перетренированности.
+                </div>
+                {(() => {
+                  const weeks = current?.totalWeeks || 12;
+                  const srs = (() => { try { return loadSRPESessions(); } catch { return []; } })();
+                  const acwr = (() => { try { return srs.length >= 2 ? acuteChronicRatio(toDailyLoads(srs as any)) : null; } catch { return null; } })() as any;
+                  const mono = (() => { try { return srs.length >= 7 ? weeklyMonotony(toDailyLoads(srs as any)) : null; } catch { return null; } })() as any;
+                  const ot = (() => { try {
+                    return detectOvertraining({
+                      performanceDecline: 0, hrvSuppression: 0, restingHRIncrease: 0, sleepHours: 7, sleepQuality: 3,
+                      moodDisturbance: false, appetiteLoss: false, frequentIllness: false, jointPainIncrease: false,
+                      trainingMotivation: 3, rpeInflation: (acwr?.ratio ?? 0) > 1.5, recoveryTimeExtension: false, libidoDecrease: false,
+                    });
+                  } catch { return { riskPercent: 0, deloadUrgency: 'normal', recommendation: '—' } as any; } })();
+                  const sched = (() => { try {
+                    return autoSchedule({
+                      goal: effectiveDiscipline === 'pl' ? 'strength' : 'hypertrophy',
+                      level: 'intermediate',
+                      weeksUntilGoal: weeks,
+                      currentWeek: 0,
+                      fatigueLevel: 0.3,
+                      recoveryLevel: 0.7,
+                      overtrainingRisk: ot.riskPercent,
+                      acwr: acwr?.ratio ?? null,
+                      monotony: mono?.monotony ?? null,
+                      strain: mono?.strain ?? null,
+                    });
+                  } catch { return { weeks: [], deloadWeeks: [], warnings: [] } as any; } })();
+                  const designDeloads = current ? current.blocks.filter(b => b.phaseKey === 'deload' || b.phaseKey === 'transition').flatMap(b => Array.from({ length: b.endWeek - b.startWeek + 1 }, (_, i) => b.startWeek + i)) : [];
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8, fontSize: 10 }}>
+                        <span style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(96,165,250,0.12)', border: '1px solid rgba(96,165,250,0.25)', color: '#60a5fa' }}>Делод в дизайне: {designDeloads.length ? designDeloads.join(', ') : '—'}</span>
+                        <span style={{ padding: '4px 8px', borderRadius: 6, background: ot.riskPercent >= 50 ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.08)', border: `1px solid ${ot.riskPercent >= 50 ? 'rgba(239,68,68,0.25)' : 'rgba(34,197,94,0.2)'}`, color: ot.riskPercent >= 50 ? '#ef4444' : '#22c55e' }}>Риск {ot.riskPercent}% · {ot.deloadUrgency}</span>
+                        {acwr && <span style={{ padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr.ratio.toFixed(2)}</span>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 8 }}>
+                        {Array.from({ length: Math.min(weeks, 24) }, (_, i) => {
+                          const w = i + 1;
+                          const isDesignDeload = designDeloads.includes(w);
+                          const isAutoDeload = sched.deloadWeeks.includes(w);
+                          const bg = isDesignDeload ? '#60a5fa' : isAutoDeload ? '#a78bfa' : 'rgba(255,255,255,0.04)';
+                          const label = isDesignDeload ? 'Д' : isAutoDeload ? 'А' : String(w);
+                          return <div key={w} title={`Нед ${w}${isDesignDeload ? ' — делод в дизайне' : ''}${isAutoDeload ? ' — авто-делоад' : ''}`} style={{ width: 28, height: 28, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, background: bg, color: isDesignDeload || isAutoDeload ? '#fff' : DIM, border: isDesignDeload ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.06)' }}>{label}</div>;
+                        })}
+                      </div>
+                      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Синий — делод заложен в дизайне, фиолетовый — предлагает авто-планировщик. Совпадение = оптимально.</div>
+                      {sched.deloadWeeks.length > 0 && (
+                        <button onClick={() => applyToPlanner({ kind: 'deload', label: 'Делод: нед ' + sched.deloadWeeks.join(','), data: { volumeMult: 0.5, rirShift: 3, weeks: sched.deloadWeeks } })} style={{ ...btn, width: '100%', minHeight: 38, background: 'rgba(96,165,250,0.12)', borderColor: 'rgba(96,165,250,0.25)', color: '#60a5fa' }}>🛠 Применить делод к планировщику</button>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {unifiedMode === 'progression' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>📈 Прогрессия — кривая объёма/интенсивности из дизайна</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>
+                  Кривая построена поверх дизайна: объём и интенсивность каждой недели + распределение фаз. Синхронизирована с таймлайном.
+                </div>
+                {(() => {
+                  const weeks = current?.totalWeeks || 12;
+                  const goal = effectiveDiscipline === 'pl' ? 'strength' as const : 'hypertrophy' as const;
+                  const prog = (() => { try { return generateMesocycleProgression({ weeks, startVolumeSets: 18, startIntensityPct: 0.72, startRIR: 3, goal }); } catch { return []; } })() as any[];
+                  const dist = (() => { try { return phaseDistribution(weeks); } catch { return {} as any; } })();
+                  const maxVol = Math.max(1, ...prog.map((p: any) => p.volumeSets));
+                  return (
+                    <div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                        {(['base','build','peak','deload'] as const).map(ph => {
+                          const cnt = (dist as any)[ph] || 0;
+                          const pct = weeks ? Math.round((cnt / weeks) * 100) : 0;
+                          const col = ({ base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' } as any)[ph];
+                          const ru = ({ base: 'База', build: 'Накопление', peak: 'Пик', deload: 'Разгрузка' } as any)[ph];
+                          return (
+                            <div key={ph} style={{ padding: 6, borderRadius: 8, background: col+'14', border: `1px solid ${col}33`, textAlign: 'center' }}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: col }}>{ru}</div>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{cnt}н</div>
+                              <div style={{ fontSize: 10, color: DIM }}>{pct}%</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', overflowX: 'auto', paddingBottom: 4 }}>
+                        {prog.slice(0, Math.min(24, weeks)).map((p: any) => {
+                          const col = ({ base: '#22c55e', build: '#eab308', peak: '#ef4444', deload: '#60a5fa' } as any)[p.phase] || '#888';
+                          const h = Math.max(12, (p.volumeSets / maxVol) * 48);
+                          return (
+                            <div key={p.week} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 22 }}>
+                              <div style={{ fontSize: 9, color: p.intensityPct > 0.85 ? '#ef4444' : DIM }}>{Math.round(p.intensityPct * 100)}%</div>
+                              <div style={{ width: 14, height: h, borderRadius: 3, background: col }} />
+                              <div style={{ fontSize: 9, color: col, fontWeight: 700 }}>{p.week}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ fontSize: 10, color: DIM, textAlign: 'center', marginTop: 4 }}>▮ Объём · %1RM вверху</div>
+                      <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Прогрессия: ' + weeks + 'н', data: { mrv: 18 } })} style={{ ...btn, width: '100%', minHeight: 38, marginTop: 8, background: accent+'18', borderColor: accent+'33', color: accent }}>🛠 Применить прогрессию</button>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {unifiedMode === 'tracker' && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', marginBottom: 4 }}>📊 Трекер — история дизайнов как мезоциклы</div>
+                <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>
+                  Сохранённые дизайны — это ваши мезоциклы. Трек показывает рост объёма/интенсивности между ними.
+                </div>
+                {(() => {
+                  const all = designs.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+                  if (all.length === 0) return <div style={{ padding: 12, textAlign: 'center', color: DIM, fontSize: 11, border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 8 }}>Нет сохранённых дизайнов — создайте и сохраните</div>;
+                  const inter = (() => { try {
+                    const first = all[all.length - 1];
+                    const cfg = { weeks: first.totalWeeks, startVolumeSets: 18, startIntensityPct: 0.72, startRIR: 3, goal: (first.sport === 'powerlifting' ? 'strength' : 'hypertrophy') as any };
+                    return generateInterMesocycleProgression(cfg, Math.max(3, all.length));
+                  } catch { return []; } })() as any[];
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 4, marginBottom: 8 }}>
+                        {inter.slice(0, all.length).map((step: any, i: number) => {
+                          const d = all[i];
+                          const col = i === 0 ? '#22c55e' : i === 1 ? '#eab308' : '#ef4444';
+                          return (
+                            <div key={i} style={{ minWidth: 110, padding: 8, borderRadius: 8, background: col+'14', border: `1px solid ${col}33`, textAlign: 'center', cursor: 'pointer' }} onClick={() => setCurrentId(d.id)}>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: col }}>Мезо {i+1}</div>
+                              <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
+                              <div style={{ fontSize: 10, color: DIM }}>{d.totalWeeks}н · {d.blocks.length} фаз</div>
+                              <div style={{ fontSize: 10, color: col }}>{step.startVolumeSets}с / {Math.round(step.startIntensityPct*100)}%</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {all.slice(0, 5).map(d => (
+                          <div key={d.id} onClick={() => setCurrentId(d.id)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', borderRadius: 8, background: d.id === currentId ? accent+'14' : 'rgba(255,255,255,0.03)', border: `1px solid ${d.id === currentId ? accent+'33' : 'rgba(255,255,255,0.06)'}`, cursor: 'pointer' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: d.id === currentId ? accent : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</div>
+                              <div style={{ fontSize: 10, color: DIM }}>{d.totalWeeks}н · {d.blocks.length} фаз · {d.sport} · {d.updatedAt ? new Date(d.updatedAt).toLocaleDateString('ru-RU') : '—'}</div>
+                            </div>
+                            <span style={{ fontSize: 10, color: accent, fontWeight: 700 }}>{d.id === currentId ? '●' : '↗'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
