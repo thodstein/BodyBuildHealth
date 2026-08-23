@@ -2729,5 +2729,9 @@ ull → default. Реальные значения лежат в UnifiedSettings
 - **Фикс**: `bb-finalize` join комментариев (`Оборудование ротации`/`Safety repair`) — убрана двойная точка (`.replace(/\.\s*$/,'')` перед join).
 - **Тесты**: NEW `bb-strict-groups.test.ts` — **14** (состав групп, strictGroupMembersOf: своп только внутри группы, ensureStrictGroupCoverage: same-class замена/lead/onlyRep/недоступные группы, buildBBPlan upper/lower 8 нед: грудь разводка+30° всегда, спина верхний блок + seal/Т-тяга, квадры присед/гакк+разгибания, бицепс бедра сгибания+румынская).
 - Проверено: 8 ключевых файлов 134/134 (rotation-mode, specialization-unified/methods, goal-coverage, split-balance, audit-extended, selection-quality, strict-groups), полный bb-прогон 1428/61 = HEAD-база, tsc 0 по своим файлам.
-- ВАЖНО: `ham_hack` (гакк на бицепс бедра/«колодец») не существует в EXERCISE_CATALOG — группа не форсируется, пока упражнение не добавят в каталог.
+- **Добавлены в EXERCISE_CATALOG (2 упражнения, группа ham_hack заработала)**:
+  - `hack_squat_ham` «Гакк-присед на бицепс бедра (стопы высоко)» — machine, hinge, задняя цепь;
+  - `well_squat` «Приседания в колодце» — barbell, hinge, глубокая амплитуда/«колодец»;
+  - `trueMuscleOf` (movement-pattern): hinge-ветка += `|гакк.*бицепс|hack.*hamstring|колодец` → оба в hamstrings; ANGLE_CLASSES.hamstrings.rdl_bridge += те же маркеры; id-маппинг → bio 'romanian_deadlift' (exercise-lab); ham_hack ids += оба, re сужен до `гакк.*бицепс|hack.*(ham|бицепс)|колодец` (квадрицепсные гакки не захватываются).
+  - Итог: bb-strict-groups 15/15, 10 ключевых файлов 147/147, полный bb-прогон 1431 passed / 59 failed = **все падения из baseline-18 (0 новых, 2 пред-существующих даже починились)**, tsc 0 по своим файлам.
 

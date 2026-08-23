@@ -56,7 +56,7 @@ export const ANGLE_CLASSES: Record<string, AngleClass[]> = {
   hamstrings: [
     { name: 'curl', match: (e) => /сгибан.*ног|leg.?curl|сгибания ног/i.test(e.name) },
     { name: 'seated_curl', match: (e) => /сгибан.*сидя|seated.*curl/i.test(e.name) },
-    { name: 'rdl_bridge', match: (e) => /румын|rdl|ягодичн.*мост|hip.?thrust|glute.?bridge/i.test(e.name) },
+    { name: 'rdl_bridge', match: (e) => /румын|rdl|ягодичн.*мост|hip.?thrust|glute.?bridge|гакк.*бицепс|hack.*(hamstring|колодец)|колодец/i.test(e.name) },
     { name: 'good_morning', match: (e) => /гудморнинг|good.?morning|гиперэкстенз|back.?extension/i.test(e.name) },
     { name: 'nordic_ghr', match: (e) => /норд|nordic|glute.?ham|ghr/i.test(e.name) },
     { name: 'lunge', match: (e) => /выпад|lunge/i.test(e.name) },
@@ -223,9 +223,9 @@ export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
       re: /сгибан.*ног|leg.?curl/i,
     },
     {
-      key: 'ham_hack', label: 'Гакк на бицепс бедра/«колодец»',
-      ids: [],
-      re: /гакк|hack|колодец/i,
+      key: 'ham_hack', label: 'Гакк на бицепс бедра / приседания в колодце',
+      ids: ['hack_squat_ham', 'well_squat'],
+      re: /гакк.*бицепс|hack.*(ham|бицепс)|колодец/i,
     },
     {
       key: 'ham_rdl', label: 'Румынская тяга',

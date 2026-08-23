@@ -36,12 +36,22 @@ describe('STRICT_EXERCISE_GROUPS — состав групп', () => {
     expect(strictGroupForExercise({ id: 'tbar_row_v2', name: 'Тяга Т-грифа (классическая)' }, 'back')!.key).toBe('back_tbar');
   });
 
-  it('бицепс бедра: сгибания ног + румынская тяга (+ гакк-группа без каталога)', () => {
+  it('бицепс бедра: сгибания ног + гакк/колодец + румынская тяга', () => {
     expect(STRICT_EXERCISE_GROUPS.hamstrings.map(g => g.key)).toEqual(['ham_curl', 'ham_hack', 'ham_rdl']);
     expect(strictGroupForExercise({ id: 'leg_curl', name: 'Сгибания ног в тренажёре лёжа' }, 'hamstrings')!.key).toBe('ham_curl');
     expect(strictGroupForExercise({ id: 'leg_curl_seated', name: 'Сгибания ног сидя' }, 'hamstrings')!.key).toBe('ham_curl');
+    expect(strictGroupForExercise({ id: 'hack_squat_ham', name: 'Гакк-присед на бицепс бедра (стопы высоко)' }, 'hamstrings')!.key).toBe('ham_hack');
+    expect(strictGroupForExercise({ id: 'well_squat', name: 'Приседания в колодце' }, 'hamstrings')!.key).toBe('ham_hack');
     expect(strictGroupForExercise({ id: 'rdl', name: 'Румынская тяга' }, 'hamstrings')!.key).toBe('ham_rdl');
     expect(strictGroupForExercise({ id: 'rdl_db', name: 'Румынская тяга с гантелями' }, 'hamstrings')!.key).toBe('ham_rdl');
+  });
+
+  it('ham_hack: своп гакк-на-бицепс ↔ колодец (члены одной группы)', () => {
+    const members = strictGroupMembersOf({ id: 'hack_squat_ham', name: 'Гакк-присед на бицепс бедра (стопы высоко)' }, 'hamstrings');
+    expect(members.some(m => m.id === 'well_squat')).toBe(true);
+    for (const m of members) {
+      expect(m.id === 'hack_squat_ham' || m.id === 'well_squat').toBe(true);
+    }
   });
 
   it('квадрицепс: присед/гакк + разгибания ног сидя', () => {
@@ -129,8 +139,8 @@ describe('ensureStrictGroupCoverage — обязательное присутс�
     const selectedIds: string[] = [];
     const selectedNames: string[] = [];
     ensureStrictGroupCoverage(exDatas, pool, 'hamstrings', 4, selectedIds, selectedNames, { isPrimary: true });
-    // ham_hack не имеет членов в каталоге → не добавляется
-    expect(exDatas.some(e => /гакк|hack/i.test(e.name || ''))).toBe(false);
+    // ham_hack: члены есть в каталоге, но НЕ в этом пуле → не добавляется
+    expect(exDatas.some(e => /гакк|hack|колодец/i.test(e.name || ''))).toBe(false);
     // rdl — другой угловой класс (rdl_bridge vs curl): заменять сгибание нельзя →
     // группа не форсируется в этой сессии (ротация недель принесёт RDL)
     expect(exDatas.some(e => e.id === 'rdl')).toBe(false);

@@ -235,6 +235,8 @@ export const EXERCISE_ID_MAP: Record<string, ExerciseIdMapping> = {
   // ── Ноги ──
   hack_squat_v2: { bio: 'hack_squat' },
   hack_squat_reverse: { bio: 'hack_squat' },
+  hack_squat_ham: { bio: 'romanian_deadlift' },
+  well_squat: { bio: 'romanian_deadlift' },
   squat_belt: { bio: 'hack_squat' },
   front_squat_v2: { bio: 'front_squat' },
   front_squat_clean_grip: { bio: 'front_squat' },

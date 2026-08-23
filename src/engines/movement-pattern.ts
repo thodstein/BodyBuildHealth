@@ -151,7 +151,8 @@ export function trueMuscleOf(ex: any): string | null {
     // (2) ББ-поза-цепь hinges: Румынская / на прямых ногах / в Смите / одной ноге /
     //     Гудморнинг (compound) / Гиперэкстензия / обратная гипер. Канонический путь
     //     задней цепи для ББ-плана → 'hamstrings' (ведущий гипертрофийный таргет).
-    if (/румын|мёртв|stiff.?leg|rdl|гудморнинг|good.?morning|гиперэкстенз|back.?extension|обратн.*гипер|reverse.?hyper/.test(nm)) {
+    //     Также: гакк-присед на бицепс бедра (стопы высоко, «колодец») — задняя цепь.
+    if (/румын|мёртв|stiff.?leg|rdl|гудморнинг|good.?morning|гиперэкстенз|back.?extension|обратн.*гипер|reverse.?hyper|гакк.*бицепс|hack.*hamstring|колодец/.test(nm)) {
       return 'hamstrings';
     }
     // (3) Прочие hinge (махи гирь, jerk pull, snatch pull и т.д.) — null вне ББ-плана.
