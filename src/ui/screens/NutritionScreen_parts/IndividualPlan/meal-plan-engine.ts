@@ -1038,14 +1038,13 @@ function buildWholeMeal(
   }
 ): Meal {
   const { label, time, type, proteinG, carbG, fatG, pool: _poolIn, proteinRotationIds, seed, includeVeg, includeFruit, isVegetarian, rationales, preferredIds: _preferredIds, mealPreferredIds, lockedIds, recentIds, hardRecentIds, dayUsedPreferredIds, vegColorIdx, refeedDay, fiberCapG, breakfast, snack, breakfastStyle, extraLiquids, isWorkDay, workStartMin, workEndMin, portableMode } = params;
-  // D-28+1: per-meal portable — все приёмы рабочего дня портативные (требование: ВСЕ ПРИЕМЫ)
+  // D-28+1: per-meal portable — только окно смены (требование: per-meal, не все приёмы)
   const _needPortable = (() => {
     if (!portableMode) return false;
-    // legacy: portableMode без work-контекста → все приёмы портативные (для тестов/совместимости)
     if (isWorkDay === undefined && workStartMin === undefined && workEndMin === undefined) return true;
     if (!isWorkDay) return false;
-    // все приёмы рабочего дня — портативные (полноценная еда на работе)
-    return true;
+    if (!Number.isFinite(workStartMin) || !Number.isFinite(workEndMin)) return false;
+    return isTimeInWorkWindow(time, workStartMin!, workEndMin!);
   })();
   const pool = (() => {
     if (!_needPortable) return _poolIn;
