@@ -11,10 +11,10 @@ import type { Exercise } from '../../../core/types';
 
 // ════════════════════ SHARED CONSTANTS ════════════════════
 export const ACCENT = '#00e68a';
-export const DIM = 'rgba(255,255,255,0.5)';
+export const DIM = '#fff';
 export const BG = 'rgba(24,24,27,0.15)';
 export const BORDER = 'rgba(255,255,255,0.05)';
-export const SMALL: React.CSSProperties = { color: 'rgba(255,255,255,0.6)', fontSize: 11, lineHeight: 1.4 };
+export const SMALL: React.CSSProperties = { color: '#fff', fontSize: 11, lineHeight: 1.4 };
 export const CARD: React.CSSProperties = { padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)' };
 export const pill: React.CSSProperties = { display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 600, marginRight: 6, marginBottom: 4 };
 export const secTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: ACCENT, margin: '12px 0 6px', borderBottom: '1px solid rgba(0,230,138,0.15)', paddingBottom: 4 };
@@ -269,13 +269,13 @@ export const TechniqueDetail: React.FC<{
             <div style={{ height: '100%', width: `${(b.value / b.max) * 100}%`, borderRadius: 3, background: lvl(b.value, b.max) }} />
           </div>
           <div style={{ width: 28, textAlign: 'right', fontWeight: 700, color: lvl(b.value, b.max) }}>{b.value}</div>
-          <div style={{ width: 16, color: 'rgba(255,255,255,0.2)', fontSize: 10 * s }}>/ {b.max}</div>
+          <div style={{ width: 16, color: '#fff', fontSize: 10 * s }}>/ {b.max}</div>
         </div>
       ))}
       {technique ? (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>🎯 Полный разбор техники</div>
-          <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 10 * s, color: '#fff', lineHeight: 1.6 }}>
             <p style={{ margin: '0 0 6px', fontWeight: 700, color: ACCENT }}>Исходное положение:</p>
             {technique.setup.map((t: string, i: number) => <div key={i} style={{ marginBottom: 2 }}>{i + 1}. {t}</div>)}
             <p style={{ margin: '8px 0 6px', fontWeight: 700, color: ACCENT }}>Выполнение:</p>
@@ -293,7 +293,7 @@ export const TechniqueDetail: React.FC<{
       ) : ex.technique ? (
         <>
           <div style={{ ...secTitle, fontSize: 10 * s }}>🎯 Техника выполнения</div>
-          <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{ex.technique}</div>
+          <div style={{ fontSize: 10 * s, color: '#fff', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{ex.technique}</div>
         </>
       ) : null}
       {cues.length > 0 && (
@@ -314,7 +314,7 @@ export const TechniqueDetail: React.FC<{
           {errors.map((e: any, i: number) => (
             <div key={i} style={{ marginBottom: 4, padding: '6px 8px', background: 'rgba(239,68,68,0.05)', borderRadius: 5, border: '1px solid rgba(239,68,68,0.1)' }}>
               <div style={{ fontSize: 10 * s, fontWeight: 700, color: '#f87171' }}>{e.error}</div>
-              <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.5)', marginTop: 1 }}>Причина: {e.cause}</div>
+              <div style={{ fontSize: 10 * s, color: '#fff', marginTop: 1 }}>Причина: {e.cause}</div>
               <div style={{ fontSize: 10 * s, color: '#22c55e', marginTop: 1 }}>Исправление: {e.fix}</div>
             </div>
           ))}
@@ -369,7 +369,7 @@ export const TechniqueDetail: React.FC<{
           return (
             <div key={i} style={{ flex: 1, textAlign: 'center', background: `${colors[i]}14`, borderRadius: 6, padding: '4px 2px', border: `1px solid ${colors[i]}22` }}>
               <div style={{ fontSize: 16 * s, fontWeight: 800, color: colors[i] }}>{sec === 0 ? 'X' : sec}</div>
-              <div style={{ fontSize: 10 * s, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{labels[i]}</div>
+              <div style={{ fontSize: 10 * s, color: '#fff', marginTop: 1 }}>{labels[i]}</div>
             </div>
           );
         })}

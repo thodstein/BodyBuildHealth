@@ -66,12 +66,12 @@ const chip = (active: boolean, accent = '#a78bfa'): React.CSSProperties => ({
   padding: '6px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
   background: active ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.04)',
   border: active ? `1px solid ${accent}` : '1px solid rgba(255,255,255,0.08)',
-  color: active ? accent : 'rgba(255,255,255,0.7)', transition: 'all 0.15s',
+  color: active ? accent : '#fff', transition: 'all 0.15s',
 });
 
 const ScoreBar: React.FC<{ label: string; value: number; color: string }> = ({ label, value, color }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', minWidth: 100 }}>{label}</span>
+    <span style={{ fontSize: 12, color: '#fff', minWidth: 100 }}>{label}</span>
     <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
       <div style={{ width: `${Math.min(100, value)}%`, height: '100%', borderRadius: 3, background: color, transition: 'width 0.5s' }} />
     </div>
@@ -89,7 +89,7 @@ const SaveResultPopup: React.FC<{
 }> = ({ popup, count, onToPlanChange, onConfirm, onClose }) => {
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: 16 };
   const box: React.CSSProperties = { maxWidth: 420, width: '100%', background: '#1a1a1f', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: 16, boxShadow: '0 12px 40px rgba(0,0,0,0.5)' };
-  const row: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' };
+  const row: React.CSSProperties = { display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' };
   const btn = (bg: string, color: string, flex = true): React.CSSProperties => ({
     flex: flex ? 1 : undefined, padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: bg, color, minHeight: 44,
   });
@@ -104,7 +104,7 @@ const SaveResultPopup: React.FC<{
             <div style={row}><span>📓</span><span><b>Дневник тренировок</b> — запись «Микс: {count} веществ» с составом и дозами.</span></div>
             <div style={row}><span>⭐</span><span><b>Избранное БАД</b> — добавятся вещества набора (без дублей).</span></div>
             <div style={row}><span>💊</span><span><b>Рекомендации</b> — анализ препаратов: дозы, предупреждения, мониторинг, конфликты. Сохранятся в избранном БАД.</span></div>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0', padding: 10, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', cursor: 'pointer', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0', padding: 10, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', cursor: 'pointer', fontSize: 12, color: '#fff' }}>
               <input type="checkbox" checked={popup.toPlan} onChange={e => onToPlanChange(e.target.checked)} style={{ marginTop: 2 }} />
               <span>🧮 <b>Внести в план поддержки</b> — вещества попадут в калькулятор поддержки: расчёт рисков, дозировок и карточка «Тренировочные миксы и пресеты здоровья».</span>
             </label>
@@ -251,15 +251,15 @@ export const TrainingMixTab: React.FC = () => {
 
   return (
     <div style={{ padding: '0 12px 80px', maxWidth: 600, margin: '0 auto' }}>
-      <h2 style={{ margin: '0 0 2px', fontSize: 18, fontWeight: 800, color: ACCENT }}>💪 Тренировочные миксы</h2>
-      <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 12px' }}>
+      <h2 style={{ margin: '0 0 2px', fontSize: 18, fontWeight: 800, color: '#fff' }}>💪 Тренировочные миксы</h2>
+      <p style={{ fontSize: 12, color: '#fff', margin: '0 0 12px' }}>
         Подбор пред-/интра-/пост-тренировочных стеков по цели и весу
       </p>
 
       <div style={CARD}>
-        <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text)' }}>⚙️ Параметры</h4>
+        <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#fff' }}>⚙️ Параметры</h4>
 
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🎯 Цель</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🎯 Цель</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
           {GOAL_OPTIONS.map(o => (
             <div key={o.id} onClick={() => setMixGoal(o.id)} style={chip(mixGoal === o.id)}>{o.emoji} {o.label}</div>
@@ -271,7 +271,7 @@ export const TrainingMixTab: React.FC = () => {
         {(
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>⏰ Тайминг</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>⏰ Тайминг</div>
               {[
                 { id: 'pre', label: '🔥 Пред-тренировочный' },
                 { id: 'intra', label: '💧 Интра-тренировочный' },
@@ -281,7 +281,7 @@ export const TrainingMixTab: React.FC = () => {
               ))}
             </div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🏋️ Тип тренировки</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🏋️ Тип тренировки</div>
               {WO_TYPE.map(o => (
                 <div key={o.id} onClick={() => setMixWorkoutType(o.id as any)} style={{ ...chip(mixWorkoutType === o.id), marginBottom: 3 }}>{o.label}</div>
               ))}
@@ -292,13 +292,13 @@ export const TrainingMixTab: React.FC = () => {
         {(
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🌅 Время суток</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🌅 Время суток</div>
               {TOD.map(o => (
                 <div key={o.id} onClick={() => setMixTimeOfDay(o.id as any)} style={{ ...chip(mixTimeOfDay === o.id), marginBottom: 3 }}>{o.label}</div>
               ))}
             </div>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>🎓 Опыт</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>🎓 Опыт</div>
               {EXP.map(o => (
                 <div key={o.id} onClick={() => setMixExperience(o.id as any)} style={{ ...chip(mixExperience === o.id), marginBottom: 3 }}>{o.label}</div>
               ))}
@@ -309,7 +309,7 @@ export const TrainingMixTab: React.FC = () => {
         {(
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
             <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 4 }}>📆 Тип дня</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#fff', marginBottom: 4 }}>📆 Тип дня</div>
               {DAY_TYPES.map(o => (
                 <div key={o.id} onClick={() => setMixDayType(o.id as any)} style={{ ...chip(mixDayType === o.id), marginBottom: 3 }}>{o.label}</div>
               ))}
@@ -318,8 +318,8 @@ export const TrainingMixTab: React.FC = () => {
         )}
 
         {(
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>
-            ⚖️ Вес тела: <b style={{ color: ACCENT }}>{bw} кг</b>
+          <div style={{ fontSize: 12, color: '#fff', marginBottom: 4 }}>
+            ⚖️ Вес тела: <b style={{ color: '#fff' }}>{bw} кг</b>
             {isOnCycle ? <span style={{ color: '#a78bfa', marginLeft: 6 }}>🔥 Курс (×1.25)</span> : ''}
           </div>
         )}
@@ -349,8 +349,8 @@ export const TrainingMixTab: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 24 }}>{mixTiming === 'pre' ? '🔥' : mixTiming === 'intra' ? '💧' : '🍗'}</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT }}>{stackTitle}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{timingLabel}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{stackTitle}</div>
+              <div style={{ fontSize: 12, color: '#fff' }}>{timingLabel}</div>
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 24, fontWeight: 800, color: score.color }}>{score.compositeScore}</div>
@@ -385,7 +385,7 @@ export const TrainingMixTab: React.FC = () => {
             <div style={{ marginBottom: 6 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b', marginBottom: 2 }}>💡 Рекомендации:</div>
               {score.suggestions.slice(0, 5).map((s, i) => (
-                <div key={i} style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 1 }}>• {s}</div>
+                <div key={i} style={{ fontSize: 12, color: '#fff', marginBottom: 1 }}>• {s}</div>
               ))}
             </div>
           )}
@@ -425,12 +425,12 @@ export const TrainingMixTab: React.FC = () => {
 
       {stack.filter(sItem => sItem.mg > 0).length > 0 && (
         <div style={CARD}>
-          <h4 style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--text)' }}>📋 Состав стека</h4>
+          <h4 style={{ margin: '0 0 8px', fontSize: 13, color: '#fff' }}>📋 Состав стека</h4>
           {stack.filter(sItem => sItem.mg > 0).map((sItem, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 3 }}>
-              <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.85)', wordBreak: 'break-word' }}>{sItem.name}</span>
+              <span style={{ flex: '1 1 auto', minWidth: 0, fontSize: 12, fontWeight: 600, color: '#fff', wordBreak: 'break-word' }}>{sItem.name}</span>
               <span style={{ flex: '0 0 auto', fontSize: 12, color: ACCENT, fontWeight: 700, whiteSpace: 'nowrap' }}>{sItem.dose} {sItem.unit}</span>
-              <span style={{ flex: '0 0 auto', fontSize: 12, color: 'var(--text-dim)', wordBreak: 'break-word' }}>{sItem.note}</span>
+              <span style={{ flex: '0 0 auto', fontSize: 12, color: '#fff', wordBreak: 'break-word' }}>{sItem.note}</span>
             </div>
           ))}
         </div>
@@ -440,17 +440,17 @@ export const TrainingMixTab: React.FC = () => {
       {mixHistory.length > 0 && (
         <div style={CARD}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <h4 style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>📂 История ({mixHistory.length})</h4>
+            <h4 style={{ margin: 0, fontSize: 13, color: '#fff' }}>📂 История ({mixHistory.length})</h4>
             <button onClick={() => { setMixHistory([]); localStorage.setItem('he_training_mixes', '[]'); }}
               style={{ fontSize: 12, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}>✕ Очистить</button>
           </div>
           {mixHistory.slice(0, 10).map((h, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '5px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.02)', marginBottom: 2 }}>
-              <span style={{ color: 'var(--text-dim)', minWidth: 65 }}>{h.date}</span>
+              <span style={{ color: '#fff', minWidth: 65 }}>{h.date}</span>
               <span>{h.timing === 'pre' ? '🔥' : h.timing === 'intra' ? '💧' : '🍗'}</span>
               <span style={{ flex: 1, fontWeight: 600 }}>{h.goal}</span>
               <span style={{ color: ACCENT, fontWeight: 700 }}>{h.score}</span>
-              <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>{h.label}</span>
+              <span style={{ color: '#fff', fontSize: 12 }}>{h.label}</span>
             </div>
           ))}
         </div>

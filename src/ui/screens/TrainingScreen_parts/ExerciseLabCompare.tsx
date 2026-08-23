@@ -65,7 +65,7 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
           </div>
           <div><div style={{ fontSize: 11, fontWeight: 700 }}>{score.label}</div><div style={{ fontSize: 10, color: DIM }}>технический счёт</div></div>
         </div>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.6 }}>
           <div>📐 Сеты: <b>{presc.sets}</b> · Повторы: <b>{presc.reps}</b></div>
           <div>🎯 RIR: <b>{presc.rir}</b> · Отдых: <b>{presc.rest}с</b></div>
           <div>⚡ ЦНС: <b>{d.bio?.cnsDemand || '—'}/5</b> · Суставы: <b>{ex.jointStress === 'high' ? 'высокая' : ex.jointStress === 'med' ? 'средняя' : 'низкая'}</b></div>
@@ -118,7 +118,7 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
 
         <div style={{ ...CARD, marginTop: 12, border: `1px solid ${ACCENT}33`, background: 'rgba(0,230,138,0.04)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8 }}>🏆 Итоговая рекомендация</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10, lineHeight: 1.6, color: 'rgba(255,255,255,0.7)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 10, lineHeight: 1.6, color: '#fff' }}>
             <div style={{ padding: '8px 10px', borderRadius: 6, background: 'rgba(0,0,0,0.12)' }}>
               <div style={{ fontWeight: 700, color: ACCENT, marginBottom: 4 }}>{ex1!.name}</div>
               <div>Тех. счёт: <b>{d1.score.total}/100</b></div><div>Безопасность: <b style={{ color: getRiskColor(d1.safety.level) }}>{d1.safety.score}/100</b></div>
@@ -156,7 +156,7 @@ const CompareTab: React.FC<{ initialId1: string; initialId2: string }> = ({ init
             return (
               <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: wColor }}>🏅 Рекомендовано: {wName}</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>Причина: {reason}. Цель: {goal === 'hypertrophy' ? 'гипертрофия' : goal}.</div>
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>Причина: {reason}. Цель: {goal === 'hypertrophy' ? 'гипертрофия' : goal}.</div>
               </div>
             );
           })()}

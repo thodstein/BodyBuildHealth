@@ -140,7 +140,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
           <div style={{ fontSize: 10, color: getRiskColor(score.level), marginTop: 1, fontWeight: 700 }}>{score.label}</div>
         </div>
       </div>
-      {ex.technique && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5, marginTop: 6, fontStyle: 'italic' }}>{ex.technique.length > 140 ? ex.technique.slice(0, 140) + '…' : ex.technique}</div>}
+      {ex.technique && <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, marginTop: 6, fontStyle: 'italic' }}>{ex.technique.length > 140 ? ex.technique.slice(0, 140) + '…' : ex.technique}</div>}
       <div style={{ display: 'flex', gap: 10, marginTop: 6, fontSize: 10 }}>
         <span>{getJointEmoji(ex.jointStress)} Суставы: {ex.jointStress === 'high' ? 'высокая' : ex.jointStress === 'med' ? 'средняя' : 'низкая'}</span>
         {bio && <span>🧠 ЦНС: {bio.cnsDemand}/5</span>}
@@ -199,7 +199,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
         </div>
       )}
 
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 10 }}>
         {viewMode === 'list'
           ? <>{flatList.length} из {totalInGroup} упражнений · {GROUP_RU[group]}{search ? ` · «${search}»` : ''}{showFavOnly ? ' · ⭐ Избранное' : ''}</>
           : <>{totalCategorized} из {totalInGroup} упражнений группы «{GROUP_RU[group]}» · {groupedExercises.length} подрегионов{showFavOnly ? ' · ⭐ Избранное' : ''}</>}
@@ -216,7 +216,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: SUB_REGION_COLORS[srIdx % SUB_REGION_COLORS.length], marginBottom: 4 }}>{sr.name}</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{sr.description}</div>
+                  <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5 }}>{sr.description}</div>
                 </div>
                 <div style={{ textAlign: 'center', minWidth: 70 }}>
                   <div style={{ fontSize: 24, fontWeight: 800, color: SUB_REGION_COLORS[srIdx % SUB_REGION_COLORS.length] }}>{filteredExs.length}</div>
@@ -244,7 +244,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
                         {ex.comments && (
                           <div style={{ marginTop: 8 }}>
                             <div style={secTitle}>💬 Комментарий</div>
-                            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
+                            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
                           </div>
                         )}
                       </>}
@@ -286,7 +286,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
               {ex.comments && (
                 <div style={{ marginTop: 8 }}>
                   <div style={secTitle}>💬 Комментарий</div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
+                  <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4, fontStyle: 'italic' }}>{ex.comments}</div>
                 </div>
               )}
             </>}
@@ -314,7 +314,7 @@ const TechniqueTab: React.FC<TechniqueTabProps> = ({ onSelectForCompare, selecte
 
       {/* Apply to planner — from TargetMuscleCalcTab */}
       <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
           🔗 Применить целевую группу «{GROUP_RU[group]}» к планировщику как приоритет (доп. объём + ↓RIR).
         </div>
         <button onClick={() => applyToPlanner({ kind: 'weakpoints', label: 'Целевая группа: ' + GROUP_RU[group], data: { groups: [group] } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>

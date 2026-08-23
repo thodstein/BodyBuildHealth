@@ -1,4 +1,4 @@
-/** MixHub.tsx — единый хаб тренировочных миксов/пресетов здоровья.
+/** MixHub.tsx — тренировочные миксы/пресеты здоровья.
  * Объединяет: TrainingMixTab (пред/интра/пост по цели тренировки) + MixPresetsCard (7 пресетов здоровья).
  * Структура как в VolumeHub / PeriodizationTaperHub — единый расчёт, без дублей. */
 import React, { useState } from 'react';
@@ -6,7 +6,7 @@ import { TrainingMixTab } from './TrainingMixTab';
 import { MixPresetsCard } from './MixPresetsCard';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = '#fff';
 type MixHubMode = 'training' | 'health';
 
 const MODE_DEFS: Array<{ m: MixHubMode; label: string; icon: string; desc: string }> = [
@@ -19,7 +19,7 @@ export const MixHub: React.FC<{ initialMode?: MixHubMode }> = ({ initialMode }) 
 
   return (
     <div style={{ padding: 12, color: '#fff' }}>
-      <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧪 Миксы — единый хаб</div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 2 }}>🧪 Миксы</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
         Без дублей: <b style={{ color: '#fff' }}>тренировочные миксы</b> (цель тренировки → пред/интра/пост, скоринг, фарма) + <b style={{ color: '#fff' }}>пресеты здоровья</b> (7 готовых составов pre/intra/post по весу) — в одном месте. Ранее разнесены в `training_mix_hub` и `mix_presets` с дублем движка `training-mix-scoring` — теперь единый расчёт. Источники: составы по ISSN, Examine.com — без выдумок.
       </div>

@@ -107,7 +107,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   volume_hub: '📐 Объём-хаб',
   training_mix_hub: '🧪 Тренировочные миксы (→ микс-хаб)',
   mix_presets: '🧪 Пресеты здоровья (→ микс-хаб)',
-  mix_hub: '🧪 Миксы — единый хаб',
+  mix_hub: '🧪 Миксы',
   tonnage: '📦 Тоннаж калькулятор',
   rir_calibration: '🎯 RIR калибратор (→ хаб)',
   readiness_forecast: '🔮 Прогноз готовности (→ хаб)',

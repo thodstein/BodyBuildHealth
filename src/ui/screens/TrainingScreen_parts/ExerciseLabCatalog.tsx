@@ -94,7 +94,7 @@ const ExerciseLabCatalog: React.FC<{
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🏋️ Каталог упражнений</div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>
         Полный каталог упражнений (~500+) с фильтрами, биомеханикой, техникой и распределением нагрузки.
         Кликните по упражнению для полной информации.
       </div>
@@ -130,17 +130,17 @@ const ExerciseLabCatalog: React.FC<{
                   {ex.type === 'compound' ? '🔩' : '🎯'}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text-light)', lineHeight: 1.2 }}>{ex.name}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? 'var(--accent)' : '#fff', lineHeight: 1.2 }}>{ex.name}</div>
                   <div style={{ display: 'flex', gap: 3, marginTop: 2, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{equipIcon} {EQUIP_RU[ex.equipment] || ex.equipment}</span>
-                    <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: 'var(--text-dim)' }}>{GROUP_RU[ex.group]}</span>
+                    <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: '#fff' }}>{equipIcon} {EQUIP_RU[ex.equipment] || ex.equipment}</span>
+                    <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: 'rgba(255,255,255,0.04)', color: '#fff' }}>{GROUP_RU[ex.group]}</span>
                     <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: ex.jointStress === 'high' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', color: ex.jointStress === 'high' ? '#ef4444' : '#22c55e' }}>
                       {ex.jointStress === 'high' ? '⚠ сустав' : ex.jointStress === 'med' ? 'средне' : '✓ сустав'}
                     </span>
                     {bio && <span style={{ fontSize: 10, padding: '1px 4px', borderRadius: 3, background: RISK_COLOR[bio.riskProfile] + '14', color: RISK_COLOR[bio.riskProfile] }}>{bio.riskProfile === 'low' ? '✓ риск' : bio.riskProfile === 'medium' ? '⚠ риск' : '🛑 риск'}</span>}
                   </div>
                 </div>
-                <span style={{ fontSize: 10, color: isSelected ? 'var(--accent)' : 'var(--text-dim)', transition: 'transform 0.15s', transform: isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
+                <span style={{ fontSize: 10, color: isSelected ? 'var(--accent)' : '#fff', transition: 'transform 0.15s', transform: isSelected ? 'rotate(180deg)' : 'none' }}>▼</span>
               </div>
 
               {/* ПОЛНАЯ КАРТОЧКА */}
@@ -163,7 +163,7 @@ const ExerciseLabCatalog: React.FC<{
                   {selectedBio && (primaryRegions.length > 0 || secondaryRegions.length > 0) && (
                     <div style={{ marginBottom: 4, display: 'flex', gap: 10, alignItems: 'center', background: 'rgba(0,230,138,0.03)', borderRadius: 8, padding: '6px 8px' }}>
                       <BodyMapSVG primary={primaryRegions} secondary={secondaryRegions} size={72} />
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, minWidth: 0 }}>
                         <b style={{ color: ACCENT }}>🗺 Карта работающих мышц:</b>
                         <div style={{ color: ACCENT, marginTop: 2 }}>• Основные: {primaryRegions.map(r => GROUP_RU[r] || r).join(', ') || '—'}</div>
                         <div>• Вспомогательные: {secondaryRegions.map(r => GROUP_RU[r] || r).join(', ') || '—'}</div>
@@ -180,14 +180,14 @@ const ExerciseLabCatalog: React.FC<{
 
                   {/* Комментарии */}
                   {ex.comments && (
-                    <div style={{ marginBottom: 4, background: 'rgba(255,145,0,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>
+                    <div style={{ marginBottom: 4, background: 'rgba(255,145,0,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
                       <b style={{ color: '#f97316' }}>💡 Комментарии:</b> {ex.comments}
                     </div>
                   )}
 
                   {/* Дефолтные параметры сет/повт/отдых/RIR */}
                   {(ex.sets || ex.reps || ex.rest || ex.rir) && (
-                    <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: 'var(--text-dim)' }}>
+                    <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: '#fff' }}>
                       <b style={{ color: '#60a5fa' }}>📋 Дефолт:</b> {ex.sets ? `${ex.sets}×` : ''}{ex.reps ? `${ex.reps} повт` : ''}{ex.rir !== undefined ? ` RIR${ex.rir}` : ''}{ex.rest ? ` · отдых ${ex.rest}с` : ''}{ex.weight ? ` · ${ex.weight}кг` : ''}
                     </div>
                   )}
@@ -208,7 +208,7 @@ const ExerciseLabCatalog: React.FC<{
                   {/* БИОМЕХАНИКА — полная */}
                   {bio && (
                     <>
-                      <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: 'var(--text-dim)' }}>
+                      <div style={{ marginBottom: 4, background: 'rgba(59,130,246,0.04)', borderRadius: 8, padding: '6px 8px', fontSize: 10, color: '#fff' }}>
                         <b style={{ color: '#60a5fa' }}>🔬 Биомеханика:</b> {CATEGORY_RU[bio.category] || bio.category} · {PATTERN_RU[bio.pattern] || bio.pattern} · Крутящий момент: {TORQUE_RU[bio.torqueProfile] || bio.torqueProfile}
                       </div>
 
@@ -216,19 +216,19 @@ const ExerciseLabCatalog: React.FC<{
                       <div style={{ marginBottom: 4, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4 }}>
                         {bio.spineLoad && (
                           <div style={{ background: LOAD_COLOR[bio.spineLoad] + '10', borderRadius: 6, padding: '4px 6px', textAlign: 'center', border: `1px solid ${LOAD_COLOR[bio.spineLoad]}30` }}>
-                            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>🦴 Позвоночник</div>
+                            <div style={{ fontSize: 11, color: '#fff' }}>🦴 Позвоночник</div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: LOAD_COLOR[bio.spineLoad] }}>{bio.spineLoad === 'high' ? 'Высокая' : bio.spineLoad === 'medium' ? 'Средняя' : 'Низкая'}</div>
                           </div>
                         )}
                         {bio.kneeLoad && (
                           <div style={{ background: LOAD_COLOR[bio.kneeLoad] + '10', borderRadius: 6, padding: '4px 6px', textAlign: 'center', border: `1px solid ${LOAD_COLOR[bio.kneeLoad]}30` }}>
-                            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>🦵 Колено</div>
+                            <div style={{ fontSize: 11, color: '#fff' }}>🦵 Колено</div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: LOAD_COLOR[bio.kneeLoad] }}>{bio.kneeLoad === 'high' ? 'Высокая' : bio.kneeLoad === 'medium' ? 'Средняя' : 'Низкая'}</div>
                           </div>
                         )}
                         {bio.shoulderLoad && (
                           <div style={{ background: LOAD_COLOR[bio.shoulderLoad] + '10', borderRadius: 6, padding: '4px 6px', textAlign: 'center', border: `1px solid ${LOAD_COLOR[bio.shoulderLoad]}30` }}>
-                            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>💪 Плечо</div>
+                            <div style={{ fontSize: 11, color: '#fff' }}>💪 Плечо</div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: LOAD_COLOR[bio.shoulderLoad] }}>{bio.shoulderLoad === 'high' ? 'Высокая' : bio.shoulderLoad === 'medium' ? 'Средняя' : 'Низкая'}</div>
                           </div>
                         )}
@@ -236,7 +236,7 @@ const ExerciseLabCatalog: React.FC<{
 
                       {/* Детальные баллы нагрузки на суставы */}
                       {bio.jointStress && Object.keys(bio.jointStress).length > 0 && (
-                        <div style={{ marginBottom: 4, background: 'rgba(99,102,241,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)' }}>
+                        <div style={{ marginBottom: 4, background: 'rgba(99,102,241,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: '#fff' }}>
                           <b style={{ color: '#818cf8' }}>📊 Детально:</b> {Object.entries(bio.jointStress).map(([k, v]) => `${k} ${v}/10`).join(' · ')}
                         </div>
                       )}
@@ -244,15 +244,15 @@ const ExerciseLabCatalog: React.FC<{
                       {/* ЦНС и сложность */}
                       <div style={{ marginBottom: 4, display: 'flex', gap: 4 }}>
                         <div style={{ flex: 1, background: 'rgba(245,158,11,0.04)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>🧠 ЦНС</div>
+                          <div style={{ fontSize: 11, color: '#fff' }}>🧠 ЦНС</div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>{bio.cnsDemand || 5}/5</div>
                         </div>
                         <div style={{ flex: 1, background: 'rgba(34,197,94,0.04)', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>📊 Сложность</div>
+                          <div style={{ fontSize: 11, color: '#fff' }}>📊 Сложность</div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e' }}>{bio.difficulty}/10</div>
                         </div>
                         <div style={{ flex: 1, background: RISK_COLOR[bio.riskProfile] + '08', borderRadius: 6, padding: '4px 6px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>⚠ Риск</div>
+                          <div style={{ fontSize: 11, color: '#fff' }}>⚠ Риск</div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: RISK_COLOR[bio.riskProfile] }}>{bio.riskProfile === 'low' ? 'Низкий' : bio.riskProfile === 'medium' ? 'Средний' : 'Высокий'}</div>
                         </div>
                       </div>
@@ -265,12 +265,12 @@ const ExerciseLabCatalog: React.FC<{
                           </div>
                         )}
                         {bio.secondaryMuscles && bio.secondaryMuscles.length > 0 && (
-                          <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>
+                          <div style={{ background: 'rgba(59,130,246,0.06)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: '#fff', marginBottom: 2 }}>
                             <b style={{ color: '#60a5fa' }}>↳ Вспомогательные:</b> {bio.secondaryMuscles.map(m => GROUP_RU[m] || m).join(', ')}
                           </div>
                         )}
                         {bio.stabilizers && bio.stabilizers.length > 0 && (
-                          <div style={{ background: 'rgba(139,92,246,0.06)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)' }}>
+                          <div style={{ background: 'rgba(139,92,246,0.06)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: '#fff' }}>
                             <b style={{ color: '#8b5cf6' }}>🛡 Стабилизаторы:</b> {bio.stabilizers.map(m => GROUP_RU[m] || m).join(', ')}
                           </div>
                         )}
@@ -278,7 +278,7 @@ const ExerciseLabCatalog: React.FC<{
 
                       {/* ROM требования */}
                       {bio.romRequirements && Object.keys(bio.romRequirements).length > 0 && (
-                        <div style={{ marginBottom: 4, background: 'rgba(236,72,153,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)' }}>
+                        <div style={{ marginBottom: 4, background: 'rgba(236,72,153,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: '#fff' }}>
                           <b style={{ color: '#ec4899' }}>📐 ROM:</b> {Object.entries(bio.romRequirements).map(([k, v]) => `${k} ${v}°`).join(' · ')}
                         </div>
                       )}
@@ -293,7 +293,7 @@ const ExerciseLabCatalog: React.FC<{
 
                       {/* Замены из биомеханики */}
                       {bio.substitutions && bio.substitutions.length > 0 && (
-                        <div style={{ marginBottom: 4, background: 'rgba(245,158,11,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: 'var(--text-dim)' }}>
+                        <div style={{ marginBottom: 4, background: 'rgba(245,158,11,0.04)', borderRadius: 8, padding: '5px 8px', fontSize: 10, color: '#fff' }}>
                           <b style={{ color: '#f59e0b' }}>🔄 Замены (биомех):</b> {bio.substitutions.map(s => { const rep = EXERCISE_CATALOG.find(e => e.id === s); return rep ? rep.name : s; }).join(', ')}
                         </div>
                       )}
@@ -303,7 +303,7 @@ const ExerciseLabCatalog: React.FC<{
                   {/* Замены из каталога */}
                   {ex.canReplace && ex.canReplace.length > 0 && (
                     <div style={{ marginBottom: 4, display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>✅ Можно заменить:</span>
+                      <span style={{ fontSize: 10, color: '#fff' }}>✅ Можно заменить:</span>
                       {ex.canReplace.map(r => { const rep = EXERCISE_CATALOG.find(e => e.id === r); return rep ? <span key={r} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(0,230,138,0.06)', color: 'var(--accent)' }}>{rep.name}</span> : null; })}
                     </div>
                   )}
@@ -311,14 +311,14 @@ const ExerciseLabCatalog: React.FC<{
                   {/* Нельзя заменять */}
                   {ex.cannotReplace && ex.cannotReplace.length > 0 && (
                     <div style={{ marginBottom: 4, display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center' }}>
-                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>🚫 Нельзя заменять:</span>
+                      <span style={{ fontSize: 10, color: '#fff' }}>🚫 Нельзя заменять:</span>
                       {ex.cannotReplace.map(r => { const rep = EXERCISE_CATALOG.find(e => e.id === r); return rep ? <span key={r} style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,0.06)', color: '#ef4444' }}>{rep.name}</span> : null; })}
                     </div>
                   )}
 
                   {/* Группа замены */}
                   {ex.substitutionGroup && (
-                    <div style={{ marginBottom: 4, fontSize: 10, color: 'var(--text-dim)' }}>
+                    <div style={{ marginBottom: 4, fontSize: 10, color: '#fff' }}>
                       <b>🔀 Группа замены:</b> {ex.substitutionGroup}
                     </div>
                   )}
@@ -341,7 +341,7 @@ const ExerciseLabCatalog: React.FC<{
             </div>
           );
         })}
-        {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-dim)', fontSize: 11 }}>Упражнения не найдены</div>}
+        {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 20, color: '#fff', fontSize: 11 }}>Упражнения не найдены</div>}
         {filtered.length > visible && (
           <button onClick={() => setVisible(v => v + 40)} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.04)', color: 'var(--accent)', cursor: 'pointer', fontSize: 11, fontWeight: 600, marginTop: 4 }}>
             ▼ Показать ещё ({filtered.length - visible} из {filtered.length})

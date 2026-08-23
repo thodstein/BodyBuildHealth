@@ -17,9 +17,9 @@ import {
 } from '../../../engines/training-plan-save.engine';
 
 const ACCENT = '#00e68a';
-const DIM = 'rgba(255,255,255,0.5)';
+const DIM = '#fff';
 const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
-const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 8px' };
+const H: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 8px' };
 
 const TIMING_RU: Record<string, string> = { pre: 'До тренировки', intra: 'Во время', post: 'После' };
 
@@ -71,7 +71,7 @@ export const MixPresetsCard: React.FC = () => {
     padding: '6px 10px', borderRadius: 10, cursor: 'pointer', fontSize: 10, fontWeight: 700,
     background: active ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)',
     border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
-    color: active ? ACCENT : 'rgba(255,255,255,0.7)', transition: 'all 0.15s', textAlign: 'center' as const,
+    color: active ? ACCENT : '#fff', transition: 'all 0.15s', textAlign: 'center' as const,
     whiteSpace: 'nowrap' as const, overflow: 'hidden' as const, textOverflow: 'ellipsis' as const,
   });
 
@@ -96,7 +96,7 @@ export const MixPresetsCard: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', padding: 12, color: '#fff' }}>
-      <div style={H}>🧪 Пресеты здоровья (тренировочные миксы)</div>
+      <div style={H}>🧪 Пресеты здоровья</div>
       <div style={{ fontSize: 10, color: DIM, marginBottom: 10 }}>
         Готовые составы pre/intra/post: жиросжигание, суставы, ЖКТ, сон, гидратация, противовоспалительный, иммунитет. Выберите цель, подгоните вес и множитель дозы.
       </div>
@@ -117,14 +117,14 @@ export const MixPresetsCard: React.FC = () => {
 
       {tpl && phases && (
         <div style={CARD}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, margin: '0 0 4px' }}>{tpl.name}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>{tpl.name}</div>
           <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>{tpl.description}</div>
           {(['pre', 'intra', 'post'] as const).map(t => {
             const items = phases[t];
             if (!items || items.length === 0) return null;
             return (
               <div key={t} style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, margin: '6px 0 4px' }}>⏱️ {TIMING_RU[t]} ({items.length})</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', margin: '6px 0 4px' }}>⏱️ {TIMING_RU[t]} ({items.length})</div>
                 {items.map((r, i) => <Item key={i} r={r} />)}
               </div>
             );
@@ -133,7 +133,7 @@ export const MixPresetsCard: React.FC = () => {
       )}
 
       <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>
           Сохранение пресета: запись в дневник тренировок + вещества в избранное БАД + рекомендации. Также можно отправить все вещества пресета «{presetTitle}» напрямую в план поддержки.
         </div>
         <button onClick={() => { if (planSubstances.length > 0) setSavePopup({ step: 'confirm', toPlan: false, result: null }); }}
@@ -151,15 +151,15 @@ export const MixPresetsCard: React.FC = () => {
             {savePopup.step === 'confirm' ? (
               <>
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 10 }}>💾 Сохранение пресета «{presetTitle}»</div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>📓</span><span><b>Дневник тренировок</b> — запись с составом ({planSubstances.length} веществ) и дозами.</span></div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>⭐</span><span><b>Избранное БАД</b> — добавятся вещества набора (без дублей).</span></div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>💊</span><span><b>Рекомендации</b> — анализ препаратов: дозы, предупреждения, мониторинг, конфликты. Сохранятся в избранном БАД.</span></div>
-                <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0', padding: 10, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', cursor: 'pointer', fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>📓</span><span><b>Дневник тренировок</b> — запись с составом ({planSubstances.length} веществ) и дозами.</span></div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>⭐</span><span><b>Избранное БАД</b> — добавятся вещества набора (без дублей).</span></div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>💊</span><span><b>Рекомендации</b> — анализ препаратов: дозы, предупреждения, мониторинг, конфликты. Сохранятся в избранном БАД.</span></div>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '10px 0', padding: 10, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', cursor: 'pointer', fontSize: 12, color: '#fff' }}>
                   <input type="checkbox" checked={savePopup.toPlan} onChange={e => setSavePopup(prev => prev ? { ...prev, toPlan: e.target.checked } : prev)} style={{ marginTop: 2 }} />
                   <span>🧮 <b>Внести в план поддержки</b> — вещества попадут в калькулятор поддержки: расчёт рисков, дозировок и карточка «Тренировочные миксы и пресеты здоровья».</span>
                 </label>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setSavePopup(null)} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)', minHeight: 44 }}>Отмена</button>
+                  <button onClick={() => setSavePopup(null)} style={{ flex: 1, padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: 'rgba(255,255,255,0.08)', color: '#fff', minHeight: 44 }}>Отмена</button>
                   <button onClick={() => {
                     try {
                       const input = {
@@ -182,10 +182,10 @@ export const MixPresetsCard: React.FC = () => {
             ) : (
               <>
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginBottom: 10 }}>✅ Сохранено</div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>📓</span><span>Запись «{presetTitle}» добавлена в <b>дневник тренировок</b> ({planSubstances.length} веществ).</span></div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>⭐</span><span>В <b>избранное БАД</b> добавлено{savePopup.result && savePopup.result.addedFavCount > 0 ? ` новых веществ: +${savePopup.result.addedFavCount}` : ' новых веществ: 0 (уже в избранном)'}.</span></div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>💊</span><span><b>Рекомендации сохранены</b>: {savePopup.result ? savePopup.result.rec.substances.length : 0} препаратов проанализировано.</span></div>
-                {savePopup.toPlan && <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: 'rgba(255,255,255,0.85)', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>🧮</span><span>Внесено в <b>план поддержки</b> — карточка «Тренировочные миксы и пресеты здоровья» в калькуляторе.</span></div>}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>📓</span><span>Запись «{presetTitle}» добавлена в <b>дневник тренировок</b> ({planSubstances.length} веществ).</span></div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>⭐</span><span>В <b>избранное БАД</b> добавлено{savePopup.result && savePopup.result.addedFavCount > 0 ? ` новых веществ: +${savePopup.result.addedFavCount}` : ' новых веществ: 0 (уже в избранном)'}.</span></div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>💊</span><span><b>Рекомендации сохранены</b>: {savePopup.result ? savePopup.result.rec.substances.length : 0} препаратов проанализировано.</span></div>
+                {savePopup.toPlan && <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#fff', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}><span>🧮</span><span>Внесено в <b>план поддержки</b> — карточка «Тренировочные миксы и пресеты здоровья» в калькуляторе.</span></div>}
                 <button onClick={() => setSavePopup(null)} style={{ marginTop: 12, width: '100%', padding: '10px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', minHeight: 44 }}>Готово</button>
               </>
             )}

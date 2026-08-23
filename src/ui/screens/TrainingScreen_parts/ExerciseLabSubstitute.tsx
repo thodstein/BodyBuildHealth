@@ -47,7 +47,7 @@ const ExerciseLabSubstitute: React.FC = () => {
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', color: '#fff' }}>
       <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, margin: '4px 0 8px' }}>🔄 Калькулятор замены упражнения</div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: '#fff', marginBottom: 10 }}>
         Выберите упражнение — покажу допустимые замены (с причиной) и запретные замены из базы биомеханики.
         Также показаны все упражнения той же группы, которые можно использовать как замену.
       </div>
@@ -62,7 +62,7 @@ const ExerciseLabSubstitute: React.FC = () => {
       ) : (<>
         <div style={{ padding: 10, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)', marginBottom: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT }}>{ex.name}</div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+          <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>
             Группа: {GROUP_RU[ex.group]} · {ex.type === 'compound' ? 'Базовое' : 'Изолированное'} · {ex.equipment}
             {ex.targetMuscle ? ` · цель: ${ex.targetMuscle}` : ''}
           </div>
@@ -76,7 +76,7 @@ const ExerciseLabSubstitute: React.FC = () => {
             {subs.map(o => (
               <div key={o.id} style={{ padding: 10, borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderLeft: '3px solid rgba(0,230,138,0.4)' }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{o.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{o.reason}</div>
+                <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{o.reason}</div>
               </div>
             ))}
           </div>
@@ -89,7 +89,7 @@ const ExerciseLabSubstitute: React.FC = () => {
               {forbidden.map((f, i) => (
                 <div key={i} style={{ padding: 8, borderRadius: 8, background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)', borderLeft: '3px solid rgba(239,68,68,0.4)' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#fca5a5' }}>{f.name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{f.reason}</div>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>{f.reason}</div>
                 </div>
               ))}
             </div>

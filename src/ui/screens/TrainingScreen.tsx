@@ -705,7 +705,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {effectiveTab === 'volume_hub' && <InfoErrorBoundary label="Объём-хаб"><VolumeHub initialMode={tab === 'tonnage' ? 'tonnage' : tab === 'calc_plates' ? 'plates' : 'volume'} /></InfoErrorBoundary>}
             {(effectiveTab as any) === 'tools_hub' && <InfoErrorBoundary label="PRI/схема повторов"><ToolsHub /></InfoErrorBoundary>}
             {(effectiveTab as any) === 'rir_forecast_hub' && <InfoErrorBoundary label="RIR + Прогноз — единый хаб"><RirForecastHub initialMode={tab === 'readiness_forecast' ? 'forecast' : 'rir'} /></InfoErrorBoundary>}
-            {effectiveTab === 'mix_hub' && <InfoErrorBoundary label="Миксы — единый хаб"><MixHub initialMode={tab === 'mix_presets' ? 'health' : 'training'} /></InfoErrorBoundary>}
+            {effectiveTab === 'mix_hub' && <InfoErrorBoundary label="Миксы"><MixHub initialMode={tab === 'mix_presets' ? 'health' : 'training'} /></InfoErrorBoundary>}
           </>);
         }
         return <TrainingIntelligenceDashboard
