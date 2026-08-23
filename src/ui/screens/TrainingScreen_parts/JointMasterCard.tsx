@@ -182,7 +182,7 @@ export const JointMasterCard: React.FC = () => {
           const flow = diag.flows[0];
           if (flow) applyToPlanner({ kind:'limiter', label:`Мобильность ${diag.joint.label}: ${flow.name}`, data:{ limiterExerciseMap:{ [diag.joint.id+'|mobility|'+flow.id]: flow.exercises || [] }, limiterProtocolMap:{}, limiterDayMap:{} } as any });
           else applyToPlanner({ kind:'limiter', label:`Анатомия ${diag.joint.label}: прехаб`, data:{ limiterExerciseMap:{ [diag.joint.id+'|prehab|anat']: diag.mobilityTests.map(t=>t.title) }, limiterProtocolMap:{}, limiterDayMap:{} } as any });
-        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#fff', color:'#000', fontWeight:800, fontSize:10 }}>🛠 Добавить прехаб для {diag.joint.label}</button>
+        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:JOINT_COLOR[joint], color:'#fff', fontWeight:800, fontSize:10 }}>🛠 Добавить прехаб для {diag.joint.label}</button>
       </div>
       </section>
 
@@ -217,7 +217,7 @@ export const JointMasterCard: React.FC = () => {
           } else {
             applyToPlanner({ kind:'pri', label:`Статус ${diag.joint.label}: норма`, data:{ volumeMult: 1, rirShift: 0 } as any });
           }
-        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#fff', color:'#000', fontWeight:800, fontSize:10 }}>
+        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:ACCENT, color:'#000', fontWeight:800, fontSize:10 }}>
           {diag.blockedPatterns.length ? `🛠 Разгрузить ${diag.joint.label} — исключить ${diag.blockedPatterns.length} паттерна` : `✓ ${diag.joint.label}: ограничений нет — применить норму`}
         </button>
       </div>
@@ -275,9 +275,44 @@ export const JointMasterCard: React.FC = () => {
       <section id="sec-prehab" ref={el=> sectionRefs.current['sec-prehab']=el} style={{ scrollMarginTop:56 }}>
       <div style={{ ...CARD, borderLeft:'3px solid #a78bfa' }}>
         <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>4 · Прехаб / мобильность для {diag.joint.label}</div>
-        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Тесты: {diag.mobilityTests.map(t=>t.title).join(', ') || '—'}</div>
-        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Слабые (последняя оценка): {diag.weakest.map(w=>`${w.test.title} ${w.score}/2`).join(', ') || 'нет данных — пройдите оценку в «Мобильность»'}</div>
-        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Потоки: {diag.flows.map(f=>f.name).join(', ') || '—'}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:6, lineHeight:1.4 }}>Выбери тесты и потоки — добавятся в ПЛ-авто как прехаб. Карточки цветные, не белые.</div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
+          {diag.mobilityTests.slice(0,4).map(t => (
+            <div key={t.id} style={{ padding:'8px', borderRadius:8, background:'rgba(167,139,250,0.12)', border:'1px solid rgba(167,139,250,0.25)', textAlign:'center' }}>
+              <div style={{ fontSize:9, color:'#a78bfa', fontWeight:700 }}>{t.title}</div>
+              <div style={{ fontSize:8, color:'#fff', marginTop:2 }}>тест мобильности</div>
+            </div>
+          ))}
+        </div>
+        {diag.weakest.length > 0 && (
+          <div style={{ marginTop:8, padding:'8px', borderRadius:8, background:'rgba(244,63,94,0.08)', border:'1px solid rgba(244,63,94,0.15)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#f43f5e' }}>Слабые зоны (последняя оценка):</div>
+            <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{diag.weakest.map(w=>`${w.test.title} ${w.score}/2`).join(' · ')}</div>
+            <button onClick={() => {
+              const map: Record<string,string[]> = {};
+              diag.weakest.forEach(w => { map[diag.joint.id+'|weak|'+w.test.id] = [w.test.title]; });
+              applyToPlanner({ kind:'limiter', label:`Прехаб слабых ${diag.joint.label}: ${diag.weakest.length} тестов`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+            }} style={{ marginTop:6, width:'100%', minHeight:28, border:'none', borderRadius:6, cursor:'pointer', background:'#f43f5e', color:'#fff', fontWeight:700, fontSize:10 }}>🛠 Добавить прехаб для слабых</button>
+          </div>
+        )}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:6, marginTop:8 }}>
+          {diag.flows.slice(0,2).map(f => (
+            <div key={f.id} style={{ padding:'8px', borderRadius:8, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.15)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#38bdf8' }}>{f.name}</div>
+              <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>{(f.exercises || []).slice(0,2).join(' · ') || 'поток мобильности'}</div>
+              <button onClick={() => applyToPlanner({ kind:'limiter', label:`Поток ${f.name} для ${diag.joint.label}`, data:{ limiterExerciseMap:{ [diag.joint.id+'|flow|'+f.id]: f.exercises || [] }, limiterProtocolMap:{}, limiterDayMap:{} } as any })} style={{ marginTop:6, width:'100%', minHeight:26, border:'none', borderRadius:6, cursor:'pointer', background:'#38bdf8', color:'#000', fontWeight:700, fontSize:9 }}>+ Добавить поток</button>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => {
+          const map: Record<string,string[]> = {};
+          diag.mobilityTests.forEach(t => { map[diag.joint.id+'|mobility|'+t.id] = [t.title]; });
+          diag.flows.forEach(f => { map[diag.joint.id+'|flow|'+f.id] = f.exercises || [f.name]; });
+          applyToPlanner({ kind:'limiter', label:`Весь прехаб ${diag.joint.label}: ${diag.mobilityTests.length + diag.flows.length} блоков`, data:{ limiterExerciseMap: map, limiterProtocolMap:{}, limiterDayMap:{} } as any });
+        }} style={{ marginTop:8, width:'100%', minHeight:32, border:'none', borderRadius:8, cursor:'pointer', background:'#a78bfa', color:'#fff', fontWeight:800, fontSize:10 }}>🛠 Добавить весь прехаб для {diag.joint.label}</button>
+        <div style={{ marginTop:6, padding:'6px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'#fff', lineHeight:1.3 }}>
+          📍 Куда: <b>ПЛ-авто → Лимитеры → {diag.joint.label} → прехаб/мобильность</b> · Карточки цветные (#a78bfa / #38bdf8), не белые.
+        </div>
       </div>
       </section>
 
