@@ -53,8 +53,8 @@ import { useDataLink } from '../../../core/data-link';
 const ACCENT = '#00e68a';
 const ACCENT_PL = '#3b82f6';
 const ACCENT_BB = '#ec4899';
-const DIM = 'rgba(255,255,255,0.5)';
-const CARD: React.CSSProperties = { padding: 14, borderRadius: 12, background: 'rgba(24,24,27,0.4)', border: '1px solid rgba(255,255,255,0.05)', marginBottom: 12 };
+const DIM = '#fff';
+const CARD: React.CSSProperties = { padding: 14, borderRadius: 14, background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', marginBottom: 12, backdropFilter: 'blur(12px)'  as any, transition:'all 0.18s ease' } as any;
 
 const btn: React.CSSProperties = { padding: '6px 12px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', minHeight: 38 };
 
@@ -1322,65 +1322,80 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
           </div>
           )}
 
-          {/* Edit block panel */}
+          {/* Edit block panel — ПЕРЕДЕЛАН: не в куче, каждая функция — своя секция */}
           {editBlock && (
             <>
-              {isMobile && <div className="pd-edit-backdrop" onClick={() => setEditBlockId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 39 }} />}
-              <div className="constructor-surface constructor-surface--accent pd-card-mobile pd-edit-sheet" style={{ ...CARD, border: '1px solid ' + accent + '44', background: isMobile ? '#18181b' : accent + '06' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: PHASE_COLORS[editBlock.phaseKey] }}>
-                  {PHASE_ICONS[editBlock.phaseKey]} {PHASE_LABELS_RU[editBlock.phaseKey]}
+              {isMobile && <div className="pd-edit-backdrop" onClick={() => setEditBlockId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', zIndex: 39 }} />}
+              <div className="constructor-surface pd-card-mobile pd-edit-sheet" style={{ ...CARD, borderLeft: `3px solid ${PHASE_COLORS[editBlock.phaseKey]}`, background: `linear-gradient(135deg, ${PHASE_COLORS[editBlock.phaseKey]}12, rgba(24,24,27,0.42))`, padding:0, overflow:'hidden' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding:'12px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)' }}>
+                <span style={{ fontSize: 13, fontWeight: 900, color: PHASE_COLORS[editBlock.phaseKey], display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: PHASE_COLORS[editBlock.phaseKey]+'22', border:`1px solid ${PHASE_COLORS[editBlock.phaseKey]}44`, fontSize:14 }}>{PHASE_ICONS[editBlock.phaseKey]}</span>
+                  {PHASE_LABELS_RU[editBlock.phaseKey]} · {editBlock.endWeek - editBlock.startWeek + 1} нед
                 </span>
-                <button onClick={() => setEditBlockId(null)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14, width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                <button onClick={() => setEditBlockId(null)} aria-label="Закрыть" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14, width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Сменить фазу ({disciplineLabel}):</div>
-                <select value={editBlock.phaseKey} onChange={e => handleChangeBlockPhase(editBlock.id, e.target.value as PhaseKey)}
-                  style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 12, minHeight: 44 }}>
-                  {allowedKeys.map(pk => {
-                    const pkT = pk as PhaseKey;
-                    return <option key={pk} value={pk}>{PHASE_ICONS[pkT]} {PHASE_LABELS_RU[pkT]}</option>;
-                  })}
-                </select>
+              <div style={{ padding:12, display:'flex', flexDirection:'column', gap:10 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:10 }}>
+                <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:10, color:'#fff', fontWeight:800, marginBottom:6, letterSpacing:0.3, textTransform:'uppercase' }}>Фаза</div>
+                  <select value={editBlock.phaseKey} onChange={e => handleChangeBlockPhase(editBlock.id, e.target.value as PhaseKey)}
+                    style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 12, minHeight: 44 }}>
+                    {allowedKeys.map(pk => {
+                      const pkT = pk as PhaseKey;
+                      return <option key={pk} value={pk}>{PHASE_ICONS[pkT]} {PHASE_LABELS_RU[pkT]}</option>;
+                    })}
+                  </select>
+                  <div style={{ fontSize:10, color:'#fff', marginTop:6, lineHeight:1.4, opacity:0.85 }}>Смена фазы — объём/интенсивность пересчитаются по шаблону {disciplineLabel}.</div>
+                </div>
+                <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:10, color:'#fff', fontWeight:800, marginBottom:6, letterSpacing:0.3, textTransform:'uppercase' }}>Действия</div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => handleDuplicateBlock(editBlock.id)} style={{ ...btn, flex: 1, minHeight: 44, background:'rgba(255,255,255,0.04)', borderColor:'rgba(255,255,255,0.08)', color:'#fff' }}>📋 Дублировать</button>
+                    <button onClick={() => { handleDeleteBlock(editBlock.id); setEditBlockId(null); }} style={{ ...btn, flex: 1, minHeight: 44, color: '#fff', background:'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.25)' }}>🗑 Удалить</button>
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', marginTop:6, lineHeight:1.4 }}>Дубликат — копия блока рядом, удаление — без подтверждения (отмена Ctrl+Z).</div>
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                <button onClick={() => handleDuplicateBlock(editBlock.id)} style={{ ...btn, flex: 1, minHeight: 44 }}>📋 Дублировать блок</button>
-                <button onClick={() => { handleDeleteBlock(editBlock.id); setEditBlockId(null); }} style={{ ...btn, flex: 1, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.25)' }}>🗑 Удалить</button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+                <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: '#fff', fontSize: 10, opacity:0.9 }}>Старт</div><b style={{ color:'#fff', fontSize:13 }}>нед {editBlock.startWeek}</b></div>
+                <div style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: '#fff', fontSize: 10, opacity:0.9 }}>Конец</div><b style={{ color:'#fff', fontSize:13 }}>нед {editBlock.endWeek}</b></div>
+                <div style={{ padding: 10, borderRadius: 10, background: accent + '14', border: '1px solid ' + accent + '22', textAlign: 'center' }}><div style={{ color: '#fff', fontSize: 10, opacity:0.9 }}>Длительность</div><b style={{ color:accent, fontSize:13 }}>{editBlock.endWeek - editBlock.startWeek + 1} нед</b></div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11, marginBottom: 8 }}>
-                <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Старт</div><b>нед {editBlock.startWeek}</b></div>
-                <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Конец</div><b>нед {editBlock.endWeek}</b></div>
-                <div style={{ padding: 8, borderRadius: 8, background: accent + '14', border: '1px solid ' + accent + '22', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Длит.</div><b>{editBlock.endWeek - editBlock.startWeek + 1} нед</b></div>
+              <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:10, color:'#fff', marginBottom:8, fontWeight:800, letterSpacing:0.3, textTransform:'uppercase' }}>Длительность — точная настройка</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <button onClick={()=> handleResize(editBlock.id, Math.max(editBlock.startWeek, editBlock.endWeek -1))} style={{ ...btn, minWidth:36, minHeight:36, padding:'6px 8px', background:'rgba(255,255,255,0.04)', color:'#fff' }}>−</button>
+                  <input type="range" min={1} max={Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)} value={editBlock.endWeek - editBlock.startWeek + 1}
+                    onChange={e => handleResize(editBlock.id, editBlock.startWeek + parseInt(e.target.value) - 1)}
+                    style={{ flex:1, accentColor: accent }} />
+                  <button onClick={()=> handleResize(editBlock.id, Math.min(current!.totalWeeks, editBlock.endWeek +1))} style={{ ...btn, minWidth:36, minHeight:36, padding:'6px 8px', background: accent+'14', color:accent, borderColor: accent+'33' }}>+</button>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#fff', marginTop: 4, opacity:0.7 }}><span>1 нед</span><span>{Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)} нед макс</span></div>
               </div>
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Длительность (недель):</div>
-                <input type="range" min={1} max={Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)} value={editBlock.endWeek - editBlock.startWeek + 1}
-                  onChange={e => handleResize(editBlock.id, editBlock.startWeek + parseInt(e.target.value) - 1)}
-                  style={{ width: '100%', accentColor: accent }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginTop: 2 }}><span>1</span><span>{Math.min(12, current!.totalWeeks - editBlock.startWeek + 1)}</span></div>
-              </div>
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Сдвинуть:</div>
+              <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:10, color:'#fff', marginBottom:8, fontWeight:800, letterSpacing:0.3, textTransform:'uppercase' }}>Сдвиг по таймлайну</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 }}>
                   {[-4, -2, -1, 1, 2, 4].map(delta => (
                     <button key={delta} onClick={() => {
                       const newStart = Math.max(1, Math.min(current!.totalWeeks - (editBlock.endWeek - editBlock.startWeek), editBlock.startWeek + delta));
                       handleMoveBlock(editBlock.id, newStart);
                     }}
-                      style={{ ...btn, fontSize: 12, padding: '8px 4px', minHeight: 44, fontWeight: 800 }}>
+                      style={{ ...btn, fontSize: 12, padding: '10px 4px', minHeight: 44, fontWeight: 800, background:'rgba(255,255,255,0.04)', color:'#fff', border:'1px solid rgba(255,255,255,0.08)' }}>
                       {delta > 0 ? '+' : ''}{delta}
                     </button>
                   ))}
                 </div>
+                <div style={{ fontSize:10, color:'#fff', marginTop:6, opacity:0.7, textAlign:'center' }}>Сдвиг — неделя старта ±1/2/4 · границы пересчитаются</div>
               </div>
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Заметки:</div>
+              <div style={{ padding:10, borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:800, letterSpacing:0.3, textTransform:'uppercase' }}>Заметки блока</div>
                 <textarea value={editBlock.notes} onChange={e => {
                   const updated = updateBlockNotes(current!, editBlock.id, e.target.value);
                   commitDesign(updated);
                 }}
                   placeholder="Цель блока, акценты, RIR, примечания…"
                   style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#fff', fontSize: 12, padding: 10, resize: 'vertical', minHeight: 64 }} />
+              </div>
               </div>
             </div>
             </>
