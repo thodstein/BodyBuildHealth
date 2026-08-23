@@ -27,6 +27,7 @@ import { finalizeBBPlan, markAntagonistSupersets, applyVolumeScheme } from '../.
 import { exerciseFeatureBadges, planSetsBreakdown, techniqueLabel, lastSetTechnique, techniqueChainParts } from './bb-technique-display';
 import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
+import { tempoExplain } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
@@ -3096,13 +3097,40 @@ export const BbAutoConstructor: React.FC = () => {
                     const subGroups = (v as any).subGroups as Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number>; explanation?: { why: string; how: string; patternRu: string; labelRu: string } }> | undefined;
                     return (
                     <div key={m} onClick={() => setExpandedMuscles(prev => { const n = new Set(prev); if (n.has(m)) n.delete(m); else n.add(m); return n; })} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
+                      {(() => {
+                        const lm = (builtPlan.volumeLandmarks || []).find((l: any) => l.group === m);
+                        const freqVal = (builtPlan.muscleFrequency?.[m] ?? v.sessionsPerWeek) as number;
+                        const targetSets = (builtPlan as any).volumeTargets?.[m]?.targetSets ?? lm?.mav ?? v.workingSets;
+                        const pedMult = (builtPlan as any).pedAdaptation?.combinedMrvMultiplier || 1;
+                        const freqColor = freqVal >= 3 ? '#ef4444' : freqVal === 2 ? '#22c55e' : '#f59e0b';
+                        const volColor = (() => {
+                          if (!lm) return '#374151';
+                          if (v.workingSets > (lm.mrv + 1)) return '#ef4444';
+                          if (v.workingSets > lm.mav) return '#f59e0b';
+                          if (v.workingSets >= lm.mev) return '#22c55e';
+                          return '#3b82f6';
+                        })();
+                        const pct = lm ? Math.min(100, Math.round((v.workingSets / (lm.mrv || v.workingSets || 1)) * 100)) : 50;
+                        return (<>
                       <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.9)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span>{MUSCLE_RU[m] || m} — {v.sessionsPerWeek} тр/нед · {v.workingSets} раб. · {v.warmupSets} разм.</span>
+                        <span>{MUSCLE_RU[m] || m} — <span style={{ color: freqColor }}>{freqVal}×/нед</span> · {v.workingSets} раб.{targetSets ? `/${targetSets} цель` : ''} · {v.warmupSets} разм.{pedMult > 1 ? ` · PED ×${pedMult.toFixed(2)}` : ''}</span>
                         <span style={{ fontSize:10, color:'rgba(255,255,255,0.4)' }}>{isExpanded ? '▲' : '▼'}</span>
                       </div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
+                      {lm && (
+                        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                          <div style={{ flex:1, height:4, borderRadius:2, background:'rgba(255,255,255,0.08)', position:'relative', overflow:'hidden' }}>
+                            <div style={{ position:'absolute', left:`${(lm.mev/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(59,130,246,0.6)' }} />
+                            <div style={{ position:'absolute', left:`${(lm.mav/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(245,158,11,0.6)' }} />
+                            <div style={{ height:'100%', borderRadius:2, background:volColor, width:`${pct}%`, transition:'width 0.3s' }} />
+                          </div>
+                          <span style={{ fontSize:8, color:volColor, fontWeight:700, whiteSpace:'nowrap' }}>MEV{lm.mev}·MAV{lm.mav}·MRV{lm.mrv}</span>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', marginTop:4 }}>
                         паттерн: {Object.entries(v.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'} · direct {v.directSets} · косв. {Math.round(v.indirectSets)}
                       </div>
+                        </>);
+                      })()}
                       {isExpanded && (
                         <>
                           <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
@@ -3208,6 +3236,22 @@ export const BbAutoConstructor: React.FC = () => {
                 <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
                   <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'rgba(255,255,255,0.8)', lineHeight:1.45 }}>
                     <b>Настройки:</b> Уровень {(builtPlan as any).level || '—'} · Цель {(builtPlan as any).goal || '—'} · Фокус {(builtPlan as any).trainingFocus || '—'} · Методика {(builtPlan as any).methodology || '—'} · Объём {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (' + ((builtPlan as any).volumeScheme || 'MRV') + ', кап 5)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'MAV') + ')'} · Стаж {(builtPlan as any).trainingYears ?? '—'} лет · Капы {(builtPlan as any).maxWorkingSets}/{ (builtPlan as any).maxExercises}
+                    {pedAdapt.activePEDs.length > 0 && (
+                      <div style={{ marginTop:3, padding:'4px 6px', borderRadius:6, background: pedAdapt.combinedMrvMultiplier > 1.2 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(245,158,11,0.2)' }}>
+                        <b>PED:</b> {pedAdapt.activePEDs.join(', ')} MRV x{pedAdapt.combinedMrvMultiplier.toFixed(2)} Recovery x{(pedAdapt as any).combinedRecoveryMultiplier?.toFixed(2) || '—'}
+                        {Object.keys(pedDoses).length > 0 && <> Doses: {Object.entries(pedDoses).map(([k,v])=>`${k}:${v}`).join(', ')}</>}
+                      </div>
+                    )}
+                    {(() => {
+                      const pp = (linked as any)?.profile?.settings?.personal;
+                      if (!pp || (!pp.weight && !pp.bodyFat && !pp.sex)) return null;
+                      const leanMass = pp.weight && pp.bodyFat ? (pp.weight * (1 - pp.bodyFat/100)).toFixed(1) : null;
+                      return (
+                        <div style={{ marginTop:3, fontSize:10, color:'rgba(255,255,255,0.6)' }}>
+                          <b>Patient:</b> {pp.sex || '—'} {pp.age ? `${pp.age}y` : '—'} {pp.weight ? `${pp.weight}kg` : '—'}{pp.height ? `/${pp.height}cm` : ''} {pp.bodyFat ? ` BF ${pp.bodyFat}%` : ''} {leanMass ? ` LBM ${leanMass}kg` : ''}
+                        </div>
+                      );
+                    })()}
                     {((builtPlan as any).supersetMode || (builtPlan as any).dupMode || (builtPlan as any).priorityMuscles?.length) && (
                       <><br/>Суперсеты {(builtPlan as any).supersetMode || 'нет'} · DUP {(builtPlan as any).dupMode || 'нет'}{(builtPlan as any).priorityMuscles?.length ? ` · Спец: ${(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}` : ''}</>
                     )}
@@ -3619,7 +3663,7 @@ export const BbAutoConstructor: React.FC = () => {
                           <Chip label="Подходы" value={edit.sets + '×' + edit.reps} color="#22c55e" />
                           <Chip label="RIR" value={String(e.rir)} color="#f59e0b" />
                           <Chip label="Вес" value={edit.weight + ' кг'} color="#60a5fa" />
-                          {e.workSets[0]?.tempo && <Chip label="Темп" value={e.workSets[0].tempo} color="#a855f7" />}
+                          {e.workSets[0]?.tempo && <Chip label="Темп" value={`${e.workSets[0].tempo}${tempoExplain(e.workSets[0].tempo) ? ` (${tempoExplain(e.workSets[0].tempo)})` : ''}`} color="#a855f7" />}
                           {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="rgba(255,255,255,0.55)" />}
                           <Chip label="Группа" value={muscleLabel(e.muscle)} color="rgba(255,255,255,0.55)" />
                         </div>
@@ -4045,24 +4089,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Per-muscle chip table */}
-        {quality.perMuscle && quality.perMuscle.length > 0 && (
-          <div style={{ ...CARD, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.1)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>🏋️ Мышцы · сеты · MEV · MAV · MRV · %</div>
-            <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-              {quality.perMuscle.map(pm => {
-                const color = pm.status === 'exceeding_mrv' ? '#ef4444' : pm.status === 'below_mev' ? '#f59e0b' : '#22c55e';
-                return (
-                  <div key={pm.muscle} title={pm.contextNote || undefined} style={{ padding:'4px 8px', borderRadius:8, background:color+'10', border:'1px solid '+color+'30', fontSize:11, display:'flex', alignItems:'center', gap:4, cursor:'help' }}>
-                    <span style={{ fontWeight:700, color:'#fff' }}>{pm.muscle}</span>
-                    <span style={{ fontWeight:700, color }}>{pm.sets}</span>
-                    <span style={{ color:'rgba(255,255,255,0.35)' }}>· {pm.mev} · {pm.mav} · {pm.mrv} · {pm.pct}%</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Per-muscle chip table removed — consolidated into Plan step's Detailed Muscle Groups */}
         {/* Recommendations */}
         {quality.recommendations && quality.recommendations.length > 0 && (
           <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
