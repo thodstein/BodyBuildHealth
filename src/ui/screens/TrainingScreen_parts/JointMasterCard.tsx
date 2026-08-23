@@ -2,11 +2,11 @@
  * JointMasterCard.tsx — ЕДИНЫЙ МАСТЕР СУСТАВНО-СВЯЗОЧНОГО АППАРАТА.
  *
  * 9 блоков на один сустав/движение (опасные зоны: поясница L4-S1 выделена):
- *  0 JSI теплокарта → 1 анатомия риска → 2 текущая нагрузка (jointStress) → 3 геометрия→сустав →
- *  4 недельный план (orthopedic-load) → 5 прехаб/мобильность → 6 мониторинг (FMS-6 + he_mobility) →
- *  7 рекомендации (замены + cue) → 8 техника и безопасность упражнения → + видео-гид ракурса.
+ *  0 ИСИ теплокарта → 1 анатомия риска → 2 текущая нагрузка → 3 геометрия → сустав →
+ *  4 недельный план → 5 прехаб/мобильность → 6 мониторинг (ФМС-6 + подвижность) →
+ *  7 рекомендации (замены + подсказки) → 8 техника и безопасность упражнения → + видео-гид ракурса.
  *
- * Использует ВСЕ 9 ортопедических калькуляторов проекта + быструю оценку техники. Без вкладок, один скролл.
+ * Использует все 9 ортопедических калькуляторов проекта + быструю оценку техники. Без вкладок, один скролл.
  */
 import React, { useMemo, useState } from 'react';
 import { JOINTS, JOINT_OPTIONS, jointLoadDiagnosis, JOINT_MAP, type JointId } from '../../../engines/pro/joint-load-master.engine';
@@ -42,14 +42,14 @@ export const JointMasterCard: React.FC = () => {
 
   return (
     <div style={{ padding:12, color:'#fff' }}>
-      <div style={{ fontSize:15, fontWeight:800, color:ACCENT }}>🦴 Ортопедия и суставы — единый инструмент</div>
-      <div style={{ fontSize:10, color:DIM, marginTop:3, lineHeight:1.45 }}>
-        Всё про суставы и движения в одном месте: тепловая карта износа (JSI), анатомия риска, нагрузка, геометрия, недельный план, прехаб/мобильность, мониторинг (FMS), замены, видео + оценка техники упражнения. Без вкладок-дублей.
+      <div style={{ fontSize:15, fontWeight:800, color:ACCENT }}>🦴 Ортопедия и суставы</div>
+      <div style={{ fontSize:10, color:'#fff', marginTop:3, lineHeight:1.45 }}>
+        Единый центр управления здоровьем суставов: тепловая карта износа, анатомия риска, текущая нагрузка, геометрия, недельный план, прехаб и мобильность, мониторинг движений, замены упражнений, видео-анализ и оценка техники. Всё в одном месте, без дублей и лишних вкладок.
       </div>
 
       {/* подвкладки */}
       <div style={{ display:'flex', gap:6, marginTop:8, marginBottom:6, flexWrap:'wrap' }}>
-        {([['ortho','🦴 Суставы и ортопедия'],['safety','🛡 Безопасность упражнения']] as const).map(([id,label])=>(
+        {([['ortho','📋 Режим детализации'],['safety','⚡ Быстрый режим']] as const).map(([id,label])=>(
           <button key={id} onClick={()=>setSub(id)} aria-pressed={sub===id} style={{
             minHeight:36, padding:'7px 14px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:800,
             border: sub===id ? '1px solid '+ACCENT : '1px solid rgba(255,255,255,0.08)',
@@ -61,8 +61,8 @@ export const JointMasterCard: React.FC = () => {
 
       {sub === 'safety' && (
         <>
-          <div style={{ marginTop:4, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.14)', fontSize:10, color:DIM, lineHeight:1.4 }}>
-            Быстрая оценка техники и противопоказаний для выбранного движения. Детальный разбор каждого сустава — во вкладке <b style={{ color:ACCENT }}>«Суставы и ортопедия»</b> выше.
+          <div style={{ marginTop:4, padding:'8px 10px', borderRadius:10, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.14)', fontSize:10, color:'#fff', lineHeight:1.4 }}>
+            Быстрая оценка техники и противопоказаний для выбранного движения. Детальный разбор каждого сустава — во вкладке <b style={{ color:ACCENT }}>«Режим детализации»</b> выше.
           </div>
           <ExerciseSafetyPanel />
         </>
@@ -93,32 +93,32 @@ export const JointMasterCard: React.FC = () => {
       {/* 1 анатомия */}
       <div style={CARD}>
         <div style={{ fontSize:11, fontWeight:800, color:JOINT_COLOR[joint] }}>1 · Анатомия риска — {diag.joint.label} {diag.joint.icon}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4, lineHeight:1.5 }}>{diag.joint.description}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4, lineHeight:1.5 }}>{diag.joint.description}</div>
         <div style={{ fontSize:10, color:'#fbbf24', marginTop:4 }}>Опасные структуры: {diag.joint.dangerous.join(' · ')}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Связанные движения: {diag.joint.relatedLifts.join(', ')}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Связанные движения: {diag.joint.relatedLifts.join(', ')}</div>
         {joint==='spine' && <div style={{ marginTop:6, padding:'6px 8px', borderRadius:6, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', color:'#f87171', fontSize:10 }}>🦴 Поясница выделена: диск L4-S1 не терпит округления + shear. Нейтраль + брейсинг + ограничение глубины — база.</div>}
       </div>
 
       {/* 2 нагрузка */}
       <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>2 · Текущая нагрузка из плана (jointStress)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Фаза ортопедии: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Разрешённые паттерны: {diag.allowedPatterns.join(', ') || '—'} · Заблокированы: <span style={{color:'#f87171'}}>{diag.blockedPatterns.join(', ') || 'нет'}</span></div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Лимиты ROM: {Object.keys(diag.romLimits).length? Object.entries(diag.romLimits).map(([k,v])=>`${k} ${v.min}-${v.max}°`).join(', ') : 'нет'} · Стресс-лимиты: {Object.entries(diag.stressLimits).slice(0,3).map(([k,v])=>`${k}:${v}`).join(', ')}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Пример упражнений каталога с high jointStress для этого сустава:</div>
-        <div style={{ fontSize:10, color:DIM }}>{EXERCISE_CATALOG.filter(e=>e.jointStress==='high' && (e.group==='legs' && joint==='knee' || e.group==='back' && joint==='spine' || e.group==='chest' && joint==='shoulder')).slice(0,3).map(e=>e.name).join(' · ') || '—'}</div>
+        <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>2 · Текущая нагрузка из плана (нагрузка на сустав)</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>Фаза ортопедии: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Разрешённые паттерны: {diag.allowedPatterns.join(', ') || '—'} · Заблокированы: <span style={{color:'#f87171'}}>{diag.blockedPatterns.join(', ') || 'нет'}</span></div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Лимиты амплитуды: {Object.keys(diag.romLimits).length? Object.entries(diag.romLimits).map(([k,v])=>`${k} ${v.min}-${v.max}°`).join(', ') : 'нет'} · Стресс-лимиты: {Object.entries(diag.stressLimits).slice(0,3).map(([k,v])=>`${k}:${v}`).join(', ')}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Пример упражнений с высокой нагрузкой на сустав:</div>
+        <div style={{ fontSize:10, color:'#fff' }}>{EXERCISE_CATALOG.filter(e=>e.jointStress==='high' && (e.group==='legs' && joint==='knee' || e.group==='back' && joint==='spine' || e.group==='chest' && joint==='shoulder')).slice(0,3).map(e=>e.name).join(' · ') || '—'}</div>
       </div>
 
       {/* 3 геометрия → сустав */}
       <div style={CARD}>
         <div style={{ fontSize:11, fontWeight:800, color:JOINT_COLOR[joint] }}>3 · Геометрия → нагрузка на {diag.joint.label}</div>
-        {opts.length===0 ? <div style={{ fontSize:10, color:DIM }}>Нет специфичных опций — используйте технику из JointMaster жима/приседа.</div> : opts.map(o=>{
+        {opts.length===0 ? <div style={{ fontSize:10, color:'#fff' }}>Нет специфичных опций — используйте технику из JointMaster жима/приседа.</div> : opts.map(o=>{
           const sel = selected[o.id] ?? [];
           return (
           <div key={o.id} style={{ marginTop:8, padding:8, borderRadius:7, background:'rgba(255,255,255,0.02)', border:`1px solid ${JOINT_COLOR[joint]}18` }}>
             <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>{o.label} <span style={{ fontSize:8, color: o.level==='critical'?'#ef4444': o.level==='high'?'#f97316':DIM, border:`1px solid ${o.level==='critical'?'#ef4444':'rgba(255,255,255,0.1)'}`, padding:'1px 5px', borderRadius:4, marginLeft:6 }}>{LEVEL_RU[o.level] || o.level}</span></div>
-            <div style={{ fontSize:9, color:DIM, marginTop:2 }}>{o.description}</div>
+            <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>{o.description}</div>
             <div style={{ fontSize:9, color:JOINT_COLOR[joint], marginTop:3 }}>📋 {o.method}</div>
-            <div style={{ fontSize:9, color:DIM, marginTop:2 }}>🧠 {o.rationale}</div>
+            <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>🧠 {o.rationale}</div>
             <div style={{ marginTop:6, display:'flex', gap:4, flexWrap:'wrap' }}>
               {o.assistance.map(name=>{
                 const on = sel.includes(name);
@@ -157,9 +157,9 @@ export const JointMasterCard: React.FC = () => {
       {/* 4 прехаб */}
       <div style={CARD}>
         <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>4 · Прехаб / мобильность для {diag.joint.label}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Тесты: {diag.mobilityTests.map(t=>t.title).join(', ') || '—'}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Слабые (последняя оценка): {diag.weakest.map(w=>`${w.test.title} ${w.score}/2`).join(', ') || 'нет данных — пройдите оценку в «Мобильность»'}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Потоки: {diag.flows.map(f=>f.name).join(', ') || '—'}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Тесты: {diag.mobilityTests.map(t=>t.title).join(', ') || '—'}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Слабые (последняя оценка): {diag.weakest.map(w=>`${w.test.title} ${w.score}/2`).join(', ') || 'нет данных — пройдите оценку в «Мобильность»'}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Потоки: {diag.flows.map(f=>f.name).join(', ') || '—'}</div>
       </div>
 
       {/* 4b недельный план нагрузки (orthopedic-load) — синхронизирован с движком (равномерное распределение, без блока «дни подряд») */}
@@ -168,21 +168,21 @@ export const JointMasterCard: React.FC = () => {
           <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>4b · Недельный план (нагрузка)</div>
           <div style={{ display:'flex', gap:4, alignItems:'center' }}>
             {(['strength','hypertrophy','rehab'] as const).map(g=>{ const on=weekGoal===g; const ru = g==='strength'?'Сила': g==='hypertrophy'?'Масса':'Реабилитация'; return <button key={g} onClick={()=>setWeekGoal(g)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?'#00e68a':DIM}}>{ru}</button>; })}
-            <span style={{ fontSize:9, color:DIM, marginLeft:6 }}>Сессий:</span>
+            <span style={{ fontSize:9, color:'#fff', marginLeft:6 }}>Сессий:</span>
             <div style={{ display:'flex', gap:3 }}>
               {[2,3,4,5,6].map(n=>{ const on=weeklySessions===n; return <button key={n} onClick={()=>setWeeklySessions(n)} style={{ minWidth:26, padding:'3px 6px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?'#00e68a':DIM }}>{n}</button>; })}
             </div>
           </div>
         </div>
-        <div style={{ fontSize:10, color:DIM, marginTop:4 }}>Фаза: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Риск: {weekPlan.warnings.join(' · ') || 'нет'} · Тяжёлых дней: {weekPlan.hardDays} · Сессий: {weeklySessions} · Синхр. с движком ✓</div>
-        <div style={{ fontSize:9, color:DIM, marginTop:2 }}>Равномерное распределение — тренировки разнесены по неделе, без 4-дневного блока подряд. Объём синхронизирован с риском (high −40%).</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Фаза: <b style={{color:ACCENT}}>{PHASE_RU[diag.phase] || diag.phase}</b> · Риск: {weekPlan.warnings.join(' · ') || 'нет'} · Тяжёлых дней: {weekPlan.hardDays} · Сессий: {weeklySessions} · Синхр. с движком ✓</div>
+        <div style={{ fontSize:9, color:'#fff', marginTop:2 }}>Равномерное распределение — тренировки разнесены по неделе, без 4-дневного блока подряд. Объём синхронизирован с риском (high −40%).</div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginTop:6 }}>
           {weekPlan.weekPlan.map(d=>(
             <div key={d.day} style={{ padding:'6px 4px', borderRadius:6, background: d.difficulty==='hard'?'rgba(239,68,68,0.12)': d.difficulty==='medium'?'rgba(251,191,36,0.12)': d.difficulty==='light'?'rgba(56,189,248,0.12)': d.difficulty==='rehab'?'rgba(167,139,250,0.12)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', textAlign:'center' }}>
-              <div style={{ fontSize:8, color:DIM }}>Д{d.day}</div>
+              <div style={{ fontSize:8, color:'#fff' }}>Д{d.day}</div>
               <div style={{ fontSize:9, fontWeight:700, color:'#fff' }}>{d.difficulty==='off'?'—':`V${d.volumeTarget}`}</div>
-              <div style={{ fontSize:8, color:DIM }}>{DIFF_RU[d.difficulty] || d.focus}</div>
-              <div style={{ fontSize:7, color:DIM }}>{d.intensityTarget ? `${Math.round(d.intensityTarget*100)}%` : ''}</div>
+              <div style={{ fontSize:8, color:'#fff' }}>{DIFF_RU[d.difficulty] || d.focus}</div>
+              <div style={{ fontSize:7, color:'#fff' }}>{d.intensityTarget ? `${Math.round(d.intensityTarget*100)}%` : ''}</div>
             </div>
           ))}
         </div>
@@ -197,10 +197,10 @@ export const JointMasterCard: React.FC = () => {
         <VideoCaptureCard lift={lift as Lift} />
       </div>
 
-      {/* 0 JSI — встроен сразу */}
+      {/* 0 ИСИ — встроен сразу */}
       <div style={{ marginTop:12, padding:8, borderRadius:10, background:'rgba(244,63,94,0.06)', border:'1px solid rgba(244,63,94,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#f43f5e' }}>0 · JSI — тепловая карта износа сустава (ввод → карта)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2 }}>Вес×объём×темп×геометрия×фарма×боль → персональный индекс по каждому суставу + тюнинг + нутрицевтики. Часть единого инструмента, переключение не нужно.</div>
+        <div style={{ fontSize:11, fontWeight:800, color:'#f43f5e' }}>0 · ИСИ — тепловая карта износа сустава (ввод → карта)</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>Вес × объём × темп × геометрия × фарма × боль → персональный индекс по каждому суставу + тюнинг + нутрицевтики. Часть единого инструмента, переключение не нужно.</div>
       </div>
       <JointJsiCalculatorCard />
       </>)}
