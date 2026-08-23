@@ -73,6 +73,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
   const [viewMode, setViewMode] = useState<'timeline' | 'list'>('timeline');
   const [showHelp, setShowHelp] = useState(false);
   const [activePanel, setActivePanel] = useState<'phases' | 'splits'>('phases');
+  const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   // — подбор сплитов/циклов —
   const [plLevel, setPlLevel] = useState('intermediate');
   const [plDays, setPlDays] = useState(4);
@@ -374,6 +375,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
           .pd-header-row { flex-direction:column; align-items:stretch !important; }
           .pd-header-actions { width:100%; justify-content:space-between; }
           .pd-quarter-nav button, .pd-quarter-nav select { min-height:44px; }
+          .pd-edit-sheet { position: fixed !important; bottom: 0; left: 0; right: 0; margin: 0 !important; border-radius: 16px 16px 0 0 !important; max-height: 85vh; overflow-y: auto; z-index: 40; box-shadow: 0 -10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.12) !important; }
         }
       `}</style>
 
@@ -581,9 +583,18 @@ export const PeriodizationDesignerTab: React.FC = () => {
           <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}`, position: isMobile ? 'sticky' as const : 'relative', top: isMobile ? 4 : undefined, zIndex: isMobile ? 6 : undefined, backdropFilter: isMobile ? 'blur(12px)' : undefined }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>🎨 Палитра — {disciplineLabel} {effectiveDiscipline === 'pl' ? '(сила/техника/DE)' : '(масса/памп/сушка)'}</div>
-              <span style={{ fontSize: 10, color: DIM }}>{allowedKeys.length} фаз</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 10, color: DIM }}>{allowedKeys.length} фаз</span>
+                {isMobile && (
+                  <button onClick={() => setPaletteCollapsed(v => !v)} style={{ ...btn, minHeight: 30, padding: '4px 8px', fontSize: 10, background: paletteCollapsed ? 'rgba(255,255,255,0.04)' : accent+'14', borderColor: paletteCollapsed ? 'rgba(255,255,255,0.08)' : accent+'33', color: paletteCollapsed ? DIM : accent }}>
+                    {paletteCollapsed ? 'Развернуть' : 'Свернуть'}
+                  </button>
+                )}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(!paletteCollapsed || !isMobile) && (
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {allowedKeys.map(pk => {
                 const pkTyped = pk as PhaseKey;
                 return (
@@ -656,7 +667,12 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 : 'ББ-палитра: гипертрофия и кондиционный памп — объём/метабол. стресс, нет техники/скоростных блоков ПЛ.'}
               {dragPhase && <span style={{ color: accent, marginLeft: 6, fontWeight: 700 }}>Выбрано: {PHASE_LABELS_RU[dragPhase]} — тапните по неделе ниже ↓</span>}
             </div>
+              </>
+            )}
           </div>
+          {isMobile && paletteCollapsed && (
+            <button onClick={() => setPaletteCollapsed(false)} aria-label="Развернуть палитру" style={{ position: 'fixed', bottom: 16, right: 16, width: 56, height: 56, borderRadius: '50%', background: accent, color: '#0a0a0a', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,0.4)', fontSize: 20, zIndex: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>🎨</button>
+          )}
 
           {/* ── Фазы и подбор сплитов/циклов — отдельная кнопка/панель ── */}
           <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}` }}>
@@ -1010,7 +1026,9 @@ export const PeriodizationDesignerTab: React.FC = () => {
 
           {/* Edit block panel */}
           {editBlock && (
-            <div className="constructor-surface constructor-surface--accent pd-card-mobile" style={{ ...CARD, border: '1px solid ' + accent + '44', background: accent + '06' }}>
+            <>
+              {isMobile && <div className="pd-edit-backdrop" onClick={() => setEditBlockId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 39 }} />}
+              <div className="constructor-surface constructor-surface--accent pd-card-mobile pd-edit-sheet" style={{ ...CARD, border: '1px solid ' + accent + '44', background: isMobile ? '#18181b' : accent + '06' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 800, color: PHASE_COLORS[editBlock.phaseKey] }}>
                   {PHASE_ICONS[editBlock.phaseKey]} {PHASE_LABELS_RU[editBlock.phaseKey]}
@@ -1067,6 +1085,7 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: '#fff', fontSize: 12, padding: 10, resize: 'vertical', minHeight: 64 }} />
               </div>
             </div>
+            </>
           )}
 
           {/* Phase distribution overview */}
