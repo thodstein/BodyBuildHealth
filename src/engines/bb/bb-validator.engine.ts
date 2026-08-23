@@ -314,6 +314,14 @@ export function generateActionableRecommendations(
         });
         break;
       }
+      case 'low_training_frequency': {
+        recs.push({
+          priority: 'medium',
+          action: `${issue.exercise || 'Мышца'} 1×/нед — добавьте 2-й день: смените сплит на FullBody/Upper-Lower/PPL 4-6× для ≥2× стимула.`,
+          code: issue.code,
+        });
+        break;
+      }
     }
   }
 
