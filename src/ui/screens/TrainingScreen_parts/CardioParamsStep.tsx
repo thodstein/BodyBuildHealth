@@ -178,6 +178,9 @@ export const CardioParamsStep: React.FC<{
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <SectionNav items={NAV} />
+      {!preview.cycle && comps.length === 0 && (
+        <InfoBanner tone="info">👋 Подсказка: выберите цель (например, Сушка) → пресет «Сушка 16 нед» → проверьте предпросмотр (фазы + прогноз VO2max) → «Далее» и соберите цикл. Taper и дни ног подстроятся сами.</InfoBanner>
+      )}
 
       <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>{age}л · {bodyWeight}кг{CARDIO_LEVEL_LABELS[level]}</span>}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
