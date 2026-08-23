@@ -4,7 +4,14 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const MAX_BYTES = 12 * 1024 * 1024;
-const OCR_TIMEOUT_MS = 90_000;
+const OCR_TIMEOUT_MS = 25_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, stage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`OCR ${stage} timeout after ${ms} ms`)), ms)),
+  ]);
+}
 
 const TESSERACT_WORKER_PATH = require.resolve('tesseract.js/src/worker-script/node/index.js');
 const TESSERACT_CORE_PATH = dirname(require.resolve('tesseract.js-core'));
@@ -19,23 +26,21 @@ export const config = {
 
 async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LANG_PATHS): Promise<string> {
   const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker(language, 1, {
+  const worker = await withTimeout(createWorker(language, 1, {
     workerPath: TESSERACT_WORKER_PATH,
     corePath: TESSERACT_CORE_PATH,
     langPath: TESSERACT_LANG_PATHS[language],
     cacheMethod: 'none',
     gzip: true,
-  } as any);
+    logger: () => {},
+  } as any), OCR_TIMEOUT_MS, 'worker initialization');
   try {
-    await worker.setParameters({
+    await withTimeout(worker.setParameters({
       tessedit_pageseg_mode: '6' as any,
       preserve_interword_spaces: '1',
       user_defined_dpi: '300',
-    });
-    const result = await Promise.race([
-      worker.recognize(buffer),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`OCR timeout after ${OCR_TIMEOUT_MS} ms`)), OCR_TIMEOUT_MS)),
-    ]);
+    }), OCR_TIMEOUT_MS, 'worker configuration');
+    const result = await withTimeout(worker.recognize(buffer), OCR_TIMEOUT_MS, 'recognition');
     return typeof result.data.text === 'string' ? result.data.text : '';
   } finally {
     await worker.terminate();
