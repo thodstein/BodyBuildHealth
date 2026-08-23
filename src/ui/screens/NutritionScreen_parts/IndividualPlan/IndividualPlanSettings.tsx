@@ -425,7 +425,7 @@ export const IndividualPlanSettings: React.FC = () => {
       )}
 
       {/* 🏁 Тапер ББ — единая система пикинга (для обоих полов) */}
-       {plannerMode === 'pro' && (
+       {(plannerMode === 'pro' || !!bbPrepConfig) && (
        <GlassCard title="Тапер ББ (пик-неделя)" icon="🏁" color="#f59e0b">
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', marginBottom: 6, lineHeight: 1.45 }}>
             Пикинг к шоу: тренировочный тапер + 7-дневная пик-неделя (карбс/вода/натрий по дням).

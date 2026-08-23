@@ -19,6 +19,10 @@ import {
   moveBlockInDesign,
   resizeBlockInDesign,
   updateBlockNotes,
+  changeBlockPhase,
+  duplicateBlockInDesign,
+  setDesignTotalWeeks,
+  getDesignVolumeCurve,
   getDesignStats,
   resolveDesignOverlaps,
   getPLPresetDesigns,
@@ -169,6 +173,26 @@ export const PeriodizationDesignerTab: React.FC = () => {
     commitDesign(resolveDesignOverlaps(current));
   }, [current, commitDesign]);
 
+  const handleSetTotalWeeks = useCallback((weeks: number) => {
+    if (!current) return;
+    const updated = setDesignTotalWeeks(current, weeks);
+    commitDesign(updated);
+    // если квартёр вышел за границу — вернём
+    const newCount = Math.max(1, Math.ceil(updated.totalWeeks / weeksPerQuarter));
+    if (viewQuarter >= newCount) setViewQuarter(Math.max(0, newCount - 1));
+  }, [current, commitDesign, viewQuarter, weeksPerQuarter]);
+
+  const handleDuplicateBlock = useCallback((blockId: string) => {
+    if (!current) return;
+    commitDesign(duplicateBlockInDesign(current, blockId));
+  }, [current, commitDesign]);
+
+  const handleChangeBlockPhase = useCallback((blockId: string, newPhase: PhaseKey) => {
+    if (!current) return;
+    if (!allowedSet.has(newPhase)) return;
+    commitDesign(changeBlockPhase(current, blockId, newPhase));
+  }, [current, commitDesign, allowedSet]);
+
   const handleDropOnCanvas = useCallback((weekNum: number, phaseKey: PhaseKey) => {
     if (!current) return;
     if (!allowedSet.has(phaseKey)) return;
@@ -184,14 +208,22 @@ export const PeriodizationDesignerTab: React.FC = () => {
   }, [refresh]);
 
   const handleNewDesign = useCallback(() => {
-    const d = createEmptyDesignForDiscipline(activeDiscipline);
+    let d = createEmptyDesignForDiscipline(activeDiscipline);
+    const starter: PhaseKey = activeDiscipline === 'pl' ? 'gpp' : 'accumulation_hypertrophy';
+    d = addBlockToDesign(d, starter, 1);
+    d.name = activeDiscipline === 'pl' ? 'Новый ПЛ-макроцикл' : 'Новый ББ-макроцикл';
     saveDesign(d);
     refresh();
     setCurrentId(d.id);
   }, [refresh, activeDiscipline]);
 
   const handleNewDesignForDiscipline = useCallback((disc: DesignerDiscipline) => {
-    const d = createEmptyDesignForDiscipline(disc);
+    let d = createEmptyDesignForDiscipline(disc);
+    // Быстрый старт: один базовый блок, чтобы таймлайн сразу не был пустым
+    const starter: PhaseKey = disc === 'pl' ? 'gpp' : 'accumulation_hypertrophy';
+    d = addBlockToDesign(d, starter, 1);
+    // Подганиваем имя
+    d.name = disc === 'pl' ? 'Новый ПЛ-макроцикл' : 'Новый ББ-макроцикл';
     saveDesign(d);
     refresh();
     setCurrentId(d.id);
@@ -384,11 +416,18 @@ export const PeriodizationDesignerTab: React.FC = () => {
           </div>
           <div style={{ marginTop: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8, textAlign: 'center' }}>📋 Готовые пресеты — {disciplineLabel}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 8 }}>
               {getPresetsForDiscipline(effectiveDiscipline).map((p) => (
-                <button key={p.name} onClick={() => handleAddPreset(p)} style={{ ...btn, background: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.08)' : 'rgba(236,72,153,0.08)', borderColor: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.25)' : 'rgba(236,72,153,0.25)', color: effectiveDiscipline === 'pl' ? '#60a5fa' : '#f472b6', minHeight: 44, textAlign: 'left', lineHeight: 1.3 }}>
-                  <span style={{ fontWeight: 800 }}>{p.name}</span><br />
-                  <span style={{ fontSize: 10, opacity: 0.75 }}>{p.totalWeeks} нед · {p.blocks.length} фаз</span>
+                <button key={p.name} onClick={() => handleAddPreset(p)} style={{ ...btn, background: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.08)' : 'rgba(236,72,153,0.08)', borderColor: effectiveDiscipline === 'pl' ? 'rgba(59,130,246,0.25)' : 'rgba(236,72,153,0.25)', color: effectiveDiscipline === 'pl' ? '#60a5fa' : '#f472b6', minHeight: 64, textAlign: 'left', lineHeight: 1.3, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ fontWeight: 800, fontSize: 12 }}>{p.name}</span><br />
+                    <span style={{ fontSize: 10, opacity: 0.75 }}>{p.totalWeeks} нед · {p.blocks.length} фаз · {p.blocks.map(b=>PHASE_ICONS[b.phaseKey]).join(' ')}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 2, height: 6 }}>
+                    {p.blocks.map((b, i) => (
+                      <div key={i} style={{ flex: b.endWeek - b.startWeek + 1, background: PHASE_COLORS[b.phaseKey], borderRadius: 2, minWidth: 6 }} />
+                    ))}
+                  </div>
                 </button>
               ))}
             </div>
@@ -430,15 +469,36 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 <div style={{ color: DIM, fontSize: 10 }}>Эти фазы сохранены, но не характерны для {disciplineLabel}. Для чистого плана используйте палитру ниже — лишние можно удалить.</div>
               </div>
             )}
+            {/* Длительность */}
+            <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>⏱ Длительность — {current.totalWeeks} нед</span>
+                <span style={{ fontSize: 10, color: DIM }}>{Math.round(current.totalWeeks/4.3)} мес</span>
+              </div>
+              <input
+                type="range" min={8} max={52} step={1} value={current.totalWeeks}
+                onChange={e => handleSetTotalWeeks(parseInt(e.target.value) || 16)}
+                style={{ width: '100%', accentColor: accent }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: DIM, marginTop: 2 }}><span>8</span><span>52</span></div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                {[12,16,24,32,52].map(w => (
+                  <button key={w} onClick={() => handleSetTotalWeeks(w)}
+                    style={{ ...btn, minHeight: 38, flex: 1, background: current.totalWeeks===w ? accent+'18' : 'rgba(255,255,255,0.04)', borderColor: current.totalWeeks===w ? accent+'44' : 'rgba(255,255,255,0.08)', color: current.totalWeeks===w ? accent : '#fff', fontWeight: 800 }}>{w}н</button>
+                ))}
+              </div>
+            </div>
             {stats && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11, color: DIM }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11, color: DIM, marginTop: 10 }}>
                 <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>📊 Занято: <b style={{ color: accent }}>{stats.usedWeeks}</b> нед</span>
-                <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>🆓 Свободно: <b style={{ color: '#3b82f6' }}>{stats.freeWeeks}</b> нед</span>
+                <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>🆓 Свободно: <b style={{ color: stats.freeWeeks>0 ? '#f59e0b' : '#22c55e' }}>{stats.freeWeeks}</b> нед</span>
                 <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>📦 Блоков: <b>{stats.blockCount}</b></span>
+                {stats.overlapWeeks>0 && <span style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444' }}>⚠ Перекр {stats.overlapWeeks}н</span>}
               </div>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-              <button onClick={handleDuplicate} style={{ ...btn, fontSize: 11, minHeight: 44 }}>📋 Дублировать</button>
+              <button onClick={handleDuplicate} style={{ ...btn, fontSize: 11, minHeight: 44 }}>📋 Дублировать дизайн</button>
+              <button onClick={handleResolveOverlaps} disabled={!stats || stats.overlapWeeks===0} style={{ ...btn, fontSize: 11, minHeight: 44, opacity: stats && stats.overlapWeeks>0 ? 1 : 0.4 }}>🧹 Компакт</button>
               <button
                 onClick={() => setViewMode(m => m === 'timeline' ? 'list' : 'timeline')}
                 style={{ ...btn, fontSize: 11, minHeight: 44, background: viewMode === 'list' ? accent + '18' : 'rgba(255,255,255,0.04)', borderColor: viewMode === 'list' ? accent + '44' : 'rgba(255,255,255,0.08)', color: viewMode === 'list' ? accent : '#fff' }}
@@ -461,8 +521,8 @@ export const PeriodizationDesignerTab: React.FC = () => {
             {linkMsg && <div style={{ fontSize: 11, color: DIM, marginTop: 6, lineHeight: 1.4 }}>{linkMsg}</div>}
           </div>
 
-          {/* Palette — draggable phase blocks (PL/BB filtered) */}
-          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}` }}>
+          {/* Palette — draggable phase blocks (PL/BB filtered) — sticky на телефоне */}
+          <div className="constructor-surface pd-card-mobile" style={{ ...CARD, borderLeft: `3px solid ${accent}`, position: isMobile ? 'sticky' as const : 'relative', top: isMobile ? 4 : undefined, zIndex: isMobile ? 6 : undefined, backdropFilter: isMobile ? 'blur(12px)' : undefined }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>🎨 Палитра — {disciplineLabel} {effectiveDiscipline === 'pl' ? '(сила/техника/DE)' : '(масса/памп/сушка)'}</div>
               <span style={{ fontSize: 10, color: DIM }}>{allowedKeys.length} фаз</span>
@@ -718,6 +778,20 @@ export const PeriodizationDesignerTab: React.FC = () => {
                 </span>
                 <button onClick={() => setEditBlockId(null)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer', fontSize: 14, width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
               </div>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, color: DIM, marginBottom: 6, fontWeight: 700 }}>Сменить фазу ({disciplineLabel}):</div>
+                <select value={editBlock.phaseKey} onChange={e => handleChangeBlockPhase(editBlock.id, e.target.value as PhaseKey)}
+                  style={{ width: '100%', background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 12, minHeight: 44 }}>
+                  {allowedKeys.map(pk => {
+                    const pkT = pk as PhaseKey;
+                    return <option key={pk} value={pk}>{PHASE_ICONS[pkT]} {PHASE_LABELS_RU[pkT]}</option>;
+                  })}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                <button onClick={() => handleDuplicateBlock(editBlock.id)} style={{ ...btn, flex: 1, minHeight: 44 }}>📋 Дублировать блок</button>
+                <button onClick={() => { handleDeleteBlock(editBlock.id); setEditBlockId(null); }} style={{ ...btn, flex: 1, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.25)' }}>🗑 Удалить</button>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, fontSize: 11, marginBottom: 8 }}>
                 <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Старт</div><b>нед {editBlock.startWeek}</b></div>
                 <div style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}><div style={{ color: DIM, fontSize: 10 }}>Конец</div><b>нед {editBlock.endWeek}</b></div>
@@ -777,6 +851,25 @@ export const PeriodizationDesignerTab: React.FC = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Мини-график объёма по неделям */}
+          {current.blocks.length > 0 && (
+            <div style={CARD} className="pd-card-mobile">
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>📈 Нагрузка по неделям · объём (столбик) + интенсивность (точка)</div>
+              <div style={{ display: 'flex', alignItems: 'end', gap: 2, height: 64, padding: '6px 4px', background: 'rgba(255,255,255,0.02)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+                {getDesignVolumeCurve(current).map(pt => (
+                  <div key={pt.week} title={`нед ${pt.week}: ${pt.label} · объём ${pt.volume}/5 · интенс ${pt.intensity}/4`} style={{ flex: 1, minWidth: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <div style={{ width: '100%', height: Math.max(6, pt.volume * 10), borderRadius: 4, background: pt.color, opacity: 0.9 }} />
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: pt.intensity >= 3 ? '#f59e0b' : pt.intensity >= 2 ? '#22c55e' : '#6b7280', border: '1px solid rgba(255,255,255,0.2)' }} />
+                    <span style={{ fontSize: 8, color: DIM, lineHeight: 1 }}>{pt.week}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: DIM, marginTop: 6, lineHeight: 1.4 }}>
+                Высота — объём фазы (1=мин, 5=макс) · точка — интенсивность. {effectiveDiscipline === 'pl' ? 'ПЛ: пики выше — интенс 4.' : 'ББ: база выше — объём 4-5, сушка — интенс 3-4.'}
+              </div>
             </div>
           )}
 

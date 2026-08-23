@@ -361,6 +361,67 @@ export function updateBlockNotes(design: MacrocycleDesign, blockId: string, note
   return { ...design, blocks, updatedAt: new Date().toISOString() };
 }
 
+export function changeBlockPhase(design: MacrocycleDesign, blockId: string, newPhase: PhaseKey): MacrocycleDesign {
+  const idx = design.blocks.findIndex(b => b.id === blockId);
+  if (idx < 0) return design;
+  if (!BLOCK_TEMPLATES[newPhase]) return design;
+  const blocks = [...design.blocks];
+  const prev = blocks[idx];
+  const tmpl = BLOCK_TEMPLATES[newPhase];
+  // сохраняем длительность, но не превышаем totalWeeks
+  const dur = prev.endWeek - prev.startWeek + 1;
+  const endWeek = Math.min(prev.startWeek + Math.max(1, Math.min(dur, tmpl.weeks + 2)) - 1, design.totalWeeks);
+  const updated: DesignerPhaseBlock = { ...prev, phaseKey: newPhase, endWeek };
+  blocks[idx] = setOverlapNotes(updated, checkBlockOverlap(blocks.filter(b => b.id !== blockId), updated.startWeek, updated.endWeek));
+  return { ...design, blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
+}
+
+export function duplicateBlockInDesign(design: MacrocycleDesign, blockId: string): MacrocycleDesign {
+  const src = design.blocks.find(b => b.id === blockId);
+  if (!src) return design;
+  const dur = src.endWeek - src.startWeek + 1;
+  let startWeek = src.endWeek + 1;
+  if (startWeek + dur - 1 > design.totalWeeks) startWeek = Math.max(1, design.totalWeeks - dur + 1);
+  const copy: DesignerPhaseBlock = {
+    ...src,
+    id: 'blk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5),
+    startWeek,
+    endWeek: Math.min(startWeek + dur - 1, design.totalWeeks),
+    notes: src.notes,
+  };
+  const blocks = [...design.blocks, setOverlapNotes(copy, checkBlockOverlap(design.blocks, copy.startWeek, copy.endWeek))];
+  return { ...design, blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
+}
+
+export function setDesignTotalWeeks(design: MacrocycleDesign, newTotal: number): MacrocycleDesign {
+  const total = Math.max(8, Math.min(52, Math.round(newTotal)));
+  if (total === design.totalWeeks) return design;
+  const blocks = design.blocks
+    .map(b => {
+      if (b.startWeek > total) return null;
+      const endWeek = Math.min(b.endWeek, total);
+      return endWeek >= b.startWeek ? { ...b, endWeek } : null;
+    })
+    .filter(Boolean) as DesignerPhaseBlock[];
+  return { ...design, totalWeeks: total, blocks: blocks.sort((a, b) => a.startWeek - b.startWeek), updatedAt: new Date().toISOString() };
+}
+
+export function getDesignVolumeCurve(design: MacrocycleDesign): { week: number; volume: number; intensity: number; color: string; label: string }[] {
+  const volMap: Record<string, number> = { very_low: 1, low: 2, medium: 3, high: 4, very_high: 5 };
+  const intMap: Record<string, number> = { low: 1, medium: 2, high: 3, very_high: 4 };
+  const out: { week: number; volume: number; intensity: number; color: string; label: string }[] = [];
+  for (let w = 1; w <= design.totalWeeks; w++) {
+    const block = design.blocks.find(b => w >= b.startWeek && w <= b.endWeek);
+    const tmpl = block ? BLOCK_TEMPLATES[block.phaseKey] : null;
+    const vol = tmpl ? (volMap[tmpl.volumeLevel] ?? 3) : 0;
+    const int = tmpl ? (intMap[tmpl.intensityLevel] ?? 2) : 0;
+    const color = block ? (PHASE_COLORS[block.phaseKey] ?? '#666') : 'rgba(255,255,255,0.06)';
+    const label = block ? (PHASE_LABELS_RU[block.phaseKey] ?? block.phaseKey) : '—';
+    out.push({ week: w, volume: vol, intensity: int, color, label });
+  }
+  return out;
+}
+
 export function getDesignStats(design: MacrocycleDesign): DesignStats {
   const totalWeeks = design.totalWeeks;
   const phaseCount: Record<string, number> = {};

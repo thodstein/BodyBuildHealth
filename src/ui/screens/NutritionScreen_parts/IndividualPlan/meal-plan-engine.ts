@@ -1675,24 +1675,26 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // часть приёмов — углеводы «терялись» → недобор ~20%, а обед получался ~10%.
   const CARB_W: Record<string, number> = { breakfast: 1.0, lunch: 1.7, dinner: 0.7, prew: 1.0, postw: 1.2, snack: 0.5, snack2: 0.5, snack3: 0.4, snack4: 0.4, preSleep: 0.3, intra: 0.4 };
   const intraEligible = trainWindow && input.allowIntraWorkout && (!input.trainDurationMin || input.trainDurationMin >= 75);
-  // set of roles that WILL be built (must match the build conditions below)
-  const _builtRoles: string[] = ['breakfast','lunch','dinner'];
-  if (trainWindow) _builtRoles.push('prew','postw');
-  if (wantPreSleep) _builtRoles.push('preSleep');
-  if (!trainWindow && input.mealsCount >= 3) _builtRoles.push('snack');
-  if (intraEligible) _builtRoles.push('intra');
-  if (input.mealsCount >= 6) _builtRoles.push('snack2');  // второй перекус для 6-8 приёмов
-  if (input.mealsCount >= 8) _builtRoles.push('snack3');  // третий перекус для 8-10 приёмов
-  if (input.mealsCount >= 9) _builtRoles.push('snack4');  // четвёртый перекус для 9-10 приёмов
-  // mealsCount cap: core (breakfast/lunch/dinner) + postw на тренинге — неприкосновенны;
-  // лишнее выбрасываем в порядке приоритета: snack4 → snack3 → snack2 → intra → preSleep → snack → prew.
-  // D-28 fix (жалоба «6 часов между приёмами»): перекус, закрывающий большой промежуток
-  // (напр. обед→ужин 6.5ч), сохраняется РАНЬШЕ pre-sleep — иначе при 4 приёмах без перекуса
-  // остаётся пустой 6-часовой провал. pre-sleep — опциональный казеиновый приём, ужин в 19:00
-  // покрывает ночное окно при отходе ко сну 23:00.
-  let _roles = [..._builtRoles];
-  for (const r of ['snack4','snack3','snack2','intra','preSleep','snack','prew']) { if (_roles.length <= input.mealsCount) break; _roles = _roles.filter(x => x !== r); }
-  if (_roles.length > input.mealsCount) _roles = _roles.slice(0, Math.max(3, input.mealsCount));
+  // P0-фикс (Aug 22 2026): пери-тренировочные приёмы — ОТДЕЛЬНО от основных.
+  // Раньше prew/postw/intra входили в общий лимит mealsCount и «съедали» слоты регулярных
+  // приёмов (жалоба «тренировочные занимают половину, не хватает рекомендуемых»).
+  // Теперь: mealsCount = количество ОСНОВНЫХ приёмов (завтрак/обед/ужин/перекусы/pre-sleep),
+  // а prew/postw/intra добавляются СВЕРХ лимита.
+  const _regularBuilt: string[] = ['breakfast','lunch','dinner'];
+  if (wantPreSleep) _regularBuilt.push('preSleep');
+  // Перекусы — по количеству ОСНОВНЫХ приёмов (независимо от трен-дня, иначе трен съедал перекус).
+  if (input.mealsCount >= 4) _regularBuilt.push('snack');
+  if (input.mealsCount >= 5) _regularBuilt.push('snack2');
+  if (input.mealsCount >= 7) _regularBuilt.push('snack3');
+  if (input.mealsCount >= 8) _regularBuilt.push('snack4');
+  const _periBuilt: string[] = [];
+  if (trainWindow) _periBuilt.push('prew', 'postw');
+  if (intraEligible) _periBuilt.push('intra');
+  // Кэп только для основных; пери — всегда сверху.
+  let _regular = [..._regularBuilt];
+  for (const r of ['snack4','snack3','snack2','preSleep','snack']) { if (_regular.length <= input.mealsCount) break; _regular = _regular.filter(x => x !== r); }
+  if (_regular.length > input.mealsCount) _regular = _regular.slice(0, Math.max(3, input.mealsCount));
+  const _roles = [..._regular, ..._periBuilt];
   const _keep = new Set(_roles);
   // N3/E2-фикс: перекусы распределяем по САМЫМ БОЛЬШИМ разрывам между фикс-приёмами,
   // чтобы не было «6 часов между завтраком и обедом». Раньше snack и snack2 оба ложились
