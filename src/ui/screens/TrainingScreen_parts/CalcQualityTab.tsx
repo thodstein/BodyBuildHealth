@@ -10,6 +10,9 @@ import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups
 import { getCycleById } from '../../../data/lms-cycles/lms-cycle-index';
 import { adaptForPEDs } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
+import TrainingMetricsChart from '../SRCBBScreen_parts/TrainingMetricsChart';
+import { calcSessionMetrics, type LMSWeekMetric } from '../../../engines/lms/lms-metrics.engine';
+import { norm } from '../../../engines/norm';
 
 const ACCENT = '#00e68a';
 const ru = (g: string) => GROUP_RU[g] || g;
@@ -146,6 +149,116 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
       return analyzeProQuality(selectedProgram, division, effectiveLevel, g, analysis.perMuscle);
     } catch { return null; }
   }, [selectedProgram, division, effectiveLevel, goal, analysis]);
+
+  // ——— Графики: тоннаж/КПШ/нагрузка — полный комплект ———
+  const lmsChart: LMSWeekMetric[] | null = useMemo(() => {
+    if (division !== 'pl' || !selectedProgram?.pl) return null;
+    try {
+      const weeks: any[] = (selectedProgram.pl as any).customWeeks || [];
+      let plWeeks: any[] = weeks;
+      if (!plWeeks.length && (selectedProgram.pl as any).sourceCycleId) {
+        const tpl = getCycleById((selectedProgram.pl as any).sourceCycleId);
+        if (tpl) {
+          const rawWeeks: any[] = (tpl as any).weeks && (tpl as any).weeks.length ? (tpl as any).weeks : [(tpl as any).week1];
+          plWeeks = rawWeeks.map((days: any, wi: number) => ({
+            week: wi + 1,
+            phase: 'accumulation' as const,
+            deload: false,
+            days: (days as any[]).map((d: any, di: number) => ({
+              name: `День ${di + 1}`,
+              exercises: (d.exercises as any[]).map((ex: any) => ({
+                name: ex.name,
+                lift: 'accessory' as const,
+                muscle: (ex as any).group || 'chest',
+                sets: (ex.sets as any[]).map((s: any) => ({ pct: s.pct, reps: s.reps, sets: s.sets, rir: s.rir ?? 2 })),
+              })),
+            })),
+          }));
+        }
+      }
+      if (!plWeeks.length) return null;
+      const workMax: any = (selectedProgram.pl as any).workMax || { squat: 140, bench: 100, dead: 160 };
+      const pmMap: Record<string, number> = {
+        'Присед': workMax.squat || 140,
+        'Приседания со штангой': workMax.squat || 140,
+        'Жим лежа': workMax.bench || 100,
+        'Жим лёжа': workMax.bench || 100,
+        'Становая тяга': workMax.dead || 160,
+        'Тяга': workMax.dead || 160,
+      };
+      const fallbackPm = 80;
+      const getPm = (name: string) => {
+        if (pmMap[name] != null) return pmMap[name];
+        const n = norm(name);
+        for (const k of Object.keys(pmMap)) if (n.includes(norm(k)) || norm(k).includes(n)) return pmMap[k];
+        return fallbackPm;
+      };
+      const chart: LMSWeekMetric[] = [];
+      for (const w of plWeeks) {
+        const sessions: any[] = [];
+        for (const d of (w.days || [])) {
+          const exs: any[] = [];
+          for (const ex of (d.exercises || [])) {
+            const pm = getPm(ex.name);
+            const sets = (ex.sets || []).map((s: any) => ({ weight: pm * (s.pct || 0.7), reps: s.reps || 5, sets: s.sets || 3 }));
+            exs.push({ name: ex.name, group: ex.muscle || 'chest', coef: 1, mnosz: 1, pm, sets });
+          }
+          const m = calcSessionMetrics(exs);
+          sessions.push(m);
+        }
+        let ton = 0, kpsh = 0, relW = 0, uoiN = 0, intFB = 0;
+        for (const s of sessions) { ton += s.tonnage; kpsh += s.kpsh; relW += s.relIntensity * s.kpsh; uoiN += s.uoi * s.kpsh; intFB += s.intFB; }
+        const relInt = kpsh > 0 ? relW / kpsh : 0;
+        const uoi = kpsh > 0 ? uoiN / kpsh : 0;
+        chart.push({ week: (w as any).week || chart.length + 1, tonnage: Math.round(ton), kpsh, relInt: Math.round(relInt * 1000) / 1000, uoi: Math.round(uoi * 100) / 100, intFB: Math.round(intFB) });
+      }
+      return chart.length ? chart : null;
+    } catch { return null; }
+  }, [selectedProgram, division]);
+
+  const bbChart = useMemo(() => {
+    if (division !== 'bb' || !selectedProgram?.bb) return null;
+    try {
+      const per = analysis?.perMuscle || [];
+      if (!per.length) return null;
+      return per.map(p => ({
+        muscle: ru(p.muscle),
+        sets: p.peakSets,
+        тяж: Math.round(p.peakSets * 0.6),
+        памп: Math.round(p.peakSets * 0.4),
+        mrv: p.mrv,
+      }));
+    } catch { return null; }
+  }, [selectedProgram, division, analysis]);
+
+  const bbExtra = useMemo(() => {
+    if (division !== 'bb' || !selectedProgram?.bb) return null;
+    try {
+      const weeks: any[] = (selectedProgram.bb as any).weeks || [];
+      if (!weeks.length) return null;
+      const totalWeeks = weeks.length;
+      const freq: Record<string, number> = {};
+      let hardSets = 0, totalSets = 0, rirSum = 0, rirN = 0;
+      for (const w of weeks) {
+        for (const s of (w.sessions || [])) {
+          const musclesInSess = new Set<string>();
+          for (const b of (s.blocks || [])) {
+            const mu = String(b.muscle || '').toLowerCase();
+            if (mu) musclesInSess.add(mu);
+            const sets = (b.sets?.length || 0);
+            totalSets += sets;
+            const rir = b.sets?.[0]?.rir ?? 2;
+            if (Number.isFinite(rir) && rir < 1) hardSets += sets;
+            if (Number.isFinite(rir)) { rirSum += rir * sets; rirN += sets; }
+          }
+          for (const mu of musclesInSess) freq[mu] = (freq[mu] || 0) + 1;
+        }
+      }
+      const freqPerWeek: Record<string, number> = {};
+      for (const [k, v] of Object.entries(freq)) freqPerWeek[k] = Math.round((v / totalWeeks) * 10) / 10;
+      return { freqPerWeek, hardSets, totalSets, avgRir: rirN ? rirSum / rirN : 0 };
+    } catch { return null; }
+  }, [selectedProgram, division]);
 
   const hasData = !!(selectedProgram && (division === 'bb' ? selectedProgram.bb : selectedProgram.pl));
   const hasAnyProgram = programs.length > 0 || !!propsProgram;
@@ -400,6 +513,32 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Графики — полный комплект параметров качества */}
+      {division === 'pl' && lmsChart && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>📈 Графики нагрузки ПЛ — тоннаж / КПШ / интенсивность (источники: Фунтиков, Черняк, Прилепин, Шейко)</div>
+          <TrainingMetricsChart lms={lmsChart} />
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 6, lineHeight: 1.4 }}>
+            Тоннаж = Σвес×пов×под×Множ · КПШ = Σпов×под · Ср.вес = Тоннаж/КПШ · Инт.отн = Ср.вес/(PM×Множ) · УОИ = ΣКПШ×Коэф/ΣКПШ · Инт.Ф+Б = Σk(вес/PM)×вес×пов×под×Множ×Коэф. По Прилепину: оптимум 60-70% — КПШ 18-30, 70-80% — 12-24 и т.д.
+          </div>
+        </div>
+      )}
+      {division === 'bb' && bbChart && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 6 }}>📊 Графики объёма ББ — тяж/памп vs MRV (Israetel, Schoenfeld, Helms)</div>
+          <TrainingMetricsChart bb={bbChart} />
+          {bbExtra && (
+            <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: '#fff' }}>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Всего сетов/ротация: <b>{bbExtra.totalSets}</b></div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Хард-сетов RIR&lt;1: <b style={{ color: bbExtra.hardSets > 6 ? '#ef4444' : '#fff' }}>{bbExtra.hardSets}</b></div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Ср. RIR: <b>{bbExtra.avgRir.toFixed(1)}</b></div>
+              <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>Частота/нед: <b>{Object.entries(bbExtra.freqPerWeek).slice(0, 4).map(([k, v]) => `${ru(k)} ${v}×`).join(' · ') || '—'}</b></div>
+            </div>
+          )}
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.3 }}>Israetel: MEV/MAV/MRV по уровню; Schoenfeld: частота 2×/нед для гипертрофии; Helms: hard-cap по уровню (нач 3/ сред 6/ продв 10). Зелёный — тяж, голубой — памп, красный пунктир — MRV.</div>
         </div>
       )}
 
