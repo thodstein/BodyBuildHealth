@@ -543,7 +543,13 @@ export const CalcQualityTab: React.FC<{ program?: UserProgram | null; level?: st
         <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 10, color: '#fff' }}>
           <span>Натурал: <b style={{ color: analysisNatural.score >= 80 ? '#22c55e' : analysisNatural.score >= 50 ? '#f59e0b' : '#ef4444' }}>{analysisNatural.score}/100 {analysisNatural.grade}</b></span>
           <span>С ПЕД: <b style={{ color: sc }}>{analysis.score}/100 {analysis.grade}</b></span>
-          <span style={{ color: analysis.score > analysisNatural.score ? '#22c55e' : 'rgba(255,255,255,0.6)' }}>{analysis.score - analysisNatural.score > 0 ? `+${analysis.score - analysisNatural.score}` : `${analysis.score - analysisNatural.score}`} баллов</span>
+          <span style={{ color: analysis.score > analysisNatural.score ? '#22c55e' : '#fff' }}>{analysis.score - analysisNatural.score > 0 ? `+${analysis.score - analysisNatural.score}` : `${analysis.score - analysisNatural.score}`} баллов</span>
+        </div>
+      )}
+      {isHybrid && (
+        <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.2)', fontSize: 10, color: '#fff', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          <span>🔀 Гибрид: оцените обе вкладки — <b>ББ</b> и <b>ПЛ</b> отдельно, затем сравните PRO-корректировки.</span>
+          <span style={{ color: '#a78bfa', fontWeight: 700 }}>{division === 'bb' ? 'ББ вид' : 'ПЛ вид'}</span>
         </div>
       )}
 
