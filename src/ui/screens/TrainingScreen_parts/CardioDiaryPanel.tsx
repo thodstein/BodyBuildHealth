@@ -12,7 +12,7 @@ import {
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeightAdvice, cardioWeekForDate, cardioCoachHints, type CardioCycle, type CardioType, type CardioCoachHint } from '../../../engines/lms/cardio.engine';
 import { getWeightLog } from '../../../engines/profile-store';
-import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, Badge } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, Badge, TYPE_COLOR } from './CardioUI';
 
 const TYPES: CardioType[] = ['zone2', 'miss', 'hiit', 'recovery'];
 const TYPE_LABEL: Record<CardioType, string> = { zone2: 'Zone 2', hiit: 'HIIT', miss: 'MISS', recovery: 'Recovery' };
@@ -265,9 +265,9 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       {log.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {(showAll ? log : log.slice(0, 6)).map(e => (
-            <div key={e.id} style={ROW}>
+            <div key={e.id} style={{ ...ROW, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', width: 84 }}>{e.date}</span>
-              <span style={{ fontSize: 11, minWidth: 60 }}>{TYPE_LABEL[e.type]}</span>
+              <span style={{ fontSize: 11, minWidth: 60, fontWeight: 700, color: TYPE_COLOR[e.type] ?? 'var(--text-dim)' }}>{TYPE_LABEL[e.type]}</span>
               {e.completed === false
                 ? <span style={{ fontSize: 10, color: '#f87171', minWidth: 60 }}>⏭ пропущена</span>
                 : <span style={{ fontSize: 11, color: 'var(--text-dim)', minWidth: 60 }}>{e.durationMin} мин</span>}

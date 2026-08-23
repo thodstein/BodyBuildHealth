@@ -12,7 +12,7 @@ import {
   type CardioCycle, type CardioTuneChange,
 } from '../../../engines/lms/cardio.engine';
 import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
-import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge } from './CardioUI';
+import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge, Accordion } from './CardioUI';
 
 export const CARDIO_AUTO_TUNE_KEY = 'he_cardio_auto_tune';
 export const CARDIO_AUTO_APPLY_KEY = 'he_cardio_auto_apply';
@@ -212,88 +212,57 @@ export const CardioAutoTunePanel: React.FC<{
         </div>
       )}
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Accordion title={`Пульс-зоны ${lthr ? '(LTHR)' : '(Karvonen)'}`} icon="🎯" defaultOpen>
         <div style={ROW}>
-          <span style={LABEL}>🎯 Пульс-зоны {lthr ? '(LTHR)' : '(Karvonen)'}</span>
-          <NumberInput
-            value={age}
-            onChange={setAge}
-            min={12}
-            max={90}
-            step={1}
-            placeholder="30"
-            ariaLabel="Возраст"
-            width={80}
-            suffix="лет"
-          />
-          <NumberInput
-            value={restHr}
-            onChange={setRestHr}
-            min={30}
-            max={120}
-            step={1}
-            placeholder="60"
-            ariaLabel="ЧСС покоя"
-            width={90}
-            suffix="уд/мин"
-          />
-          <NumberInput
-            value={lthr}
-            onChange={setLthr}
-            min={80}
-            max={220}
-            step={1}
-            placeholder="160"
-            ariaLabel="LTHR (пороговый пульс)"
-            width={100}
-            suffix="уд/мин"
-          />
+          <NumberInput value={age} onChange={setAge} min={12} max={90} step={1} placeholder="30" ariaLabel="Возраст" width={80} suffix="лет" />
+          <NumberInput value={restHr} onChange={setRestHr} min={30} max={120} step={1} placeholder="60" ariaLabel="ЧСС покоя" width={90} suffix="уд/мин" />
+          <NumberInput value={lthr} onChange={setLthr} min={80} max={220} step={1} placeholder="160" ariaLabel="LTHR (пороговый пульс)" width={100} suffix="уд/мин" />
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {zones.map(z => (
-            <div key={z.zone} title={z.purpose} style={{ fontSize: 10, padding: '4px 8px', borderRadius: 8, background: z.zone === 2 ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.07)', color: z.zone === 2 ? '#4ade80' : 'rgba(255,255,255,0.6)' }}>
-              {z.label}: {z.bpmMin}–{z.bpmMax} уд
+            <div key={z.zone} title={z.purpose} style={{ fontSize: 10, padding: '5px 9px', borderRadius: 8, background: z.zone === 2 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: z.zone === 2 ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', color: z.zone === 2 ? '#4ade80' : 'rgba(255,255,255,0.62)', fontWeight: z.zone === 2 ? 800 : 500 }}>
+              {z.label}: {z.bpmMin}–{z.bpmMax}
             </div>
           ))}
         </div>
-      </div>
+        <div style={HINT_SM}>Zone 2 — базовая выносливость. LTHR приоритетнее Karvonen.</div>
+      </Accordion>
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Accordion title="VDOT — темпы по тесту" icon="🏃" defaultOpen={false}>
         <div style={ROW}>
-          <span style={LABEL}>🏃 VDOT (тест: км за минуты)</span>
           <NumberInput value={vdotKm} onChange={setVdotKm} min={0.1} max={100} step={0.1} placeholder="5" ariaLabel="Дистанция теста км" width={70} suffix="км" />
           <NumberInput value={vdotMin} onChange={setVdotMin} min={1} max={120} step={1} placeholder="20" ariaLabel="Время теста мин" width={70} suffix="мин" />
+          {vdot && <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.26)" color="#60a5fa">VDOT {vdot.vdot}</Badge>}
         </div>
-        {vdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)' }}>VDOT {vdot.vdot} · темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm} мин/км`).join(' · ')}</div>}
-      </div>
+        {vdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.66)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
+        <div style={HINT_SM}>Любая дистанция/время → VDOT → темпы Daniels.</div>
+      </Accordion>
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Accordion title="Cooper 12′" icon="🏃" defaultOpen={false}>
         <div style={ROW}>
-          <span style={LABEL}>🏃 Cooper 12′</span>
           <NumberInput value={cooperKm} onChange={setCooperKm} min={0.5} max={5} step={0.05} placeholder="2.4" ariaLabel="Дистанция Cooper км" width={80} suffix="км за 12мин" />
-          {cooperVdot && <Badge bg="rgba(96,165,250,0.14)" border="rgba(96,165,250,0.28)" color="#60a5fa">VDOT {cooperVdot.vdot}</Badge>}
+          {cooperVdot && <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.26)" color="#60a5fa">VDOT {cooperVdot.vdot}</Badge>}
         </div>
-        {cooperVdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)' }}>Темпы Cooper: {cooperVdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')} — бегите по ним Zone2/HIIT.</div>}
-        <div style={HINT_SM}>Cooper: 12 мин максимально, дистанция → VDOT → темпы тренировок (Daniels).</div>
-      </div>
+        {cooperVdot && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.66)', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы Cooper: {cooperVdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
+        <div style={HINT_SM}>Cooper: 12 мин максимально → VDOT.</div>
+      </Accordion>
 
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Accordion title="Менструальный цикл" icon="🌸" defaultOpen={false}>
         <div style={ROW}>
-          <span style={LABEL}>🌸 Менструальный цикл</span>
           <input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '7px 10px', color: '#fff', fontSize: 12 }} aria-label="Дата начала цикла" />
           <NumberInput value={periodLen} onChange={setPeriodLen} min={21} max={35} step={1} placeholder="28" ariaLabel="Длина цикла" width={70} suffix="дн" />
         </div>
         {periodInfo && (
           <div style={{ fontSize: 11, padding: '7px 10px', borderRadius: 8, background: periodInfo.phase === 'luteal' ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.07)', border: `1px solid ${periodInfo.phase === 'luteal' ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.18)'}`, color: periodInfo.phase === 'luteal' ? '#f87171' : '#4ade80' }}>
             День {periodInfo.cycleDay} · {periodInfo.phase === 'follicular' ? 'Фолликулярная' : periodInfo.phase === 'ovulatory' ? 'Овуляция' : 'Лютеиновая'} — {periodInfo.note}
-            {periodInfo.phase === 'luteal' && <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>Рекомендация: HIIT/MISS → zone2 (пульс воспринимается выше, задержка воды).</div>}
+            {periodInfo.phase === 'luteal' && <div style={{ marginTop: 4, fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>HIIT/MISS → zone2.</div>}
           </div>
         )}
         <div style={ROW}>
-          <button style={BTN_SMALL} onClick={applyPeriodAware} disabled={!periodStart || !cycle} title="Заменить HIIT/MISS на zone2 в лютеиновые недели цикла">🌸 Коррекция по циклу</button>
-          <span style={HINT_SM}>Коррекция одноразовая (с undo), только будущие недели, только HIIT→zone2.</span>
+          <button style={BTN_SMALL} onClick={applyPeriodAware} disabled={!periodStart || !cycle} title="Заменить HIIT/MISS на zone2">🌸 Коррекция по циклу</button>
+          <span style={HINT_SM}>Одноразово, с undo, только будущие недели.</span>
         </div>
-      </div>
+      </Accordion>
     </div>
   );
 };
