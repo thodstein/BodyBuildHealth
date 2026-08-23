@@ -529,17 +529,17 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         const cats = ZONES[zone].categories;
         if (cats) {
           return (
-            <div style={{ marginBottom: 8, position:'sticky', top:0, zIndex:4, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px 8px', padding:'6px 4px' }}>
+            <div style={{ marginBottom: 10, display:'flex', flexDirection:'column', gap:8 }}>
               {cats.map(cat => (
-                <div key={cat.label} style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', margin: '2px 0 2px', textTransform: 'uppercase', letterSpacing: 0.3 }}>{cat.icon} {cat.label}</div>
-                  <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                <div key={cat.label} style={{ background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom:6, display:'flex', alignItems:'center', gap:6, letterSpacing:0.3, textTransform:'uppercase' as any }}><span style={{ width:20, height:20, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:11 }}>{cat.icon}</span> {cat.label}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {cat.tabs.map(k => (
                       <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
-                        padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600,
-                        background: tab === k ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+                        padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                        background: tab === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
                         color: tab === k ? '#000' : '#fff', border: tab === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
-                        transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word',
+                        transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word', boxShadow: tab === k ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
                       }}>{TAB_LABELS[k]}</button>
                     ))}
                   </div>
@@ -549,13 +549,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           );
         }
         return (
-          <div style={{ display: 'flex', gap: 3, marginBottom: 8, flexWrap: 'wrap', position:'sticky', top:0, zIndex:4, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px 8px', paddingLeft:4, paddingRight:4 }}>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px 10px' }}>
             {ZONES[zone].tabs.map(k => (
               <button key={k} onClick={() => { hapticImpact('light'); goTab(k); }} style={{
-                padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600,
-                background: tab === k ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+                padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700,
+                background: tab === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
                 color: tab === k ? '#000' : '#fff', border: tab === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
-                transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word',
+                transition: 'all 0.2s', whiteSpace: 'normal', wordBreak: 'break-word', boxShadow: tab === k ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
               }}>{TAB_LABELS[k]}</button>
             ))}
           </div>

@@ -82,14 +82,14 @@ const RecordModeSelector: React.FC<{
 }> = ({ diary, historyWorkouts, selectedWeek, onSave, sub, onSubChange, pendingTemplate, templateKey, onTemplateApplied }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', gap: 4, position:'sticky', top:0, zIndex:3, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px', paddingLeft:4, paddingRight:4 }}>
+      <div style={{ display: 'flex', gap: 6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'6px' }}>
         {([['quick', '⚡ Быстро'], ['full', '📝 Подробно']] as const).map(([k, l]) => (
           <button key={k} onClick={() => onSubChange(k)} style={{
-            flex: 1, padding: '8px 12px', borderRadius: 8,
-            border: sub === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)',
-            background: sub === k ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.02)',
-            color: sub === k ? 'var(--accent)' : '#fff',
-            fontWeight: sub === k ? 700 : 400, fontSize: 11, cursor: 'pointer',
+            flex: 1, padding: '8px 12px', borderRadius: 10,
+            border: sub === k ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+            background: sub === k ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
+            color: sub === k ? '#000' : '#fff',
+            fontWeight: 700, fontSize: 11, cursor: 'pointer', boxShadow: sub === k ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
           }}>{l}</button>
         ))}
       </div>
@@ -476,14 +476,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Подвкладки дневника: запись / соревнования (mode внутри record-блока сужен до 'record') */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', position:'sticky', top:0, zIndex:3, background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', padding:'6px 0', borderBottom:'1px solid rgba(255,255,255,0.06)', margin:'0 -4px 8px', paddingLeft:4, paddingRight:4 }}>
-            <button onClick={() => setMode('record')} style={{ flex: 1, minWidth: 100, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--accent)', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📓 Запись</button>
-            <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
-            <button onClick={() => setMode('feedback')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>📊 Фидбек</button>
-            <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>⭐ Мои тренировки</button>
-            <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
-            <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', color: '#fff', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
+          {/* Подвкладки дневника — красиво, без бега */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px', marginBottom:4 }}>
+            <button onClick={() => setMode('record')} style={{ flex: 1, minWidth: 100, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--accent)', background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 800, fontSize: 11, cursor: 'pointer', boxShadow:'0 2px 8px rgba(0,230,138,0.25)' }}>📓 Запись</button>
+            <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
+            <button onClick={() => setMode('feedback')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📊 Фидбек</button>
+            <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>⭐ Мои тренировки</button>
+            <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
+            <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
           </div>
           {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
           <BBContestPrepActiveCard onOpen={() => {

@@ -129,14 +129,15 @@ export const CycleLayoutView: React.FC<{ cycle: SRCycleTemplate }> = ({ cycle })
   );
 };
 
-// ── Чип-кнопка (стиль как в nav.ts:504) ──
+// ── Чип-кнопка — красиво, без бега
 function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button onClick={onClick} style={{
-      padding: '5px 10px', borderRadius: 20, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+      padding: '7px 12px', borderRadius: 12, fontSize: 11, fontWeight: 700, cursor: 'pointer',
       whiteSpace: 'normal', wordBreak: 'break-word', transition: 'all 0.2s',
-      background: active ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
-      color: active ? '#000' : '#fff', border: 'none',
+      background: active ? 'linear-gradient(135deg, var(--accent), #00c853)' : 'rgba(255,255,255,0.04)',
+      color: active ? '#000' : '#fff', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+      boxShadow: active ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
     }}>{label}</button>
   );
 }
