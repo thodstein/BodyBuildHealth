@@ -18,6 +18,7 @@
  */
 import type { Exercise } from '../../core/types';
 import type { BBTrainingFocus } from './bb-goal-types';
+import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
 export interface AngleClass {
   name: string;
@@ -156,4 +157,175 @@ export function selectDiverseExercises(
     if (clsIdx >= 0) usedClassIdx.add(clsIdx);
   }
   return diverse.slice(0, exerciseCount);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * ЖЁСТКИЕ ГРУППЫ ЗАМЕНЫ (требование пользователя):
+ * упражнения ВНУТРИ группы меняются ТОЛЬКО между собой (в один день могут
+ * стоять все, между программами/неделями — ротация членов группы), и каждая
+ * группа ОБЯЗАНА быть представлена в сессии мышцы (если группа доступна в пуле).
+ *
+ * Грудь: разводки (гантели/пек-дек) + жим под углом 30° (гантели/Смит/штанга).
+ * Спина: тяга верхнего блока (широкий прямой/параллельный хват), тяга двух
+ * гантелей лёжа на скамье (seal), Т-тяга.
+ * Бицепс бедра: сгибания ног (лёжа/сидя), гакк на бицепс/«колодец» (нет в
+ * каталоге — группа сработает, если появится), румынская тяга.
+ * Квадрицепс: приседания со штангой/гакк, разгибания ног сидя.
+ * ═══════════════════════════════════════════════════════════════════ */
+export interface StrictExerciseGroup {
+  key: string;
+  label: string;
+  ids?: string[];
+  re?: RegExp;
+  /** Имена, НЕ входящие в группу (например, жимы не попадают в разводки). */
+  not?: RegExp;
+}
+
+export const STRICT_EXERCISE_GROUPS: Record<string, StrictExerciseGroup[]> = {
+  chest: [
+    {
+      key: 'chest_fly', label: 'Разводки/пек-дек',
+      ids: ['fly_db', 'pec_deck', 'fly_cable', 'cable_fly', 'cable_fly_low', 'cable_fly_mid', 'cable_fly_incline',
+        'incline_fly_db', 'incline_fly_cable', 'decline_fly_db', 'machine_fly', 'dumbbell_crossover',
+        'bb_cable_upper', 'bb_cable_mid', 'bb_cable_lower', 'cable_crossover_low_high', 'cable_decline_fly',
+        'incline_bench_cable_fly', 'cable_iron_cross'],
+      re: /развод|пек.?дек|бабоч|сведен|кроссов|crossover|сведение|fly/i,
+      not: /жим|press|bench/i,
+    },
+    {
+      key: 'chest_incline', label: 'Жим под углом 30°',
+      ids: ['incline_bar', 'incline_db', 'smith_incline', 'machine_incline_press'],
+      re: /жим.*(наклон|incline)|incline.*(жим|press)/i,
+    },
+  ],
+  back: [
+    {
+      key: 'back_pulldown', label: 'Тяга верхнего блока',
+      ids: ['pulldown', 'pulldown_wide', 'pulldown_rev', 'pulldown_vbar', 'lat_pulldown_mag'],
+      re: /тяга верхнего блока|pulldown|lat.?pull/i,
+    },
+    {
+      key: 'back_seal', label: 'Тяга лёжа на скамье',
+      ids: ['row_seal', 'row_chest_supported'],
+      re: /л[её]жа на скамь|seal|упор.*груд|chest.?supported/i,
+    },
+    {
+      key: 'back_tbar', label: 'Т-тяга',
+      ids: ['row_tbar', 'tbar_row_v2'],
+      re: /т-?гриф|t.?bar/i,
+    },
+  ],
+  hamstrings: [
+    {
+      key: 'ham_curl', label: 'Сгибания ног (лёжа/сидя)',
+      ids: ['leg_curl', 'leg_curl_seated', 'leg_curl_standing', 'leg_curl_seated_v2', 'leg_curl_single',
+        'leg_curl_lying', 'seated_leg_curl', 'lying_leg_curl', 'single_leg_curl', 'nordic_curl'],
+      re: /сгибан.*ног|leg.?curl/i,
+    },
+    {
+      key: 'ham_hack', label: 'Гакк на бицепс бедра/«колодец»',
+      ids: [],
+      re: /гакк|hack|колодец/i,
+    },
+    {
+      key: 'ham_rdl', label: 'Румынская тяга',
+      ids: ['rdl', 'rdl_db', 'rdl_v2', 'b_stance_rdl', 'deadlift_stiff_leg', 'deadlift_romanian'],
+      re: /румын|rdl|м[её]ртв.*прям/i,
+    },
+  ],
+  quads: [
+    {
+      key: 'quad_squat', label: 'Приседания со штангой/гакк',
+      ids: ['squat', 'squat_bar', 'front_squat', 'front_squat_v2', 'front_squat_clean_grip', 'hack_squat',
+        'hack_squat_v2', 'hack_squat_reverse', 'squat_ssb', 'squat_smith', 'squat_belt', 'squat_lowbar',
+        'squat_pause', 'squat_tempo', 'squat_anderson', 'squat_box', 'squat_zercher', 'goblet_squat',
+        'sumo_squat', 'pendulum_squat', 'squat_overhead'],
+      re: /присед|squat|хак|hack|гакк/i,
+    },
+    {
+      key: 'quad_ext', label: 'Разгибания ног сидя',
+      ids: ['leg_ext', 'leg_ext_v2', 'leg_ext_single', 'seated_leg_extension', 'single_leg_extension', 'wall_sit'],
+      re: /разгибан.*ног|leg.?extension/i,
+    },
+  ],
+};
+
+/** Проверить, входит ли упражнение в жёсткую группу (по id или имени). */
+export function strictGroupMatches(ex: { id?: string; name?: string }, g: StrictExerciseGroup): boolean {
+  if (g.ids && ex.id && g.ids.includes(ex.id)) return true;
+  if (g.not && ex.name && g.not.test(ex.name)) return false;
+  if (g.re && ex.name && g.re.test(ex.name)) return true;
+  return false;
+}
+
+/** Группа, в которую входит упражнение (для свопа: менять ТОЛЬКО внутри группы). */
+export function strictGroupForExercise(ex: { id?: string; name?: string }, muscle?: string): StrictExerciseGroup | undefined {
+  const groups = muscle
+    ? (STRICT_EXERCISE_GROUPS[muscle] || [])
+    : Object.values(STRICT_EXERCISE_GROUPS).flat();
+  return groups.find(g => strictGroupMatches(ex, g));
+}
+
+/** Члены группы из каталога — кандидаты на замену упражнения (свод-модал). */
+export function strictGroupMembersOf(ex: { id?: string; name?: string }, muscle?: string): Exercise[] {
+  const g = strictGroupForExercise(ex, muscle);
+  if (!g) return [];
+  return EXERCISE_CATALOG.filter(c => strictGroupMatches(c, g));
+}
+
+/**
+ * Pass покрытия жёстких групп для сессии мышцы (buildSession):
+ * каждая группа, доступная в пуле, обязана быть представлена в exDatas.
+ *
+ * Политика (сохраняет объёмную модель неизменной):
+ *  - ТОЛЬКО замена, без добавления слотов: количество упражнений мышцы и
+ *    делитель pl.sets/exDatas.length не меняются (weeklySets инвариантны);
+ *  - заменяемый элемент НЕ является единственным представителем другой
+ *    обязательной группы (иначе создадим дыру); lead-compound на 0-й
+ *    позиции — крайний случай;
+ *  - выбор кандидата детерминирован (лучший _score из пула, без учёта
+ *    freshness недели) — primary-упражнения стабильны между неделями;
+ *  - применяется ТОЛЬКО для primary-мышц (accessory-дни не трогаются);
+ *  - deload-недели пропускаются (восстановление).
+ */
+export function ensureStrictGroupCoverage(
+  exDatas: any[],
+  pool: any[],
+  muscle: string,
+  exerciseCount: number,
+  sessionSelectedIds: string[],
+  sessionSelectedNames: string[],
+  opts?: { isPrimary?: boolean },
+): void {
+  if (opts?.isPrimary === false) return;
+  const groups = STRICT_EXERCISE_GROUPS[muscle];
+  if (!groups || groups.length === 0 || exDatas.length < 2) return;
+  for (const g of groups) {
+    if (exDatas.some(ex => strictGroupMatches(ex, g))) continue;
+    const poolMembers = pool.filter(ex => strictGroupMatches(ex, g));
+    if (poolMembers.length === 0) continue; // группа недоступна (нет в каталоге/оборудовании)
+    const fresh = poolMembers.filter(m => !exDatas.some(d => d.id === m.id));
+    const candidates = fresh.length > 0 ? fresh : poolMembers;
+    const best = candidates.slice().sort((a, b) => ((b._score ?? 0) - (a._score ?? 0)))[0];
+    if (!best) continue;
+    // Ищем заменяемый элемент: последний, НЕ являющийся единственным
+    // представителем другой обязательной группы (иначе создадим дыру).
+    let idx = -1;
+    for (let i = exDatas.length - 1; i >= 1; i--) {
+      const d = exDatas[i];
+      const onlyRep = groups.some(other => other !== g
+        && strictGroupMatches(d, other)
+        && !exDatas.some((x, xi) => xi !== i && strictGroupMatches(x, other)));
+      if (!onlyRep) { idx = i; break; }
+    }
+    if (idx < 0 && !strictGroupMatches(exDatas[0], g)) idx = 0;
+    if (idx >= 0) {
+      const replaced = exDatas[idx];
+      exDatas[idx] = best;
+      const iId = sessionSelectedIds.indexOf(replaced.id);
+      if (iId >= 0) sessionSelectedIds[iId] = best.id; else sessionSelectedIds.push(best.id);
+      const iNm = sessionSelectedNames.indexOf(replaced.name);
+      if (iNm >= 0) sessionSelectedNames[iNm] = best.name; else sessionSelectedNames.push(best.name);
+    }
+  }
 }

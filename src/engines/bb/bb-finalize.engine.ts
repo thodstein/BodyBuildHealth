@@ -1972,7 +1972,7 @@ function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalize
               ...set,
               weight: Math.round(set.weight * loadRatio * 10) / 10,
             }));
-            exercise.comment = [exercise.comment, `Оборудование ротации: ${oldEquipment} → ${newEquipment}; вес скорректирован ×${loadRatio.toFixed(2)}`].filter(Boolean).join('. ');
+            exercise.comment = [exercise.comment?.replace(/\.\s*$/, ''), `Оборудование ротации: ${oldEquipment} → ${newEquipment}; вес скорректирован ×${loadRatio.toFixed(2)}`].filter(Boolean).join('. ');
             exercise.rationale = [exercise.rationale, `Controlled rotation: ${oldName} -> ${replacement.name}`].filter(Boolean).join(' | ');
             usedNames.add(replacement.name);
             previousPatternByMuscle.set(exercise.muscle, derivePattern(replacement));
@@ -2023,7 +2023,7 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
       : replacement.equipment;
     const ratio = (loadRatio[String(replacementEquipment)] || 1) / (loadRatio[equipmentOfName(oldName)] || 1);
     exercise.workSets = exercise.workSets.map(set => ({ ...set, weight: Math.round(set.weight * ratio * 10) / 10 }));
-    exercise.comment = [exercise.comment, `Safety repair: ${oldName} → ${replacement.name}; вес скорректирован ×${ratio.toFixed(2)}`].filter(Boolean).join('. ');
+    exercise.comment = [exercise.comment?.replace(/\.\s*$/, ''), `Safety repair: ${oldName} → ${replacement.name}; вес скорректирован ×${ratio.toFixed(2)}`].filter(Boolean).join('. ');
     exercise.rationale = [exercise.rationale, 'Adaptive safety replacement'].filter(Boolean).join(' | ');
   }
 }

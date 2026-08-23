@@ -102,6 +102,7 @@ import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveU
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote, movementPatternLabel } from './bb-labels';
 import { EQUIP_RU } from './ExerciseLabShared';
+import { strictGroupMembersOf } from '../../../engines/bb/bb-exercise-selection.engine';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
@@ -5813,8 +5814,14 @@ export const BbAutoConstructor: React.FC = () => {
   // ── Exercise swap modal ──
   const renderExSwapModal = () => {
     if (!exSwapModal || !builtPlan) return null;
-    const filtered = EXERCISE_CATALOG
-      .filter(e => (e.group || '') === exSwapModal.muscle)
+    // Замена ТОЛЬКО внутри жёсткой группы (требование пользователя): разводки ↔
+    // пек-дек, жим 30° ↔ Смит/штанга, верхний блок прямой/параллельный, seal/T-тяга,
+    // сгибания ног лёжа/сидя, присед/гакк, разгибания ног сидя.
+    const groupMembers = strictGroupMembersOf({ name: exSwapModal.currentName }, exSwapModal.muscle);
+    const baseCandidates = groupMembers.length > 0
+      ? groupMembers
+      : EXERCISE_CATALOG.filter(e => (e.group || '') === exSwapModal.muscle);
+    const filtered = baseCandidates
       .filter(e => e.name.toLowerCase().includes(exSwapSearch.toLowerCase()));
     return (
       <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }}
@@ -5823,6 +5830,7 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
           <div style={{ padding:'14px 16px', maxHeight:'calc(78vh - 3px)', overflowY:'auto' }}>
             <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:10 }}>🔄 Замена: {exSwapModal.currentName}</div>
+            <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.4 }}>💡 Меняется только внутри своей группы (разводки ↔ пек-дек, жим 30° ↔ Смит/штанга, верхний блок ↔ параллельный хват, seal ↔ Т-тяга, сгибания ног лёжа/сидя, присед ↔ гакк, разгибания ног сидя).</div>
             <input type="text" placeholder="Поиск упражнений..." value={exSwapSearch} autoFocus
               onChange={e => setExSwapSearch(e.target.value)}
               style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:10 }} />
