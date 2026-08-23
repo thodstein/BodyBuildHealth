@@ -760,7 +760,9 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   // tighter cap (e.g. maxGrainPerMeal for cooked grains so a 140g-carb target doesn't
   // produce a 600g bowl of buckwheat).
   const ceiling = Math.min(maxGramPerItem(_currentBudget), capG ?? maxGramPerItem(_currentBudget));
-  const base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
+  let base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
+  // Нормальная человеческая порция: овсянка/хлопья на работе — минимум 60г сухого (~180г готового), не 15г
+  if ((food.id === 'oats' || food.id === 'oats_dry' || food.id === 'grain_quinoa_flakes') && base < 60) base = 60;
   const supplementCap = SUPPLEMENT_MAX_G[food.id];
   return supplementCap ? Math.min(supplementCap, base) : base;
 }
