@@ -35,7 +35,7 @@ export interface RirPayload { rirShift: number; label?: string }
 export interface MrvPayload { mrv: number; label?: string }
 export interface DeloadPayload { volumeMult: number; rirShift: number; weeks: number[]; label?: string }
 export interface VolumePayload { sets: Record<string, number>; label?: string }
-export interface PeakPayload { volumeMult?: number; rirTarget?: number; label?: string; weeks?: unknown; protocol?: unknown }
+export interface PeakPayload { volumeMult?: number; rirTarget?: number; label?: string; weeks?: unknown; protocol?: unknown; peakCycleId?: string }
 export interface MethodologyPayload { methodName: string; category?: string }
 export interface ProgramPayload { cycleId?: string; [key: string]: unknown }
 export interface DesignPayload { design: unknown; fillExercises?: boolean; daysPerWeek?: number; level?: string; goal?: string }
@@ -68,7 +68,7 @@ export interface PlannerApplyDataByKind {
   peak: PeakPayload;
   methodology: MethodologyPayload;
   // Program bridge accepts both a cycle id and a full legacy cycle template.
-  program: unknown;
+  program: ProgramPayload;
   design: DesignPayload;
   macrocycle: MacrocyclePayload;
   cardio: CardioPayload;

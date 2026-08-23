@@ -12,6 +12,7 @@ import {
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { buildPLTaperCurve, taperWeeksByFatigue, TAPER_MODE_LABELS, type TaperMode } from '../../../engines/lms/lms-taper.engine';
 import { meetAttemptsFor, MEET_STRATEGY_LABEL, type MeetStrategy } from '../../../engines/lms/competition-attempts';
+import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
 import { scoreBBShowPrep } from '../../../engines/bb/bb-show-coach.engine';
 import { buildBBContestPrepPlan } from '../../../engines/bb/bb-contest-prep.engine';
 
@@ -101,6 +102,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   const [weighIn, setWeighIn] = useState('09:00');
   const [startTime, setStartTime] = useState('10:00');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [peakCycleId, setPeakCycleId] = useState<string>('');
 
   // BB state — единая система тапера ББ (bb-contest-prep.engine)
   const defaultBbCfg = (): BBContestPrepConfig => {
@@ -149,8 +151,8 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
   };
 
   const cls = useMemo(() => weightClass(bw, fed, (() => { try { return (getProfile().settings as any)?.personal?.sex === 'female' ? 'female' : 'male'; } catch { return 'male'; } })()), [bw, fed]);
-  // Канон (lms-taper.engine): единая кривая тапера — режим × длительность.
-  const taper = useMemo(() => buildPLTaperCurve({ taperWeeks: weeks, mode: taperMode, fatigue: Math.max(0, Math.min(100, Math.round(fatigue / 5))) }), [weeks, taperMode, fatigue]);
+  // Канон (lms-taper.engine): единая кривая тапера — режим × длительность × пиковый цикл (интеграция).
+  const taper = useMemo(() => buildPLTaperCurve({ taperWeeks: weeks, mode: taperMode, fatigue: Math.max(0, Math.min(100, Math.round(fatigue / 5))), peakCycleId: peakCycleId || undefined }), [weeks, taperMode, fatigue, peakCycleId]);
   // Прикиды — канон (competition-attempts.meetAttemptsFor), стратегия на выбор.
   const attempts = useMemo(() => ([
     { lift: 'Присед', ...meetAttemptsFor(squat, strategy) },
@@ -164,8 +166,8 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
     const lastWeek = taper[taper.length - 1];
     applyToPlanner({
       kind: 'peak',
-      label: `Taper ${weeks} нед (${TAPER_MODE_LABELS[taperMode]}): объём ×${lastWeek.volumePct}, RIR → ${lastWeek.rirTarget ?? '+' + lastWeek.rirShift}`,
-      data: { volumeMult: lastWeek.volumePct, rirTarget: lastWeek.rirTarget, weeks: taper.map(t => t.week), protocol: { mode: taperMode, curve: taper } },
+      label: `Taper ${weeks} нед (${TAPER_MODE_LABELS[taperMode]}${peakCycleId ? ` + цикл ${peakCycleId}` : ''}): объём ×${lastWeek.volumePct}, RIR → ${lastWeek.rirTarget ?? '+' + lastWeek.rirShift}`,
+      data: { volumeMult: lastWeek.volumePct, rirTarget: lastWeek.rirTarget, weeks: taper.map(t => t.week), protocol: { mode: taperMode, curve: taper }, peakCycleId: peakCycleId || undefined },
     });
   };
 
@@ -492,6 +494,7 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
         <PopupSelect label="Длительность taper" value={String(weeks)} options={WEEK_OPTS} hint={`Недель пиковой фазы перед соревнованием${suggestedWeeks ? ` · по усталости рекомендуется ${suggestedWeeks} нед` : ''}`} onChange={v => setWeeks(Number(v))} />
         <PopupNumber label="Усталость (у.е.)" value={fatigue} min={100} max={500} step={50} hint="Субъективная накопленная усталость (рекомендация длительности тапера)" onChange={setFatigue} />
         <PopupSelect label="Раскладка тапера" value={taperMode} options={(['classic', 'pl', 'pro'] as TaperMode[]).map(m => ({ id: m, label: TAPER_MODE_LABELS[m] }))} hint="Канон lms-taper.engine: классика — разгрузка Bosquet; ПЛ-пик-протокол — интенсификация 90/95/100%; про — усталость-зависимая кривая с праймингом" onChange={v => setTaperMode(v as TaperMode)} />
+        <PopupSelect label="🏆 Пиковый цикл (интеграция)" value={peakCycleId} options={[{ id: '', label: '— канон по режиму —', desc: 'classic/pl/pro' }, ...getPeakCycles().map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.weeks} нед · ${c.meta.level}` }))]} hint="Если выбран — кривая тапера берётся ИЗ недель пикового цикла (соответствие ПЛ-авто). Без выбора — каноническая кривая по режиму." onChange={v => setPeakCycleId(v)} />
         <PopupSelect label="Стратегия прикидов" value={strategy} options={STRATEGY_OPTS} hint="Прикиды дня соревнований (округление к 2.5 кг)" onChange={v => setStrategy(v as MeetStrategy)} />
       </CalcSection>
 

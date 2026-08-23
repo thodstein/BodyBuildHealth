@@ -40,6 +40,8 @@ export interface MacroTaperOpts {
   windowWeeks?: number;
   /** Весь окно = непрерывный тапер (без отдельного «входа в пик»). */
   wholeWindowAsTaper?: boolean;
+  /** Пиковый цикл ПЛ (period=peak) — если задан, кривая берётся ИЗ цикла (интеграция пиковых циклов). */
+  peakCycleId?: string;
 }
 
 export interface MacroTaperResult {
@@ -202,7 +204,7 @@ export function applyMacroTaperToPLWeeks(weeks: LMSPlanWeek[], opts?: MacroTaper
     postMeet: opts?.postMeet,
     wholeWindowAsTaper: opts?.wholeWindowAsTaper,
   }) : null;
-  const curve = layout ? layout.curve : buildPLTaperCurve({ taperWeeks, mode, weightGoal });
+  const curve = layout ? layout.curve : buildPLTaperCurve({ taperWeeks, mode, weightGoal, peakCycleId: opts?.peakCycleId });
   if (!Array.isArray(weeks) || weeks.length === 0) return { weeks, notes };
 
   const out = weeks.map(w => ({ ...w }));
@@ -337,6 +339,7 @@ export function buildPLSeasonPeaks(
     postMeet: opts?.postMeet,
     windowWeeks: opts?.windowWeeks,
     wholeWindowAsTaper: opts?.wholeWindowAsTaper,
+    peakCycleId: opts?.peakCycleId,
   });
 
   // P2-6: календарная разметка вперёд от начала сезона.

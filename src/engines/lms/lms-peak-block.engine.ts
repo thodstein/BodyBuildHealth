@@ -45,6 +45,8 @@ export interface PLPeakBlockLayoutOpts {
    *  плавная кривая разгрузки на все доступные недели окна. Для classic тянется
    *  до 12 нед; pl/pro/wf остаются в пределах своего протокола. */
   wholeWindowAsTaper?: boolean;
+  /** Пиковый цикл ПЛ — если задан, кривая тапера берётся ИЗ цикла (интеграция). */
+  peakCycleId?: string;
 }
 
 export interface PLPeakBlockLayout {
@@ -120,7 +122,7 @@ export function buildPLPeakBlockLayout(opts: PLPeakBlockLayoutOpts): PLPeakBlock
   }
 
   const rampCurve = buildRampCurve(rampWeeks, weightGoal);
-  const taperCurve = buildPLTaperCurve({ taperWeeks, mode, weightGoal });
+  const taperCurve = buildPLTaperCurve({ taperWeeks, mode, weightGoal, peakCycleId: opts.peakCycleId });
 
   const parts: string[] = [];
   if (rampWeeks > 0) parts.push(`вход ${rampWeeks}`);

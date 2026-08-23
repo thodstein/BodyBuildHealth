@@ -10,6 +10,8 @@ import {
   type AttemptStrategy, type Lift, type TaperPlan,
 } from '../../../engines/pro/taper.engine';
 import { generateBBPeaking, type BBPeakingOutput } from '../../../engines/peaking-engine';
+import { buildPLTaperCurve, type TaperMode } from '../../../engines/lms/lms-taper.engine';
+import { getPeakCycles, buildPeakCycleTaperCurve } from '../../../engines/lms/pl-peak-cycle-taper.engine';
 import { buildBBContestPrep, isoToday, isoAddDays, normalizeContestCategory, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
 import {
   selectWeightClassForSex, generateCompetitionTimeline,
@@ -68,6 +70,8 @@ export const TaperPlannerTab: React.FC = () => {
   const [kind, setKind] = useState<'pl' | 'bb'>('pl');
   const [selectedPlCycle, setSelectedPlCycle] = useState<string>('');
   const [selectedBbCycle, setSelectedBbCycle] = useState<string>('');
+  // Интеграция пиковых циклов ПЛ → ТАПЕР-пик ПЛ-авто (канон lms-taper)
+  const [plPeakCycleId, setPlPeakCycleId] = useState<string>('');
 
   // ── PL: taper + соревнование ──
   const [meetDate, setMeetDate] = useState<string>(addDays(28));
@@ -173,6 +177,17 @@ export const TaperPlannerTab: React.FC = () => {
     try { return taperPlan(meetDate, { squat: squat1RM, bench: bench1RM, deadlift: deadlift1RM }, effectiveFatigue, strategy); }
     catch { return null; }
   }, [kind, meetDate, squat1RM, bench1RM, deadlift1RM, effectiveFatigue, strategy]);
+  // Канон ПЛ-авто (lms-taper) — та же усталость/стратегия, но через buildPLTaperCurve (соответствие «интеллектуальные тренировки ↔ ПЛ-авто»)
+  const canonicalCurve = useMemo(() => {
+    if (kind !== 'pl') return null;
+    try {
+      return buildPLTaperCurve({ taperWeeks: adjustedTaperWeeks, mode: 'pl' as TaperMode, peakCycleId: plPeakCycleId || undefined });
+    } catch { return null; }
+  }, [kind, adjustedTaperWeeks, plPeakCycleId]);
+  const peakCycleCurve = useMemo(() => {
+    if (kind !== 'pl' || !plPeakCycleId) return null;
+    try { return buildPeakCycleTaperCurve(plPeakCycleId, adjustedTaperWeeks); } catch { return null; }
+  }, [kind, plPeakCycleId, adjustedTaperWeeks]);
 
   const daysUntil = useMemo(() => {
     const d = new Date(meetDate).getTime() - Date.now();
@@ -297,6 +312,47 @@ export const TaperPlannerTab: React.FC = () => {
           </>
         )}
       </div>
+      {/* ── Интеграция пиковых циклов ПЛ → ТАПЕР-пик ПЛ-авто (канон) ── */}
+      {kind === 'pl' && (
+        <div style={CARD}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🏆 Пиковый цикл ПЛ → Тапер-пик (интеграция с ПЛ-авто)</div>
+          <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.4 }}>
+            Если выбран пиковый цикл — кривая тапера берётся <b style={{ color: '#fff' }}>ИЗ недель пикового цикла</b> (объём/intensity по фактическим сетам, buildPeakCycleTaperCurve). Без выбора — каноническая кривая по режиму (classic/pl/pro/wf). <b style={{ color: ACCENT }}>Тапер-пик здесь = тапер-пик в ПЛ-авто</b> (lms-taper.engine, один канон).
+          </div>
+          <PopupSelect
+            label="Пиковый цикл для тапера"
+            value={plPeakCycleId}
+            options={[
+              { id: '', label: '— канон по режиму (без цикла) —', desc: 'classic/pl/pro/wf' },
+              ...getPeakCycles().map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.weeks} нед · ${c.meta.level}` })),
+            ]}
+            onChange={v => setPlPeakCycleId(v)}
+          />
+          {plPeakCycleId && peakCycleCurve && canonicalCurve && (
+            <div style={{ marginTop: 8, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.14)', fontSize: 10, lineHeight: 1.4 }}>
+              <div style={{ fontWeight: 700, color: ACCENT, marginBottom: 4 }}>✓ Соответствие: пиковый цикл → канон ПЛ-авто</div>
+              <div style={{ color: DIM }}>Из цикла «{plPeakCycleId}»: объём финальной нед {Math.round(peakCycleCurve[peakCycleCurve.length-1].volumePct*100)}% · Инт. {Math.round(peakCycleCurve[peakCycleCurve.length-1].intensityPct*100)}% · Канон {canonicalCurve[canonicalCurve.length-1].label}: объём {Math.round(canonicalCurve[canonicalCurve.length-1].volumePct*100)}% — оба используют <b style={{ color: '#fff' }}>lms-taper.engine</b> (один источник).</div>
+              <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => {
+                    try {
+                      const txt = `Пиковый цикл ${plPeakCycleId}: ${peakCycleCurve.map(p=>`нед ${p.week} объём×${p.volumePct} int ${Math.round(p.intensityPct*100)}%`).join(' | ')} | Канон: ${canonicalCurve.map(p=>`нед ${p.week} объём×${p.volumePct}`).join(' | ')}`;
+                      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(txt);
+                    } catch {}
+                  }}
+                  style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.1)', color: ACCENT, fontSize: 10, cursor: 'pointer' }}
+                >📋 Скопировать соответствие</button>
+                <button
+                  onClick={() => {
+                    applyToPlanner({ kind: 'peak', label: `Тапер из пикового цикла ${plPeakCycleId}: объём×${peakCycleCurve[peakCycleCurve.length-1].volumePct}`, data: { volumeMult: peakCycleCurve[peakCycleCurve.length-1].volumePct, rirTarget: peakCycleCurve[peakCycleCurve.length-1].rirTarget ?? 0, peakCycleId: plPeakCycleId } } as any);
+                  }}
+                  style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.1)', color: '#a78bfa', fontSize: 10, cursor: 'pointer' }}
+                >↗ В ПЛ-авто</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Унификация возраст/пол/федерация (как в PlNormsCalcTab) — влияет на taper и весовую категорию ── */}
       <div style={CARD}>
@@ -383,6 +439,22 @@ export const TaperPlannerTab: React.FC = () => {
                 <span style={{ color: 'rgba(255,255,255,0.7)' }}>Инт.: <b style={{ color: '#fff' }}>{Math.round(tw.intensityPct * 100)}%</b></span>
                 <span style={{ color: 'rgba(255,255,255,0.7)' }}>RIR: <b style={{ color: '#fff' }}>{tw.rir}</b></span>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: DIM, marginTop: 2 }}>{tw.rationale}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* Канон ПЛ-авто ↔ интеллектуальные тренировки — соответствие кривых */}
+        {plan && canonicalCurve && (
+          <div style={CARD}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 6 }}>🔗 Канон ПЛ-авто (соответствие) {plPeakCycleId ? `· из цикла ${plPeakCycleId}` : '· режим pl'}</div>
+            <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>Кривая тапера здесь = кривая в ПЛ-авто (lms-taper.engine). Интеллектуальные тренировки соответствуют ПЛ-авто — один канон, оба используют buildPLTaperCurve{plPeakCycleId ? ' + buildPeakCycleTaperCurve' : ''}.</div>
+            {canonicalCurve.map(pt => (
+              <div key={pt.week} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', gap: 8, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)', fontSize: 11 }}>
+                <span style={{ color: '#a78bfa', fontWeight: 700 }}>Нед {pt.week}</span>
+                <span style={{ color: 'rgba(255,255,255,0.7)' }}>Объём: <b style={{ color: '#fff' }}>{Math.round(pt.volumePct * 100)}%</b></span>
+                <span style={{ color: 'rgba(255,255,255,0.7)' }}>Инт.: <b style={{ color: '#fff' }}>{pt.intensityMode === 'preserve' ? 'сохр.' : Math.round(pt.intensityPct * 100) + '%'}</b></span>
+                <span style={{ color: 'rgba(255,255,255,0.7)' }}>RIR: <b style={{ color: '#fff' }}>{pt.rirTarget != null ? pt.rirTarget : `+${pt.rirShift}`}</b></span>
+                <div style={{ gridColumn: '1 / -1', fontSize: 10, color: DIM, marginTop: 2 }}>{pt.label}{pt.focus ? ` · ${pt.focus}` : ''}</div>
               </div>
             ))}
           </div>
@@ -548,8 +620,13 @@ export const TaperPlannerTab: React.FC = () => {
               <button onClick={() => applyToPlanner({ kind: 'pm', label: 'ПМ taper: ' + squat1RM + '/' + bench1RM + '/' + deadlift1RM + ' кг', data: { squat: squat1RM, bench: bench1RM, dead: deadlift1RM } })} style={{ ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000' }}>
                 🛠 Применить ПМ
               </button>
-              <button onClick={() => applyToPlanner({ kind: 'peak', label: 'Taper: объём ×' + (plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5) + ', RIR→0', data: { volumeMult: plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5, rirTarget: 0 } })} style={{ ...BTN, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff' }}>
-                🛠 Применить пик
+              <button onClick={() => {
+                const canon = canonicalCurve?.[canonicalCurve.length-1];
+                const vol = canon?.volumePct ?? plan.taperCurve[plan.taperCurve.length - 1]?.volumePctOfPeak ?? 0.5;
+                const rir = canon?.rirTarget ?? 0;
+                applyToPlanner({ kind: 'peak', label: `Taper${plPeakCycleId ? ` из цикла ${plPeakCycleId}` : ''}: объём ×${vol}${rir!=null ? `, RIR→${rir}` : ''}`, data: { volumeMult: vol, rirTarget: rir, peakCycleId: plPeakCycleId || undefined } } as any);
+              }} style={{ ...BTN, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff' }}>
+                🛠 Применить пик{plPeakCycleId ? ' (из цикла)' : ''}
               </button>
             </div>
           </div>

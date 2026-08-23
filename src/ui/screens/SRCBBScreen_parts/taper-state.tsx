@@ -38,6 +38,8 @@ export interface PLTaperState {
   meetList: PLMeetListItem[];
   setMeetList: React.Dispatch<React.SetStateAction<PLMeetListItem[]>>;
   mainMeetId: string; setMainMeetId: React.Dispatch<React.SetStateAction<string>>;
+  /** Пиковый цикл ПЛ для тапера (интеграция пиковых циклов → канон). */
+  peakCycleId: string | null; setPeakCycleId: React.Dispatch<React.SetStateAction<string | null>>;
   /** Синхронизация: локальные поля = главное соревнование. */
   applyMainMeet: (m: PLMeetListItem) => void;
   updateMainMeet: (patch: Partial<PLMeetListItem>) => void;
@@ -70,6 +72,7 @@ export function usePLTaperState(saved: any, profBodyWeight?: number): PLTaperSta
   const [peakLayout, setPeakLayout] = useState<PeakWeekLayout>(saved?.plPeakLayout ?? 'attempts');
   const [postMeetOn, setPostMeetOn] = useState<boolean>(saved?.plPostMeetOn ?? true);
   const [taperPlan, setTaperPlan] = useState<LMSBuildOutput | null>(null);
+  const [peakCycleId, setPeakCycleId] = useState<string | null>(saved?.plPeakCycleId ?? null);
 
   const applyMainMeet = (m: PLMeetListItem) => {
     setWeeksToMeet(m.weeksToStart);
@@ -110,6 +113,7 @@ export function usePLTaperState(saved: any, profBodyWeight?: number): PLTaperSta
     mockMeetOn, setMockMeetOn, meetWeekOn, setMeetWeekOn, postMeetOn, setPostMeetOn,
     taperNote, setTaperNote, taperPlan, setTaperPlan,
     meetList, setMeetList, mainMeetId, setMainMeetId,
+    peakCycleId, setPeakCycleId,
     applyMainMeet, updateMainMeet, addMeet, removeMeet,
   };
 }

@@ -34,6 +34,7 @@
 import { getPeakingProtocol } from '../peaking-protocols.engine';
 import { taperCurve, type TaperWeek } from '../pro/mesocycle-progression.engine';
 import { taperWeeksForFatigue } from '../pro/taper.engine';
+import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
 
 export type TaperMode = 'classic' | 'pl' | 'pro' | 'wf';
 export type TaperWeightGoal = 'lose' | 'gain' | 'maintain' | 'auto';
@@ -77,6 +78,8 @@ export interface TaperCurveOptions {
   fatigue?: number;
   /** Пиковая интенсивность для pro-режима (% от ПМ). */
   peakIntensityPct?: number;
+  /** Пиковый цикл ПЛ (period=peak) — если задан, кривая строится ИЗ недель цикла (интеграция пиковых циклов). */
+  peakCycleId?: string;
 }
 
 export const TAPER_MODE_LABELS: Record<TaperMode, string> = {
@@ -121,12 +124,83 @@ export function taperWeeksByFatigue(fatigue?: number): number | null {
   return taperWeeksForFatigue(Math.max(0, Math.min(100, fatigue)));
 }
 
+/** Вспомогательное для peakCycle-интеграции: построить кривую ИЗ недель цикла. */
+function buildPeakCycleCurveInline(
+  cycle: import('../../data/lms-cycles/lms-types').SRCycleTemplate,
+  taperWeeks: number,
+  weightGoal: TaperWeightGoal,
+): TaperCurvePoint[] {
+  const n = Math.max(1, Math.min(4, Math.round(taperWeeks)));
+  const wGoalMult = weightGoalVolumeMult(weightGoal);
+  const weightNote = weightGoal === 'lose' ? ' · сгонка: объём ×0.9' : weightGoal === 'gain' ? ' · набор: полный объём' : '';
+  const weeks = cycle.weeks && cycle.weeks.length > 0 ? cycle.weeks : [cycle.week1];
+  const vols = weeks.map(w => {
+    let v = 0;
+    for (const d of w) for (const e of d.exercises) for (const s of e.sets) v += s.sets;
+    return v;
+  });
+  const intensities = weeks.map(w => {
+    let sum = 0, n2 = 0;
+    for (const d of w) for (const e of d.exercises) for (const s of e.sets) { sum += s.pct * s.sets; n2 += s.sets; }
+    return n2 > 0 ? sum / n2 : 0.7;
+  });
+  const maxVol = Math.max(1, ...vols);
+  const isFlat = vols.length >= 2 && Math.max(...vols) - Math.min(...vols) < 1;
+  if (isFlat || vols.length === 1) {
+    const fixed: Record<number, number[]> = { 1: [0.45], 2: [0.65, 0.45], 3: [0.85, 0.65, 0.45], 4: [0.85, 0.75, 0.60, 0.45] };
+    const cur = fixed[n] ?? [0.65, 0.45];
+    return cur.map((v, i) => {
+      const rirShift = i === cur.length - 1 ? 2 : 1;
+      return {
+        week: i + 1,
+        volumePct: r2(v * wGoalMult),
+        intensityPct: 1,
+        intensityMode: 'preserve' as const,
+        rirShift,
+        label: (i === cur.length - 1 ? 'Финальная' : i === cur.length - 2 ? 'Предпоследняя' : `Нед ${i + 1}`) + ` · из цикла «${cycle.meta.title}»` + weightNote,
+        focus: `Пиковый цикл «${cycle.meta.title}» (плоский объём — классическая кривая).`,
+      };
+    });
+  }
+  const start = Math.max(0, weeks.length - n);
+  const sliceVol = vols.slice(start);
+  const sliceInt = intensities.slice(start);
+  return sliceVol.map((v, i) => {
+    const volumePct = r2(Math.max(0.3, Math.min(1, v / maxVol)) * wGoalMult);
+    const avgPct = sliceInt[i];
+    const rirTarget = avgPct >= 0.88 ? (i === sliceVol.length - 1 ? 0 : 1) : avgPct >= 0.75 ? 2 : 2;
+    const intensityPct = avgPct > 0 ? r2(avgPct) : 1;
+    const label = i === sliceVol.length - 1 ? 'Соревновательная' : i === sliceVol.length - 2 ? 'Предсоревновательная' : `Нед ${i + 1}`;
+    return {
+      week: i + 1,
+      volumePct,
+      intensityPct,
+      intensityMode: 'set_pct' as const,
+      rirShift: 1,
+      rirTarget,
+      label: `${label} · из цикла «${cycle.meta.title}»` + weightNote,
+      focus: `Объём ${Math.round((v / maxVol) * 100)}% от пика цикла, инт. ${Math.round(avgPct * 100)}%`,
+      warmupOnly: i === sliceVol.length - 1 && avgPct >= 0.95,
+      singles: avgPct >= 0.90 && i === sliceVol.length - 2,
+    };
+  });
+}
+
 /**
  * Каноническая кривая тапера. Все потребители ПЛ-авто обязаны строить
  * тапер-недели из этой кривой, чтобы цифры в UI и плане не расходились.
+ * Если задан peakCycleId — кривая берётся ИЗ пикового цикла (pl-peak-cycle-taper).
  */
 export function buildPLTaperCurve(opts: TaperCurveOptions): TaperCurvePoint[] {
-  const { taperWeeks, mode = 'classic', weightGoal = 'maintain', fatigue, peakIntensityPct = 0.92 } = opts;
+  const { taperWeeks, mode = 'classic', weightGoal = 'maintain', fatigue, peakIntensityPct = 0.92, peakCycleId } = opts;
+  // Интеграция пиковых циклов: если указан peakCycleId — кривая из цикла, а не из протокола.
+  if (peakCycleId) {
+    const c = getCycleById(peakCycleId);
+    if (c && c.meta.period === 'peak' && normalizeCycleDirection(c.meta.direction) !== 'bodybuilding') {
+      const cur = buildPeakCycleCurveInline(c, taperWeeks, weightGoal as TaperWeightGoal);
+      if (cur.length > 0) return cur;
+    }
+  }
   // classic допускает длинные плавные кривые (вход в пик «весь окно = тапер»);
   // pl/pro/wf — фиксированные протоколы (не растягиваются сверх своей длины).
   const n = Math.max(1, Math.min(mode === 'classic' ? 12 : 4, Math.round(taperWeeks)));

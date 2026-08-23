@@ -96,6 +96,8 @@ export interface LMSBuildInput {
   peakMode?: TaperMode;
   /** Число авто-тапер-недель при сборке (по умолчанию 2). */
   taperWeeks?: number;
+  /** Пиковый цикл ПЛ для тапера (если задан — кривая из цикла, интеграция пиковых циклов). */
+  peakCycleId?: string;
 }
 
 
@@ -1561,7 +1563,7 @@ export function buildLMSPlan(input: LMSBuildInput): LMSBuildOutput {
   // Применяется только для auto-прогрессирующих циклов (не faithful) и при отсутствии ACWR-deload.
   // B1: уважает выбранную модель (peakMode) и число недель (taperWeeks) вместо хардкода classic/2.
   const taperedWeeks = (!faithful && !hasExplicitWeeks && totalWeeks >= 4 && !acwrDeload)
-    ? applyPLTaper(weeks, totalWeeks, { taperWeeks: input.taperWeeks, mode: input.peakMode })
+    ? applyPLTaper(weeks, totalWeeks, { taperWeeks: input.taperWeeks, mode: input.peakMode, peakCycleId: input.peakCycleId })
     : weeks;
 
   const taperNote = taperedWeeks !== weeks ? ' 📉 Taper: финальные недели — объём ↓, интенсивность сохранена (Bosquet 2005).' : '';
@@ -1607,7 +1609,7 @@ export function computeMeetAttemptsFromPmRow(pmRow: Record<string, number>, stra
 function applyPLTaper(
   weeks: LMSPlanWeek[],
   totalWeeks: number,
-  opts?: { taperWeeks?: number; mode?: TaperMode },
+  opts?: { taperWeeks?: number; mode?: TaperMode; peakCycleId?: string },
 ): LMSPlanWeek[] {
   if (weeks.length < 4) return weeks;
   const lastIdx = weeks.length - 1;
@@ -1616,6 +1618,7 @@ function applyPLTaper(
   const curve = buildPLTaperCurve({
     taperWeeks: opts?.taperWeeks ?? 2,
     mode: opts?.mode ?? 'classic',
+    peakCycleId: opts?.peakCycleId,
   });
   // Сколько финальных недель режем: последние N точек кривой (финал — самый глубокий).
   const n = Math.min(curve.length, Math.max(1, weeks.length - 1));
@@ -1757,6 +1760,8 @@ export function appendPLTaperWeeks(
     reference?: string;
     /** Весь окно = непрерывный тапер (без отдельного «входа в пик»). */
     wholeWindowAsTaper?: boolean;
+    /** Пиковый цикл ПЛ — если задан, кривая тапера берётся из него (интеграция). */
+    peakCycleId?: string;
   },
 ): LMSBuildOutput {
   if (!plan || taperWeeks < 1 || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return plan;
@@ -1805,11 +1810,12 @@ export function appendPLTaperWeeks(
         meetWeek: !!opts?.meetWeek,
         postMeet: !!opts?.postMeet,
         wholeWindowAsTaper: opts?.wholeWindowAsTaper,
+        peakCycleId: opts?.peakCycleId,
       })
     : null;
   const taperCurvePoints = layout
     ? layout.curve
-    : buildPLTaperCurve({ taperWeeks, mode: opts?.peakMode ?? 'classic', weightGoal: opts?.weightGoal });
+    : buildPLTaperCurve({ taperWeeks, mode: opts?.peakMode ?? 'classic', weightGoal: opts?.weightGoal, peakCycleId: opts?.peakCycleId });
   const taperWeeksEff = layout ? layout.taperWeeks : taperWeeks;
   const rampWeeksEff = layout ? layout.rampWeeks : 0;
   const blockWarnings = layout ? layout.warnings : [];
@@ -2232,6 +2238,7 @@ export function appendPLTaperWeeks(
   const windowNote = layout
     ? ` 🗓 Пик-блок по окну до старта (${layout.windowWeeks} нед): ${layout.summary}.${rampWeeksEff > 0 ? ` Вход в пик ${rampWeeksEff} нед — объём плавно ↓, интенсивность сохранена.` : ''}`
     : '';
+  const cycleNote = opts?.peakCycleId ? ` 🏆 Пиковый цикл «${opts.peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : '';
 
   // Отчёт качества (Объём vs MRV) пересчитывается с учётом taper-недель
   // и PED-множителя — иначе peakWeek/статусы остаются от исходного плана.
@@ -2256,6 +2263,7 @@ export function appendPLTaperWeeks(
       meetNote +
       postMeetNote +
       peakNote +
+      cycleNote +
       pedNote +
       nutritionTaperNote +
       autoRegNote +

@@ -24,6 +24,7 @@ import { buildPLTaperPrintHtml, buildPLPeakWeekCutProtocol } from '../../../engi
 import { PopupNumber, PopupSelect, ExpandableCard } from './TrainingPopups';
 import { TaperCoachCard } from './TaperCoachCard';
 import { usePLTaper } from './taper-state';
+import { getPeakCycles } from '../../../engines/lms/pl-peak-cycle-taper.engine';
 
 const BTN: React.CSSProperties = { background: '#00e68a', color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: '#00e68a', border: '1px solid var(--accent-dim)' };
@@ -78,6 +79,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     taperAttemptOverride, setTaperAttemptOverride,
     mockMeetOn, setMockMeetOn, meetWeekOn, setMeetWeekOn, postMeetOn, setPostMeetOn,
     taperNote, setTaperNote, taperPlan, setTaperPlan,
+    peakCycleId, setPeakCycleId,
   } = t;
   const { peds, pedDoses, courseIntensity, pedAuto, autoRegMode, autoRegResult, plCalorieSurplus, plProteinPerKg, selectedCycleId, pmSquat, pmBench, pmDead } = cyc;
   const setAutoRegMode = (mode: AutoRegMode) => {
@@ -87,6 +89,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
   };
   // A1: предпросмотр пик-блока по окну до старта (weeksToMeet) — блок = вход в пик +
   // mock + глубокий тапер + соревнования (+ пост после окна). Показывает, что окно реально работает.
+  // Интеграция пиковых циклов: если выбран peakCycleId — кривая тапера берётся ИЗ цикла.
   const peakPreview = React.useMemo(() => buildPLPeakBlockLayout({
     windowWeeks: weeksToMeet,
     taperWeeks: taperWeeksToAdd,
@@ -95,7 +98,8 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
     mockMeet: mockMeetOn,
     meetWeek: meetWeekOn,
     postMeet: postMeetOn,
-  }), [weeksToMeet, taperWeeksToAdd, peakMode, taperWeightGoal, mockMeetOn, meetWeekOn, postMeetOn]);
+    peakCycleId: peakCycleId ?? undefined,
+  }), [weeksToMeet, taperWeeksToAdd, peakMode, taperWeightGoal, mockMeetOn, meetWeekOn, postMeetOn, peakCycleId]);
   // C1: дата старта (ISO) — реверс от неё календарной разметки недель блока.
   // P2-6: реальная дата старта (ISO) — реверс календарной разметки от неё.
   const derivedMeetDate = (() => {
@@ -137,6 +141,7 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
         postMeet: postMeetOn,
         windowWeeks: weeksToMeet,
         seasonStart: meetDateInput || undefined,
+        peakCycleId: peakCycleId ?? undefined,
       });
       if (res.weeks.length === 0) { onNote('⚠ Не удалось построить сезон — нет базового плана.'); return; }
       const sessions = res.weeks.flatMap(wk => wk.days.map(d => d.exercises.map(ex => ({
@@ -288,6 +293,16 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
           { id: 'pro', label: '🎯 Про (усталость-зависимый, прайминг)' },
           { id: 'wf', label: '🎢 Classic WF (4 нед: перегрузка → суперкомпенсация)' },
         ] as { id: TaperMode; label: string }[])} />
+        <PopupSelect
+          label="🏆 Пиковый цикл ПЛ (интеграция)"
+          value={peakCycleId ?? ''}
+          onChange={v => setPeakCycleId(v || null)}
+          hint="Если выбран — кривая тапера берётся ИЗ недель пикового цикла (объём/intensity по фактическим сетам, канон buildPeakCycleTaperCurve). Без выбора — каноническая кривая по режиму. Интеграция: тапер-пик соответствует пиковому циклу."
+          options={[
+            { id: '', label: '— каноническая кривая (по режиму) —', desc: 'classic/pl/pro/wf' },
+            ...getPeakCycles().map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${c.meta.weeks} нед · ${c.meta.level}` })),
+          ]}
+        />
         <PopupSelect label="Раскладка финальной недели" value={peakLayout} onChange={v => setPeakLayout(v as PeakWeekLayout)} hint="Attempts: прикиды соревновательного дня на финальной тапер-неделе (опенер/вторая/третья). Light: только разминка 50/70/90% без прикидов — для контрольных стартов" options={([
           { id: 'attempts', label: '🏁 Прикиды соревновательного дня' },
           { id: 'light', label: '🎭 Только разминка (без прикидов)' },
@@ -337,11 +352,13 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               peakLayout,
               windowWeeks: weeksToMeet,
               reference: meetRef,
+              peakCycleId: peakCycleId ?? undefined,
             });
             setTaperPlan(next);
             const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
-            setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${peakMode === 'pl' ? ' · 🏁 ПЛ-пик-протокол' : peakMode === 'pro' ? ' · 🎯 про-тапер' : ' · 📉 классика'}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''}${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}${autoRegMode === 'auto' ? ' · auto-regime: top-set×' + (autoRegResult?.topSetPctMultiplier ?? 1).toFixed(2) + ' · объём×' + (autoRegResult?.volumeMultiplier ?? 1).toFixed(2) + ' · RIR+' + (autoRegResult?.rirShift ?? 0) : ''}${autoRegMode === 'diary' ? ' · diary-regime active' : ''}`);
-            onNote(`📋 Тапер-план готов (отдельная карточка — цикл не изменён).${peakMode === 'pl' ? ' Режим: ПЛ-пик-протокол (объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR→0).' : peakMode === 'pro' ? ' Режим: про-тапер (усталость-зависимый, прайминг).' : ' Режим: классический тапер (Bosquet, интенсивность сохранена).'}${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${Object.keys(meetData.actualPm).length ? ' Тренировочные веса тапера от фактического ПМ после цикла.' : ''}${Object.keys(meetData.plannedPm).length ? ' Прикиды/попытки от планируемого ПМ федерации.' : ''} Чтобы встроить в weeks цикла — «Встроить в план».`);
+            const cycNote = peakCycleId ? ` · 🏆 из цикла «${peakCycleId}»` : '';
+            setTaperNote(`Тапер-план сгенерирован: +${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${peakMode === 'pl' ? ' · 🏁 ПЛ-пик-протокол' : peakMode === 'pro' ? ' · 🎯 про-тапер' : ' · 📉 классика'}${cycNote}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''}${Object.keys(meetData.actualPm).length ? ' · по факт. ПМ после цикла' : ''}${Object.keys(meetData.plannedPm).length ? ' · прикиды от плана федерации' : ''} · пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}${autoRegMode === 'auto' ? ' · auto-regime: top-set×' + (autoRegResult?.topSetPctMultiplier ?? 1).toFixed(2) + ' · объём×' + (autoRegResult?.volumeMultiplier ?? 1).toFixed(2) + ' · RIR+' + (autoRegResult?.rirShift ?? 0) : ''}${autoRegMode === 'diary' ? ' · diary-regime active' : ''}`);
+            onNote(`📋 Тапер-план готов (отдельная карточка — цикл не изменён).${peakCycleId ? ` Пиковый цикл «${peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : peakMode === 'pl' ? ' Режим: ПЛ-пик-протокол (объём 85/75/60%, интенсивность 90/95/100% ПМ, RIR→0).' : peakMode === 'pro' ? ' Режим: про-тапер (усталость-зависимый, прайминг).' : ' Режим: классический тапер (Bosquet, интенсивность сохранена).'}${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${Object.keys(meetData.actualPm).length ? ' Тренировочные веса тапера от фактического ПМ после цикла.' : ''}${Object.keys(meetData.plannedPm).length ? ' Прикиды/попытки от планируемого ПМ федерации.' : ''} Чтобы встроить в weeks цикла — «Встроить в план».`);
           }}
           style={{ ...BTN_GHOST, alignSelf: 'flex-end', minHeight: 44, fontSize: 11, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
           title="Сгенерировать тапер-план в ОТДЕЛЬНУЮ карточку (не встраивая в weeks цикла) — под разницу ПМ: факт после цикла / план федерации"
@@ -483,11 +500,13 @@ export const PLCompetitionTab: React.FC<{ api: PLCompetitionTabApi }> = ({ api }
               peakLayout,
               windowWeeks: weeksToMeet,
               reference: meetRef,
+              peakCycleId: peakCycleId ?? undefined,
             });
             setBuiltSrc(next);
             const addCount = (mockMeetOn ? 1 : 0) + taperWeeksToAdd + (meetWeekOn ? 1 : 0) + (postMeetOn ? 1 : 0);
-            setTaperNote(`+${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''} · 🏁 пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
-            onNote(`📉 Пик-блок применён к активному циклу по окну ${weeksToMeet} нед: ${peakPreview.summary}${peakPreview.warnings.length ? ' ⚠ ' + peakPreview.warnings.join(' ⚠ ') : ''} — ${peakMode === 'pl' ? 'ПЛ-пик-протокол (объём 85/75/60%, инт. 90/95/100%)' : peakMode === 'pro' ? 'про-тапер (усталость-зависимый)' : 'объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005)'}.${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''}${meetWeekOn ? ' 🏁 Неделя соревнований добавлена в конец — прикиды как подходы дня старта.' : ''}${postMeetOn ? ' 🔄 Пост-соревновательная неделя: объём ×0.5, RIR +3.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''} → откройте «📋 План цикла», чтобы увидеть результат.`);
+            const cycNote2 = peakCycleId ? ` · 🏆 из цикла «${peakCycleId}»` : '';
+            setTaperNote(`+${addCount} нед${mockMeetOn ? ' · 🎯 mock meet' : ''}${meetWeekOn ? ' · 🏁 соревнования' : ''}${postMeetOn ? ' · 🔄 пост-старт' : ''}${pedAuto && peds.length > 0 ? ' · 💉 PED-адаптация как в цикле' : ''}${cycNote2}${taperWeightGoal === 'lose' ? ' · ⬇ сгонка' : taperWeightGoal === 'gain' ? ' · ⬆ набор' : ''} · 🏁 пик ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}`);
+            onNote(`📉 Пик-блок применён к активному циклу по окну ${weeksToMeet} нед: ${peakPreview.summary}${peakPreview.warnings.length ? ' ⚠ ' + peakPreview.warnings.join(' ⚠ ') : ''} — ${peakCycleId ? `пиковый цикл «${peakCycleId}» — кривая тапера из цикла (соответствует ПЛ-авто).` : peakMode === 'pl' ? 'ПЛ-пик-протокол (объём 85/75/60%, инт. 90/95/100%)' : peakMode === 'pro' ? 'про-тапер (усталость-зависимый)' : 'объём ×0.65/×0.45, RIR +1/+2 (Bosquet 2005)'}.${taperWeightGoal === 'lose' ? ' Весовая цель: сгонка — объём ×0.9.' : taperWeightGoal === 'gain' ? ' Весовая цель: набор — полный объём.' : ''}${mockMeetOn ? ' 🎯 Имитация соревнований (mock meet) добавлена перед тапером — прикиды-синглы.' : ''}${meetWeekOn ? ' 🏁 Неделя соревнований добавлена в конец — прикиды как подходы дня старта.' : ''}${postMeetOn ? ' 🔄 Пост-соревновательная неделя: объём ×0.5, RIR +3.' : ''} 🏁 Выход на пик: прикиды дня соревнований (${MEET_STRATEGY_LABEL[attemptStrategy]}, ${MEET_STRATEGY_PCT_LABEL[attemptStrategy]}) на финальной тапер-неделе.${pedAuto && peds.length > 0 ? ' 💉 PED-адаптация та же, что в цикле: прогрессия ПМ продолжена по курсу, adaptForPEDs (MRV/восст).' : ''} → откройте «📋 План цикла», чтобы увидеть результат.`);
           }}
           style={{ ...BTN_GHOST, flex: 1, minHeight: 44, border: builtSrc ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.08)', color: builtSrc ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: 700, background: builtSrc ? 'rgba(245,158,11,0.1)' : 'transparent' }}
           title={builtSrc ? `Построить пик-блок на окно ${weeksToMeet} нед до старта: вход в пик + mock + глубокий тапер (${taperWeeksToAdd} нед) + соревнования${postMeetOn ? ' + пост-старт' : ''}${pedAuto && peds.length > 0 ? ' (с учётом PED-курса)' : ''}` : 'Сначала сгенерируйте план'}
