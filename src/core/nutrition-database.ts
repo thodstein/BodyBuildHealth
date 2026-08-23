@@ -405,7 +405,7 @@ export const FOOD_DB: FoodItem[] = [
     description: 'Средний — ниже GI, больше клетчатки и микроэлементов (Mg, Zn, Se). Стабильная энергия.',
     bestFor: ['maintenance', 'recomp'], timing: 'lunch', pharmaNote: 'Mg в буром рисе — дополнительный источник при дефиците от кленбутерола', tier: 'mid',
     micros: { Ca: 10, Fe: 0.4, Mg: 44, P: 150, K: 79, Na: 5, Zn: 0.6, Se: 12, VitB1: 0.19, VitB3: 2.6, VitB6: 0.15 } },
-  { id: 'oats', name: 'Овсянка (сухая)', category: 'grain', kcal: 367, protein: 13, fat: 7, carbs: 60, fiber: 10, gi: 55, servingSize: '40 г (сухого)', foodState: 'dry',
+  { id: 'oats', name: 'Овсянка (на воде)', category: 'grain', kcal: 71, protein: 2.5, fat: 1.4, carbs: 12, fiber: 1.7, gi: 55, servingSize: '100 г',
     description: 'Базовый утренний углевод — β-глюкан снижает холестерин, стабилизирует сахар. Долгое насыщение.',
     bestFor: ['bulk', 'maintenance', 'recomp'], timing: 'morning', pharmaNote: 'β-глюкан синергичен с телмисартаном — снижение холестерина', tier: 'basic',
     micros: { Ca: 54, Fe: 4.7, Mg: 177, P: 410, K: 400, Na: 2, Zn: 3.9, Se: 34, VitB1: 0.76, VitB3: 0.9, VitB6: 0.12 } },
