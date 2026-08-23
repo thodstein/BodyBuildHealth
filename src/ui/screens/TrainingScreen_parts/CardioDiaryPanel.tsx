@@ -180,12 +180,41 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
     flashMsg(editingId ? '✏️ Сессия обновлена' : '💾 Сессия записана');
   };
 
+  const csvEscape = (v: unknown) => {
+    const s = String(v ?? '');
+    return `"${(/^[=+\-@]/.test(s) ? "'" + s : s).replace(/"/g, '""')}"`;
+  };
+
+  const exportCsv = () => {
+    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС,RPE,Завершено\n';
+    const body = log.map(e =>
+      [e.date, TYPE_LABEL[e.type], e.durationMin, e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '', e.completed ? 'да' : 'нет'].map(csvEscape).join(','),
+    ).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff' + head + body], { type: 'text/csv' }));
+    a.download = `cardio-log-${todayIso()}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    flashMsg('📥 CSV экспортирован');
+  };
+
+  const exportJson = () => {
+    const data = JSON.stringify(log, null, 2);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    a.download = `cardio-log-${todayIso()}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    flashMsg('📥 JSON экспортирован');
+  };
+
   return (
     <div style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>📓 Дневник выполнения кардио</span>
-        <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : 'rgba(255,255,255,0.55)'}>🔥 стрик {streak.current}д · лучший {streak.best}д</Badge>
-        <button style={BTN_SMALL} onClick={shareWeek} title="Скопировать недельный отчет">📋 Поделиться неделей</button>
+        <Badge bg={streak.current >= 3 ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)'} border={streak.current >= 3 ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'} color={streak.current >= 3 ? '#4ade80' : 'rgba(255,255,255,0.55)'}>🔥 стрик {streak.current}д</Badge>
+        <button style={BTN_SMALL} onClick={exportCsv} title="Экспорт в CSV">📥 CSV</button>
+        <button style={BTN_SMALL} onClick={exportJson} title="Экспорт в JSON">📥 JSON</button>
         {undoPrev && (
           <button style={{ ...BTN, minHeight: 30, padding: '4px 10px', fontSize: 10 }} onClick={() => { const restored = replaceCardioLog(undoPrev); commitLog(restored); setUndoPrev(null); flashMsg('↩ Отменено'); }} aria-label="Отменить последнее изменение">↩ Отменить</button>
         )}

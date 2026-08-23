@@ -15,7 +15,7 @@ import {
 import { CardioVolumeChart } from './CardioVolumeChart';
 import { CardioProgressCard } from './CardioProgressCard';
 import { CARD, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, PHASE_COLOR, PHASE_BG, TYPE_COLOR, Badge, ProgressBar, Stepper } from './CardioUI';
-const CardioCalendar = React.lazy(() => import('./CardioCalendar').then(m => ({ default: m.CardioCalendar })) );
+import { CardioCalendar } from './CardioCalendar';
 
 const VARIANT_BTN: React.CSSProperties = {
   flex: '1 1 100px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
