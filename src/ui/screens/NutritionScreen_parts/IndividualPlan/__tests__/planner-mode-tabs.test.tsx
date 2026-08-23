@@ -2,7 +2,7 @@
  * planner-mode-tabs.test.tsx — проверка поведения режимов планировщика в UI:
  * - pro: видны все 6 вкладок и продвинутые карточки настроек;
  * - simple: скрыты Отчёт/Нагрузка/Тапер и продвинутые карточки (v2 Скоринг, Фаза и препараты);
- * - minimal: остаётся только вкладка «Настройки», 3 цели (масса/сушка/поддержание), ручное КБЖУ.
+ * - minimal: остаются вкладки «Настройки» + «План» (быстрый должен показывать план), 3 цели (масса/сушка/поддержание), ручное КБЖУ.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -68,10 +68,10 @@ describe('планировщик: быстрый (minimal) режим', () => {
     try { localStorage.setItem('he_planner_mode', 'minimal'); } catch {}
   });
 
-  it('остаётся только вкладка «Настройки»', () => {
+  it('остаётся вкладка «Настройки» + «План» (быстрый режим должен показывать план)', () => {
     render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
     expect(hasButton(/Настройки/)).toBe(true);
-    expect(hasButton(/План/)).toBe(false);
+    expect(hasButton(/План/)).toBe(true);
     expect(hasButton(/Компоновщик/)).toBe(false);
     expect(hasButton(/Отчёт/)).toBe(false);
   });

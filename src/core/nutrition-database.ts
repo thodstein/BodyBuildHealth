@@ -388,7 +388,7 @@ export const FOOD_DB: FoodItem[] = [
     description: 'Средний — нежирная свинина, богата тиамином (B1), цинком. Хорошая альтернатива курице.',
     bestFor: ['bulk', 'maintenance'], timing: 'lunch', pharmaNote: 'B1 поддерживает нервную систему при курсе ААС', tier: 'mid',
     micros: { Ca: 6, Fe: 0.9, Mg: 28, P: 230, K: 370, Na: 52, Zn: 2.4, Se: 33, VitB1: 0.9, VitB6: 0.5, VitB12: 0.6 } },
-  { id: 'whey_protein', name: 'Протеин сывороточный (1 скуп)', category: 'supplement', kcal: 400, protein: 80, fat: 5, carbs: 6.7, fiber: 0, gi: 15, servingSize: '30 г', foodState: 'powder',
+  { id: 'whey_protein', name: 'Протеин сывороточный', category: 'supplement', kcal: 400, protein: 80, fat: 5, carbs: 6.7, fiber: 0, gi: 15, servingSize: '30 г (1 скуп)', foodState: 'powder',
     description: 'Базовая добавка — быстрый аминокислотный пик через 30 мин. Leucine 2.5 г — триггер mTOR для синтеза мышц. per100 порошка.',
     bestFor: ['bulk', 'cut', 'recomp', 'strength'], timing: 'after_train', pharmaNote: 'Усвоение ускоряется при приёме с углеводами', tier: 'basic',
     micros: { Ca: 890, Fe: 3.3, Mg: 443, P: 1777, K: 1667, Na: 2223, Zn: 16.7, VitB2: 2.23 } },

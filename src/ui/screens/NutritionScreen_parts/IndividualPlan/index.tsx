@@ -50,11 +50,11 @@ const TAB_META: { key: PlanTab; label: string; icon: string }[] = [
 ];
 
 // Вкладки по режиму: pro — все; simple — только базовые (без Отчёта/Нагрузки/Тапера);
-// minimal — только Настройки. Скрытые вкладки убирают лишнюю информацию и «раздутый» интерфейс.
+// minimal (быстрый) — Настройки + План (иначе план не видно и кажется что не генерируется).
 const isTabAllowed = (key: PlanTab, mode: PlannerMode): boolean => {
   if (mode === 'pro') return true;
   if (mode === 'simple') return key === 'settings' || key === 'plan' || key === 'composer';
-  return key === 'settings';
+  return key === 'settings' || key === 'plan';
 };
 
 const IndividualPlanInner: React.FC = () => {

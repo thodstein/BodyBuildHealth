@@ -382,7 +382,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try { return localStorage.getItem('he_peak_week') === 'true'; } catch {}
     return false;
   });
-  useEffect(() => { try { updateSection('goals', { peakWeek: peakWeekEnabled }); } catch {} }, [peakWeekEnabled]);
+  useEffect(() => { try { updateSection('goals', { peakWeek: peakWeekEnabled }); } catch {} if (!peakWeekEnabled) setBBPrepPlan(null); }, [peakWeekEnabled]);
   const [peakWeekShowDay, setPeakWeekShowDay] = useState<number>(() => {
     try {
       const v = (s as any)?.goals?.peakShowDay;
