@@ -72,6 +72,8 @@ import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL } from './training-ui';
+import { ManualHeader, ManualStepper, InfoBanner, SectionCard, Badge, ProgressBar } from './ManualUI';
+import { ManualLibraryGallery } from './ManualLibraryGallery';
 import { EditorPopupSelect } from './EditorPopup';
 import { GROUP_RU } from './program-types';
 import { labTrainingAdjust } from './lab-training-adjust';
@@ -241,13 +243,15 @@ export const ProgramManagerPanel: React.FC = () => {
   }, [editing]);
 
   const renderMstepNav = () => (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-      {MSTEP_LIST.map(s => (
-        <button key={s} onClick={() => { if ((s === 'editor' || s === 'final') && !editing) return; setMstep(s); }} style={STEP_PILL(mstep === s)}>
-          {MSTEP_LABELS[s]}
-        </button>
-      ))}
-    </div>
+    <ManualStepper
+      steps={MSTEP_LIST.map(s => ({ id: s, label: MSTEP_LABELS[s] }))}
+      active={mstep}
+      onChange={(id) => {
+        if ((id === 'editor' || id === 'final') && !editing) return;
+        setMstep(id as MStep);
+      }}
+      disabledIds={!editing ? new Set(['editor', 'final']) : undefined}
+    />
   );
 
   // F3.1: Undo/Redo history через useProgramUndo hook (извлечено из inline-кода)
@@ -694,9 +698,20 @@ export const ProgramManagerPanel: React.FC = () => {
   };
 
   if (editing) {
+    const _mstepIdx = MSTEP_LIST.indexOf(mstep);
+    const _mstepLabel = MSTEP_LABELS[mstep];
     if (mstep === 'final') {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <ManualHeader
+            title={`✋ Ручной конструктор — ${editing.meta.title || 'Программа'}`}
+            subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${GOAL_OPTS.find(g=>g.id===editing.meta.goal)?.label ?? editing.meta.goal} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
+            progress={{ current: _mstepIdx + 1, total: MSTEP_LIST.length, label: _mstepLabel }}
+            chips={[
+              { label: DIR_LABEL[editing.meta.direction] ?? editing.meta.direction, color: DIR_COLOR[editing.meta.direction] },
+              { label: editing.meta.level, color: '#fff' },
+            ]}
+          />
           {renderMstepNav()}
           {renderFinalStep()}
         </div>
@@ -704,6 +719,15 @@ export const ProgramManagerPanel: React.FC = () => {
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <ManualHeader
+          title={`✋ Ручной конструктор — ${editing.meta.title || 'Программа'}`}
+          subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${GOAL_OPTS.find(g=>g.id===editing.meta.goal)?.label ?? editing.meta.goal} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
+          progress={{ current: _mstepIdx + 1, total: MSTEP_LIST.length, label: _mstepLabel }}
+          chips={[
+            { label: DIR_LABEL[editing.meta.direction] ?? editing.meta.direction, color: DIR_COLOR[editing.meta.direction] },
+            { label: editing.meta.level, color: '#fff' },
+          ]}
+        />
         {renderMstepNav()}
         <ProgramEditor
           program={editing}
@@ -802,15 +826,13 @@ export const ProgramManagerPanel: React.FC = () => {
   if (programs.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <ManualHeader
+          title="✋ Ручной конструктор программ"
+          subtitle="Соберите программу с нуля, клонируйте из библиотеки 29 шаблонов или подключите LMS-цикл 66 — сеты, RIR, вес и отдых настраиваются вручную или в 1 клик из профиля."
+          progress={{ current: 1, total: 3, label: 'Выбор' }}
+          chips={[{ label: '29 шаблонов', color: '#00e68a' }, { label: '66 циклов', color: '#a78bfa' }]}
+        />
         {renderMstepNav()}
-        <div style={{ padding: '14px 12px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.10))', border: '1px solid rgba(0,230,138,0.25)' }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>✋ Ручной конструктор программ</div>
-          <div style={{ fontSize: 11, color: '#fff', marginTop: 4, lineHeight: 1.45 }}>
-            Здесь вы сами собираете программу: выбираете упражнения, ставите сеты,
-            RIR, вес, отдых. Можно создать с нуля, загрузить готовую для правки или
-            подключить LMS-цикл и поверх него сделать свой оверлей.
-          </div>
-        </div>
 
         {/* Онбординг при первом запуске: как работает конструктор */}
         {onboardingOpen && (
@@ -892,23 +914,16 @@ export const ProgramManagerPanel: React.FC = () => {
         {/* P2.1: Визард создания программы (модал для пустого состояния) */}
         <ManualProgramWizard open={wizardOpen} step={wizardStep} direction={wizardDir} goal={wizardGoal} level={wizardLevel} days={wizardDays} weeks={wizardWeeks} pro={manualMode === 'pro'} onClose={() => setWizardOpen(false)} onStep={setWizardStep} onDirection={setWizardDirection} onGoal={setWizardGoal} onLevel={setWizardLevel} onDays={setWizardDays} onWeeks={setWizardWeeks} onCreate={finishWizard} />
 
-        {/* Пикеры: Библиотека ББ / LMS-цикл (модалы для пустого состояния) */}
+        {/* Пикеры: Библиотека ББ / LMS-цикл — единая галерея */}
         {pickerOpen === 'bb' && (
-          <TrainingModal title="📚 Библиотека программ" onClose={() => setPickerOpen(null)}>
-            <BbProgramLibraryPicker value={null} label="Выбрать программу" programs={allLibraryPrograms} onSelect={startCloneLibrary} />
+          <TrainingModal title="📚 Библиотека + 🟣 ПЛ-циклы — галерея" onClose={() => setPickerOpen(null)}>
+            <ManualLibraryGallery bbPrograms={allLibraryPrograms} plCycles={plCycles as any} onSelectBB={(p) => { startCloneLibrary(p); setPickerOpen(null); }} onSelectPL={(id) => { startCloneCycle(id); setPickerOpen(null); }} />
           </TrainingModal>
         )}
 
         {pickerOpen === 'pl' && (
-          <TrainingModal title="🟣 Проф. LMS-циклы (immutable)" onClose={() => setPickerOpen(null)}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
-              {plCycles.map(c => (
-                <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer', minHeight: 44 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{c.meta.title}</div>
-                  <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {periodLabelRu(c.meta.period)}</div>
-                </button>
-              ))}
-            </div>
+          <TrainingModal title="📚 Библиотека + 🟣 ПЛ-циклы — галерея" onClose={() => setPickerOpen(null)}>
+            <ManualLibraryGallery bbPrograms={allLibraryPrograms} plCycles={plCycles as any} onSelectBB={(p) => { startCloneLibrary(p); setPickerOpen(null); }} onSelectPL={(id) => { startCloneCycle(id); setPickerOpen(null); }} />
           </TrainingModal>
         )}
       </div>
@@ -917,11 +932,13 @@ export const ProgramManagerPanel: React.FC = () => {
 
   return (
     <div className="manual-constructor" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <ManualHeader
+        title={`✋ Ручной конструктор — Мои программы (${programs.length})`}
+        subtitle="Создавайте с нуля, клонируйте из библиотеки или подключайте LMS-циклы — процентовки цикла не меняются, ваш оверлей сверху."
+        progress={{ current: 1, total: 3, label: 'Выбор' }}
+        chips={[{ label: `${programs.length} сохранено`, color: '#00e68a' }, { label: 'Выбор', color: '#fff' }]}
+      />
       {renderMstepNav()}
-      <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>✋ Ручной конструктор — Мои программы ({programs.length})</div>
-      <div style={{ fontSize: 11, color: DIM }}>
-        Создавайте программы с нуля, клонируйте готовые из библиотеки или подключайте LMS-циклы (без изменения их процентовок).
-      </div>
 
       {/* Онбординг при первом запуске: как работает конструктор */}
       {onboardingOpen && (
@@ -1224,22 +1241,9 @@ export const ProgramManagerPanel: React.FC = () => {
       {wizardOpen && (
         <ManualProgramWizard embedded open={wizardOpen} step={wizardStep} direction={wizardDir} goal={wizardGoal} level={wizardLevel} days={wizardDays} weeks={wizardWeeks} pro={manualMode === 'pro'} onClose={() => setWizardOpen(false)} onStep={setWizardStep} onDirection={setWizardDirection} onGoal={setWizardGoal} onLevel={setWizardLevel} onDays={setWizardDays} onWeeks={setWizardWeeks} onCreate={finishWizard} />
       )}
-      {pickerOpen === 'bb' && (
-        <TrainingModal title="📚 Библиотека программ" onClose={() => setPickerOpen(null)}>
-          <BbProgramLibraryPicker value={null} label="Выбрать программу" programs={allLibraryPrograms} onSelect={startCloneLibrary} />
-        </TrainingModal>
-      )}
-
-      {pickerOpen === 'pl' && (
-        <TrainingModal title="🟣 Проф. ПЛ-циклы (immutable)" onClose={() => setPickerOpen(null)}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 360, overflowY: 'auto' }}>
-            {plCycles.map(c => (
-              <button key={c.meta.id} onClick={() => startCloneCycle(c.meta.id)} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.18)', color: DIM_STRONG, cursor: 'pointer', minHeight: 44 }}>
-                <div style={{ fontSize: 12, fontWeight: 700 }}>{c.meta.title}</div>
-                <div style={{ fontSize: 10, color: DIM }}>{c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {c.meta.level} · {periodLabelRu(c.meta.period)}</div>
-              </button>
-            ))}
-          </div>
+      {pickerOpen && (
+        <TrainingModal title={pickerOpen === 'pl' ? '🟣 ПЛ-циклы + 📚 Библиотека — галерея' : '📚 Библиотека + 🟣 ПЛ-циклы — галерея'} onClose={() => setPickerOpen(null)}>
+          <ManualLibraryGallery bbPrograms={allLibraryPrograms} plCycles={plCycles as any} onSelectBB={(p) => { startCloneLibrary(p); setPickerOpen(null); }} onSelectPL={(id) => { startCloneCycle(id); setPickerOpen(null); }} />
         </TrainingModal>
       )}
 

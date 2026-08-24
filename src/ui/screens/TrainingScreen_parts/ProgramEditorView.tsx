@@ -39,6 +39,7 @@ import { loadDesigns } from '../../../engines/periodization-designer.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL, UI_METRICS } from './training-ui';
+import { ManualHeader, ManualStepper, SectionCard as ManualSectionCard, Badge, ProgressBar, InfoBanner, VolumeMiniBar, ScoreBadge } from './ManualUI';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -749,22 +750,18 @@ return (
         )}
         </div>
 
-      {/* Пилюли шагов + заголовок активного шага — обычный контент (не липкие) */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        {editorSteps.map((s, si) => (
-          <button key={s} onClick={() => setEstep(s)} style={STEP_PILL(estep === s)} aria-current={estep === s ? 'step' : undefined} title={EDITOR_STEP_INFO[s].hint}>
-            {si < estepIdx ? '✓ ' : ''}{EDITOR_STEP_LABELS[s]}
-          </button>
-        ))}
-        <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 'auto' }}>шаг {estepIdx + 1} из {editorSteps.length}</span>
-      </div>
+      {/* Внутренний степпер редактора — единый стиль ManualUI */}
+      <ManualStepper
+        steps={editorSteps.map(s => ({ id: s, label: EDITOR_STEP_LABELS[s] }))}
+        active={estep}
+        onChange={(id) => { setEstep(id as typeof estep); scrollEditorTop(); }}
+      />
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', letterSpacing: -0.2 }}>{EDITOR_STEP_INFO[estep].title}</span>
         <span style={{ fontSize: 11, color: DIM, lineHeight: 1.3 }}>{EDITOR_STEP_INFO[estep].hint}</span>
+        <span style={{ fontSize: 10, color: DIM, fontWeight: 600, marginLeft: 'auto' }}>шаг {estepIdx + 1} из {editorSteps.length}</span>
       </div>
-      <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', borderRadius: 2, background: 'linear-gradient(90deg,#00e68a,#00c8a0)', width: `${Math.round(((estepIdx + 1) / editorSteps.length) * 100)}%`, transition: 'width .3s ease' }} />
-      </div>
+      <ProgressBar value={estepIdx + 1} max={editorSteps.length} color="#00e68a" height={4} />
 
       {/* P2-1/F5: подсказка при пустой программе — прямая CTA авто-черновика (шаг «🎛 Параметры») */}
       {estep === 'params' && (() => {

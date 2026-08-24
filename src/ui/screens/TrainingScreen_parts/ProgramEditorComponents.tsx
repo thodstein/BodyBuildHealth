@@ -223,6 +223,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   const [noteWeekIdx, setNoteWeekIdx] = useState<number | null>(null);
   const [howCollapsed, setHowCollapsed] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_how_collapsed') === '1'; } catch { return false; } });
   const [showAllWeeks, setShowAllWeeks] = useState(false);
+  const [boardMode, setBoardMode] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_board_mode') === '1'; } catch { return false; } });
   const { confirm } = useConfirmDialog();
   React.useEffect(() => {
     setExpandedWeekIdx(current => body.weeks.length === 0 ? -1 : Math.min(Math.max(current, 0), body.weeks.length - 1));
@@ -340,6 +341,11 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура: {body.weeks.length} нед. · тренировочные дни внутри каждой недели</span>
         <span style={{ fontSize: 10, color: DIM }}>{body.weeks.length > 0 ? '— редактируйте расписание и упражнения ниже' : '— добавьте первую неделю'}</span>
+        {body.weeks.length > 0 && (
+          <button onClick={() => { const v = !boardMode; setBoardMode(v); try { localStorage.setItem('he_bb_board_mode', v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: boardMode ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: boardMode ? '#00e68a' : DIM }}>
+            {boardMode ? '📋 Список' : '🗂 Доска'}
+          </button>
+        )}
       </div>
       {body.weeks.length > 1 && (
         <div className="editor-week-bulk-actions">
@@ -569,8 +575,8 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           )}
           {isOpen && (
             <div style={{ marginTop: 4 }}>
-              <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Шаг 2: тренировочные дни этой недели</div>
-              <SessionList sessions={w.sessions} phase={w.phase} onChange={(sessions) => updateWeek(wi, { sessions })} />
+              <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>{boardMode ? '🗂 Доска — дни рядом, скролль вбок' : 'Шаг 2: тренировочные дни этой недели'}</div>
+              <SessionList sessions={w.sessions} phase={w.phase} boardMode={boardMode} onChange={(sessions) => updateWeek(wi, { sessions })} />
             </div>
           )}
         </div>
@@ -624,7 +630,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   );
 };
 
-const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, onChange }) => {
+const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; boardMode?: boolean; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, boardMode, onChange }) => {
   const { confirm } = useConfirmDialog();
   const [noteOpenIdx, setNoteOpenIdx] = useState<number | null>(null);
   const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), dayOfWeek: firstFreeTrainingDay(sessions), focus: '', blocks: [] }]);
@@ -672,9 +678,9 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: boardMode ? 'row' : 'column', gap: 6, overflowX: boardMode ? 'auto' : undefined, paddingBottom: boardMode ? 4 : undefined }}>
       {sessions.length === 0 && (
-        <div style={{ padding: 12, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center' }}>
+        <div style={{ padding: 12, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center', minWidth: boardMode ? 260 : undefined }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>В этой неделе пока нет тренировок</div>
           <div style={{ fontSize: 10, color: DIM }}>Создайте первый день, например «Пн · Грудь / Трицепс».</div>
           <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={addSession}>+ Добавить первый день</button>
@@ -684,7 +690,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
         const dow = sessionDayOfWeek(s, si);
         const dc = DAY_COLORS[dow % 7] ?? '#f59e0b';
         return (
-        <div key={s.id} className="editor-session-card" style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+        <div key={s.id} className="editor-session-card" style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', ...(boardMode ? { minWidth: 320, maxWidth: 360, flex: '0 0 320px' } : {}) }}>
           <div className="editor-session-heading" style={{ alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: dc + '1c', color: dc, border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>{TRAINING_DAY_NAMES[dow]}</span>
