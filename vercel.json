@@ -12,7 +12,7 @@
     "api/ocr-image.ts": {
       "maxDuration": 300,
       "memory": 2048,
-      "includeFiles": "node_modules/{tesseract.js,tesseract.js-core,@tesseract.js-data,wasm-feature-detect,bmp-js,is-url,node-fetch,regenerator-runtime,zlibjs}/**,src/engines/nutrition-ocr-parser.ts,src/core/nutrition-database.ts"
+      "includeFiles": "node_modules/{tesseract.js,tesseract.js-core,@tesseract.js-data,wasm-feature-detect,bmp-js,is-url,node-fetch,regenerator-runtime,zlibjs}/**"
     }
   },
   "headers": [

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { parseNutritionText } from '../src/engines/nutrition-ocr-parser.ts';
+import { parseNutritionText } from '../src/engines/nutrition-ocr-parser';
 
 const require = createRequire(import.meta.url);
 const MAX_BYTES = 12 * 1024 * 1024;
