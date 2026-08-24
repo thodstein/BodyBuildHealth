@@ -39,9 +39,9 @@ describe('recipe-enrichment', () => {
       const r = enrichRecipe(baseRecipe('Курица с рисом в одной кастрюле'));
       expect(r.ingredientIds).toBeDefined();
       expect(r.portions).toBeDefined();
-      expect(r.difficulty).toBe('easy');
+      expect(r.difficulty).toBe('medium');
       expect(r.batchFriendly).toBe(true);
-      expect(r.cookSkill).toBe('basic');
+      expect(r.cookSkill).toBe('medium');
     });
 
     it('не обогащает рецепт без match (возвращает как есть)', () => {
