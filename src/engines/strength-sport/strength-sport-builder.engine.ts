@@ -52,19 +52,16 @@ function filterPool(ids: string[], input: StrengthSportInput): string[] {
   const hasOther = eq.includes('other') || eq.includes('specialty') || eq.length === 0;
   const beforeTier = [...out];
   out = filterByTier(out, input.level, input.allowExotic, hasOther);
-  // fallback без спец-снарядов: заменяем удалённое на штангу
   if (!hasOther) {
     for (const orig of beforeTier) if (!out.includes(orig) && STRONG_FALLBACK[orig]) {
       const fb = STRONG_FALLBACK[orig];
-      if (!out.includes(fb) && !ids.includes(fb)) {} else if (!out.includes(fb)) out.push(fb);
-      else if (!out.includes(fb) && out.length < 3) out.push(fb);
+      if (!out.includes(fb)) out.push(fb);
     }
-    // если всё ещё пусто — гарантируем базу
-    if (out.length===0) out = ['back_squat','deadlift','ohp'].filter(id=>!beforeTier.includes(id) || true).slice(0,3);
+    if (out.length===0) out = ['back_squat','deadlift','ohp'].slice(0,3);
   }
+  const beforeInjury = [...out];
   out = filterByInjury(out, input.injuries as any);
-  // если после injury пусто — gentle fallback (не удаляем, а пометим)
-  if (out.length===0 && (input.injuries||[]).length>0) out = beforeTier.slice(0,2);
+  if (out.length===0 && (input.injuries||[]).length>0) out = beforeInjury.slice(0,2);
   return out;
 }
 function gentleFactor(id: string, injuries: any[]|undefined): number {
