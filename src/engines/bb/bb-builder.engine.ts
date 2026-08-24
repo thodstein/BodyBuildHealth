@@ -26,7 +26,7 @@ import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
 import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR } from './bb-progression-feedback.engine';
 import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression, wasInPreviousMeso, type MesocycleProgression } from './bb-mesocycle-progression.engine';
-import { buildExerciseInstructions, formatExerciseInstructions, cleanInstructionsText } from './bb-exercise-instructions.engine';
+import { buildExerciseInstructions, formatExerciseInstructions, cleanInstructionsText, tempoExplain } from './bb-exercise-instructions.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { warmupRampFor } from '../warmup-ramp.engine';
 import { getActiveInjuries, getExcludedMuscles, getGradedInjuries, getInjuryVolumeFactor } from '../manual-plan-builder';
