@@ -56,15 +56,15 @@ async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
 
 async function prepareImageForServer(file: File): Promise<Blob> {
   if (typeof document === 'undefined') return file;
-  const maxSide = 1600;
-  const maxPixels = 2_200_000;
+  const maxSide = 1280;
+  const maxPixels = 1_600_000;
   const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> => Promise.race([
     promise,
     new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
   ]);
 
   const encodeCanvas = async (canvas: HTMLCanvasElement): Promise<Blob | null> => withTimeout(
-    new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.78)),
+    new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.65)),
     10_000,
     'image encode timeout',
   );
@@ -104,7 +104,10 @@ async function prepareImageForServer(file: File): Promise<Blob> {
     // Older Telegram WebViews may not implement createImageBitmap. Decode via
     // an HTMLImageElement instead of falling back to the full camera file.
     try {
-      if (typeof Image === 'undefined' || typeof URL?.createObjectURL !== 'function') return file;
+      if (typeof Image === 'undefined' || typeof URL?.createObjectURL !== 'function') {
+        if (file.size > 5 * 1024 * 1024) throw new Error('Фото слишком большое и не удалось сжать. Сделайте скриншот экрана вместо фото камеры.');
+        return file;
+      }
       const url = URL.createObjectURL(file);
       try {
         const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -119,14 +122,20 @@ async function prepareImageForServer(file: File): Promise<Blob> {
         canvas.width = Math.max(1, Math.round(image.width * scale));
         canvas.height = Math.max(1, Math.round(image.height * scale));
         const context = canvas.getContext('2d');
-        if (!context) return file;
+        if (!context) {
+          if (file.size > 5 * 1024 * 1024) throw new Error('Не удалось сжать фото. Сделайте скриншот.');
+          return file;
+        }
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
         const compressed = await encodeCanvas(canvas);
-        return compressed && compressed.size < file.size ? compressed : file;
+        if (compressed && compressed.size < file.size) return compressed;
+        if (file.size > 5 * 1024 * 1024) throw new Error('Фото слишком большое даже после сжатия. Сделайте скриншот экрана.');
+        return file;
       } finally {
         URL.revokeObjectURL(url);
       }
-    } catch {
+    } catch (e) {
+      if (file.size > 5 * 1024 * 1024) throw e;
       return file;
     }
   }
