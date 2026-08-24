@@ -3,7 +3,7 @@
  * 5 под-вкладок: Обзор | Варианты | План | График | Детали
  * Hero-сводка sticky, календарь открыт по умолчанию, крупные карточки вариантов.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useCallback } from 'react';
 import {
   cardioCycleSummary, cardioQualityReport, cardioEquipmentLabel,
   cardioPlanVariants, improveCardioCycle, cardioSessionProtocol,
@@ -130,6 +130,12 @@ export const CardioPreviewStep: React.FC<{
   };
 
   const visibleWeeks = showAllWeeks || (cycle?.totalWeeks ?? 0) <= 16 ? (cycle?.weeks ?? []) : (cycle?.weeks ?? []).slice(0, 12);
+  // Виртуализация для 52 нед — рендер только видимого окна
+  const virtualRef = useRef<HTMLDivElement>(null);
+  const [virtualScroll, setVirtualScroll] = useState(0);
+  const onVirtualScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => setVirtualScroll(e.currentTarget.scrollTop), []);
+  const ROW_H = 118; // высота карточки недели + gap
+  const VIEW_H = 420;
 
   const previewImprove = () => {
     if (!cycle) return;
@@ -423,49 +429,102 @@ export const CardioPreviewStep: React.FC<{
             <div style={ROW}>
               <span style={LABEL}>🗓 Недели ({cycle.totalWeeks})</span>
               <span style={{ flex: 1 }} />
-              <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.12)" color="rgba(255,255,255,0.72)">{visibleWeeks.length} показано</Badge>
+              <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.12)" color="rgba(255,255,255,0.72)">{showAllWeeks && (cycle.totalWeeks ?? 0) > 16 ? cycle.totalWeeks : visibleWeeks.length} показано</Badge>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {visibleWeeks.map(w => {
-                const hint = cardioCoachHints(cycle).find(h => h.week === w.week);
-                const color = PHASE_COLOR[w.phase] ?? '#888';
-                return (
-                  <div key={w.week} style={{
-                    display: 'flex', flexDirection: 'column', gap: 4,
-                    background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
-                    borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '8px 10px',
-                  }}>
-                    <div style={ROW}>
-                      <span style={{ minWidth: 22, fontSize: 12, fontWeight: 900, color }}>{w.week}</span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
-                        {CARDIO_PHASE_LABELS[w.phase]}{w.deload ? ' · делод' : ''}{w.taper ? ' · taper' : ''}
-                      </span>
-                      {w.deload && <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 20, padding: '2px 8px' }}>🧘 делод</span>}
-                      {w.taper && <span style={{ fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 20, padding: '2px 8px' }}>📉 taper</span>}
-                      <span style={{ flex: 1 }} />
-                      <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingLeft: 22 }}>
-                      {w.sessions.map((s, i) => (
-                        <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#4ade80', whiteSpace: 'nowrap', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', borderRadius: 20, padding: '3px 8px' }}>
-                          {TYPE_LABEL[s.type]} {s.durationMin}×{s.weeklyFrequency}{s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}{s.targetHr?.max ? ' · ' + s.targetHr.min + '-' + s.targetHr.max : ''}
+            {showAllWeeks && (cycle.totalWeeks ?? 0) > 16 ? (
+              <div ref={virtualRef} onScroll={onVirtualScroll} style={{ height: VIEW_H, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4, scrollbarWidth: 'thin' }}>
+                {(() => {
+                  const all = cycle.weeks;
+                  const startIdx = Math.max(0, Math.floor(virtualScroll / ROW_H) - 1);
+                  const endIdx = Math.min(all.length, Math.ceil((virtualScroll + VIEW_H) / ROW_H) + 1);
+                  const slice = all.slice(startIdx, endIdx);
+                  const topPad = startIdx * ROW_H;
+                  const bottomPad = (all.length - endIdx) * ROW_H;
+                  return (
+                    <>
+                      {topPad > 0 && <div style={{ height: topPad, flexShrink: 0 }} aria-hidden />}
+                      {slice.map(w => {
+                        const hint = cardioCoachHints(cycle).find(h => h.week === w.week);
+                        const color = PHASE_COLOR[w.phase] ?? '#888';
+                        return (
+                          <div key={w.week} style={{
+                            display: 'flex', flexDirection: 'column', gap: 4,
+                            background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
+                            borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '8px 10px', minHeight: 92,
+                          }}>
+                            <div style={ROW}>
+                              <span style={{ minWidth: 22, fontSize: 12, fontWeight: 900, color }}>{w.week}</span>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                                {CARDIO_PHASE_LABELS[w.phase]}{w.deload ? ' · делод' : ''}{w.taper ? ' · taper' : ''}
+                              </span>
+                              {w.deload && <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 20, padding: '2px 8px' }}>🧘 делод</span>}
+                              {w.taper && <span style={{ fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 20, padding: '2px 8px' }}>📉 taper</span>}
+                              <span style={{ flex: 1 }} />
+                              <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingLeft: 22 }}>
+                              {w.sessions.map((s, i) => (
+                                <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#4ade80', whiteSpace: 'nowrap', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', borderRadius: 20, padding: '3px 8px' }}>
+                                  {TYPE_LABEL[s.type]} {s.durationMin}×{s.weeklyFrequency}{s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}{s.targetHr?.max ? ' · ' + s.targetHr.min + '-' + s.targetHr.max : ''}
+                                </span>
+                              ))}
+                            </div>
+                            {hint && hint.kind !== 'work' && (
+                              <div style={{ fontSize: 11, color: hint.kind === 'test' ? '#4ade80' : hint.kind === 'deload' ? '#fbbf24' : hint.kind === 'taper' ? '#eab308' : '#f87171', paddingLeft: 22, lineHeight: 1.4 }}>
+                                {hint.kind === 'test' ? '🔬 ' : hint.kind === 'deload' ? '🧘 ' : hint.kind === 'taper' ? '📉 ' : '🎭 '}{hint.text}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {bottomPad > 0 && <div style={{ height: bottomPad, flexShrink: 0 }} aria-hidden />}
+                    </>
+                  );
+                })()}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {visibleWeeks.map(w => {
+                  const hint = cardioCoachHints(cycle).find(h => h.week === w.week);
+                  const color = PHASE_COLOR[w.phase] ?? '#888';
+                  return (
+                    <div key={w.week} style={{
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)',
+                      borderLeft: `3px solid ${color}`, borderRadius: 10, padding: '8px 10px',
+                    }}>
+                      <div style={ROW}>
+                        <span style={{ minWidth: 22, fontSize: 12, fontWeight: 900, color }}>{w.week}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                          {CARDIO_PHASE_LABELS[w.phase]}{w.deload ? ' · делод' : ''}{w.taper ? ' · taper' : ''}
                         </span>
-                      ))}
-                    </div>
-                    {hint && hint.kind !== 'work' && (
-                      <div style={{ fontSize: 11, color: hint.kind === 'test' ? '#4ade80' : hint.kind === 'deload' ? '#fbbf24' : hint.kind === 'taper' ? '#eab308' : '#f87171', paddingLeft: 22, lineHeight: 1.4 }}>
-                        {hint.kind === 'test' ? '🔬 ' : hint.kind === 'deload' ? '🧘 ' : hint.kind === 'taper' ? '📉 ' : '🎭 '}{hint.text}
+                        {w.deload && <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 20, padding: '2px 8px' }}>🧘 делод</span>}
+                        {w.taper && <span style={{ fontSize: 10, fontWeight: 700, color: '#eab308', background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)', borderRadius: 20, padding: '2px 8px' }}>📉 taper</span>}
+                        <span style={{ flex: 1 }} />
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap' }}>{w.totalMinutes} мин · {w.totalKcal} ккал</span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-              {!showAllWeeks && (cycle.totalWeeks ?? 0) > 16 && (
-                <button style={{ ...BTN, minHeight: 36, padding: '8px 12px', alignSelf: 'flex-start' }} onClick={() => setShowAllWeeks(true)} aria-label="Показать все недели">
-                  Показать все ({cycle.totalWeeks})
-                </button>
-              )}
-            </div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingLeft: 22 }}>
+                        {w.sessions.map((s, i) => (
+                          <span key={i} style={{ fontSize: 11, fontWeight: 600, color: '#4ade80', whiteSpace: 'nowrap', background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)', borderRadius: 20, padding: '3px 8px' }}>
+                            {TYPE_LABEL[s.type]} {s.durationMin}×{s.weeklyFrequency}{s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}{s.targetHr?.max ? ' · ' + s.targetHr.min + '-' + s.targetHr.max : ''}
+                          </span>
+                        ))}
+                      </div>
+                      {hint && hint.kind !== 'work' && (
+                        <div style={{ fontSize: 11, color: hint.kind === 'test' ? '#4ade80' : hint.kind === 'deload' ? '#fbbf24' : hint.kind === 'taper' ? '#eab308' : '#f87171', paddingLeft: 22, lineHeight: 1.4 }}>
+                          {hint.kind === 'test' ? '🔬 ' : hint.kind === 'deload' ? '🧘 ' : hint.kind === 'taper' ? '📉 ' : '🎭 '}{hint.text}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!showAllWeeks && (cycle.totalWeeks ?? 0) > 16 && (
+                  <button style={{ ...BTN, minHeight: 36, padding: '8px 12px', alignSelf: 'flex-start' }} onClick={() => setShowAllWeeks(true)} aria-label="Показать все недели">
+                    Показать все ({cycle.totalWeeks})
+                  </button>
+                )}
+              </div>
+            )}
           </div>
           {cycle.rationale.length > 0 && (
             <div style={CARD}>

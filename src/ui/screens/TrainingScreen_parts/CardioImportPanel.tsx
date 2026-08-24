@@ -17,14 +17,16 @@ function parseGpx(text: string): { durationMin: number; distanceKm: number | nul
       const end = new Date(timeMatches[timeMatches.length - 1]);
       const dur = Math.round((end.getTime() - start.getTime()) / 60000);
       if (dur > 0 && dur < 600) {
-        // dist: sum haversine between trkpt
+        // dist: sum haversine between trkpt (лимит точек — защита от OOM)
         const pts = [...text.matchAll(/lat="([^"]+)"\s+lon="([^"]+)"/gi)].map(m => ({ lat: parseFloat(m[1]), lon: parseFloat(m[2]) }));
+        const MAX_PTS = 50000;
+        const usePts = pts.length > MAX_PTS ? pts.filter((_, i) => i % Math.ceil(pts.length / MAX_PTS) === 0) : pts;
         let distM = 0;
-        for (let i = 1; i < pts.length; i++) {
+        for (let i = 1; i < usePts.length; i++) {
           const R = 6371000;
-          const dLat = (pts[i].lat - pts[i - 1].lat) * Math.PI / 180;
-          const dLon = (pts[i].lon - pts[i - 1].lon) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(pts[i - 1].lat * Math.PI / 180) * Math.cos(pts[i].lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+          const dLat = (usePts[i].lat - usePts[i - 1].lat) * Math.PI / 180;
+          const dLon = (usePts[i].lon - usePts[i - 1].lon) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(usePts[i - 1].lat * Math.PI / 180) * Math.cos(usePts[i].lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
           distM += 2 * R * Math.asin(Math.sqrt(a));
         }
         const hrMatches = [...text.matchAll(/<gpxtpx:hr>(\d+)<\/gpxtpx:hr>/gi)].map(m => parseInt(m[1], 10)).filter(n => n > 30 && n < 220);
@@ -75,18 +77,54 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    const text = await f.text();
+    // Лимит 5 МБ — защита от подвисания на битых/огромных файлах
+    if (f.size > 5 * 1024 * 1024) {
+      setFlash('⚠ Файл слишком большой (>5 МБ) — выберите файл до 5 МБ');
+      window.setTimeout(() => setFlash(null), 3500);
+      e.target.value = '';
+      return;
+    }
+    if (f.size === 0) {
+      setFlash('⚠ Пустой файл');
+      window.setTimeout(() => setFlash(null), 3000);
+      e.target.value = '';
+      return;
+    }
+    let text: string;
+    try {
+      text = await f.text();
+      // Снять BOM
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+      if (text.length > 10_000_000) {
+        setFlash('⚠ Файл слишком большой (>10М символов)');
+        window.setTimeout(() => setFlash(null), 3000);
+        e.target.value = '';
+        return;
+      }
+    } catch {
+      setFlash('⚠ Не удалось прочитать файл — проверьте кодировку (UTF-8)');
+      window.setTimeout(() => setFlash(null), 3000);
+      e.target.value = '';
+      return;
+    }
     const lower = f.name.toLowerCase();
     let parsed = null;
     if (lower.endsWith('.gpx')) parsed = parseGpx(text);
     else if (lower.endsWith('.tcx')) parsed = parseTcx(text);
     else {
-      // try both
       parsed = parseGpx(text) ?? parseTcx(text);
     }
     if (!parsed) {
       setFlash('⚠ Не удалось распарсить файл — проверьте формат GPX/TCX');
       window.setTimeout(() => setFlash(null), 3000);
+      e.target.value = '';
+      return;
+    }
+    // Дополнительная валидация распарсенных значений
+    if (!Number.isFinite(parsed.durationMin) || parsed.durationMin <= 0) {
+      setFlash('⚠ Некорректная длительность в файле');
+      window.setTimeout(() => setFlash(null), 3000);
+      e.target.value = '';
       return;
     }
     setPreview({ ...parsed, fileName: f.name });
