@@ -505,6 +505,11 @@ export const BbAutoConstructor: React.FC = () => {
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
   // PRO-пресеты методик (DC/Fortitude/Meadows) — применяется поверх сплита
   const [proPreset, setProPreset] = useState<string>('none');
+  // BFR + Blast/Cruise
+  const [bfrMode, setBfrMode] = useState<boolean>(false);
+  const [blastCruiseEnabled, setBlastCruiseEnabled] = useState<boolean>(false);
+  const [blastWeeks, setBlastWeeks] = useState<number>(8);
+  const [cruiseWeeks, setCruiseWeeks] = useState<number>(4);
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(() => ({
     chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60,
     ...(prof.workMax || {}),
@@ -1524,6 +1529,10 @@ export const BbAutoConstructor: React.FC = () => {
           proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
           calorieSurplus,
           eccentricMult,
+          bfrMode,
+          blastCruiseEnabled,
+          blastWeeks,
+          cruiseWeeks,
           mobilityRestrictions,
           // PRO: cross-mesocycle continuity — передаём последний сохранённый план
           previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
@@ -2779,6 +2788,14 @@ export const BbAutoConstructor: React.FC = () => {
           );
         } catch { return null; }
       })()}
+      <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
+        <button onClick={() => setBfrMode(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: bfrMode ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.04)', border: bfrMode ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.1)', color: bfrMode ? '#ec4899' : '#fff' }}>{bfrMode ? '🩸 BFR включён (30-15-15-15)' : '🩸 BFR окклюзия (только памп)'}</button>
+        <button onClick={() => setBlastCruiseEnabled(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: blastCruiseEnabled ? 'rgba(250,204,21,0.18)' : 'rgba(255,255,255,0.04)', border: blastCruiseEnabled ? '1px solid #facc15' : '1px solid rgba(255,255,255,0.1)', color: blastCruiseEnabled ? '#facc15' : '#fff' }}>{blastCruiseEnabled ? `🔄 Blast ${blastWeeks}н / Cruise ${cruiseWeeks}н` : '🔄 Blast/Cruise выкл'}</button>
+        {blastCruiseEnabled && <>
+          <PopupNumber label='Blast нед' value={blastWeeks} min={4} max={12} onChange={setBlastWeeks} />
+          <PopupNumber label='Cruise нед' value={cruiseWeeks} min={2} max={8} onChange={setCruiseWeeks} />
+        </>}
+      </div>
           {/* Рекомендации по питанию */}
           {(() => {
             const nut: Record<string, { cal: string; pro: string; tip: string }> = {

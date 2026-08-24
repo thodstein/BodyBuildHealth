@@ -189,6 +189,12 @@ export interface BBBuilderInput {
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
   /** Объёмный vs обычный — кнопка с пояснением, капы от уровня */
   trainingVolumeMode?: 'standard' | 'high';
+  /** BFR-режим: окклюзия 20-30% 1RM, 30-15-15-15, 30с. Только для памп-изоляций, тяж не трогает. */
+  bfrMode?: boolean;
+  /** Blast/Cruise: 8н blast (×1.15) / 4н cruise (×0.85), повторяется. Auto = по дозам. */
+  blastCruiseEnabled?: boolean;
+  blastWeeks?: number; // по умолчанию 8
+  cruiseWeeks?: number; // по умолчанию 4
 }
 
 /**
@@ -348,6 +354,10 @@ export interface BBPlan {
   dupMode?: string;
   trainingYears?: number;
   courseIntensity?: string;
+  bfrMode?: boolean;
+  blastCruiseEnabled?: boolean;
+  blastWeeks?: number;
+  cruiseWeeks?: number;
   inputSnapshot?: {
     level?: string;
     goal?: string;
@@ -756,8 +766,9 @@ export function weightForRepMax(reps: number, workMax: number, rir: number, inte
  * RIR упражнения в ББ-плане = фаза + характер дня + training focus.
  * strength: RIR 1-2 (Schoenfeld 2021), hypertrophy: RIR 2-3 (Roberts 2022), endurance: RIR 3-4.
  * Памп всегда ≥3 (Schoenfeld 2017: metabolic stress, не failure).
+ * + PED-дрифт: enhanced (-1.5) быстрее к отказу, GH solo (-0.5) медленнее (суставы).
  */
-export function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number, focus?: BBTrainingFocus): number {
+export function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number, focus?: BBTrainingFocus, pedDoses?: Record<string, number>, level?: string): number {
   const cfg = focus ? FOCUS_RIR_TABLE[focus] : FOCUS_RIR_TABLE.hypertrophy;
   // Phase adjustment: intensification/peaking → base-1, deload → forced 4
   let base = cfg.base;
@@ -771,8 +782,19 @@ export function bbRir(resolved: DayCharacter, phase: BBPhase, phaseWeek: number,
   // Per-week RIR drift: driftPer2Weeks applies every 2 weeks of the SAME phase.
   // strength/hypertrophy: drift=-1 → RIR drops 1 every 2 weeks (W1=base, W2=base-1, W3=base-1, W4=base-2).
   // endurance: drift=0 → RIR stays constant (metabolic focus, no neural peaking).
+  // PED-дрифт: enhanced (-1.5) быстрее, GH solo (-0.5) медленнее.
+  let driftPer2 = cfg.driftPer2Weeks;
+  if (pedDoses) {
+    const aas = Number((pedDoses as any)['AAS'] || 0);
+    const gh = Number((pedDoses as any)['GH'] || 0);
+    const hasAAS = aas >= 500;
+    const hasGH = gh >= 2;
+    const isEnhanced = level === 'enhanced' || hasAAS;
+    if (isEnhanced && driftPer2 === -1) driftPer2 = -1.5;
+    else if (hasGH && !hasAAS && driftPer2 === -1) driftPer2 = -0.5;
+  }
   const drift = Math.floor(phaseWeek / 2);
-  const driftable = Math.max(0, base + cfg.driftPer2Weeks * drift);
+  const driftable = Math.max(0, base + driftPer2 * drift);
   let rir = resolved === 'тяж' ? driftable : driftable + 1;
   if (phase === 'deload') rir = Math.max(3, Math.min(4, rir));
   if (resolved === 'памп') rir = Math.max(cfg.pumpRir, rir);
@@ -1640,8 +1662,8 @@ function buildSession(
     // double progression с 3 неделями rep buildup. Deload сохраняет midpoint
     // (больше reps = легче вес для разгрузки).
     const reps = phase === 'deload' ? Math.round((shiftedMin + shiftedMax) / 2) : shiftedMin;
-    // RIR: bbRir (учитывает phase + phaseWeek + характер). Делод → RIR 3-4.
-    const rir = bbRir(resolved, phase, phaseWeek, trainingFocus);
+    // RIR: bbRir (учитывает phase + phaseWeek + характер + PED дрифт). Делод → RIR 3-4.
+    const rir = bbRir(resolved, phase, phaseWeek, trainingFocus, pedDoses, level);
     const wm = workMax[repKey] || PRO_WORKMAX_RATIO[repKey]?.(workMax) || defaultWorkMax(repKey);
     // P1-4 (audit 2026-07): Brzycki inverse %1RM formula — реп-корректный вес.
     // Раньше: weight = workMax × intensityMult × PCT_FOR_RIR[rir] (не учитывала reps).
@@ -2822,8 +2844,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // P5: Volume progression MEV→MAV→MRV (Helms 2022)
     // Week 1 = 0.85× (MEV), mid = 1.0× (MAV), last = 1.10× (MRV), deload = 0.6×
     const weekPhase = phaseByWeek.get(w) || 'accumulation';
-    const weekVolumeMult = weekPhase === 'deload' ? 0.6
+    const baseWeekVolumeMult = weekPhase === 'deload' ? 0.6
       : Math.min(1.10, 0.85 + ((w - 1) / Math.max(1, input.weeks - 1)) * 0.25);
+    // Blast/Cruise: 8н blast ×1.15 / 4н cruise ×0.85 (повторяется), только при вкл.
+    let blastMult = 1;
+    if (input.blastCruiseEnabled) {
+      const blast = Math.max(1, Math.min(12, input.blastWeeks ?? 8));
+      const cruise = Math.max(1, Math.min(12, input.cruiseWeeks ?? 4));
+      const cycle = blast + cruise;
+      const pos = (w - 1) % cycle;
+      blastMult = pos < blast ? 1.15 : 0.85;
+    }
+    const weekVolumeMult = baseWeekVolumeMult * blastMult;
     // Акценты НЕДЕЛИ по расписанию блоков специализации (цели блока или баланс).
     const weekSpec = specResForWeekSchedule(specSchedule, w);
     const weekRotation = rotationMapByKey.get(weekSpec.targets.join('|')) || muscleVolumeRotation;
@@ -3575,6 +3607,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     dupMode: (input as any).dupMode,
     trainingYears: input.trainingYears,
     courseIntensity: input.courseIntensity || pedAdapt?.courseIntensity,
+    bfrMode: input.bfrMode,
+    blastCruiseEnabled: input.blastCruiseEnabled,
+    blastWeeks: input.blastWeeks,
+    cruiseWeeks: input.cruiseWeeks,
     inputSnapshot: {
       level: input.level,
       goal: input.goal,
@@ -3610,6 +3646,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       stressLevel: input.stressLevel,
       weakPoints,
       focusGroup,
+      bfrMode: input.bfrMode,
+      blastCruiseEnabled: input.blastCruiseEnabled,
+      blastWeeks: input.blastWeeks,
+      cruiseWeeks: input.cruiseWeeks,
     },
   };
   syncBBPlanSetShape(output);
@@ -3694,6 +3734,44 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       finalized.rationale.push(`🔄 Сплит «${pattern.name}» адаптирован: бюджет ${weeklyBudget} сетов/нед (натурал) — все сплиты масштабируются под режим`);
     }
   } catch (e) { /* ped overlay не должен ломать план */ }
+
+  // BFR-режим: окклюзия 20-30% 1RM, 30-15-15-15, 30с — только памп-изоляции, тяж не трогает.
+  if (input.bfrMode) {
+    let bfrApplied = 0;
+    for (const week of finalized.weeks) {
+      if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      for (const sess of week.sessions) {
+        if (sess.character !== 'памп' && sess.character !== 'лёг') continue;
+        for (const ex of sess.exercises) {
+          if ((ex as any).warmupActivator) continue;
+          if (ex.role !== 'accessory') continue;
+          const isIso = (ex as any).exerciseType === 'isolation' || (ex as any).type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц/i.test(ex.name || '');
+          if (!isIso) continue;
+          // BFR: 4 сета 30-15-15-15 @ 25% workMax, RIR 2-3, rest 30с, tempo 2-1-1-0
+          const baseW = workMax[ex.muscle] || 50;
+          const bfrW = Math.max(5, Math.round(baseW * 0.25 * 10) / 10);
+          ex.sets = 4;
+          ex.repsRange = [15, 30];
+          ex.rir = 2;
+          ex.restSeconds = 30;
+          ex.tempoSpec = '2-1-1-0';
+          ex.workSets = [
+            { reps: 30, rir: 2, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
+            { reps: 15, rir: 2, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
+            { reps: 15, rir: 2, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
+            { reps: 15, rir: 3, weight: bfrW, tempo: '2-1-1-0', restSeconds: 30 },
+          ];
+          if (!ex.comment?.includes('BFR')) ex.comment = `${ex.comment || ''} | 🩸 BFR 30-15-15-15 @${bfrW}кг (20-30% 1RM, 30с)`.trim().replace(/^\|\s*/, '');
+          bfrApplied++;
+        }
+      }
+    }
+    if (bfrApplied > 0) finalized.rationale.push(`🩸 BFR-режим: ${bfrApplied} памп-изоляций переведены в 30-15-15-15 @25% (тяж дни без изменений)`);
+  }
+  if (input.blastCruiseEnabled) {
+    const bw = input.blastWeeks ?? 8, cw = input.cruiseWeeks ?? 4;
+    finalized.rationale.push(`🔄 Blast/Cruise: ${bw}н ×1.15 (blast) / ${cw}н ×0.85 (cruise), повторяется — объём волнами, тяж/памп сохранены`);
+  }
 
   // Слабые группы: +1 упражнение (3-4 сета) на отстающий вид, БЕЗ учёта капа (optional ⚡).
   // Добавляется ПОСЛЕ финализации, чтобы финализатор не срезал его.

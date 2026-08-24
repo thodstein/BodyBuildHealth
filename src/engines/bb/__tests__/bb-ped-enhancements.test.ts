@@ -110,3 +110,51 @@ describe('selector PED мягкий бонус', () => {
     expect(ranked[0].score - ranked[4].score).toBeLessThan(35); // разрыв не огромный
   });
 });
+
+describe('BFR mode', () => {
+  it('BFR только памп изоляции, тяж не трогает', async () => {
+    const { buildBBPlan: b } = await import('../bb-builder.engine');
+    const plan = b({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 2, bfrMode: true } as any);
+    let bfrCount = 0, heavyBfr = 0;
+    for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) {
+      if (e.comment?.includes('BFR')) {
+        bfrCount++;
+        if (s.character === 'тяж' && e.role === 'primary') heavyBfr++;
+      }
+    }
+    expect(bfrCount).toBeGreaterThan(0);
+    expect(heavyBfr).toBe(0);
+  });
+});
+
+describe('Blast/Cruise', () => {
+  it('blast неделя объём > cruise', async () => {
+    const { buildBBPlan: b } = await import('../bb-builder.engine');
+    const plan = b({ patternId: 'upper_lower_4', level: 'enhanced', goal: 'mass', weeks: 12, trainingYears: 5, blastCruiseEnabled: true, blastWeeks: 8, cruiseWeeks: 4 } as any);
+    const w1 = plan.weeks[0].sessions.flatMap(s=>s.exercises).reduce((a,e)=>a+e.sets,0);
+    const w9 = plan.weeks[8].sessions.flatMap(s=>s.exercises).reduce((a,e)=>a+e.sets,0);
+    expect(w1).toBeGreaterThan(w9);
+    expect(plan.rationale.join(' ')).toMatch(/Blast\/Cruise/);
+  });
+});
+
+describe('RIR drift PED', () => {
+  it('enhanced быстрее к отказу, GH медленнее', async () => {
+    const { bbRir } = await import('../bb-builder.engine');
+    const rNat = bbRir('тяж', 'accumulation', 2, 'hypertrophy' as any, {}, 'intermediate');
+    const rEnh = bbRir('тяж', 'accumulation', 2, 'hypertrophy' as any, { AAS: 800 } as any, 'enhanced');
+    const rGh = bbRir('тяж', 'accumulation', 2, 'hypertrophy' as any, { GH: 4 } as any, 'intermediate');
+    expect(rEnh).toBeLessThanOrEqual(rNat);
+    expect(rGh).toBeGreaterThan(rEnh);
+  });
+});
+
+describe('PED export в отчёт', () => {
+  it('BFR и GH+insulin попадают в текст отчёта', async () => {
+    const { buildBBPlan: b } = await import('../bb-builder.engine');
+    const { buildBBPlanReportText } = await import('../bb-report.engine');
+    const plan = b({ patternId: 'upper_lower_4', level: 'enhanced', goal: 'mass', weeks: 4, pedDoses: { GH: 4, insulin: 10 }, bfrMode: true, trainingYears: 3 } as any);
+    const txt = buildBBPlanReportText(plan);
+    expect(txt).toMatch(/BFR|PED-методика|GH\+insulin/);
+  });
+});

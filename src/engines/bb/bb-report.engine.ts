@@ -262,6 +262,17 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   if (methods.length) {
     lines.push(`🧩 Методики: ${methods.join(' · ')}`);
   }
+  // PED-методика (BFR, joint-guard, insulin window, схемы, blast/cruise, RIR дрифт)
+  const pedLines = (plan.rationale || []).filter((l: string) => /💉|🛡|🧬|📋 Схема|🩸 BFR|🔄 Сплит.*фарму|Blast|Cruise|BFR/i.test(l));
+  if (pedLines.length) {
+    lines.push(`🧬 PED-методика: ${pedLines.slice(0, 8).join(' · ')}`);
+    for (const pl of pedLines.slice(0, 6)) if (!methods.join(' ').includes(pl.slice(0, 15))) lines.push(`  ${pl}`);
+  }
+  if ((plan as any).bfrMode) lines.push(`🩸 BFR-режим: памп-изоляции 30-15-15-15 @25% (тяж без изменений)`);
+  if ((plan as any).blastCruiseEnabled) {
+    const bw = (plan as any).blastWeeks ?? 8, cw = (plan as any).cruiseWeeks ?? 4;
+    lines.push(`🔄 Blast/Cruise: ${bw}н ×1.15 / ${cw}н ×0.85 (повторяется)`);
+  }
   // Фазы — чего ждать по неделям (практическая ценность: делод/пик видны заранее).
   const phases = phaseSummary(plan);
   if (phases) lines.push(`📅 Фазы: ${phases}`);
