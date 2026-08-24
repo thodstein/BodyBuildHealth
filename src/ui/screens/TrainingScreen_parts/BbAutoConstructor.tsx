@@ -3942,7 +3942,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Подробная таблица объёма по мышцам с подмышцами */}
+        {/* Подробная таблица объёма по мышцам с подгруппами — клик раскрывает */}
         {(() => {
           const weakSet = new Set<string>((weakPoints as string[]).map(w => {
             const v = String(w).toLowerCase();
@@ -3951,7 +3951,7 @@ export const BbAutoConstructor: React.FC = () => {
             if (v === 'back_width' || v === 'back_thickness') return 'back';
             return v;
           }));
-          // Агрегация подгрупп для спины и плеч из факта плана (пиковая неделя)
+          // Пиковая неделя
           const peakIdx = (() => {
             let best = 0, max = -1;
             for (let i=0;i<W.length;i++) {
@@ -3961,20 +3961,57 @@ export const BbAutoConstructor: React.FC = () => {
             return best;
           })();
           const peakSessions = W[peakIdx]?.sessions || [];
-          const backSubSets: Record<string, number> = {};
-          const shoulderSubSets: Record<string, number> = { front:0, mid:0, rear:0 };
+          // UI-фолбэк для старых планов без subgroup — деривация тем же регексом что в движке
+          const uiDerive = (mus: string, name: string): string | undefined => {
+            const n = String(name||'').toLowerCase();
+            if (mus==='chest') {
+              if (/наклон.*верх|верх.*груд|incline/i.test(n)) return 'chest_upper';
+              if (/отрицат|decline|брусь|dip/i.test(n)) return 'chest_lower';
+              return 'chest_mid';
+            }
+            if (mus==='back') {
+              if (/подтяг|pull.?up|тяга.*верх|вертикал/i.test(n)) return 'back_width';
+              if (/тяга.*гантел|row|горизонт/i.test(n) && !/шраг/i.test(n)) return 'back_thickness';
+              if (/шраг|shrug/i.test(n)) return 'traps';
+              if (/задн.*дельт|rear/i.test(n)) return 'rear_delts';
+              return 'upper_back';
+            }
+            if (mus==='shoulders') {
+              if (/жим|press|армей/i.test(n) && !/мах/i.test(n)) return 'delt_front';
+              if (/задн|rear/i.test(n)) return 'delt_rear';
+              return 'delt_mid';
+            }
+            if (mus==='biceps') {
+              if (/молот|hammer/i.test(n)) return 'biceps_brachialis';
+              if (/наклон|incline/i.test(n)) return 'biceps_long';
+              if (/скотт|preacher/i.test(n)) return 'biceps_short';
+              return 'biceps_long';
+            }
+            if (mus==='triceps') {
+              if (/над.*голов|overhead|француз/i.test(n)) return 'triceps_long';
+              if (/канат|pushdown|блок/i.test(n)) return 'triceps_lateral';
+              return 'triceps_medial';
+            }
+            return undefined;
+          };
+          const subgroupRu: Record<string,string> = {
+            chest_upper:'Верх груди (наклон 30°)', chest_mid:'Середина груди', chest_lower:'Низ груди (брусья/отриц)',
+            back_width:'Ширина (тяга сверху)', back_thickness:'Толщина (тяга в наклоне)', upper_back:'Верх спины', rear_delts:'Задняя дельта', traps:'Трапеции', erectors:'Разгибатели',
+            delt_front:'Передняя дельта (жим)', delt_mid:'Средняя дельта (махи)', delt_rear:'Задняя дельта',
+            biceps_long:'Бицепс длинная', biceps_short:'Бицепс короткая', biceps_brachialis:'Брахиалис (молот)',
+            triceps_long:'Трицепс длинная (overhead)', triceps_lateral:'Трицепс латеральная (блок)', triceps_medial:'Трицепс медиальная',
+            quads_mid:'Квадрицепс (общий)', quads_rectus:'Прямая бедра', ham_biceps:'Бицепс бедра', ham_semi:'Полусухожильная', glutes_max:'Ягодичная большая', calves_soleus:'Камбаловидная',
+          };
+          // Агрегация по подгруппам + упражнения
+          const subSetsByMuscle: Record<string, Record<string, number>> = {};
+          const exByMuscle: Record<string, Array<{ name:string; sets:number; reps:number; rir:number; sub:string; character:string }>> = {};
           for (const s of peakSessions) for (const e of s.exercises) {
-            if (e.muscle === 'back') {
-              const sub = (e as any).backSubgroup || 'back_width';
-              backSubSets[sub] = (backSubSets[sub] || 0) + e.sets;
-            }
-            if (e.muscle === 'shoulders') {
-              const n = (e.name || '').toLowerCase();
-              if (/жим|press|армей|overhead/i.test(n) && !/мах/i.test(n)) shoulderSubSets.front += e.sets;
-              else if (/мах|lateral|отведение|raise/i.test(n) && !/задн/i.test(n)) shoulderSubSets.mid += e.sets;
-              else if (/задн|rear|обратн/i.test(n)) shoulderSubSets.rear += e.sets;
-              else shoulderSubSets.mid += e.sets;
-            }
+            const mus = e.muscle;
+            const sg = (e as any).subgroup || (e as any).chestSubgroup || (e as any).backSubgroup || uiDerive(mus, e.name) || mus;
+            if (!subSetsByMuscle[mus]) subSetsByMuscle[mus] = {};
+            subSetsByMuscle[mus][sg] = (subSetsByMuscle[mus][sg]||0) + e.sets;
+            if (!exByMuscle[mus]) exByMuscle[mus] = [];
+            exByMuscle[mus].push({ name:e.name||'', sets:e.sets, reps:e.workSets?.[0]?.reps||0, rir:e.rir, sub:sg, character:(e as any).character||'' });
           }
           const weakVols = metrics.perMuscle.filter(x => weakSet.has(x.muscle));
           const normVols = metrics.perMuscle.filter(x => !weakSet.has(x.muscle));
@@ -3982,8 +4019,8 @@ export const BbAutoConstructor: React.FC = () => {
           const normAvg = normVols.length ? Math.round(normVols.reduce((s,x)=>s+x.totalSets,0)/normVols.length) : 0;
           return (
             <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.18)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#a855f7', marginBottom:6 }}>🏋️ Объём по мышцам с подгруппами (пиковая неделя, сетов/нед)</div>
-              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Подгруппы спины — из факта плана (backSubgroup), плечи — по типу упражнения. Статус и MEV/MAV/MRV — из quality (среднее по мезо).</div>
+              <div style={{ fontSize:11, fontWeight:800, color:'#a855f7', marginBottom:4 }}>🏋️ Объём по мышцам с подгруппами (клик — детали)</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Пиковая неделя. Подгруппы — из факта плана (`subgroup`/`chestSubgroup`/`backSubgroup` или фолбэк по имени). Частота/RIR — средние по мезо в `quality`.</div>
               <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, fontWeight:700, color:'#fff', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
                 <span>Мышца / подгруппа</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
               </div>
@@ -3993,36 +4030,43 @@ export const BbAutoConstructor: React.FC = () => {
                 const qm = (quality as any).perMuscle?.find((x:any) => x.muscle === mm.muscle);
                 const statusLabel = qm ? (qm.status === 'exceeding_mrv' ? 'перегруз' : qm.status === 'approaching_mrv' ? 'около MRV' : qm.status === 'below_mev' ? 'недотрен' : 'оптимум') : mm.status;
                 const statusColor = over ? '#ef4444' : weak ? '#ec4899' : statusLabel==='перегруз' ? '#ef4444' : statusLabel==='недотрен' ? '#60a5fa' : '#22c55e';
-                // Подгруппы
-                let subs: Array<{ label:string; sets:number }> = [];
-                if (mm.muscle === 'back' && Object.keys(backSubSets).length) {
-                  subs = Object.entries(backSubSets).map(([k,v]) => ({ label: backSubgroupLabel(k) || k, sets: v }));
-                } else if (mm.muscle === 'shoulders' && (shoulderSubSets.front + shoulderSubSets.mid + shoulderSubSets.rear) > 0) {
-                  subs = [
-                    { label:'Передняя дельта (жим)', sets: shoulderSubSets.front },
-                    { label:'Средняя дельта (махи)', sets: shoulderSubSets.mid },
-                    { label:'Задняя дельта', sets: shoulderSubSets.rear },
-                  ].filter(x=>x.sets>0);
-                } else if (mm.muscle === 'chest' && mm.totalSets > 0) {
-                  // Грудь — верх/середина/низ не хранится отдельно, показываем общий
-                  subs = [];
-                }
+                const isExpanded = expandedMuscles.has(mm.muscle);
+                const subs = subSetsByMuscle[mm.muscle] || {};
+                const subEntries = Object.entries(subs).sort((a,b)=>b[1]-a[1]);
+                const exs = exByMuscle[mm.muscle] || [];
                 return (
                   <div key={mm.muscle} style={{ padding:'4px 0', borderTop:'1px solid rgba(255,255,255,0.04)', background: weak?'rgba(236,72,153,0.06)':'transparent' }}>
-                    <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, color:'#fff', alignItems:'center' }}>
-                      <span style={{ fontWeight:700, color: weak?'#ec4899': '#fff' }}>{weak?'🔥 ':''}{mm.muscle} <span style={{ fontSize:10, color: statusColor }}>· {statusLabel}{over?' ⚠':''}</span></span>
+                    <div
+                      role="button" tabIndex={0} aria-expanded={isExpanded}
+                      onClick={() => setExpandedMuscles(prev => { const ns=new Set(prev); if(ns.has(mm.muscle)) ns.delete(mm.muscle); else ns.add(mm.muscle); return ns; })}
+                      onKeyDown={e => { if(e.key==='Enter'||e.key===' ') { e.preventDefault(); setExpandedMuscles(prev => { const ns=new Set(prev); if(ns.has(mm.muscle)) ns.delete(mm.muscle); else ns.add(mm.muscle); return ns; }); }}}
+                      style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, color:'#fff', alignItems:'center', cursor:'pointer' }}
+                    >
+                      <span style={{ fontWeight:700, color: weak?'#ec4899': '#fff' }}>{isExpanded?'▼':'▶'} {weak?'🔥 ':''}{mm.muscle} <span style={{ fontSize:10, color: statusColor }}>· {statusLabel}{over?' ⚠':''}</span></span>
                       <span style={{ color:over?'#ef4444':(weak?'#ec4899':ACCENT), fontWeight:800 }}>{mm.totalSets}</span>
                       <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
                       <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
                       <span style={{ color:'#fff', fontSize:10 }}>MRV {mm.mrv} · MEV {mm.mev}</span>
                     </div>
-                    {subs.length > 0 && (
-                      <div style={{ marginTop:3, marginLeft:8, display:'flex', flexDirection:'column', gap:2 }}>
-                        {subs.map(s => (
-                          <div key={s.label} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'2px 6px', borderRadius:6 }}>
-                            <span style={{ opacity:0.9 }}>↳ {s.label}</span><span style={{ fontWeight:700 }}>{s.sets} сетов</span>
+                    {isExpanded && (
+                      <div style={{ marginTop:4, marginLeft:8, display:'flex', flexDirection:'column', gap:3 }}>
+                        {subEntries.length>0 && subEntries.map(([sg, sets]) => (
+                          <div key={sg} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'3px 6px', borderRadius:6 }}>
+                            <span>↳ {subgroupRu[sg] || backSubgroupLabel(sg) || sg}</span><span style={{ fontWeight:700 }}>{sets} сетов</span>
                           </div>
                         ))}
+                        {exs.length>0 && (
+                          <div style={{ marginTop:2, padding:'4px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                            <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:2 }}>Упражнения пика:</div>
+                            {exs.map((ex,i)=> (
+                              <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', padding:'1px 0' }}>
+                                <span style={{ opacity:0.9 }}>{ex.name} <span style={{ opacity:0.6 }}>· {subgroupRu[ex.sub] || ex.sub} · {ex.character}</span></span>
+                                <span style={{ fontWeight:600 }}>{ex.sets}×{ex.reps} RIR{ex.rir}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:1 }}>MEV {mm.mev} · MAV {mm.mav} · MRV {mm.mrv} · частота {mm.frequencyPerRotation}×/рот · RIR {mm.avgRir.toFixed(1)}</div>
                       </div>
                     )}
                   </div>

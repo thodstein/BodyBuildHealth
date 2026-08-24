@@ -267,6 +267,9 @@ export interface BBExercise {
   /** Структурированная инструкция из Exercise Lab, без необходимости парсить comment. */
   executionProfile?: import('./bb-exercise-instructions.engine').ExerciseInstructionProfile;
   backSubgroup?: 'back_width' | 'back_thickness' | 'upper_back' | 'rear_delts' | 'traps' | 'erectors';
+  /** Детальная подгруппа для UI-детализации (клик по мышце → подгруппы). Опционально, не влияет на логику отбора. */
+  subgroup?: string;
+  chestSubgroup?: 'chest_upper' | 'chest_mid' | 'chest_lower';
   movementPattern?: string;
   /** Разминочное упражнение на целевую группу (3×10-15 лёгких). Не входит в объём/бюджет. */
   warmupActivator?: boolean;
@@ -291,6 +294,63 @@ export interface BBWeek {
   deload?: boolean;
   taper?: boolean;
   sessions: BBSession[];
+}
+
+/** Детальная подгруппа упражнения — display-only, не влияет на отбор/MRV. */
+export function deriveExerciseSubgroup(muscle: string, name: string, backSubgroup?: string): string | undefined {
+  const n = String(name || '').toLowerCase();
+  const m = String(muscle || '').toLowerCase();
+  if (m === 'chest') {
+    if (/наклон.*верх|верх.*груд|incline.*press|incline.*dumbbell|жим.*наклон/i.test(n)) return 'chest_upper';
+    if (/отрицат|decline|брусь|dip/i.test(n)) return 'chest_lower';
+    return 'chest_mid';
+  }
+  if (m === 'back') {
+    if (backSubgroup) return String(backSubgroup);
+    if (/подтяг|pull.?up|chin|тяга.*верх|lat.?pull|вертикаль/i.test(n)) return 'back_width';
+    if (/тяга.*гантел|тяга.*штан|row|горизонт/i.test(n)) return 'back_thickness';
+    if (/шраг|shrug/i.test(n)) return 'traps';
+    if (/задн.*дельт|rear.?delt|face.?pull/i.test(n)) return 'rear_delts';
+    if (/разгиб|extension|good.?morning|гиперэкстенз/i.test(n)) return 'erectors';
+    return 'upper_back';
+  }
+  if (m === 'shoulders') {
+    if (/жим|press|армей|overhead|военный/i.test(n) && !/мах/i.test(n)) return 'delt_front';
+    if (/задн|rear|обратн/i.test(n)) return 'delt_rear';
+    if (/мах|lateral|отведение|raise|подъем/i.test(n)) return 'delt_mid';
+    return 'delt_mid';
+  }
+  if (m === 'biceps') {
+    if (/молот|hammer/i.test(n)) return 'biceps_brachialis';
+    if (/наклон|incline/i.test(n)) return 'biceps_long';
+    if (/скотт|проповед|preacher|концентр/i.test(n)) return 'biceps_short';
+    return 'biceps_long';
+  }
+  if (m === 'triceps') {
+    if (/над.*голов|overhead|француз/i.test(n)) return 'triceps_long';
+    if (/канат|верёвк|pushdown|блок/i.test(n)) return 'triceps_lateral';
+    return 'triceps_medial';
+  }
+  if (m === 'quads') {
+    if (/разгиб|extension/i.test(n)) return 'quads_rectus';
+    if (/фронт|front/i.test(n)) return 'quads_vastus';
+    return 'quads_mid';
+  }
+  if (m === 'hamstrings') {
+    if (/сгиб|curl|лежа|сидя/i.test(n)) return 'ham_biceps';
+    if (/румын|rdl|мёртв|мертв/i.test(n)) return 'ham_semi';
+    return 'ham_mid';
+  }
+  if (m === 'glutes') {
+    if (/ягодич.*мост|hip.?thrust|glute.?bridge/i.test(n)) return 'glutes_max';
+    if (/отведение|abduct/i.test(n)) return 'glutes_med';
+    return 'glutes_max';
+  }
+  if (m === 'calves') return 'calves_soleus';
+  if (m === 'abs') return 'abs_upper';
+  if (m === 'forearms') return 'forearms_flex';
+  if (m === 'traps') return 'traps_upper';
+  return undefined;
 }
 
 export interface BBPlan {
@@ -2460,6 +2520,18 @@ function buildSession(
   });
   exercises.length = 0;
   exercises.push(...finalOrdered);
+
+  // Подгруппы для UI-детализации — display-only, после финальной сортировки
+  for (const ex of exercises) {
+    if (!(ex as any).subgroup) {
+      const sg = deriveExerciseSubgroup(ex.muscle, ex.name, (ex as any).backSubgroup as string | undefined);
+      if (sg) {
+        (ex as any).subgroup = sg;
+        if (ex.muscle === 'chest' && sg.startsWith('chest_')) (ex as any).chestSubgroup = sg as any;
+        if (ex.muscle === 'back' && !(ex as any).backSubgroup) (ex as any).backSubgroup = sg as any;
+      }
+    }
+  }
 
   // Добавляем растяжку в конец сессии (динамическая растяжка для основных групп мышц)
   // BUG-B13/B21: Stretching удалён (мёртвый код с Jul 16 — не ББ-гипертрофия, занимал слоты).
