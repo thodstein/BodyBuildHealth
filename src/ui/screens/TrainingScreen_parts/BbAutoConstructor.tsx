@@ -104,12 +104,13 @@ import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
+import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
 
-type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'contest' | 'annual';
+type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 type PlanMode = 'generic_split' | 'bb_cycle';
 
@@ -2047,8 +2048,8 @@ export const BbAutoConstructor: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','contest','annual'] : ['params','ped','split','plan','quality','adjust','contest','annual'];
-  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план' };
+  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','quality','adjust','contest','annual','tools'];
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
   const renderStepNav = () => (
     <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
       {stepList.map(s => {
@@ -6086,6 +6087,16 @@ export const BbAutoConstructor: React.FC = () => {
       {step === 'quality' && renderQuality()}
       {step === 'adjust' && renderAdjust()}
       {step === 'contest' && renderContestPrep()}
+      {step === 'tools' && (
+        <div style={{ minWidth: 0, maxWidth: '100%' }}>
+          <div style={H}>🔧 Инструменты ББ</div>
+          <PlannerToolsPanel mode="bb" />
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setStep('annual')}>← 🗓 Годовой план</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setStep('params')}>1 Параметры →</button>
+          </div>
+        </div>
+      )}
       {renderExSwapModal()}
       {subTarget && (() => {
         const wk = builtPlan?.weeks[bbWeekSel - 1];
