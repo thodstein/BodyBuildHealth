@@ -121,14 +121,14 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
 
 };
 
-// ══ Режим зоны «Планировщик»: ПЛ-авто / ББ-авто / Ручной конструктор / Кардио-конструктор
+// ══ Режим зоны «Планировщик»: ПЛ-авто / ББ-авто / Ручной / Кардио / Стронг+ТА / Единоборства
 // (сегментированный переключатель в nav.ts).
-export type PlanningTrack = 'pl' | 'bb' | 'manual' | 'cardio';
+export type PlanningTrack = 'pl' | 'bb' | 'manual' | 'cardio' | 'strength' | 'combat';
 const PT_KEY = 'he_training_planning_track';
 export function getPlanningTrack(): PlanningTrack {
   try {
     const v = localStorage.getItem(PT_KEY);
-    if (v === 'bb' || v === 'manual' || v === 'cardio') return v;
+    if (v === 'bb' || v === 'manual' || v === 'cardio' || v === 'strength' || v === 'combat') return v as PlanningTrack;
     // Backward-compat: старое значение 'my' → 'manual'.
     if (v === 'my') return 'manual';
     return 'pl';
