@@ -235,7 +235,11 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         }
       }
       return result;
-    }));
+    })).filter(item => {
+      // OCR-only queue must not expose raw garbage as a food. Known local/USDA
+      // products are safe; unknown low-confidence rows require manual entry.
+      return Boolean(item.foodId) && (item.confidence === undefined || item.confidence >= 0.5);
+    });
   }, []);
 
   const fillQueuedMicros = useCallback(() => setParsedItems(prev => prev.map(item => ({ ...item, micros: fillMissingMicros(item.name, Number(item.qty) || 100, item.micros) }))), []);
