@@ -12,6 +12,7 @@ import { calcMealQuality, getQualityLabel } from '../../../engines/nutrition-qua
 import { NutritionDiaryCharts } from './NutritionDiaryCharts';
 import { NutritionQualityCard } from '../../components/NutritionQualityCard';
 import { useRecentFoods } from './useNutritionDiary';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 // Extracted components
 import { WeekDaySelector } from './diary/WeekDaySelector';
@@ -541,6 +542,12 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       )}
       
       
+      <ModernHero icon="📓" title="Дневник питания" subtitle="Учёт приёмов, КБЖУ, микронутриенты и качество — с OCR, штрихкодом и аналитикой. Все данные локально." count={Object.keys(diaryData).length} stats={[
+        { k:'Дней', v: Object.keys(diaryData).length, sub:'записей', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+        { k:'Ккал', v: Math.round(dayTotals.kcal), sub:'сегодня', col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
+        { k:'Приёмов', v: Object.values(dayMeals).flat().length, sub:'сегодня', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+      ]} />
+
       {/* Week day selector */}
       <WeekDaySelector weekDays={weekDays} selectedDate={selectedDate} onSelectDate={setSelectedDate} diaryData={diaryData} />
 

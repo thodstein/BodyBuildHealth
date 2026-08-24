@@ -35,11 +35,11 @@ type NutritionSection = 'diary' | 'planning' | 'overview' | 'analytics' | 'all';
 type ActiveTab = 'diary' | 'charts' | 'mealplan' | 'cart' | 'favorites' | 'catalog' | 'reference' | 'recipes' | 'reports' | 'restaurant' | 'info' | 'customfood' | 'overview' | 'usefulness' | 'progress' | 'nutria' | 'visualize' | 'achievements' | 'quests' | 'peri' | 'metabolic';
 
 const SECTION_TABS: Record<NutritionSection, string[]> = {
-  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic'],
+  overview: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'metabolic'],
   analytics: ['charts', 'reports'],
   diary: ['diary', 'charts', 'reports', 'peri'],
-  planning: ['mealplan', 'catalog', 'favorites', 'reference', 'info', 'usefulness', 'recipes', 'metabolic'],
-  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'reports', 'restaurant', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic'],
+  planning: ['mealplan', 'catalog', 'favorites', 'reference', 'info', 'usefulness', 'recipes', 'restaurant', 'metabolic'],
+  all: ['diary', 'charts', 'mealplan', 'cart', 'favorites', 'catalog', 'reference', 'recipes', 'restaurant', 'reports', 'customfood', 'overview', 'usefulness', 'progress', 'nutria', 'visualize', 'achievements', 'quests', 'peri', 'metabolic'],
 };
 
 const TAB_LABELS: Record<string, string> = {
@@ -1300,8 +1300,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {[
               { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
-              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, каталог, справочник, инфо', color: '#f97316' },
-              { section: 'planning' as NutritionSection, tab: 'restaurant' as ActiveTab, icon: '🍽', title: 'Рестораны', desc: 'Фастфуд с КБЖУ — KFC, BK, Вкусно и точка', color: '#f59e0b' },
+              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, каталог, рецепты, рестораны, справочник', color: '#f97316' },
             ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
