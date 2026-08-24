@@ -11,6 +11,7 @@ import { ManualHeader, SectionCard, Badge, InfoBanner, BTN, BTN_GHOST, BTN_SMALL
 import { GROUP_RU } from './program-types';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { ACCENT, DIM } from './training-ui';
+import { loadTrainingProfile } from './training-profile';
 
 type Tab = 'bb' | 'pl';
 
@@ -109,6 +110,42 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
     return arr as SRCycleTemplate[];
   }, [plCycles, search, level, days, favOnly, plFavs, tab, goal]);
 
+  const recommendedBB = useMemo(() => {
+    try {
+      const prof = loadTrainingProfile() as any;
+      const lvl = prof?.level;
+      const d = prof?.daysPerWeek;
+      const g = prof?.goal;
+      const scored = [...bbPrograms].map(p => {
+        let s = 0;
+        if (lvl && p.level === lvl) s += 10;
+        if (d && p.daysPerWeek === d) s += 5; else if (d) s += Math.max(0, 5 - Math.abs(p.daysPerWeek - d) * 2);
+        if (g && (p.goal === g || (p as any).direction === g)) s += 3;
+        return { p, s };
+      });
+      scored.sort((a,b)=> b.s - a.s);
+      return scored.slice(0,3).map(x=>x.p);
+    } catch { return bbPrograms.slice(0,3); }
+  }, [bbPrograms]);
+  const recommendedBBIds = useMemo(()=> new Set(recommendedBB.map(p=>p.id)), [recommendedBB]);
+  const recommendedPL = useMemo(() => {
+    try {
+      const prof = loadTrainingProfile() as any;
+      const lvl = prof?.level;
+      const d = prof?.daysPerWeek;
+      const arr = [...plCycles] as any[];
+      const scored = arr.map(c=>{
+        let s=0;
+        if(lvl && c.meta.level===lvl) s+=10;
+        if(d && c.meta.sessionsPerWeek===d) s+=5; else if(d) s+=Math.max(0,5-Math.abs(c.meta.sessionsPerWeek-d)*2);
+        return {c,s};
+      });
+      scored.sort((a,b)=> b.s-a.s);
+      return scored.slice(0,3).map(x=>x.c) as SRCycleTemplate[];
+    } catch { return plCycles.slice(0,3); }
+  }, [plCycles]);
+  const recommendedPLIds = useMemo(()=> new Set((recommendedPL as any[]).map((c:any)=>c.meta.id)), [recommendedPL]);
+
   const toggleCompare = (id: string) => {
     setCompareIds(prev => {
       if (prev.includes(id)) return prev.filter(x => x !== id);
@@ -165,6 +202,35 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
         )}
       </div>
 
+      {/* Рекомендовано для вас — интеллигентный подбор */}
+      {tab === 'bb' && !search && !favOnly && level === 'all' && goal === 'all' && days === 'all' && recommendedBB.length > 0 && (
+        <SectionCard title="⭐ Рекомендовано для вас" hint="На основе профиля (уровень/дни/цель) — интеллигентный подбор" accent>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            {recommendedBB.map(p => (
+              <div key={p.id} style={{ padding: 8, borderRadius: 10, background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', border: '1px solid rgba(0,230,138,0.25)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{p.name}</div>
+                <div style={{ fontSize: 10, color: DIM }}>{p.level} · {p.daysPerWeek}д/нед · {p.durationWeeks} нед · {p.goal}</div>
+                <div style={{ fontSize: 10, color: '#00e68a', fontWeight: 700 }}>★ Подходит вашему профилю</div>
+                <button onClick={() => onSelectBB(p)} style={{ ...BTN, minHeight: 36, fontSize: 11, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800, marginTop: 4 }}>📥 Взять рекомендовано</button>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+      {tab === 'pl' && !search && !favOnly && level === 'all' && days === 'all' && (recommendedPL as any[]).length > 0 && (
+        <SectionCard title="⭐ Рекомендовано для вас" hint="ПЛ-циклы под ваш уровень и частоту" accent>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+            {(recommendedPL as any[]).map((c: any) => (
+              <div key={c.meta.id} style={{ padding: 8, borderRadius: 10, background: 'linear-gradient(135deg, rgba(167,139,250,0.10), rgba(59,130,246,0.06))', border: '1px solid rgba(167,139,250,0.25)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{c.meta.title}</div>
+                <div style={{ fontSize: 10, color: DIM }}>{c.meta.level} · {c.meta.sessionsPerWeek}д/нед · {c.meta.weeks} нед · {periodLabelRu(c.meta.period)}</div>
+                <button onClick={() => onSelectPL(c.meta.id)} style={{ ...BTN, minHeight: 36, fontSize: 11, background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 800, marginTop: 4 }}>📥 Подключить</button>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
+
       {/* Сравнение */}
       {compareIds.length === 2 && tab === 'bb' && compareBB.length === 2 && (
         <SectionCard title="⇄ Сравнение программ" accent>
@@ -214,6 +280,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
                   <Badge>{p.daysPerWeek}д/нед</Badge>
                   <Badge>{p.durationWeeks} нед</Badge>
                   <Badge color="#fff">{p.goal}</Badge>
+                  {recommendedBBIds.has(p.id) && <Badge color="#00e68a" bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.30)">★ Рекомендовано</Badge>}
                 </div>
                 <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{p.description}</div>
                 {p.weeks[0] && <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>Нед-1: {p.weeks[0].days.map(d => d.name).join(' · ')} · {p.weeks[0].days.reduce((s, d) => s + d.exercises.length, 0)} упр.</div>}
@@ -255,6 +322,7 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
                   <Badge>{c.meta.sessionsPerWeek}д/нед</Badge>
                   <Badge>{c.meta.weeks} нед</Badge>
                   <Badge color="#fff">{periodLabelRu(c.meta.period)}</Badge>
+                  {recommendedPLIds.has(c.meta.id) && <Badge color="#00e68a" bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.30)">★ Рекомендовано</Badge>}
                 </div>
                 <div style={{ fontSize: 10, color: DIM }}>{c.meta.description?.slice(0, 110) ?? 'Профессиональный СРЦ-цикл — процентовки immutable'}</div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
