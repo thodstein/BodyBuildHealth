@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
-import { parseNutritionText } from '../src/engines/nutrition-ocr-parser';
 
 const require = createRequire(import.meta.url);
 const MAX_BYTES = 12 * 1024 * 1024;
@@ -88,9 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(413).json({ ok: false, error: 'Image must be between 1 byte and 12 MB' });
     }
     const text = await recognizeImage(buffer);
-    let meals: unknown = undefined;
-    try { meals = parseNutritionText(text); } catch { meals = []; }
-    return res.status(200).json({ ok: true, text, meals });
+    return res.status(200).json({ ok: true, text });
   } catch (error: any) {
     console.error('[ocr-image]', error);
     return res.status(422).json({ ok: false, error: error?.message || 'Server OCR failed' });
