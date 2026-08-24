@@ -1770,6 +1770,15 @@ function buildSession(
       favoriteIds, muscle, focusGroup, weakPoints, fewerCompound,
       pedDoses, labMrvMultiplier,
     });
+    // Pro primary: только канонические tier 1, иначе tier 1-2, чтобы hex/svend/TRX не лезли в primary Pro
+    if (role === 'primary' && (level === 'advanced' || level === 'enhanced')) {
+      const tier1 = pool.filter(e => bbExerciseTier(e) === 1);
+      if (tier1.length >= exerciseCount) pool = tier1;
+      else {
+        const tier12 = pool.filter(e => bbExerciseTier(e) <= 2);
+        if (tier12.length >= exerciseCount) pool = tier12;
+      }
+    }
 
     // 3.1 — вынесенный слой selection: selectExercisesForMuscle (selectExercisesSmart + фиксация выбора)
     let selected = selectExercisesForMuscle(pool, muscle, exerciseCount, {

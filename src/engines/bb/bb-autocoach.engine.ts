@@ -727,19 +727,50 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
       for (const exercise of session.exercises) rebuildComment(exercise, cfg.label);
     }
 
-    // P6: intensity-techniques (применяется к primary упражнениям фазо-уместными техниками).
-    // Если intensityTechnique задана явно — применяем ко всем primary; иначе — дефолт по фазе.
+    // P6: intensity-techniques — применяется с учётом методики и группы.
+    // drop_set/myo_reps/twenty_ones → последняя изоляция группы (accessory), не compound.
+    // rest_pause → primary compound. pause_rep/negative/mechanical_drop → primary.
+    // Техника может быть в середине сессии, если методика требует (pre_exhaust), но отображается корректно.
     const techniqueChoice = (input as any).intensityTechnique;
     const technique = techniqueChoice || DEFAULT_TECHNIQUE_BY_PHASE[ph] || 'none';
     if (technique !== 'none') {
-      for (const s of w.sessions) {
-        for (const e of s.exercises) {
-          // Только primary упражнения получают intensity-технику
-          if (e.role !== 'primary') continue;
-          // Проверка meta.phases — избегаем неуместных применений
-          const meta = INTENSITY_TECHNIQUES[technique as IntensityTechnique];
-          if (meta && !meta.phases.includes(ph)) continue;
-          applyIntensityTechniqueToExercise(e, technique, ph);
+      const meta = INTENSITY_TECHNIQUES[technique as IntensityTechnique];
+      if (!meta || meta.phases.includes(ph)) {
+        for (const s of w.sessions) {
+          // Группируем по мышце, чтобы техника была на логичном упражнении, а не на 2/5 подряд
+          const byMuscle = new Map<string, typeof s.exercises>();
+          for (const e of s.exercises) {
+            const list = byMuscle.get(e.muscle) || [];
+            list.push(e);
+            byMuscle.set(e.muscle, list);
+          }
+          for (const [muscle, list] of byMuscle) {
+            let target: any = null;
+            if (technique === 'drop_set' || technique === 'myo_reps' || technique === 'twenty_ones') {
+              // Последняя изоляция группы
+              const isolations = list.filter((e:any) => e.role === 'accessory' && !e.warmupActivator && /isolation|accessory/i.test(e.role) || /curl|fly|raise|extension|pushdown|crunch|шраг/i.test(e.name || ''));
+              // Fallback: последняя accessory
+              target = isolations.length ? isolations[isolations.length - 1] : list.filter((e:any)=>e.role==='accessory').pop();
+            } else if (technique === 'rest_pause') {
+              target = list.find((e:any)=> e.role==='primary' && !e.warmupActivator);
+            } else {
+              // pause_rep, mechanical_drop, negative — primary compound
+              target = list.find((e:any)=> e.role==='primary' && !e.warmupActivator);
+              if (!target) target = list[0];
+            }
+            if (!target || target.warmupActivator) continue;
+            // Проверка appliesTo
+            if (meta) {
+              const isIso = /curl|fly|raise|extension|pushdown|crunch|шраг|разгибан|сгибан|мах/i.test(target.name || '');
+              const appliesTo = meta.appliesTo || [];
+              const targetType = isIso ? 'isolation' : 'compound';
+              const roleOk = appliesTo.includes(target.role as any) || appliesTo.includes(targetType as any) || appliesTo.includes('accessory' as any);
+              // Для drop_set/myo: требуем изоляцию, для rest_pause — compound
+              if (technique === 'drop_set' && target.role !== 'accessory') continue;
+              if (technique === 'myo_reps' && target.role !== 'accessory') continue;
+            }
+            applyIntensityTechniqueToExercise(target, technique, ph);
+          }
         }
       }
     }

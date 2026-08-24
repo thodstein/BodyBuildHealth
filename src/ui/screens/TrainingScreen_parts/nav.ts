@@ -25,7 +25,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     title: '🏗 Планировщик',
     icon: '🏗',
     color: '#00e68a',
-    subtitle: 'ПЛ-авто / ББ-авто — построение плана и макроцикла',
+    subtitle: 'ПЛ-авто / ББ-авто / Стронг+ТА / Единоборства — построение плана',
     tabs: [],
   },
   training: {
@@ -79,16 +79,18 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
 /** Режимы зоны 'planner' — сегментированный переключатель.
  *  PL-авто и BB-авто — авто-планировщики.
  *  Manual ("Ручной конструктор") — пустая UserProgram, которую пользователь сам
- *  редактирует (program-store.ts). Не дублирует BB-auto — пустой blackboard,
- *  который программируется пользователем по факту.
- *  Cardio ("Кардио-конструктор") — отдельный CardioCycle (cardio.engine),
- *  подключается к PL/BB ссылкой (cardio-bridge). */
-export type PlannerMode = 'pl' | 'bb' | 'manual' | 'cardio';
+ *  редактирует (program-store.ts).
+ *  Cardio ("Кардио-конструктор") — отдельный CardioCycle (cardio.engine).
+ *  Strength ("Стронг+ТА") и Combat ("Единоборства") — изолированные силовые конструкторы,
+ *  только заловая часть, внезальная нагрузка — декларация OutsideLoad. */
+export type PlannerMode = 'pl' | 'bb' | 'manual' | 'cardio' | 'strength' | 'combat';
 export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
   { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: LMS-циклы, ПМ-прогрессия, пик-протоколы' },
   { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
-  { id: 'manual', label: 'Ручной конструктор', icon: '✋', hint: 'Своя программа: создать с нуля, загрузить для правки, авто-черновик для ручной правки' },
-  { id: 'cardio', label: 'Кардио-конструктор', icon: '❤️', hint: 'Отдельный кардио-цикл: Zone 2/HIIT, фазы, taper к стартам, подключение к ПЛ/ББ' },
+  { id: 'manual', label: 'Ручной', icon: '✋', hint: 'Своя программа: создать с нуля, загрузить для правки' },
+  { id: 'cardio', label: 'Кардио', icon: '❤️', hint: 'Кардио-цикл: Zone 2/HIIT, фазы, taper' },
+  { id: 'strength', label: 'Стронг+ТА', icon: '🏋️', hint: 'Тяжёлая атлетика / Стронг: рывок, толчок, лог, камни, outside-load' },
+  { id: 'combat', label: 'Единоборства', icon: '🥊', hint: 'Бокс/ММА/Борьба: шея, хват, ротация, внезальная 4-5×/нед' },
 ];
 
 /** Порядок вывода зон на hero-экране. */
