@@ -36,6 +36,8 @@ import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } fro
 import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
+import { VolumeMiniBar } from './ManualUI';
+import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
@@ -576,7 +578,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           {isOpen && (
             <div style={{ marginTop: 4 }}>
               <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>{boardMode ? '🗂 Доска — дни рядом, скролль вбок' : 'Шаг 2: тренировочные дни этой недели'}</div>
-              <SessionList sessions={w.sessions} phase={w.phase} boardMode={boardMode} onChange={(sessions) => updateWeek(wi, { sessions })} />
+              <SessionList sessions={w.sessions} phase={w.phase} boardMode={boardMode} level={level} onChange={(sessions) => updateWeek(wi, { sessions })} />
             </div>
           )}
         </div>
@@ -630,7 +632,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   );
 };
 
-const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; boardMode?: boolean; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, boardMode, onChange }) => {
+const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; boardMode?: boolean; level?: string; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, boardMode, level: levelProp, onChange }) => {
   const { confirm } = useConfirmDialog();
   const [noteOpenIdx, setNoteOpenIdx] = useState<number | null>(null);
   const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), dayOfWeek: firstFreeTrainingDay(sessions), focus: '', blocks: [] }]);
@@ -724,6 +726,27 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
               style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${ACCENT_LINE}`, borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 11, resize: 'vertical', minHeight: 44, marginBottom: 6 }}
             />
           )}
+          {/* Живой баланс объёма сессии — MEV/MAV/MRV полоски */}
+          {s.blocks.length > 0 && (() => {
+            const effLevel = levelProp || (() => { try { return loadTrainingProfile().level; } catch { return 'intermediate'; } })();
+            const byMuscle: Record<string, number> = {};
+            for (const b of s.blocks) {
+              const mu = (b.muscle || '').toLowerCase();
+              if (!mu) continue;
+              byMuscle[mu] = (byMuscle[mu] || 0) + (b.sets?.length || 0);
+            }
+            const entries = Object.entries(byMuscle).slice(0, 4);
+            if (entries.length === 0) return null;
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 6 }}>
+                {entries.map(([mu, cur]) => {
+                  const lm = getVolumeLandmarks(effLevel, mu);
+                  if (!lm) return null;
+                  return <VolumeMiniBar key={mu} cur={cur} mrv={lm.mrv} mev={lm.mev} label={GROUP_RU[mu] ?? mu} compact />;
+                })}
+              </div>
+            );
+          })()}
           <BlockList blocks={s.blocks} phase={phase} sessionFocus={s.focus} sessionName={s.name} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
         );

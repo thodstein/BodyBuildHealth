@@ -72,7 +72,7 @@ import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL } from './training-ui';
-import { ManualHeader, ManualStepper, InfoBanner, SectionCard, Badge, ProgressBar } from './ManualUI';
+import { ManualHeader, ManualStepper, InfoBanner, SectionCard, Badge, ProgressBar, ScoreBadge } from './ManualUI';
 import { ManualLibraryGallery } from './ManualLibraryGallery';
 import { buildProgramIcs, downloadIcs } from './ManualExport';
 import { EditorPopupSelect } from './EditorPopup';
@@ -559,6 +559,7 @@ export const ProgramManagerPanel: React.FC = () => {
         <div style={{ ...CARD, padding: 12, borderLeft: `3px solid ${DIR_COLOR[dir]}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
             <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{p.meta.title}</span>
+            {(() => { try { const q = computePlanQualityFor(p, p.meta.level); return <ScoreBadge score={q.score} grade={q.grade} />; } catch { return null; } })()}
             <span style={{ fontSize: 11, fontWeight: 700, color: DIR_COLOR[dir] }}>
               {dir === 'bb' ? '💪 ' : dir === 'pl' ? '🏆 ' : '⚡ '}{DIR_LABEL[dir]} · {SOURCE_LABEL[p.meta.source] ?? p.meta.source}
             </span>
