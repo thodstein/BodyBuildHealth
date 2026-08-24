@@ -27,7 +27,7 @@ import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, build
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
-import { buildDayPlan as buildDayPlanV2, type DayPlanV2, type MealPlanInput, type BreakfastStyle, type BreakfastTemplateId } from "./meal-plan-engine";
+import { buildDayPlan as buildDayPlanV2, snapPortionG, type DayPlanV2, type MealPlanInput, type BreakfastStyle, type BreakfastTemplateId } from "./meal-plan-engine";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
 import { getBBCategory, type BBCategory, getPeakWeekDay, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
@@ -2797,7 +2797,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const macroPer100 = getMacro(food);
             if (!macroPer100 || macroPer100 <= 0) continue;
             const portion = Math.min(3.5, targetG / macroPer100);
-            let amount = Math.round(Math.round(portion * 100)/5)*5;
+            let amount = snapPortionG(food, Math.round(portion * 100));
             const idCap = SUPP_CAP[food.id];
             if (idCap) amount = Math.min(idCap, amount);
             const r = portion;
@@ -3150,7 +3150,35 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const dayIdx = days === 1 ? selectedDayIndex : 0;
     await maybeYield();
-    const d1 = buildDay(dayIdx, effIsTrainingDay(dayIdx));
+    // FINAL SNAP: порции к человеческой сетке в классическом пути (simple/minimal)
+    const snapDayMeals = (day: any) => {
+      if (!day || !Array.isArray(day.meals)) return day;
+      for (const m of day.meals) {
+        if (!Array.isArray(m.items)) continue;
+        for (const it of m.items) {
+          const fd = FOOD_DB.find((f: any) => f.id === it.id);
+          if (!fd) continue;
+          const snapped = snapPortionG(fd, it.amount);
+          if (snapped !== it.amount && it.amount > 0 && Math.abs(snapped - it.amount) >= 25) {
+            const factor = snapped / it.amount;
+            it.amount = snapped;
+            it.kcal = Math.round(it.kcal * factor);
+            it.p = Math.round((it.p || 0) * factor * 10) / 10;
+            it.f = Math.round((it.f || 0) * factor * 10) / 10;
+            it.c = Math.round((it.c || 0) * factor * 10) / 10;
+            it.fiber = Math.round((it.fiber || 0) * factor * 10) / 10;
+          }
+        }
+        if (m.totals) {
+          m.totals = m.items.reduce((acc: any, it: any) => ({ kcal: acc.kcal + (it.kcal||0), p: acc.p + (it.p||0), f: acc.f + (it.f||0), c: acc.c + (it.c||0), fiber: acc.fiber + (it.fiber||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
+        }
+      }
+      if (day.totals) {
+        day.totals = day.meals.reduce((acc: any, m: any) => ({ kcal: acc.kcal + (m.totals?.kcal||0), p: acc.p + (m.totals?.p||0), f: acc.f + (m.totals?.f||0), c: acc.c + (m.totals?.c||0), fiber: acc.fiber + (m.totals?.fiber||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
+      }
+      return day;
+    };
+    const d1 = snapDayMeals(buildDay(dayIdx, effIsTrainingDay(dayIdx)));
     // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
     // и загрязняя usedFoodIds для 1-дневного плана).
     await maybeYield();
@@ -3222,6 +3250,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, pharmaBaseMl: Math.round(pharmaBaseMl), trainBonus, fiberFactor, pharmaBonus, total: waterTotal, hasPharma, electrolytes });
     setGenerated(true);
+    try { setPlanTab('plan'); } catch {}
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     } catch (e: any) {
       const message = e?.message || String(e) || 'Ошибка генерации плана. Проверьте введённые данные.';

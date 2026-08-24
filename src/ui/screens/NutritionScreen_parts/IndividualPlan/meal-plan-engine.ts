@@ -864,7 +864,7 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   return supplementCap ? Math.min(supplementCap, base) : base;
 }
 
-function snapPortionG(food: FoodItem, grams: number): number {
+export function snapPortionG(food: FoodItem, grams: number): number {
   if (grams <= 0) return grams;
   const id = (food.id || '').toLowerCase();
   const cat = food.category;
