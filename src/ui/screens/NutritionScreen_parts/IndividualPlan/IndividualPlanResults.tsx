@@ -1895,7 +1895,7 @@ export const IndividualPlanResults: React.FC = () => {
               <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
             </div>
           )}
-          {generated && (
+          {generated && plannerMode === 'pro' && (
             <>
             <div style={{ background:'rgba(139,92,246,0.04)', borderRadius:10, padding:'8px 10px', border:'1px solid rgba(139,92,246,0.08)', marginBottom:6 }}>
               <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:3 }}>🧬 v2 Скоринг — что это?</div>

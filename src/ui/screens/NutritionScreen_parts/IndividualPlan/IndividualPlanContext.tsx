@@ -2996,7 +2996,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (devK <= TOL && devP <= TOL && devF <= TOL && devC <= TOL) break;
         if (iter === 0) {
           const scales = [tK / Math.max(1, totals.kcal), tP_ / Math.max(1, totals.p), tF_ / Math.max(1, totals.f), tC_ / Math.max(1, totals.c)];
-          const effScale = Math.min(1.3, Math.max(0.7, scales.reduce((s, v) => s + v, 0) / scales.length));
+          const effScale = Math.min(1.8, Math.max(0.5, scales.reduce((s, v) => s + v, 0) / scales.length));
           meals.forEach((m: any) => {
             m.items.forEach((it: any) => {
               const fd = FOOD_DB.find((f: any) => f.id === it.id);
@@ -3160,7 +3160,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const fd = FOOD_DB.find((f: any) => f.id === it.id);
           if (!fd) continue;
           const snapped = snapPortionG(fd, it.amount);
-          if (snapped !== it.amount && it.amount > 0 && Math.abs(snapped - it.amount) >= 25) {
+          if (snapped !== it.amount && it.amount > 0 && Math.abs(snapped - it.amount) >= 10) {
             const factor = snapped / it.amount;
             it.amount = snapped;
             it.kcal = Math.round(it.kcal * factor);
