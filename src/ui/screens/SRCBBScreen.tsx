@@ -33,7 +33,7 @@ import { useDataLink } from '../../core/data-link';
 import { EXERCISE_CATALOG, getExercisesByGroup } from '../../core/exercise-catalog';
 import { TRAINING_SPLITS } from '../../engines/training.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './TrainingScreen_parts/training-profile';
-import { subscribePlannerApply, getPlannerApply, clearPlannerApply, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
+import { subscribePlannerApply, getPlannerApply, clearPlannerApply, setPlannerSource, type PlannerApply } from './TrainingScreen_parts/planner-bridge';
 import { StrengthDiary } from '../../engines/strength-diary.engine';
 import type { WorkoutLog } from '../../core/types';
 import { AnalyticsTab } from './TrainingScreen_parts/AnalyticsTab';
@@ -128,6 +128,11 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     manual: [],
   };
   const [subView, setSubView] = useState<string>('plan');
+  // маршрутизация «Применить» — контекст ПЛ/ББ (интеллектуальные — в TrainingScreen)
+  useEffect(() => {
+    if (mainTab === 'pl') setPlannerSource('pl-auto');
+    else if (mainTab === 'bb') setPlannerSource('bb-auto');
+  }, [mainTab, subView]);
 
   // ── СРЦ ── (инициализация из сессии PL и единого профиля тренированности)
   const _plSaved: any = (() => { try { return JSON.parse(localStorage.getItem('he_pl_session') || 'null'); } catch { return null; } })();
@@ -996,26 +1001,47 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     try { saveBridgeSessions(bbPlanToSessions(finalPlan)); } catch { /* ignore */ }
     setSubView('plan');
   };
-  // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ)
+  // 🔗 применение корректировок из калькуляторов к активному плану (ПЛ/ББ) — с маршрутизацией по источнику
   const applyExternal = () => {
     const p = getPlannerApply();
     if (!p) return;
+    const src = (p as any).source as string | undefined;
+    const targetId = (p as any).targetCycleId as string | undefined;
+    // pl-auto → только PL, bb-auto → только BB, intellectual → к выбранному циклу
+    if (src === 'pl-auto' && mainTab !== 'pl') { clearPlannerApply(); setApplyPayload(null); return; }
+    if (src === 'bb-auto' && mainTab !== 'bb') { clearPlannerApply(); setApplyPayload(null); return; }
+    let effectiveTab: Mode = mainTab;
+    if (src === 'intellectual' && targetId) {
+      const c = getCycleById(targetId);
+      if (c) effectiveTab = normalizeCycleDirection(c.meta.direction) === 'bodybuilding' ? 'bb' : 'pl';
+      if (targetId !== selectedCycleId) setSelectedCycleId(targetId);
+    } else if (src === 'intellectual') {
+      // без targetId — применяем к текущему mainTab, но сохраняем в профиль выбранного цикла
+      try {
+        const last = JSON.parse(localStorage.getItem('he_pl_session') || '{}')?.selectedCycleId;
+        if (last && last !== selectedCycleId) {
+          const c2 = getCycleById(last);
+          if (c2) effectiveTab = normalizeCycleDirection(c2.meta.direction) === 'bodybuilding' ? 'bb' : 'pl';
+        }
+      } catch {}
+    }
+    const tabForApply: Mode = effectiveTab;
     if (p.kind === 'pm') {
       const pm = p.data || {};
       if (pm.lift && pm.value) {
-        // одиночный 1RM (из калькулятора 1RM)
-        if (mainTab === 'pl') {
+        // одиночный 1RM (из калькулятора 1RM) — маршрутизация по источнику
+        if (tabForApply === 'pl') {
           if (pm.lift === 'squat') setPmSquat(pm.value);
           else if (pm.lift === 'bench') setPmBench(pm.value);
           else if (pm.lift === 'dead') setPmDead(pm.value);
           pendingApplyRef.current = p;
-        } else if (mainTab === 'bb') {
+        } else if (tabForApply === 'bb') {
           setBbWorkMax(w => ({ ...w, quads: pm.lift === 'squat' ? pm.value : w.quads, chest: pm.lift === 'bench' ? pm.value : w.chest, hamstrings: pm.lift === 'dead' ? pm.value : w.hamstrings }));
           pendingApplyRef.current = p;
         }
       } else {
-        if (mainTab === 'pl') { setPmSquat(pm.squat || pmSquat); setPmBench(pm.bench || pmBench); setPmDead(pm.dead || pmDead); pendingApplyRef.current = p; }
-        else if (mainTab === 'bb') { setBbWorkMax(w => ({ ...w, quads: pm.squat || w.quads, chest: pm.bench || w.chest, hamstrings: pm.dead || w.hamstrings })); pendingApplyRef.current = p; }
+        if (tabForApply === 'pl') { setPmSquat(pm.squat || pmSquat); setPmBench(pm.bench || pmBench); setPmDead(pm.dead || pmDead); pendingApplyRef.current = p; }
+        else if (tabForApply === 'bb') { setBbWorkMax(w => ({ ...w, quads: pm.squat || w.quads, chest: pm.bench || w.chest, hamstrings: pm.dead || w.hamstrings })); pendingApplyRef.current = p; }
       }
       } else if (p.kind === 'weakpoints') {
        setWeakPoints(p.data?.groups || []);
@@ -1042,14 +1068,14 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     } else if (p.kind === 'pri') {
       setPriAdjust({ volumeMult: (p.data?.volumeMult ?? 1) as number, rirShift: (p.data?.rirShift ?? 0) as number });
     } else if (p.kind === 'split') {
-      if (mainTab === 'bb') { setBbDays(p.data?.cycle?.length || bbDays); pendingApplyRef.current = p; }
+      if (tabForApply === 'bb') { setBbDays(p.data?.cycle?.length || bbDays); pendingApplyRef.current = p; }
     } else if (p.kind === 'tempo') {
       setTempoAdjust(p.data ? { ...p.data } : null);
     } else if (p.kind === 'rir') {
       // объединить со существующим priAdjust: добавка к RIR
       setRirShiftAdjust((p.data?.rirShift ?? 0) as number);
     } else if (p.kind === 'mrv') {
-      if (mainTab === 'bb') { setMrvOverride((p.data?.mrv ?? null) as number | null); pendingApplyRef.current = p; }
+      if (tabForApply === 'bb') { setMrvOverride((p.data?.mrv ?? null) as number | null); pendingApplyRef.current = p; }
       else { pendingApplyRef.current = p; }
     } else if (p.kind === 'deload') {
       setDeloadAdjust({ volumeMult: (p.data?.volumeMult ?? 0.5) as number, rirShift: (p.data?.rirShift ?? 3) as number, weeks: (p.data?.weeks || []) as number[] });
@@ -1066,8 +1092,17 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const p = pendingApplyRef.current;
     if (!p) return;
     pendingApplyRef.current = null;
-    if (mainTab === 'pl') { try { buildSrc(); } catch { /* ignore */ } }
-    else if (mainTab === 'bb') { try { buildBb(); } catch { /* ignore */ } }
+    const src = (p as any).source as string | undefined;
+    const targetId = (p as any).targetCycleId as string | undefined;
+    let eff: Mode = mainTab;
+    if (src === 'pl-auto') eff = 'pl';
+    else if (src === 'bb-auto') eff = 'bb';
+    else if (src === 'intellectual' && targetId) {
+      const c = getCycleById(targetId);
+      if (c) eff = normalizeCycleDirection(c.meta.direction) === 'bodybuilding' ? 'bb' : 'pl';
+    }
+    if (eff === 'pl') { try { buildSrc(); } catch { /* ignore */ } }
+    else if (eff === 'bb') { try { buildBb(); } catch { /* ignore */ } }
     setSubView('plan'); // показать пересобранный план
   }, [pmSquat, pmBench, pmDead, weakPoints, bbDays, bbWorkMax, mrvOverride, mainTab]);
   const baseMrv = useMemo(() => Object.fromEntries(Object.entries(getAllVolumeLandmarks(bbLevel)).map(([k, v]) => [k, mrvOverride != null ? mrvOverride : v.mrv])), [bbLevel, mrvOverride]);
@@ -1341,14 +1376,33 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           {methodNote}
         </div>
       )}
-      {/* sub-view pill nav for PL/BB */}
-      {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (
-        <div style={{ display: 'flex', gap: 4, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4, scrollbarWidth: 'none' }}>
-          {subViewList[mainTab].map(({ key, label }) => (
-            <button key={key} style={PILL(subView === key)} onClick={() => setSubView(key)}>{label}</button>
-          ))}
-        </div>
-      )}
+      {/* sub-view pill nav for PL/BB — структурировано: группы + прогресс, фрост-гласс */}
+      {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (() => {
+        const list = subViewList[mainTab];
+        const idx = Math.max(0, list.findIndex(s => s.key === subView));
+        const groups: Record<string, string[]> = mainTab === 'pl'
+          ? { 'Сборка': ['settings','diagnostics','plan'], 'Анализ': ['charts','reference'], 'Система': ['competition','macro','tools'] }
+          : { 'План': ['plan','macro','tools'], 'Работа': ['bridge','peak_bb'], 'Анализ': ['methods','analytics','prometrics','charts'] };
+        const groupFor = (k: string) => Object.entries(groups).find(([, arr]) => (arr as string[]).includes(k))?.[0] ?? '';
+        return (
+          <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(24,24,27,0.72)', backdropFilter: 'blur(16px) saturate(140%)', WebkitBackdropFilter: 'blur(16px) saturate(140%)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '8px 8px 6px', marginBottom: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '0 2px' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: ACCENT, letterSpacing: 0.4, textTransform: 'uppercase' as const }}>{mainTab === 'pl' ? 'ПЛ-авто' : 'ББ-авто'} • {list[idx]?.label || subView}</span>
+              <span style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 8 }}>{idx + 1} / {list.length}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, paddingBottom: 2 }}>
+              {list.map(({ key, label }) => {
+                const active = subView === key;
+                const g = groupFor(key);
+                return <button key={key} title={g ? `${g}: ${label}` : label} style={{ ...PILL(active), position: 'relative' as const, display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px' }} onClick={() => setSubView(key)}>{g && <span style={{ fontSize: 8, opacity: 0.75, fontWeight: 700 as const, background: active ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: 4 }}>{g.slice(0,2)}</span>}{label}</button>;
+              })}
+            </div>
+            <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, marginTop: 6, overflow: 'hidden' as const }}>
+              <div style={{ width: `${((idx + 1) / list.length) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent), #00c8a0)', transition: 'width 0.35s ease' }} />
+            </div>
+          </div>
+        );
+      })()}
 
       {mainTab === 'pl' && subView === 'settings' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>

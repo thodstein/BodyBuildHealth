@@ -57,6 +57,9 @@ import {
 import { ZONES, ZONE_ORDER, zoneForTab, PLANNER_MODES, type TrainingZone } from './TrainingScreen_parts/nav';
 import { hapticImpact } from '../../core/telegram';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
+import { subscribePlannerApply, setPlannerSource } from './TrainingScreen_parts/planner-bridge';
+import { getCycleById, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
+import { saveTrainingProfile, loadTrainingProfile } from './TrainingScreen_parts/training-profile';
 
 export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
   const linked = useDataLink();
@@ -88,6 +91,58 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   }, []);
   // Универсальный переход на вкладку с автоматическим выбором её зоны
   const goTab = useCallback((t: TrainingTab) => { setZone(zoneForTab(t)); setTab(t); }, []);
+  // маршрутизация «Применить» для интеллектуальных тренировок (source = intellectual)
+  useEffect(() => {
+    if (zone === 'calculators') {
+      try {
+        const sel = JSON.parse(localStorage.getItem('he_pl_session') || '{}')?.selectedCycleId || JSON.parse(localStorage.getItem('he_bb_session') || '{}')?.selectedCycleId || '';
+        setPlannerSource('intellectual', sel || undefined);
+      } catch { setPlannerSource('intellectual'); }
+    } else if (zone === 'planner') {
+      const tr = planningTrack;
+      if (tr === 'pl') setPlannerSource('pl-auto');
+      else if (tr === 'bb') setPlannerSource('bb-auto');
+      else if (tr === 'manual') setPlannerSource('manual');
+    }
+  }, [zone, planningTrack]);
+  // приём «Применить» из интеллектуальных — к действующему выбранному циклу
+  useEffect(() => {
+    const unsub = subscribePlannerApply((payload) => {
+      if (!payload || (payload as any).source !== 'intellectual') return;
+      const targetId = (payload as any).targetCycleId as string | undefined;
+      if (!targetId) return;
+      const c = getCycleById(targetId);
+      if (!c) return;
+      const isBB = normalizeCycleDirection(c.meta.direction) === 'bodybuilding';
+      // для ПЛ — обновляем weakPoints/тренировочный профиль, для ББ — аналогично
+      if (payload.kind === 'weakpoints' && Array.isArray((payload.data as any).groups)) {
+        const groups = (payload.data as any).groups as string[];
+        try {
+          const prof = loadTrainingProfile();
+          saveTrainingProfile({ ...prof, weakPoints: groups });
+          // также обновляем he_pl_session для ПЛ-авто, чтобы при следующем построении подхватилось
+          if (!isBB) {
+            const raw = JSON.parse(localStorage.getItem('he_pl_session') || '{}');
+            localStorage.setItem('he_pl_session', JSON.stringify({ ...raw, plWeakPoints: payload.data }));
+          }
+        } catch {}
+      } else if (payload.kind === 'pm' && payload.data) {
+        const d: any = payload.data;
+        try {
+          const prof = loadTrainingProfile();
+          const patch: any = {};
+          if (d.lift === 'squat' && typeof d.value === 'number') patch.pmSquat = d.value;
+          else if (d.lift === 'bench' && typeof d.value === 'number') patch.pmBench = d.value;
+          else if (d.lift === 'dead' && typeof d.value === 'number') patch.pmDead = d.value;
+          if (typeof d.squat === 'number') patch.pmSquat = d.squat;
+          if (typeof d.bench === 'number') patch.pmBench = d.bench;
+          if (typeof d.dead === 'number') patch.pmDead = d.dead;
+          if (Object.keys(patch).length) saveTrainingProfile({ ...prof, ...patch });
+        } catch {}
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // Plan state — pre-fill from readiness and labAnalysis
   const [goal, setGoal] = useState('bulk');

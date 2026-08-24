@@ -76,6 +76,8 @@ export interface PlannerApplyDataByKind {
   limiter: LimiterPayload;
 }
 
+export type PlannerSource = 'pl-auto' | 'bb-auto' | 'intellectual' | 'manual' | string;
+
 export interface PlannerApply {
   kind: PlannerApplyKind;
   label: string;
@@ -83,6 +85,10 @@ export interface PlannerApply {
    *  Kept as `any` for backward-compat with existing consumers — see payload interfaces above. */
   data: any;
   ts: number;
+  /** Источник вызова: pl-auto / bb-auto / intellectual — для маршрутизации «Применить». */
+  source?: PlannerSource;
+  /** Для intellectual: id выбранного цикла, к которому применять. */
+  targetCycleId?: string;
 }
 
 export function getPlannerApply(): PlannerApply | null {
@@ -93,10 +99,37 @@ export function applyToPlanner<K extends PlannerApplyKind>(p: {
   kind: K;
   label: string;
   data: PlannerApplyDataByKind[K];
+  source?: PlannerSource;
+  targetCycleId?: string;
 }): void {
-  const payload: PlannerApply = { ...p, ts: Date.now() };
+  let src = p.source;
+  if (!src) {
+    try {
+      const w: any = typeof window !== 'undefined' ? window : {};
+      src = w.__planner_source || (localStorage.getItem('he_training_planning_track') as PlannerSource) || undefined;
+      if (!src) {
+        const tab = w.__intellectual_cycle_id ? 'intellectual' : undefined;
+        src = tab;
+      }
+    } catch {}
+  }
+  let target = p.targetCycleId;
+  if (!target && src === 'intellectual') {
+    try {
+      const w: any = typeof window !== 'undefined' ? window : {};
+      target = w.__intellectual_cycle_id || JSON.parse(localStorage.getItem('he_pl_session') || '{}')?.selectedCycleId || undefined;
+    } catch {}
+  }
+  const payload: PlannerApply = { ...p, ts: Date.now(), source: src, targetCycleId: target };
   try { localStorage.setItem(KEY, JSON.stringify(payload)); } catch { /* ignore */ }
   window.dispatchEvent(new CustomEvent('planner-apply', { detail: payload }));
+}
+
+export function setPlannerSource(src: PlannerSource, cycleId?: string): void {
+  try {
+    (window as any).__planner_source = src;
+    if (cycleId) (window as any).__intellectual_cycle_id = cycleId;
+  } catch {}
 }
 
 export function clearPlannerApply(): void {
