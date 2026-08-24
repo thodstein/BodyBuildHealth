@@ -792,27 +792,34 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
     onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   };
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
-  // P0-3: быстрый старт — группа мышц → упражнения из движка подбора
+  // P0-3: быстрый старт — группа мышц → упражнения из движка подбора + поиск
   const [quickGroup, setQuickGroup] = useState<string | null>(null);
+  const [quickSearch, setQuickSearch] = useState('');
   const quickExercises = useMemo(() => {
-    if (!quickGroup) return [] as Array<{ id: string; name: string; group?: string; type?: string }>;
+    if (!quickGroup) return [] as Array<{ id: string; name: string; group?: string; type?: string; equipment?: string }>;
     try {
       const prof = loadTrainingProfile();
-      return suggestExercisesForGroup(
+      const list = suggestExercisesForGroup(
         quickGroup,
         prof.level || 'intermediate',
-        6,
+        12,
         prof.equipment ?? [],
         prof.weakPoints ?? [],
         (prof.injuries ?? []).filter(i => i.exclude).map(i => i.muscle),
         prof.avoidAxialLoad ?? false,
         prof.favoriteExercises ?? [],
         prof.excludedExercises ?? [],
-      ).map(ex => ({ id: ex.id, name: ex.name, group: ex.group, type: ex.type }));
+      ).map(ex => {
+        const cat = (EXERCISE_CATALOG as unknown as Array<{ id: string; name: string; equipment?: string; type?: string; group?: string }>).find(c => c.id === ex.id || c.name === ex.name);
+        return { id: ex.id, name: ex.name, group: ex.group || cat?.group, type: ex.type || cat?.type, equipment: (cat as any)?.equipment || '—' };
+      });
+      if (!quickSearch.trim()) return list.slice(0, 6);
+      const q = quickSearch.toLowerCase().trim();
+      return list.filter(e => e.name.toLowerCase().includes(q)).slice(0, 6);
     } catch {
       return [];
     }
-  }, [quickGroup]);
+  }, [quickGroup, quickSearch]);
   const addQuickBlock = (ex: { name: string; group?: string; type?: string }) => {
     const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', workMax: {} } as any; } })();
     const muscle = ex.group || quickGroup || '';
@@ -1009,7 +1016,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             {Object.keys(GROUP_RU).map(g => (
               <button
                 key={g}
-                onClick={() => setQuickGroup(quickGroup === g ? null : g)}
+                onClick={() => { const nxt = quickGroup === g ? null : g; setQuickGroup(nxt); setQuickSearch(''); }}
                 aria-label={`Быстрое добавление: ${GROUP_RU[g]}`}
                 style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', minHeight: 44, background: quickGroup === g ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${quickGroup === g ? 'rgba(0,230,138,0.5)' : 'rgba(255,255,255,0.1)'}`, color: quickGroup === g ? '#00e68a' : '#fff', fontWeight: 700 }}>
                 {GROUP_RU[g]}
@@ -1017,17 +1024,25 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             ))}
           </div>
           {quickGroup && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6, justifyContent: 'center' }}>
-              {quickExercises.length === 0 && <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>Не нашлось упражнений — добавьте вручную через каталог ниже.</span>}
-              {quickExercises.map(ex => (
-                <button
-                  key={ex.id}
-                  onClick={() => addQuickBlock(ex)}
-                  title={`Добавить «${ex.name}» (3×10, RIR 2)`}
-                  style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer', minHeight: 44, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa', fontWeight: 700 }}>
-                  + {ex.name}
-                </button>
-              ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', alignItems: 'stretch' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{GROUP_RU[quickGroup] ?? quickGroup}</span>
+                <input value={quickSearch} onChange={e => setQuickSearch(e.target.value)} placeholder="🔍 Фильтр по названию…" style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: 11, minHeight: 32 }} />
+                <button onClick={() => { setQuickGroup(null); setQuickSearch(''); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, border: 'none', background: 'rgba(255,255,255,0.06)', color: DIM, cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 6 }}>
+                {quickExercises.length === 0 && <span style={{ gridColumn: '1/-1', fontSize: 10, color: DIM, textAlign: 'center', padding: 6 }}>Не нашлось — попробуйте другой фильтр или добавьте вручную через каталог</span>}
+                {quickExercises.map(ex => (
+                  <button
+                    key={ex.id}
+                    onClick={() => addQuickBlock(ex)}
+                    title={`Добавить «${ex.name}» · ${ex.type ?? ''} · ${ex.equipment ?? ''}`}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', minHeight: 56, textAlign: 'left', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', color: '#fff' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>+ {ex.name}</span>
+                    <span style={{ fontSize: 10, color: DIM }}>{ex.type === 'compound' ? '🏋️ База' : ex.type === 'isolation' ? '🎯 Изоляция' : '🔧 Доп.'} · {typeof ex.equipment === 'string' ? ex.equipment : Array.isArray(ex.equipment) ? (ex.equipment as string[]).join('/') : '—'}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -1041,7 +1056,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             {Object.keys(GROUP_RU).map(g => (
               <button
                 key={g}
-                onClick={() => setQuickGroup(quickGroup === g ? null : g)}
+                onClick={() => { const nxt = quickGroup === g ? null : g; setQuickGroup(nxt); setQuickSearch(''); }}
                 aria-label={`Быстрое добавление: ${GROUP_RU[g]}`}
                 title={`Показать упражнения для ${GROUP_RU[g]}`}
                 style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', minHeight: 32, background: quickGroup === g ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${quickGroup === g ? 'rgba(0,230,138,0.5)' : 'rgba(255,255,255,0.1)'}`, color: quickGroup === g ? '#00e68a' : '#fff', fontWeight: 600 }}>
@@ -1050,19 +1065,25 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             ))}
           </div>
           {quickGroup && (
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', padding: '4px 0 6px', alignItems: 'center' }}>
-              <span style={{ fontSize: 10, color: DIM }}>{GROUP_RU[quickGroup]}:</span>
-              {quickExercises.length === 0 && <span style={{ fontSize: 10, color: DIM, fontStyle: 'italic' }}>нет упражнений — выберите из каталога</span>}
-              {quickExercises.map(ex => (
-                <button
-                  key={ex.id}
-                  onClick={() => addQuickBlock(ex)}
-                  title={`Добавить «${ex.name}»`}
-                  style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', minHeight: 32, background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa', fontWeight: 700 }}>
-                  + {ex.name}
-                </button>
-              ))}
-              <button onClick={() => setQuickGroup(null)} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, border: 'none', background: 'transparent', color: DIM, cursor: 'pointer' }}>✕</button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{GROUP_RU[quickGroup] ?? quickGroup}</span>
+                <input value={quickSearch} onChange={e => setQuickSearch(e.target.value)} placeholder="🔍 Фильтр…" style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '5px 8px', color: '#fff', fontSize: 10, minHeight: 30 }} />
+                <button onClick={() => { setQuickGroup(null); setQuickSearch(''); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, border: 'none', background: 'rgba(255,255,255,0.06)', color: DIM, cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 6 }}>
+                {quickExercises.length === 0 && <span style={{ gridColumn: '1/-1', fontSize: 10, color: DIM, textAlign: 'center', padding: 4 }}>нет — попробуйте другой фильтр</span>}
+                {quickExercises.map(ex => (
+                  <button
+                    key={ex.id}
+                    onClick={() => addQuickBlock(ex)}
+                    title={`Добавить «${ex.name}» · ${ex.type ?? ''} · ${ex.equipment ?? ''}`}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', textAlign: 'left', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.22)', color: '#fff' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa' }}>+ {ex.name}</span>
+                    <span style={{ fontSize: 10, color: DIM }}>{ex.type === 'compound' ? '🏋️ База' : ex.type === 'isolation' ? '🎯 Изоляция' : '🔧 Доп.'} · {typeof ex.equipment === 'string' ? ex.equipment : Array.isArray(ex.equipment) ? (ex.equipment as string[]).join('/') : '—'}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </>
