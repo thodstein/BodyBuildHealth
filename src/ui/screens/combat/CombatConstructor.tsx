@@ -24,6 +24,8 @@ export const CombatConstructor: React.FC = () => {
   const [days, setDays] = useState(3);
   const [weightCut, setWeightCut] = useState(0);
   const [methodology, setMethodology] = useState<CombatInput['methodology']>('compound_first');
+  const [dupMode, setDupMode] = useState<CombatInput['dupMode']>('off');
+  const [intensityTech, setIntensityTech] = useState<CombatInput['intensityTech']>('none');
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('mma'));
   const [outsideEnabled, setOutsideEnabled] = useState(true);
   const [equipment, setEquipment] = useState<string[]>([]);
@@ -65,7 +67,7 @@ export const CombatConstructor: React.FC = () => {
   const build = () => {
     let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
-      weightCutKg: weightCut, methodology,
+      weightCutKg: weightCut, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
       equipment, injuries, mobilityRestrictions: mobility as any,
     };
@@ -147,6 +149,16 @@ export const CombatConstructor: React.FC = () => {
             <option value="compound_first">База первой</option>
             <option value="pre_exhaust">Предутомление</option>
             <option value="post_exhaust">Постутомление</option>
+          </select>
+          <label style={{ color: '#fff', fontSize: 12 }}>DUP волны</label>
+          <select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+            <option value="off">Выкл</option>
+            <option value="power_endurance">Сила/выносливость</option>
+          </select>
+          <label style={{ color: '#fff', fontSize: 12 }}>Интенс-техника</label>
+          <select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+            <option value="none">Нет</option>
+            <option value="rest_pause">Rest-pause</option>
           </select>
           <label style={{ color: '#fff', fontSize: 12 }}>Весогонка кг (0 = нет): {weightCut}</label>
           <input type="range" min={0} max={8} step={0.5} value={weightCut} onChange={e => setWeightCut(Number(e.target.value))} />

@@ -47,6 +47,8 @@ export interface StrengthSportInput {
   bodyweightCapability?: { pullUpsStrict?: number; dipsStrict?: number };
   weakPoints?: string[];
   focus?: 'snatch' | 'clean' | 'squat' | 'overhead' | 'carry' | 'stone' | null;
+  dupMode?: 'off' | 'heavy_light' | 'wave';
+  intensityTech?: 'none' | 'cluster';
   // Методика
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   // PED / recovery

@@ -14,6 +14,8 @@ import { adaptForPEDsSS } from './strength-sport-ped-adaptation';
 import { filterByMobility } from './strength-sport-mobility';
 import { lengthenedBonus } from './strength-sport-bonus';
 import { warmupRampFor } from './strength-sport-warmup';
+import { applyDUP } from './strength-sport-dup';
+import { applyIntensity } from './strength-sport-intensity';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
 /** Пул упражнений по тегу — кандидаты (id каталога) + замены */
@@ -374,6 +376,16 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
     const totalTonnage = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
     weeksData.push({ week: w, phase, deload, taper: w === weeks && goal === 'peaking', sessions, totalSets, totalTonnage });
+  }
+
+  // DUP / intensity (изолированно, только зал)
+  if (input.dupMode && input.dupMode !== 'off') {
+    const tmp: any = { weeksData, level, rationale: [] };
+    applyDUP(tmp as any, input.dupMode as any);
+  }
+  if (input.intensityTech && input.intensityTech !== 'none') {
+    const tmp: any = { weeksData, level, rationale: [] };
+    applyIntensity(tmp as any, input.intensityTech as any);
   }
 
   // Валидация

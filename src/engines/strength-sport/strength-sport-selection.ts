@@ -75,18 +75,29 @@ export function filterByInjury(pool: string[], injuries: any[] | undefined): str
 // Diversity: выбрать по одному из каждого angle класса
 export function selectDiverse(pool: string[], tag: string, count: number, favorite: Set<string>): string[] {
   const classes = SS_ANGLE_CLASSES[tag];
-  if (!classes) return pool.slice(0, count);
+  if (!classes) {
+    // без классов — сортировка по favorite + lengthenedBonus
+    const withBonus = [...pool].sort((a,b) => {
+      const fav = (favorite.has(b)?1:0) - (favorite.has(a)?1:0);
+      if (fav !== 0) return fav;
+      // lengthenedBonus из bonus файла (избегаем импорта цикла — inline check)
+      const lb = (id:string)=> ['rdl','snatch_pull','clean_pull','bulgarian','cossack','overhead_squat','snatch_balance'].some(k=> id.includes(k)) ? 10 : 0;
+      return lb(b) - lb(a);
+    });
+    return withBonus.slice(0, count);
+  }
   const chosen: string[] = [];
-  const usedClass = new Set<string>();
-  // сначала любимые
-  const favFirst = [...pool].sort((a,b) => (favorite.has(b)?1:0)-(favorite.has(a)?1:0));
-  // по классам
+  const favFirst = [...pool].sort((a,b) => {
+    const fav = (favorite.has(b)?1:0)-(favorite.has(a)?1:0);
+    if (fav!==0) return fav;
+    const lb = (id:string)=> ['rdl','snatch_pull','clean_pull','bulgarian','cossack','overhead_squat','snatch_balance'].some(k=> id.includes(k)) ? 10 : 0;
+    return lb(b)-lb(a);
+  });
   for (const [cls, ids] of Object.entries(classes)) {
     if (chosen.length >= count) break;
     const cand = favFirst.find(id => ids.includes(id) && !chosen.includes(id));
-    if (cand) { chosen.push(cand); usedClass.add(cls); }
+    if (cand) { chosen.push(cand); }
   }
-  // добиваем остатком
   for (const id of favFirst) {
     if (chosen.length >= count) break;
     if (!chosen.includes(id)) chosen.push(id);

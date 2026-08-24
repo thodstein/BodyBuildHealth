@@ -25,6 +25,8 @@ export const StrengthSportConstructor: React.FC = () => {
   const [days, setDays] = useState(3);
   const [focus, setFocus] = useState<StrengthSportInput['focus']>(null);
   const [methodology, setMethodology] = useState<StrengthSportInput['methodology']>('compound_first');
+  const [dupMode, setDupMode] = useState<StrengthSportInput['dupMode']>('off');
+  const [intensityTech, setIntensityTech] = useState<StrengthSportInput['intensityTech']>('none');
   const [workMax, setWorkMax] = useState<StrengthSportInput['workMax']>({ backSquat: 120, deadlift: 160, snatch: 70, cleanJerk: 90, overheadPress: 60 });
   const [equipment, setEquipment] = useState<string[]>([]);
   const [mobility, setMobility] = useState<string[]>([]);
@@ -73,7 +75,7 @@ export const StrengthSportConstructor: React.FC = () => {
 
   const build = () => {
     let input: StrengthSportInput = {
-      mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology,
+      mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
       equipment, injuries, mobilityRestrictions: mobility as any,
     };
@@ -185,6 +187,17 @@ export const StrengthSportConstructor: React.FC = () => {
             <option value="compound_first">База первой</option>
             <option value="pre_exhaust">Предутомление</option>
             <option value="post_exhaust">Постутомление</option>
+          </select>
+          <label style={{ color: '#fff', fontSize: 12 }}>DUP волны</label>
+          <select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+            <option value="off">Выкл</option>
+            <option value="heavy_light">Тяж/лёг</option>
+            <option value="wave">Волна</option>
+          </select>
+          <label style={{ color: '#fff', fontSize: 12 }}>Интенс-техника</label>
+          <select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+            <option value="none">Нет</option>
+            <option value="cluster">Кластер (3×1)</option>
           </select>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (

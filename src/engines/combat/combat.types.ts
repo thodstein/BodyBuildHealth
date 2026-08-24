@@ -27,6 +27,8 @@ export interface CombatInput {
   weightCutKg?: number; // кг к сгонке за цикл
   // Внешняя нагрузка
   outsideLoad?: import('../outside-load.engine').OutsideLoad | null;
+  dupMode?: 'off' | 'power_endurance';
+  intensityTech?: 'none' | 'rest_pause';
   // Методика
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   // Recovery / PED

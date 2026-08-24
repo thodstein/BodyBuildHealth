@@ -11,6 +11,8 @@ import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
 import { filterByMobilityCB } from './combat-mobility';
+import { applyCombatDUP } from './combat-dup';
+import { applyCombatIntensity } from './combat-intensity';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
@@ -240,6 +242,15 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     sessions.sort((a, b) => a.day - b.day);
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
     weeksData.push({ week: w, phase, deload, sessions, totalSets, outsideLoad: outsideMetrics?.weeklyLoad });
+  }
+
+  if (input.dupMode && input.dupMode !== 'off') {
+    const tmp:any = { weeksData, rationale: [] };
+    applyCombatDUP(tmp as any, input.dupMode as any);
+  }
+  if (input.intensityTech && input.intensityTech !== 'none') {
+    const tmp:any = { weeksData, rationale: [] };
+    applyCombatIntensity(tmp as any, input.intensityTech as any);
   }
 
   const warnings: string[] = [];
