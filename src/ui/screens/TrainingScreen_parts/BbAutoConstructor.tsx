@@ -48,7 +48,7 @@ import { activeBlockForWeek, weekForDate } from '../../../engines/annual-trainin
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
 import { ACCENT, CARD, SMALL, BTN, BTN_GHOST, H, STEP_PILL, IN, Chip } from './training-ui';
 import { MesocycleProgressionCard } from './MesocycleProgressionCard';
-import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, MetricCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
+import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, phaseExerciseMix, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
@@ -65,12 +65,11 @@ import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
-import { validatePlan, weeklySetsFromBBPlan } from '../../../engines/plan-validator';
+
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
 import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from '../../../engines/periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
-import { BBMetricsSummaryCard } from './BBMetricsSummaryCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
 import {
@@ -139,8 +138,8 @@ export const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
 
 // P2-6: ограниченный кеш (max 8 записей — достаточно для типичных значений weeks 4-24).
 const _phaseMapCache = new Map<string, Map<number, BBPhase>>();
-function getPhaseMap(totalWeeks: number): Map<number, BBPhase> {
-  const cacheKey = String(totalWeeks);
+function getPhaseMap(totalWeeks: number, goal: string = 'mass'): Map<number, BBPhase> {
+  const cacheKey = `${totalWeeks}:${goal}`;
   if (_phaseMapCache.has(cacheKey)) return _phaseMapCache.get(cacheKey)!;
   // P2-6: evict oldest if cache > 8 entries (anti-leak)
   if (_phaseMapCache.size >= 8) {
@@ -150,7 +149,7 @@ function getPhaseMap(totalWeeks: number): Map<number, BBPhase> {
   // P1: синхронизируем deloadFreq с движком buildBBPlan (deloadFreq = weeks>=6 ? 4 : 0),
   // иначе календарь/баннер показывал «без делода», а сгенерированный план содержал deload-неделю.
   const deloadFreq = totalWeeks >= 6 ? 4 : 0;
-  const dist: PhaseDistribution[] = distributePhasesUnified(totalWeeks, deloadFreq, 'mass');
+  const dist: PhaseDistribution[] = distributePhasesUnified(totalWeeks, deloadFreq, goal as any);
   const map = new Map<number, BBPhase>();
   for (const d of dist) {
     for (const w of d.weeks) {
@@ -164,8 +163,8 @@ function getPhaseMap(totalWeeks: number): Map<number, BBPhase> {
   return map;
 }
 
-function phaseForWeek(week: number, totalWeeks: number): BBPhase {
-  return getPhaseMap(totalWeeks).get(week) || 'accumulation';
+function phaseForWeek(week: number, totalWeeks: number, goal: string = 'mass'): BBPhase {
+  return getPhaseMap(totalWeeks, goal).get(week) || 'accumulation';
 }
 
 /** Проверка: мышца в списке слабых групп (с учётом родительских групп). */
@@ -263,10 +262,10 @@ export function annualBlockCtxToPrepPatch(
   };
 }
 
-function computePhases(totalWeeks: number): { week: number; phase: BBPhase }[] {
+function computePhases(totalWeeks: number, goal: string = 'mass'): { week: number; phase: BBPhase }[] {
   const phases: { week: number; phase: BBPhase }[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
-    const p = phaseForWeek(w, totalWeeks);
+    const p = phaseForWeek(w, totalWeeks, goal);
     phases.push({ week: w, phase: p });
   }
   return phases;
@@ -1050,7 +1049,7 @@ export const BbAutoConstructor: React.FC = () => {
     setStep('params');
   }, []);
 
-  const phases = useMemo(() => computePhases(bbWeeks), [bbWeeks]);
+  const phases = useMemo(() => computePhases(bbWeeks, bbGoal), [bbWeeks, bbGoal]);
 
   const autoRegResult = useMemo(() => {
     const rec = linked.readiness?.recovery ?? 80;
@@ -4296,7 +4295,7 @@ export const BbAutoConstructor: React.FC = () => {
     if (!builtPlan || !metrics) return null;
     const W = builtPlan.weeks;
     const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
-    const currentPhase = phaseForWeek(wk.week, bbWeeks);
+    const currentPhase = ((wk as any).phase || ((wk as any).deload ? 'deload' : 'accumulation')) as BBPhase;
     return (
       <div>
         <div style={H}>🛠 Шаг 6: Ручная коррекция</div>

@@ -41,9 +41,9 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
   return (
     <div style={{ ...CARD, padding: 10, marginBottom: 8, background: 'rgba(0,230,138,0.04)', borderLeft: '3px solid #00e68a' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>📊 Бюджет объёма по мышцам</span>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>📊 Бюджет объёма по мышцам · пик</span>
         {mrvMultiplier > 1 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: 4 }}>MRV ×{mrvMultiplier.toFixed(2)}</span>}
-        <span style={{ fontSize: 10, color: '#fff' }}>всего {metrics.totalSets} сетов/нед</span>
+        <span style={{ fontSize: 10, color: '#fff' }}>всего {metrics.totalSets} сетов/нед · пик-неделя</span>
       </div>
 
       {/* Легенда */}
