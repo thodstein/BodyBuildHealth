@@ -21,6 +21,7 @@ import { NutritionWeeklyComparison } from './NutritionScreen_parts/NutritionWeek
 import { readDiaryV2, onDiaryChangeV2 } from './NutritionScreen_parts/diary-storage-v2';
 import { MetabolicHub } from './Shared/MetabolicHub';
 import { RecipesTabModern } from './NutritionScreen_parts/RecipesTabModern';
+import { ModernHero, ModernPill, ModernSearch, modernCardBg } from './NutritionScreen_parts/nutrition-modern-kit';
 
 const NutritionCharts = lazy(() => import('./NutritionScreen_parts/NutritionCharts').then(m => ({ default: m.NutritionCharts })));
 import { generateNutritionReport, NutritionReport } from '../../engines/nutrition-report.engine';
@@ -64,11 +65,11 @@ const pillInactive = { background: '#202023', color: 'rgba(255,255,255,0.45)', b
 const inputStyle: React.CSSProperties = { width:'100%', padding:'10px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, boxSizing:'border-box', outline:'none' };
 const labelSec: React.CSSProperties = { fontSize:14, fontWeight:600, color:'#fff', marginBottom:10, letterSpacing:-0.3 };
 
+
 const CartTab: React.FC = () => {
   const [refresh, setRefresh] = useState(0);
   const [editingStoreId, setEditingStoreId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({});
-  const [editingNote, setEditingNote] = useState<Record<string, string>>({});
   const [storeNotes, setStoreNotes] = useState<Record<string, string>>({});
   const [newStoreName, setNewStoreName] = useState('');
   const [showNewStore, setShowNewStore] = useState(false);
@@ -81,61 +82,38 @@ const CartTab: React.FC = () => {
 
   const rerender = () => setRefresh(n => n + 1);
   const updateCarts = (newCarts: CartStore[]) => { saveCarts(newCarts); rerender(); };
-
   const switchStore = (id: string) => { setActiveStoreId(id); rerender(); };
-
   const addStore = () => {
     const name = newStoreName.trim() || 'Магазин ' + (carts.length + 1);
     const nc: CartStore = { id: 'store_' + Date.now(), name, notes: '', sortOrder: carts.length, items: [] };
-    updateCarts([...carts, nc]);
-    setActiveStoreId(nc.id);
-    setNewStoreName('');
-    setShowNewStore(false);
+    updateCarts([...carts, nc]); setActiveStoreId(nc.id); setNewStoreName(''); setShowNewStore(false);
   };
-
   const deleteStore = (id: string) => {
     const filtered = carts.filter(s => s.id !== id);
     updateCarts(filtered);
     if (getActiveStoreId() === id && filtered.length > 0) setActiveStoreId(filtered[0].id);
   };
-
-  const renameStore = (id: string, name: string) => {
-    updateCarts(carts.map(s => s.id === id ? { ...s, name } : s));
-  };
-
+  const renameStore = (id: string, name: string) => { updateCarts(carts.map(s => s.id === id ? { ...s, name } : s)); };
   const duplicateStore = (id: string) => {
     const src = carts.find(s => s.id === id);
     if (!src) return;
     const dup: CartStore = { ...src, id: 'store_' + Date.now(), name: src.name + ' (копия)', sortOrder: carts.length };
     updateCarts([...carts, dup]);
   };
-
-  const updateStoreNotes = (id: string, notes: string) => {
-    updateCarts(carts.map(s => s.id === id ? { ...s, notes } : s));
-  };
-
-  const addItem = (name: string, kcal: number, amount?: number, category?: string) => {
-    addToCart({ name, kcal, amount, category });
-    rerender();
-  };
-
+  const updateStoreNotes = (id: string, notes: string) => { updateCarts(carts.map(s => s.id === id ? { ...s, notes } : s)); };
   const removeItem = (itemId: string) => {
     if (activeIdx < 0) return;
     const newCarts = [...carts];
     newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.filter(i => i.id !== itemId) };
     updateCarts(newCarts);
   };
-
   const updateQty = (itemId: string, delta: number) => {
     if (activeIdx < 0) return;
     const newCarts = [...carts];
     newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.map(i => i.id === itemId ? { ...i, amount: Math.max(10, i.amount + delta), kcal: Math.round(i.kcal * Math.max(10, i.amount + delta) / Math.max(1, i.amount)) } : i) };
     updateCarts(newCarts);
   };
-
-  const setItemPrice = (itemId: string, price: string) => {
-    setEditingPrice(p => ({ ...p, [itemId]: price }));
-  };
+  const setItemPrice = (itemId: string, price: string) => { setEditingPrice(p => ({ ...p, [itemId]: price })); };
   const confirmPrice = (itemId: string) => {
     if (activeIdx < 0) return;
     const price = parseFloat(editingPrice[itemId] || '0') || 0;
@@ -143,14 +121,12 @@ const CartTab: React.FC = () => {
     newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.map(i => i.id === itemId ? { ...i, price } : i) };
     updateCarts(newCarts);
   };
-
   const setItemNote = (itemId: string, note: string) => {
     if (activeIdx < 0) return;
     const newCarts = [...carts];
     newCarts[activeIdx] = { ...newCarts[activeIdx], items: newCarts[activeIdx].items.map(i => i.id === itemId ? { ...i, note } : i) };
     updateCarts(newCarts);
   };
-
   const clearStore = () => {
     if (activeIdx < 0) return;
     const newCarts = [...carts];
@@ -164,134 +140,126 @@ const CartTab: React.FC = () => {
   const groups: Record<string, CartItemEnhanced[]> = {};
   (items || []).forEach(item => { const cat = item.category || 'other'; if (!groups[cat]) groups[cat] = []; groups[cat].push(item); });
 
-  const storeBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode, extra?: React.CSSProperties) => (
-    <button onClick={onClick} style={{ padding:'4px 10px', borderRadius:8, fontSize:9, cursor:'pointer', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'rgba(0,230,138,0.12)' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: isActive ? 700 : 400, whiteSpace:'nowrap', ...extra }}>{children}</button>
-  );
-
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-      {/* Stores bar */}
-      <div style={{ padding:14, ...cardBg }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-          <div style={{ fontSize:15, fontWeight:700, color:'#fff', letterSpacing:-0.3 }}>🛒 Корзина</div>
-          <button onClick={() => setShowNewStore(!showNewStore)} style={{ padding:'5px 10px', borderRadius:8, fontSize:9, cursor:'pointer', border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', fontWeight:600 }}>+ Магазин</button>
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <ModernHero icon="🛒" title="Корзина" subtitle="Списки покупок по магазинам — с КБЖУ, ценами и заметками. Синхронизируется с планом питания." count={carts.length} stats={[
+        { k:'Магазинов', v: carts.length, sub:'списков', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+        { k:'Позиций', v: items.length, sub:'товаров', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+        { k:'Ккал', v: Math.round(totalKcal), sub:'всего', col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
+      ]} action={<button onClick={() => setShowNewStore(!showNewStore)} style={{ padding:'8px 14px', borderRadius:10, border:'1px solid rgba(0,230,138,0.25)', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:750, fontSize:11, cursor:'pointer', boxShadow:'0 4px 12px rgba(0,230,138,0.2)' }}>＋ Магазин</button>} />
+      {showNewStore && (
+        <div style={{ ...modernCardBg, padding:12, display:'flex', gap:8 }}>
+          <input value={newStoreName} onChange={e => setNewStoreName(e.target.value)} placeholder="Название магазина (например: Перекрёсток)" style={{ flex:1, padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background:'#202023', color:'#fff', outline:'none', fontSize:12 }} onKeyDown={e => { if (e.key === 'Enter') addStore(); }} />
+          <button onClick={addStore} style={{ padding:'10px 14px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, cursor:'pointer' }}>Создать</button>
+          <button onClick={() => setShowNewStore(false)} style={{ padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background:'#202023', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>✕</button>
         </div>
-        {showNewStore && (
-          <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-            <input value={newStoreName} onChange={e => setNewStoreName(e.target.value)} placeholder="Название магазина" style={{ flex:1, padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none' }}
-              onKeyDown={e => { if (e.key === 'Enter') addStore(); }} />
-            <button onClick={addStore} style={{ padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontSize:9, fontWeight:700 }}>✅</button>
-            <button onClick={() => setShowNewStore(false)} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', cursor:'pointer', background:'#202023', color:'rgba(255,255,255,0.7)', fontSize:9 }}>✕</button>
-          </div>
-        )}
-        <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-          {carts.map(s => (
-            <div key={s.id} style={{ display:'flex', alignItems:'center', gap:2 }}>
-              {storeBtn(s.id === (activeStore?.id || ''), () => switchStore(s.id), `${s.name} (${s.items.length})`)}
-              <button onClick={() => duplicateStore(s.id)} style={{ padding:'2px 4px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.8)', fontSize:7 }}>📋</button>
-              {carts.length > 1 && <button onClick={() => deleteStore(s.id)} style={{ padding:'2px 4px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.08)', color:'#ef4444', fontSize:7 }}>✕</button>}
-            </div>
-          ))}
+      )}
+      <div style={{ ...modernCardBg, padding:12 }}>
+        <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:8 }}>Магазины</div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          {carts.length===0 ? <span style={{ fontSize:11, color:'rgba(255,255,255,0.4)' }}>Нет списков — создай первый</span> : carts.map(s => {
+            const isActive = s.id === (activeStore?.id || '');
+            return (
+              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 4px 4px 8px', borderRadius:999, background: isActive ? 'rgba(0,230,138,0.10)' : '#202023', border: isActive ? '1px solid rgba(0,230,138,0.22)' : '1px solid rgba(255,255,255,0.06)', cursor:'pointer' }} onClick={() => switchStore(s.id)}>
+                <span style={{ fontSize:11, fontWeight: isActive?700:500, color: isActive?'#00e68a':'rgba(255,255,255,0.75)' }}>{s.name}</span>
+                <span style={{ fontSize:9, padding:'2px 6px', borderRadius:999, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)' }}>{s.items.length}</span>
+                <button onClick={e => { e.stopPropagation(); duplicateStore(s.id); }} style={{ width:22, height:22, borderRadius:999, border:'none', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10 }}>⎘</button>
+                {carts.length>1 && <button onClick={e => { e.stopPropagation(); deleteStore(s.id); }} style={{ width:22, height:22, borderRadius:999, border:'none', background:'rgba(239,68,68,0.10)', color:'#ef4444', cursor:'pointer', fontSize:10 }}>✕</button>}
+              </div>
+            );
+          })}
         </div>
-
-        {!activeStore ? (
-          <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:11 }}>
-            Создайте магазин, чтобы начать собирать список покупок.
-          </div>
-        ) : (
-          <>
-            {/* Store name + rename */}
-            <input value={editingStoreId === activeStore.id ? (editingStoreId === activeStore.id ? storeNotes['_name'] ?? activeStore.name : activeStore.name) : activeStore.name}
+      </div>
+      {!activeStore ? (
+        <div style={{ ...modernCardBg, padding:24, textAlign:'center' }}>
+          <div style={{ fontSize:28 }}>🛒</div>
+          <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginTop:6 }}>Нет активного списка</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginTop:4 }}>Создай магазин, чтобы собирать продукты из плана.</div>
+        </div>
+      ) : (
+        <>
+          <div style={{ ...modernCardBg, padding:12 }}>
+            <input value={editingStoreId === activeStore.id ? (storeNotes['_name'] ?? activeStore.name) : activeStore.name}
               onChange={e => { setEditingStoreId(activeStore.id); setStoreNotes(p => ({ ...p, _name: e.target.value })); }}
               onBlur={() => { if (editingStoreId === activeStore.id) { renameStore(activeStore.id, storeNotes['_name'] ?? activeStore.name); setEditingStoreId(null); } }}
-              placeholder="🏪 Название магазина" style={{ ...inputStyle, marginBottom:4, fontSize:12, fontWeight:600 }} />
-
-            {/* Summary */}
-            <div style={{ display:'flex', gap:8, marginBottom:6 }}>
-              <div style={{ flex:1, background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>Позиций</div>
-                <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{items.length}</div>
-              </div>
-              <div style={{ flex:1, background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>Ккал</div>
-                <div style={{ fontSize:14, fontWeight:800, color:'#8b5cf6' }}>{Math.round(totalKcal)}</div>
-              </div>
-              <div style={{ flex:1, background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>Сумма</div>
-                <div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>{totalPrice.toFixed(0)}₽</div>
-              </div>
+              placeholder="🏪 Название магазина" style={{ width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, fontWeight:600, outline:'none' }} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginTop:10 }}>
+              {[
+                {k:'Позиций',v:items.length,col:'#00e68a',bg:'rgba(0,230,138,0.08)'},
+                {k:'Ккал',v:Math.round(totalKcal),col:'#a78bfa',bg:'rgba(167,139,250,0.08)'},
+                {k:'Сумма',v:`${totalPrice.toFixed(0)}₽`,col:'#f59e0b',bg:'rgba(245,158,11,0.08)'},
+              ].map(s=>(
+                <div key={s.k} style={{ background:s.bg, border:`1px solid ${s.col}18`, borderRadius:12, padding:'10px', textAlign:'center' }}>
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', fontWeight:600 }}>{s.k}</div>
+                  <div style={{ fontSize:16, fontWeight:800, color:s.col, marginTop:2 }}>{s.v}</div>
+                </div>
+              ))}
             </div>
-
-            {/* Actions */}
-            <div style={{ display:'flex', gap:3, marginBottom:6, flexWrap:'wrap' }}>
-              <button onClick={clearStore} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.08)', color:'#ef4444' }}>✕ Очистить список</button>
-              <button onClick={() => duplicateStore(activeStore.id)} style={{ padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(139,92,246,0.2)', background:'rgba(139,92,246,0.08)', color:'#8b5cf6' }}>📋 Дублировать</button>
+            <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
+              <button onClick={clearStore} style={{ padding:'7px 12px', borderRadius:10, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕ Очистить</button>
+              <button onClick={() => duplicateStore(activeStore.id)} style={{ padding:'7px 12px', borderRadius:10, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:10, fontWeight:600 }}>⎘ Дублировать</button>
             </div>
-
-            {/* General notes */}
-            <textarea value={storeNotes[activeStore.id] ?? activeStore.notes ?? ''}
-              onChange={e => { setStoreNotes(p => ({ ...p, [activeStore.id]: e.target.value })); }}
-              onBlur={() => { updateStoreNotes(activeStore.id, storeNotes[activeStore.id] ?? activeStore.notes ?? ''); }}
-              placeholder="📝 Общие заметки к списку..." style={{ width:'100%', boxSizing:'border-box', padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none', resize:'vertical', minHeight:36, marginBottom:6, fontFamily:'inherit' }} />
-
-            {items.length === 0 ? (
-              <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>
-                Список пуст. Добавляйте продукты из плана питания кнопкой «🛒».
-              </div>
-            ) : (
-              <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
-                {Object.entries(groups).map(([cat, catItems]) => (
-                  <div key={cat}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#f97316', marginBottom:3, padding:'2px 0', borderBottom:'1px solid rgba(249,115,22,0.1)', display:'flex', alignItems:'center', gap:4 }}>
-                      {CART_CAT_LABELS[cat] || cat} <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)', fontWeight:400 }}>({catItems.length})</span>
-                      <span style={{ marginLeft:'auto', fontSize:8, color:'#f59e0b' }}>{catItems.reduce((s,i) => s+(i.price||0),0).toFixed(0)}₽</span>
-                    </div>
+            <textarea value={storeNotes[activeStore.id] ?? activeStore.notes ?? ''} onChange={e => { setStoreNotes(p => ({ ...p, [activeStore.id]: e.target.value })); }} onBlur={() => { updateStoreNotes(activeStore.id, storeNotes[activeStore.id] ?? activeStore.notes ?? ''); }} placeholder="📝 Заметки к списку (например: без сахара, только акции)…" style={{ width:'100%', boxSizing:'border-box', marginTop:10, padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', outline:'none', fontSize:11, minHeight:48, resize:'vertical' as const }} />
+          </div>
+          {items.length===0 ? (
+            <div style={{ ...modernCardBg, padding:24, textAlign:'center' }}>
+              <div style={{ fontSize:26 }}>📭</div>
+              <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginTop:6 }}>Список пуст</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginTop:4 }}>Добавляй продукты из каталога или плана кнопкой «🛒»</div>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {Object.entries(groups).map(([cat, catItems]) => (
+                <div key={cat} style={{ ...modernCardBg, padding:12 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, paddingBottom:8, borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#f97316' }}>{CART_CAT_LABELS[cat] || cat}</span>
+                    <span style={{ fontSize:9, padding:'2px 6px', borderRadius:999, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)' }}>{catItems.length}</span>
+                    <span style={{ marginLeft:'auto', fontSize:9, fontWeight:700, color:'#f59e0b' }}>{catItems.reduce((s,i)=>s+(i.price||0),0).toFixed(0)}₽</span>
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                     {catItems.map(item => (
-                      <div key={item.id} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)' }}>
+                      <div key={item.id} style={{ padding:'10px 12px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.05)', display:'flex', flexDirection:'column', gap:8 }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                           <div style={{ flex:1 }}>
-                            <div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{item.name}</div>
-                            <div style={{ display:'flex', alignItems:'center', gap:4, marginTop:1 }}>
-                              <button onClick={() => updateQty(item.id, -10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
-                              <span style={{ fontSize:9, fontWeight:700, color:'#00e68a' }}>{item.amount}г</span>
-                              <button onClick={() => updateQty(item.id, 10)} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.03)', color:'#fff', cursor:'pointer', fontSize:9, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                            <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{item.name}</div>
+                            <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                              <button onClick={() => updateQty(item.id, -10)} style={{ width:26, height:26, borderRadius:8, border:'1px solid rgba(255,255,255,0.07)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontWeight:700 }}>-</button>
+                              <span style={{ fontSize:11, fontWeight:800, color:'#00e68a', minWidth:40, textAlign:'center' }}>{item.amount}г</span>
+                              <button onClick={() => updateQty(item.id, 10)} style={{ width:26, height:26, borderRadius:8, border:'1px solid rgba(255,255,255,0.07)', background:'rgba(255,255,255,0.04)', color:'#fff', cursor:'pointer', fontWeight:700 }}>+</button>
+                              <span style={{ marginLeft:8, fontSize:11, fontWeight:800, color:'#00e68a' }}>{Math.round(item.kcal)} ккал</span>
                             </div>
                           </div>
-                          <div style={{ display:'flex', alignItems:'center', gap:3 }}>
-                            <div style={{ fontSize:11, fontWeight:800, color:'#00e68a' }}>{Math.round(item.kcal)}</div>
-                            <button onClick={() => removeItem(item.id)} style={{ padding:'2px 5px', borderRadius:4, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
-                          </div>
+                          <button onClick={() => removeItem(item.id)} style={{ width:30, height:30, borderRadius:10, border:'1px solid rgba(239,68,68,0.15)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontWeight:700 }}>✕</button>
                         </div>
-                        {/* Price + Note row */}
-                        <div style={{ display:'flex', gap:4, marginTop:3, alignItems:'center' }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:2, background:'#18181b', borderRadius:6, padding:'2px 6px' }}>
-                            <span style={{ fontSize:8, color:'rgba(255,255,255,0.8)' }}>₽</span>
-                            <input value={editingPrice[item.id] ?? (item.price ? item.price.toString() : '')} onChange={e => setItemPrice(item.id, e.target.value)}
-                              onBlur={() => confirmPrice(item.id)}
-                              style={{ width:45, padding:'2px 4px', borderRadius:4, border:'none', background:'transparent', color:'#f59e0b', fontSize:9, fontWeight:600, textAlign:'right', outline:'none' }}
-                              placeholder="0" />
+                        <div style={{ display:'flex', gap:6 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, background:'#18181b', borderRadius:10, padding:'6px 8px', border:'1px solid rgba(255,255,255,0.04)' }}>
+                            <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)' }}>₽</span>
+                            <input value={editingPrice[item.id] ?? (item.price ? item.price.toString() : '')} onChange={e => setItemPrice(item.id, e.target.value)} onBlur={() => confirmPrice(item.id)} placeholder="цена" style={{ width:60, background:'transparent', border:'none', color:'#f59e0b', fontSize:11, fontWeight:700, outline:'none', textAlign:'right' }} />
                           </div>
-                          <input value={item.note} onChange={e => setItemNote(item.id, e.target.value)}
-                            placeholder="📌 Заметка к продукту..." style={{ flex:1, padding:'3px 6px', borderRadius:6, fontSize:8, border:'1px solid rgba(255,255,255,0.04)', background:'#18181b', color:'rgba(255,255,255,0.85)', outline:'none' }} />
-                          {item.price > 0 && <span style={{ fontSize:8, color:'#f59e0b', fontWeight:700 }}>{(item.price).toFixed(0)}₽</span>}
+                          <input value={item.note || ''} onChange={e => setItemNote(item.id, e.target.value)} placeholder="📌 Заметка…" style={{ flex:1, padding:'8px 10px', borderRadius:10, background:'#18181b', border:'1px solid rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.75)', outline:'none', fontSize:10 }} />
                         </div>
                       </div>
                     ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
-
 const ReferenceTab: React.FC = () => (
-  <div style={{ display:'flex', flexDirection:'column', gap:8, padding:'4px 0' }}>
-    <div style={{ fontSize:13, fontWeight:700, color:'#fff', marginBottom:2, padding:'0 4px', letterSpacing:-0.2 }}>📖 Справочник питания</div>
-    <NutritionReference />
+  <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <ModernHero icon="📖" title="Справочник питания" subtitle="Твоя база знаний по нутрициологии — от БЖУ до микронутриентов. Быстрый доступ к проверенной инфо." stats={[
+      { k:'Разделов', v: '12+', sub:'тем', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+      { k:'Проверено', v: '100%', sub:'наука', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+      { k:'Обновлено', v: '2026', sub:'год', col:'#a78bfa', bg:'rgba(167,139,250,0.08)' },
+    ]} />
+    <div style={{ ...modernCardBg, padding:12 }}>
+      <NutritionReference />
+    </div>
   </div>
 );
 
@@ -306,6 +274,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   supplement: '💊 Добавки',
   other: '📦 Прочее',
 };
+
 
 const CatalogTab: React.FC = () => {
   const [catSearch, setCatSearch] = React.useState('');
@@ -334,203 +303,114 @@ const CatalogTab: React.FC = () => {
     if (q) {
       result = result.filter((f: any) => (f.name || '').toLowerCase().includes(q) || (f.description || '').toLowerCase().includes(q));
     }
-    return result.slice(0, 100);
+    return result.slice(0, 120);
   }, [catFilter, catSearch, showExclusive, allFoods]);
-  const filterBtn = (isActive: boolean, onClick: () => void, children: React.ReactNode) => (
-    <button onClick={onClick} style={{ padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: isActive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap', border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: isActive ? 'linear-gradient(135deg,rgba(0,230,138,0.2),rgba(0,200,160,0.12))' : '#202023', color: isActive ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>{children}</button>
-  );
   const toggleExpanded = (id: string) => setCatExpanded(prev => prev === id ? null : id);
-  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-    <div style={{ padding:14, ...cardBg }}>
-      <div style={labelSec}>📦 Каталог продуктов ({allFoods.length})</div>
-      <input value={catSearch} onChange={e => setCatSearch(e.target.value)} placeholder="🔍 Поиск по названию..." style={inputStyle} />
-      <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
-        {filterBtn(catFilter === 'all', () => { setShowExclusive(false); setCatFilter('all'); }, `Все (${allFoods.length})`)}
-        {categories.map(c => {
-          const count = allFoods.filter(f => f.category === c).length;
-          return filterBtn(catFilter === c, () => { setShowExclusive(false); setCatFilter(c); }, `${CATEGORY_LABELS[c] || c} (${count})`);
-        })}
-        <button onClick={() => { setShowExclusive(e => !e); setCatFilter('all'); }} style={{
-          padding:'5px 10px', borderRadius:8, fontSize:8, cursor:'pointer', fontWeight: showExclusive ? 700 : 400, letterSpacing:0.2, whiteSpace:'nowrap',
-          border: showExclusive ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.06)',
-          background: showExclusive ? 'rgba(168,85,247,0.14)' : '#202023',
-          color: showExclusive ? '#a855f7' : 'rgba(255,255,255,0.85)',
-        }}>⭐ Exclusive ({allFoods.filter((f: any) => f.tier === 'max').length})</button>
+  const exclusiveCount = allFoods.filter((f: any) => f.tier === 'max').length;
+  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+    <ModernHero icon="📦" title="Каталог продуктов" subtitle="База FOOD_DB + USDA — с BB-оценкой, фильтрами по категориям и tier. Все для точного плана." count={allFoods.length} stats={[
+      { k:'Всего', v: allFoods.length, sub:'позиций', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+      { k:'Категорий', v: categories.length, sub:'групп', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+      { k:'Exclusive', v: exclusiveCount, sub:'max tier', col:'#a78bfa', bg:'rgba(167,139,250,0.08)' },
+    ]} />
+    <div style={{ ...modernCardBg, padding:12 }}>
+      <ModernSearch value={catSearch} onChange={setCatSearch} placeholder="Поиск по названию, описанию, категории…" />
+      <div style={{ marginTop:10 }}>
+        <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:6 }}>Категории</div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          <ModernPill active={catFilter==='all' && !showExclusive} onClick={() => { setShowExclusive(false); setCatFilter('all'); }}>{`Все (${allFoods.length})`}</ModernPill>
+          {categories.map(c => {
+            const count = allFoods.filter(f => f.category === c).length;
+            return <ModernPill key={c} active={catFilter===c && !showExclusive} onClick={() => { setShowExclusive(false); setCatFilter(c); }}>{`${CATEGORY_LABELS[c] || c} (${count})`}</ModernPill>;
+          })}
+          <ModernPill active={showExclusive} onClick={() => { setShowExclusive(e => !e); setCatFilter('all'); }} accent="#a78bfa">{`⭐ Exclusive (${exclusiveCount})`}</ModernPill>
+        </div>
       </div>
-      <div style={{ marginTop:6, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        {catFilter === 'all' ? (
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.7)' }}>Показаны все продукты</div>
-        ) : (
-          <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', padding:'4px 10px', borderRadius:6, border:'1px solid rgba(0,230,138,0.3)' }}>
-            🔍 Фильтр: {CATEGORY_LABELS[catFilter] || catFilter} — {filtered.length} из {allFoods.length}
+      {catFilter !== 'all' && !showExclusive && (
+        <div style={{ marginTop:10, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.10)', padding:'5px 10px', borderRadius:999, border:'1px solid rgba(0,230,138,0.18)' }}>
+            🔍 {CATEGORY_LABELS[catFilter] || catFilter} — {filtered.length} из {allFoods.length}
           </div>
-        )}
-      </div>
-      <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:3, borderRadius:8 }}>
-        {filtered.map(f => {
-          const isExpanded = catExpanded === f.id;
-          const bbScore = f.bb_quality_score;
-          const scoreLabel = bbScore ? (bbScore >= 7 ? '✅' : '⚠️') : '';
-          return (<div key={f.id}>
-            <div onClick={() => toggleExpanded(f.id)} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 10px', borderRadius:10, background: isExpanded ? 'rgba(0,230,138,0.04)' : '#202023', border: isExpanded ? '1px solid rgba(0,230,138,0.12)' : '1px solid rgba(255,255,255,0.06)', cursor:'pointer' }}>
+          <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{showExclusive ? 'Exclusive' : ''}</span>
+        </div>
+      )}
+    </div>
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:8 }}>
+      {filtered.map(f => {
+        const isExpanded = catExpanded === f.id;
+        const bbScore = (f as any).bb_quality_score;
+        const scoreCol = bbScore ? (bbScore >= 7 ? '#00e68a' : bbScore >= 5 ? '#f59e0b' : '#ef4444') : 'rgba(255,255,255,0.2)';
+        return (
+          <div key={f.id} style={{ padding:12, borderRadius:16, background:'#202023', border: isExpanded ? '1px solid rgba(0,230,138,0.14)' : '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
               <div style={{ flex:1 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                  <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{f.name}</span>
-                  {bbScore && <span style={{ fontSize:8, padding:'1px 5px', borderRadius:4, background: bbScore >= 7 ? 'rgba(0,230,138,0.1)' : bbScore >= 5 ? 'rgba(249,115,22,0.1)' : 'rgba(239,68,68,0.1)', color: bbScore >= 7 ? '#00e68a' : bbScore >= 5 ? '#f97316' : '#ef4444' }}>{bbScore.toFixed(1)}</span>}
-                  <span style={{ fontSize:7, color:'rgba(255,255,255,0.9)' }}>{isExpanded ? '▲' : '▼'}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ width:26, height:26, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>{f.category==='protein'?'🥩':f.category==='dairy'?'🥛':f.category==='grain'?'🌾':f.category==='carb'?'🥔':f.category==='veg_fruit'?'🥦':f.category==='fat'?'🧈':f.category==='supplement'?'💊':'📦'}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{f.name}</span>
+                  {bbScore !== undefined && <span style={{ fontSize:8, fontWeight:800, padding:'2px 6px', borderRadius:999, background: scoreCol+'14', color: scoreCol, border:`1px solid ${scoreCol}30` }}>{bbScore.toFixed(1)}</span>}
                 </div>
-                <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:1 }}>{CATEGORY_LABELS[f.category] || f.category} • {f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs} {f.fiber ? `• В{f.fiber}г` : ''}</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:3, letterSpacing:0.2, textTransform:'uppercase' }}>{CATEGORY_LABELS[f.category] || f.category} • {f.servingSize || '100г'}</div>
               </div>
-              <div style={{ display:'flex', gap:3, alignItems:'center' }}>
-                <button onClick={e => { e.stopPropagation(); addFav(f); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', color:'#8b5cf6' }}>⭐</button>
-                <button onClick={e => { e.stopPropagation(); addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category }); }} style={{ padding:'4px 8px', borderRadius:6, fontSize:9, cursor:'pointer', background:'rgba(0,230,138,0.15)', border:'1px solid rgba(0,230,138,0.3)', color:'#00e68a' }}>🛒</button>
-              </div>
+              <button onClick={() => toggleExpanded(f.id)} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.07)', background: isExpanded ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.04)', color: isExpanded ? '#00e68a' : 'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:10 }}>{isExpanded ? '▲' : '▼'}</button>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
+              {[
+                {l:'ккал',v:f.kcal,col:'#00e68a',bg:'rgba(0,230,138,0.08)'},
+                {l:'Б',v:f.protein,col:'#60a5fa',bg:'rgba(96,165,250,0.08)'},
+                {l:'Ж',v:f.fat,col:'#fbbf24',bg:'rgba(251,191,36,0.08)'},
+                {l:'У',v:f.carbs,col:'#fb923c',bg:'rgba(251,146,60,0.08)'},
+              ].map(b => (
+                <div key={b.l} style={{ background:b.bg, border:`1px solid ${b.col}18`, borderRadius:10, padding:'5px 2px', textAlign:'center' }}>
+                  <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
+                  <div style={{ fontSize:11, fontWeight:800, color:b.col }}>{b.v}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={e => { e.stopPropagation(); addFav(f); }} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:10, fontWeight:600 }}>⭐ В избранное</button>
+              <button onClick={e => { e.stopPropagation(); addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category }); }} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>🛒 В корзину</button>
             </div>
             {isExpanded && (() => {
-              const m = f.macro_100g || {};
-              const aa = f.amino_acid_profile_100g || {};
-              const el = f.electrolytes_100g || {};
-              const vit = f.vitamins_100g || {};
-              const tr = f.trace_elements_100g || {};
-              const bio = f.bioactive_compounds_100g || {};
-              const gt = f.gastro_tags || {};
-              const mf = f.metabolic_flags || {};
-              const sc = f.specific_compounds_100g || {};
-              const row = (items: any[], color = 'rgba(255,255,255,0.7)') => (
-                <div style={{ display:'flex', gap:2, flexWrap:'wrap', marginBottom:2, fontSize:7, color }}>
-                  {items.map((item: any,i: number) => <span key={i}>{item}</span>)}
-                </div>
+              const m = (f as any).macro_100g || {};
+              const aa = (f as any).amino_acid_profile_100g || {};
+              const el = (f as any).electrolytes_100g || {};
+              const vit = (f as any).vitamins_100g || {};
+              const tr = (f as any).trace_elements_100g || {};
+              const bio = (f as any).bioactive_compounds_100g || {};
+              const gt = (f as any).gastro_tags || {};
+              const mf = (f as any).metabolic_flags || {};
+              const sc = (f as any).specific_compounds_100g || {};
+              const row = (items: any[], color='rgba(255,255,255,0.7)') => (
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:4, fontSize:8, color }}>{items.filter(Boolean).map((it:any,i:number)=><span key={i}>{typeof it==='string'?it:it}</span>)}</div>
               );
               return (
-              <div style={{ padding:'8px 12px', marginBottom:2, borderRadius:'0 0 10px 10px', background:'rgba(32,32,35,0.6)', border:'1px solid rgba(255,255,255,0.04)', borderTop:'none', fontSize:8, color:'rgba(255,255,255,0.7)' }}>
-                {f.description && <div style={{ marginBottom:3, lineHeight:1.3, fontSize:7 }}>{f.description}</div>}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:2, marginBottom:3 }}>
-                  <span>⏱ ГИ: {f.gi ?? '—'} | ИИ: {m.insulin_index ?? '—'}</span>
-                  <span>⚡ Клетчатка: {f.fiber ?? '—'}г</span>
-                  {m.proteins_animal !== undefined ? <span>🥩 Белок жив.: {m.proteins_animal}г</span> : null}
-                  {m.proteins_plant !== undefined ? <span>🌱 Белок раст.: {m.proteins_plant}г</span> : null}
-                  {m.fats_saturated !== undefined ? <span>🧈 Насыщ.: {m.fats_saturated}г</span> : null}
-                  {m.fats_monounsaturated !== undefined ? <span>🫒 Моно: {m.fats_monounsaturated}г</span> : null}
-                  {m.fats_polyunsaturated !== undefined ? <span>🌻 Поли: {m.fats_polyunsaturated}г</span> : null}
-                  {m.omega_3_mg !== undefined ? <span>🐟 Омега-3: {m.omega_3_mg}мг</span> : null}
-                  {m.omega_6_mg !== undefined ? <span>🔴 Омега-6: {m.omega_6_mg}мг</span> : null}
-                  {m.mct_oil_g !== undefined ? <span>🫐 MCT: {m.mct_oil_g}г</span> : null}
-                  {m.cholesterol_mg !== undefined ? <span>🫀 Холестерин: {m.cholesterol_mg}мг</span> : null}
-                  {m.carbs_sugar !== undefined ? <span>🍬 Сахара: {m.carbs_sugar}г</span> : null}
+                <div style={{ padding:10, borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.04)', display:'flex', flexDirection:'column', gap:6 }}>
+                  {f.description && <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', lineHeight:1.4 }}>{f.description}</div>}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:8 }}>
+                    <span>⏱ ГИ: {f.gi ?? '—'} | ИИ: {m.insulin_index ?? '—'}</span>
+                    <span>⚡ Клетчатка: {f.fiber ?? '—'}г</span>
+                    {m.proteins_animal !== undefined && <span>🥩 Жив.белок: {m.proteins_animal}г</span>}
+                    {m.proteins_plant !== undefined && <span>🌱 Раст.белок: {m.proteins_plant}г</span>}
+                    {m.fats_saturated !== undefined && <span>🧈 Насыщ: {m.fats_saturated}г</span>}
+                    {m.omega_3_mg !== undefined && <span>🐟 Омега-3: {m.omega_3_mg}мг</span>}
+                    {m.cholesterol_mg !== undefined && <span>🫀 Хол: {m.cholesterol_mg}мг</span>}
+                  </div>
+                  {aa.leucine_mg !== undefined && row([<span key="a" style={{color:'#a78bfa'}}>🧬 АК:</span>, <span key="b">лей {aa.leucine_mg}мг</span>, aa.isoleucine_mg!==undefined && <span key="c">• илей {aa.isoleucine_mg}мг</span>, aa.valine_mg!==undefined && <span key="d">• вал {aa.valine_mg}мг</span>], '#a78bfa')}
+                  {el.sodium_mg !== undefined && row([<span key="a" style={{color:'#60a5fa'}}>⚡ Эл:</span>, <span key="b">Na {el.sodium_mg}мг</span>, el.potassium_mg!==undefined && <span key="c">• K {el.potassium_mg}мг</span>, el.magnesium_mg!==undefined && <span key="d">• Mg {el.magnesium_mg}мг</span>], '#60a5fa')}
+                  {vit.vitamin_a_mcg !== undefined && row([<span key="a" style={{color:'#f97316'}}>💊 Вит:</span>, <span key="b">A {vit.vitamin_a_mcg}мкг</span>, vit.vitamin_c_mg!==undefined && <span key="c">• C {vit.vitamin_c_mg}мг</span>, vit.vitamin_d_mcg!==undefined && <span key="d">• D {vit.vitamin_d_mcg}мкг</span>], '#f97316')}
+                  {tr.iron_total_mg !== undefined && row([<span key="a" style={{color:'#22c55e'}}>⚙️ Микро:</span>, <span key="b">Fe {tr.iron_total_mg}мг</span>, tr.zinc_mg!==undefined && <span key="c">• Zn {tr.zinc_mg}мг</span>, tr.selenium_mcg!==undefined && <span key="d">• Se {tr.selenium_mcg}мкг</span>], '#22c55e')}
+                  {bio.creatine_mg !== undefined && <div style={{ fontSize:7, color:'#a78bfa' }}>🧪 креатин {bio.creatine_mg}мг {bio.beta_alanine_mg!==undefined?`• β-ала {bio.beta_alanine_mg}мг`:''} {bio.taurine_mg!==undefined?`• тау {bio.taurine_mg}мг`:''}</div>}
+                  {(gt.fodmap_group || mf.atherogenic_potential) && <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', display:'flex', gap:6, flexWrap:'wrap' }}>{gt.fodmap_group && <span>FODMAP {gt.fodmap_group}</span>}{mf.atherogenic_potential==='HIGH' && <span style={{color:'#ef4444'}}>🚨 Атероген</span>}{mf.anabolic_potential==='HIGH' && <span style={{color:'#00e68a'}}>💪 Анабол</span>}</div>}
                 </div>
-                {aa.leucine_mg !== undefined && row([
-                  <span style={{color:'#8b5cf6'}}>🧬 АК:</span>,
-                  <span>лей {aa.leucine_mg}мг</span>,
-                  aa.isoleucine_mg !== undefined && <span>• илей {aa.isoleucine_mg}мг</span>,
-                  aa.valine_mg !== undefined && <span>• вал {aa.valine_mg}мг</span>,
-                  aa.lysine_mg !== undefined && <span>• лиз {aa.lysine_mg}мг</span>,
-                  aa.methionine_mg !== undefined && <span>• мет {aa.methionine_mg}мг</span>,
-                  aa.threonine_mg !== undefined && <span>• тре {aa.threonine_mg}мг</span>,
-                  aa.tryptophan_mg !== undefined && <span>• три {aa.tryptophan_mg}мг</span>,
-                  aa.phenylalanine_mg !== undefined && <span>• фен {aa.phenylalanine_mg}мг</span>,
-                  aa.histidine_mg !== undefined && <span>• гис {aa.histidine_mg}мг</span>,
-                  aa.arginine_mg !== undefined && <span>• арг {aa.arginine_mg}мг</span>,
-                  aa.glutamine_mg !== undefined && <span>• глу {aa.glutamine_mg}мг</span>,
-                  aa.cysteine_mg !== undefined && <span>• цис {aa.cysteine_mg}мг</span>,
-                ], '#8b5cf6')}
-                {el.sodium_mg !== undefined && row([
-                  <span style={{color:'#60a5fa'}}>⚡ Электролиты:</span>,
-                  <span>Na {el.sodium_mg}мг</span>,
-                  el.potassium_mg !== undefined && <span>• K {el.potassium_mg}мг</span>,
-                  el.magnesium_mg !== undefined && <span>• Mg {el.magnesium_mg}мг</span>,
-                  el.calcium_mg !== undefined && <span>• Ca {el.calcium_mg}мг</span>,
-                  el.phosphorus_mg !== undefined && <span>• P {el.phosphorus_mg}мг</span>,
-                  el.pral_index !== undefined && <span>• PRAL {el.pral_index}</span>,
-                ], '#60a5fa')}
-                {vit.vitamin_a_mcg !== undefined && row([
-                  <span style={{color:'#f97316'}}>💊 Витамины:</span>,
-                  <span>A {vit.vitamin_a_mcg}мкг</span>,
-                  vit.vitamin_c_mg !== undefined && <span>• C {vit.vitamin_c_mg}мг</span>,
-                  vit.vitamin_d_mcg !== undefined && <span>• D {vit.vitamin_d_mcg}мкг</span>,
-                  vit.vitamin_e_mg !== undefined && <span>• E {vit.vitamin_e_mg}мг</span>,
-                  vit.vitamin_k_mcg !== undefined && <span>• K {vit.vitamin_k_mcg}мкг</span>,
-                  vit.vitamin_b1_mg !== undefined && <span>• B1 {vit.vitamin_b1_mg}мг</span>,
-                  vit.vitamin_b2_mg !== undefined && <span>• B2 {vit.vitamin_b2_mg}мг</span>,
-                  vit.vitamin_b3_mg !== undefined && <span>• B3 {vit.vitamin_b3_mg}мг</span>,
-                  vit.vitamin_b5_mg !== undefined && <span>• B5 {vit.vitamin_b5_mg}мг</span>,
-                  vit.vitamin_b6_mg !== undefined && <span>• B6 {vit.vitamin_b6_mg}мг</span>,
-                  vit.vitamin_b7_mcg !== undefined && <span>• B7 {vit.vitamin_b7_mcg}мкг</span>,
-                  vit.vitamin_b9_mcg !== undefined && <span>• B9 {vit.vitamin_b9_mcg}мкг</span>,
-                  vit.vitamin_b12_mcg !== undefined && <span>• B12 {vit.vitamin_b12_mcg}мкг</span>,
-                ], '#f97316')}
-                {tr.iron_total_mg !== undefined && row([
-                  <span style={{color:'#22c55e'}}>⚙️ Микроэлементы:</span>,
-                  <span>Fe {tr.iron_total_mg}мг{tr.iron_heme_mg ? `(гем ${tr.iron_heme_mg})` : ''}</span>,
-                  tr.zinc_mg !== undefined && <span>• Zn {tr.zinc_mg}мг</span>,
-                  tr.selenium_mcg !== undefined && <span>• Se {tr.selenium_mcg}мкг</span>,
-                  tr.copper_mg !== undefined && <span>• Cu {tr.copper_mg}мг</span>,
-                  tr.manganese_mg !== undefined && <span>• Mn {tr.manganese_mg}мг</span>,
-                  tr.iodine_mcg !== undefined && <span>• I {tr.iodine_mcg}мкг</span>,
-                  tr.chromium_mcg !== undefined && <span>• Cr {tr.chromium_mcg}мкг</span>,
-                ], '#22c55e')}
-                {bio.creatine_mg !== undefined && row([
-                  <span style={{color:'#a78bfa'}}>🧪 Биоактивные:</span>,
-                  <span>креатин {bio.creatine_mg}мг</span>,
-                  bio.beta_alanine_mg !== undefined && <span>• β-аланин {bio.beta_alanine_mg}мг</span>,
-                  bio.taurine_mg !== undefined && <span>• таурин {bio.taurine_mg}мг</span>,
-                  bio.lignan_mg !== undefined && <span>• лигнан {bio.lignan_mg}мг</span>,
-                  bio.indol_3_carbinol_mg !== undefined && <span>• I3C {bio.indol_3_carbinol_mg}мг</span>,
-                ], '#a78bfa')}
-                {sc.polyphenols_mg !== undefined && row([
-                  <span style={{color:'#f59e0b'}}>🌿 Соединения:</span>,
-                  <span>полифенолы {sc.polyphenols_mg}мг</span>,
-                  sc.flavonoids_mg !== undefined && <span>• флав. {sc.flavonoids_mg}мг</span>,
-                  sc.curcumin_mg !== undefined && <span>• куркумин {sc.curcumin_mg}мг</span>,
-                  sc.sulforaphane_mg !== undefined && <span>• сульф. {sc.sulforaphane_mg}мг</span>,
-                  sc.resveratrol_mg !== undefined && <span>• ресвер. {sc.resveratrol_mg}мг</span>,
-                  sc.lectins_mg !== undefined && <span>• лектины {sc.lectins_mg}мг</span>,
-                  sc.oxalates_mg !== undefined && <span>• оксалаты {sc.oxalates_mg}мг</span>,
-                  sc.phytoestrogens_mg !== undefined && <span>• фитоэстр. {sc.phytoestrogens_mg}мг</span>,
-                  sc.alpha_lipoic_acid_mg !== undefined && <span>• АЛК {sc.alpha_lipoic_acid_mg}мг</span>,
-                  sc.coenzyme_q10_mg !== undefined && <span>• CoQ10 {sc.coenzyme_q10_mg}мг</span>,
-                  sc.berberine_mg !== undefined && <span>• берберин {sc.berberine_mg}мг</span>,
-                ], '#f59e0b')}
-                {gt.fodmap_group && row([
-                  <span style={{color:'#f97316'}}>🫃 ЖКТ:</span>,
-                  <span>FODMAP {gt.fodmap_group}</span>,
-                  gt.enzyme_demand_score !== undefined && <span>• Ферм.нагрузка {gt.enzyme_demand_score}/10</span>,
-                  gt.gastric_emptying_speed && <span>• Опорожнение: {gt.gastric_emptying_speed === 'FAST' ? 'быстрое' : gt.gastric_emptying_speed === 'SLOW' ? 'медленное' : 'среднее'}</span>,
-                  gt.gut_irritant_potential && <span>• Раздражение: {gt.gut_irritant_potential}</span>,
-                  gt.allergen_flags && gt.allergen_flags.length > 0 && <span>• Аллергены: {gt.allergen_flags.join(',')}</span>,
-                ], '#f97316')}
-                {row([
-                  <span style={{color:'#a78bfa'}}>🏷 Флаги:</span>,
-                  mf.atherogenic_potential === 'HIGH' && <span style={{color:'#ef4444'}}>🚨 Атероген.</span>,
-                  mf.glycation_potential === 'HIGH' && <span style={{color:'#f59e0b'}}>🔥 Гликация</span>,
-                  mf.ammonia_source_level === 'HIGH' && <span style={{color:'#ef4444'}}>💨 Аммиак HIGH</span>,
-                  mf.ammonia_source_level === 'MEDIUM' && <span style={{color:'#a78bfa'}}>💨 Аммиак MED</span>,
-                  mf.heavy_metal_risk === 'HIGH' && <span style={{color:'#ef4444'}}>☢️ Тяж.мет.</span>,
-                  mf.heavy_metal_risk === 'MEDIUM' && <span style={{color:'#f59e0b'}}>☢️ Тяж.мет.MED</span>,
-                  mf.cns_impact === 'STIMULANT' && <span style={{color:'#f97316'}}>🧠 Стим.</span>,
-                  mf.cns_impact === 'SEDATIVE' && <span style={{color:'#8b5cf6'}}>😴 Седат.</span>,
-                  mf.anabolic_potential === 'HIGH' && <span style={{color:'#00e68a'}}>💪 Анабол</span>,
-                  mf.anabolic_potential === 'MEDIUM' && <span style={{color:'#f59e0b'}}>💪 Анабол MED</span>,
-                  mf.hepatoprotective && <span style={{color:'#22c55e'}}>🫁 Гепатопр.</span>,
-                  mf.insulin_sensitivity_impact === 'NEGATIVE' && <span style={{color:'#ef4444'}}>📉 Инс.-сенс NEG</span>,
-                  mf.insulin_sensitivity_impact === 'POSITIVE' && <span style={{color:'#00e68a'}}>📈 Инс.-сенс POS</span>,
-                  mf.goitrogenic_potential === 'HIGH' && <span style={{color:'#f59e0b'}}>🦋 Зобоген.</span>,
-                  mf.detox_support_level === 'HIGH' && <span style={{color:'#22c55e'}}>🧹 Детокс</span>,
-                  mf.histamine_level === 'HIGH' && <span style={{color:'#ef4444'}}>🧪 Гистамин HIGH</span>,
-                  mf.thyroid_support_level === 'HIGH' && <span style={{color:'#22c55e'}}>🦋 Щит. HIGH</span>,
-                ], '#a78bfa')}
-                {row([
-                  <span style={{color:'rgba(255,255,255,0.65)'}}>📊 {f.tier === 'max' ? 'Уровень: Максимум' : f.tier === 'mid' ? 'Уровень: Средний' : 'Уровень: Базовый'}</span>,
-                  f.bb_quality_score ? <span>| BB Score: {f.bb_quality_score.toFixed(1)}</span> : null,
-                ], 'rgba(255,255,255,0.65)')}
-              </div>);
+              );
             })()}
-          </div>);
-        })}
-      </div>
+          </div>
+        );
+      })}
     </div>
+    {filtered.length===0 && <div style={{ ...modernCardBg, padding:24, textAlign:'center' }}><div style={{fontSize:22}}>🔍</div><div style={{fontSize:12,fontWeight:700,color:'#fff',marginTop:6}}>Ничего не нашлось</div><div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:4}}>Попробуй сбросить фильтр или изменить запрос</div></div>}
   </div>);
 };
-
 const RecipesTab = RecipesTabModern;
 const RESTAURANT_CUISINE: Record<string, string[]> = {
   russian: ['харчо','лагман','долма','хачапури','чебуреки','пян-се','шницель','котлета по-киевски','бефстроганов','щавелевый суп'],
@@ -571,7 +451,7 @@ const RestaurantTab: React.FC = () => {
       {rtToast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'10px 24px', borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)', color:'#fff', fontSize:11, fontWeight:600 }}>{rtToast}</div>}
       {/* КБЖУ сводка */}
     {filtered.length > 0 && (
-      <div style={{ padding:14, ...cardBg }}>
+      <div style={{ padding:14, ...modernCardBg }}>
         <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>📊 КБЖУ выбранных блюд</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
           {[{l:'Калории',v:Math.round(totals.kcal),c:'#00e68a',u:'ккал'},{l:'Белки',v:Math.round(totals.p),c:'#3b82f6',u:'г'},{l:'Жиры',v:Math.round(totals.f),c:'#f59e0b',u:'г'},{l:'Углеводы',v:Math.round(totals.c),c:'#f97316',u:'г'}].map((s,i) => (
@@ -584,7 +464,7 @@ const RestaurantTab: React.FC = () => {
       </div>
     )}
     {/* Фильтры */}
-    <div style={{ padding:14, ...cardBg }}>
+    <div style={{ padding:14, ...modernCardBg }}>
       <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
         {cuisineBtn('all', 'Все')}
         {cuisineBtn('russian', '🇷🇺 Русская')}
@@ -595,7 +475,7 @@ const RestaurantTab: React.FC = () => {
       <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск блюд..." style={{ width:'100%', boxSizing:'border-box', padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none' }} />
     </div>
     {/* Список блюд с КБЖУ */}
-    <div style={{ padding:14, ...cardBg }}>
+    <div style={{ padding:14, ...modernCardBg }}>
       <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>🍽 Блюда ресторанов ({filtered.length})</div>
       {filtered.length === 0 ? (
         <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', textAlign:'center', padding:20 }}>Нет блюд по выбранному фильтру.</div>
@@ -715,6 +595,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
   );
 
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      <ModernHero icon="📊" title="Отчёты" subtitle="Аналитика питания — от дня до месяца, с оценкой, КБЖУ, микронутриентами и архивом." stats={[{k:'Периодов',v:3,sub:'день/нед/мес',col:'#00e68a',bg:'rgba(0,230,138,0.08)'},{k:'Метрик',v:12,sub:'показателей',col:'#60a5fa',bg:'rgba(96,165,250,0.08)'},{k:'Архив',v: archiveReports.length,sub:'отчётов',col:'#a78bfa',bg:'rgba(167,139,250,0.08)'}]} />
     {reportSubTab === 'full' && (<div style={{ padding:14, ...cardBg }}>
       {tabButtons}
       <div style={labelSec}>📋 Полный отчёт о питании</div>
@@ -1123,8 +1004,8 @@ const InfoTab: React.FC = () => {
     { title: '🩺 Здоровье — интеграция с планировщиком', body: 'Вкладка «Здоровье» (внутри Планировщика):\n• Ввод 8+ маркеров крови (гематокрит, гемоглобин, ЛПВП, ЛПНП, АЛТ, АСТ, СРБ, тестостерон) с цветовой индикацией\n• 8 предустановленных проблем здоровья: отёки, непереносимость лактозы/глютена, диабет, гипертония, ЖКТ, подагра, камни в почках\n• При выборе проблемы — автоматическое исключение конфликтующих продуктов из плана\n• Список аллергенов: лактоза, глютен, орехи, яйца, соя, морепродукты, гистамин, сульфиты\n• Данные синхронизируются с v2-движком скоринга' },
     { title: '⚡ Быстрые пресеты настроек', body: '🥩 Мясной — высокий белок, стандартные жиры\n🥬 Вегетарианский — растительные источники белка, без мяса/рыбы\n🫒 Средиземноморский — оливковое масло, рыба, овощи, орехи\n🥑 Кето — <50 г углеводов, высокие жиры\n🍚 High Carb — повышенные углеводы для массонабора\n💰 Бюджетный — недорогие продукты (курица, гречка, яйца)\n💪 Массонаборный — профицит 15%, белок 2.2 г/кг, частые приёмы\n🔥 Жиросжигающий — дефицит 20%, белок 2.5 г/кг, клетчатка 35 г' },
   ];
-  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-    <div style={{ padding:14, ...cardBg }}>
+  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="ℹ️" title="Инфо" subtitle="Полезная информация о питании, гиде и советах." /><div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+    <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>ℹ️ Как работает приложение</div>
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
         {sections.map((s, i) => (
@@ -1135,7 +1016,7 @@ const InfoTab: React.FC = () => {
         ))}
       </div>
     </div>
-  </div>);
+  </div></div>);
 };
 
 const FavoritesTab: React.FC = () => {
@@ -1151,7 +1032,7 @@ const FavoritesTab: React.FC = () => {
   const pill = (t: string, icon: string, label: string) => (
     <button onClick={() => setFavTab(t as any)} style={{ padding:'5px 10px', borderRadius:16, fontSize:8, fontWeight: favTab === t ? 700 : 400, cursor:'pointer', border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: favTab === t ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023', color: favTab === t ? '#000' : 'rgba(255,255,255,0.8)' }}>{icon} {label}</button>
   );
-  return (<div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:80 }}>
+  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="⭐" title="Избранное" subtitle="Твои сохранённые продукты и блюда — быстрый доступ к любимому." /><div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:80 }}>
     <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'4px 0' }}>
       {pill('products','⭐','Продукты')}{pill('recipes','🍳','Рецепты')}{pill('plans','📋','Планы')}{pill('stacks','🧩','Стеки')}
     </div>
@@ -1202,7 +1083,7 @@ const FavoritesTab: React.FC = () => {
         </div>
       ))}
     </div>}
-  </div>);
+  </div></div>);
 };
 
 export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab }) => {
