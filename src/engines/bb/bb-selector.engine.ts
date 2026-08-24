@@ -25,6 +25,11 @@ export interface BBSelectorInput {
   donorMuscles?: string[];
   /** Активна специализация: FullBody не является автоматическим default. */
   specialization?: boolean;
+  /** PED для адаптации ранжирования (все сплиты адаптируются, выбор сохранён). */
+  peds?: string[];
+  pedDoses?: Record<string, number>;
+  /** Выбранный пресет методики (DC/Fortitude/Meadows) — мягкая подсказка. */
+  preset?: string;
 }
 
 export interface BBRankedPattern {
@@ -164,10 +169,23 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     }
 
     if (lvl === 'enhanced') {
-      if (p.id === 'ppl_6') score += 12;
-      else if (['arnold_6', 'fullbody_4'].includes(p.id)) score += 8;
-      else if (['rolling_3_1_3_1', 'tpt_o_ttp'].includes(p.id)) score += 4;
+      if (p.id === 'ppl_6') score += 8;
+      else if (['arnold_6', 'fullbody_4'].includes(p.id)) score += 6;
+      else if (['rolling_3_1_3_1', 'tpt_o_ttp'].includes(p.id)) score += 3;
     }
+
+    // PED-адаптация ранжирования: все сплиты масштабируются, бонус мягкий (+3..+5), не навязывает.
+    const hasAAS = (input.peds || []).some(x => String(x).toLowerCase().includes('aas') || String(x).toLowerCase().includes('тест')) || Number((input.pedDoses as any)?.['AAS'] || 0) >= 500;
+    const hasGH = (input.peds || []).includes('GH' as any) || Number((input.pedDoses as any)?.['GH'] || 0) > 0;
+    const hasIns = (input.peds || []).includes('insulin' as any) || Number((input.pedDoses as any)?.['insulin'] || 0) > 0;
+    if (hasAAS && (p.id === 'arnold_6' || p.id === 'bro_5')) { score += 3; rationale.push('AAS: bro/Arnold допустим (длинный синтез)'); }
+    if (hasGH && hasIns && (p.id === 'upper_lower_5' || p.id === 'fullbody_4')) { score += 3; rationale.push('GH+insulin: частый памп-сплит предпочтителен'); }
+    if (!hasAAS && (p.id === 'bro_5')) { score -= 2; warnings.push('Натурал: bro 1×/нед — неоптимально, лучше 2×/нед'); }
+
+    // Пресет-подсказка (мягко)
+    if (input.preset === 'dc' && (p.id === 'upper_lower_4' || p.id === 'ppl_6')) { score += 4; rationale.push('DC пресет: Upper/Lower/PPL подходит'); }
+    if (input.preset === 'fortitude' && (p.id === 'upper_lower_5' || p.id === 'fullbody_4')) { score += 4; rationale.push('Fortitude: частый сплит'); }
+    if (input.preset === 'meadows' && (p.id === 'ppl_6' || p.id === 'arnold_6')) { score += 4; rationale.push('Meadows: PPL/Arnold для pre-exhaust'); }
 
     out.push({ pattern: p, score, rationale, warnings });
   }

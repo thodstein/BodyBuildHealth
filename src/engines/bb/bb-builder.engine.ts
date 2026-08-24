@@ -48,6 +48,10 @@ import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
 import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
+import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
+import { insulinWindowActive } from './bb-insulin-window.engine';
+import { recommendPEDMethodology, applyPEDMethodologyToPlan } from './bb-ped-methodology.engine';
+import { REP_SCHEMES, schemeFor, schemeToLoading } from './bb-rep-schemes.engine';
 import type { BBRotationReport } from './bb-rotation.engine';
 import type { BBSessionCost } from './bb-fatigue.engine';
 import type { BBPlanReport } from './bb-report.engine';
@@ -1162,6 +1166,9 @@ export interface BuildExercisePoolOpts {
   focusGroup?: string;
   weakPoints: string[];
   fewerCompound?: boolean;
+  /** PED для joint-guard (GH+AAS) — не ломает тяж/памп, только отбор. */
+  pedDoses?: Record<string, number>;
+  labMrvMultiplier?: number;
 }
 
 /** 3.1 — вынесенный слой selection: построение скорированного пула упражнений.
@@ -1250,6 +1257,13 @@ export function buildExercisePool(muscle: string, role: string, opts: BuildExerc
     if (/над голов|overhead.*squat|пистол.*присед|pistol.*squat/i.test(n)) return false;
     return true;
   });
+  // ━━━ joint-guard: не ломает тяж/памп, только штрафует axial/high-stress в пуле ━━━
+  // Гард работает на уровне отбора, а не характера дня (тяж остаётся тяж, но с машиной).
+  const _jgHasGH = !!opts.pedDoses && Number((opts.pedDoses as any)['GH']) > 0;
+  const _jgHasAAS = !!opts.pedDoses && Number((opts.pedDoses as any)['AAS']) > 0;
+  const _jgInput = { hasGH: _jgHasGH, ghDose: Number((opts.pedDoses as any)?.['GH'] || 0), hasAAS: _jgHasAAS, aasDose: Number((opts.pedDoses as any)?.['AAS'] || 0), hasInsulin: !!opts.pedDoses && Number((opts.pedDoses as any)['insulin']) > 0, labMrvMultiplier: opts.labMrvMultiplier as any };
+  const _jgActive = jointGuardActive(_jgInput);
+
   // ━━━ _score: BB-приоритет ВСЕГДА (не только generic) ━━━
   // Гакк/Смит > свободный присед, наклонный жим > плоский, стандартные
   // compound'ы приоритетны. Этот скор используется multi-angle diversity
@@ -1289,6 +1303,8 @@ export function buildExercisePool(muscle: string, role: string, opts: BuildExerc
     // Армейский жим стоя — ПЛ-движение: предпочтительны классические жимы
     // перед собой (Smith широким хватом, жимы гантелей).
     if (/армейск|жим.*стоя|standing.*press|military/i.test(n)) score -= 25;
+    // Joint-guard штраф (не меняет характер дня, только отбор)
+    if (_jgActive) score += jointGuardScorePenalty(ex, _jgInput);
     return { ...ex, _score: score };
   }).sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
   // Generic-план (без специализации/слабых точек): убираем слишком специфичные вариации
@@ -1354,6 +1370,7 @@ export interface BuildSessionParams {
   /** Пропустить жёсткие группы замены (cross-meso continuity — веса прогрессируют по имени). */
   skipStrictCoverage?: boolean;
   pedDoses?: Record<string, number>;
+  labMrvMultiplier?: number;
   courseIntensity?: CourseIntensity;
   onCourse?: boolean;
   sex?: 'male' | 'female';
@@ -1403,6 +1420,7 @@ function buildSession(
   autoRegResult?: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number },
   specialization?: boolean,
   pedDoses?: Record<string, number>,
+  labMrvMultiplier?: number,
   courseIntensity?: CourseIntensity,
   onCourse: boolean = false,
   sex: 'male' | 'female' = 'male',
@@ -1728,6 +1746,7 @@ function buildSession(
       allowStrengthLifts, isPurePull, equipmentList, excludeIds,
       avoidAxialLoad, mobilityRestrictions, bodyweightCapability,
       favoriteIds, muscle, focusGroup, weakPoints, fewerCompound,
+      pedDoses, labMrvMultiplier,
     });
 
     // 3.1 — вынесенный слой selection: selectExercisesForMuscle (selectExercisesSmart + фиксация выбора)
@@ -2420,7 +2439,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.favoriteIds, p.excludeIds,
     p.avoidAxialLoad, p.equipmentList, p.methodology, p.isFemale,
     p.intensityTechnique, p.autoDeload, p.loadStrategy, p.autoRegResult,
-    p.specialization, p.pedDoses, p.courseIntensity, p.onCourse, p.sex,
+    p.specialization, p.pedDoses, p.labMrvMultiplier, p.courseIntensity, p.onCourse, p.sex,
     p.weekLocalUsed, p.primaryBySlot, p.trainingFocus, p.eccentricMult,
     p.mobilityRestrictions, p.trainingYears, p.bodyweightCapability,
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
@@ -2872,7 +2891,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
        const weekInjuryProfile = [...new Set([...weekExcluded, ...weekGraded.map(inj => inj.muscle)])];
         const legDaysInWeek = sessions.filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
         const legDayIndex = legDaysInWeek === 1 ? (w % 2) : sessions.slice(0, i).filter(ss => /Legs|Lower/.test((ss as any).sessionTag || '')).length;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: undefined, courseIntensity: undefined, onCourse: false, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRot, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, specialization: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       // FB: собираем ID и имена упражнений для запрета повторов
       if (isFB) for (const ex of sess.exercises) {
@@ -3607,7 +3626,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     const seen = new Set(output.rationale);
     for (const w of validationWarnings) if (!seen.has(w)) { seen.add(w); output.rationale.push(w); }
   }
-  const finalized = finalizeBBPlan(output, {
+  let finalized = finalizeBBPlan(output, {
     reorder: true,
     methodology: input.methodology,
     priorityMuscles: [...new Set([...weakPoints, ...allSpecTargets, ...(focusGroup ? [focusGroup] : [])])],
@@ -3635,6 +3654,47 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     supersetMode: input.supersetMode,
     volumeScheme: input.volumeScheme,
   });
+  // PED-методика + insulin window + rep-схемы: overlay после финализации, не ломает тяж/памп.
+  // Joint-guard уже отработал на уровне пула (buildExercisePool), здесь — только rationale/подсказки.
+  try {
+    const pedsForMeth: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => Number((input.pedDoses as any)[k]) > 0) as any) : []);
+    if (pedsForMeth.length > 0 || (input.pedDoses && Object.keys(input.pedDoses).length > 0)) {
+      const methInput: any = { peds: pedsForMeth, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus };
+      const meth = recommendPEDMethodology(methInput);
+      // Insulin window: только памп-дни получают подсказку (тяж не трогаем)
+      const ghDose = Number((input.pedDoses as any)?.['GH'] || 0);
+      const insDose = Number((input.pedDoses as any)?.['insulin'] || 0);
+      const hasGH = pedsForMeth.includes('GH' as any);
+      const hasIns = pedsForMeth.includes('insulin' as any);
+      // Добавляем пери-WO и joint rationale (не меняем характер)
+      let withMeth = applyPEDMethodologyToPlan(finalized, meth);
+      if (hasGH || hasIns) {
+        const winRationale = hasGH && hasIns && ghDose >= 2 && insDose >= 5 ? `💉 GH+insulin окно: памп-дни — intra 30-60г + 10г EAA (тяж дни без изменений)` : null;
+        if (winRationale && !withMeth.rationale.includes(winRationale)) withMeth.rationale.push(winRationale);
+      }
+      // MGF/IGF1 локально: если специализация совпадает — пометка
+      if ((pedsForMeth.includes('MGF' as any) || pedsForMeth.includes('IGF1' as any)) && specRes.active) {
+        withMeth.rationale.push('🧬 MGF/IGF1 локально: целевая мышца специализации получает myo-reps/lengthened приоритет (см. отбор)');
+      }
+      // Rep-схемы: подсказка, не форсирование (сохраняем текущие reps, добавляем label)
+      // Выбираем схему для отображения в rationale (не переписываем repsRange)
+      const heavyScheme = meth.recommendedScheme.heavy;
+      const pumpScheme = meth.recommendedScheme.pump;
+      if (heavyScheme || pumpScheme) {
+        const hs = heavyScheme ? REP_SCHEMES[heavyScheme] : null;
+        const ps = pumpScheme ? REP_SCHEMES[pumpScheme] : null;
+        if (hs) withMeth.rationale.push(`📋 Схема тяж: ${hs.nameRu} ${hs.repRange[0]}-${hs.repRange[1]} RIR${hs.rir} (${hs.evidence})`);
+        if (ps) withMeth.rationale.push(`📋 Схема памп: ${ps.nameRu} ${ps.repRange[0]}-${ps.repRange[1]} RIR${ps.rir} (${ps.evidence})`);
+      }
+      // Все сплиты адаптируются: показать адаптированный объём для выбранного сплита
+      const adaptNote = `🔄 Сплит «${pattern.name}» адаптирован: целевые объёмы пересчитаны под фарму (режим ×${regimeMult.toFixed(2)}, бюджет ${weeklyBudget} сетов/нед) — все сплиты масштабируются, выбор сохранён`;
+      if (!withMeth.rationale.includes(adaptNote)) withMeth.rationale.push(adaptNote);
+      finalized = withMeth;
+    } else {
+      finalized.rationale.push(`🔄 Сплит «${pattern.name}» адаптирован: бюджет ${weeklyBudget} сетов/нед (натурал) — все сплиты масштабируются под режим`);
+    }
+  } catch (e) { /* ped overlay не должен ломать план */ }
+
   // Слабые группы: +1 упражнение (3-4 сета) на отстающий вид, БЕЗ учёта капа (optional ⚡).
   // Добавляется ПОСЛЕ финализации, чтобы финализатор не срезал его.
   // Это НЕ специализация (забирает кап у других) — лишь смещение баланса паттернов.

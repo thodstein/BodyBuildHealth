@@ -502,6 +502,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
+  // PRO-пресеты методик (DC/Fortitude/Meadows) — применяется поверх сплита
+  const [proPreset, setProPreset] = useState<string>('none');
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(() => ({
     chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60,
     ...(prof.workMax || {}),
@@ -1080,7 +1082,10 @@ export const BbAutoConstructor: React.FC = () => {
     focusGroup: specTargets[0] || undefined,
     donorMuscles: specBlocks.flatMap(b => b.donors),
     specialization: specTargets.length > 0,
-  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex]);
+    peds: peds as any,
+    pedDoses: pedDoses as any,
+    preset: proPreset,
+  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, peds, pedDoses, proPreset]);
   const bestSplit = ranked[0];
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
@@ -2343,6 +2348,23 @@ export const BbAutoConstructor: React.FC = () => {
                         { id: 'gvt', label: 'GVT 10×10 (10 сетов на мышцу)' },
                         { id: 'fst7', label: 'FST-7 (7 сетов, 30-45с)' },
                         { id: 'gironda', label: '8×8 Gironda (60с)' },
+                      ]}
+                    />
+                    <PopupSelect
+                      label='🏆 Pro-пресет методики'
+                      value={proPreset}
+                      onChange={v => {
+                        setProPreset(v);
+                        const p = (v === 'dc' ? 'dc_rp' : v === 'fortitude' ? 'myo_reps' : v === 'meadows' ? 'lengthened_partial' : null);
+                        if (v === 'dc' && dupMode === 'none') setDupMode('strength_hypertrophy' as any);
+                        if (v === 'fortitude') { setSupersetMode('giant' as any); if (volumeScheme === 'standard') setVolumeScheme('fst7' as any); }
+                      }}
+                      hint='DC (RP 11-15 + stretch), Fortitude (MR 4×6), Meadows (pre-exhaust + lengthened) — все сплиты адаптируются'
+                      options={[
+                        { id: 'none', label: 'Без пресета (стандарт)' },
+                        { id: 'dc', label: 'DC Training (1 RP all-out)' },
+                        { id: 'fortitude', label: 'Fortitude (Muscle Rounds)' },
+                        { id: 'meadows', label: 'Meadows Mountain Dog' },
                       ]}
                     />
                     <PopupSelect
