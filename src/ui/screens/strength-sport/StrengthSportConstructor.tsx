@@ -8,8 +8,10 @@ import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength
 import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../../engines/strength-sport/strength-sport-split-patterns';
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
-import { saveStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-storage';
+import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
+import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
+import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 
@@ -20,6 +22,8 @@ export const StrengthSportConstructor: React.FC = () => {
   const [level, setLevel] = useState<StrengthSportInput['level']>('intermediate');
   const [weeks, setWeeks] = useState(8);
   const [days, setDays] = useState(3);
+  const [focus, setFocus] = useState<StrengthSportInput['focus']>(null);
+  const [methodology, setMethodology] = useState<StrengthSportInput['methodology']>('compound_first');
   const [workMax, setWorkMax] = useState<StrengthSportInput['workMax']>({ backSquat: 120, deadlift: 160, snatch: 70, cleanJerk: 90, overheadPress: 60 });
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('weightlifting'));
   const [outsideEnabled, setOutsideEnabled] = useState(false);
@@ -28,12 +32,28 @@ export const StrengthSportConstructor: React.FC = () => {
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
 
+  const pullFromProfile = () => {
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      const training = p.training || p;
+      if (training.workMax) setWorkMax(s => ({ ...s, ...training.workMax }));
+      if (training.level) setLevel(training.level);
+      if (p.personal?.sex) { /* could set sex but input not exposed */ }
+    } catch {}
+  };
+
   const build = () => {
-    const input: StrengthSportInput = {
-      mode, goal, level, weeks, daysPerWeek: days, workMax,
+    let input: StrengthSportInput = {
+      mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology,
       outsideLoad: outsideEnabled ? outside : null,
-      equipment: [], // по умолчанию всё доступно
+      equipment: [],
     };
+    try {
+      const prev = loadStrengthSportPlans()[0];
+      if (prev) input = applyMesocycleProgression(prev, input) as any;
+    } catch {}
     let p = buildStrengthSportPlan(input);
     p = finalizeStrengthSportPlan(p, { outsideLoad: outsideEnabled ? outside : null });
     setPlan(p);
@@ -80,11 +100,28 @@ export const StrengthSportConstructor: React.FC = () => {
           <input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} />
           <label style={{ color: '#fff', fontSize: 12 }}>Дней/нед в зале: {days}</label>
           <input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} />
+          <label style={{ color: '#fff', fontSize: 12 }}>Фокус зала (специализация)</label>
+          <select value={focus || ''} onChange={e => setFocus((e.target.value || null) as any)} style={{ padding: 6, borderRadius: 6 }}>
+            <option value="">Без фокуса (баланс)</option>
+            <option value="snatch">Рывок</option>
+            <option value="clean">Толчок/взятие</option>
+            <option value="squat">Присед</option>
+            <option value="overhead">Жим/лог</option>
+            <option value="carry">Переноски (фермер/йок)</option>
+            <option value="stone">Камни</option>
+          </select>
+          <label style={{ color: '#fff', fontSize: 12 }}>Методика порядка</label>
+          <select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+            <option value="compound_first">База первой</option>
+            <option value="pre_exhaust">Предутомление</option>
+            <option value="post_exhaust">Постутомление</option>
+          </select>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
             {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
               <label key={k} style={{ color: '#fff', fontSize: 11 }}>{k}: <input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value) }))} style={{ width: 70, padding: 4, borderRadius: 6 }} /></label>
             ))}
           </div>
+          <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля</button>
           <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#00e68a', color: '#000', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
         </div>
       )}
@@ -127,6 +164,25 @@ export const StrengthSportConstructor: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ background: 'rgba(0,230,138,0.1)', padding: 10, borderRadius: 10, color: '#fff', fontSize: 11, whiteSpace: 'pre-wrap' }}>{buildStrengthSportReport(plan)}</div>
           {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
+          <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Quality heatmap (подъёмы/нед vs MEV/MAV/MRV):</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {plan.weeksData.map(wk => {
+                const sn = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch','hang_snatch','power_snatch','muscle_snatch'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
+                const lm = getWL(plan.level,'snatch'); const st = lm ? (sn<lm.mev?'below': sn<=lm.mav?'optimal': sn<=lm.mrv?'high':'over') : 'optimal';
+                const col = st==='below'?'#f59e0b': st==='optimal'?'#00e68a': st==='high'?'#eab308':'#ef4444';
+                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {sn} рывков</span>;
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+              {plan.weeksData.map(wk => {
+                const sq = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['back_squat','front_squat','squat','hack_squat'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+                const lm = getStrong(plan.level,'squat'); const st = lm ? (sq<lm.mev?'below': sq<=lm.mav?'optimal': sq<=lm.mrv?'high':'over') : 'optimal';
+                const col = st==='below'?'#f59e0b': st==='optimal'?'#00e68a': st==='high'?'#eab308':'#ef4444';
+                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {sq} присед сетов</span>;
+              })}
+            </div>
+          </div>
           {plan.weeksData.map(wk => (
             <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
               <div style={{ color: '#00e68a', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {wk.phase}{wk.deload ? ' · делод' : ''} · {wk.totalSets} сетов</div>
@@ -140,7 +196,10 @@ export const StrengthSportConstructor: React.FC = () => {
               ))}
             </div>
           ))}
-          <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
+            <button onClick={() => { const txt = buildStrengthSportReport(plan); const w = window.open('', '_blank'); if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap">${txt.replace(/</g,'&lt;')}</pre>`); w.document.close(); w.print(); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Печать</button>
+          </div>
           {msg && <div style={{ color: '#00e68a', fontSize: 11 }}>{msg}</div>}
         </div>
       )}

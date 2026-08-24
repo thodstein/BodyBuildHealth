@@ -7,8 +7,10 @@ import { buildCombatPlan } from '../../../engines/combat/combat-builder.engine';
 import { finalizeCombatPlan, buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
 import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat/combat-split-patterns';
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
-import { saveCombatPlan } from '../../../engines/combat/combat-storage';
+import { saveCombatPlan, loadCombatPlans } from '../../../engines/combat/combat-storage';
+import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
+import { getCombat } from '../../../engines/combat/combat-volume';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 
@@ -20,6 +22,7 @@ export const CombatConstructor: React.FC = () => {
   const [weeks, setWeeks] = useState(6);
   const [days, setDays] = useState(3);
   const [weightCut, setWeightCut] = useState(0);
+  const [methodology, setMethodology] = useState<CombatInput['methodology']>('compound_first');
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('mma'));
   const [outsideEnabled, setOutsideEnabled] = useState(true);
   const [plan, setPlan] = useState<CombatPlan | null>(null);
@@ -28,12 +31,13 @@ export const CombatConstructor: React.FC = () => {
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
 
   const build = () => {
-    const input: CombatInput = {
+    let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
-      weightCutKg: weightCut,
+      weightCutKg: weightCut, methodology,
       outsideLoad: outsideEnabled ? outside : null,
       equipment: [],
     };
+    try { const prev = loadCombatPlans()[0]; if (prev) input = applyCombatMesocycle(prev, input) as any; } catch {}
     let p = buildCombatPlan(input);
     p = finalizeCombatPlan(p);
     setPlan(p);
@@ -82,8 +86,15 @@ export const CombatConstructor: React.FC = () => {
           <input type="range" min={2} max={12} value={weeks} onChange={e => setWeeks(Number(e.target.value))} />
           <label style={{ color: '#fff', fontSize: 12 }}>Дней/нед в зале: {days}</label>
           <input type="range" min={2} max={4} value={days} onChange={e => setDays(Number(e.target.value))} />
+          <label style={{ color: '#fff', fontSize: 12 }}>Методика порядка</label>
+          <select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+            <option value="compound_first">База первой</option>
+            <option value="pre_exhaust">Предутомление</option>
+            <option value="post_exhaust">Постутомление</option>
+          </select>
           <label style={{ color: '#fff', fontSize: 12 }}>Весогонка кг (0 = нет): {weightCut}</label>
           <input type="range" min={0} max={8} step={0.5} value={weightCut} onChange={e => setWeightCut(Number(e.target.value))} />
+          <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля</button>
           <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#a855f7', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
         </div>
       )}
@@ -125,6 +136,25 @@ export const CombatConstructor: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ background: 'rgba(168,85,247,0.12)', padding: 10, borderRadius: 10, color: '#fff', fontSize: 11, whiteSpace: 'pre-wrap' }}>{buildCombatReport(plan)}</div>
           {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
+          <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Quality heatmap (сеты/нед vs MEV/MRV):</div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {plan.weeksData.map(wk => {
+                const neck = wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('neck')).reduce((a,e)=> a+e.sets,0),0);
+                const lm = getCombat(plan.level,'neck'); const st = lm ? (neck<lm.mev?'below': neck<=lm.mav?'optimal': neck<=lm.mrv?'high':'over') : 'optimal';
+                const col = st==='below'?'#f59e0b': st==='optimal'?'#a855f7': st==='high'?'#eab308':'#ef4444';
+                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: шея {neck}</span>;
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+              {plan.weeksData.map(wk => {
+                const grip = wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((a,e)=> a+e.sets,0),0);
+                const lm = getCombat(plan.level,'grip'); const st = lm ? (grip<lm.mev?'below': grip<=lm.mav?'optimal': grip<=lm.mrv?'high':'over') : 'optimal';
+                const col = st==='below'?'#f59e0b': st==='optimal'?'#a855f7': st==='high'?'#eab308':'#ef4444';
+                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: хват {grip}</span>;
+              })}
+            </div>
+          </div>
           {plan.weeksData.map(wk => (
             <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
               <div style={{ color: '#a855f7', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {wk.phase}{wk.deload ? ' · делод' : ''} · {wk.totalSets} сетов</div>
@@ -138,7 +168,10 @@ export const CombatConstructor: React.FC = () => {
               ))}
             </div>
           ))}
-          <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
+            <button onClick={() => { const txt = buildCombatReport(plan); const w = window.open('', '_blank'); if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap">${txt.replace(/</g,'&lt;')}</pre>`); w.document.close(); w.print(); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Печать</button>
+          </div>
           {msg && <div style={{ color: '#a855f7', fontSize: 11 }}>{msg}</div>}
         </div>
       )}
