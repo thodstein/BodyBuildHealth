@@ -27,6 +27,8 @@ import { computeStructuredAnalytics } from '../../engines/structured-analytics.e
 import { PlannerPlAuto } from './TrainingScreen_parts/PlannerPlAuto';
 import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
 import { CardioConstructor } from './TrainingScreen_parts/CardioConstructor';
+import { StrengthSportConstructor } from './strength-sport/StrengthSportConstructor';
+import { CombatConstructor } from './combat/CombatConstructor';
 import { ProgramManagerPanelWithProvider as ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
@@ -79,7 +81,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   useEffect(() => {
     const h = (e: Event) => {
       const track = (e as CustomEvent).detail as PlanningTrack | undefined;
-      if (track === 'pl' || track === 'bb' || track === 'manual' || track === 'cardio') switchPlanningTrack(track);
+      if (track === 'pl' || track === 'bb' || track === 'manual' || track === 'cardio' || track === 'strength' || track === 'combat') switchPlanningTrack(track);
     };
     window.addEventListener('planning-track-open', h);
     return () => window.removeEventListener('planning-track-open', h);
@@ -298,7 +300,8 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'he_training_planning_track') {
         const val = localStorage.getItem('he_training_planning_track');
-        const parsed = val === 'bb' ? val : 'pl';
+        const allowed: PlanningTrack[] = ['pl','bb','manual','cardio','strength','combat'];
+        const parsed = (allowed as string[]).includes(val || '') ? (val as PlanningTrack) : 'pl';
         setPlanningTrack(parsed);
         setPlanningTrackState(parsed);
         setZone('planner'); setPage('tabs');
@@ -613,6 +616,8 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {planningTrack === 'bb' && <PlannerBbAuto />}
             {planningTrack === 'manual' && <ProgramManagerPanel />}
             {planningTrack === 'cardio' && <CardioConstructor />}
+            {planningTrack === 'strength' && <StrengthSportConstructor />}
+            {planningTrack === 'combat' && <CombatConstructor />}
           </div>
         </InfoErrorBoundary>
       )}
