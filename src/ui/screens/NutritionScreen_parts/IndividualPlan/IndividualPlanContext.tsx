@@ -2140,7 +2140,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainStartMin: linkToTraining && isTrainDay(offset) && plannerModeRef.current === 'pro' ? toMin(trainStart) : undefined,
           allowIntraWorkout: intraWorkoutEnabled && trainIntensity !== 'low' && plannerModeRef.current === 'pro',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
-          excludedIds: (() => { const s = new Set(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
+          excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
           preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
@@ -2236,7 +2236,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const _currentItemIds = new Set((Array.isArray(m.items) ? m.items : []).map((it: any) => it.id));
             const suggestions = pickRecipesForMeal(_filteredRecipes, {
               mealType: mt, targetKcal: m.totals.kcal || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
-              excludedIds, cookProfile: _cookProf, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _recipeBudget,
+              excludedIds: new Set(Array.from(excludedIds).map((x: any) => String(x))) as Set<string>, cookProfile: _cookProf, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _recipeBudget,
               currentItemIds: _currentItemIds,
             }, 3);
             if (suggestions.length > 0) {
