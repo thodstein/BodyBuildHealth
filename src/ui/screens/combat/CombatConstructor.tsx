@@ -98,6 +98,23 @@ export const CombatConstructor: React.FC = () => {
       return copy;
     });
   };
+  const moveEx = (wkIdx: number, day: number, exId: string, dir: -1|1) => {
+    setPlan(prev => {
+      if (!prev) return prev;
+      const copy: CombatPlan = JSON.parse(JSON.stringify(prev));
+      const sess = copy.weeksData[wkIdx]?.sessions.find(s=> s.day===day);
+      if (!sess) return prev;
+      const idx = sess.exercises.findIndex(e=> e.id===exId);
+      if (idx<0) return prev;
+      const nIdx = idx + dir;
+      if (nIdx<0||nIdx>=sess.exercises.length) return prev;
+      const tmp = sess.exercises[idx];
+      sess.exercises[idx]=sess.exercises[nIdx];
+      sess.exercises[nIdx]=tmp;
+      saveCombatPlan(copy);
+      return copy;
+    });
+  };
   const exportToUserProgram = () => {
     if (!plan) return;
     const prog = { id: plan.id, name: `Единоборства ${plan.discipline} ${plan.weeks}нед`, weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, exercises: s.exercises.map(e=> ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir })) })) })), meta: { source: 'combat', discipline: plan.discipline } };
@@ -275,6 +292,8 @@ export const CombatConstructor: React.FC = () => {
                         <input aria-label="вес" type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ width: 58, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                         <input aria-label="повторы" type="text" value={ex.reps} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ width: 54, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                         <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ width: 44, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
+                        <button aria-label="вверх" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, -1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↑</button>
+                        <button aria-label="вниз" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, 1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↓</button>
                       </div>
                       {ex.comment && <div style={{ fontSize: 10, opacity: 0.7, marginLeft: 4, borderLeft: '2px solid rgba(168,85,247,0.3)', paddingLeft: 6 }}>{ex.comment}</div>}
                       {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize: 10, opacity: 0.5 }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}

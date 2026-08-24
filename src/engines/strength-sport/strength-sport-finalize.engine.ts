@@ -76,6 +76,13 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     if (lmS && liftsSnatch > lmS.mrv) warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} подъёмов > MRV ${lmS.mrv} — перебор.`);
     if (lmC && liftsClean > lmC.mrv) warnings.push(`Нед ${wk.week}: толчок ${liftsClean} подъёмов > MRV ${lmC.mrv}.`);
     if (lmS && liftsSnatch < lmS.mev) warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} < MEV ${lmS.mev} — недобор объёма.`);
+    // баланс push/pull
+    const push = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['bench_bar','ohp','push_press','log_press','circus_db_press','push_jerk','split_jerk','db_press'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    const pull = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['deadlift','sumo_dl','axle_deadlift','row_bar','row_db','pullup','snatch_pull','clean_pull'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    if (push>0 && pull>0) {
+      const ratio = push / Math.max(1, pull);
+      if (ratio > 1.8 || ratio < 0.55) warnings.push(`Нед ${wk.week}: дисбаланс push ${push} / pull ${pull} = ${ratio.toFixed(2)} — выровняйте тяги/жимы.`);
+    }
   }
 
   plan.validation = { ok: errors.length === 0, warnings: [...new Set(warnings)], errors };
