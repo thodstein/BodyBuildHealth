@@ -2236,8 +2236,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const _currentItemIds = new Set((Array.isArray(m.items) ? m.items : []).map((it: any) => it.id));
             const suggestions = pickRecipesForMeal(_filteredRecipes, {
               mealType: mt, targetKcal: m.totals.kcal || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
-              excludedIds: new Set(Array.from(excludedIds).map((x: any) => String(x))) as Set<string>, cookProfile: _cookProf, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _recipeBudget,
-              currentItemIds: _currentItemIds,
+              excludedIds: new Set<string>([...(excludedIds as Set<string>)]), cookProfile: _cookProf, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _recipeBudget,
             }, 3);
             if (suggestions.length > 0) {
               m.recipeSuggestions = suggestions.map(r => ({ name: r.name, kcal: r.kcal, protein: r.protein, fat: r.fat, carbs: r.carbs, prepTimeMin: r.prepTimeMin, usefulness: r.usefulness, description: r.description, ingredients: r.ingredients, instructions: r.instructions, tags: r.tags }));
