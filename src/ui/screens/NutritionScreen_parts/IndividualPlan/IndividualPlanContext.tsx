@@ -3159,8 +3159,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         for (const it of m.items) {
           const fd = FOOD_DB.find((f: any) => f.id === it.id);
           if (!fd) continue;
-          const snapped = snapPortionG(fd, it.amount);
-          if (snapped !== it.amount && it.amount > 0 && Math.abs(snapped - it.amount) >= 10) {
+           const snapped = snapPortionG(fd, it.amount);
+          if (snapped !== it.amount && it.amount > 0) {
             const factor = snapped / it.amount;
             it.amount = snapped;
             it.kcal = Math.round(it.kcal * factor);
