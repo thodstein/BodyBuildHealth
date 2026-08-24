@@ -25,17 +25,32 @@ export const CombatConstructor: React.FC = () => {
   const [methodology, setMethodology] = useState<CombatInput['methodology']>('compound_first');
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('mma'));
   const [outsideEnabled, setOutsideEnabled] = useState(true);
+  const [equipment, setEquipment] = useState<string[]>([]);
+  const [injuries, setInjuries] = useState<any[]>([]);
+  const [injInput, setInjInput] = useState('');
   const [plan, setPlan] = useState<CombatPlan | null>(null);
   const [msg, setMsg] = useState('');
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
 
+  const pullFromProfile = () => {
+    try {
+      const raw = localStorage.getItem('he_profile_v2');
+      if (!raw) return;
+      const p = JSON.parse(raw);
+      const training = p.training || p;
+      if (training.level) setLevel(training.level);
+      if (Array.isArray(p.health?.injuries)) setInjuries(p.health.injuries);
+      else if (Array.isArray(training.injuries)) setInjuries(training.injuries);
+      if (Array.isArray(training.equipment)) setEquipment(training.equipment);
+    } catch {}
+  };
   const build = () => {
     let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
       weightCutKg: weightCut, methodology,
       outsideLoad: outsideEnabled ? outside : null,
-      equipment: [],
+      equipment, injuries,
     };
     try { const prev = loadCombatPlans()[0]; if (prev) input = applyCombatMesocycle(prev, input) as any; } catch {}
     let p = buildCombatPlan(input);
@@ -94,6 +109,22 @@ export const CombatConstructor: React.FC = () => {
           </select>
           <label style={{ color: '#fff', fontSize: 12 }}>Весогонка кг (0 = нет): {weightCut}</label>
           <input type="range" min={0} max={8} step={0.5} value={weightCut} onChange={e => setWeightCut(Number(e.target.value))} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+            <label style={{ color: '#fff', fontSize: 11 }}>Оборудование</label>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {['barbell','dumbbell','machine','cable','other'].map(eq => (
+                <label key={eq} style={{ color: '#fff', fontSize: 11, display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <input type="checkbox" checked={equipment.includes(eq)} onChange={e => setEquipment(s => e.target.checked ? [...s, eq] : s.filter(x=>x!==eq))} /> {eq}
+                </label>
+              ))}
+            </div>
+            <label style={{ color: '#fff', fontSize: 11 }}>Щадящие травмы (neck/knee/shoulder/wrist)</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="neck, wrist" style={{ flex: 1, padding: 4, borderRadius: 6, fontSize: 11 }} />
+              <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, background: '#a855f7', color: '#fff', cursor: 'pointer' }}>Применить</button>
+            </div>
+            {injuries.length>0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>Щадящий: {injuries.map((j:any)=> j.location).join(', ')}</div>}
+          </div>
           <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля</button>
           <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#a855f7', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
         </div>

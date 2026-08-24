@@ -25,6 +25,9 @@ export const StrengthSportConstructor: React.FC = () => {
   const [focus, setFocus] = useState<StrengthSportInput['focus']>(null);
   const [methodology, setMethodology] = useState<StrengthSportInput['methodology']>('compound_first');
   const [workMax, setWorkMax] = useState<StrengthSportInput['workMax']>({ backSquat: 120, deadlift: 160, snatch: 70, cleanJerk: 90, overheadPress: 60 });
+  const [equipment, setEquipment] = useState<string[]>([]);
+  const [injuries, setInjuries] = useState<any[]>([]);
+  const [injInput, setInjInput] = useState('');
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('weightlifting'));
   const [outsideEnabled, setOutsideEnabled] = useState(false);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
@@ -40,7 +43,14 @@ export const StrengthSportConstructor: React.FC = () => {
       const training = p.training || p;
       if (training.workMax) setWorkMax(s => ({ ...s, ...training.workMax }));
       if (training.level) setLevel(training.level);
+      if (Array.isArray(p.health?.injuries)) setInjuries(p.health.injuries);
+      else if (Array.isArray(training.injuries)) setInjuries(training.injuries);
+      if (Array.isArray(training.equipment)) setEquipment(training.equipment);
       if (p.personal?.sex) { /* could set sex but input not exposed */ }
+      // outside из профиля: спорт → дефолт внезальной
+      const sport = (p.training?.sportType || p.goals?.primaryGoal || '').toLowerCase();
+      if (sport.includes('weightlifting') || sport.includes('та')) setOutside(defaultOutsideLoadFor('weightlifting'));
+      else if (sport.includes('strongman') || sport.includes('стронг')) setOutside(defaultOutsideLoadFor('strongman'));
     } catch {}
   };
 
@@ -48,7 +58,7 @@ export const StrengthSportConstructor: React.FC = () => {
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology,
       outsideLoad: outsideEnabled ? outside : null,
-      equipment: [],
+      equipment, injuries,
     };
     try {
       const prev = loadStrengthSportPlans()[0];
@@ -120,6 +130,22 @@ export const StrengthSportConstructor: React.FC = () => {
             {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
               <label key={k} style={{ color: '#fff', fontSize: 11 }}>{k}: <input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value) }))} style={{ width: 70, padding: 4, borderRadius: 6 }} /></label>
             ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
+            <label style={{ color: '#fff', fontSize: 11 }}>Оборудование (пусто — всё доступно)</label>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {['barbell','dumbbell','machine','cable','other'].map(eq => (
+                <label key={eq} style={{ color: '#fff', fontSize: 11, display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <input type="checkbox" checked={equipment.includes(eq)} onChange={e => setEquipment(s => e.target.checked ? [...s, eq] : s.filter(x=>x!==eq))} /> {eq}
+                </label>
+              ))}
+            </div>
+            <label style={{ color: '#fff', fontSize: 11 }}>Щадящие травмы (knee/back/shoulder/wrist, через запятую)</label>
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="knee, shoulder" style={{ flex: 1, padding: 4, borderRadius: 6, fontSize: 11 }} />
+              <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, background: '#00e68a', color: '#000', cursor: 'pointer' }}>Применить</button>
+            </div>
+            {injuries.length>0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>Щадящий режим: {injuries.map((j:any)=> j.location).join(', ')} — вес ×0.6, +RIR</div>}
           </div>
           <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля</button>
           <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#00e68a', color: '#000', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
