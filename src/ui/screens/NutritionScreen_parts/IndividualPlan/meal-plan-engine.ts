@@ -2554,6 +2554,31 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
+  // P4-CARB: Carb overshoot correction — if carbs >10% over goal, scale down carb items.
+  // FIX: раньше был только protein overshoot и fat deficit, но НЕ было carb overshoot —
+  // в simple/minimal режиме движок генерировал +200г углеводов от цели без коррекции.
+  {
+    const goalC = carbsTotal;
+    const devC = (totals.c - goalC) / Math.max(1, goalC);
+    if (devC > 0.10) {
+      const excessC = totals.c - goalC;
+      const carbItems = meals.flatMap(m => m.items.filter(it => it.role === 'carb_slow' || it.role === 'carb_fast' || it.role === 'fruit').map(it => ({ meal: m, item: it })));
+      if (carbItems.length > 0) {
+        const reducePerItem = excessC / carbItems.length;
+        carbItems.forEach(({ meal, item }) => {
+          const food = FOOD_DB.find(f => f.id === item.id);
+          if (!food || !food.carbs) return;
+          const reduceGrams = Math.round(reducePerItem / food.carbs * 100);
+          const floor = 10;
+          const newAmount = snapPortionG(food, Math.max(floor, item.amount - reduceGrams));
+          const factor = newAmount / (item.amount || 1);
+          item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
+        });
+        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+      }
+    }
+  }
   if (_qualityMode === 'full') notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
   notes.push(`Диверсификация: ${uniqueFoods} уникальных продуктов (${Object.keys(categories).length} категорий)`);
   if (input.refeedDay) notes.push('🔄 Refeed-день: быстрые/низкоклетчаточные углеводы, овощи легче — приоритет гликогеновому ре-синтезу (лептин/психологическая разгрузка)');
