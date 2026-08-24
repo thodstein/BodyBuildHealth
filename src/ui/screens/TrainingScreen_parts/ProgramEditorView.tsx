@@ -144,6 +144,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
   const [tprofile, updateTProfile] = useTrainingProfile();
   const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const [showFeedbackAdv, setShowFeedbackAdv] = useState(false);
+  const [showToolsAdv, setShowToolsAdv] = useState(false);
 
   // V6: Toast with variants — replaces plain editorToast div
   const { showToast: showToastRaw, ToastNode } = useEditorToast();
@@ -890,10 +892,10 @@ return (
             <LoadGuardPanel program={program} dir={dir} />
             <RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
             <RealMRVPanel program={program} dir={dir} labMrvMult={labAdjust.mrvMultiplier} />
-            <ReadinessForecastPanel program={program} dir={dir} />
             <CheckinGuardPanel program={program} dir={dir} />
-            <WhatIfGuardPanel program={program} dir={dir} />
             <StrengthDiaryPanel program={program} dir={dir} />
+            <button onClick={() => setShowFeedbackAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showFeedbackAdv ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.10)', color: showFeedbackAdv ? '#00e68a' : DIM }}>{showFeedbackAdv ? '▲ Скрыть прогноз' : '▼ Дополнительно: прогноз готовности / what-if'}</button>
+            {showFeedbackAdv && <><ReadinessForecastPanel program={program} dir={dir} /><WhatIfGuardPanel program={program} dir={dir} /></>}
           </>,
         },
       ]} />
@@ -922,10 +924,10 @@ return (
           hint: 'Срывы, bar-path, блины, инфо об упражнениях',
           color: '#06b6d4',
           content: <>
-            <StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
-            <BiomechanicsPanel program={program} dir={dir} />
             <PlateAutoPanel program={program} dir={dir} />
             <ExerciseInfoPanel program={program} dir={dir} />
+            <button onClick={() => setShowToolsAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showToolsAdv ? 'rgba(6,182,212,0.35)' : 'rgba(255,255,255,0.10)', color: showToolsAdv ? '#06b6d4' : DIM }}>{showToolsAdv ? '▲ Скрыть биомеханику' : '▼ Биомеханика: срывы / bar-path'}</button>
+            {showToolsAdv && <><StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><BiomechanicsPanel program={program} dir={dir} /></>}
           </>,
         },
         {
