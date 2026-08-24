@@ -5,23 +5,35 @@
 import type { CombatPlan } from './combat.types';
 import { isDayConflictWithOutside } from '../outside-load.engine';
 import { getCombat } from './combat-volume';
+import { sessionLimitsForCombat, validateSyncCombat } from './combat-limits';
 
 export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   const warnings = [...(plan.validation?.warnings || [])];
   const errors = [...(plan.validation?.errors || [])];
 
-  // Кап сетов на упражнение
+  const onCourse = Array.isArray(plan.inputSnapshot?.peds) && (plan.inputSnapshot!.peds!.length>0);
+  const lim = sessionLimitsForCombat(plan.level, onCourse);
   for (const wk of plan.weeksData) {
     for (const sess of wk.sessions) {
+      let totalSets = 0;
       for (const ex of sess.exercises) {
-        if (ex.sets > 5) {
-          warnings.push(`Нед ${wk.week} ${sess.sessionTag} ${ex.name}: ${ex.sets} > 5 — срезано.`);
-          ex.sets = 5;
-          ex.workSets = ex.workSets.slice(0, 5);
+        if (ex.sets > lim.perExerciseCap) {
+          warnings.push(`Нед ${wk.week} ${sess.sessionTag} ${ex.name}: ${ex.sets} > cap ${lim.perExerciseCap} — срезано.`);
+          ex.sets = lim.perExerciseCap;
+          ex.workSets = ex.workSets.slice(0, lim.perExerciseCap);
         }
+        if (ex.workSets.length !== ex.sets) {
+          warnings.push(`Нед ${wk.week} ${ex.name}: workSets ${ex.workSets.length} != sets ${ex.sets}`);
+          ex.workSets = ex.workSets.slice(0, ex.sets);
+          while (ex.workSets.length < ex.sets) ex.workSets.push({ reps: 5, rir: 2, weight: ex.weight } as any);
+        }
+        totalSets += ex.sets;
       }
+      if (totalSets > lim.maxSets) warnings.push(`Нед ${wk.week} ${sess.sessionTag}: ${totalSets} сетов > лимита ${lim.maxSets}`);
+      if (sess.exercises.length > lim.maxExercises) warnings.push(`Нед ${wk.week} ${sess.sessionTag}: ${sess.exercises.length} упр > лимита ${lim.maxExercises}`);
     }
   }
+  for (const e of validateSyncCombat(plan)) warnings.push(e);
 
   // Шея/хват/ротация vs landmarks + кап
   for (const wk of plan.weeksData) {

@@ -10,6 +10,10 @@ import { pmForWeek, rirForWeek, phaseForWeek } from './strength-sport-progressio
 import { filterByTier, filterByInjury, selectDiverse } from './strength-sport-selection';
 import { volumeMultForExercise } from './strength-sport-specialization';
 import { tempoForSS, restForSS } from './strength-sport-loading';
+import { adaptForPEDsSS } from './strength-sport-ped-adaptation';
+import { filterByMobility } from './strength-sport-mobility';
+import { lengthenedBonus } from './strength-sport-bonus';
+import { warmupRampFor } from './strength-sport-warmup';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
 /** Пул упражнений по тегу — кандидаты (id каталога) + замены */
@@ -62,6 +66,10 @@ function filterPool(ids: string[], input: StrengthSportInput): string[] {
   const beforeInjury = [...out];
   out = filterByInjury(out, input.injuries as any);
   if (out.length===0 && (input.injuries||[]).length>0) out = beforeInjury.slice(0,2);
+  // mobility
+  const mob = (input as any).mobilityRestrictions as string[] | undefined;
+  out = filterByMobility(out, mob);
+  if (out.length===0 && mob && mob.length>0) out = beforeInjury.slice(0,2);
   return out;
 }
 function gentleFactor(id: string, injuries: any[]|undefined): number {
@@ -119,12 +127,7 @@ function weightForExercise(id: string, input: StrengthSportInput, pct: number, w
 }
 
 function buildWarmup(weight: number): StrengthSportSet[] {
-  if (!weight || weight < 20) return [];
-  const w: StrengthSportSet[] = [];
-  w.push({ reps: 8, rir: 5, weight: Math.round(weight * 0.5 / 2.5) * 2.5 });
-  if (weight > 60) w.push({ reps: 5, rir: 4, weight: Math.round(weight * 0.65 / 2.5) * 2.5 });
-  if (weight > 100) w.push({ reps: 3, rir: 3, weight: Math.round(weight * 0.8 / 2.5) * 2.5 });
-  return w;
+  return warmupRampFor(weight).map(s => ({ reps: s.reps, rir: s.rir, weight: s.weight } as StrengthSportSet));
 }
 
 function buildExerciseSets(id: string, tag: string, phase: string, input: StrengthSportInput, isPrimary: boolean, week: number): { sets: number; reps: [number, number]; rir: number; weight: number; workSets: StrengthSportSet[] } {
@@ -187,10 +190,9 @@ function computeNutMult(input: { calorieSurplus?: number; proteinPerKg?: number 
   if (input.proteinPerKg != null) v *= input.proteinPerKg >= 2.0 ? 1.1 : input.proteinPerKg >= 1.6 ? 1.05 : input.proteinPerKg < 1.0 ? 0.85 : 1.0;
   return Math.max(0.6, Math.min(1.5, v));
 }
-function computeBudget(input: { peds?: string[]; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number }): number {
-  const onCourse = Array.isArray(input.peds) && input.peds.length > 0;
-  const regime = onCourse ? (input.courseIntensity === 'heavy' ? 2.1 : input.courseIntensity === 'mild' ? 1.9 : 2.0) : 1.0;
-  const base = Math.round(112 * Math.max(1.0, regime));
+function computeBudget(input: { peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number }): number {
+  const ped = adaptForPEDsSS(input.peds, input.pedDoses as any, input.courseIntensity);
+  const base = Math.round(112 * ped.mrvMult);
   const lab = input.labMrvMultiplier ?? 1;
   const nut = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
   return Math.round(base * lab * nut);
@@ -291,7 +293,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   const recoveryMult = computeRecMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
   const nutritionMult = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  const weeklyBudget = computeBudget({ peds: input.peds, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier });
+  const weeklyBudget = computeBudget({ peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier });
 
   const weeksData: StrengthSportWeek[] = [];
   const rationale: string[] = [];

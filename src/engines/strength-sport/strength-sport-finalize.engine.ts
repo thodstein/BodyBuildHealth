@@ -4,6 +4,7 @@
  */
 import type { StrengthSportPlan } from './strength-sport.types';
 import { getWL, getStrong } from './strength-sport-volume';
+import { sessionLimitsFor, validateSync } from './strength-sport-limits';
 
 export interface FinalizeOptions {
   outsideLoad?: any;
@@ -13,18 +14,30 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
   const warnings = [...(plan.validation?.warnings || [])];
   const errors = [...(plan.validation?.errors || [])];
 
-  // Кап сетов на упражнение (про-правило)
+  const onCourse = Array.isArray(plan.inputSnapshot?.peds) && (plan.inputSnapshot!.peds!.length>0);
+  const lim = sessionLimitsFor(plan.level, plan.inputSnapshot?.trainingYears, onCourse);
   for (const wk of plan.weeksData) {
     for (const sess of wk.sessions) {
+      let totalSets = 0;
       for (const ex of sess.exercises) {
-        if (ex.sets > 6) {
-          warnings.push(`Нед ${wk.week} ${sess.sessionTag} ${ex.name}: ${ex.sets} сетов > 6 — срезано до 6.`);
-          ex.sets = 6;
-          ex.workSets = ex.workSets.slice(0, 6);
+        if (ex.sets > lim.perExerciseCap) {
+          warnings.push(`Нед ${wk.week} ${sess.sessionTag} ${ex.name}: ${ex.sets} > cap ${lim.perExerciseCap} — срезано.`);
+          ex.sets = lim.perExerciseCap;
+          ex.workSets = ex.workSets.slice(0, lim.perExerciseCap);
         }
+        if (ex.workSets.length !== ex.sets) {
+          warnings.push(`Нед ${wk.week} ${ex.name}: workSets ${ex.workSets.length} != sets ${ex.sets} — синхронизировано.`);
+          ex.workSets = ex.workSets.slice(0, ex.sets);
+          while (ex.workSets.length < ex.sets) ex.workSets.push({ reps: 3, rir: 2, weight: ex.weight, pct: 75, tempo: ex.tempo, restSeconds: ex.restSeconds } as any);
+        }
+        totalSets += ex.sets;
       }
+      if (totalSets > lim.maxSets) warnings.push(`Нед ${wk.week} ${sess.sessionTag}: ${totalSets} сетов > лимита сессии ${lim.maxSets}`);
+      if (sess.exercises.length > lim.maxExercises) warnings.push(`Нед ${wk.week} ${sess.sessionTag}: ${sess.exercises.length} упр > лимита ${lim.maxExercises}`);
     }
   }
+  const syncErrs = validateSync(plan);
+  for (const e of syncErrs) warnings.push(e);
 
   // outside highDays конфликт: тяж ноги накануне high вне зала → soft warning
   const out = opts?.outsideLoad || plan.inputSnapshot?.outsideLoad;

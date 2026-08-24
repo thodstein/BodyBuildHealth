@@ -36,6 +36,7 @@ export interface StrengthSportInput {
   trainingYears?: number;
   equipment?: string[]; // barbell/dumbbell/machine/cable/specialty (yoke/log/stone/sandbag)
   injuries?: any[];
+  mobilityRestrictions?: string[];
   favoriteExercises?: string[];
   excludedExercises?: string[];
   // Внешняя нагрузка (вне зала)

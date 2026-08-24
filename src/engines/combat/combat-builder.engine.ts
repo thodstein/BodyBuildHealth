@@ -9,6 +9,8 @@ import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progre
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB } from './combat-selection';
 import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
+import { adaptForPEDsCombat } from './combat-ped-adaptation';
+import { filterByMobilityCB } from './combat-mobility';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
@@ -84,6 +86,10 @@ function filterPool(ids: string[], input: CombatInput): string[] {
   const beforeInjury=[...out];
   out = filterByInjuryCB(out, input.injuries as any);
   if (out.length===0 && (input.injuries||[]).length>0) out = beforeInjury.slice(0,2);
+  const mob = (input as any).mobilityRestrictions as string[] | undefined;
+  const beforeMob=[...out];
+  out = filterByMobilityCB(out, mob);
+  if (out.length===0 && mob && mob.length>0) out = beforeMob.slice(0,2);
   return out;
 }
 function gentleFactorCB(id: string, injuries: any[]|undefined): number {
@@ -151,9 +157,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   })();
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   const weeklyBudget = (() => {
-    const onCourse = Array.isArray(input.peds) && input.peds.length > 0;
-    const regime = onCourse ? (input.courseIntensity === 'heavy' ? 2.1 : input.courseIntensity === 'mild' ? 1.9 : 2.0) : 1.0;
-    const base = Math.round(112 * Math.max(1.0, regime));
+    const ped = adaptForPEDsCombat(input.peds, input.pedDoses as any, input.courseIntensity);
+    const base = Math.round(112 * ped.mrvMult);
     const lab = input.labMrvMultiplier ?? 1;
     return Math.round(base * lab * outsideMult);
   })();

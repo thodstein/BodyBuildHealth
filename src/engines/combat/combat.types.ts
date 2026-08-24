@@ -20,6 +20,7 @@ export interface CombatInput {
   trainingYears?: number;
   equipment?: string[];
   injuries?: any[];
+  mobilityRestrictions?: string[];
   favoriteExercises?: string[];
   excludedExercises?: string[];
   // Весогонка (только camp/weight_cut)

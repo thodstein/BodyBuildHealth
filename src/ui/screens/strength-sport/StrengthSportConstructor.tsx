@@ -27,6 +27,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [methodology, setMethodology] = useState<StrengthSportInput['methodology']>('compound_first');
   const [workMax, setWorkMax] = useState<StrengthSportInput['workMax']>({ backSquat: 120, deadlift: 160, snatch: 70, cleanJerk: 90, overheadPress: 60 });
   const [equipment, setEquipment] = useState<string[]>([]);
+  const [mobility, setMobility] = useState<string[]>([]);
   const [injuries, setInjuries] = useState<any[]>([]);
   const [injInput, setInjInput] = useState('');
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('weightlifting'));
@@ -60,6 +61,8 @@ export const StrengthSportConstructor: React.FC = () => {
       if (Array.isArray(p.health?.injuries)) setInjuries(p.health.injuries);
       else if (Array.isArray(training.injuries)) setInjuries(training.injuries);
       if (Array.isArray(training.equipment)) setEquipment(training.equipment);
+      if (Array.isArray(training.mobilityRestrictions)) setMobility(training.mobilityRestrictions);
+      else if (Array.isArray(p.health?.mobilityRestrictions)) setMobility(p.health.mobilityRestrictions);
       if (p.personal?.sex) { /* could set sex but input not exposed */ }
       // outside из профиля: спорт → дефолт внезальной
       const sport = (p.training?.sportType || p.goals?.primaryGoal || '').toLowerCase();
@@ -72,7 +75,7 @@ export const StrengthSportConstructor: React.FC = () => {
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology,
       outsideLoad: outsideEnabled ? outside : null,
-      equipment, injuries,
+      equipment, injuries, mobilityRestrictions: mobility as any,
     };
     try {
       const prev = loadStrengthSportPlans()[0];
@@ -203,6 +206,14 @@ export const StrengthSportConstructor: React.FC = () => {
               <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, background: '#00e68a', color: '#000', cursor: 'pointer' }}>Применить</button>
             </div>
             {injuries.length>0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>Щадящий режим: {injuries.map((j:any)=> j.location).join(', ')} — вес ×0.6, +RIR</div>}
+            <label style={{ color: '#fff', fontSize: 11 }}>Мобильность (ограничения)</label>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {['shoulder','hip','knee','ankle','wrist','lower_back'].map(m => (
+                <label key={m} style={{ color: '#fff', fontSize: 10, display: 'flex', gap: 3, alignItems: 'center' }}>
+                  <input type="checkbox" checked={mobility.includes(m)} onChange={e => setMobility(s => e.target.checked ? [...s, m] : s.filter(x=> x!==m))} /> {m}
+                </label>
+              ))}
+            </div>
           </div>
           <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля</button>
           <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#00e68a', color: '#000', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
