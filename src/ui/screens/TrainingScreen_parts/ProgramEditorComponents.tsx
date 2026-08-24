@@ -342,7 +342,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура: {body.weeks.length} нед. · тренировочные дни внутри каждой недели</span>
         <span style={{ fontSize: 10, color: DIM }}>{body.weeks.length > 0 ? '— редактируйте расписание и упражнения ниже' : '— добавьте первую неделю'}</span>
         {body.weeks.length > 0 && (
-          <button onClick={() => { const v = !boardMode; setBoardMode(v); try { localStorage.setItem('he_bb_board_mode', v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: boardMode ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: boardMode ? '#00e68a' : DIM }}>
+          <button aria-pressed={boardMode} aria-label={boardMode ? 'Переключить в список' : 'Переключить в доску'} onClick={() => { const v = !boardMode; setBoardMode(v); try { localStorage.setItem('he_bb_board_mode', v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: boardMode ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: boardMode ? '#00e68a' : DIM }}>
             {boardMode ? '📋 Список' : '🗂 Доска'}
           </button>
         )}

@@ -74,6 +74,7 @@ import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL } from './training-ui';
 import { ManualHeader, ManualStepper, InfoBanner, SectionCard, Badge, ProgressBar } from './ManualUI';
 import { ManualLibraryGallery } from './ManualLibraryGallery';
+import { buildProgramIcs, downloadIcs } from './ManualExport';
 import { EditorPopupSelect } from './EditorPopup';
 import { GROUP_RU } from './program-types';
 import { labTrainingAdjust } from './lab-training-adjust';
@@ -690,6 +691,7 @@ export const ProgramManagerPanel: React.FC = () => {
               a.click(); URL.revokeObjectURL(url);
               flash('📤 Экспортировано');
             }}>📤 JSON</button>
+            <button style={ghostBtn} onClick={() => { try { const ics = buildProgramIcs(p); downloadIcs((p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); flash('📅 ICS скачан'); } catch { flash('⚠ Не удалось собрать ICS'); } }}>📅 ICS</button>
             <button style={ghostBtn} onClick={() => setEditing(null)}>✕ К списку</button>
           </div>
         </div>

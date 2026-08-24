@@ -40,6 +40,7 @@ import type { MacrocycleDesign } from '../../../engines/periodization-designer.e
 import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL, UI_METRICS } from './training-ui';
 import { ManualHeader, ManualStepper, SectionCard as ManualSectionCard, Badge, ProgressBar, InfoBanner, VolumeMiniBar, ScoreBadge } from './ManualUI';
+import { buildProgramIcs, downloadIcs } from './ManualExport';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -706,7 +707,8 @@ return (
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36 }} onClick={undo} title="Отменить (Ctrl+Z)">↩</button>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36 }} onClick={redo} title="Повторить (Ctrl+Shift+Z)">↪</button>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / PDF">🖨 PDF</button>
-          {(dir === 'bb' || dir === 'pl') && (
+          <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(0,230,138,0.35)', color: '#00e68a' }} onClick={() => { try { const ics = buildProgramIcs(program); downloadIcs((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); showToast('📅 ICS скачан'); } catch { showToast('⚠ Не удалось собрать ICS', 'error'); } }} title="Скачать календарь (.ics) — все тренировки по неделям">📅 ICS</button>
+           {(dir === 'bb' || dir === 'pl') && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 2 }}>
               <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 3 }}>
                 Нед
