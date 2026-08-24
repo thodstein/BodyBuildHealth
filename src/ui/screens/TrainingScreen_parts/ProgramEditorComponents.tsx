@@ -732,6 +732,15 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
     arr[j] = tmp;
     onChange(arr);
   };
+  const moveBlockToSession = (fromSi: number, bi: number, toSi: number) => {
+    if (fromSi === toSi || fromSi < 0 || toSi < 0 || fromSi >= sessions.length || toSi >= sessions.length) return;
+    const fromBlocks = sessions[fromSi].blocks;
+    const block = fromBlocks[bi];
+    if (!block) return;
+    const newFrom = fromBlocks.filter((_, i) => i !== bi);
+    const toBlocks = [...sessions[toSi].blocks, { ...block, id: newId('blk') }];
+    onChange(sessions.map((s, idx) => idx === fromSi ? { ...s, blocks: newFrom } : idx === toSi ? { ...s, blocks: toBlocks } : s));
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: boardMode ? 'row' : 'column', gap: 6, overflowX: boardMode ? 'auto' : undefined, paddingBottom: boardMode ? 4 : undefined }}>
@@ -803,7 +812,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
               </div>
             );
           })()}
-          <BlockList blocks={s.blocks} phase={phase} sessionFocus={s.focus} sessionName={s.name} onChange={(blocks) => updateSession(si, { blocks })} />
+          <BlockList blocks={s.blocks} phase={phase} sessionFocus={s.focus} sessionName={s.name} otherSessions={sessions.map((os, oi) => ({ idx: oi, name: os.name || `День ${oi + 1}` })).filter((_, oi) => oi !== si)} onMoveBlock={(bi, targetSi) => moveBlockToSession(si, bi, targetSi)} onChange={(blocks) => updateSession(si, { blocks })} />
         </div>
         );
       })}
@@ -821,7 +830,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
   );
 };
 
-const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sessionFocus?: string; sessionName?: string; onChange: (b: UserBlock[]) => void }> = ({ blocks, phase, sessionFocus, sessionName, onChange }) => {
+const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sessionFocus?: string; sessionName?: string; otherSessions?: Array<{ idx: number; name: string }>; onMoveBlock?: (bi: number, targetSi: number) => void; onChange: (b: UserBlock[]) => void }> = ({ blocks, phase, sessionFocus, sessionName, otherSessions, onMoveBlock, onChange }) => {
   const { confirm } = useConfirmDialog();
   const inferMuscleFromSession = (focus?: string, name?: string): string => {
     const txt = (focus || name || '').toLowerCase();
@@ -951,6 +960,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
   // 🔄 Замена упражнения: findSubstitutions подбирает альтернативы
   const [substFor, setSubstFor] = useState<number | null>(null);
   const [expandedBlock, setExpandedBlock] = useState<number | null>(null);
+  const [movePicker, setMovePicker] = useState<number | null>(null);
   const substResults = useMemo(() => {
     if (substFor == null) return [];
     const b = blocks[substFor];
@@ -1198,6 +1208,9 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             <button onClick={() => moveBlock(bi, -1)} disabled={bi === 0} aria-label={`Переместить упражнение ${bi + 1} выше`} title="Вверх" style={{ ...BTN_GHOST, minWidth: 28, minHeight: 22, padding: '2px 4px', fontSize: 9, lineHeight: 1, opacity: bi === 0 ? 0.35 : 1, borderColor: 'rgba(255,255,255,0.12)' }}>▲</button>
             <button onClick={() => moveBlock(bi, 1)} disabled={bi === blocks.length - 1} aria-label={`Переместить упражнение ${bi + 1} ниже`} title="Вниз" style={{ ...BTN_GHOST, minWidth: 28, minHeight: 22, padding: '2px 4px', fontSize: 9, lineHeight: 1, opacity: bi === blocks.length - 1 ? 0.35 : 1, borderColor: 'rgba(255,255,255,0.12)' }}>▼</button>
           </div>
+          {otherSessions && otherSessions.length > 0 && onMoveBlock && (
+            <button onClick={() => setMovePicker(movePicker === bi ? null : bi)} title="Переместить в другой день" aria-label={`Переместить упражнение ${bi + 1} в другой день`} style={{ ...BTN_GHOST, minWidth: 32, minHeight: 32, padding: '4px 6px', fontSize: 12, borderColor: movePicker === bi ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: movePicker === bi ? '#00e68a' : DIM }}>↗</button>
+          )}
           <EditorPopupSelect
             value={b.type}
             options={[
@@ -1230,6 +1243,15 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
              aria-expanded={expandedBlock === bi}
            >{expandedBlock === bi ? '▲ Детали' : '▼ Детали'}</button>
           </div>
+          {movePicker === bi && otherSessions && otherSessions.length > 0 && onMoveBlock && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 8, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.2)', alignItems: 'center' }}>
+              <span style={{ fontSize: 10, color: '#00e68a', fontWeight: 700 }}>↗ Переместить в:</span>
+              {otherSessions.map(os => (
+                <button key={os.idx} onClick={() => { onMoveBlock(bi, os.idx); setMovePicker(null); }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 32, borderColor: 'rgba(0,230,138,0.25)', color: '#00e68a' }}>{os.name}</button>
+              ))}
+              <button onClick={() => setMovePicker(null)} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, border: 'none', background: 'transparent', color: DIM, cursor: 'pointer' }}>✕</button>
+            </div>
+          )}
 
           {/* Схема подходов — отдельной строкой, чтобы ряд с упражнением не был перегружен */}
           <SetEditor sets={b.sets} onChange={(sets) => updateBlock(bi, { sets })} muscle={b.muscle} workMax={(loadTrainingProfile().workMax ?? {}) as Record<string, number>} />
