@@ -1534,6 +1534,10 @@ export const BbAutoConstructor: React.FC = () => {
           supersetMode,
           volumeScheme: effectiveVolumeScheme,
           trainingVolumeMode,
+          bfrMode,
+          blastCruiseEnabled,
+          blastWeeks,
+          cruiseWeeks,
         }, pedAdapt);
     }
 
@@ -2773,6 +2777,7 @@ export const BbAutoConstructor: React.FC = () => {
           <PopupNumber label='Blast нед' value={blastWeeks} min={4} max={12} onChange={setBlastWeeks} />
           <PopupNumber label='Cruise нед' value={cruiseWeeks} min={2} max={8} onChange={setCruiseWeeks} />
         </>}
+        <PopupSelect label='🏆 Pro-пресет' value={proPreset} onChange={v=>{ setProPreset(v); if(v==='dc'&&dupMode==='none') setDupMode('strength_hypertrophy' as any); if(v==='fortitude'){ setSupersetMode('giant' as any); if(volumeScheme==='standard') setVolumeScheme('fst7' as any);} }} hint='DC (RP 11-15), Fortitude (MR 4×6), Meadows (lengthened)' options={[{id:'none',label:'Без пресета'},{id:'dc',label:'DC Training'},{id:'fortitude',label:'Fortitude'},{id:'meadows',label:'Meadows'}]} />
       </div>
           {/* Рекомендации по питанию */}
           {(() => {
