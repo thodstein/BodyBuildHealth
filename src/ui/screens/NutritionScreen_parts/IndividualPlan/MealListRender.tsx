@@ -166,13 +166,34 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                   </span>;})}</div>
                 {m.totals&&<div style={{display:'flex',gap:6,marginTop:4,fontSize:8,alignItems:'center',flexWrap:'wrap'}}>{(() => { const tg = m.target; const fmt = (v: number, t: number|undefined, color: string) => { if (!t || t <= 0) return <span style={{color,fontWeight:600}}>{v}г</span>; const dev = v - t; const ok = Math.abs(dev) <= 3; return <span style={{color,fontWeight:600}}>{v}/{t}г{ok?null:<span style={{fontSize:6,color:dev>0?'#ef4444':'#f59e0b',fontWeight:700}}>{dev>0?('+'+Math.round(dev)):(''+Math.round(dev))}</span>}</span>; }; return <span style={{display:'contents'}}>{fmt(mealP,tg?.p,'#3b82f6')}<span style={{color:'rgba(255,255,255,0.2)',margin:'0 3px'}}>·</span>{fmt(mealF,tg?.f,'#f59e0b')}<span style={{color:'rgba(255,255,255,0.2)',margin:'0 3px'}}>·</span>{fmt(mealC,tg?.c,'#f97316')}</span>; })()}{mealDiaas.diaas > 0 && <span style={{fontSize:10,fontWeight:600,color:mealDiaas.diaas >= 1 ? '#22c55e' : mealDiaas.diaas >= 0.75 ? '#f59e0b' : '#ef4444',background:(mealDiaas.diaas >= 1 ? 'rgba(34,197,94,0.08)' : mealDiaas.diaas >= 0.75 ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)') + ' none repeat scroll 0% 0%',padding:'1px 5px',borderRadius:4}}>DIAAS {mealDiaas.diaas.toFixed(2)}</span>}{mealGL > 0 && <span style={{fontSize:10,fontWeight:600,color:mealGL<10?'#22c55e':mealGL<=20?'#f59e0b':'#ef4444',background:(mealGL<10?'rgba(34,197,94,0.08)':mealGL<=20?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)'),padding:'1px 5px',borderRadius:4}} title={'Glycemic Load: ' + mealGL + (isPostWorkout ? ' (high GL ok post-workout)' : '')}>GL {mealGL}</span>}{mealII > 0 && <span style={{fontSize:10,fontWeight:600,color:mealII<40?'#22c55e':mealII<=70?'#f59e0b':'#ef4444',background:(mealII<40?'rgba(34,197,94,0.08)':mealII<=70?'rgba(245,158,11,0.08)':'rgba(239,68,68,0.08)'),padding:'1px 5px',borderRadius:4}} title={'Insulin Index (kcal-weighted): ' + mealII}>II {mealII}</span>}{m.mpsCheck && m.mpsCheck.triggers_mTOR && <span style={{fontSize:10,fontWeight:600,color:'#00e68a',background:'rgba(0,230,138,0.08)',padding:'1px 5px',borderRadius:4}} title={'+' + m.mpsCheck.leucineG + 'g leucine, MPS triggered'}>{'\uD83E\uDDEC mTOR'}</span>}{m.mpsCheck && !m.mpsCheck.triggers_mTOR && m.mpsCheck.proteinG > 0 && <span style={{fontSize:10,fontWeight:600,color:'#f59e0b',background:'rgba(245,158,11,0.08)',padding:'1px 5px',borderRadius:4}} title={'Leucine ' + m.mpsCheck.leucineG + 'g < 2.5g threshold'}>{'\u26A0\uFE0F ' + m.mpsCheck.leucineG + 'g'}</span>}{m.synergyNotes&&m.synergyNotes.length>0&&<span style={{fontSize:10,color:'#22c55e',fontWeight:600}} title={m.synergyNotes.join('; ')}>✅ {(m.synergyNotes as string[]).length} синерги{((m.synergyNotes as string[]).length>1?'й':'я')}</span>}{m.conflictWarnings&&m.conflictWarnings.length>0&&<span style={{fontSize:10,color:'#ef4444',fontWeight:600}} title={m.conflictWarnings.join('; ')}>⚠️ {(m.conflictWarnings as string[]).length} конфликт{((m.conflictWarnings as string[]).length>1?'ов':'')}</span>}</div>}
                 {m.recipeSuggestions && Array.isArray(m.recipeSuggestions) && m.recipeSuggestions.length > 0 && (
-                  <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:2}}>
+                  <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:3}}>
                     <div style={{fontSize:8,fontWeight:700,color:'#f97316',padding:'2px 0'}}>🍲 Рецепты для этого приёма:</div>
                     {m.recipeSuggestions.slice(0, 3).map((r: any, ri: number) => (
-                      <div key={ri} style={{display:'flex',alignItems:'center',gap:4,fontSize:8,padding:'2px 6px',borderRadius:6,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.1)'}}>
-                        <span style={{color:'#f97316',fontWeight:600,cursor:'pointer'}} onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})}>{r.name}</span>
-                        <span style={{color:'rgba(255,255,255,0.5)'}}>· {r.kcal}ккал · {r.protein}г Б · ⏱{r.prepTimeMin}мин{r.usefulness?` · ⭐${r.usefulness}`:''}</span>
-                      </div>
+                      <details key={ri} style={{borderRadius:8,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.12)',overflow:'hidden'}}>
+                        <summary style={{cursor:'pointer',padding:'3px 6px',fontSize:8,color:'#f97316',fontWeight:600,listStyle:'none'}}>
+                          {r.name} · {r.kcal}ккал · Б{r.protein}г Ж{r.fat}г У{r.carbs}г · ⏱{r.prepTimeMin}мин{r.usefulness?` · ⭐${r.usefulness}`:''}
+                        </summary>
+                        <div style={{padding:'4px 6px',fontSize:7,color:'rgba(255,255,255,0.8)',lineHeight:1.5}}>
+                          {r.description && <div style={{marginBottom:3,color:'rgba(255,255,255,0.65)'}}>{r.description}</div>}
+                          {Array.isArray(r.ingredients) && r.ingredients.length > 0 && (
+                            <div style={{marginBottom:3}}>
+                              <span style={{color:'#f97316',fontWeight:600}}>Ингредиенты:</span>
+                              <ul style={{margin:'2px 0 0 12px',padding:0}}>
+                                {r.ingredients.map((ing: string, ii: number) => <li key={ii} style={{fontSize:7}}>{ing}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                          {Array.isArray(r.instructions) && r.instructions.length > 0 && (
+                            <div>
+                              <span style={{color:'#f97316',fontWeight:600}}>Как готовить:</span>
+                              <ol style={{margin:'2px 0 0 12px',padding:0}}>
+                                {r.instructions.map((step: string, si: number) => <li key={si} style={{fontSize:7,marginBottom:2}}>{step}</li>)}
+                              </ol>
+                            </div>
+                          )}
+                          <button onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{marginTop:3,padding:'2px 6px',borderRadius:4,border:'1px solid rgba(249,115,22,0.3)',background:'rgba(249,115,22,0.1)',color:'#f97316',cursor:'pointer',fontSize:7,fontWeight:600}}>🍳 Заменить приём этим рецептом</button>
+                        </div>
+                      </details>
                     ))}
                   </div>
                 )}

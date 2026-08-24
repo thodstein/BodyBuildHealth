@@ -1912,10 +1912,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
      if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
      setWeekEditDay(null); // FIX button-audit: новая генерация сбрасывает редактирование недели
 
-        // ─── V2 Engine path (MPS-based, professional bodybuilding dietology) ───
-       // FIX: simple/minimal теперь тоже используют V2-движок с quality:'basic' (быстро, без микро-анализа).
-       if (useProEngine) {
-        try {
+        // ─── V2 Engine path — ТОЛЬКО для Pro режима ───
+       // simple/minimal используют классический путь (простой КБЖУ, без V2-расчётов)
+       if (useProEngine && plannerModeRef.current === 'pro') {
+         try {
        const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
        const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
        const lbmKg = weight * (1 - bfPct / 100);
@@ -2238,7 +2238,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               excludedIds, cookProfile: _cookProf, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _recipeBudget,
             }, 3);
             if (suggestions.length > 0) {
-              m.recipeSuggestions = suggestions.map(r => ({ name: r.name, kcal: r.kcal, protein: r.protein, prepTimeMin: r.prepTimeMin, usefulness: r.usefulness, description: r.description }));
+              m.recipeSuggestions = suggestions.map(r => ({ name: r.name, kcal: r.kcal, protein: r.protein, fat: r.fat, carbs: r.carbs, prepTimeMin: r.prepTimeMin, usefulness: r.usefulness, description: r.description, ingredients: r.ingredients, instructions: r.instructions, tags: r.tags }));
             }
           });
         }
