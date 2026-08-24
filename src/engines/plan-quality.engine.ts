@@ -372,30 +372,49 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
 
 // ─── Утилиты для конвертации планов ───
 
-/** Конвертировать BBPlan → PlanQualityInput */
+/** Конвертировать BBPlan → PlanQualityInput — частота и сеты усреднены по всему мезоциклу. */
 export function bbPlanToQualityInput(bbPlan: {
-  weeks: { sessions: { exercises: { muscle: string; sets: number; name: string }[] }[] }[];
+  weeks: { sessions: { exercises: { muscle: string; sets: number; name: string }[] }[]; phase?: string; deload?: boolean }[];
   mrvByMuscle?: Record<string, number>;
 }, opts: {
   level: string; weakPoints?: string[]; hasDeload?: boolean; deloadWeeks?: number[];
   onCourse?: boolean; trainingYears?: number; pedMultiplier?: number;
+  injuries?: { muscle: string; exclude?: boolean }[];
 }): PlanQualityInput {
   const weeklySets: Record<string, number> = {};
-  const frequency: Record<string, number> = {};
-  const dayGroups: string[][] = [];
   const exerciseNames: string[][] = [];
+  const freqTotal: Record<string, number> = {};
 
-  // Берём неделю 1 для frequency/dayGroups
-  const week1 = bbPlan.weeks[0];
-  if (week1) {
-    for (const sess of week1.sessions) {
+  // dayGroups — уникальные мышцы по всем неделям для покрытия (а не только нед.1)
+  // frequency — средняя частота по всему мезоциклу (сессий/нед), а не только пик/нед.1
+  const dayGroupsMap = new Map<string, string[]>();
+  for (const week of bbPlan.weeks) {
+    for (const sess of week.sessions) {
       const groups = [...new Set(sess.exercises.map(e => e.muscle))];
-      dayGroups.push(groups);
+      // собираем exerciseNames по всем неделям для diversity
       exerciseNames.push(sess.exercises.map(e => e.name));
       for (const g of groups) {
-        frequency[g] = (frequency[g] || 0) + 1;
+        freqTotal[g] = (freqTotal[g] || 0) + 1;
       }
+      // dayGroups — уникальные группы за ротацию (берём первую неделю как базис ротации)
+      // но дополняем группами, появляющимися в поздних блоках специализации
+      for (const g of groups) if (!dayGroupsMap.has(g)) dayGroupsMap.set(g, [g]);
     }
+  }
+  // Восстанавливаем dayGroups из первой недели + добавленные специализации
+  const week1 = bbPlan.weeks[0];
+  const dayGroups: string[][] = [];
+  if (week1) {
+    for (const sess of week1.sessions) dayGroups.push([...new Set(sess.exercises.map(e => e.muscle))]);
+  }
+  // Добавляем отсутствующие группы специализации как отдельные дни для покрытия
+  for (const g of Object.keys(freqTotal)) if (!dayGroups.flat().includes(g)) dayGroups.push([g]);
+
+  const frequency: Record<string, number> = {};
+  const totalWeeks = bbPlan.weeks.length || 1;
+  for (const [g, cnt] of Object.entries(freqTotal)) {
+    frequency[g] = Math.round((cnt / totalWeeks) * 10) / 10;
+    if (frequency[g] < 1 && cnt > 0) frequency[g] = Math.max(1, frequency[g]);
   }
 
   // Средние сеты по неделям
@@ -410,15 +429,20 @@ export function bbPlanToQualityInput(bbPlan: {
     weeklySets[g] = Math.round(weeklySets[g] / bbPlan.weeks.length);
   }
 
+  // Авто-определение делода по факту плана, если не передан явно
+  const hasDeloadActual = opts.hasDeload ?? bbPlan.weeks.some(w => (w as any).deload || (w as any).phase === 'deload');
+  const deloadWeeksActual = opts.deloadWeeks ?? bbPlan.weeks.filter(w => (w as any).deload || (w as any).phase === 'deload').map(w => (w as any).week ?? 0).filter(Boolean);
+
   return {
     dayGroups, weeklySets, frequency,
     level: opts.level, weakPoints: opts.weakPoints,
-    hasDeload: opts.hasDeload, deloadWeeks: opts.deloadWeeks,
+    hasDeload: hasDeloadActual, deloadWeeks: deloadWeeksActual,
     planType: 'bb', totalWeeks: bbPlan.weeks.length,
     exerciseNames, onCourse: opts.onCourse,
     mrvByMuscle: bbPlan.mrvByMuscle,
     trainingYears: opts.trainingYears,
     pedMultiplier: opts.pedMultiplier,
+    injuries: opts.injuries,
   };
 }
 

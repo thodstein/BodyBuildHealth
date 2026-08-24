@@ -100,7 +100,13 @@ function collectExercises(program: UserProgram, division: ProQualityDivision) {
           const meta = findMeta(b.exerciseName);
           const pattern = meta?.movementPattern || (meta ? (meta as any).substitutionGroup : '') || b.muscle || '';
           const stretch = !!meta?.stretchPhase;
-          const tech = ((b as any).technique && (b as any).technique !== 'none' ? (b as any).technique : '') || ((b as any).techniques?.[0] || '');
+          // Техника может быть в b.technique / b.techniques[0] / b.sets[0].technique (BBPlan workSets) / lastSetTechnique
+          const rawTech = ((b as any).technique && (b as any).technique !== 'none' ? (b as any).technique : '')
+            || ((b as any).techniques?.[0] || '')
+            || ((b as any).sets?.[0]?.technique && (b as any).sets[0].technique !== 'none' ? (b as any).sets[0].technique : '')
+            || ((b as any).workSets?.[0]?.technique && (b as any).workSets[0].technique !== 'none' ? (b as any).workSets[0].technique : '')
+            || '';
+          const tech = rawTech;
           const reps = b.sets?.[0]?.reps != null ? String(b.sets[0].reps) : '';
           const rir = b.sets?.[0]?.rir ?? 2;
           const sets = b.sets?.reduce((a, st) => a + 1, 0) || 0;

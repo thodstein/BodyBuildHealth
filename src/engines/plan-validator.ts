@@ -135,7 +135,7 @@ export function weeklySetsFromManualResult(result: { days: { exercises: { group:
   return acc;
 }
 
-/** Хелпер: вычислить weeklySets из BBPlan (BBWeek[]) */
+/** Хелпер: вычислить weeklySets из BBPlan (BBWeek[]) — среднее по неделям. */
 export function weeklySetsFromBBPlan(weeks: Array<{ sessions: Array<{ exercises: Array<{ muscle: string; sets: number }> }> }>): Record<string, number> {
   const acc: Record<string, number> = {};
   for (const week of weeks) {
@@ -146,5 +146,7 @@ export function weeklySetsFromBBPlan(weeks: Array<{ sessions: Array<{ exercises:
       }
     }
   }
+  const n = weeks.length || 1;
+  for (const k of Object.keys(acc)) acc[k] = Math.round(acc[k] / n);
   return acc;
 }

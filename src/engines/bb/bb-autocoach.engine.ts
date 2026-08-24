@@ -479,8 +479,17 @@ export interface GarbageVolume {
  * Определить «мусорный» объём: упражнения, где целевая мышца не совпадает
  * с тегом сессии, или упражнения, дублирующие механический паттерн.
  */
-export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[]): GarbageVolume[] {
+export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?: { level?: string; trainingYears?: number }): GarbageVolume[] {
   const garbage: GarbageVolume[] = [];
+  // Канонизация слабых групп: delt_mid → shoulders, chest_upper → chest и т.д.
+  const weakCanonical = new Set((weakPoints || []).map(w => {
+    const v = String(w).toLowerCase();
+    if (v === 'delt_front' || v === 'delt_mid' || v === 'delt_rear') return 'shoulders';
+    if (v === 'chest_upper' || v === 'chest_lower') return 'chest';
+    if (v === 'back_width' || v === 'back_thickness') return 'back';
+    return v;
+  }));
+  const isWeak = (muscle: string) => weakCanonical.has(String(muscle).toLowerCase()) || weakPoints.includes(muscle);
   for (const w of weeks) {
     const seenPatterns: Set<string> = new Set();
     for (const s of w.sessions) {
@@ -521,7 +530,7 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[]): Garb
         if (pattern && pattern !== 'other' && !isCompoundPattern) {
           // Ключ включает мышцу: forearms-изоляция не конфликтует с biceps-изоляцией.
           const key = `${s.day}-${e.muscle}-${pattern}`;
-          if (seenPatterns.has(key) && !weakPoints.includes(e.muscle)) {
+          if (seenPatterns.has(key) && !isWeak(e.muscle)) {
             garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Дублирование паттерна ${pattern} для ${e.muscle} — одна изоляция на сессию` });
           }
           seenPatterns.add(key);

@@ -1128,13 +1128,21 @@ export const BbAutoConstructor: React.FC = () => {
   // Режим-множитель (×2 на курсе) — масштабирует MRV-капы в карточке muscle volume
   // под реальный режим (а не натуральный), чтобы карточка совпадала с планом.
   const regimeMrvMult = computeRegimeMrvMult({ onCourse: peds.length > 0, courseIntensity });
-  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, Math.max(1, pedAdapt.combinedMrvMultiplier, regimeMrvMult)) : null, [builtPlan, pedAdapt, regimeMrvMult]);
+  // ACWR — единый расчёт для всего качества (пороги 1.3/1.5)
+  const acwrData = useMemo(() => {
+    try {
+      const srpe = loadSRPESessions();
+      if (srpe.length < 2) return null;
+      return acuteChronicRatio(toDailyLoads(srpe));
+    } catch { return null; }
+  }, [builtPlan]);
+  const metrics = useMemo(() => builtPlan ? calcBBPlanMetrics(builtPlan, 1) : null, [builtPlan]);
   const safetyScore = useMemo<PlanSafetyScore | null>(() => {
     if (!builtPlan) return null;
     const personal = linked.profile?.settings?.personal;
     const lifestyle = linked.profile?.settings?.lifestyle;
     return calculatePlanSafetyScore(builtPlan, {
-      acwrRatio: calculateACWR(),
+      acwrRatio: acwrData?.ratio,
       bodyFat: personal?.bodyFat,
       hrvMs: lifestyle?.morningHRV,
       sleepHours: lifestyle?.sleepHours,
@@ -1142,27 +1150,51 @@ export const BbAutoConstructor: React.FC = () => {
       injuryCount: injuries.length,
       balanceReport: (builtPlan as any).balanceReport || null,
     });
-  }, [builtPlan, linked.profile, injuries.length]);
+  }, [builtPlan, linked.profile, injuries.length, acwrData]);
   // FIX-6: Единый источник качества — validatePlanQuality + pro-quality-analysis (паттерны/углы/растяжка)
   const quality = useMemo(() => {
     if (!builtPlan) return null;
+    // Фактический делод по неделям плана (а не тоггл autoDeload)
+    const hasDeloadActual = builtPlan.weeks.some((w:any) => (w as any).deload || (w as any).phase === 'deload');
+    const deloadWeeksActual = builtPlan.weeks.filter((w:any) => (w as any).deload || (w as any).phase === 'deload').map((w:any) => w.week).filter(Boolean);
     const input = bbPlanToQualityInput(builtPlan, {
       level: bbLevel,
       weakPoints,
-      hasDeload: autoDeload,
+      hasDeload: hasDeloadActual,
+      deloadWeeks: deloadWeeksActual,
       onCourse: peds.length > 0,
       trainingYears: bbTrainingYears,
       pedMultiplier: pedAdapt.combinedMrvMultiplier,
+      injuries: injuries.map(i => ({ muscle: i.muscle, exclude: i.exclude })),
     });
     const result = validatePlanQuality(input);
-    // PRO-качество из интеллектуальных — паттерны/углы/растяжка/техники
+    // PRO-качество из интеллектуальных — паттерны/углы/растяжка/техники (читает технику из workSets)
     let proDelta = 0;
     let proIssues: string[] = [];
+    let proResult: ReturnType<typeof analyzeProQuality> | null = null;
     try {
-      const dummyProgram: any = { bb: { weeks: builtPlan.weeks.map((w:any) => ({ sessions: w.sessions.map((s:any) => ({ blocks: s.exercises.map((e:any) => ({ exerciseName: e.name, muscle: e.muscle, sets: e.workSets || [{reps: e.repsRange?.[0] || 10, rir: e.rir || 2}] })) })) })) }, pl: { customWeeks: [] }, goal: bbGoal, level: bbLevel };
-      const proQ = analyzeProQuality(dummyProgram, 'bb', bbLevel, bbGoal);
-      proDelta = proQ.scoreDelta;
-      proIssues = proQ.totalIssues.slice(0, 2);
+      // Передаём технику честно: маппим workSets с technique, иначе PRO всегда 0%
+      const dummyProgram: any = {
+        bb: {
+          weeks: builtPlan.weeks.map((w:any) => ({
+            sessions: w.sessions.map((s:any) => ({
+              blocks: s.exercises.map((e:any) => {
+                const ws = e.workSets || [{ reps: e.repsRange?.[0] || 10, rir: e.rir || 2 }];
+                // Техника — из workSets с technique, иначе из коммента/parent
+                const tech = (ws[0] as any)?.technique || (e as any).technique || 'none';
+                return { exerciseName: e.name, muscle: e.muscle, sets: ws.map((x:any) => ({ reps: x.reps, rir: x.rir ?? e.rir, technique: x.technique || tech })), technique: tech };
+              }),
+            })),
+          })),
+        },
+        pl: { customWeeks: [] },
+        goal: bbGoal,
+        level: bbLevel,
+      };
+      const basePerMuscle = result.muscles.map(m => ({ muscle: m.muscle, peakSets: m.weeklySets, mrv: m.mrv }));
+      proResult = analyzeProQuality(dummyProgram, 'bb', bbLevel, bbGoal, basePerMuscle);
+      proDelta = proResult.scoreDelta;
+      proIssues = proResult.totalIssues.slice(0, 2);
     } catch {}
     const finalScore = Math.max(0, Math.min(100, result.score + proDelta));
     const finalGrade = finalScore >= 85 ? '🟢 Отлично' : finalScore >= 65 ? '🟡 Хорошо' : finalScore >= 45 ? '🟠 Средне' : '🔴 Слабо';
@@ -1175,8 +1207,11 @@ export const BbAutoConstructor: React.FC = () => {
         pct: m.pctOfMav, status: m.status, contextNote: m.contextNote,
       })),
       recommendations: [...result.recommendations, ...(proDelta < 0 ? [`PRO: ${proIssues.join('; ')}`] : [])],
+      proResult,
+      hasDeloadActual,
+      deloadWeeksActual,
     };
-  }, [builtPlan, bbLevel, weakPoints, autoDeload, peds, bbTrainingYears, pedAdapt.combinedMrvMultiplier, bbGoal]);
+  }, [builtPlan, bbLevel, weakPoints, peds, bbTrainingYears, pedAdapt.combinedMrvMultiplier, bbGoal, injuries]);
 
   useEffect(() => {
     try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, mobilityRestrictions, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
@@ -3748,9 +3783,8 @@ export const BbAutoConstructor: React.FC = () => {
   const renderQuality = () => {
     if (!metrics || !quality || !builtPlan) return null;
     const W = builtPlan.weeks;
-    const srpe = loadSRPESessions();
-    const loads = srpe.length >= 2 ? toDailyLoads(srpe) : null;
-    const ratio = loads ? acuteChronicRatio(loads) : null;
+    // Единый ACWR из селектора (а не 5 расчётов)
+    const ratio = acwrData;
     return (
       <div>
         {safetyScore && (
@@ -3760,19 +3794,26 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         )}
         <div style={H}>📊 Шаг 5: Качество и нагрузка плана</div>
-        {/* Перенесено из шага План: фаза, делод, авторег, советник, heatmap */}
+        {/* Фаза — факт из плана, а не синтетика distributePhases */}
         {(() => {
           const Wq = builtPlan.weeks;
           const wkq = Wq[Math.min(bbWeekSel, Wq.length) - 1] || Wq[0];
-          const curPh = phaseForWeek(wkq.week, bbWeeks);
-          const srpeQ = loadSRPESessions();
-          const acwrQ = srpeQ.length >= 2 ? acuteChronicRatio(toDailyLoads(srpeQ)) : null;
+          const curPhRaw = ((wkq as any).phase || (wkq as any).deload ? 'deload' : 'accumulation') as BBPhase;
+          const curPh = (['accumulation','intensification','deload','peaking'].includes(curPhRaw) ? curPhRaw : 'accumulation') as BBPhase;
+          const acwrQ = ratio;
           const needsDeloadQ = autoDeload && acwrQ && acwrQ.ratio > 1.3;
+          // Фактические RIR/повторы/темп из упражнений недели (а не PHASE_CONFIGS хардкод)
+          const wkExs = wkq.sessions.flatMap(s => s.exercises);
+          const avgRirFact = wkExs.length ? (wkExs.reduce((a,e) => a + (Number.isFinite(e.rir) ? e.rir * e.sets : 0), 0) / wkExs.reduce((a,e) => a + e.sets, 0) || 1) : 0;
+          const repsAll = wkExs.flatMap(e => e.workSets?.map((ws:any) => ws.reps) ?? [e.repsRange?.[0] ?? 10]);
+          const repMin = repsAll.length ? Math.min(...repsAll) : PHASE_CONFIGS[curPh].repRange[0];
+          const repMax = repsAll.length ? Math.max(...repsAll) : PHASE_CONFIGS[curPh].repRange[1];
+          const tempoFact = wkExs[0]?.tempoSpec || PHASE_CONFIGS[curPh].tempo;
           return <>
             <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:12, fontWeight:700, color:PHASE_COLORS[curPh] }}>📌 Фаза: {PHASE_LABELS[curPh]}</span>
-                <span style={{ fontSize:11, color:'#fff' }}>RIR {PHASE_CONFIGS[curPh].rirRange[0]}→{PHASE_CONFIGS[curPh].rirRange[1]} · Повт {PHASE_CONFIGS[curPh].repRange[0]}-{PHASE_CONFIGS[curPh].repRange[1]} · Темп {PHASE_CONFIGS[curPh].tempo}</span>
+                <span style={{ fontSize:12, fontWeight:700, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт недели {wkq.week}): {PHASE_LABELS[curPh]}</span>
+                <span style={{ fontSize:11, color:'#fff' }}>RIR ~{avgRirFact.toFixed(1)} · Повт {repMin}-{repMax} · Темп {tempoFact}</span>
               </div>
               <div style={{ marginTop:4, fontSize:11, color:'#fff' }}>
                 {curPh === 'accumulation' && '🎯 Цель: накопление метаболического стресса. Больше объёма, умеренные веса.'}
@@ -3780,6 +3821,7 @@ export const BbAutoConstructor: React.FC = () => {
                 {curPh === 'deload' && '🎯 Цель: активное восстановление. Минимум объёма, лёгкие веса.'}
                 {curPh === 'peaking' && '🎯 Цель: максимальная сила. Низкий объём, высокие веса.'}
               </div>
+              <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.7 }}>Уровень «{bbLevel}» · Цель «{bbGoal}» · Фокус «{bbTrainingFocus}» · Методика «{bbMethodology}» · Сплит «{builtPlan.pattern?.name || ''}»</div>
             </div>
             {needsDeloadQ && curPh !== 'deload' && (
               <div style={{ marginBottom:6, padding:8, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', fontSize:11, fontWeight:600 }}>🚨 ACWR {acwrQ?.ratio.toFixed(2)} &gt; 1.3 — рекомендуется разгрузка.</div>
@@ -3788,34 +3830,7 @@ export const BbAutoConstructor: React.FC = () => {
               const dp = DELOAD_PROTOCOLS[deloadType] || DELOAD_PROTOCOLS.pump;
               return <div style={{ marginBottom:8, padding:10, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)' }}><div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔋 Разгрузка — активное восстановление</div><div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, fontSize:11 }}><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Объём</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.volumeMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Интенсивность</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.intensityMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>RIR</div><div style={{ fontWeight:700, color:'#22c55e' }}>→{dp.rirTarget}</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Повторения</div><div style={{ fontWeight:700, color:'#22c55e' }}>{dp.repRange[0]}-{dp.repRange[1]}</div></div></div></div>;
             })()}
-            <div style={{ marginTop:6, padding:'8px 10px', borderRadius:10, background:(loadSRPESessions() as any).length >= 2 && acuteChronicRatio(toDailyLoads(loadSRPESessions() as any))?.ratio > 1.3 ? 'rgba(239,68,68,0.08)' : 'rgba(96,165,250,0.06)', border:'1px solid ' + ((loadSRPESessions() as any).length >= 2 && acuteChronicRatio(toDailyLoads(loadSRPESessions() as any))?.ratio > 1.3 ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.2)') }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>📈 Нагрузка и восстановление (ACWR)</div>
-              <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>{acwrQ ? `ACWR ${acwrQ.ratio.toFixed(2)} — ${acwrQ.zone === 'dangerous' ? '⛔ опасная зона' : acwrQ.zone === 'caution' ? '⚠ осторожно' : '✅ оптимально'}` : 'ACWR: нет данных sRPE (нужно ≥2 сессии)'}</div>
-            </div>
           </>;
-        })()}
-        {/* Validation banners */}
-        {(() => {
-          const ws = weeklySetsFromBBPlan(W);
-          const b = validatePlan({
-            weeklySets: ws, level: bbLevel, goal: bbGoal, daysPerWeek: bbDays, weakPoints,
-            readiness: ((prof.recovery ?? 7) * 10),
-            trainingYears: bbTrainingYears,
-            mrvMultiplier: pedAdapt.combinedMrvMultiplier,
-            mrvByMuscle: builtPlan.mrvByMuscle,
-          });
-          if (b.length === 0) return null;
-          return (
-            <div style={{ ...CARD, marginBottom:8, background:'rgba(220,38,38,0.04)', border:'1px solid rgba(220,38,38,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f87171', marginBottom:6 }}>🛡 Валидация плана</div>
-              {b.map((bn, i) => (
-                <div key={i} style={{ fontSize:11, color:bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'#fff', marginBottom:4, padding:'4px 6px', borderRadius:4, background:bn.level==='error'?'rgba(248,113,113,0.08)':bn.level==='warning'?'rgba(251,191,36,0.08)':'rgba(255,255,255,0.03)', borderLeft:'2px solid '+(bn.level==='error'?'#f87171':bn.level==='warning'?'#fbbf24':'rgba(255,255,255,0.2)'), lineHeight:1.4 }}>
-                  <div style={{ fontWeight:700 }}>{bn.level==='error'?'⛔':bn.level==='warning'?'⚠':'ℹ'} {bn.title}</div>
-                  <div style={{ opacity:0.7, marginTop:1 }}>{bn.detail}</div>
-                </div>
-              ))}
-            </div>
-          );
         })()}
         {/* Cycle info if in cycle mode */}
         {planMode === 'bb_cycle' && selectedCycleId && (() => {
@@ -3832,44 +3847,58 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Score gauge */}
+        {/* Score gauge — фактические фазы из плана */}
         <div style={{ ...CARD, textAlign:'center', borderLeft:'3px solid ' + (quality.score >= 85 ? '#22c55e' : quality.score >= 65 ? '#eab308' : '#ef4444') }}>
           <div style={{ fontSize:36, fontWeight:800, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.score}/100</div>
           <div style={{ fontSize:13, fontWeight:700, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.label}</div>
           <div style={{ marginTop:8, display:'flex', justifyContent:'center', gap:12, flexWrap:'wrap' }}>
-            <div style={SMALL}>Всего сетов: <b style={{ color:'#fff' }}>{metrics.totalSets}</b></div>
+            <div style={SMALL}>Всего сетов (пик): <b style={{ color:'#fff' }}>{metrics.totalSets}</b></div>
             <div style={SMALL}>Тяж: <b style={{ color:'#ef4444' }}>{(metrics.тяжPct*100).toFixed(0)}%</b></div>
             <div style={SMALL}>Памп: <b style={{ color:'#60a5fa' }}>{(metrics.пампPct*100).toFixed(0)}%</b></div>
             <div style={SMALL}>RIR: <b style={{ color:'#f59e0b' }}>{metrics.avgRir.toFixed(1)}</b></div>
-            <div style={SMALL}>Фаз: <b style={{ color:'#a855f7' }}>{phases.filter((p,i,a) => p.phase !== a[i-1]?.phase).length}</b></div>
+            <div style={SMALL}>Фаз: <b style={{ color:'#a855f7' }}>{Array.from(new Set(W.map((w:any) => (w as any).phase || 'accumulation'))).length}</b></div>
           </div>
           {pedAdapt.combinedMrvMultiplier > 1 && (
             <div style={{ marginTop:6, fontSize:11, fontWeight:700, color:'#f59e0b', background:'rgba(245,158,11,0.08)', padding:'4px 10px', borderRadius:8, display:'inline-block' }}>
               💉 PED: MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} — пороги MEV/MAV/MRV увеличены
             </div>
           )}
+          <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Средний объём по мезо — в «Бюджете объёма», пик — здесь</div>
         </div>
-        {/* Объём vs MRV (volume-landmarks, единый источник) */}
+        {/* Бюджет объёма — единственный источник perMuscle (пиковая неделя) */}
         {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
-        {/* Логика построения — реальные изменения, а не шаблон */}
-        <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой</div>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
-            {builtPlan.rationale.slice(0, 12).map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
-            {builtPlan.rationale.length > 12 && <div style={{ marginTop:4, fontSize:10, color:'#fff' }}>+ ещё {builtPlan.rationale.length - 12} пунктов — см. вкладку «План»</div>}
-          </div>
-          <div style={{ marginTop:6, fontSize:10, color:'#fff', fontStyle:'italic' }}>Изменения отражают цель «{bbGoal}», уровень «{bbLevel}», сплит «{builtPlan.pattern.name}», методики «{bbMethodology}» + «{supersetMode}» + «{volumeScheme}», специализацию {weakPoints.join(', ') || 'нет'}.</div>
-        </div>
-        {/* Прогноз пиковой загрузки */}
+        {/* Логика построения — факт из builtPlan + inputSnapshot, без обрезки важных warnings */}
+        {(() => {
+          const snap = (builtPlan as any).inputSnapshot || { level: bbLevel, goal: bbGoal, trainingFocus: bbTrainingFocus, methodology: bbMethodology, volumeGoal: bbVolGoal, supersetMode, volumeScheme, weakPoints };
+          const rationale = builtPlan.rationale || [];
+          // Показываем все пункты кроме самых технических, но обязательно держим PED/lab/deload в начале
+          const head = rationale.slice(0, 8);
+          const tail = rationale.length > 8 ? rationale.slice(-4) : [];
+          const shown = rationale.length > 12 ? [...head, '…', ...tail] : rationale;
+          const goalLabel = snap.goal || bbGoal;
+          const levelLabel = snap.level || bbLevel;
+          const focusLabel = snap.trainingFocus || bbTrainingFocus;
+          const methodLabel = snap.methodology || bbMethodology;
+          return (
+            <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой</div>
+              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                {shown.map((r,i) => r === '…' ? <div key={i} style={{ margin: '4px 0', color:'#fff', opacity:0.5 }}>… {rationale.length - head.length - tail.length} пунктов скрыто …</div> : <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
+              </div>
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', fontStyle:'italic' }}>Факт: цель «{goalLabel}» · уровень «{levelLabel}» · фокус «{focusLabel}» · методика «{methodLabel}» · суперсет «{snap.supersetMode || supersetMode}» · схема «{snap.volumeScheme || volumeScheme}» · специализация {(snap.weakPoints || weakPoints).join(', ') || 'нет'} · сплит «{builtPlan.pattern?.name || ''}» ({W.length} нед).</div>
+            </div>
+          );
+        })()}
+        {/* Прогноз по фазам — факт из плана */}
         {(() => {
           const peakWeek = W.reduce((best, w, i) => {
             const ts = w.sessions.reduce((s, ss) => s + ss.exercises.reduce((ss2, e) => ss2 + e.sets, 0), 0);
             return ts > best.ts ? { wk: w.week, ts } : best;
           }, { wk: 1, ts: 0 });
-          const deloadWeeks = phases.filter(p => p.phase === 'deload').map(p => p.week);
-          const hasDeload = deloadWeeks.length > 0;
-          const accWeeks = phases.filter(p => p.phase === 'accumulation');
-          const intensWeeks = phases.filter(p => p.phase === 'intensification');
+          const actualDeloadWeeks = W.filter((w:any) => (w as any).phase === 'deload' || (w as any).deload).map((w:any) => w.week);
+          const hasDeload = actualDeloadWeeks.length > 0;
+          const accWeeks = W.filter((w:any) => ((w as any).phase || 'accumulation') === 'accumulation');
+          const intensWeeks = W.filter((w:any) => ((w as any).phase || '') === 'intensification');
           return (
             <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔮 Прогноз по фазам</div>
@@ -3882,107 +3911,189 @@ export const BbAutoConstructor: React.FC = () => {
                 <div>
                   <span style={{ color:'#fff' }}>Разгрузка: </span>
                   <span style={{ fontWeight:700, color: hasDeload ? '#22c55e' : '#ef4444' }}>
-                    {hasDeload ? 'нед ' + deloadWeeks.join(', ') : 'НЕ ЗАПЛАНИРОВАНА ⚠'}
+                    {hasDeload ? 'нед ' + actualDeloadWeeks.join(', ') : 'НЕ ЗАПЛАНИРОВАНА ⚠'}
                   </span>
                 </div>
-                <div>
-                  <span style={{ color:'#fff' }}>Накопление: </span>
-                  <span style={{ fontWeight:700, color:'#60a5fa' }}>{accWeeks.length} нед</span>
-                  <span style={{ color:'#fff' }}> (RIR {PHASE_CONFIGS.accumulation.rirRange[0]}→{PHASE_CONFIGS.accumulation.rirRange[1]})</span>
-                </div>
-                <div>
-                  <span style={{ color:'#fff' }}>Интенсификация: </span>
-                  <span style={{ fontWeight:700, color:'#ef4444' }}>{intensWeeks.length} нед</span>
-                  <span style={{ color:'#fff' }}> (RIR {PHASE_CONFIGS.intensification.rirRange[0]}→{PHASE_CONFIGS.intensification.rirRange[1]})</span>
-                </div>
+                {(() => {
+                  const avgRirFor = (weeks: any[]) => {
+                    const exs = weeks.flatMap((w:any) => w.sessions.flatMap((s:any) => s.exercises));
+                    if (exs.length === 0) return '—';
+                    const avg = exs.reduce((a:any,e:any) => a + (Number.isFinite(e.rir) ? e.rir : 2), 0) / exs.length;
+                    return avg.toFixed(1);
+                  };
+                  return (<>
+                    <div>
+                      <span style={{ color:'#fff' }}>Накопление: </span>
+                      <span style={{ fontWeight:700, color:'#60a5fa' }}>{accWeeks.length} нед</span>
+                      <span style={{ color:'#fff' }}> (ср. RIR {avgRirFor(accWeeks)})</span>
+                    </div>
+                    <div>
+                      <span style={{ color:'#fff' }}>Интенсификация: </span>
+                      <span style={{ fontWeight:700, color:'#ef4444' }}>{intensWeeks.length} нед</span>
+                      <span style={{ color:'#fff' }}> (ср. RIR {avgRirFor(intensWeeks)})</span>
+                    </div>
+                  </>);
+                })()}
               </div>
-              {!hasDeload && bbWeeks >= 6 && (
+              {!hasDeload && W.length >= 6 && (
                 <div style={{ marginTop:6, padding:'4px 8px', borderRadius:8, background:'rgba(239,68,68,0.1)', fontSize:11, color:'#ef4444' }}>
-                  ⚠ Мезоцикл {bbWeeks} нед без разгрузки — высокий риск перетрена. Добавьте разгрузочную неделю.
+                  ⚠ Мезоцикл {W.length} нед без разгрузки — высокий риск перетрена. Добавьте разгрузочную неделю.
                 </div>
               )}
             </div>
           );
         })()}
-        {/* MRV table */}
-        <MetricCard title="Объём по мышцам (сетов/нед vs MEV/MAV/MRV)" icon="🏋️" accent="#a855f7">
-          <div style={{ overflowX:'auto' }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, fontWeight:700, color:'#fff', textTransform:'uppercase', padding:'2px 0', minWidth:340 }}>
-              <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
+        {/* Подробная таблица объёма по мышцам с подмышцами */}
+        {(() => {
+          const weakSet = new Set<string>((weakPoints as string[]).map(w => {
+            const v = String(w).toLowerCase();
+            if (v === 'delt_front' || v === 'delt_mid' || v === 'delt_rear') return 'shoulders';
+            if (v === 'chest_upper' || v === 'chest_lower') return 'chest';
+            if (v === 'back_width' || v === 'back_thickness') return 'back';
+            return v;
+          }));
+          // Агрегация подгрупп для спины и плеч из факта плана (пиковая неделя)
+          const peakIdx = (() => {
+            let best = 0, max = -1;
+            for (let i=0;i<W.length;i++) {
+              const ts = W[i].sessions.reduce((a,s) => a + s.exercises.reduce((b,e) => b + e.sets, 0), 0);
+              if (ts > max) { max = ts; best = i; }
+            }
+            return best;
+          })();
+          const peakSessions = W[peakIdx]?.sessions || [];
+          const backSubSets: Record<string, number> = {};
+          const shoulderSubSets: Record<string, number> = { front:0, mid:0, rear:0 };
+          for (const s of peakSessions) for (const e of s.exercises) {
+            if (e.muscle === 'back') {
+              const sub = (e as any).backSubgroup || 'back_width';
+              backSubSets[sub] = (backSubSets[sub] || 0) + e.sets;
+            }
+            if (e.muscle === 'shoulders') {
+              const n = (e.name || '').toLowerCase();
+              if (/жим|press|армей|overhead/i.test(n) && !/мах/i.test(n)) shoulderSubSets.front += e.sets;
+              else if (/мах|lateral|отведение|raise/i.test(n) && !/задн/i.test(n)) shoulderSubSets.mid += e.sets;
+              else if (/задн|rear|обратн/i.test(n)) shoulderSubSets.rear += e.sets;
+              else shoulderSubSets.mid += e.sets;
+            }
+          }
+          const weakVols = metrics.perMuscle.filter(x => weakSet.has(x.muscle));
+          const normVols = metrics.perMuscle.filter(x => !weakSet.has(x.muscle));
+          const weakAvg = weakVols.length ? Math.round(weakVols.reduce((s,x)=>s+x.totalSets,0)/weakVols.length) : 0;
+          const normAvg = normVols.length ? Math.round(normVols.reduce((s,x)=>s+x.totalSets,0)/normVols.length) : 0;
+          return (
+            <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.18)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#a855f7', marginBottom:6 }}>🏋️ Объём по мышцам с подгруппами (пиковая неделя, сетов/нед)</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Подгруппы спины — из факта плана (backSubgroup), плечи — по типу упражнения. Статус и MEV/MAV/MRV — из quality (среднее по мезо).</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, fontWeight:700, color:'#fff', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+                <span>Мышца / подгруппа</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
+              </div>
+              {metrics.perMuscle.map(mm => {
+                const over = mm.totalSets > mm.mrv;
+                const weak = weakSet.has(mm.muscle);
+                const qm = (quality as any).perMuscle?.find((x:any) => x.muscle === mm.muscle);
+                const statusLabel = qm ? (qm.status === 'exceeding_mrv' ? 'перегруз' : qm.status === 'approaching_mrv' ? 'около MRV' : qm.status === 'below_mev' ? 'недотрен' : 'оптимум') : mm.status;
+                const statusColor = over ? '#ef4444' : weak ? '#ec4899' : statusLabel==='перегруз' ? '#ef4444' : statusLabel==='недотрен' ? '#60a5fa' : '#22c55e';
+                // Подгруппы
+                let subs: Array<{ label:string; sets:number }> = [];
+                if (mm.muscle === 'back' && Object.keys(backSubSets).length) {
+                  subs = Object.entries(backSubSets).map(([k,v]) => ({ label: backSubgroupLabel(k) || k, sets: v }));
+                } else if (mm.muscle === 'shoulders' && (shoulderSubSets.front + shoulderSubSets.mid + shoulderSubSets.rear) > 0) {
+                  subs = [
+                    { label:'Передняя дельта (жим)', sets: shoulderSubSets.front },
+                    { label:'Средняя дельта (махи)', sets: shoulderSubSets.mid },
+                    { label:'Задняя дельта', sets: shoulderSubSets.rear },
+                  ].filter(x=>x.sets>0);
+                } else if (mm.muscle === 'chest' && mm.totalSets > 0) {
+                  // Грудь — верх/середина/низ не хранится отдельно, показываем общий
+                  subs = [];
+                }
+                return (
+                  <div key={mm.muscle} style={{ padding:'4px 0', borderTop:'1px solid rgba(255,255,255,0.04)', background: weak?'rgba(236,72,153,0.06)':'transparent' }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, color:'#fff', alignItems:'center' }}>
+                      <span style={{ fontWeight:700, color: weak?'#ec4899': '#fff' }}>{weak?'🔥 ':''}{mm.muscle} <span style={{ fontSize:10, color: statusColor }}>· {statusLabel}{over?' ⚠':''}</span></span>
+                      <span style={{ color:over?'#ef4444':(weak?'#ec4899':ACCENT), fontWeight:800 }}>{mm.totalSets}</span>
+                      <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
+                      <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
+                      <span style={{ color:'#fff', fontSize:10 }}>MRV {mm.mrv} · MEV {mm.mev}</span>
+                    </div>
+                    {subs.length > 0 && (
+                      <div style={{ marginTop:3, marginLeft:8, display:'flex', flexDirection:'column', gap:2 }}>
+                        {subs.map(s => (
+                          <div key={s.label} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'2px 6px', borderRadius:6 }}>
+                            <span style={{ opacity:0.9 }}>↳ {s.label}</span><span style={{ fontWeight:700 }}>{s.sets} сетов</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {weakVols.length > 0 && <div style={{ marginTop:8, padding:'6px 10px', borderRadius:10, background:'rgba(236,72,153,0.1)', border:'1px solid rgba(236,72,153,0.25)', fontSize:11, fontWeight:700, color:'#ec4899' }}>
+                🔥 Отстающие получают акцент: {weakAvg} сетов/нед против {normAvg} у остальных{normAvg>0 && weakAvg>normAvg?` (+${Math.round((weakAvg/normAvg-1)*100)}%)`:''} (пиковая неделя)
+              </div>}
             </div>
-            {(() => {
-              const weakSet = new Set<string>(weakPoints as string[]);
-              const weakVols = metrics.perMuscle.filter(x => weakSet.has(x.muscle));
-              const normVols = metrics.perMuscle.filter(x => !weakSet.has(x.muscle));
-              const weakAvg = weakVols.length ? Math.round(weakVols.reduce((s,x)=>s+x.totalSets,0)/weakVols.length) : 0;
-              const normAvg = normVols.length ? Math.round(normVols.reduce((s,x)=>s+x.totalSets,0)/normVols.length) : 0;
-              return <>
-                {metrics.perMuscle.map(mm => {
-                  const over = mm.totalSets > mm.mrv;
-                  const weak = weakSet.has(mm.muscle);
-                  return <div key={mm.muscle} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, color:'#fff', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)', minWidth:340, background: weak?'rgba(236,72,153,0.08)':'transparent' }}>
-                    <span style={{ fontWeight:600, color: weak?'#ec4899':undefined }}>{weak?'🔥 ':''}{mm.muscle}{over?' ⚠':''}</span>
-                    <span style={{ color:over?'#ef4444':(weak?'#ec4899':ACCENT), fontWeight:700 }}>{mm.totalSets}</span>
-                    <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
-                    <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
-                    <span style={{ color:'#fff' }}>{mm.mrv}</span>
-                  </div>;
-                })}
-                {weakVols.length > 0 && <div style={{ marginTop:8, padding:'6px 10px', borderRadius:10, background:'rgba(236,72,153,0.1)', border:'1px solid rgba(236,72,153,0.25)', fontSize:11, fontWeight:700, color:'#ec4899' }}>
-                  🔥 Отстающие получают акцент: {weakAvg} сетов/нед против {normAvg} у остальных{normAvg>0 && weakAvg>normAvg?` (+${Math.round((weakAvg/normAvg-1)*100)}%)`:''}
-                </div>}
-              </>;
-            })()}
-          </div>
-        </MetricCard>
-        {/* PRO Quality — паттерны/углы/растяжка/техники из интеллектуальных тренировок */}
-        {(() => {
-          try {
-            const dummyProgram: any = { bb: { weeks: builtPlan.weeks.map((w:any) => ({ sessions: w.sessions.map((s:any) => ({ blocks: s.exercises.map((e:any) => ({ exerciseName: e.name, muscle: e.muscle, sets: e.workSets || [{reps: e.repsRange?.[0] || 10, rir: e.rir || 2}] })) })) })) }, pl: { customWeeks: [] }, goal: bbGoal, level: bbLevel };
-            const proQ = analyzeProQuality(dummyProgram, 'bb', bbLevel, bbGoal);
-            return (
-              <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧠 PRO-качество (паттерны/углы/растяжка) — из интеллектуальных тренировок</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
-                  <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} OK {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
-                  <div><b>Углы:</b> {proQ.angles.filter(a=>a.ok).length}/{proQ.angles.length} OK {proQ.angles.filter(a=>!a.ok).map(a=>a.issue).slice(0,2).join('; ') || '—'}</div>
-                  <div><b>Растяжка:</b> {proQ.stretches.filter(s=>s.ok).length}/{proQ.stretches.length} OK</div>
-                  <div><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
-                </div>
-                {proQ.totalIssues.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss,i)=><div key={i}>• {iss}</div>)}</div>}
-                {proQ.totalRecommendations.length > 0 && <div style={{ marginTop:4, fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec,i)=><div key={i}>→ {rec}</div>)}</div>}
-                <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Δ Score: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (корректировка к базовому)</div>
-              </div>
-            );
-          } catch { return null; }
+          );
         })()}
-        {/* Phase distribution */}
-        <div style={{ ...CARD, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📅 Распределение фаз</div>
-          {(['accumulation','intensification','deload','peaking'] as BBPhase[]).map(ph => {
-            const count = phases.filter(p => p.phase === ph).length;
-            if (count === 0) return null;
-            const pct = (count / bbWeeks * 100).toFixed(0);
-            return <div key={ph} style={{ marginBottom:4 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:2 }}>
-                <span style={{ color:PHASE_COLORS[ph], fontWeight:600 }}>{PHASE_LABELS[ph]}</span>
-                <span style={{ color:'#fff' }}>{count} нед ({pct}%)</span>
-              </div>
-              <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.06)' }}>
-                <div style={{ height:'100%', width: pct + '%', borderRadius:2, background: PHASE_COLORS[ph], opacity:0.7 }} />
-              </div>
-            </div>;
-          })}
-        </div>
-        {/* Прогрессия весов по неделям (основные упражнения) */}
+        {/* PRO Quality — отдельный блок, данные из единого quality.proResult */}
         {(() => {
+          const proQ = (quality as any).proResult as ReturnType<typeof analyzeProQuality> | null;
+          if (!proQ) return null;
+          return (
+            <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧠 PRO-качество (паттерны/углы/растяжка) — отдельно</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Оценка техники/углов/растяжки из интеллектуальных тренировок. Скорректировала базовый score на {proQ.scoreDelta>0?'+':''}{proQ.scoreDelta}.</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
+                <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} OK {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
+                <div><b>Углы:</b> {proQ.angles.filter(a=>a.ok).length}/{proQ.angles.length} OK {proQ.angles.filter(a=>!a.ok).map(a=>a.issue).slice(0,2).join('; ') || '—'}</div>
+                <div><b>Растяжка:</b> {proQ.stretches.filter(s=>s.ok).length}/{proQ.stretches.length} OK</div>
+                <div><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
+              </div>
+              {proQ.totalIssues.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss,i)=><div key={i}>• {iss}</div>)}</div>}
+              {proQ.totalRecommendations.length > 0 && <div style={{ marginTop:4, fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec,i)=><div key={i}>→ {rec}</div>)}</div>}
+              <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Δ Score: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включена в {quality.score}/100)</div>
+            </div>
+          );
+        })()}
+        {/* Распределение фаз — факт из плана */}
+        {(() => {
+          const phaseCounts: Record<string, number> = {};
+          for (const w of W as any[]) {
+            const ph = (w.phase || 'accumulation') as string;
+            phaseCounts[ph] = (phaseCounts[ph] || 0) + 1;
+          }
+          const total = W.length || 1;
+          return (
+            <div style={{ ...CARD, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📅 Распределение фаз (факт плана)</div>
+              {(['accumulation','intensification','deload','peaking'] as BBPhase[]).map(ph => {
+                const count = phaseCounts[ph] || 0;
+                if (count === 0) return null;
+                const pct = (count / total * 100).toFixed(0);
+                return <div key={ph} style={{ marginBottom:4 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:2 }}>
+                    <span style={{ color:PHASE_COLORS[ph], fontWeight:600 }}>{PHASE_LABELS[ph]}</span>
+                    <span style={{ color:'#fff' }}>{count} нед ({pct}%)</span>
+                  </div>
+                  <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.06)' }}>
+                    <div style={{ height:'100%', width: pct + '%', borderRadius:2, background: PHASE_COLORS[ph], opacity:0.7 }} />
+                  </div>
+                </div>;
+              })}
+            </div>
+          );
+        })()}
+        {/* Прогрессия весов по неделям (основные упражнения) — факт из плана */}
+        {(() => {
+          const totalW = W.length;
+          const cols = Math.min(8, totalW);
           const primaryExs = new Map<string, { name: string; muscle: string; weights: number[] }>();
           for (const w of W) {
             for (const s of w.sessions) {
               for (const e of s.exercises) {
                 if (e.role !== 'primary') continue;
                 const key = e.name;
-                if (!primaryExs.has(key)) primaryExs.set(key, { name: e.name, muscle: e.muscle, weights: new Array(W.length).fill(0) });
+                if (!primaryExs.has(key)) primaryExs.set(key, { name: e.name, muscle: e.muscle, weights: new Array(totalW).fill(0) });
                 const rec = primaryExs.get(key)!;
                 rec.weights[w.week - 1] = e.workSets[0]?.weight || 0;
               }
@@ -3993,21 +4104,21 @@ export const BbAutoConstructor: React.FC = () => {
           if (top.length === 0) return null;
           return (
             <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>📈 Прогрессия весов (кг) по неделям</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>📈 Прогрессия весов (кг) по неделям — факт плана</div>
               <div style={{ overflowX:'auto' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(Math.min(8, bbWeeks)), gap:2, fontSize:10, minWidth:Math.min(8,bbWeeks)*40+120 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, minWidth: cols*40+120 }}>
                   <span style={{ fontWeight:700, color:'#fff' }}>Упражнение</span>
-                  {Array.from({ length: Math.min(8, bbWeeks) }, (_, i) => (
+                  {Array.from({ length: cols }, (_, i) => (
                     <span key={i} style={{ fontWeight:700, color:'#fff', textAlign:'center' }}>{i+1}</span>
                   ))}
                 </div>
                 {top.map(ex => {
-                  const weights = ex.weights.slice(0, 8);
+                  const weights = ex.weights.slice(0, cols);
                   const first = weights.find(w => w > 0) || 0;
                   const last = weights.filter(w => w > 0).pop() || first;
                   const delta = last > first ? '+' + (last - first) : '';
                   return (
-                    <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(Math.min(8, bbWeeks)), gap:2, fontSize:10, padding:'2px 0', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
+                    <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, padding:'2px 0', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
                       <span style={{ fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={ex.name}>{ex.name.substring(0, 18)}</span>
                       {weights.map((w, wi) => {
                         const prev = wi > 0 ? weights[wi-1] : 0;
@@ -4027,79 +4138,21 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ marginTop:4, fontSize:10, color:'#fff', display:'flex', gap:12 }}>
                 <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span>
               </div>
+              {totalW > 8 && <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Показаны первые 8 нед из {totalW}</div>}
             </div>
           );
         })()}
-        {/* 3D evolution chart */}
-        <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 3D эволюция объёма/интенсивности/частоты</div>
-          {(() => {
-            const wkStats = W.map(w => {
-              const ph = phaseForWeek(w.week, bbWeeks);
-              const exs = w.sessions.flatMap(s => s.exercises);
-              const sets = exs.reduce((s, e) => s + e.sets, 0);
-              const rir = sets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / sets : 0;
-              const totalWeight = exs.reduce((s, e) => s + (e.workSets[0]?.weight || 0) * e.sets, 0);
-              const avgWeight = sets > 0 ? totalWeight / sets : 0;
-              return { week: w.week, phase: ph, sets, rir, avgWeight };
-            });
-            // Aggregate into 4-week blocks for >16 weeks
-            const useAgg = W.length > 16;
-            const chartData = useAgg ? (() => {
-              const blocks: typeof wkStats = [];
-              for (let i = 0; i < wkStats.length; i += 4) {
-                const chunk = wkStats.slice(i, i + 4);
-                blocks.push({
-                  week: chunk[0].week + '-' + chunk[chunk.length - 1].week,
-                  phase: chunk[Math.floor(chunk.length / 2)].phase,
-                  sets: Math.round(chunk.reduce((s, x) => s + x.sets, 0) / chunk.length),
-                  rir: chunk.reduce((s, x) => s + x.rir, 0) / chunk.length,
-                  avgWeight: chunk.reduce((s, x) => s + x.avgWeight, 0) / chunk.length,
-                } as any);
-              }
-              return blocks;
-            })() : wkStats;
-            const maxSets = Math.max(1, ...chartData.map((x: any) => x.sets));
-            const maxWt = Math.max(1, ...chartData.map((x: any) => x.avgWeight));
-            const labelField = useAgg ? 'week' : 'week';
+        {/* Мусорный объём — честная проверка с каноникой слабых */}
+        {(() => {
+          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears });
+          if (garbage.length === 0) {
             return (
-              <div>
-                {useAgg && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>Агрегировано по 4-нед блокам (средние)</div>}
-                <svg width="100%" viewBox="0 0 320 90" style={{ maxWidth:360, margin:'0 auto', display:'block' }}>
-                  {(chartData as any[]).map((x: any, i: number) => {
-                    const px2 = 16 + (i / Math.max(1, chartData.length - 1)) * 290;
-                    const barH = (x.sets / maxSets) * 36;
-                    return <rect key={'b' + String(x.week)} x={px2 - 6} y={82 - barH} width={12} height={barH} rx={2} fill={PHASE_COLORS[x.phase as BBPhase]} opacity={0.5} />;
-                  })}
-                  {(chartData as any[]).map((x: any, i: number) => {
-                    const px2 = 16 + (i / Math.max(1, chartData.length - 1)) * 290;
-                    const wtPct = x.avgWeight / maxWt;
-                    return <rect key={'w' + String(x.week)} x={px2 - 4} y={82 - wtPct * 36} width={8} height={wtPct * 36} rx={2} fill={PHASE_COLORS[x.phase as BBPhase]} opacity={0.9} />;
-                  })}
-                  <line x1={10} y1={82} x2={310} y2={82} stroke="rgba(255,255,255,0.1)" strokeWidth={0.5} />
-                  {(chartData as any[]).filter((x: any, i: number) => i % 2 === 0 || i === chartData.length - 1).map((x: any) => {
-                    const idx = (chartData as any[]).indexOf(x);
-                    const px2 = 16 + (idx / Math.max(1, chartData.length - 1)) * 290;
-                    return <text key={'l' + String(x.week)} x={px2} y={95} fontSize={10} fill="#fff" textAnchor="middle">{x.week}</text>;
-                  })}
-                </svg>
-                <div style={{ display:'flex', gap:12, justifyContent:'center', marginTop:4, flexWrap:'wrap' }}>
-                  <span style={{ fontSize:11, color:'#fff' }}>▮ Сеты/нед</span>
-                  <span style={{ fontSize:11, color:'#fff' }}>▮ Средний вес</span>
-                  {(['accumulation','intensification','deload','peaking'] as BBPhase[]).map(ph => {
-                    const c = wkStats.filter(x => x.phase === ph).length;
-                    if (c === 0) return null;
-                    return <span key={ph} style={{ fontSize:11, color:PHASE_COLORS[ph] }}>● {PHASE_LABELS[ph]}</span>;
-                  })}
-                </div>
+              <div style={{ ...CARD, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e' }}>🗑 Мусорный объём: чисто ✅</div>
+                <div style={{ fontSize:10, color:'#fff', marginTop:4, lineHeight:1.4 }}>Дублей изоляций не найдено. Для слабых групп допустим доп. стимул, проверено с учётом ваших параметров: уровень {bbLevel}{bbTrainingYears!==undefined?`, стаж ${bbTrainingYears} лет`:''}{weakPoints.length?`, слабые ${weakPoints.join(', ')}`:''}.</div>
               </div>
             );
-          })()}
-        </div>
-        {/* Garbage volume detection */}
-        {(() => {
-          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints);
-          if (garbage.length === 0) return null;
+          }
           const ctxParts: string[] = [`уровень ${bbLevel}`];
           if (bbTrainingYears !== undefined) ctxParts.push(`стаж ${bbTrainingYears} лет`);
           if (weakPoints.length > 0) ctxParts.push(`слабые: ${weakPoints.join(', ')}`);
@@ -4107,7 +4160,7 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={{ ...CARD, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🗑 Мусорный объём ({garbage.length})</div>
               <div style={{ fontSize:10, color:'#fff', marginBottom:6, lineHeight:1.4 }}>
-                Дублирование изоляций оценено по вашим параметрам: {ctxParts.join(' · ')}. Для слабых групп дубль паттерна допустим (дополнительный стимул), для остальных — срезан или помечен.
+                Дублирование изоляций по вашим параметрам: {ctxParts.join(' · ')}. Для слабых групп дубль допустим (учтена каноника chest_upper→chest, delt_mid→shoulders).
               </div>
               {garbage.slice(0, 5).map((g, i) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, padding:'3px 6px', borderRadius:4, background:'rgba(239,68,68,0.04)' }}>
                 • {g.exerciseName} ({g.muscle}): {g.reason}
@@ -4116,19 +4169,26 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Exercise mix by phase */}
+        {/* Распределение упражнений — среднее по мезоциклу (а не только нед.1) */}
         {(() => {
-          const mixPhase = phaseForWeek(W[0]?.week || 1, bbWeeks);
-          const mix = phaseExerciseMix(mixPhase);
+          // Среднее по всем неделям: считаем факт compound/isolation по всем упражнениям
+          const allEx = W.flatMap(w => w.sessions.flatMap(s => s.exercises));
+          const total = allEx.length || 1;
+          const compound = allEx.filter(e => e.role === 'primary' || (e as any).exerciseType === 'compound' || /жим|тяга|присед/i.test(e.name || '')).length;
+          const isolation = total - compound;
+          // Машины/кабели — по exerciseType или имени (эвристика)
+          const machines = allEx.filter(e => /машин|тренаж|machine/i.test((e as any).exerciseType || '') || /машин|смит|хаммер/i.test(e.name || '')).length;
+          const cables = allEx.filter(e => /cable|канат|блок|кроссовер/i.test((e as any).exerciseType || '') || /блок|кроссовер|канат/i.test(e.name || '')).length;
           return (
             <div style={{ ...CARD, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🎯 Распределение упражнений ({PHASE_LABELS[mixPhase]})</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🎯 Распределение упражнений (среднее по мезо, {W.length} нед)</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:11 }}>
-                <div>Базовые: <b style={{ color:'#fff' }}>{(mix.compoundPct * 100).toFixed(0)}%</b></div>
-                <div>Изоляция: <b style={{ color:'#fff' }}>{(mix.isolationPct * 100).toFixed(0)}%</b></div>
-                <div>Машины: <b style={{ color:'#fff' }}>{(mix.machinePct * 100).toFixed(0)}%</b></div>
-                <div>Кабели: <b style={{ color:'#fff' }}>{(mix.cablePct * 100).toFixed(0)}%</b></div>
+                <div>Базовые: <b style={{ color:'#fff' }}>{Math.round(compound/total*100)}%</b></div>
+                <div>Изоляция: <b style={{ color:'#fff' }}>{Math.round(isolation/total*100)}%</b></div>
+                <div>Машины: <b style={{ color:'#fff' }}>{Math.round(machines/total*100)}%</b></div>
+                <div>Кабели: <b style={{ color:'#fff' }}>{Math.round(cables/total*100)}%</b></div>
               </div>
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.6 }}>Факт из плана, а не шаблон фазы «{((W[0] as any)?.phase || 'accumulation') }»</div>
             </div>
           );
         })()}
@@ -4187,9 +4247,19 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           )}
         </div>
-        <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
-        <BBMetricsSummaryCard metrics={metrics} />
-        {/* Export plan card */}
+        {/* Дополнительно: прогрессия мезоцикла + What-if — свернуто по умолчанию */}
+        <ExpandableCard
+          title="🔧 Дополнительно: прогноз прогрессии и What-if"
+          icon="🔧"
+          short="Прогрессия мезоцикла · What-if сценарии (калории/сон/AAS)"
+          full={
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
+              <WhatIfCard baseRisk={quality?.score ? 100 - quality.score : 20} baseReadiness={Math.round((linked.readiness?.recovery ?? 80))} />
+            </div>
+          }
+        />
+        {/* Экспорт — фактические параметры плана */}
         {quality && (
           <div style={{ marginTop:8 }}>
             <PlanExportCard
@@ -4207,19 +4277,11 @@ export const BbAutoConstructor: React.FC = () => {
               }}
               level={bbLevel}
               weakPoints={weakPoints}
-              hasDeload={autoDeload}
-              meta={{ splitName: builtPlan.pattern.name, weeks: bbWeeks, corrections: builtPlan.rationale }}
+              hasDeload={(quality as any).hasDeloadActual ?? autoDeload}
+              meta={{ splitName: builtPlan.pattern?.name || 'BB-сплит', weeks: W.length, corrections: builtPlan.rationale }}
             />
           </div>
         )}
-
-        {/* What-if прогноз (раскрывающаяся секция) */}
-        <ExpandableCard title="🔮 What-if прогноз (что если изменить параметры)" icon="🔮"
-          short="Δ калории / Δ сон / AAS множитель → прогноз риска и готовности"
-          full={
-            <WhatIfCard baseRisk={quality?.score ? 100 - quality.score : 20} baseReadiness={Math.round((linked.readiness?.recovery ?? 80))} />
-          }
-        />
 
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
