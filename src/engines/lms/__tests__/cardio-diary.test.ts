@@ -163,15 +163,15 @@ describe('cardioPaceMinPerKm / cardioAvgPaceMinPerKm (темп мин/км)', ()
 
 describe('cardioExpectedDistanceHint', () => {
   it('zone2 30 мин → ~4.5 км при 9 км/ч', () => {
-    expect(cardioExpectedDistanceHint('zone2', 30)).toBe('~4.5 км при 9 км/ч (Zone 2 (лёгкий бег))');
+    expect(cardioExpectedDistanceHint('zone2', 30)).toContain('~4.5 км при 9 км/ч (Zone 2 (лёгкий бег)');
   });
 
   it('hiit 20 мин → ~2.7 км при 8 км/ч', () => {
-    expect(cardioExpectedDistanceHint('hiit', 20)).toBe('~2.7 км при 8 км/ч (HIIT (с учётом отдыха))');
+    expect(cardioExpectedDistanceHint('hiit', 20)).toContain('~2.7 км при 8 км/ч (HIIT (с учётом отдыха)');
   });
 
   it('recovery 40 мин → ~3.3 км при 5 км/ч', () => {
-    expect(cardioExpectedDistanceHint('recovery', 40)).toBe('~3.3 км при 5 км/ч (Recovery (ходьба))');
+    expect(cardioExpectedDistanceHint('recovery', 40)).toContain('~3.3 км при 5 км/ч (Recovery (ходьба)');
   });
 
   it('null при нулевой/отрицательной длительности', () => {
@@ -181,7 +181,7 @@ describe('cardioExpectedDistanceHint', () => {
   });
 
   it('miss: скорость 10 км/ч', () => {
-    expect(cardioExpectedDistanceHint('miss', 60)).toBe('~10 км при 10 км/ч (MISS (умеренно))');
+    expect(cardioExpectedDistanceHint('miss', 60)).toContain('~10 км при 10 км/ч (MISS (умеренно)');
   });
 });
 

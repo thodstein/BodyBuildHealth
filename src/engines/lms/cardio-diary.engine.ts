@@ -238,15 +238,17 @@ const CARDIO_TYPE_HINT_LABEL: Record<CardioType, string> = {
 };
 
 /**
- * Ожидаемая дистанция сессии по типу и длительности: «~N км при N км/ч (тип)»
- * или null (нет/некорректная длительность). Ориентир для ввода км в журнале.
+ * Ожидаемая дистанция сессии по типу и длительности: «~N км при N км/ч (тип) — N±15%»
+ * или null (нет/некорректная длительность). Диапазон учитывает рельеф/ветер.
  */
 export function cardioExpectedDistanceHint(type: CardioType, durationMin: number): string | null {
   const kmh = CARDIO_TYPICAL_SPEED_KMH[type];
   if (!kmh || !durationMin || durationMin <= 0) return null;
   const km = Math.round((kmh * durationMin / 60) * 10) / 10;
+  const lo = Math.round(km * 0.85 * 10) / 10;
+  const hi = Math.round(km * 1.15 * 10) / 10;
   const label = CARDIO_TYPE_HINT_LABEL[type];
-  return `~${km} км при ${kmh} км/ч (${label})`;
+  return `~${km} км при ${kmh} км/ч (${label}, ${lo}–${hi})`;
 }
 
 /**

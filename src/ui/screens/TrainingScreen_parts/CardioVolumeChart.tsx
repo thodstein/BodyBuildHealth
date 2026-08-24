@@ -55,22 +55,30 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
   if (!cycle || series.length === 0) return null;
 
   const values = series.map(s => (s as unknown as Record<string, number>)[metric] ?? 0);
+  // Точный TRIMP факта — по датам недели, а не хак 2.2
   const factValues = fact
     ? series.map(s => {
         const f = fact.rows.find(r => r.week === s.week);
         if (!f) return 0;
         if (metric === 'minutes') return f.doneMinutes;
         if (metric === 'kcal') return f.factKcal;
-        // trimp fact: estimate from log entries of that week
-        const weekLog = log.filter(e => {
-          if (!e.completed) return false;
-          // week range via cardioWeekFact already computed? reuse doneMinutes approx *2
-          // quick: check if entry belongs to week via weekFact rows
-          return f.doneMinutes > 0 && e.date >= (cycle.startDate ?? '') && true; // fallback approx
-        });
-        // approx: use doneMinutes weighted by type factor (avg 2.2)
-        // to avoid complex date math, use f.doneMinutes * 2 as TRIMP proxy
-        return Math.round(f.doneMinutes * 2.2);
+        // TRIMP факта: сумма по лог-записям недели, взвешенная по типу
+        const start = (() => {
+          if (!cycle.startDate) return null;
+          const d = new Date(cycle.startDate + 'T00:00:00');
+          d.setDate(d.getDate() + (s.week - 1) * 7);
+          const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          return iso;
+        })();
+        const end = start ? (() => {
+          const d = new Date(start + 'T00:00:00');
+          d.setDate(d.getDate() + 6);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        })() : null;
+        if (!start || !end) return Math.round(f.doneMinutes * 2.2);
+        const weekLog = log.filter(e => e.completed && e.date >= start && e.date <= end);
+        if (weekLog.length === 0) return 0;
+        return weekLog.reduce((sum, e) => sum + e.durationMin * (TRIMP_FACTOR[e.type] ?? 2), 0);
       })
     : [];
   const max = Math.max(1, ...values, ...factValues);
