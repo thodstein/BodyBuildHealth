@@ -22,6 +22,7 @@ import {
   muscleAwareSets,
   makeSetsFromTemplate,
   suggestExercisesForGroup,
+  computePlanQualityFor,
 } from '../../../engines/manual-constructor';
 import { loadTrainingProfile } from './training-profile';
 import { addWeakToWeekLogic, calcW as calcWLogic, firstFreeTrainingDay, resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex } from './program-editor-logic';
@@ -36,7 +37,7 @@ import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } fro
 import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
-import { VolumeMiniBar } from './ManualUI';
+import { VolumeMiniBar, ScoreBadge, Badge, ProgressBar } from './ManualUI';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
@@ -349,6 +350,46 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </button>
         )}
       </div>
+      {/* Live качество — score + баланс, прямо в редакторе недель */}
+      {body.weeks.length > 0 && (() => {
+        try {
+          const tmpProg = { meta: { id:'tmp', title:'tmp', author:'', goal:'hypertrophy', level, daysPerWeek: body.weeks[0]?.sessions.length ?? 3, weeks: body.weeks.length, direction:'bb' as const, createdAt:'', updatedAt:'', source:'custom' as const }, bb: body } as any;
+          const q = computePlanQualityFor(tmpProg, level);
+          const low = q.perMuscle.filter(m => m.status === 'low');
+          const over = q.perMuscle.filter(m => m.status === 'over');
+          const col = q.score >=75 ? '#22c55e' : q.score >=50 ? '#f59e0b' : '#ef4444';
+          return (
+            <div style={{ ...CARD, padding: 10, borderLeft: `3px solid ${col}`, display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                <span style={{ fontSize:11, fontWeight:800, color: col }}>📊 Качество</span>
+                <ScoreBadge score={q.score} grade={q.grade} />
+                <span style={{ fontSize:10, color:DIM }}>{q.perMuscle.length} групп · {low.length} недобор · {over.length} перегруз</span>
+                <span style={{ marginLeft:'auto', fontSize:10, color:DIM }}>Live при правке</span>
+              </div>
+              <ProgressBar value={q.score} max={100} color={col} height={6} />
+              <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                {q.perMuscle.map(pm => {
+                  const c = pm.status === 'over' ? '#ef4444' : pm.status === 'low' ? '#3b82f6' : pm.status === 'high' ? '#f59e0b' : '#22c55e';
+                  const icon = pm.status === 'over' ? '⚠' : pm.status === 'low' ? '⬇' : pm.status === 'high' ? '↗' : '✓';
+                  return <span key={pm.muscle} style={{ fontSize:10, fontWeight:700, color:c, background:c+'14', border:`1px solid ${c}30`, borderRadius:6, padding:'2px 6px' }}>{icon} {GROUP_RU[pm.muscle] ?? pm.muscle} {pm.peakSets}/{pm.mrv}</span>;
+                })}
+              </div>
+              {low.length >0 && (
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+                  <span style={{ fontSize:10, color:'#3b82f6', fontWeight:700 }}>+ Быстро:</span>
+                  {low.slice(0,3).map(w => (
+                    <button key={w.muscle} onClick={() => {
+                      const prof = loadTrainingProfile();
+                      const upd = addWeakToWeekLogic({ weeks: body.weeks, muscle: w.muscle, level, profile: prof, maxExercisesPerWeek: 2, sessionIndex: 0 });
+                      setWeeks(upd);
+                    }} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.25)', color:'#3b82f6', fontWeight:700 }}>+ {GROUP_RU[w.muscle] ?? w.muscle}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        } catch { return null; }
+      })()}
       {body.weeks.length > 1 && (
         <div className="editor-week-bulk-actions">
           <span>Навигация по неделям:</span>
