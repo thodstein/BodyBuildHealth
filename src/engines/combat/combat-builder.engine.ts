@@ -47,12 +47,29 @@ const CB_EX_META: Record<string, { name: string; group: string; pattern: string 
   med_ball_throw: { name: 'Медбол бросок', group: 'core', pattern: 'hinge' },
   wrist_roller: { name: 'Валик', group: 'arms', pattern: 'isolation' },
 };
-function getExerciseMeta(id: string): { name: string; group: string; pattern: string } | null {
+const CB_TECHNIQUE: Record<string,string> = {
+  bench_bar:'Жим: лопатки сведены, грудь вверх, стопы в пол',
+  row_bar:'Тяга: нейтральная спина, локти к корпусу',
+  ohp:'Жим стоя: кор напряжён, без прогиба поясницы',
+  pullup:'Подтягивания: тяга грудью к перекладине',
+  neck_harness_ext:'Шея: лёгкий вес 5-12кг, без рывков, 12-20 повт',
+  neck_lateral_flex:'Боковая шея: контроль, не форсировать',
+  neck_bridge_wrestler:'Мост: только продвинутым, контроль шеи',
+  gi_grip_pullup:'Хват за кимоно, без раскачки',
+  squat:'Присед: глубина ниже параллели, колени по носкам',
+  bulgarian_split_heavy:'Болгарский: корпус вертикально, переднее колено над стопой',
+  single_leg_rdl_combat:'Румынка на одной: баланс, таз назад',
+  landmine_rotation:'Ротация от кора, взрыв, без рывка поясницы',
+  pallof_rotation_press:'Паллоф: анти-ротация, контроль',
+  suitcase_carry:'Чемодан: корпус ровно, без наклона',
+};
+function getExerciseMeta(id: string): { name: string; group: string; pattern: string; technique?: string } | null {
   const m = CB_EX_META[id];
-  if (!m) return { name: id, group: 'core', pattern: 'unknown' };
-  return m;
+  if (!m) return { name: id, group: 'core', pattern: 'unknown', technique: CB_TECHNIQUE[id] };
+  return { ...m, technique: CB_TECHNIQUE[id] };
 }
 
+const COMBAT_FALLBACK: Record<string,string> = { pallof_rotation_press:'landmine_rotation', neck_bridge_wrestler:'neck_harness_ext', wrist_roller:'plate_pinch', gi_grip_pullup:'pullup' };
 function filterPool(ids: string[], input: CombatInput): string[] {
   let out = [...ids];
   if (input.excludedExercises?.length) {
@@ -61,9 +78,22 @@ function filterPool(ids: string[], input: CombatInput): string[] {
   }
   const eq = (input.equipment || []).map(s => String(s).toLowerCase());
   const hasCable = eq.includes('cable') || eq.includes('other') || eq.length===0;
+  const before = [...out];
   out = filterByTierCB(out, input.level, hasCable);
+  if (!hasCable) for (const orig of before) if (!out.includes(orig) && COMBAT_FALLBACK[orig] && !out.includes(COMBAT_FALLBACK[orig])) out.push(COMBAT_FALLBACK[orig]);
+  const beforeInjury=[...out];
   out = filterByInjuryCB(out, input.injuries as any);
+  if (out.length===0 && (input.injuries||[]).length>0) out = beforeInjury.slice(0,2);
   return out;
+}
+function gentleFactorCB(id: string, injuries: any[]|undefined): number {
+  if (!injuries||injuries.length===0) return 1;
+  const txt=JSON.stringify(injuries).toLowerCase();
+  if ((txt.includes('neck')||txt.includes('ше')) && id.includes('neck')) return 0.6;
+  if ((txt.includes('knee')||txt.includes('колен')) && ['squat','front_squat','bulgarian_split_heavy','cossack_squat'].includes(id)) return 0.6;
+  if ((txt.includes('shoulder')||txt.includes('плеч')) && ['bench_bar','ohp'].includes(id)) return 0.65;
+  if ((txt.includes('wrist')||txt.includes('запяст')||txt.includes('кист')) && ['gi_grip_pullup','plate_pinch','wrist_roller'].includes(id)) return 0.7;
+  return 1;
 }
 
 function weightForCombatExercise(id: string, input: CombatInput, goal: string): number {
@@ -165,10 +195,9 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const id = chosen[idx];
         const meta = getExerciseMeta(id) || { name: id, group: 'core', pattern: 'unknown' };
         const isPrimary = idx < primaryCount;
-        const reps = repsForCombat(goal, effectiveCharacter);
-        const rir = rirForCombat(goal, phase, effectiveCharacter);
+        let reps = repsForCombat(goal, effectiveCharacter);
+        let rir = rirForCombat(goal, phase, effectiveCharacter);
         let sets = effectiveCharacter === 'тяж' ? (isPrimary ? 4 : 3) : (deload ? 2 : 3);
-        // специализация по дисциплине
         const accentMap = accentForDiscipline(discipline as any);
         const accentKey = id.includes('neck') ? 'neck' : (id.includes('grip')||id.includes('pinch')||id.includes('wrist')) ? 'grip' : (id.includes('landmine')||id.includes('pallof')||id.includes('med_ball')||id.includes('rotation')) ? 'rotational' : tag.includes('lower')||tag.includes('full') ? 'legs' : 'push';
         const accMult = (accentMap as any)[accentKey] || 1;
@@ -176,7 +205,9 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         if (goal === 'weight_cut' && sets > 2) sets -= 1;
         if (outsideMult < 0.75 && sets > 2) sets -= 1;
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
-        const weight = weightForCombatExercise(id, input, goal);
+        const gentle = gentleFactorCB(id, input.injuries as any);
+        let weight = weightForCombatExercise(id, input, goal);
+        if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
         const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
         const tempo = tempoForCB(isPrimary, effectiveCharacter as any);
         const rest = restForCB(isPrimary, effectiveCharacter as any);
@@ -195,7 +226,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           warmupSets: isPrimary && weight > 20 ? [{ reps: 8, rir: 5, weight: Math.round(weight * 0.5 / 2.5) * 2.5, tempo, restSeconds: 60 }] : [],
           tempo,
           restSeconds: rest,
-          comment: (conflict && isLegDay) ? 'Снижена интенсивность: завтра высокая внезальная' : deload ? 'Делод' : undefined,
+          comment: (conflict && isLegDay) ? 'Снижена интенсивность: завтра высокая внезальная' : deload ? 'Делод' : gentle < 1 ? 'Щадящий: снижен вес, +RIR' : (meta as any).technique || undefined,
         };
         exercises.push(ex);
       }

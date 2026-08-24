@@ -41,6 +41,7 @@ function orderByMethod(exs: StrengthSportExercise[], method?: string): StrengthS
 function clampWeeks(w: number): number { return Math.max(2, Math.min(16, Math.round(Number(w) || 8))); }
 function clampDays(d: number): number { return Math.max(2, Math.min(6, Math.round(Number(d) || 3))); }
 
+const STRONG_FALLBACK: Record<string,string> = { log_press:'push_press', yoke_walk:'farmers_walk_heavy', farmers_walk_heavy:'deadlift', atlas_stone_load:'deadlift', axle_deadlift:'deadlift', circus_db_press:'db_press', tire_flip:'deadlift', stone_lift:'deadlift', sandbag_shoulder:'rdl', zercher_carry:'farmers_walk_heavy' };
 function filterPool(ids: string[], input: StrengthSportInput): string[] {
   let out = [...ids];
   if (input.excludedExercises?.length) {
@@ -49,9 +50,35 @@ function filterPool(ids: string[], input: StrengthSportInput): string[] {
   }
   const eq = (input.equipment || []).map(s => String(s).toLowerCase());
   const hasOther = eq.includes('other') || eq.includes('specialty') || eq.length === 0;
+  const beforeTier = [...out];
   out = filterByTier(out, input.level, input.allowExotic, hasOther);
+  // fallback без спец-снарядов: заменяем удалённое на штангу
+  if (!hasOther) {
+    for (const orig of beforeTier) if (!out.includes(orig) && STRONG_FALLBACK[orig]) {
+      const fb = STRONG_FALLBACK[orig];
+      if (!out.includes(fb) && !ids.includes(fb)) {} else if (!out.includes(fb)) out.push(fb);
+      else if (!out.includes(fb) && out.length < 3) out.push(fb);
+    }
+    // если всё ещё пусто — гарантируем базу
+    if (out.length===0) out = ['back_squat','deadlift','ohp'].filter(id=>!beforeTier.includes(id) || true).slice(0,3);
+  }
   out = filterByInjury(out, input.injuries as any);
+  // если после injury пусто — gentle fallback (не удаляем, а пометим)
+  if (out.length===0 && (input.injuries||[]).length>0) out = beforeTier.slice(0,2);
   return out;
+}
+function gentleFactor(id: string, injuries: any[]|undefined): number {
+  if (!injuries||injuries.length===0) return 1;
+  const txt = JSON.stringify(injuries).toLowerCase();
+  const knee = txt.includes('knee')||txt.includes('колен');
+  const back = txt.includes('back')||txt.includes('спин')||txt.includes('поясн');
+  const shoulder = txt.includes('shoulder')||txt.includes('плеч');
+  const wrist = txt.includes('wrist')||txt.includes('запяст');
+  if (knee && ['back_squat','front_squat','hack_squat','bulgarian_split','squat','overhead_squat_v2','snatch_balance'].includes(id)) return 0.6;
+  if (back && ['deadlift','sumo_dl','axle_deadlift','yoke_walk','atlas_stone_load','snatch_pull','clean_pull'].includes(id)) return 0.6;
+  if (shoulder && ['snatch','log_press','push_jerk','split_jerk','overhead_squat_v2','ohp','push_press'].includes(id)) return 0.65;
+  if (wrist && ['clean_and_jerk','front_squat_clean_grip','hang_clean'].includes(id)) return 0.7;
+  return 1;
 }
 
 function repsFor(tag: string, phase: string, goal: string, isPrimary: boolean): [number, number] {
@@ -120,14 +147,23 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   const rir = rirForWeek(week, input.weeks, input.goal);
   let finalRir = rir;
   if (phase === 'deload') finalRir = 4;
+  const gentle = gentleFactor(id, input.injuries as any);
+  let finalWeight = baseWeight;
+  let finalReps = reps;
+  if (gentle < 1) {
+    finalWeight = Math.round(baseWeight * gentle / 2.5) * 2.5;
+    finalRir = Math.min(4, finalRir + 1);
+    // щадящий: +2 повтора, меньше отказ
+    finalReps = [reps[0]+1, reps[1]+2] as [number, number];
+  }
   const tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
   const rest = restForSS(isPrimary ? 'тяж' : 'памп', isPrimary);
   const workSets: StrengthSportSet[] = [];
   for (let i = 0; i < sets; i++) {
-    const rep = Math.round((reps[0] + reps[1]) / 2);
-    workSets.push({ reps: rep, rir: finalRir, weight: baseWeight, pct: Math.round(pct * 100), tempo, restSeconds: rest });
+    const rep = Math.round((finalReps[0] + finalReps[1]) / 2);
+    workSets.push({ reps: rep, rir: finalRir, weight: finalWeight, pct: Math.round(pct * 100), tempo, restSeconds: gentle<1? rest+30 : rest });
   }
-  return { sets, reps, rir: finalRir, weight: baseWeight, workSets };
+  return { sets, reps: finalReps, rir: finalRir, weight: finalWeight, workSets };
 }
 
 function goalRir(goal: string): number {
@@ -212,10 +248,33 @@ const SS_EX_META: Record<string, { name: string; group: string; pattern: string 
   tire_flip: { name: 'Покрышка', group: 'legs', pattern: 'hinge' },
   sled_push_sprint: { name: 'Сани спринт', group: 'legs', pattern: 'carry' },
 };
-function getExerciseMeta(id: string): { name: string; group: string; pattern: string; equipment: string } | null {
+const SS_TECHNIQUE: Record<string,string> = {
+  snatch:'Рывок: широкий хват, тяга + подрыв + уход в сед, фиксация над головой',
+  hang_snatch:'С виса: контроль спины, взрыв бёдрами',
+  power_snatch:'Без полного седа, скорость',
+  muscle_snatch:'Силой без подседа, малый вес',
+  snatch_pull:'Тяга до груди, без ухода, 90-110% рывка',
+  snatch_balance:'Подсед + жим в сед, баланс',
+  overhead_squat_v2:'Оверхед: штанга над головой, глубокий сед',
+  back_squat:'Гриф на трапециях, глубина ниже параллели',
+  front_squat:'Гриф на груди, вертикальный корпус',
+  clean_and_jerk:'Толчок: взятие + толчок в ножницы',
+  hang_clean:'С виса, локти высоко',
+  power_clean:'Силой, без полного седа',
+  push_jerk:'Подсед + выталкивание, полуприсед',
+  split_jerk:'Ножницы, фиксация',
+  push_press:'Толчок ногами + жим',
+  log_press:'Бревно на груди, локти высоко, толчок',
+  yoke_walk:'Кор напряжён, короткие шаги, не округлять',
+  farmers_walk_heavy:'Хват без лямок, грудь вверх',
+  atlas_stone_load:'Обхват, через колени, мощное разгибание',
+  deadlift:'Нейтральная спина, гриф по ногам',
+  squat:'Глубина, колени по носкам',
+};
+function getExerciseMeta(id: string): { name: string; group: string; pattern: string; equipment: string; technique?: string } | null {
   const m = SS_EX_META[id];
-  if (!m) return { name: id, group: 'legs', pattern: 'unknown', equipment: 'barbell' };
-  return { name: m.name, group: m.group, pattern: m.pattern, equipment: 'barbell' };
+  if (!m) return { name: id, group: 'legs', pattern: 'unknown', equipment: 'barbell', technique: SS_TECHNIQUE[id] };
+  return { name: m.name, group: m.group, pattern: m.pattern, equipment: 'barbell', technique: SS_TECHNIQUE[id] };
 }
 
 export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSportPlan {
@@ -277,6 +336,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         let finalRir = built.rir;
         if (deload) { finalSets = Math.max(2, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
         const workSets: StrengthSportSet[] = built.workSets.slice(0, finalSets).map(s => ({ ...s, weight: finalWeight, rir: finalRir }));
+        const gentle = gentleFactor(id, input.injuries as any);
         const ex: StrengthSportExercise = {
           id,
           name: meta.name,
@@ -292,7 +352,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           warmupSets: isPrimary ? buildWarmup(finalWeight) : [],
           tempo: tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase),
           restSeconds: restForSS(isPrimary ? 'тяж' : 'памп', isPrimary),
-          comment: deload ? 'Делод — лёгкая неделя' : undefined,
+          comment: deload ? 'Делод — лёгкая неделя' : gentle < 1 ? 'Щадящий режим: снижен вес, +RIR' : (meta as any).technique || undefined,
           isCompetitionLift: isOly(id) || isStrong(id),
         };
         exercises.push(ex);

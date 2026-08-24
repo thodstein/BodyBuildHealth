@@ -157,12 +157,26 @@ export const CombatConstructor: React.FC = () => {
           </div>
           {plan.weeksData.map(wk => (
             <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
-              <div style={{ color: '#a855f7', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {wk.phase}{wk.deload ? ' · делод' : ''} · {wk.totalSets} сетов</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#a855f7', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {wk.phase}{wk.deload ? ' · делод' : ''} · {wk.totalSets} сетов</span>
+                <button onClick={() => {
+                  const txt = wk.sessions.map(s=> `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e=> `  ${e.name} ${e.sets}x${e.reps} ${e.weight?e.weight+'кг':''} RIR${e.rir} ${e.tempo} отдых${e.restSeconds}с${e.comment? ' // '+e.comment:''}`).join('\n')).join('\n\n');
+                  navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n`+txt); setMsg(`Неделя ${wk.week} скопирована`);
+                }} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>Копировать неделю</button>
+              </div>
               {wk.sessions.map(sess => (
                 <div key={sess.day} style={{ marginTop: 6, padding: 6, background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
-                  <div style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>{sess.sessionTag} · {sess.character} · день {sess.day}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>{sess.sessionTag} · {sess.character} · день {sess.day} · {sess.durationMin} мин</span>
+                    <span style={{ color: '#fff', fontSize: 10, opacity: 0.5 }}>⏱ {sess.exercises.reduce((a,e)=>a+ e.workSets.length* (e.restSeconds||75),0)/60 |0} мин отдыха</span>
+                  </div>
                   {sess.exercises.map(ex => (
-                    <div key={ex.id} style={{ color: '#fff', fontSize: 11, marginLeft: 6 }}>{ex.name} — {ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}кг` : ''} RIR{ex.rir}{ex.comment ? ` · ${ex.comment}` : ''}</div>
+                    <div key={ex.id} style={{ color: '#fff', fontSize: 11, marginLeft: 6, marginTop: 4, padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 4 }}>
+                      <div>{ex.name} — {ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}кг` : ''} RIR{ex.rir} · {ex.tempo} · отдых {ex.restSeconds}с</div>
+                      {ex.comment && <div style={{ fontSize: 10, opacity: 0.7, marginLeft: 4, borderLeft: '2px solid rgba(168,85,247,0.3)', paddingLeft: 6 }}>{ex.comment}</div>}
+                      {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize: 10, opacity: 0.5 }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
+                      <div style={{ fontSize: 10, opacity: 0.45 }}>Сеты: {ex.workSets.map(s=> `${s.reps}×${s.weight? s.weight+'кг' : '—'} RIR${s.rir}`).join(' | ')}</div>
+                    </div>
                   ))}
                 </div>
               ))}
