@@ -280,7 +280,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       sessions: src.sessions.map(s => ({
         id: newId('ses'),
         name: s.name,
-        dayOfНеделя: s.dayOfWeek,
+        dayOfWeek: s.dayOfWeek,
         focus: s.focus,
         blocks: s.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st, weight: st.weight ? Math.round(st.weight * progression / 2.5) * 2.5 : st.weight })) })),
         warmup: s.warmup,
@@ -371,7 +371,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
             muscle,
             level,
             profile: prof,
-            maxExercisesPerНеделя: 2,
+            maxExercisesPerWeek: 2,
             sessionIndex: 0,
           });
           setWeeks(updated);
@@ -627,13 +627,13 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
 const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']; onChange: (s: UserSession[]) => void }> = ({ sessions, phase, onChange }) => {
   const { confirm } = useConfirmDialog();
   const [noteOpenIdx, setNoteOpenIdx] = useState<number | null>(null);
-  const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), dayOfНеделя: firstFreeTrainingDay(sessions), focus: '', blocks: [] }]);
+  const addSession = () => onChange([...sessions, { id: newId('ses'), name: 'День ' + (sessions.length + 1), dayOfWeek: firstFreeTrainingDay(sessions), focus: '', blocks: [] }]);
   // Быстрый день из шаблона — с готовыми упражнениями из каталога
   const addSessionFromTemplate = (tmpl: typeof DAY_TEMPLATES[0]) => {
     onChange([...sessions, {
       id: newId('ses'),
       name: tmpl.name,
-      dayOfНеделя: firstFreeTrainingDay(sessions),
+      dayOfWeek: firstFreeTrainingDay(sessions),
       focus: tmpl.focus,
       blocks: tmpl.blocks.map(b => ({
         id: newId('blk'),
@@ -662,7 +662,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
       {
         id: newId('ses'),
         name: src.name + ' (копия)',
-        dayOfНеделя: firstFreeTrainingDay(sessions),
+        dayOfWeek: firstFreeTrainingDay(sessions),
         focus: src.focus,
         blocks: src.blocks.map(b => ({ ...b, id: newId('blk'), sets: b.sets.map(st => ({ ...st })) })),
         warmup: src.warmup,
@@ -704,7 +704,7 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
             <DayOfWeekPicker
               value={dow}
               occupied={sessions.flatMap((other, oi) => oi === si ? [] : [sessionDayOfWeek(other, oi)])}
-              onChange={d => updateSession(si, { dayOfНеделя: normalizeProgramDayOfWeek(d, trainingDayForIndex(si)) })}
+              onChange={d => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(d, trainingDayForIndex(si)) })}
               ariaLabel={`День недели тренировки ${si + 1}`}
             />
             <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
@@ -1426,13 +1426,13 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
   const addWeek = () => {
     const weeks = [...(bodyRef.current.customWeeks ?? [])];
     const n = weeks.length + 1;
-    weeks.push({ week: n, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfНеделя: 0, exercises: [] }] });
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfНеделя: d.dayOfWeek ?? di }))) });
+    weeks.push({ week: n, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfWeek: 0, exercises: [] }] });
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
     setExpandedWeek(n - 1);
   };
   const removeWeek = (wi: number) => {
     const weeks = bodyRef.current.customWeeks?.filter((_, i) => i !== wi).map((w, i) => ({ ...w, week: i + 1 })) ?? [];
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfНеделя: d.dayOfWeek ?? di }))) });
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
     setExpandedWeek(weeks.length === 0 ? null : Math.min(wi, weeks.length - 1));
   };
   const cloneWeek = (wi: number) => {
@@ -1440,8 +1440,8 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
     const src = current.customWeeks?.[wi];
     if (!src) return;
     const weeks = [...(current.customWeeks ?? [])];
-    const cloned: PLWeek = { week: weeks.length + 1, phase: src.phase, deload: src.deload, days: src.days.map(d => ({ name: d.name, dayOfНеделя: d.dayOfWeek, exercises: d.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) })) };
-    set({ customWeeks: [...weeks, cloned], schedule: [...weeks, cloned].flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: [...weeks, cloned].slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfНеделя: d.dayOfWeek ?? di }))) });
+    const cloned: PLWeek = { week: weeks.length + 1, phase: src.phase, deload: src.deload, days: src.days.map(d => ({ name: d.name, dayOfWeek: d.dayOfWeek, exercises: d.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) })) };
+    set({ customWeeks: [...weeks, cloned], schedule: [...weeks, cloned].flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: [...weeks, cloned].slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
     setExpandedWeek(weeks.length);
   };
   const updateWeek = (wi: number, patch: Partial<PLWeek>) => {
@@ -1450,15 +1450,15 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
   };
   const updateDay = (wi: number, di: number, patch: Partial<PLDay>) => {
     const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, ...patch } : d) } : w);
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, dayIndex) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + dayIndex, dayOfНеделя: d.dayOfWeek ?? dayIndex }))) });
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, dayIndex) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + dayIndex, dayOfWeek: d.dayOfWeek ?? dayIndex }))) });
   };
   const addDay = (wi: number) => {
-    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: [...w.days, { name: 'День ' + (w.days.length + 1), dayOfНеделя: firstFreeTrainingDay(w.days), exercises: [] }] } : w);
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfНеделя: d.dayOfWeek ?? di }))) });
+    const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: [...w.days, { name: 'День ' + (w.days.length + 1), dayOfWeek: firstFreeTrainingDay(w.days), exercises: [] }] } : w);
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
   };
   const removeDay = (wi: number, di: number) => {
     const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.filter((_, j) => j !== di) } : w);
-    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfНеделя: d.dayOfWeek ?? di }))) });
+    set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
   };
   const updateExercise = (wi: number, di: number, ei: number, patch: Partial<PLExercise>) => {
     const weeks = (bodyRef.current.customWeeks ?? []).map((w, i) => i === wi ? { ...w, days: w.days.map((d, j) => j === di ? { ...d, exercises: d.exercises.map((e, k) => k === ei ? { ...e, ...patch } : e) } : d) } : w);
@@ -1489,7 +1489,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                 onClick={async () => {
                   const ok = await confirm({ title: 'Переключиться на свой ПЛ-цикл?', message: 'Процентки LMS-цикла будут отсоединены — вы сможете редактировать недели/дни/упражнения/процентки самостоятельно. Это нельзя отменить.', confirmLabel: 'Переключить', danger: true });
                   if (!ok) return;
-                  set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfНеделя: 0, exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
+                  set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfWeek: 0, exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
                 }}
               >✏ Переключить на свой цикл</button>
             </div>
@@ -1501,7 +1501,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                 <button
                   style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }}
                   onClick={() => {
-                    set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfНеделя: 0, exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
+                    set({ sourceCycleId: null, customWeeks: [{ week: 1, phase: 'accumulation', deload: false, days: [{ name: 'День 1', dayOfWeek: 0, exercises: [{ name: 'Присед', lift: 'squat', muscle: 'legs', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }] }] }] });
                   }}
                 >✏ Создать свой цикл с нуля</button>
               </div>
@@ -1543,7 +1543,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                   <span style={{ color: DIM, minWidth: 70 }}>Сессия {s.sessionIdx + 1}</span>
                   <DayOfWeekPicker
                     value={s.dayOfWeek}
-                    onChange={d => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfНеделя: normalizeProgramDayOfWeek(d, s.dayOfWeek) }; set({ schedule: sc }); }}
+                    onChange={d => { const sc = [...body.schedule]; sc[i] = { ...sc[i], dayOfWeek: normalizeProgramDayOfWeek(d, s.dayOfWeek) }; set({ schedule: sc }); }}
                     ariaLabel={`День недели сессии ${s.sessionIdx + 1}`}
                   />
                 </div>
@@ -1612,9 +1612,9 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
             <button key={t.label} onClick={() => {
               const w0 = (bodyRef.current.customWeeks?.[0]) ?? null;
               if (!w0) return;
-              const newDay = { name: t.name, dayOfНеделя: firstFreeTrainingDay(w0.days as any), exercises: t.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) };
+              const newDay = { name: t.name, dayOfWeek: firstFreeTrainingDay(w0.days as any), exercises: t.exercises.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s })) })) };
               const weeks = (bodyRef.current.customWeeks ?? []).map((w, wi) => wi === 0 ? { ...w, days: [...w.days, newDay as any] } : w);
-              set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfНеделя: d.dayOfWeek ?? di }))) });
+              set({ customWeeks: weeks, schedule: weeks.flatMap((w, wwi) => w.days.map((d, di) => ({ sessionIdx: weeks.slice(0, wwi).reduce((a, ww) => a + ww.days.length, 0) + di, dayOfWeek: d.dayOfWeek ?? di }))) });
             }} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.25)', color: '#a78bfa' }}>{t.icon} {t.label}</button>
           ))}
         </div>
@@ -1720,7 +1720,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                       <DayOfWeekPicker
                         value={d.dayOfWeek ?? trainingDayForIndex(di)}
                         occupied={w.days.flatMap((other, otherIndex) => otherIndex === di ? [] : [other.dayOfWeek ?? trainingDayForIndex(otherIndex)])}
-                        onChange={nd => updateDay(wi, di, { dayOfНеделя: normalizeProgramDayOfWeek(nd, trainingDayForIndex(di)) })}
+                        onChange={nd => updateDay(wi, di, { dayOfWeek: normalizeProgramDayOfWeek(nd, trainingDayForIndex(di)) })}
                         ariaLabel={`День недели ${d.name}`}
                       />
                       <span style={{ fontSize: 10, color: DIM }}>{d.exercises.length} упр. · {TRAINING_DAY_NAMES[d.dayOfWeek ?? di % 7]}</span>

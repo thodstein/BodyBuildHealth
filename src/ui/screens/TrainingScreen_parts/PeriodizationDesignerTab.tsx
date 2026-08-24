@@ -790,7 +790,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     </div>
                     <div style={{ fontSize: 10, color: accent, fontWeight: 700, marginBottom: 4 }}>⭐ Топ-3 цикла для ПЛ (rankCycles)</div>
                     <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
-                      {rankCycles({ goal: 'strength' as any, level: plLevel as any, daysPerНеделя: plDays, direction: 'powerlifting' as any, mode: 'natural' }).slice(0,3).map((r, idx) => (
+                      {rankCycles({ goal: 'strength' as any, level: plLevel as any, daysPerWeek: plDays, direction: 'powerlifting' as any, mode: 'natural' }).slice(0,3).map((r, idx) => (
                         <div key={r.cycle.meta.id} style={{ padding: 8, borderRadius: 8, background: idx===0 ? accent+'14' : 'rgba(255,255,255,0.03)', border: `1px solid ${idx===0 ? accent+'33' : 'rgba(255,255,255,0.06)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 11, fontWeight: 800, color: idx===0 ? accent : '#fff' }}>{idx===0 ? '★ ' : ''}{r.cycle.meta.title}</div>
@@ -854,7 +854,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                     </div>
                     <div style={{ fontSize: 10, color: accent, fontWeight: 700, marginBottom: 4 }}>⭐ Топ-3 сплита для ББ (rankBBSplits)</div>
                     <div style={{ display: 'grid', gap: 6, marginBottom: 10 }}>
-                      {rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerНеделя: bbDays } as any).slice(0,3).map((r, idx) => (
+                      {rankBBSplits({ level: bbLevel, goal: bbGoal as any, daysPerWeek: bbDays } as any).slice(0,3).map((r, idx) => (
                         <div key={r.pattern.id} style={{ padding: 8, borderRadius: 8, background: idx===0 ? accent+'14' : 'rgba(255,255,255,0.03)', border: `1px solid ${idx===0 ? accent+'33' : 'rgba(255,255,255,0.06)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 11, fontWeight: 800, color: idx===0 ? accent : '#fff' }}>{idx===0 ? '★ ' : ''}{r.pattern.name}</div>
@@ -1517,7 +1517,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                 applyToPlanner({
                   kind: 'design',
                   label: 'Дизайн: ' + current.name + ' (' + current.totalWeeks + ' нед, ' + current.blocks.length + ' блоков)',
-                  data: { design: current, fillExercises: false, daysPerНеделя: 4 },
+                  data: { design: current, fillExercises: false, daysPerWeek: 4 },
                 });
               }}
               style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 48, marginBottom: 8 }}
@@ -1535,7 +1535,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                 applyToPlanner({
                   kind: 'design',
                   label: 'Дизайн+упражнения: ' + current.name + ' (' + current.totalWeeks + ' нед)',
-                  data: { design: current, fillExercises: true, daysPerНеделя: 4 },
+                  data: { design: current, fillExercises: true, daysPerWeek: 4 },
                 });
               }}
               style={{ width: '100%', padding: 14, borderRadius: 12, border: 'none', cursor: 'pointer', background: `linear-gradient(135deg,${accent},#0ea5e9)`, color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 48 }}

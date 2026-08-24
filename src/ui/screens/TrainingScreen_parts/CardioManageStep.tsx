@@ -83,7 +83,7 @@ export const CardioManageStep: React.FC<{
     if (!cycle) return;
     const p = cardioToNutritionPayload(cycle, loadCardioLog());
     try {
-      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerНеделя: p.avgKcalPerWeek, avgMinutesPerНеделя: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
+      localStorage.setItem(CARDIO_KCAL_NOTE_KEY, JSON.stringify({ cycleId: cycle.id, avgKcalPerWeek: p.avgKcalPerWeek, avgMinutesPerWeek: p.avgMinutesPerWeek, updatedAt: new Date().toISOString() }));
     } catch { /* ignore */ }
     try {
       navigator.clipboard.writeText(p.text).then(() => setNutriFlash(true)).catch(() => fallbackCopy(p.text));

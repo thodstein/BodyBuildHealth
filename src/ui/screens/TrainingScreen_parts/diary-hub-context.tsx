@@ -23,7 +23,7 @@ export interface DiaryHubCtx {
   mesoLength: number;
   curPhase: any;
   goal: string;
-  daysPerНеделя: number;
+  daysPerWeek: number;
   splitType: string;
   periodizationType: string;
   trainingArchive: any[];

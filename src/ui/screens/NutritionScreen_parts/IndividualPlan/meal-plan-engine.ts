@@ -2657,7 +2657,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // D-28+ fix: цельный белок (курица/рыба/творог) тоже не раздувается коррекцией за 300 г
         // на приём — иначе прецизионная подгонка давала «лосось 316 г».
         if (item.role === 'protein') upCap = Math.min(upCap, 300);
-        const newAmount = Math.max(suppMin, Math.min(upCap, rawNew));
+        // FIX: snap к человеческой сетке (сыворотка 30/60/90, масло 5/10/15/30) — без 34г/1.1 скупа
+        const fd2 = FOOD_DB.find(f => f.id === item.id);
+        const newAmount = fd2 ? snapPortionG(fd2, Math.max(suppMin, Math.min(upCap, rawNew))) : Math.max(suppMin, Math.min(upCap, rawNew));
         const factor = newAmount / (item.amount || 1);
         item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
       });

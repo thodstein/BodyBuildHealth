@@ -3819,6 +3819,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
     }
   }
+  // Final strict muscle grouping after all feeders/optional (fix chest-shoulders-chest, biceps-triceps-biceps)
+  for (const week of finalized.weeks) {
+    for (const sess of week.sessions) {
+      const ordered = orderSessionExercises(sess.exercises, {
+        sessionTag: sess.sessionTag,
+        methodology: input.methodology,
+        priorityMuscles: [...weakPoints, ...(focusGroup ? [focusGroup] : [])],
+      });
+      sess.exercises.length = 0;
+      sess.exercises.push(...ordered);
+    }
+  }
   return finalized;
 }
 

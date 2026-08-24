@@ -25,7 +25,7 @@ interface Props {
   onTabChange?: (tab: TrainingTab) => void;
   trainingOutput: TrainingOutput | null;
   goal: string;
-  daysPerНеделя: number;
+  daysPerWeek: number;
   splitType: string;
   periodizationType: string;
   mesoLength: number;

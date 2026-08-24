@@ -120,7 +120,7 @@ interface TrainingDiaryHubProps {
   onGoRecord?: () => void;
   trainingOutput: TrainingOutput | null;
   goal: string;
-  daysPerНеделя: number;
+  daysPerWeek: number;
   splitType: string;
   periodizationType: string;
   mesoLength: number;

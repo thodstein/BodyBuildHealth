@@ -2219,11 +2219,11 @@ export const IndividualPlanResults: React.FC = () => {
                                 <div style={{ width:`${Math.min(100, m.percent)}%`, height:'100%', borderRadius:2,
                                   background: m.percent >= 50 ? '#22c55e' : m.percent >= 20 ? '#f59e0b' : '#ef4444' }} />
                               </div>
-                              <span style={{ fontSize:6, color:'rgba(255,255,255,0.8)', minWidth:20, textAlign:'right' }}>{m.percent}%</span>
+                              <span style={{ fontSize:6, color:'rgba(255,255,255,0.8)', minWidth:20, textAlign:'right' }}>{Math.min(500, m.percent)}%</span>
                             </div>
                           ))}
                           {(sc as any).microCoverage.length > 8 && (
-                            <div style={{ fontSize:6, color:'rgba(255,255,255,0.2)', marginTop:1 }}>+ ещё {(sc as any).microCoverage.length - 8}</div>
+                            <div style={{ fontSize:6, color:'rgba(255,255,255,0.2)', marginTop:1 }}>+ ещё {Math.min(8, (sc as any).microCoverage.length - 8)}</div>
                           )}
                         </div>
                       )}

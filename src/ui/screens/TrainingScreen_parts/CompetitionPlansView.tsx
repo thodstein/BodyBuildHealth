@@ -19,7 +19,7 @@ export interface CompetitionPlanRecord {
   weekCount: number;
   taperWeeks: number;
   mockMeet: boolean;
-  meetНеделя: boolean;
+  meetWeek: boolean;
   weights: { squat: number; bench: number; deadlift: number };
   meetAttempts?: { name: string; opener: number; second: number; third: number }[];
   plan: LMSBuildOutput;     // полный снимок плана с тапером

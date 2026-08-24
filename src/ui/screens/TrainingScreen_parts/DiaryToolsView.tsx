@@ -172,7 +172,7 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               const planWeeks = macrocycle?.totalWeeks ?? (trainingOutput?.plan?.length && daysPerWeek > 0 ? Math.ceil(trainingOutput.plan.length / daysPerWeek) : 0);
               const report = {
                 id: 'report_' + Date.now(), date: new Date().toISOString(),
-                exerciseCatalogCount: EXERCISE_CATALOG.length, planWeeks, exercisesPerНеделя: daysPerWeek,
+                exerciseCatalogCount: EXERCISE_CATALOG.length, planWeeks, exercisesPerWeek: daysPerWeek,
                 totalVolume: trainingOutput?.weeklyVolume ?? 0,
                 avgIntensity: trainingOutput?.estimatedProgress ? Math.round(50 + trainingOutput.estimatedProgress * 5) : 0,
                 goal, level, daysPerWeek, splitType, periodizationType, mesoLength,

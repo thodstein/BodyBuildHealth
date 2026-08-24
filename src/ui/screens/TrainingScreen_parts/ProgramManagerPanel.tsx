@@ -300,7 +300,7 @@ export const ProgramManagerPanel: React.FC = () => {
       .map((x, si) => ({
         id: newId('ses'),
         name: 'День ' + (si + 1),
-        dayOfНеделя: x.di,
+        dayOfWeek: x.di,
         focus: x.d.sessionTag ?? '',
         blocks: [],
       }));
@@ -358,11 +358,11 @@ export const ProgramManagerPanel: React.FC = () => {
           deload: wi % 4 === 3,
           days: Array.from({ length: wizardDays }, (_, di) => ({
             name: dayNames[di % dayNames.length] + (wizardDays > 3 && di >= 3 ? ` ${di+1}` : ''),
-            dayOfНеделя: di % 7,
+            dayOfWeek: di % 7,
             exercises: [{ name: '', lift: lifts[di % lifts.length], muscle: lifts[di % lifts.length] === 'squat' ? 'legs' : lifts[di % lifts.length] === 'bench' ? 'chest' : 'back', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }],
           })),
         }));
-        p.pl.schedule = Array.from({ length: wizardDays }, (_, i) => ({ sessionIdx: i, dayOfНеделя: i % 7 }));
+        p.pl.schedule = Array.from({ length: wizardDays }, (_, i) => ({ sessionIdx: i, dayOfWeek: i % 7 }));
       } else if (wizardDir === 'hybrid' && p.hybrid) {
         p.hybrid.bbWeeks = buildBBSkeleton(Math.max(1, wizardDays - 2), wizardWeeks);
         p.hybrid.weeksOverride = wizardWeeks;
@@ -755,7 +755,7 @@ export const ProgramManagerPanel: React.FC = () => {
         p.meta.weeks = tpl.weeks;
         if (p.pl && foundCycle) {
           p.pl.sourceCycleId = foundCycle.meta.id;
-          p.pl.schedule = Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfНеделя: i }));
+          p.pl.schedule = Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfWeek: i }));
           p.pl.workMax = { squat: prof.pmSquat, bench: prof.pmBench, dead: prof.pmDead };
           p.pl.notes = 'Цикл: ' + foundCycle.meta.title + ' (' + foundCycle.meta.weeks + ' нед, ' + foundCycle.meta.sessionsPerWeek + 'д/нед). Процентки неизменны — ваш оверлей.';
         }
@@ -851,7 +851,7 @@ export const ProgramManagerPanel: React.FC = () => {
 
         {/* P15: Шаблоны быстрого старта — в обоих режимах + подсветка по профилю */}
         {(manualMode === 'standard' || manualMode === 'pro') && (() => {
-          const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', daysPerНеделя: 4 } as any; } })();
+          const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', daysPerWeek: 4 } as any; } })();
           const isRecommended = (tpl: typeof QUICK_TEMPLATES[0]) => tpl.days === prof.daysPerWeek && tpl.level === prof.level;
           return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -947,7 +947,7 @@ export const ProgramManagerPanel: React.FC = () => {
           <button onClick={() => setQuickTplCollapsed(v => !v)} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{quickTplCollapsed ? 'Показать' : 'Скрыть'}</button>
         </div>
         {!quickTplCollapsed && (() => {
-          const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', daysPerНеделя: 4 } as any; } })();
+          const prof = (() => { try { return loadTrainingProfile(); } catch { return { level: 'intermediate', daysPerWeek: 4 } as any; } })();
           const isRecommended = (tpl: typeof QUICK_TEMPLATES[0]) => tpl.days === prof.daysPerWeek && tpl.level === prof.level;
           return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6, marginTop: 8 }}>

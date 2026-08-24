@@ -338,7 +338,7 @@ export function calcMealScore(
       name: MICRO_NAMES[key] || key,
       current: Math.round(microTotals[key] * 10) / 10,
       rda,
-      percent: Math.round(microTotals[key] / rda * 100),
+      percent: Math.min(500, Math.round(microTotals[key] / rda * 100)),
     }))
     .sort((a, b) => b.percent - a.percent);
 
