@@ -252,20 +252,25 @@ function isPortableFood(f: FoodItem): boolean {
   if (f.category === 'supplement') return true;        // порошки/батончики
   if (f.category === 'veg_fruit') return true;          // фрукты/ягоды/сырые овощи
   if (f.category === 'fat') {
-    if (lid.includes('mayonnaise') || lid.includes('cream_sauce')) return false;
-    return true;                // орехи/семечки/масла (кроме соусов)
+    // Орехи/семечки — можно есть руками. Масла/пасты — нет (нужна ложка, пачкают).
+    const lid = (f.id || '').toLowerCase();
+    if (lid.includes('oil') || lid.includes('butter') || lid.includes('paste') || lid.includes('mayonnaise') || lid.includes('cream_sauce') || lid.includes('spread')) return false;
+    return true;  // орехи/семечки/сухофрукты — едим руками
   }
   if (f.category === 'dairy') {
-    if (lid.includes('ice_cream') || lid.includes('cream_sauce')) return false;
-    return true;              // йогурт/творог/кефир в упаковке
+    // Только питьевые молочные (молоко/кефир в бутылке) — можно пить на работе.
+    // Творог/йогурт/сыр — требуют ложки/контейнера, пахнут.
+    const lid = (f.id || '').toLowerCase();
+    if (lid.includes('milk') || lid.includes('kefir') || lid.includes('ayran')) return true;
+    return false;
   }
   if (f.category === 'protein') {
-    // Только холодные/готовые белки портативны: яйца (вареные), творог, йогурт, консервы (тунец), нарезка (ветчина/колбаса), протеин
-    // Говядина/стейк/курица/рыба — НЕ портативны (нужен разогрев, запах)
-    const portableProtein = ['egg', 'cottage_cheese', 'tuna_canned', 'ham', 'sausage', 'jerky', 'dried_meat', 'supp_'];
-    const nonPortableProtein = ['beef_steak', 'beef_lean', 'beef_minced', 'chicken_breast', 'chicken_thigh', 'turkey_breast', 'salmon', 'trout', 'cod', 'pollock', 'mackerel', 'pork', 'lamb', 'veal', 'duck', 'goose', 'rabbit'];
-    if (nonPortableProtein.some(k => lid.includes(k))) return false;
-    return portableProtein.some(k => lid.includes(k));
+    // «Хлопья на работе» = БЕЗ разогрева, БЕЗ запаха, БЕЗ контейнера.
+    // Только протеиновый порошок (сыворотка/казеин/вега) — разводится водой в шейкере.
+    // Никакого мяса, рыбы, яиц, творога — всё это требует контейнера, вилки, пахнет.
+    const lid = (f.id || '').toLowerCase();
+    if (lid.includes('whey') || lid.includes('casein') || lid.includes('isolate') || lid.includes('pea_protein') || lid.includes('soy_isolate') || lid.includes('rice_protein') || lid.includes('supp_eaa') || lid.includes('bcaa') || lid.includes('collagen')) return true;
+    return false;
   }
   if (f.category === 'grain' || f.category === 'carb') {
     // готовые к употреблению злаки (хлопья/мюсли/хлеб/рисовый крем/хлебцы) — портативны
@@ -1749,12 +1754,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   let tLunch = input.lunchTime || '12:30';
   let tDinner = input.dinnerTime || '19:00';
   const tBed = input.bedTime || '22:00';
-  // Работа: если isWorkDay, сдвигаем обед в середину смены, ужин — через 30м после конца смены (раньше только классика)
+  // Работа: если isWorkDay, сдвигаем обед в середину смены, ужин — через 30м после конца смены
   if (input.isWorkDay && Number.isFinite(input.workStartMin) && Number.isFinite(input.workEndMin)) {
     const ws = input.workStartMin as number, we = input.workEndMin as number;
-    if (ws >= 0 && ws < 1440 && we >= 0 && we < 1440 && we > ws) {
-      tLunch = fmtMin(Math.round((ws + we) / 2));
-      tDinner = fmtMin((we + 30) % 1440);
+    if (ws >= 0 && ws < 1440 && we >= 0 && we < 1440) {
+      if (we > ws) {
+        // Дневная смена: обед в середине, ужин через 30м после
+        tLunch = fmtMin(Math.round((ws + we) / 2));
+        tDinner = fmtMin((we + 30) % 1440);
+      } else {
+        // Ночная смена (we <= ws, через полночь): обед в середине смены с поправкой
+        const midShift = (ws + (we + 1440)) / 2 % 1440;
+        tLunch = fmtMin(Math.round(midShift));
+        tDinner = fmtMin((we + 30) % 1440);
+      }
     }
   }
   // Pre-sleep 30 min before bed
