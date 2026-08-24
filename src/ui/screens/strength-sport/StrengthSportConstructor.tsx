@@ -10,6 +10,7 @@ import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../..
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
+import { buildAnnualFromSS, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 
@@ -31,6 +32,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('weightlifting'));
   const [outsideEnabled, setOutsideEnabled] = useState(false);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
+  const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [msg, setMsg] = useState('');
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
@@ -68,6 +70,12 @@ export const StrengthSportConstructor: React.FC = () => {
     p = finalizeStrengthSportPlan(p, { outsideLoad: outsideEnabled ? outside : null });
     setPlan(p);
     saveStrengthSportPlan(p);
+    try {
+      const hist = loadStrengthSportPlans().slice(0, 6);
+      const ann = buildAnnualFromSS(hist);
+      saveAnnualSS(ann);
+      setAnnual(ann);
+    } catch {}
     setMsg('План сохранён');
     setStep('plan');
   };
@@ -236,6 +244,14 @@ export const StrengthSportConstructor: React.FC = () => {
               ))}
             </div>
           ))}
+          {annual && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>Годовой план (изолирован): {annual.totalWeeks} нед · {annual.blocks.length} блоков</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                {annual.blocks.map(b => <span key={b.id} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', fontSize: 10 }}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}: {b.mode} ×{b.weeks}</span>)}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
             <button onClick={() => { const txt = buildStrengthSportReport(plan); const w = window.open('', '_blank'); if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap">${txt.replace(/</g,'&lt;')}</pre>`); w.document.close(); w.print(); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Печать</button>

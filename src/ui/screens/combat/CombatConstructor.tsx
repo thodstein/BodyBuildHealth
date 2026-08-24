@@ -9,6 +9,7 @@ import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
+import { buildAnnualFromCB, saveAnnualCB, loadAnnualCB } from '../../../engines/combat/combat-annual';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 
@@ -29,6 +30,7 @@ export const CombatConstructor: React.FC = () => {
   const [injuries, setInjuries] = useState<any[]>([]);
   const [injInput, setInjInput] = useState('');
   const [plan, setPlan] = useState<CombatPlan | null>(null);
+  const [annual, setAnnual] = useState(() => loadAnnualCB());
   const [msg, setMsg] = useState('');
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
@@ -57,6 +59,7 @@ export const CombatConstructor: React.FC = () => {
     p = finalizeCombatPlan(p);
     setPlan(p);
     saveCombatPlan(p);
+    try { const hist = loadCombatPlans().slice(0,6); const ann = buildAnnualFromCB(hist); saveAnnualCB(ann); setAnnual(ann); } catch {}
     setMsg('План сохранён');
     setStep('plan');
   };
@@ -213,6 +216,14 @@ export const CombatConstructor: React.FC = () => {
               ))}
             </div>
           ))}
+          {annual && (
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>Годовой план (изолирован): {annual.totalWeeks} нед · {annual.blocks.length} блоков</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                {annual.blocks.map(b => <span key={b.id} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7', fontSize: 10 }}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}: {b.discipline} ×{b.weeks}</span>)}
+              </div>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
             <button onClick={() => { const txt = buildCombatReport(plan); const w = window.open('', '_blank'); if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap">${txt.replace(/</g,'&lt;')}</pre>`); w.document.close(); w.print(); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Печать</button>
