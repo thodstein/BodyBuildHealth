@@ -16,22 +16,24 @@ import { trueMuscleOf } from '../../movement-pattern';
  * ═══════════════════════════════════════════════════════════════════ */
 
 describe('STRICT_EXERCISE_GROUPS — состав групп', () => {
-  it('грудь: разводки/пек-дек + жим под углом 30°', () => {
+  it('грудь: разводка гантелей/пек-дек + жим под углом 30° (гантели/Смит/штанга)', () => {
     expect(STRICT_EXERCISE_GROUPS.chest.map(g => g.key)).toEqual(['chest_fly', 'chest_incline']);
     const fly = strictGroupForExercise({ id: 'fly_db', name: 'Разводка гантелей лёжа' }, 'chest')!;
     expect(fly.key).toBe('chest_fly');
-    expect(fly.ids).toContain('pec_deck');
+    expect(fly.ids).toEqual(['fly_db', 'pec_deck']);
     const incline = strictGroupForExercise({ id: 'incline_bar', name: 'Жим штанги на наклонной (30°)' }, 'chest')!;
     expect(incline.key).toBe('chest_incline');
-    expect(incline.ids).toEqual(['incline_bar', 'incline_db', 'smith_incline', 'machine_incline_press']);
+    expect(incline.ids).toEqual(['incline_bar', 'incline_db', 'smith_incline']);
   });
 
-  it('спина: верхний блок + тяга лёжа на скамье + Т-тяга', () => {
+  it('спина: верхний блок широкий (прямой/параллельный) + тяга лёжа на скамье + Т-тяга', () => {
     expect(STRICT_EXERCISE_GROUPS.back.map(g => g.key)).toEqual(['back_pulldown', 'back_seal', 'back_tbar']);
     expect(strictGroupForExercise({ id: 'pulldown_wide', name: 'Тяга верхнего блока широким хватом' }, 'back')!.key).toBe('back_pulldown');
     expect(strictGroupForExercise({ id: 'pulldown_vbar', name: 'Тяга верхнего блока V-рукоятью' }, 'back')!.key).toBe('back_pulldown');
+    // Обычный/обратный хват — НЕ в группе (только широкий прямой/параллельный)
+    expect(strictGroupForExercise({ id: 'pulldown', name: 'Тяга верхнего блока (прямой)' }, 'back')).toBeUndefined();
     expect(strictGroupForExercise({ id: 'row_seal', name: 'Тяга лёжа на скамье (seal row)' }, 'back')!.key).toBe('back_seal');
-    expect(strictGroupForExercise({ id: 'row_chest_supported', name: 'Тяга с упором грудью' }, 'back')!.key).toBe('back_seal');
+    expect(strictGroupForExercise({ id: 'row_chest_supported', name: 'Тяга с упором грудью' }, 'back')).toBeUndefined();
     expect(strictGroupForExercise({ id: 'row_tbar', name: 'Тяга Т-грифа' }, 'back')!.key).toBe('back_tbar');
     expect(strictGroupForExercise({ id: 'tbar_row_v2', name: 'Тяга Т-грифа (классическая)' }, 'back')!.key).toBe('back_tbar');
   });
