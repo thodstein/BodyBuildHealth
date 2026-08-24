@@ -5,8 +5,10 @@
  */
 import { computeOutsideMetrics, outsideVolumeMultiplier, isDayConflictWithOutside, type OutsideLoad } from '../outside-load.engine';
 import { getCombatPattern, recommendCombatPattern, type CombatPattern } from './combat-split-patterns';
-import { COMBAT_TAG_MUSCLES, COMBAT_MANDATORY_MUSCLES } from './combat-day-types';
 import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progression';
+import { filterByTierCB, filterByInjuryCB, selectDiverseCB } from './combat-selection';
+import { accentForDiscipline } from './combat-specialization';
+import { tempoForCB, restForCB } from './combat-loading';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
@@ -57,19 +59,11 @@ function filterPool(ids: string[], input: CombatInput): string[] {
     const excl = new Set(input.excludedExercises.map(s => s.toLowerCase()));
     out = out.filter(id => !excl.has(id.toLowerCase()));
   }
-  // оборудование: если нет cable — убираем паллоф
   const eq = (input.equipment || []).map(s => String(s).toLowerCase());
-  if (eq.length && !eq.includes('cable') && !eq.includes('other')) {
-    out = out.filter(id => !['pallof_rotation_press'].includes(id));
-  }
-  // травмы — пропуск тяжёлых приседаний при колене
-  // injuries — пока не детализируем, оставляем as is
+  const hasCable = eq.includes('cable') || eq.includes('other') || eq.length===0;
+  out = filterByTierCB(out, input.level, hasCable);
+  out = filterByInjuryCB(out, input.injuries as any);
   return out;
-}
-
-function orderByFavorite(ids: string[], input: CombatInput): string[] {
-  const fav = new Set((input.favoriteExercises || []).map(s => s.toLowerCase()));
-  return [...ids].sort((a, b) => (fav.has(b.toLowerCase()) ? 1 : 0) - (fav.has(a.toLowerCase()) ? 1 : 0));
 }
 
 function weightForCombatExercise(id: string, input: CombatInput, goal: string): number {
@@ -156,24 +150,16 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       const effectiveCharacter = (conflict && isLegDay && character === 'тяж') ? 'памп' : character;
       const poolIds = POOL_BY_TAG[tag] || POOL_BY_TAG.full_power;
       let pool = filterPool(poolIds, input);
-      pool = orderByFavorite(pool, input);
-      // обязательные мышцы: шея/хват/кор должны быть хотя бы 1 упр в неделю
-      // обеспечим в full_conditioning / upper_power
       const primaryCount = effectiveCharacter === 'тяж' ? 3 : 2;
-      const chosen: string[] = [];
-      // приоритет: сначала mandatory если их нет в выборе
-      const mandatoryPool = COMBAT_MANDATORY_MUSCLES;
-      // простая логика: берём по порядку пула, но гарантируем шею/хват в conditioning
-      for (const id of pool) {
-        if (chosen.length >= 5) break;
-        if (!chosen.includes(id)) chosen.push(id);
-        if (chosen.length >= primaryCount + 2) break;
-      }
-      // если conditioning и нет шеи — форсим
+      const total = 5;
+      const favSet = new Set((input.favoriteExercises || []).map(s=>s.toLowerCase()));
+      const chosen = selectDiverseCB(pool, tag, total, favSet);
       if (tag === 'full_conditioning' && !chosen.some(id => id.includes('neck'))) {
-        if (!chosen.includes('neck_harness_ext')) chosen.unshift('neck_harness_ext');
+        if (!chosen.includes('neck_harness_ext')) { chosen.unshift('neck_harness_ext'); chosen.splice(total); }
       }
-      chosen.splice(5); // кап 5 упражнений
+      if (chosen.length < primaryCount + 1) {
+        for (const id of pool) { if (chosen.length >= total) break; if (!chosen.includes(id)) chosen.push(id); }
+      }
       const exercises: CombatExercise[] = [];
       for (let idx = 0; idx < chosen.length; idx++) {
         const id = chosen[idx];
@@ -182,11 +168,18 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const reps = repsForCombat(goal, effectiveCharacter);
         const rir = rirForCombat(goal, phase, effectiveCharacter);
         let sets = effectiveCharacter === 'тяж' ? (isPrimary ? 4 : 3) : (deload ? 2 : 3);
+        // специализация по дисциплине
+        const accentMap = accentForDiscipline(discipline as any);
+        const accentKey = id.includes('neck') ? 'neck' : (id.includes('grip')||id.includes('pinch')||id.includes('wrist')) ? 'grip' : (id.includes('landmine')||id.includes('pallof')||id.includes('med_ball')||id.includes('rotation')) ? 'rotational' : tag.includes('lower')||tag.includes('full') ? 'legs' : 'push';
+        const accMult = (accentMap as any)[accentKey] || 1;
+        if (accMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * accMult)));
         if (goal === 'weight_cut' && sets > 2) sets -= 1;
         if (outsideMult < 0.75 && sets > 2) sets -= 1;
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
         const weight = weightForCombatExercise(id, input, goal);
         const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
+        const tempo = tempoForCB(isPrimary, effectiveCharacter as any);
+        const rest = restForCB(isPrimary, effectiveCharacter as any);
         const ex: CombatExercise = {
           id,
           name: meta.name,
@@ -198,10 +191,10 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           reps: `${reps[0]}-${reps[1]}`,
           rir,
           weight,
-          workSets,
-          warmupSets: isPrimary && weight > 20 ? [{ reps: 8, rir: 5, weight: Math.round(weight * 0.5 / 2.5) * 2.5 }] : [],
-          tempo: isPrimary ? 'X-0-X-0' : '2-0-1-0',
-          restSeconds: isPrimary ? 150 : 75,
+          workSets: workSets.map(s=> ({...s, tempo, restSeconds: rest})),
+          warmupSets: isPrimary && weight > 20 ? [{ reps: 8, rir: 5, weight: Math.round(weight * 0.5 / 2.5) * 2.5, tempo, restSeconds: 60 }] : [],
+          tempo,
+          restSeconds: rest,
           comment: (conflict && isLegDay) ? 'Снижена интенсивность: завтра высокая внезальная' : deload ? 'Делод' : undefined,
         };
         exercises.push(ex);

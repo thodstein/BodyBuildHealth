@@ -3,7 +3,7 @@
  * Аналог bb-finalize: капы, баланс, недели делода, outside-конфликты.
  */
 import type { StrengthSportPlan } from './strength-sport.types';
-import { outsideVolumeMultiplier } from '../outside-load.engine';
+import { getWL, getStrong } from './strength-sport-volume';
 
 export interface FinalizeOptions {
   outsideLoad?: any;
@@ -50,6 +50,19 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
         warnings.push(`Делод нед ${wk.week}: объём ${wk.totalSets} > 70% среднего ${Math.round(avg)} — делод должен быть легче.`);
       }
     }
+  }
+
+  // Объём per-lift vs landmarks (зальный)
+  for (const wk of plan.weeksData) {
+    if (wk.deload) continue;
+    const liftsSnatch = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch','hang_snatch','power_snatch','muscle_snatch'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
+    const liftsClean = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
+    const lvl = plan.level;
+    const lmS = getWL(lvl,'snatch');
+    const lmC = getWL(lvl,'cleanJerk');
+    if (lmS && liftsSnatch > lmS.mrv) warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} подъёмов > MRV ${lmS.mrv} — перебор.`);
+    if (lmC && liftsClean > lmC.mrv) warnings.push(`Нед ${wk.week}: толчок ${liftsClean} подъёмов > MRV ${lmC.mrv}.`);
+    if (lmS && liftsSnatch < lmS.mev) warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} < MEV ${lmS.mev} — недобор объёма.`);
   }
 
   plan.validation = { ok: errors.length === 0, warnings: [...new Set(warnings)], errors };

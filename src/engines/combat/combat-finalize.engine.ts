@@ -4,6 +4,7 @@
  */
 import type { CombatPlan } from './combat.types';
 import { isDayConflictWithOutside } from '../outside-load.engine';
+import { getCombat } from './combat-volume';
 
 export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   const warnings = [...(plan.validation?.warnings || [])];
@@ -22,10 +23,20 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
     }
   }
 
-  // Шея: не более 12 сетов/нед (травмоопасно)
+  // Шея/хват/ротация vs landmarks + кап
   for (const wk of plan.weeksData) {
+    if (wk.deload) continue;
     const neckSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
-    if (neckSets > 12) warnings.push(`Нед ${wk.week}: шея ${neckSets} сетов > 12 — снизьте (риск).`);
+    const gripSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((a, e) => a + e.sets, 0), 0);
+    const rotSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')).reduce((a, e) => a + e.sets, 0), 0);
+    const lmN = getCombat(plan.level,'neck');
+    const lmG = getCombat(plan.level,'grip');
+    const lmR = getCombat(plan.level,'rotational');
+    if (lmN && neckSets > lmN.mrv) warnings.push(`Нед ${wk.week}: шея ${neckSets} > MRV ${lmN.mrv} — снизьте.`);
+    if (lmN && neckSets < lmN.mev) warnings.push(`Нед ${wk.week}: шея ${neckSets} < MEV ${lmN.mev} — недобор.`);
+    if (lmG && gripSets > lmG.mrv) warnings.push(`Нед ${wk.week}: хват ${gripSets} > MRV ${lmG.mrv}.`);
+    if (lmR && rotSets > lmR.mrv) warnings.push(`Нед ${wk.week}: ротация ${rotSets} > MRV ${lmR.mrv}.`);
+    if (neckSets > 12) warnings.push(`Нед ${wk.week}: шея ${neckSets} сетов > 12 — риск.`);
   }
 
   // outside конфликт — уже в builder, дублируем проверку

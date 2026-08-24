@@ -5,8 +5,11 @@
  */
 import { computeOutsideMetrics, outsideVolumeMultiplier, type OutsideLoad } from '../outside-load.engine';
 import { getStrengthSportPattern, recommendStrengthSportPattern, type StrengthSportPattern } from './strength-sport-split-patterns';
-import { SS_TAG_MUSCLES, isPrimaryForTag } from './strength-sport-day-types';
+import { SS_TAG_MUSCLES } from './strength-sport-day-types';
 import { pmForWeek, rirForWeek, phaseForWeek } from './strength-sport-progression';
+import { filterByTier, filterByInjury, selectDiverse } from './strength-sport-selection';
+import { volumeMultForExercise } from './strength-sport-specialization';
+import { tempoForSS, restForSS } from './strength-sport-loading';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
 /** Пул упражнений по тегу — кандидаты (id каталога) + замены */
@@ -29,39 +32,26 @@ const STRONG_IDS = new Set(['log_press','yoke_walk','farmers_walk_heavy','atlas_
 
 function isOly(id: string): boolean { return OLY_IDS.has(id); }
 function isStrong(id: string): boolean { return STRONG_IDS.has(id); }
+function orderByMethod(exs: StrengthSportExercise[], method?: string): StrengthSportExercise[] {
+  if (method === 'pre_exhaust') return [...exs].sort((a,b) => (a.role==='accessory'?-1:1) - (b.role==='accessory'?-1:1));
+  if (method === 'post_exhaust') return [...exs].sort((a,b) => (a.role==='primary'?-1:1) - (b.role==='primary'?-1:1));
+  return exs; // compound_first default: already primary first due to chosen order
+}
 
 function clampWeeks(w: number): number { return Math.max(2, Math.min(16, Math.round(Number(w) || 8))); }
 function clampDays(d: number): number { return Math.max(2, Math.min(6, Math.round(Number(d) || 3))); }
 
 function filterPool(ids: string[], input: StrengthSportInput): string[] {
   let out = [...ids];
-  // excluded
   if (input.excludedExercises?.length) {
     const excl = new Set(input.excludedExercises.map(s => s.toLowerCase()));
     out = out.filter(id => !excl.has(id.toLowerCase()));
   }
-  // оборудование: если нет other/specialty — убираем стронг-спец
   const eq = (input.equipment || []).map(s => String(s).toLowerCase());
   const hasOther = eq.includes('other') || eq.includes('specialty') || eq.length === 0;
-  if (!hasOther) {
-    out = out.filter(id => !isStrong(id));
-  }
-  // allowExotic false — убираем сложные oly для новичков
-  if (!input.allowExotic && input.level === 'beginner') {
-    out = out.filter(id => !['snatch','clean_and_jerk','atlas_stone_load','yoke_walk'].includes(id));
-  }
-  // травмы: грубая фильтрация по группе (если есть legs травма — убираем squat/dead)
-  // injuries — массив объектов с location/type, сейчас просто пропуск
+  out = filterByTier(out, input.level, input.allowExotic, hasOther);
+  out = filterByInjury(out, input.injuries as any);
   return out;
-}
-
-function orderPoolByFavorite(ids: string[], input: StrengthSportInput): string[] {
-  const fav = new Set((input.favoriteExercises || []).map(s => s.toLowerCase()));
-  return [...ids].sort((a, b) => {
-    const fa = fav.has(a.toLowerCase()) ? 1 : 0;
-    const fb = fav.has(b.toLowerCase()) ? 1 : 0;
-    return fb - fa;
-  });
 }
 
 function repsFor(tag: string, phase: string, goal: string, isPrimary: boolean): [number, number] {
@@ -87,19 +77,21 @@ function pctFor(phase: string, goal: string): number {
   return 0.78;
 }
 
-function weightForExercise(id: string, input: StrengthSportInput, pct: number): number {
+function basePmFor(id: string, wm: StrengthSportInput['workMax']): number {
+  if (['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_pull','snatch_balance','overhead_squat_v2'].includes(id)) return wm.snatch || 60;
+  if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip'].includes(id)) return wm.cleanJerk || wm.clean || wm.frontSquat || 80;
+  if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip'].includes(id)) return wm.backSquat || wm.frontSquat || 100;
+  if (['deadlift','sumo_dl','axle_deadlift','rdl'].includes(id)) return wm.deadlift || 120;
+  if (['ohp','push_press','log_press','circus_db_press','bench_bar'].includes(id)) return wm.overheadPress || wm.bench || wm.logPress || 60;
+  return wm.backSquat || 80;
+}
+function weightForExercise(id: string, input: StrengthSportInput, pct: number, week: number): number {
   const wm = input.workMax || {};
-  let base = 0;
-  if (['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_pull','snatch_balance','overhead_squat_v2'].includes(id)) base = wm.snatch || wm.backSquat ? (wm.snatch || 60) : 60;
-  else if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip'].includes(id)) base = wm.cleanJerk || wm.clean || wm.frontSquat || 80;
-  else if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip'].includes(id)) base = wm.backSquat || wm.frontSquat || 100;
-  else if (['deadlift','sumo_dl','axle_deadlift','rdl'].includes(id)) base = wm.deadlift || 120;
-  else if (['ohp','push_press','log_press','circus_db_press','bench_bar'].includes(id)) base = wm.overheadPress || wm.bench || wm.logPress || 60;
-  else base = wm.backSquat || 80;
-  // outside / recovery корректировка уже в объёме, вес не режем сильно — только 5% при high outside
+  const base = basePmFor(id, wm);
+  const pm = pmForWeek(base, week, input);
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   const adj = outsideMult < 0.75 ? 0.95 : 1;
-  return Math.round(base * pct * adj / 2.5) * 2.5;
+  return Math.round((pm || base) * pct * adj / 2.5) * 2.5;
 }
 
 function buildWarmup(weight: number): StrengthSportSet[] {
@@ -111,28 +103,29 @@ function buildWarmup(weight: number): StrengthSportSet[] {
   return w;
 }
 
-function buildExerciseSets(id: string, tag: string, phase: string, input: StrengthSportInput, isPrimary: boolean): { sets: number; reps: [number, number]; rir: number; weight: number; workSets: StrengthSportSet[] } {
+function buildExerciseSets(id: string, tag: string, phase: string, input: StrengthSportInput, isPrimary: boolean, week: number): { sets: number; reps: [number, number]; rir: number; weight: number; workSets: StrengthSportSet[] } {
   const reps = repsFor(tag, phase, input.goal, isPrimary);
   const pct = pctFor(phase, input.goal);
-  const baseWeight = weightForExercise(id, input, pct);
-  // сеты: oly 5-6, сила 4-5, памп 3, делод 2-3
+  const baseWeight = weightForExercise(id, input, pct, week);
   let sets = 3;
   if (isOly(id)) sets = phase === 'peaking' ? 5 : phase === 'deload' ? 3 : 5;
   else if (tag === 'event_day') sets = phase === 'deload' ? 2 : 3;
   else sets = phase === 'peaking' ? 4 : phase === 'deload' ? 2 : isPrimary ? 4 : 3;
-  // outside high — минус 1 сет
+  if (input.focus) {
+    const f = volumeMultForExercise(id, input.focus);
+    sets = Math.max(2, Math.min(6, Math.round(sets * f)));
+  }
   const outM = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   if (outM < 0.75 && sets > 2) sets -= 1;
-  // PED / recovery: не меняем сеты здесь, только через бюджет
-  const rir = rirForWeek(1, input.weeks, input.goal); // базовый, далее phase корректирует
+  const rir = rirForWeek(week, input.weeks, input.goal);
   let finalRir = rir;
-  if (phase === 'peaking') finalRir = Math.max(0, rir - 1);
-  else if (phase === 'deload') finalRir = 4;
-  else if (phase === 'accumulation' && isPrimary) finalRir = goalRir(input.goal);
+  if (phase === 'deload') finalRir = 4;
+  const tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
+  const rest = restForSS(isPrimary ? 'тяж' : 'памп', isPrimary);
   const workSets: StrengthSportSet[] = [];
   for (let i = 0; i < sets; i++) {
     const rep = Math.round((reps[0] + reps[1]) / 2);
-    workSets.push({ reps: rep, rir: finalRir, weight: baseWeight, pct: Math.round(pct * 100), tempo: isOly(id) ? 'X-0-X-0' : '2-0-1-0', restSeconds: isPrimary ? 180 : 90 });
+    workSets.push({ reps: rep, rir: finalRir, weight: baseWeight, pct: Math.round(pct * 100), tempo, restSeconds: rest });
   }
   return { sets, reps, rir: finalRir, weight: baseWeight, workSets };
 }
@@ -264,26 +257,20 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
       const character = slot.character as any;
       const poolIds = POOL_BY_TAG[tag] || POOL_BY_TAG.strength_day;
       let pool = filterPool(poolIds, input);
-      pool = orderPoolByFavorite(pool, input);
-      // выбираем 4-5 упражнений: 2-3 primary + 1-2 accessory
       const primaryCount = tag === 'event_day' ? 3 : tag === 'technique_day' ? 3 : 2;
       const accessoryCount = tag === 'event_day' ? 1 : 2;
-      const chosen: string[] = [];
-      for (const id of pool) {
-        if (chosen.length >= primaryCount + accessoryCount) break;
-        if (!chosen.includes(id)) chosen.push(id);
-      }
-      // если пул мал — добиваем generic
-      while (chosen.length < primaryCount + accessoryCount && pool.length) {
-        const fallback = pool[chosen.length % pool.length];
-        if (!chosen.includes(fallback)) chosen.push(fallback); else break;
+      const total = primaryCount + accessoryCount;
+      const favSet = new Set((input.favoriteExercises || []).map(s => s.toLowerCase()));
+      const chosen = selectDiverse(pool, tag, total, favSet);
+      if (chosen.length < total) {
+        for (const id of pool) { if (chosen.length >= total) break; if (!chosen.includes(id)) chosen.push(id); }
       }
       const exercises: StrengthSportExercise[] = [];
       for (let idx = 0; idx < chosen.length; idx++) {
         const id = chosen[idx];
         const meta = getExerciseMeta(id) || { name: id, group: 'legs', pattern: 'unknown', equipment: 'barbell' };
         const isPrimary = idx < primaryCount;
-        const built = buildExerciseSets(id, tag, phase, input, isPrimary);
+        const built = buildExerciseSets(id, tag, phase, input, isPrimary, w);
         // deload — режем сеты и вес
         let finalSets = built.sets;
         let finalWeight = built.weight;
@@ -303,21 +290,22 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           weight: finalWeight,
           workSets,
           warmupSets: isPrimary ? buildWarmup(finalWeight) : [],
-          tempo: isOly(id) ? 'X-0-X-0' : '2-0-1-0',
-          restSeconds: isPrimary ? 180 : 90,
+          tempo: tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase),
+          restSeconds: restForSS(isPrimary ? 'тяж' : 'памп', isPrimary),
           comment: deload ? 'Делод — лёгкая неделя' : undefined,
           isCompetitionLift: isOly(id) || isStrong(id),
         };
         exercises.push(ex);
       }
+      const ordered = orderByMethod(exercises, input.methodology);
       const sess: StrengthSportSession = {
         day: d + 1,
         week: w,
         sessionTag: tag,
         character: deload ? 'лёг' : (character as any) || 'тяж',
         focus: SS_TAG_MUSCLES[tag]?.join(', '),
-        exercises,
-        durationMin: exercises.length * 12 + 10,
+        exercises: ordered,
+        durationMin: ordered.length * 12 + 10,
       };
       sessions.push(sess);
       absoluteDay++;
