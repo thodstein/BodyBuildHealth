@@ -21,6 +21,7 @@ interface AddFoodPanelProps {
   onCustomMealInputChange: (value: string) => void;
   onAddCustomMeal: () => void;
   onShowBarcode: () => void;
+  onCloseBarcode: () => void;
   showBarcode: boolean;
   onBarcodeProduct: (product: OFFProduct) => void;
   onOcrFile: (file: File) => void;
@@ -58,7 +59,7 @@ interface AddFoodPanelProps {
 
 export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
-  allMealTypes, onAddFoodFromDB, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, showBarcode, onBarcodeProduct, onOcrFile,
+  allMealTypes, onAddFoodFromDB, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, onCloseBarcode, showBarcode, onBarcodeProduct, onOcrFile,
   ocrFileLoading, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, onOcrClose,
   parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems, onEditParsedItem,
   onFixAllLowConfidence,
@@ -232,7 +233,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       </div>
 
       {showBarcode && (
-        <BarcodeScanner onProductFound={onBarcodeProduct} onClose={onShowBarcode} />
+        <BarcodeScanner onProductFound={onBarcodeProduct} onClose={onCloseBarcode} />
       )}
 
       {/* OCR Panel */}

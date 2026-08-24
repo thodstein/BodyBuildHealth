@@ -568,7 +568,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           usdaFoods={usdaFoods} mealType={mealType} onMealTypeChange={setMealType}
           allMealTypes={allMealTypes} onAddFoodFromDB={addFoodFromDB} onDirectAdd={handleDirectAdd}
           customMealInput={customMealInput} onCustomMealInputChange={setCustomMealInput} onAddCustomMeal={addCustomMeal}
-          onShowBarcode={() => setShowBarcode(true)} showBarcode={showBarcode} onBarcodeProduct={handleBarcodeProduct}
+           onShowBarcode={() => setShowBarcode(true)} onCloseBarcode={() => setShowBarcode(false)} showBarcode={showBarcode} onBarcodeProduct={handleBarcodeProduct}
           onOcrFile={handleOcrFileUpload} ocrFileLoading={ocrFileLoading}
           onShowOCR={() => setShowOCR(!showOCR)} showOCR={showOCR}
           ocrText={ocrText} onOcrTextChange={setOcrText} onOcrSubmit={handleOCR}
