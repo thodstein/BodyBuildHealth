@@ -346,39 +346,38 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     const rationales: string[] = [];
     let score = 50; // базовый
 
-    // 1. Покрытие слабой зоны (+0..+15)
+    // 1. Покрытие слабой зоны — программа-специфично
     const wz = weakZoneScore(ex, muscleGroup, weakZones || []);
     score += wz;
-    if (wz > 0) rationales.push(`Покрывает слабую зону +${wz}`);
+    if (wz > 0) rationales.push(`Закрывает слабую зону: ${muscleGroup}`);
 
-    // 2. Разнообразие углов (-5..+10)
-    // Нам нужны уже выбранные упражнения — берём из selectedIds
+    // 2. Разнообразие углов — программа-специфично
     const alreadySelected = _selIds.map(id => candidates.find(c => c.id === id)).filter(Boolean) as Exercise[];
     const ad = angleDiversityScore(ex, alreadySelected, muscleGroup);
     score += ad;
-    if (ad > 0) rationales.push(`Новый угол +${ad}`);
-    else if (ad < 0) rationales.push(`Дублирует угол ${ad}`);
+    if (ad > 0) rationales.push(`Новый угол для ${muscleGroup} — разнообразие паттерна`);
+    else if (ad < 0) rationales.push(`Дублирует угол для ${muscleGroup}`);
 
     // 3. Конфликт паттернов (-30..-10..0)
     const pc = patternConflictScore(ex, alreadySelected);
     score += pc;
-    if (pc < 0) rationales.push(`Конфликт паттерна ${pc}`);
+    if (pc < 0) rationales.push(`Дублирует паттерн — уже есть такой угол`);
 
-    // 4. Суставная безопасность (-20..+10)
+    // 4. Суставная безопасность — программа-специфично
     const js = jointSafetyScore(ex, injuryProfile || []);
     score += js;
-    if (js < 0) rationales.push(`Нагрузка на травму ${js}`);
-    else if (js > 0) rationales.push(`Безопасно для травм +${js}`);
+    if (js < 0) rationales.push(`Риск для травмы — требует замены`);
+    else if (js > 0) rationales.push(`Безопасно для травмы — щадящий вариант`);
 
-    // 5. Баланс тяни/толкай (-10..+5)
+    // 5. Баланс тяни/толкай — программа-специфично
     const pp = pushPullScore(ex, alreadySelected);
     score += pp;
-    if (pp !== 0) rationales.push(`push/pull ${pp > 0 ? '+' : ''}${pp}`);
+    if (pp !== 0) rationales.push(pp > 0 ? `Баланс тяни/толкай — выравнивает программу` : `Перекос тяни/толкай — уже много такого паттерна`);
 
-    // 5x. Любимые упражнения (+15)
+    // 5x. Любимые упражнения — программа-специфично
     if (_favIds.has(ex.id)) {
       score += 15;
-      rationales.push('Любимое +15');
+      rationales.push('Любимое упражнение — приоритет в программе');
     }
 
     // 6. Оборудование — программа-специфично
@@ -422,7 +421,7 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     // не принадлежат тренировке спины — только ногам. Штрафуем в пуле back.
     if (preferBB && muscleGroup === 'back' && isHingePattern(ex)) {
       score -= 10;
-      rationales.push('Бодибилдинг: hinge (бицепс бедра), не спина −10');
+      // rationales.push('Бодибилдинг: hinge (бицепс бедра), не спина −10'); // скрыто — внутренний скоринг, не для пользователя
     }
 
     // 5d. Безопасность — программа-специфично
