@@ -3488,6 +3488,7 @@ export const BbAutoConstructor: React.FC = () => {
            // Per-muscle частота и объём
            const freq = builtPlan.muscleFrequency || {};
            const vol = builtPlan.rotationMuscleVolume || {};
+           const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
            const actualVolume = builtPlan.weeklyVolume?.[wk.week] || {};
             const muscleEntries = Object.keys(freq).map(m => {
               const metric = metrics?.perMuscle.find(x => x.muscle === m);
