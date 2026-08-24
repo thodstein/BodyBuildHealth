@@ -596,7 +596,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
 
   return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       <ModernHero icon="📊" title="Отчёты" subtitle="Аналитика питания — от дня до месяца, с оценкой, КБЖУ, микронутриентами и архивом." stats={[{k:'Периодов',v:3,sub:'день/нед/мес',col:'#00e68a',bg:'rgba(0,230,138,0.08)'},{k:'Метрик',v:12,sub:'показателей',col:'#60a5fa',bg:'rgba(96,165,250,0.08)'},{k:'Архив',v: archiveReports.length,sub:'отчётов',col:'#a78bfa',bg:'rgba(167,139,250,0.08)'}]} />
-    {reportSubTab === 'full' && (<div style={{ padding:14, ...cardBg }}>
+    {reportSubTab === 'full' && (<div style={{ padding:14, ...modernCardBg }}>
       {tabButtons}
       <div style={labelSec}>📋 Полный отчёт о питании</div>
       {data.length === 0 ? (
@@ -894,7 +894,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       )}
     </div>)}
 
-    {reportSubTab === 'archive' && (<div style={{ padding:14, ...cardBg }}>
+    {reportSubTab === 'archive' && (<div style={{ padding:14, ...modernCardBg }}>
       {tabButtons}
       <div style={labelSec}>🗄 Архив отчётов</div>
       {archiveReports.length === 0 ? (
@@ -916,7 +916,7 @@ const ReportsTab: React.FC<{ foodEntries: DiaryEntry[]; profile?: any; targets?:
       {archiveReports.length > 0 && <button onClick={() => { setArchiveReports([]); localStorage.removeItem('he_nutrition_report_archive'); localStorage.removeItem('he_nutrition_report_current'); localStorage.removeItem('he_profile_nutrition_reports'); }} style={{ marginTop:6, padding:'4px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border:'1px solid rgba(239,68,68,0.2)', background:'rgba(239,68,68,0.06)', color:'#ef4444' }}>🗑 Очистить архив</button>}
     </div>)}
 
-    {reportSubTab === 'overview' && (<div style={{ padding:14, ...cardBg }}>
+    {reportSubTab === 'overview' && (<div style={{ padding:14, ...modernCardBg }}>
       {tabButtons}
       <div style={labelSec}>📊 Обзор питания</div>
       <div style={{ display:'flex', gap:4, marginBottom:8 }}>
@@ -1008,12 +1008,21 @@ const InfoTab: React.FC = () => {
     <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>ℹ️ Как работает приложение</div>
       <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-        {sections.map((s, i) => (
-          <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:3 }}>{s.title}</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>{s.body}</div>
-          </div>
-        ))}
+        {sections.map((s, i) => {
+          const icon = s.title.split(' ')[0];
+          const titleText = s.title.slice(icon.length+1);
+          const colors = ['#22c55e','#3b82f6','#f59e0b','#a78bfa','#f97316','#06b6d4','#ef4444','#8b5cf6'];
+          const col = colors[i % colors.length];
+          return (
+            <div key={i} style={{ padding:12, borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:10, alignItems:'flex-start' }}>
+              <span style={{ width:32, height:32, borderRadius:10, background: col+'18', border:`1px solid ${col}30`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>{icon}</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4 }}>{titleText}</div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.75)', lineHeight:1.5, whiteSpace:'pre-wrap' }}>{s.body}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   </div></div>);
@@ -1030,13 +1039,13 @@ const FavoritesTab: React.FC = () => {
   const groups: Record<string, typeof FOOD_DB> = {};
   favs.forEach(f => { const g = catLabels[f.category] || '📦 Прочее'; if (!groups[g]) groups[g] = []; groups[g].push(f); });
   const pill = (t: string, icon: string, label: string) => (
-    <button onClick={() => setFavTab(t as any)} style={{ padding:'5px 10px', borderRadius:16, fontSize:8, fontWeight: favTab === t ? 700 : 400, cursor:'pointer', border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: favTab === t ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023', color: favTab === t ? '#000' : 'rgba(255,255,255,0.8)' }}>{icon} {label}</button>
+    <button onClick={() => setFavTab(t as any)} style={{ padding:'6px 12px', borderRadius:999, fontSize:10, fontWeight: favTab === t ? 700 : 500, cursor:'pointer', border: favTab === t ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)', background: favTab === t ? 'linear-gradient(135deg,rgba(0,230,138,0.18),rgba(0,200,160,0.12))' : '#202023', color: favTab === t ? '#00e68a' : 'rgba(255,255,255,0.7)', boxShadow: favTab === t ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>{icon} {label}</button>
   );
   return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}><ModernHero icon="⭐" title="Избранное" subtitle="Твои сохранённые продукты и блюда — быстрый доступ к любимому." /><div style={{ display:'flex', flexDirection:'column', gap:8, paddingBottom:80 }}>
     <div style={{ display:'flex', gap:3, flexWrap:'wrap', padding:'4px 0' }}>
       {pill('products','⭐','Продукты')}{pill('recipes','🍳','Рецепты')}{pill('plans','📋','Планы')}{pill('stacks','🧩','Стеки')}
     </div>
-    {favTab === 'products' && <div style={{ padding:14, ...cardBg }}>
+    {favTab === 'products' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>⭐ Избранные продукты ({favs.length}/100)</div>
       {favs.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет избранных. Добавляйте из каталога ⭐.</div> : <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
         {Object.entries(groups).map(([cat, items]) => (
@@ -1057,7 +1066,7 @@ const FavoritesTab: React.FC = () => {
         ))}
       </div>}
     </div>}
-    {favTab === 'recipes' && <div style={{ padding:14, ...cardBg }}>
+    {favTab === 'recipes' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>🍳 Сохранённые рецепты ({myRecipes.length})</div>
       {myRecipes.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет рецептов. Создайте в 🍳 Рецепты.</div> : myRecipes.slice(0,50).map((r,i) => (
         <div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:3 }}>
@@ -1066,7 +1075,7 @@ const FavoritesTab: React.FC = () => {
         </div>
       ))}
     </div>}
-    {favTab === 'plans' && <div style={{ padding:14, ...cardBg }}>
+    {favTab === 'plans' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>📋 Сохранённые планы ({savedPlans.length})</div>
       {savedPlans.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет планов. Сохраните в 🥗 План.</div> : savedPlans.slice(0,30).map((p,i) => (
         <div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:3 }}>
@@ -1075,7 +1084,7 @@ const FavoritesTab: React.FC = () => {
         </div>
       ))}
     </div>}
-    {favTab === 'stacks' && <div style={{ padding:14, ...cardBg }}>
+    {favTab === 'stacks' && <div style={{ padding:14, ...modernCardBg }}>
       <div style={labelSec}>🧩 Сохранённые стеки ({savedStacks.length})</div>
       {savedStacks.length === 0 ? <div style={{ textAlign:'center', padding:16, color:'rgba(255,255,255,0.8)', fontSize:10 }}>Нет стеков. Сохраните в Бады → Готовые стеки.</div> : savedStacks.map((ids, i) => (
         <div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:3 }}>
@@ -1291,7 +1300,8 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {[
               { section: 'diary' as NutritionSection, tab: 'diary' as ActiveTab, icon: '📋', title: 'Дневник и аналитика', desc: 'Дневник, графики, отчёты', color: '#22c55e' },
-              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, справочник, инфо', color: '#f97316' },
+              { section: 'planning' as NutritionSection, tab: 'mealplan' as ActiveTab, icon: '🥗', title: 'Планирование питания', desc: 'План, каталог, справочник, инфо', color: '#f97316' },
+              { section: 'planning' as NutritionSection, tab: 'restaurant' as ActiveTab, icon: '🍽', title: 'Рестораны', desc: 'Фастфуд с КБЖУ — KFC, BK, Вкусно и точка', color: '#f59e0b' },
             ].map(card => (
               <button key={card.tab} onClick={() => { setPage('tabs'); setNutritionSection(card.section); setTab(card.tab); }} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'12px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',

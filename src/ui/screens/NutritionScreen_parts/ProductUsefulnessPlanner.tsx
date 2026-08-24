@@ -5,6 +5,7 @@ import { scoreAllProducts, compareProducts, calcMealScore, CATEGORY_LABELS, GOAL
 import type { MealProduct, SavedMeal, MealScore } from '../../../engines/product-usefulness.engine';
 import { scoreAllProductsV2, compareProductsV2, calcMealScoreV2, calcDIAAS, analyzeDailyDiet, getDefaultProfile, type UserDietProfile, type V2ScoreResult, type MealScoreV2 } from '../../../engines/product-usefulness-v2.engine';
 import { PopupBool, PopupNumber, PopupSelect } from '../../components/PopupXxx';
+import { ModernHero, ModernPill, modernCardBg } from './nutrition-modern-kit';
 import { analyzeNutrientGaps, NUTRIENT_CATEGORIES, findBestCombo, type NutrientGap, type NutrientGapResult, type NutrientCombo } from '../../../engines/nutrient-gap-filler.engine';
 import { readDiaryV2 } from './diary-storage-v2';
 
@@ -115,10 +116,10 @@ const normalizeMealScore = (result: MealScore | MealScoreV2, timingNote?: string
 };
 
 const PILL = (active: boolean, color = '#00e68a') => ({
-  padding: '5px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: active ? 700 : 400,
+  padding: '6px 12px', borderRadius: 999, cursor: 'pointer', fontSize: 10, fontWeight: active ? 700 : 500, whiteSpace:'nowrap' as const,
   background: active ? `${color}18` : '#202023',
-  border: active ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
-  color: active ? color : 'rgba(255,255,255,0.85)', transition: 'all 0.15s',
+  border: active ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.07)',
+  color: active ? color : 'rgba(255,255,255,0.75)', transition: 'all 0.15s', boxShadow: active ? `0 2px 8px ${color}20` : 'none',
 } as React.CSSProperties);
 
 const INPUT = (w = '80px') => ({
@@ -422,8 +423,14 @@ export const ProductUsefulnessPlanner: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: '0 2px' }}>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <ModernHero icon="🧮" title="Полезность продуктов" subtitle="Оценка FOOD_DB по трём модулям — нутриенты, контекст, цена. Сравни продукты, собери приём, найди слабые звенья." count={scored.length} stats={[
+        { k:'Продуктов', v: scored.length, sub:'в базе', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+        { k:'Ср. скор', v: scored.length>0 ? Math.round(scored.reduce((s,x)=>s+(useV2 ? (v2Scored.get(x.food.id)?.total||0) : x.score.total),0)/scored.length) : 0, sub:'из 100', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+        { k:'Категорий', v: Object.keys(CATEGORY_LABELS).length, sub:'групп', col:'#a78bfa', bg:'rgba(167,139,250,0.08)' },
+      ]} />
+      <div style={{ display: 'flex', gap: 4, marginBottom: 2, flexWrap:'wrap' as const }}>
+
         <button onClick={() => setPlannerTab('dashboard')} style={PILL(plannerTab === 'dashboard', '#00e68a')}>📊 Дашборд</button>
         <button onClick={() => setPlannerTab('settings')} style={PILL(plannerTab === 'settings', '#f59e0b')}>⚙️</button>
         <button onClick={() => setPlannerTab('catalog')} style={PILL(plannerTab === 'catalog', '#3b82f6')}>📦 {filtered.length > 0 && `(${filtered.length})`}</button>

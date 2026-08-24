@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FOOD_DB } from '../../../core/nutrition-database';
+import { ModernHero, ModernPill, ModernSearch, modernCardBg } from './nutrition-modern-kit';
 
 
 const NUTRITION_RULES = [
@@ -233,7 +234,16 @@ export const NutritionReference: React.FC = () => {
     : null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <ModernHero icon="📖" title="Справочник питания" subtitle="35 правил, 27 синергий, 15 категорий продуктов и оценки качества — всё для осознанного питания. Поиск по всему контенту." stats={[
+        { k:'Правил', v: 35, sub:'питания', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+        { k:'Синергий', v: 27, sub:'пар', col:'#a78bfa', bg:'rgba(167,139,250,0.08)' },
+        { k:'Категорий', v: 15, sub:'продуктов', col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
+      ]} />
+      <div style={{ ...modernCardBg, padding:12 }}>
+        <ModernSearch value={search} onChange={setSearch} placeholder="Поиск по правилам, синергиям, продуктам…" />
+      </div>
+
       {/* Search bar */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingBottom: 6, background: '#18181b' }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск по всему справочнику..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: '#202023', color: '#fff', fontSize: 13, outline: 'none', boxShadow: search ? '0 0 0 1px rgba(0,230,138,0.3)' : 'none' }} />
@@ -335,29 +345,32 @@ export const NutritionReference: React.FC = () => {
 
         </>
       )}
+    
     </div>
   );
 };
 
 const SectionCard: React.FC<{ title: string; isOpen: boolean; onToggle: () => void; color?: string; children: React.ReactNode }> = ({ title, isOpen, onToggle, color, children }) => (
-  <div style={{ padding: 10, borderRadius: 14, background: 'rgba(24,24,27,0.12)', border: '1px solid rgba(255,255,255,0.04)' }}>
-    <button onClick={onToggle} style={{ width: '100%', padding: '6px 0', cursor: 'pointer', background: 'none', border: 'none', color: color || '#fff', fontWeight: 700, fontSize: 13, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', fontSize: 12 }}>›</span>
+  <div style={{ ...modernCardBg, padding:12, border: isOpen ? `1px solid ${color || '#00e68a'}18` : '1px solid rgba(255,255,255,0.06)', background: isOpen ? `${color || '#00e68a'}06` : '#18181b' }}>
+    <button onClick={onToggle} style={{ width: '100%', padding: '8px 10px', cursor: 'pointer', background: isOpen ? `${color || '#00e68a'}10` : 'rgba(255,255,255,0.02)', border: '1px solid transparent', borderRadius:10, color: color || '#fff', fontWeight:700, fontSize:13, textAlign:'left', display:'flex', alignItems:'center', gap:8 }}>
+      <span style={{ width:22, height:22, borderRadius:8, background: isOpen ? (color || '#00e68a')+'18' : 'rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, transition:'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', color: isOpen ? (color || '#00e68a') : 'rgba(255,255,255,0.5)' }}>›</span>
       {title}
+      <span style={{ marginLeft:'auto', fontSize:9, padding:'2px 6px', borderRadius:999, background: isOpen ? (color || '#00e68a')+'14' : 'rgba(255,255,255,0.04)', color: isOpen ? (color || '#00e68a') : 'rgba(255,255,255,0.4)', border:`1px solid ${isOpen ? (color || '#00e68a')+'20' : 'rgba(255,255,255,0.06)'}` }}>{isOpen ? '▲' : '▼'}</span>
     </button>
-    {isOpen && <div style={{ marginTop: 6 }}>{children}</div>}
+    {isOpen && <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6 }}>{children}</div>}
   </div>
 );
 
 const RuleItem: React.FC<{ rule: typeof NUTRITION_RULES[number] }> = ({ rule }) => {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 3 }}>
-      <button onClick={() => setExpanded(!expanded)} style={{ width: '100%', padding: '8px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, background: expanded ? `${rule.color}10` : 'rgba(255,255,255,0.02)', border: 'none', color: '#fff', textAlign: 'left', fontSize: 12, fontWeight: 600 }}>
-        <span style={{ width: 18, height: 18, borderRadius: 4, background: rule.color + '20', color: rule.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 12, transition: 'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>›</span>
-        <span>{rule.title}</span>
+    <div style={{ borderRadius:12, overflow:'hidden', border: expanded ? `1px solid ${rule.color}20` : '1px solid rgba(255,255,255,0.06)', background: expanded ? `${rule.color}08` : '#202023', boxShadow: expanded ? `0 4px 12px ${rule.color}10` : 'none' }}>
+      <button onClick={() => setExpanded(!expanded)} style={{ width:'100%', padding:'10px 12px', cursor:'pointer', display:'flex', alignItems:'center', gap:8, background: expanded ? `${rule.color}12` : 'transparent', border:'none', color:'#fff', textAlign:'left', fontSize:12, fontWeight:600 }}>
+        <span style={{ width:24, height:24, borderRadius:8, background: expanded ? rule.color+'20' : 'rgba(255,255,255,0.06)', color: expanded ? rule.color : 'rgba(255,255,255,0.6)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:10, transition:'transform 0.2s', transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', border: `1px solid ${expanded ? rule.color+'30' : 'rgba(255,255,255,0.06)'}` }}>›</span>
+        <span style={{ flex:1 }}>{rule.title}</span>
+        <span style={{ fontSize:8, padding:'2px 6px', borderRadius:999, background: expanded ? rule.color+'14' : 'rgba(255,255,255,0.04)', color: expanded ? rule.color : 'rgba(255,255,255,0.4)', border:`1px solid ${expanded ? rule.color+'20' : 'rgba(255,255,255,0.06)'}` }}>{expanded ? 'Свернуть' : 'Подробнее'}</span>
       </button>
-      {expanded && <div style={{ padding: '8px 10px 8px 36px', fontSize: 12, color: '#fff', lineHeight: 1.6, borderTop: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.15)' }}>{rule.body}</div>}
+      {expanded && <div style={{ padding:'10px 12px 12px 44px', fontSize:11, color:'rgba(255,255,255,0.85)', lineHeight:1.6, borderTop:`1px solid ${rule.color}12`, background:'rgba(0,0,0,0.12)' }}>{rule.body}</div>}
     </div>
   );
 };
