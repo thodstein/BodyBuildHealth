@@ -858,9 +858,11 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
 }
 
 function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealItem {
-  const r = grams / 100;
+  // FIX: граммовки — всегда кратно 5г (человеческие порции), иначе 9/41/114
+  const cleanGrams = Math.max(5, Math.round(grams / 5) * 5);
+  const r = cleanGrams / 100;
   return {
-    id: food.id, name: food.name, amount: Math.round(grams), role,
+    id: food.id, name: food.name, amount: cleanGrams, role,
     kcal: Math.round((food.kcal || 0) * r),
     p: Math.round((food.protein || 0) * r),
     f: Math.round((food.fat || 0) * r),
