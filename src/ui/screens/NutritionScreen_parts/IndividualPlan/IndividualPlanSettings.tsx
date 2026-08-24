@@ -1358,11 +1358,6 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           <PopupSelect label="Ужин" value={dinnerTime} options={TIME_OPTIONS} onChange={setDinnerTime} />
           <PopupSelect label="Отход ко сну" value={bedTime} options={TIME_OPTIONS} onChange={setBedTime} />
           <div style={{ gridColumn: 'span 2' }}>
-            <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Еда на работе</label>
-            {pickerBtn('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setShowWorkFoodPicker)}
-            {pickerModal('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setWorkFood, showWorkFoodPicker, setShowWorkFoodPicker)}
-          </div>
-          <div style={{ gridColumn: 'span 2' }}>
             <button
               onClick={() => setMorningTrainLoad(!morningTrainLoad)}
               style={{ width:'100%', padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600, textAlign:'left', background: morningTrainLoad ? 'rgba(59,130,246,0.12)' : '#202023', border:`1px solid ${morningTrainLoad ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.1)'}`, color: morningTrainLoad ? '#60a5fa' : 'rgba(255,255,255,0.5)' }}
@@ -1393,8 +1388,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       </GlassCard>
       )}
 
-        {/* Work Schedule — MOVED FROM INSIDE Циклирование */}
-        {plannerMode === 'pro' && (
+        {/* Work Schedule — доступно во всех режимах (еда на работе нужна всем) */}
+        {true && (
         <GlassCard title="💼 Работа" icon="💼" color="#60a5fa">
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -1491,6 +1486,14 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               )}
             </div>
           )}
+          <div style={{ marginTop:8 }}>
+            <label style={{fontSize:9,color:'rgba(255,255,255,0.85)',marginBottom:3,display:'block'}}>Еда на работе</label>
+            {pickerBtn('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setShowWorkFoodPicker)}
+            {pickerModal('Еда на работе', [{value:'any',label:'Любая (можно разогреть)'},{value:'portable',label:'Только порошок/хлопья/протеин'}], workFood, setWorkFood, showWorkFoodPicker, setShowWorkFoodPicker)}
+            <div style={{fontSize:8,color:'rgba(255,255,255,0.6)',marginTop:3,lineHeight:1.35}}>
+              «Только порошок/хлопья/протеин» — в рабочие часы только портативная еда (протеин, хлопья, орехи, фрукты, хлеб, йогурт). Супы, каши, жареное — исключаются.
+            </div>
+          </div>
         </GlassCard>
       )}
 
