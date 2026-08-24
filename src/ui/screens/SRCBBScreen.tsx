@@ -123,7 +123,7 @@ export const SRCBBScreen: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = (props) =
 const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 'auto' }) => {
   const [mainTab, setMainTab] = useState<Mode>(track === 'bb' ? 'bb' : track === 'pl' ? 'pl' : 'manual');
   const subViewList: Record<Mode, { key: string; label: string }[]> = {
-    pl: [['settings', '1 ⚙️ Настройки'], ['season', '🧩 Сезон'], ['diagnostics', '2 🔧 Корректор движений'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
+    pl: [['settings', '1 ⚙️ Настройки'], ['diagnostics', '2 🔧 Корректор движений'], ['plan', '3 📋 План'], ['charts', '4 📊 Графики'], ['reference', '5 📚 Справка и отчёты'], ['competition', '🏁 Соревнования'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты']].map(([k, l]) => ({ key: k, label: l })),
     bb: [['plan', '📋 План сплита'], ['macro', '🗓 Годовой план'], ['tools', '🔧 Инструменты'], ['bridge', '🔗 Мост план→сессия'], ['peak_bb', '🏆 Шоу ББ'], ['methods', '🧠 Методики'], ['analytics', '📈 Аналитика'], ['prometrics', '🧮 PRO-метрики'], ['charts', '📊 Графики']].map(([k, l]) => ({ key: k, label: l })),
     manual: [],
   };
@@ -1489,21 +1489,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               })()}
             </div>
           </div>
-          <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); setSubView('plan'); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед)</button>
-          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>← 2 Слабые точки + 10 калькуляторов</button>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('season')}>🧩 Сезон →</button>
-          </div>
-        </div>
-      )}
-
-      {mainTab === 'pl' && subView === 'season' && (
-        <div style={{ minWidth: 0, maxWidth: '100%' }}>
-          {renderMacroEditBanner()}
-          <div style={H}>🧩 Сезон по микроциклам</div>
-          <div style={{ fontSize: 11, color: '#fff', marginBottom: 8, lineHeight: 1.5 }}>
-            Постройте сезон из периодов-микроциклов (выносливость 6–20 / сила 6–12 / скорость+координация 6–10 / пик 8–10 нед) — авто-подбор или ручной выбор каждого цикла из базы; задайте соревнования, чтобы между стартами циклы ужимались под окно и у каждого старта был пик/тапер.
-          </div>
+          {/* 🧩 Сезон — встроен в Настройки (выбор одиночный / сезон) */}
           <PLSeasonBuilder
             mode={plSeasonMode}
             onModeChange={setPlSeasonMode}
@@ -1527,7 +1513,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             </div>
           )}
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
-            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('settings')}>← 1 Настройки</button>
+            <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('diagnostics')}>2 Корректор →</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>3 План →</button>
           </div>
         </div>
@@ -1553,6 +1539,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               )}
               <PopupSelect label="Выбор цикла из каталога" value={selectedCycleId} onChange={setSelectedCycleId} hint="Полный каталог силовых циклов, блоков и встроенных программ. Нажмите, чтобы открыть." options={filteredPlCycles.map(c => ({ id: c.meta.id, label: c.meta.title, desc: `${directionLabelRu(c.meta.direction)} · ${periodLabelRu(c.meta.period)} · ${c.meta.level} · ${c.meta.weeks} нед` }))} />
               {(() => { const c = getCycleById(selectedCycleId); if (!c) return null; return <ExpandableCard title={c.meta.title} icon="📖" short={<><b>Кратко:</b> {c.meta.description}</>} full={<><div style={{ marginBottom: 8 }}><b>Как работает цикл:</b> {c.meta.howItWorks}</div>{c.meta.conditions.length > 0 && <div><b>Условия применения:</b><ul style={{ margin: '4px 0 0 16px', padding: 0 }}>{c.meta.conditions.map((cond, i) => <li key={i} style={{ marginBottom: 3 }}>{cond}</li>)}</ul></div>}</>} />; })()}
+              <button style={{ ...BTN, width: '100%', marginTop: 10, minHeight:44, fontSize:13 }} onClick={() => { try { buildSrc(); } catch (error) { setMethodNote(`Ошибка генерации плана: ${(error as Error).message}`); } }}>Сгенерировать план ({cycleWeeks} нед) — {getCycleById(selectedCycleId)?.meta.title || 'выберите цикл'}</button>
             </>
           )}
           {/* 🏁 Компактный статус соревнований + переход в мастерскую тапера (отдельная вкладка) */}
@@ -1606,8 +1593,8 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 </>
               ) : (
                 <>
-                  🧩 Сезон по микроциклам активен, но сезон ещё не собран — выберите циклы/периоды и нажмите «🧩 Собрать сезон» на вкладке «Сезон». Здесь будет итоговый план (включая пик/тапер под соревнования).
-                  <button style={{ ...BTN_GHOST, minHeight: 32, fontSize: 10, marginLeft: 6, border: '1px solid rgba(168,85,247,0.4)', color: '#c4b5fd' }} onClick={() => setSubView('season')}>→ 🧩 Сезон</button>
+                  🧩 Сезон по микроциклам активен, но сезон ещё не собран — выберите циклы/периоды и нажмите «🧩 Собрать сезон» в «1 Настройки» (карточка Сезон). Здесь будет итоговый план (включая пик/тапер под соревнования).
+                  <button style={{ ...BTN_GHOST, minHeight: 32, fontSize: 10, marginLeft: 6, border: '1px solid rgba(168,85,247,0.4)', color: '#c4b5fd' }} onClick={() => setSubView('settings')}>→ 1 Настройки</button>
                 </>
               )}
             </div>
