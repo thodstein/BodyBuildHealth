@@ -121,6 +121,33 @@ describe('E2E: полный цикл распознавания еды', () => {
     }
   });
 
+  it('production-shaped FatSecret OCR output becomes the expected diary queue', () => {
+    const raw = [
+      'Сегодня',
+      'Жиры Углев Белк РСК ккал',
+      '3®: Завтрак +',
+      'Калории',
+      'ВорОгорз Кокосовое Масло — 180',
+      'для Кулинарии ›',
+      '20 г',
+      '19,98 0,00 0,00 6%',
+      'Гарнец Рисовая Манка 525 ‹',
+      '150 г',
+      '0,75 117,00 10,50 17%',
+      'Стоинг Яичный Протеин 90',
+      'Ваниль ›',
+      'З0 г',
+      '0,09 0,51 21,00 3%',
+      'Общество Дневник Отчеты Premium',
+    ].join('\n');
+    const items = parseNutritionText(raw).flatMap(meal => meal.items);
+
+    expect(items).toHaveLength(3);
+    expect(items.map(item => item.foodId)).toEqual(['coconut_oil', 'cereal_semolina', 'supp_egg_white_powder']);
+    expect(items.map(item => item.qtyGrams)).toEqual([20, 150, 30]);
+    expect(items.every(item => (item.confidence || 0) >= 0.9)).toBe(true);
+  });
+
   // ================================================================
   // 1. Парсинг текста
   // ================================================================
