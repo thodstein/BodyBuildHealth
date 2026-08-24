@@ -547,12 +547,15 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
                }}
               title="Показать бюджет объёма по мышцам для этой недели"
              >{volWeekIdx === wi ? 'Скрыть объём' : 'Объём'}</button>
-             <button aria-label={`Копировать неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Создать копию недели">Копировать</button>
-             <button aria-label={`Заметка недели ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: noteWeekIdx === wi ? ACCENT : DIM_STRONG, borderColor: noteWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }} onClick={() => setNoteWeekIdx(noteWeekIdx === wi ? null : wi)} title="Заметка к неделе (для тренера, попадает в экспорт/PDF)">💬</button>
-             {wi < body.weeks.length - 1 && (
-               <button aria-label={`Переместить неделю ${w.week} ниже`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами со следующей неделей">Ниже</button>
-             )}
-             <button aria-label={`Удалить неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>Удалить</button>
+              <button aria-label={`Копировать неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Создать копию недели">Копировать</button>
+              <button aria-label={`Заметка недели ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: noteWeekIdx === wi ? ACCENT : DIM_STRONG, borderColor: noteWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }} onClick={() => setNoteWeekIdx(noteWeekIdx === wi ? null : wi)} title="Заметка к неделе (для тренера, попадает в экспорт/PDF)">💬</button>
+              {wi > 0 && (
+                <button aria-label={`Переместить неделю ${w.week} выше`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi - 1)} title="Поменять местами с предыдущей неделей">▲</button>
+              )}
+              {wi < body.weeks.length - 1 && (
+                <button aria-label={`Переместить неделю ${w.week} ниже`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => swapWeek(wi, wi + 1)} title="Поменять местами со следующей неделей">▼</button>
+              )}
+              <button aria-label={`Удалить неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>Удалить</button>
           </div>
           {noteWeekIdx === wi && (
             <div style={{ marginBottom: 8 }}>
@@ -678,6 +681,15 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
       },
     ]);
   };
+  const moveSession = (si: number, dir: -1 | 1) => {
+    const j = si + dir;
+    if (j < 0 || j >= sessions.length) return;
+    const arr = [...sessions];
+    const tmp = arr[si];
+    arr[si] = arr[j];
+    arr[j] = tmp;
+    onChange(arr);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: boardMode ? 'row' : 'column', gap: 6, overflowX: boardMode ? 'auto' : undefined, paddingBottom: boardMode ? 4 : undefined }}>
@@ -701,7 +713,9 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
                 <div className="editor-session-day" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name || 'Без названия'} · {s.blocks.length} упражн.</div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0, alignItems: 'center' }}>
+              <button aria-label={`Вверх тренировка ${si + 1}`} disabled={si === 0} onClick={() => moveSession(si, -1)} title="Вверх" style={{ ...BTN_GHOST, padding: '5px 7px', fontSize: 10, minHeight: 36, minWidth: 32, opacity: si === 0 ? 0.35 : 1 }}>▲</button>
+              <button aria-label={`Вниз тренировка ${si + 1}`} disabled={si === sessions.length - 1} onClick={() => moveSession(si, 1)} title="Вниз" style={{ ...BTN_GHOST, padding: '5px 7px', fontSize: 10, minHeight: 36, minWidth: 32, opacity: si === sessions.length - 1 ? 0.35 : 1 }}>▼</button>
               <button aria-label={`Заметка тренировки ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44, color: noteOpenIdx === si ? ACCENT : DIM_STRONG, borderColor: noteOpenIdx === si ? ACCENT_LINE : 'rgba(255,255,255,0.08)' }} onClick={() => setNoteOpenIdx(noteOpenIdx === si ? null : si)} title="Заметка к тренировке (для тренера, попадает в экспорт/PDF)">💬</button>
               <button aria-label={`Клонировать тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44 }} onClick={() => cloneSession(si)} title="Клонировать тренировку">⧉</button>
               <button aria-label={`Удалить тренировку ${si + 1}`} style={{ ...BTN_GHOST, padding: '5px 9px', fontSize: 12, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeSession(si)}>✕</button>
@@ -1138,6 +1152,10 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
               }
             }}
           >☰</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 2 }}>
+            <button onClick={() => moveBlock(bi, -1)} disabled={bi === 0} aria-label={`Переместить упражнение ${bi + 1} выше`} title="Вверх" style={{ ...BTN_GHOST, minWidth: 28, minHeight: 22, padding: '2px 4px', fontSize: 9, lineHeight: 1, opacity: bi === 0 ? 0.35 : 1, borderColor: 'rgba(255,255,255,0.12)' }}>▲</button>
+            <button onClick={() => moveBlock(bi, 1)} disabled={bi === blocks.length - 1} aria-label={`Переместить упражнение ${bi + 1} ниже`} title="Вниз" style={{ ...BTN_GHOST, minWidth: 28, minHeight: 22, padding: '2px 4px', fontSize: 9, lineHeight: 1, opacity: bi === blocks.length - 1 ? 0.35 : 1, borderColor: 'rgba(255,255,255,0.12)' }}>▼</button>
+          </div>
           <EditorPopupSelect
             value={b.type}
             options={[
