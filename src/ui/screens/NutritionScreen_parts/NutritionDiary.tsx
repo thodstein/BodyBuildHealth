@@ -265,9 +265,10 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         processUploadedFile(file),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), 45_000)),
       ]);
-      setOcrText(result.text);
-      setShowOCR(true);
-      if (result.meals.length > 0) setParsedItems(prev => [...prev, ...convertOCRItems(result.meals, usdaFoods)]); 
+      if (result.meals.length > 0) {
+        setParsedItems(prev => [...prev, ...convertOCRItems(result.meals, usdaFoods)]);
+        setOcrHint(`Распознано позиций: ${result.meals.reduce((total, meal) => total + meal.items.length, 0)}. Проверьте очередь перед сохранением.`);
+      }
       if (result.meals.length === 0 && result.labs.length === 0) setOcrError(result.warnings[0] || 'Не удалось распознать данные питания.'); 
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } 
     finally { setOcrFileLoading(false); } 
