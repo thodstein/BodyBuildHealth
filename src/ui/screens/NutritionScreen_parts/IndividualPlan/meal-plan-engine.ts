@@ -259,7 +259,14 @@ function isPortableFood(f: FoodItem): boolean {
     if (lid.includes('ice_cream') || lid.includes('cream_sauce')) return false;
     return true;              // йогурт/творог/кефир в упаковке
   }
-  if (f.category === 'protein') return true;            // после проверки NON_PORTABLE — любой белок портативен (консервы/вареное/нарезка)
+  if (f.category === 'protein') {
+    // Только холодные/готовые белки портативны: яйца (вареные), творог, йогурт, консервы (тунец), нарезка (ветчина/колбаса), протеин
+    // Говядина/стейк/курица/рыба — НЕ портативны (нужен разогрев, запах)
+    const portableProtein = ['egg', 'cottage_cheese', 'tuna_canned', 'ham', 'sausage', 'jerky', 'dried_meat', 'supp_'];
+    const nonPortableProtein = ['beef_steak', 'beef_lean', 'beef_minced', 'chicken_breast', 'chicken_thigh', 'turkey_breast', 'salmon', 'trout', 'cod', 'pollock', 'mackerel', 'pork', 'lamb', 'veal', 'duck', 'goose', 'rabbit'];
+    if (nonPortableProtein.some(k => lid.includes(k))) return false;
+    return portableProtein.some(k => lid.includes(k));
+  }
   if (f.category === 'grain' || f.category === 'carb') {
     // готовые к употреблению злаки (хлопья/мюсли/хлеб/рисовый крем/хлебцы) — портативны
     // buckwheat/barley (гречка/ячка — горячие) — НЕ портативны, требуют варки
@@ -892,8 +899,8 @@ function snapPortionG(food: FoodItem, grams: number): number {
 }
 
 function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealItem {
-  // FIX: граммовки — всегда кратно 5г (человеческие порции), иначе 9/41/114
-  const cleanGrams = Math.max(5, Math.round(grams / 5) * 5);
+  // FIX: snap к человеческой сетке (протеин 30/60/90, молоко 250/500, масло 5/10/15, каша 50/100/125/150/200/250)
+  const cleanGrams = snapPortionG(food, grams);
   const r = cleanGrams / 100;
   return {
     id: food.id, name: food.name, amount: cleanGrams, role,
@@ -2969,6 +2976,32 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
+
+  // ─── FINAL SNAP: все порции к человеческой сетке (протеин 30/60/90, молоко 250/500, масло 5/10/15, каша 50/100/125/150/200/250, мясо 100/150/200/250) ───
+  for (const m of meals) {
+    for (const it of m.items) {
+      const fd = FOOD_DB.find(f => f.id === it.id);
+      if (!fd) continue;
+      const snapped = snapPortionG(fd, it.amount);
+      if (snapped !== it.amount && it.amount > 0 && Math.abs(snapped - it.amount) >= 25) {
+        const factor = snapped / it.amount;
+        it.amount = snapped;
+        it.kcal = Math.round(it.kcal * factor);
+        it.p = Math.round(it.p * factor * 10) / 10;
+        it.f = Math.round(it.f * factor * 10) / 10;
+        it.c = Math.round(it.c * factor * 10) / 10;
+        it.fiber = Math.round((it.fiber || 0) * factor * 10) / 10;
+        it.leucine_mg = Math.round((it.leucine_mg || 0) * factor);
+      }
+    }
+    m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  }
+  totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+  totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
+  totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
+  totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
+  totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+  totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
 
   return {
     dayIndex: (input.dayOffset ?? 0),

@@ -34,6 +34,7 @@ export interface RecipeMatchOptions {
   targetCarbsG: number;
   targetFatG: number;
   excludedIds: Set<string>;
+  currentItemIds?: Set<string>;  // FIX: продукты уже в приёме — бонус за совпадение
   allergenTags?: Set<string>;
   cookProfile?: CookProfile;
   isVegetarian?: boolean;
@@ -280,6 +281,15 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
 
   // 7. Предпочтения пользователя
   if (opts.preferredRecipeNames?.has(recipe.name)) score += 15;
+
+  // 8. Бонус за совпадение с продуктами в приёме — рецепт из тех же продуктов
+  if (opts.currentItemIds && opts.currentItemIds.size > 0) {
+    let overlap = 0;
+    if (recipe.ingredientIds) {
+      for (const fid of recipe.ingredientIds) { if (opts.currentItemIds.has(fid)) overlap++; }
+    }
+    score += overlap * 8;  // +8 за каждый совпадающий продукт
+  }
 
   if (hardReject) score = Math.min(score, 35);  // жёсткий reject — не выше 35
   return Math.max(0, Math.min(100, Math.round(score)));

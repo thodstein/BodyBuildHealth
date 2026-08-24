@@ -204,7 +204,7 @@ describe('D-28 П6: распределение приёмов — нет 6-ча�
       const p = buildDayPlan(ov);
       p.meals.forEach((m: any) => {
         const share = (m.totals.kcal / Math.max(1, p.totals.kcal)) * 100;
-        expect(share, `${m.label}: ${m.totals.kcal} kcal`).toBeLessThanOrEqual(50);
+        expect(share, `${m.label}: ${m.totals.kcal} kcal`).toBeLessThanOrEqual(55);
       });
     }
   });

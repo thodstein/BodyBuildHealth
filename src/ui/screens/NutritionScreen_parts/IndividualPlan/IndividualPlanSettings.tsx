@@ -311,12 +311,12 @@ export const IndividualPlanSettings: React.FC = () => {
           ✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин
         </div>
         {errorMsg && <div style={{ fontSize: 9, color: '#ef4444', padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, marginBottom: 6 }}>⚠️ {errorMsg}</div>}
-        <button onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
+        <button onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
           width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
           fontSize: 12, fontWeight: 700,
           background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
           boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
-        }}>✨ Сгенерировать план питания</button>
+        }}>✨ Сгенерировать план питания →</button>
       </GlassCard>
       )}
 
@@ -2685,6 +2685,15 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           </div>
         </div>
       )}
+
+      {/* Кнопка генерации внизу настроек */}
+      <button onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
+        width: '100%', padding: '14px', borderRadius: 12, cursor: 'pointer',
+        fontSize: 13, fontWeight: 700,
+        background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
+        boxShadow: '0 4px 20px rgba(0,230,138,0.25)',
+        position: 'sticky', bottom: 8, zIndex: 10,
+      }}>✨ Сгенерировать план питания →</button>
 
     </>
   );
