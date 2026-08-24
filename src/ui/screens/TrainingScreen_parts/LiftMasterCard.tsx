@@ -42,6 +42,19 @@ const CARD: React.CSSProperties = {
   border: '1px solid rgba(255,255,255,0.08)', marginTop: 8,
 };
 const btn: React.CSSProperties = { padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 32 };
+// ── красивые сворачиваемые заголовки-карточки ──
+const collapsibleCard = (accent: string): React.CSSProperties => ({
+  ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${accent}`, borderRadius: 12,
+} as React.CSSProperties);
+const headerBtnStyle = (accent: string, isCollapsed: boolean): React.CSSProperties => ({
+  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  padding: '11px 12px', cursor: 'pointer', border: 'none', textAlign: 'left' as const,
+  background: isCollapsed
+    ? `linear-gradient(135deg, ${accent}14, rgba(255,255,255,0.02))`
+    : `linear-gradient(135deg, ${accent}22, ${accent}0F)`,
+  borderBottom: isCollapsed ? 'none' : `1px solid ${accent}22`,
+  transition: 'all 0.2s ease',
+} as React.CSSProperties);
 
 const CATEGORY_COLOR: Record<LimiterCategory, { color: string; bg: string }> = {
   speed_strength: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
@@ -220,6 +233,8 @@ export const LiftMasterCard: React.FC<{
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
   const [armSpanInput, setArmSpanInput] = useState('');
   const [shoulderInput, setShoulderInput] = useState('');
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggleCollapsed = (id: string) => setCollapsed(p => ({ ...p, [id]: !p[id] }));
   useEffect(()=>{
     try{
       const raw = JSON.parse(localStorage.getItem('he_profile_v2')||'null');
@@ -397,9 +412,20 @@ export const LiftMasterCard: React.FC<{
         {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
       </div>
       {/* антропометрия редактор */}
-      <div style={{ ...CARD, border:'1px solid rgba(167,139,250,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>📏 Антропометрия (для геометрии)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Размах рук и ширина плеч влияют на подсказки хвата/локтей. Сохраняется в профиль.</div>
+      <div style={collapsibleCard('#a78bfa')}>
+        <button onClick={()=> toggleCollapsed('secAnthro')} aria-expanded={!collapsed['secAnthro']} style={headerBtnStyle('#a78bfa', !!collapsed['secAnthro'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a78bfa,#8b5cf6)', boxShadow:'0 2px 8px rgba(167,139,250,0.35)', fontSize:13, flexShrink:0 }}>📏</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>Антропометрия</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Размах рук · ширина плеч · подсказки хвата/локтей</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['secAnthro'] ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.18)', border:`1px solid ${collapsed['secAnthro'] ? 'rgba(255,255,255,0.08)' : 'rgba(167,139,250,0.28)'}`, color: collapsed['secAnthro'] ? 'rgba(255,255,255,0.5)' : '#a78bfa', fontSize:10, transform: collapsed['secAnthro'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['secAnthro'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['secAnthro'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', display:'none' }}>📏 Антропометрия (для геометрии)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Размах рук и ширина плеч влияют на подсказки хвата/локтей. Сохраняется в профиль.</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <label style={{ fontSize:10, color:DIM }}>Размах рук (см): <input value={armSpanInput} onChange={e=>setArmSpanInput(e.target.value)} placeholder="180" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
           <label style={{ fontSize:10, color:DIM }}>Плечи (см): <input value={shoulderInput} onChange={e=>setShoulderInput(e.target.value)} placeholder="42" style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
@@ -417,12 +443,24 @@ export const LiftMasterCard: React.FC<{
             }catch{}
           }} style={{ ...btn, background:'rgba(167,139,250,0.15)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.3)' }}>💾 Сохранить</button>
         </div>
-      </div>
+      </div>}</div>
 
       {/* ── 1. Слабые мышцы + BB-грануляр ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#4ade80' }}>1 · Слабые мышцы · BB-грануляр (головки)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Ниже — 12 гранулярных BB-изолятов (верх/середина/низ груди, 3 головки дельт, 3 трицепса, 3 бицепса) — точечно по головкам.</div>
+      <div style={collapsibleCard('#4ade80')}>
+        <button onClick={()=> toggleCollapsed('sec1')} aria-expanded={!collapsed['sec1']} style={headerBtnStyle('#4ade80', !!collapsed['sec1'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#4ade80,#22c55e)', boxShadow:'0 2px 8px rgba(74,222,128,0.35)', fontSize:13, flexShrink:0 }}>💪</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#4ade80', display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>1 · Слабые мышцы · BB-грануляр {weakMuscleSubs.length>0 && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:20, background:'rgba(74,222,128,0.18)', border:'1px solid rgba(74,222,128,0.28)', color:'#4ade80' }}>{weakMuscleSubs.length} выбр.</span>}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1, lineHeight:1.2 }}>5 ассистентов из цикла + 12 BB-изолятов по головкам</span>
+            </span>
+          </span>
+          <span style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+            <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec1'] ? 'rgba(255,255,255,0.06)' : 'rgba(74,222,128,0.18)', border:`1px solid ${collapsed['sec1'] ? 'rgba(255,255,255,0.08)' : 'rgba(74,222,128,0.28)'}`, color: collapsed['sec1'] ? 'rgba(255,255,255,0.5)' : '#4ade80', fontSize:10, transition:'transform 0.2s', transform: collapsed['sec1'] ? 'rotate(-90deg)' : 'rotate(0deg)' }}>{collapsed['sec1'] ? '▶' : '▼'}</span>
+          </span>
+        </button>
+        {!collapsed['sec1'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Ниже — 12 гранулярных BB-изолятов (верх/середина/низ груди, 3 головки дельт, 3 трицепса, 3 бицепса) — точечно по головкам.</div>
         <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.15)' }}>
           <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:6 }}>💎 BB-грануляр — 12 изолятов по головкам</div>
           <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
@@ -480,11 +518,22 @@ export const LiftMasterCard: React.FC<{
             </div>
           );
         })}
-      </div>
+      </div>}</div>
 
       {/* ── 2. Слабые точки ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>2 · Слабые точки (фаза срыва)</div>
+      <div style={collapsibleCard('#a855f7')}>
+        <button onClick={()=> toggleCollapsed('sec2')} aria-expanded={!collapsed['sec2']} style={headerBtnStyle('#a855f7', !!collapsed['sec2'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a855f7,#7c3aed)', boxShadow:'0 2px 8px rgba(168,85,247,0.35)', fontSize:13, flexShrink:0 }}>🎯</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#c084fc', display:'flex', alignItems:'center', gap:6 }}>2 · Слабые точки {effectivePhase ? <span style={{ fontSize:9, padding:'1px 6px', borderRadius:20, background:'rgba(168,85,247,0.18)', border:'1px solid rgba(168,85,247,0.28)', color:'#c084fc' }}>{PHASE_RU[effectivePhase]||effectivePhase}</span> : null}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Фаза срыва · подсказка из дневника</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec2'] ? 'rgba(255,255,255,0.06)' : 'rgba(168,85,247,0.18)', border:`1px solid ${collapsed['sec2'] ? 'rgba(255,255,255,0.08)' : 'rgba(168,85,247,0.28)'}`, color: collapsed['sec2'] ? 'rgba(255,255,255,0.5)' : '#a855f7', fontSize:10, transform: collapsed['sec2'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec2'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec2'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:ACCENT, display:'none' }}>2 · Слабые точки (фаза срыва)</div>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
           {(WEAK_POINTS_BY_LIFT[lift]??[]).map(p=>{ const on=effectivePhase===p; return <button key={p} onClick={()=>setPhase(p as WeakPoint)} style={{ minHeight:34, padding:'5px 10px', borderRadius:8, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.16)':'transparent', color: on?'#c084fc':DIM, fontWeight:700, fontSize:10 }}>{PHASE_RU[p]||p}</button>; })}
         </div>
@@ -509,11 +558,22 @@ export const LiftMasterCard: React.FC<{
             )}
           </div>
         )}
-      </div>
+      </div>}</div>
 
       {/* ── 3. Мёртвые точки ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>3 · Мёртвые точки (углы) · {effectivePhase ? (PHASE_RU[effectivePhase]||effectivePhase) : ''}</div>
+      <div style={collapsibleCard('#60a5fa')}>
+        <button onClick={()=> toggleCollapsed('sec3')} aria-expanded={!collapsed['sec3']} style={headerBtnStyle('#60a5fa', !!collapsed['sec3'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#60a5fa,#3b82f6)', boxShadow:'0 2px 8px rgba(96,165,250,0.35)', fontSize:13, flexShrink:0 }}>🧱</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>3 · Мёртвые точки {effectivePhase ? `· ${PHASE_RU[effectivePhase]||effectivePhase}` : ''}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Углы суставов · биомеханика · коррекции</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec3'] ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.18)', border:`1px solid ${collapsed['sec3'] ? 'rgba(255,255,255,0.08)' : 'rgba(96,165,250,0.28)'}`, color: collapsed['sec3'] ? 'rgba(255,255,255,0.5)' : '#60a5fa', fontSize:10, transform: collapsed['sec3'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec3'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec3'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', display:'none' }}>3 · Мёртвые точки (углы) · {effectivePhase ? (PHASE_RU[effectivePhase]||effectivePhase) : ''}</div>
         {movement?.sticking ? (
           <div style={{ marginTop:6, padding:8, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', fontSize:10, color:DIM, lineHeight:1.5 }}>
             <div>📐 Угол: {movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}° · сустав: {movement.sticking.keyJoint}</div>
@@ -529,11 +589,22 @@ export const LiftMasterCard: React.FC<{
             {stickingAnalysis.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|sticking|${effectivePhase}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|sticking|${effectivePhase}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|sticking|${effectivePhase}`, [it.exercise.name])} />)}
           </div>
         )}
-      </div>
+      </div>}</div>
 
       {/* ── 4. Движение штанги ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#a855f7' }}>4 · Движение штанги (bar-path)</div>
+      <div style={collapsibleCard('#f59e0b')}>
+        <button onClick={()=> toggleCollapsed('sec4')} aria-expanded={!collapsed['sec4']} style={headerBtnStyle('#f59e0b', !!collapsed['sec4'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow:'0 2px 8px rgba(245,158,11,0.35)', fontSize:13, flexShrink:0 }}>📈</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#f59e0b' }}>4 · Движение штанги {issues.length>0 && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:20, background:'rgba(245,158,11,0.18)', border:'1px solid rgba(245,158,11,0.28)', color:'#f59e0b' }}>{issues.length} откл.</span>}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Bar-path · отклонения траектории</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec4'] ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.18)', border:`1px solid ${collapsed['sec4'] ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.28)'}`, color: collapsed['sec4'] ? 'rgba(255,255,255,0.5)' : '#f59e0b', fontSize:10, transform: collapsed['sec4'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec4'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec4'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a855f7', display:'none' }}>4 · Движение штанги (bar-path)</div>
         <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:8 }}>
           {barPathIssuesForLift(lift).map(iss=>{ const on=issues.includes(iss); return <button key={iss} onClick={()=>toggleIssue(iss)} style={{ minHeight:34, padding:'5px 8px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.14)':'transparent', color: on?'#c084fc':DIM, fontSize:10 }}>{ISSUE_RU[iss]}</button>; })}
         </div>
@@ -554,12 +625,23 @@ export const LiftMasterCard: React.FC<{
             </div>
           </div>
         ))}
-      </div>
+      </div>}</div>
 
       {/* ── 5. Геометрия техники — для выбранного движения ── */}
-      <div style={{ ...CARD, border:'1px solid rgba(56,189,248,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>5 · Геометрия техники — {geomRawOptions.length} парам. для {LIFT_RU[lift]}</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>{lift==='bench'?'Хват / локти / мост / ноги / кисть / траектория — частые лимитеры «на бумаге всё по плану, а жим не идёт»':'Геометрия постановки/хвата/трекинга/брейсинга для выбранного движения — то же, что для жима, но под его механику.'} Каждая — метод + протокол + упражнения.</div>
+      <div style={collapsibleCard('#38bdf8')}>
+        <button onClick={()=> toggleCollapsed('sec5')} aria-expanded={!collapsed['sec5']} style={headerBtnStyle('#38bdf8', !!collapsed['sec5'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#38bdf8,#0ea5e9)', boxShadow:'0 2px 8px rgba(56,189,248,0.35)', fontSize:13, flexShrink:0 }}>📐</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>5 · Геометрия техники — {geomRawOptions.length} парам. {selectedGeomCount>0 && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:20, background:'rgba(56,189,248,0.18)', border:'1px solid rgba(56,189,248,0.28)', color:'#38bdf8' }}>{selectedGeomCount} выбр.</span>}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>{LIFT_RU[lift]} · хват / локти / мост / ноги / кисть</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec5'] ? 'rgba(255,255,255,0.06)' : 'rgba(56,189,248,0.18)', border:`1px solid ${collapsed['sec5'] ? 'rgba(255,255,255,0.08)' : 'rgba(56,189,248,0.28)'}`, color: collapsed['sec5'] ? 'rgba(255,255,255,0.5)' : '#38bdf8', fontSize:10, transform: collapsed['sec5'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec5'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec5'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8', display:'none' }}>5 · Геометрия техники — {geomRawOptions.length} парам. для {LIFT_RU[lift]}</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>{lift==='bench'?'Хват / локти / мост / ноги / кисть / траектория — частые лимитеры «на бумаге всё по плану, а жим не идёт»':'Геометрия постановки/хвата/трекинга/брейсинга для выбранного движения — то же, что для жима, но под его механику.'} Каждая — метод + протокол + упражнения.</div>
         {geomRawOptions.map(opt=>{
           const k=geomKey(opt); const an=analyzeLimiterOption(opt); const col=CATEGORY_COLOR[opt.category];
           return (
@@ -579,12 +661,23 @@ export const LiftMasterCard: React.FC<{
             </div>
           );
         })}
-      </div>
+      </div>}</div>
 
       {/* ── 6. VBT ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#f472b6' }}>6 · VBT: скорость штанги (м/с)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Лучший vs последний повтор → потеря скорости → зона → вероятная фаза срыва (максимальный момент). План не меняется — диагностика.</div>
+      <div style={collapsibleCard('#f472b6')}>
+        <button onClick={()=> toggleCollapsed('sec6')} aria-expanded={!collapsed['sec6']} style={headerBtnStyle('#f472b6', !!collapsed['sec6'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#f472b6,#ec4899)', boxShadow:'0 2px 8px rgba(244,114,182,0.35)', fontSize:13, flexShrink:0 }}>⚡</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#f472b6' }}>6 · VBT — скорость штанги</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Потеря скорости · зона · фаза срыва</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec6'] ? 'rgba(255,255,255,0.06)' : 'rgba(244,114,182,0.18)', border:`1px solid ${collapsed['sec6'] ? 'rgba(255,255,255,0.08)' : 'rgba(244,114,182,0.28)'}`, color: collapsed['sec6'] ? 'rgba(255,255,255,0.5)' : '#f472b6', fontSize:10, transform: collapsed['sec6'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec6'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec6'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#f472b6', display:'none' }}>6 · VBT: скорость штанги (м/с)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Лучший vs последний повтор → потеря скорости → зона → вероятная фаза срыва (максимальный момент). План не меняется — диагностика.</div>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
           <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>setVbtBest(e.target.value)} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
           <label style={{ fontSize:10, color:DIM }}>Последний (м/с): <input type="number" step="0.01" min="0" value={vbtLast} onChange={e=>setVbtLast(e.target.value)} placeholder="0.40" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
@@ -612,37 +705,82 @@ export const LiftMasterCard: React.FC<{
             </div>
           );
         })()}
-      </div>
+      </div>}</div>
 
       {/* ── 6b. Видео + гид ── */}
-      <VideoCaptureCard lift={lift} onResult={r=>{
-        // автоподстановка в VBT поля для демо: скорость → best/last
-        if (r.barVelocity!=null) {
-          const v = r.barVelocity;
-          setVbtBest((v+0.15).toFixed(2));
-          setVbtLast(v.toFixed(2));
-        }
-      }} />
+      <div style={collapsibleCard('#0ea5e9')}>
+        <button onClick={()=> toggleCollapsed('secVideo')} aria-expanded={!collapsed['secVideo']} style={headerBtnStyle('#0ea5e9', !!collapsed['secVideo'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#0ea5e9,#0284c7)', boxShadow:'0 2px 8px rgba(14,165,233,0.35)', fontSize:13, flexShrink:0 }}>📹</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#0ea5e9' }}>Видео-анализ · BlazePose</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Запись → скорость штанги → углы → автоподстановка в VBT</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['secVideo'] ? 'rgba(255,255,255,0.06)' : 'rgba(14,165,233,0.18)', border:`1px solid ${collapsed['secVideo'] ? 'rgba(255,255,255,0.08)' : 'rgba(14,165,233,0.28)'}`, color: collapsed['secVideo'] ? 'rgba(255,255,255,0.5)' : '#0ea5e9', fontSize:10, transform: collapsed['secVideo'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['secVideo'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['secVideo'] && <div style={{ padding:12 }}>
+          <VideoCaptureCard lift={lift} onResult={r=>{
+            if (r.barVelocity!=null) {
+              const v = r.barVelocity;
+              setVbtBest((v+0.15).toFixed(2));
+              setVbtLast(v.toFixed(2));
+            }
+          }} />
+        </div>}</div>
 
       {/* ── 7. Дневник срывы ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24' }}>7 · Срывы (из дневника, RPE≥8)</div>
-        <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Авто-детект тяжёлых подходов (фаза по phaseForReps, ≥6 повт. = неопределена). «Слабые мышцы → планировщик» — одним кликом.</div>
+      <div style={collapsibleCard('#fbbf24')}>
+        <button onClick={()=> toggleCollapsed('sec7')} aria-expanded={!collapsed['sec7']} style={headerBtnStyle('#fbbf24', !!collapsed['sec7'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#fbbf24,#f59e0b)', boxShadow:'0 2px 8px rgba(251,191,36,0.35)', fontSize:13, flexShrink:0 }}>💥</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#fbbf24' }}>7 · Срывы — дневник RPE≥8</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Авто-детект тяжёлых подходов · подсказка слабых мышц</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec7'] ? 'rgba(255,255,255,0.06)' : 'rgba(251,191,36,0.18)', border:`1px solid ${collapsed['sec7'] ? 'rgba(255,255,255,0.08)' : 'rgba(251,191,36,0.28)'}`, color: collapsed['sec7'] ? 'rgba(255,255,255,0.5)' : '#fbbf24', fontSize:10, transform: collapsed['sec7'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec7'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec7'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', display:'none' }}>7 · Срывы (из дневника, RPE≥8)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Авто-детект тяжёлых подходов (фаза по phaseForReps, ≥6 повт. = неопределена). «Слабые мышцы → планировщик» — одним кликом.</div>
         <StickingPointAnalysisCard sessions={sessions} />
-      </div>
+      </div>}</div>
 
       {/* ── 8. RIR-калибровка ── */}
-      <div style={CARD}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>8 · RIR-калибровка (bias из дневника)</div>
-        <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Насколько вы пере-/недооцениваете RIR. «Применить калибровку к плану» — сдвиг RIR одним кликом.</div>
+      <div style={collapsibleCard('#60a5fa')}>
+        <button onClick={()=> toggleCollapsed('sec8')} aria-expanded={!collapsed['sec8']} style={headerBtnStyle('#60a5fa', !!collapsed['sec8'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#60a5fa,#3b82f6)', boxShadow:'0 2px 8px rgba(96,165,250,0.35)', fontSize:13, flexShrink:0 }}>🎚️</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>8 · RIR-калибровка</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>Bias из дневника · сдвиг RIR одним кликом</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec8'] ? 'rgba(255,255,255,0.06)' : 'rgba(96,165,250,0.18)', border:`1px solid ${collapsed['sec8'] ? 'rgba(255,255,255,0.08)' : 'rgba(96,165,250,0.28)'}`, color: collapsed['sec8'] ? 'rgba(255,255,255,0.5)' : '#60a5fa', fontSize:10, transform: collapsed['sec8'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec8'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec8'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', display:'none' }}>8 · RIR-калибровка (bias из дневника)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Насколько вы пере-/недооцениваете RIR. «Применить калибровку к плану» — сдвиг RIR одним кликом.</div>
         <RIRCalibrationCard />
-      </div>
+      </div>}</div>
 
       {/* ── 9. Коррекция мезоцикла ── */}
       {profile && (
-        <div style={CARD}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>9 · Коррекция мезоцикла (объём/RIR/делод)</div>
-          <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>По ACWR, монотонности, готовности и дневнику — рекомендованный объём, RIR и частота делода. «Применить» — в планировщик.</div>
+        <div style={collapsibleCard('#a78bfa')}>
+          <button onClick={()=> toggleCollapsed('sec9')} aria-expanded={!collapsed['sec9']} style={headerBtnStyle('#a78bfa', !!collapsed['sec9'])}>
+            <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+              <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a78bfa,#8b5cf6)', boxShadow:'0 2px 8px rgba(167,139,250,0.35)', fontSize:13, flexShrink:0 }}>🔄</span>
+              <span style={{ minWidth:0 }}>
+                <span style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>9 · Коррекция мезоцикла</span>
+                <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>ACWR · монотонность · готовность · объём/RIR/делод</span>
+              </span>
+            </span>
+            <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec9'] ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.18)', border:`1px solid ${collapsed['sec9'] ? 'rgba(255,255,255,0.08)' : 'rgba(167,139,250,0.28)'}`, color: collapsed['sec9'] ? 'rgba(255,255,255,0.5)' : '#a78bfa', fontSize:10, transform: collapsed['sec9'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec9'] ? '▶' : '▼'}</span>
+          </button>
+          {!collapsed['sec9'] && <div style={{ padding:12 }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', display:'none' }}>9 · Коррекция мезоцикла (объём/RIR/делод)</div>
+          <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>По ACWR, монотонности, готовности и дневнику — рекомендованный объём, RIR и частота делода. «Применить» — в планировщик.</div>
           <MesoCorrectionCard
             profile={profile}
             acwr={acwr ?? 1}
@@ -654,13 +792,24 @@ export const LiftMasterCard: React.FC<{
             currentVolume={currentVolume}
             currentRir={currentRir}
           />
-        </div>
+        </div>}</div>
       )}
 
       {/* ── 10. Остальные лимитирующие — ПОЛНЫЙ СПИСОК для выбранного движения ── */}
-      <div style={{ ...CARD, border:'1px solid rgba(167,139,250,0.18)' }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>10 · Остальные лимитирующие факторы — для {LIFT_RU[lift]} (все калькуляторы)</div>
-        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Кроме геометрии (блок 5) — ещё 10 категорий. Каждая — как в эксперт-режиме, но прямо здесь: выберите параметр → упражнения → дни. Один клик внизу добавит и геометрию, и эти.</div>
+      <div style={collapsibleCard('#a78bfa')}>
+        <button onClick={()=> toggleCollapsed('sec10')} aria-expanded={!collapsed['sec10']} style={headerBtnStyle('#a78bfa', !!collapsed['sec10'])}>
+          <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+            <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#a78bfa,#7c3aed)', boxShadow:'0 2px 8px rgba(167,139,250,0.35)', fontSize:13, flexShrink:0 }}>🧩</span>
+            <span style={{ minWidth:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>10 · Остальные лимитирующие — {LIFT_RU[lift]}</span>
+              <span style={{ fontSize:9, color:'#fff', opacity:0.72, display:'block', marginTop:1 }}>10 категорий · параметры · упражнения · дни</span>
+            </span>
+          </span>
+          <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: collapsed['sec10'] ? 'rgba(255,255,255,0.06)' : 'rgba(167,139,250,0.18)', border:`1px solid ${collapsed['sec10'] ? 'rgba(255,255,255,0.08)' : 'rgba(167,139,250,0.28)'}`, color: collapsed['sec10'] ? 'rgba(255,255,255,0.5)' : '#a78bfa', fontSize:10, transform: collapsed['sec10'] ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{collapsed['sec10'] ? '▶' : '▼'}</span>
+        </button>
+        {!collapsed['sec10'] && <div style={{ padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', display:'none' }}>10 · Остальные лимитирующие факторы — для {LIFT_RU[lift]} (все калькуляторы)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4 }}>Кроме геометрии (блок 5) — ещё 10 категорий. Каждая — как в эксперт-режиме, но прямо здесь: выберите параметр → упражнения → дни. Один клик внизу добавит и геометрию, и эти.</div>
         {LIMITER_CATEGORIES.filter(c=>c.id!=='technique_geometry').map(cat=>{
           const opts = limiterOptionsFor(cat.id, lift);
           if (opts.length===0) return null;
@@ -690,7 +839,7 @@ export const LiftMasterCard: React.FC<{
             </div>
           );
         })}
-      </div>
+      </div>}</div>
 
       {/* ── Footer ── */}
       <button onClick={applyAll} style={{ width:'100%', minHeight:44, marginTop:10, border:'none', borderRadius:9, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800 }}>

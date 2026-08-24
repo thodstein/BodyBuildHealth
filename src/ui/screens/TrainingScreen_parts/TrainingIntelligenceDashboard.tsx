@@ -1,7 +1,7 @@
 /** TrainingIntelligenceDashboard.tsx — визуальная сетка карточек инструментов.
  *  Категории с цветными заголовками, каждая карточка — иконка + название + описание.
  *  Без коллапсов и мелких текстов: всё видно сразу, читаемо на 320px+ */
-import React from 'react';
+import React, { useState } from 'react';
 import type { ManualResult } from './program-types';
 import type { WorkoutLog } from '../../../core/types';
 import type { TrainingTab } from './shared';
@@ -36,6 +36,8 @@ type Category = {
 };
 
 export default function TrainingIntelligenceDashboard(p: Props) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const toggle = (label: string) => setCollapsed(prev => ({ ...prev, [label]: !prev[label] }));
   const srpe = loadSRPESessions();
   const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
   const acwrLabel = acwr ? (acwr.ratio > 1.5 ? 'опасно' : acwr.ratio > 1.3 ? 'осторожно' : acwr.ratio < 0.8 ? 'недотрен' : 'оптимум') : '—';
@@ -96,29 +98,42 @@ export default function TrainingIntelligenceDashboard(p: Props) {
         </p>
       </div>
 
-      {/* Categories */}
-      {categories.map(cat => (
+      {/* Categories — каждый заголовок — красивая карточка-кнопка */}
+      {categories.map(cat => {
+        const isCollapsed = !!collapsed[cat.label];
+        return (
         <div key={cat.label} style={{
           borderRadius: 14, overflow: 'hidden',
-          background: 'rgba(24,24,27,0.2)', border: '1px solid rgba(255,255,255,0.04)',
+          background: 'rgba(24,24,27,0.22)', border: `1px solid ${isCollapsed ? 'rgba(255,255,255,0.04)' : cat.color + '22'}`,
+          borderLeft: `3px solid ${cat.color}`,
         }}>
-          {/* Category header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 10px 6px',
+          {/* Category header — карточка-кнопка */}
+          <button onClick={() => toggle(cat.label)} aria-expanded={!isCollapsed} style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            padding: '10px 12px', cursor: 'pointer', border: 'none', textAlign: 'left',
+            background: isCollapsed
+              ? `linear-gradient(135deg, ${cat.color}14, rgba(255,255,255,0.01))`
+              : `linear-gradient(135deg, ${cat.color}22, ${cat.color}0F)`,
+            borderBottom: isCollapsed ? 'none' : `1px solid ${cat.color}1E`,
+            transition: 'all 0.2s ease',
           }}>
-            <span style={{ fontSize: 13 }}>{cat.icon}</span>
-            <span style={{
-              fontSize: 10, fontWeight: 700, color: cat.color,
-              textTransform: 'uppercase', letterSpacing: 0.4, flex: 1,
-            }}>{cat.label}</span>
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>{cat.tools.length}</span>
-          </div>
+            <span style={{ display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+              <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:`linear-gradient(135deg, ${cat.color}, ${cat.color}CC)`, boxShadow:`0 2px 10px ${cat.color}35`, fontSize:14, flexShrink:0 }}>{cat.icon}</span>
+              <span style={{ minWidth:0 }}>
+                <span style={{ fontSize:11, fontWeight:800, color: cat.color, textTransform:'uppercase', letterSpacing:0.4, display:'block', lineHeight:1 }}>{cat.label}</span>
+                <span style={{ fontSize:9, color:'#fff', opacity:0.55, display:'block', marginTop:1 }}>{cat.tools.length} инструмент{cat.tools.length===1?'':'а'}</span>
+              </span>
+            </span>
+            <span style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
+              <span style={{ fontSize:9, padding:'2px 7px', borderRadius:20, background: isCollapsed ? 'rgba(255,255,255,0.06)' : cat.color + '18', border:`1px solid ${isCollapsed ? 'rgba(255,255,255,0.08)' : cat.color + '28'}`, color: isCollapsed ? 'rgba(255,255,255,0.45)' : cat.color, fontWeight:700 }}>{cat.tools.length}</span>
+              <span style={{ width:22, height:22, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', background: isCollapsed ? 'rgba(255,255,255,0.06)' : cat.color + '18', border:`1px solid ${isCollapsed ? 'rgba(255,255,255,0.08)' : cat.color + '28'}`, color: isCollapsed ? 'rgba(255,255,255,0.5)' : cat.color, fontSize:10, transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s' }}>{isCollapsed ? '▶' : '▼'}</span>
+            </span>
+          </button>
 
-          {/* Tool cards grid */}
-          <div style={{
+          {/* Tool cards grid — скрывается по клику на заголовок */}
+          {!isCollapsed && <div style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4,
-            padding: '0 6px 6px',
+            padding: '6px 6px 6px',
           }}>
             {cat.tools.map(t => (
               <button key={t.tab} onClick={() => p.onOpenTool(t.tab)} style={{
@@ -149,9 +164,9 @@ export default function TrainingIntelligenceDashboard(p: Props) {
                 </span>
               </button>
             ))}
-          </div>
+          </div>}
         </div>
-      ))}
+      )})}
 
       {/* Quick actions */}
       <div style={{
