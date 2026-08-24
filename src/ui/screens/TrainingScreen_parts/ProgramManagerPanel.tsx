@@ -837,16 +837,31 @@ export const ProgramManagerPanel: React.FC = () => {
         />
         {renderMstepNav()}
 
-        {/* Онбординг при первом запуске: как работает конструктор */}
+        {/* Онбординг — красивый тур 3 шага (ManualUI) */}
         {onboardingOpen && (
-          <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>👋 Как работает ручной конструктор</div>
-            <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.55 }}>
-              1. <b>Выбор</b> — создайте программу, склонируйте из библиотеки или подключите ПЛ-цикл.<br />
-              2. <b>Редактор</b> — заполните параметры, недели и упражнения (в PRO-режиме добавятся анализ и инструменты тренера).<br />
-              3. <b>Итог</b> — проверьте метрики и сохраните.
+          <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 16 }}>👋</span>
+              <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>Как работает ручной конструктор</span>
+              <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>3 шага · 1 минута</span>
             </div>
-            <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, alignSelf: 'flex-start' }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch { /* ignore */ } }}>Понятно, поехали →</button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+              {[
+                { n: '1', icon: '📚', title: 'Выбор', desc: 'Библиотека 29 + 66 циклов, фильтры, ⭐ рекомендовано, 1-клик' },
+                { n: '2', icon: '🛠️', title: 'Редактор', desc: 'Недели → дни → упражнения, доска, live качество, пикер с поиском' },
+                { n: '3', icon: '✅', title: 'Итог', desc: 'Score 0-100, проверка MRV, 📅 ICS / 📤 JSON / 🖨 PDF' },
+              ].map(s => (
+                <div key={s.n} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'center' }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 14, background: '#00e68a', color: '#06281c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12, margin: '0 auto' }}>{s.n}</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{s.icon} {s.title}</div>
+                  <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4 }}>{s.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800 }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch {} }}>Понятно, поехали →</button>
+              <span style={{ fontSize: 10, color: DIM }}>Подсказка: в PRO — анализ, тепловая карта и прогноз</span>
+            </div>
           </div>
         )}
 
@@ -943,16 +958,28 @@ export const ProgramManagerPanel: React.FC = () => {
       />
       {renderMstepNav()}
 
-      {/* Онбординг при первом запуске: как работает конструктор */}
+      {/* Онбординг — тур 3 шага (красивый) */}
       {onboardingOpen && (
-        <div className="constructor-surface constructor-surface--accent" style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>👋 Как работает ручной конструктор</div>
-          <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.55 }}>
-            1. <b>Выбор</b> — создайте программу, склонируйте из библиотеки или подключите ПЛ-цикл.<br />
-            2. <b>Редактор</b> — заполните параметры, недели и упражнения (в PRO-режиме добавятся анализ и инструменты тренера).<br />
-            3. <b>Итог</b> — проверьте метрики и сохраните.
+        <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(96,165,250,0.06))', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 16 }}>👋</span>
+            <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>Как работает ручной конструктор</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>3 шага · 1 минута</span>
           </div>
-          <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, alignSelf: 'flex-start' }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch { /* ignore */ } }}>Понятно, поехали →</button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+            {[
+              { n: '1', icon: '📚', title: 'Выбор', desc: 'Библиотека 29 + 66 циклов, ⭐ рекомендовано' },
+              { n: '2', icon: '🛠️', title: 'Редактор', desc: 'Недели → дни → упражнения, доска, live качество' },
+              { n: '3', icon: '✅', title: 'Итог', desc: 'Score 0-100, ICS / JSON / PDF' },
+            ].map(s => (
+              <div key={s.n} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'center' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 14, background: '#00e68a', color: '#06281c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 12, margin: '0 auto' }}>{s.n}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{s.icon} {s.title}</div>
+                <div style={{ fontSize: 10, color: DIM, lineHeight: 1.4 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+          <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, alignSelf: 'flex-start', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800 }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch {} }}>Понятно, поехали →</button>
         </div>
       )}
 

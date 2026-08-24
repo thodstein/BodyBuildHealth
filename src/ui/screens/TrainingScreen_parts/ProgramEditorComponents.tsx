@@ -40,6 +40,7 @@ import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { VolumeMiniBar, ScoreBadge, Badge, ProgressBar } from './ManualUI';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
+import { MesoHeatmap } from './MesoHeatmap';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
@@ -228,6 +229,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   const [howCollapsed, setHowCollapsed] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_how_collapsed') === '1'; } catch { return false; } });
   const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [boardMode, setBoardMode] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_board_mode') === '1'; } catch { return false; } });
+  const [showHeatmap, setShowHeatmap] = useState(false);
   const { confirm } = useConfirmDialog();
   React.useEffect(() => {
     setExpandedWeekIdx(current => body.weeks.length === 0 ? -1 : Math.min(Math.max(current, 0), body.weeks.length - 1));
@@ -389,6 +391,19 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               )}
             </div>
           );
+        } catch { return null; }
+      })()}
+      {body.weeks.length > 1 && (
+        <div style={{ ...CARD, padding: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>🗺 Тепловая карта объёма</span>
+          <span style={{ fontSize: 10, color: DIM }}>Live по неделям · MEV/MAV/MRV</span>
+          <button onClick={() => setShowHeatmap(v => !v)} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: showHeatmap ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.12)', color: showHeatmap ? '#00e68a' : DIM }}>{showHeatmap ? 'Скрыть' : 'Показать'}</button>
+        </div>
+      )}
+      {showHeatmap && body.weeks.length > 1 && (() => {
+        try {
+          const tmpProg = { meta: { id: 'tmp', title: 'tmp', author: '', goal: 'hypertrophy', level, daysPerWeek: body.weeks[0]?.sessions.length ?? 3, weeks: body.weeks.length, direction: 'bb' as const, createdAt: '', updatedAt: '', source: 'custom' as const }, bb: body } as any;
+          return <MesoHeatmap program={tmpProg} dir="bb" />;
         } catch { return null; }
       })()}
       {body.weeks.length > 1 && (
