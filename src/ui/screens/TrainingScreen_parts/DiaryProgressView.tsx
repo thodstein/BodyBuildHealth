@@ -6,6 +6,7 @@ import { migrateWeightLogLegacy } from '../../../engines/profile-store';
 import { loadMeasurements } from '../../../engines/log-analytics-progression.engine';
 import { Sparkline } from './Sparkline';
 import { ProgressChartsCard } from './diary-cards';
+import { diaryCard } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 
 export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
@@ -16,7 +17,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
   } = hub;
   return (
         <div>
-          <div className="card" style={{ marginBottom: 8, padding: 10 }}>
+          <div style={{ ...diaryCard,  marginBottom: 8, padding: 10 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
               <h4 style={{ margin: 0, fontSize: 12 }}>📏 Замеры тела</h4>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(0,230,138,0.1)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)' }}>
@@ -41,7 +42,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
           </div>
           {measurements.length > 0 && (
-            <div className="card" style={{ marginBottom: 8, padding: 10 }}>
+            <div style={{ ...diaryCard,  marginBottom: 8, padding: 10 }}>
               <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📊 История ({measurements.length})</h4>
               {measurements.slice(-5).reverse().map((m: any, i) => (
                 <div key={i} style={{ fontSize: 10, padding: '2px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
@@ -51,7 +52,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
           )}
           {measureAnalytics && (
-            <div className="card" style={{ padding: 10 }}>
+            <div style={{ ...diaryCard,  padding: 10 }}>
               <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📈 Аналитика тела</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 8px', fontSize: 10 }}>
                 <span>FFMI:</span><span style={{ fontWeight: 600 }}>{measureAnalytics.ffmi?.toFixed(1)}</span>
@@ -63,7 +64,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
           )}
           {/* Body composition trend sparklines */}
           {measurements.length >= 3 && (
-            <div className="card" style={{ padding: 10, marginBottom: 8 }}>
+            <div style={{ ...diaryCard,  padding: 10, marginBottom: 8 }}>
               <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📉 Тренды замеров</h4>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                 {[
@@ -94,7 +95,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
           )}
           {repData && (
-            <div className="card" style={{ padding: 10, marginTop: 8 }}>
+            <div style={{ ...diaryCard,  padding: 10, marginTop: 8 }}>
               <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>📋 Недельный отчёт</h4>
               <div style={{ fontSize: 10, color: '#fff' }}>{repData.insights?.slice(0, 3).map((r: any, i: number) => <div key={i}>• {r}</div>)}</div>
             </div>
@@ -119,7 +120,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             const prs = [...prMap.values()].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15);
             if (prs.length === 0) return null;
             return (
-              <div className="card" style={{ padding: 10, marginTop: 8 }}>
+              <div style={{ ...diaryCard,  padding: 10, marginTop: 8 }}>
                 <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🏆 Личные рекорды</h4>
                 {prs.map((pr, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
@@ -162,7 +163,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               .slice(0, 6);
             if (top.length === 0) return null;
             return (
-              <div className="card" style={{ padding: 10, marginTop: 8 }}>
+              <div style={{ ...diaryCard,  padding: 10, marginTop: 8 }}>
                 <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>📈 1ПМ по упражнениям</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
                   {top.map(ex => (
@@ -201,7 +202,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             }
             const dayLabels = ['Пн', '', 'Ср', '', 'Пт', '', 'Вс'];
             return (
-              <div className="card" style={{ padding: 10, marginTop: 8 }}>
+              <div style={{ ...diaryCard,  padding: 10, marginTop: 8 }}>
                 <h4 style={{ margin: '0 0 6px', fontSize: 12 }}>🏆 Календарь PR ({prDays.size} дней за {weeks} нед)</h4>
                 <div style={{ display: 'flex', gap: 2 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginRight: 2 }}>
@@ -250,7 +251,7 @@ export const DiaryProgressView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             });
             const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + 'Z';
             return (
-              <div className="card" style={{ padding: 10 }}>
+              <div style={{ ...diaryCard,  padding: 10 }}>
                 <h4 style={{ margin: '0 0 4px', fontSize: 12 }}>💪 Баланс сил</h4>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <svg width={110} height={110} viewBox="0 0 110 110">

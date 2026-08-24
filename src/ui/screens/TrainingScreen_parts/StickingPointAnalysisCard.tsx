@@ -9,9 +9,7 @@ interface LiftFailureData {
   lift: Lift;
   label: string;
   currentMax: number;
-  /** Лучший e1RM в предыдущем 28-дневном окне (тренд). 0 = нет данных. */
   priorMax: number;
-  /** Δ% (currentMax − priorMax) / priorMax × 100; null если priorMax = 0. */
   e1rmDeltaPct: number | null;
   totalFailedSets: number;
   failureRate: number;
@@ -21,6 +19,7 @@ interface LiftFailureData {
 }
 
 const TREND_WINDOW_DAYS = 28;
+const GLASS: React.CSSProperties = { background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:14 } as any;
 
 function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): LiftFailureData | null {
   const phaseCounts: Record<string, number> = {};
@@ -29,7 +28,6 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
   let currentMax = 0;
   let priorMax = 0;
   let hasLift = false;
-  // Окна по датам: текущее (0..28 дн) и предыдущее (28..56 дн) от последней сессии.
   const dated = sessions.filter(w => w && typeof w.date === 'string' && !Number.isNaN(Date.parse(w.date)));
   const maxDate = dated.length > 0 ? dated.reduce((m, w) => Math.max(m, Date.parse(w.date)), 0) : 0;
   const ageOf = (date: string): number => maxDate > 0 ? Math.max(0, Math.floor((maxDate - Date.parse(date)) / 86400000)) : 0;
@@ -43,20 +41,15 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
     (e.sets || []).forEach((s: any) => {
       const weight = s.weight || 0;
       const reps = s.reps || 0;
-      // RPE может отсутствовать в логе (поле опционально), но RIR всегда есть.
-      // Конвертируем RIR→RPE (RPE = 10 − RIR), чтобы тяжёлые подходы определялись корректно.
       const rpe = (s.rpe && s.rpe > 0) ? s.rpe : (s.rir != null ? 10 - s.rir : 0);
       const e1rm = epley1RM(weight, reps);
       if (Number.isFinite(e1rm)) {
         if (isPrior && e1rm > priorMax) priorMax = Math.round(e1rm);
         else if (!isPrior && e1rm > currentMax) currentMax = Math.round(e1rm);
       }
-      // Тяжёлый подход (RPE ≥ 8 / низкие повторы без RPE): кандидат в срыв.
       const isHard = (rpe >= 8 && weight > 0) || (rpe === 0 && reps > 0 && reps <= 2 && weight > 0);
       if (!isHard) return;
       totalHard += 1;
-      // Фаза срыва: сумо → sumo_start/sumo_lockout (эвристика); иначе каноническая
-      // phaseForReps (reps ≥ 6 → фаза не определяется, подход учитывается как тяжёлый).
       const phaseHint = isSumo
         ? (reps <= 2 ? 'sumo_start' : reps <= 5 ? 'sumo_lockout' : null)
         : phaseForReps(reps, lift);
@@ -65,7 +58,6 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
     });
   }));
   if (!hasLift) return null;
-  // Наиболее вероятная слабая фаза = модальная фаза по зафиксированным срывам
   const phases = WEAK_POINTS_BY_LIFT[lift] ?? [];
   let likelyPhase: WeakPoint | null;
   if (totalHard > 0 && Object.keys(phaseCounts).length > 0) {
@@ -131,6 +123,19 @@ const PHASE_LABELS: Record<string, string> = {
   biceps_top: 'Сгибание: пик (сокращение)',
 };
 
+const pill = (active:boolean): React.CSSProperties => ({
+  flex:1, padding:'6px 8px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:800,
+  border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+  background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
+  color: active ? '#000' : '#fff',
+});
+const liftPill = (active:boolean): React.CSSProperties => ({
+  padding:'5px 9px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight:700,
+  border: active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+  background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
+  color: active ? '#000' : '#fff',
+});
+
 const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {
   const [mode, setMode] = useState<'diary'|'manual'>('diary');
   const [manualLift, setManualLift] = useState<Lift>('bench');
@@ -150,25 +155,24 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
     if (mode!=='manual') return null;
     const reps = parseInt(manualReps)||0;
     const weight = parseFloat(manualWeight)||0;
-    const rir = parseInt(manualRir)||0;
     if (reps<=0 || weight<=0) return null;
     const phase = phaseForReps(reps, manualLift);
     const diagnosis = phase ? diagnoseLift(manualLift, phase) : null;
     const e1rm = epley1RM(weight, reps);
-    return { lift: manualLift, reps, weight, rir, phase, diagnosis, e1rm };
+    return { lift: manualLift, reps, weight, rir: parseInt(manualRir)||0, phase, diagnosis, e1rm };
   }, [mode, manualLift, manualWeight, manualReps, manualRir]);
 
-  if (mode==='diary' && !analysis.length) return (
-    <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
-      <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-        <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.05)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
-        <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border:'1px solid var(--accent)', background:'rgba(0,230,138,0.12)', color:'var(--accent)', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника ✓</button>
+  if ((mode as string)==='diary' && !analysis.length) return (
+    <div style={{ ...GLASS, padding:12 }}>
+      <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+        <button onClick={()=>setMode('manual')} style={pill((mode as string)==='manual')}>✍️ Вручную</button>
+        <button onClick={()=>setMode('diary')} style={pill((mode as string)==='diary')}>📓 Из дневника</button>
       </div>
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-        🔬 Анализ мёртвых точек (sticking points)
+      <div style={{ fontSize: 11, fontWeight: 800, color:'#fff', marginBottom:6 }}>
+        🔬 Анализ срывов (sticking points)
       </div>
-      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>
-        Нет данных по приседу, жиму лёжа, становой тяге и другим движениям. Чтобы рассчитать срывы, выполните эти упражнения через «▶ Проведение тренировки» — тяжёлые подходы (RPE≥8 по данным RIR) будут отмечены автоматически. Или переключитесь в «Вручную».
+      <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, opacity:0.92 }}>
+        Нет тяжёлых подходов (RPE≥8) по дневнику. Сделай 1–2 подхода в отказной зоне через «▶ Проведение тренировки» — здесь появится фаза срыва и коррекции. Или включи «Вручную» и введи вес/повторы.
       </div>
     </div>
   );
@@ -176,94 +180,97 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
   const active = analysis.find(a => a.lift === selectedLift) || analysis[0];
 
   return (
-    <div className="card" style={{ padding: '8px 10px', marginBottom: 8 }}>
-      <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-        <button onClick={()=>setMode('manual')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='manual'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='manual'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='manual'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>✍️ Вручную</button>
-        <button onClick={()=>setMode('diary')} style={{ flex:1, padding:'6px', borderRadius:6, border: mode==='diary'?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: mode==='diary'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.05)', color: mode==='diary'?'var(--accent)':'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>📓 Из дневника</button>
+    <div style={{ ...GLASS, padding:12 }}>
+      <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+        <button onClick={()=>setMode('manual')} style={pill(mode==='manual')}>✍️ Вручную</button>
+        <button onClick={()=>setMode('diary')} style={pill(mode==='diary')}>📓 Из дневника</button>
       </div>
       {mode==='manual' ? (
-        <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', marginBottom:8 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>✍️ Ручной ввод — без дневника</div>
-          <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:6 }}>
-            {(['bench','squat','deadlift','ohp','row'] as Lift[]).map(l=> <button key={l} onClick={()=>setManualLift(l)} style={{ padding:'4px 8px', borderRadius:6, border: manualLift===l?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.1)', background: manualLift===l?'rgba(0,230,138,0.12)':'transparent', color: manualLift===l?'var(--accent)':'#fff', fontSize:10 }}>{l}</button>)}
+        <div style={{ padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', marginBottom:10 }}>
+          <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:7 }}>✍️ Ручной ввод — фаза по повторам</div>
+          <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginBottom:8 }}>
+            {(['bench','squat','deadlift','ohp','row'] as Lift[]).map(l=> <button key={l} onClick={()=>setManualLift(l)} style={liftPill(manualLift===l)}>{l}</button>)}
           </div>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-            <label style={{fontSize:10,color:'#fff'}}>Вес <input value={manualWeight} onChange={e=>setManualWeight(e.target.value)} style={{width:60,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
-            <label style={{fontSize:10,color:'#fff'}}>Повт <input value={manualReps} onChange={e=>setManualReps(e.target.value)} style={{width:40,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
-            <label style={{fontSize:10,color:'#fff'}}>RIR <input value={manualRir} onChange={e=>setManualRir(e.target.value)} style={{width:32,marginLeft:4,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.15)',color:'#fff',borderRadius:6,padding:'4px 6px',fontSize:11}} /></label>
+            <label style={{fontSize:10,color:'#fff'}}>Вес <input value={manualWeight} onChange={e=>setManualWeight(e.target.value)} style={{width:60,marginLeft:4,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.07)',color:'#fff',borderRadius:8,padding:'5px 7px',fontSize:10}} /></label>
+            <label style={{fontSize:10,color:'#fff'}}>Повт <input value={manualReps} onChange={e=>setManualReps(e.target.value)} style={{width:40,marginLeft:4,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.07)',color:'#fff',borderRadius:8,padding:'5px 7px',fontSize:10}} /></label>
+            <label style={{fontSize:10,color:'#fff'}}>RIR <input value={manualRir} onChange={e=>setManualRir(e.target.value)} style={{width:32,marginLeft:4,background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.07)',color:'#fff',borderRadius:8,padding:'5px 7px',fontSize:10}} /></label>
           </div>
           {manualData && (
-            <div style={{ marginTop:6, padding:6, borderRadius:6, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.15)' }}>
-              <div style={{fontSize:10,fontWeight:700,color:'var(--accent)'}}>Фаза: {manualData.phase ? (PHASE_LABELS[manualData.phase]||manualData.phase) : 'неопределена (≥6 повт)'} · e1RM ~{Math.round(manualData.e1rm)}кг</div>
+            <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{fontSize:10,fontWeight:800,color:'#fff'}}>Фаза: {manualData.phase ? (PHASE_LABELS[manualData.phase]||manualData.phase) : 'неопределена (≥6 повт)'} · e1RM ~{Math.round(manualData.e1rm)}кг</div>
               {manualData.diagnosis && <>
-                <div style={{fontSize:10,color:'#fff',marginTop:2}}>{manualData.diagnosis.biomechanicalReason}</div>
-                <div style={{fontSize:10,marginTop:2}}><span style={{color:'#22c55e'}}>Коррекции:</span> {manualData.diagnosis.corrections.slice(0,3).join(' · ')}</div>
+                <div style={{fontSize:10,color:'#fff',marginTop:3, opacity:0.92}}>{manualData.diagnosis.biomechanicalReason}</div>
+                <div style={{fontSize:10,marginTop:4}}><span style={{color:'#fff', fontWeight:700}}>Коррекции:</span> <span style={{color:'#fff', opacity:0.9}}>{manualData.diagnosis.corrections.slice(0,3).join(' · ')}</span></div>
               </>}
             </div>
           )}
         </div>
       ) : null}
-      <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-        🔬 Анализ мёртвых точек (sticking points) — {mode==='manual'?'вручную':'из дневника'}
+      <div style={{ fontSize: 11, fontWeight: 800, color:'#fff', marginBottom:8 }}>
+        🔬 Срывы — {mode==='manual'?'вручную':'из дневника'}
       </div>
-      {mode==='diary' && <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+      {mode==='diary' && <div style={{ display: 'flex', gap: 5, marginBottom: 10, flexWrap: 'wrap' }}>
         {analysis.map(a => (
           <button key={a.lift} onClick={() => setSelectedLift(a.lift)} style={{
-            flex: 1, padding: '4px 6px', borderRadius: 6, border: a.lift === selectedLift ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)',
-            background: a.lift === selectedLift ? 'rgba(0,230,138,0.1)' : 'transparent',
-            color: a.lift === selectedLift ? 'var(--accent)' : '#fff', fontSize: 10, fontWeight: a.lift === selectedLift ? 600 : 400, cursor: 'pointer',
+            padding: '5px 9px', borderRadius:20, cursor:'pointer', fontSize:10, fontWeight: a.lift === selectedLift ? 800 : 700,
+            border: a.lift === selectedLift ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+            background: a.lift === selectedLift ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.04)',
+            color: a.lift === selectedLift ? '#000' : '#fff',
           }}>
-            {a.label} {a.failureRate > 0 && <span style={{ color: a.failureRate > 20 ? '#ef4444' : '#f59e0b' }}>({a.failureRate}% срывов)</span>}
+            {a.label} {a.failureRate > 0 && <span style={{ opacity:0.9 }}>({a.failureRate}%)</span>}
           </button>
         ))}
       </div>}
       {active && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 10 }}>
-            <span style={{ color: '#fff' }}>Текущий максимум:</span>
-            <span style={{ fontWeight: 600, color: '#00e68a' }}>{active.currentMax} кг</span>
-          </div>
-          {active.e1rmDeltaPct != null && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 10 }}>
-              <span style={{ color: '#fff' }}>e1RM-тренд (28 дн):</span>
-              <span style={{ fontWeight: 600, color: active.e1rmDeltaPct <= -5 ? '#ef4444' : active.e1rmDeltaPct <= 1 ? '#f59e0b' : '#22c55e' }}>
-                {active.e1rmDeltaPct > 0 ? '▲ +' : active.e1rmDeltaPct < 0 ? '▼ ' : '→ '}{active.e1rmDeltaPct}% ({active.priorMax} кг)
-              </span>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7, marginBottom:8 }}>
+            <div style={{ padding:'8px 9px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', textAlign:'center' }}>
+              <div style={{ fontSize:9, color:'#fff', opacity:0.7, fontWeight:700 }}>Текущий макс</div>
+              <div style={{ fontSize:14, fontWeight:900, color:'#fff', marginTop:2 }}>{active.currentMax} кг</div>
             </div>
-          )}
+            <div style={{ padding:'8px 9px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', textAlign:'center' }}>
+              <div style={{ fontSize:9, color:'#fff', opacity:0.7, fontWeight:700 }}>e1RM-тренд 28д</div>
+              {active.e1rmDeltaPct != null ? (
+                <div style={{ fontSize:12, fontWeight:900, color: active.e1rmDeltaPct <= -5 ? '#ef4444' : active.e1rmDeltaPct <= 1 ? '#f59e0b' : '#22c55e', marginTop:2 }}>
+                  {active.e1rmDeltaPct > 0 ? '▲ +' : active.e1rmDeltaPct < 0 ? '▼ ' : '→ '}{active.e1rmDeltaPct}% <span style={{ fontSize:9, color:'#fff', opacity:0.7 }}>({active.priorMax} кг)</span>
+                </div>
+              ) : <div style={{ fontSize:11, color:'#fff', opacity:0.6, marginTop:2 }}>—</div>}
+            </div>
+          </div>
           {active.totalFailedSets > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7, fontSize: 10, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(255,255,255,0.07)' }}>
               <span style={{ color: '#fff' }}>Тяжёлых подходов (RPE≥8):</span>
-              <span style={{ fontWeight: 600, color: '#ef4444' }}>{active.totalFailedSets} сетов ({active.failureRate}%)</span>
+              <span style={{ fontWeight: 800, color: '#fff' }}>{active.totalFailedSets} ({active.failureRate}%)</span>
             </div>
           )}
           {active.sumoHardSets > 0 && (
-            <div style={{ marginBottom: 6, padding: 4, borderRadius: 6, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.15)', fontSize: 10, color: '#60a5fa' }}>
-              🤸 Сумо-тяга: {active.sumoHardSets} тяжёлых подходов — проверьте фазы «Сумо: старт» и «Сумо: дожим».
+            <div style={{ marginBottom: 7, padding: 7, borderRadius: 8, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(255,255,255,0.07)', fontSize: 10, color: '#fff' }}>
+              🤸 Сумо-тяга: {active.sumoHardSets} тяжёлых подходов — сверь фазы «Сумо: старт» и «Сумо: дожим».
             </div>
           )}
           {active.likelyPhase && (
-            <div style={{ marginBottom: 6, padding: 6, borderRadius: 6, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: '#f59e0b', marginBottom: 2 }}>
+            <div style={{ marginBottom: 8, padding: 9, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
                 Вероятная слабая фаза: {PHASE_LABELS[active.likelyPhase] || active.likelyPhase}
               </div>
               {active.diagnosis && (
                 <>
-                  <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>
+                  <div style={{ fontSize: 10, color: '#fff', marginBottom: 4, lineHeight:1.45, opacity:0.92 }}>
                     {active.diagnosis.biomechanicalReason}
                   </div>
-                  <div style={{ fontSize: 10, color: '#fff', marginBottom: 2 }}>
+                  <div style={{ fontSize: 10, color: '#fff', marginBottom: 4, opacity:0.92 }}>
                     Слабые мышцы: {active.diagnosis.weakMuscles.join(', ')}
                   </div>
                   <div style={{ fontSize: 10 }}>
-                    <span style={{ color: '#22c55e' }}>Корректирующие упражнения:</span>
-                    <ul style={{ margin: '2px 0 0 14px', padding: 0 }}>
+                    <span style={{ color: '#fff', fontWeight:700 }}>Коррекции:</span>
+                    <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                       {active.diagnosis.corrections.slice(0, 4).map((c: string, i: number) => (
-                        <li key={i} style={{ color: '#fff', fontSize: 10, marginBottom: 1 }}>{c}</li>
+                        <li key={i} style={{ color: '#fff', fontSize: 10, marginBottom: 2, opacity:0.92 }}>{c}</li>
                       ))}
                     </ul>
                   </div>
-                  <div style={{ fontSize: 10, color: '#818cf8', marginTop: 2 }}>
+                  <div style={{ fontSize: 10, color: '#fff', marginTop: 6, opacity:0.9 }}>
                     🎯 {active.diagnosis.loadCues}
                   </div>
                 </>
@@ -271,18 +278,18 @@ const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessi
             </div>
           )}
           {active.totalFailedSets === 0 && (
-            <div style={{ fontSize: 10, color: '#22c55e', padding: '4px 6px', background: 'rgba(34,197,94,0.08)', borderRadius: 4 }}>
-              ✅ Срывов не обнаружено. Прогрессия стабильна.
+            <div style={{ fontSize: 10, color: '#fff', padding: '7px 9px', background: 'rgba(34,197,94,0.07)', borderRadius: 8, border:'1px solid rgba(255,255,255,0.07)' }}>
+              ✅ Срывов не обнаружено — прогрессия стабильна.
             </div>
           )}
         </div>
       )}
-{active && active.diagnosis && active.diagnosis.weakMuscles && active.diagnosis.weakMuscles.length > 0 && (() => { const mapM = (m: string) => { const l = m.toLowerCase(); if (/трицеп|бицеп|arm/.test(l)) return 'arms'; if (/дельт|плеч|shoulder/.test(l)) return 'shoulders'; if (/груд|chest|pec/.test(l)) return 'chest'; if (/спин|широк|трап|back|lat|разгибат/.test(l)) return 'back'; if (/квадр|ягод|икр|бедр|ног|привод|leg|quad|glute|calf|adductor/.test(l)) return 'legs'; if (/пресс|кор|core|ab/.test(l)) return 'core'; return null; }; const groups = Array.from(new Set(active.diagnosis.weakMuscles.map(mapM).filter(Boolean) as string[])); return (
-      <div style={{ marginTop: 6, padding: 8, borderRadius: 8, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-        <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>🔗 Слабые мышцы по срывам «{active.label}»: {active.diagnosis.weakMuscles.join(', ')} → приоритет групп планировщику.</div>
-        <button onClick={() => applyToPlanner({ kind: 'weakpoints', label: 'Срывы ' + active.label + ': ' + groups.join(', '), data: { groups, lift: active.lift } })} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 12, minHeight: 40 }}>🛠 Слабые мышцы → планировщик</button>
-      </div>
-    ); })()}
+      {active && active.diagnosis && active.diagnosis.weakMuscles && active.diagnosis.weakMuscles.length > 0 && (() => { const mapM = (m: string) => { const l = m.toLowerCase(); if (/трицеп|бицеп|arm/.test(l)) return 'arms'; if (/дельт|плеч|shoulder/.test(l)) return 'shoulders'; if (/груд|chest|pec/.test(l)) return 'chest'; if (/спин|широк|трап|back|lat|разгибат/.test(l)) return 'back'; if (/квадр|ягод|икр|бедр|ног|привод|leg|quad|glute|calf|adductor/.test(l)) return 'legs'; if (/пресс|кор|core|ab/.test(l)) return 'core'; return null; }; const groups = Array.from(new Set(active.diagnosis.weakMuscles.map(mapM).filter(Boolean) as string[])); return (
+        <div style={{ marginTop: 10, padding: 9, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 7, lineHeight:1.4, opacity:0.92 }}>Слабые мышцы по срывам «{active.label}»: {active.diagnosis.weakMuscles.join(', ')} → приоритет групп планировщику.</div>
+          <button onClick={() => applyToPlanner({ kind: 'weakpoints', label: 'Срывы ' + active.label + ': ' + groups.join(', '), data: { groups, lift: active.lift } })} style={{ width: '100%', padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 11, minHeight: 40 }}>🛠 Слабые мышцы → планировщик</button>
+        </div>
+      ); })()}
     </div>
   );
 };

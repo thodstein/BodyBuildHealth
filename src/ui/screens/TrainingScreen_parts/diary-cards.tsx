@@ -367,6 +367,26 @@ export const SectionHeader: React.FC<{ icon: string; title: string; hint?: strin
   </div>
 );
 
+/* ─── DiaryCollapsible — единый стеклянный блок с кнопкой-хидером hide/show (▶/▼) ─── */
+export const DiaryCollapsible: React.FC<{ icon?: string; title: string; hint?: string; defaultOpen?: boolean; children: React.ReactNode; badge?: React.ReactNode }> = ({ icon, title, hint, defaultOpen = true, children, badge }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ ...style.card, padding: 0, overflow: 'hidden' }}>
+      <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ fontSize: 10, color: '#fff', transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
+        {icon && <span style={{ fontSize: 13 }}>{icon}</span>}
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{title}</span>
+        {hint && <span style={{ fontSize: 9, color: '#fff', marginLeft: 6 }}>{hint}</span>}
+        <span style={{ flex: 1 }} />
+        {badge}
+        <span style={{ fontSize: 10, color: '#fff' }}>{open ? '▼' : '▶'}</span>
+      </button>
+      {open && <div style={{ padding: '0 12px 12px' }}>{children}</div>}
+    </div>
+  );
+};
+
 /* ─── DiaryEmptyState — единое пустое состояние ─── */
 
 export const DiaryEmptyState: React.FC<{

@@ -26,6 +26,7 @@ import {
   PHASE_LABELS, PHASE_HINTS, TAB_LABELS,
   type TrainingTab, type TrainingPage,
 } from './shared';
+import { diaryCard } from './diary-tokens';
 
 
 export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => void }> = ({ sessions, onRefresh }) => {
@@ -66,7 +67,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
 
   if (!analytics || sessions.length === 0) {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: 30 }}>
+      <div style={{ ...diaryCard,  textAlign: 'center', padding: 30 }}>
         <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
         <div style={{ fontSize: 13, color: '#fff', marginBottom: 8 }}>
           {sessions.length === 0
@@ -89,27 +90,27 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
     <div>
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
-        <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
+        <div style={{ ...diaryCard,  padding: '8px 10px', textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff' }}>Объём/нед</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#00e68a' }}>{volume.weeklyVolumeKg.toLocaleString()} кг</div>
           <div style={{ fontSize: 10, color: volume.volumeTrend >= 0 ? '#22c55e' : '#ef4444' }}>
             {volume.volumeTrend >= 0 ? '↑' : '↓'} {Math.abs(volume.volumeTrend)}% vs пред.
           </div>
         </div>
-        <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
+        <div style={{ ...diaryCard,  padding: '8px 10px', textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff' }}>Интенсивность</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#60a5fa' }}>{intensity.avgIntensity}%</div>
           <div style={{ fontSize: 10, color: '#fff' }}>
             RPE avg: {intensity.avgRPE}
           </div>
         </div>
-        <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
+        <div style={{ ...diaryCard,  padding: '8px 10px', textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff' }}>Усталость</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: fatigue.weeklyFatigue > 0.7 ? '#ef4444' : fatigue.weeklyFatigue > 0.4 ? '#f59e0b' : '#22c55e' }}>
             {Math.round(fatigue.weeklyFatigue * 100)}%
           </div>
         </div>
-        <div className="card" style={{ padding: '8px 10px', textAlign: 'center' }}>
+        <div style={{ ...diaryCard,  padding: '8px 10px', textAlign: 'center' }}>
           <div style={{ fontSize: 10, color: '#fff' }}>Готовность</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: recovery.readinessEstimate > 60 ? '#22c55e' : recovery.readinessEstimate > 40 ? '#f59e0b' : '#ef4444' }}>
             {recovery.readinessEstimate}%
@@ -118,7 +119,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
       </div>
 
       {/* Intensity distribution */}
-      <div className="card" style={{ marginBottom: 10, padding: '8px 10px' }}>
+      <div style={{ ...diaryCard,  marginBottom: 10, padding: '8px 10px' }}>
         <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Распределение нагрузки</div>
         <div style={{ display: 'flex', height: 10, borderRadius: 6, overflow: 'hidden', marginBottom: 4 }}>
           <div style={{ width: `${intensity.intensityDistribution.strength}%`, background: '#ef4444' }} title="" />
@@ -133,7 +134,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
       </div>
 
       {/* Volume by group */}
-      <div className="card" style={{ marginBottom: 10, padding: '8px 10px' }}>
+      <div style={{ ...diaryCard,  marginBottom: 10, padding: '8px 10px' }}>
         <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Объём по группам мышц</div>
         {Object.entries(volume.volumeByGroup)
           .sort(([, a], [, b]) => b - a)
@@ -154,7 +155,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
 
       {/* Strength estimates */}
       {Object.keys(strength.estimated1RM).length > 0 && (
-        <div className="card" style={{ marginBottom: 10, padding: '8px 10px' }}>
+        <div style={{ ...diaryCard,  marginBottom: 10, padding: '8px 10px' }}>
           <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>Расчётный 1RM</div>
           {Object.entries(strength.estimated1RM)
             .sort(([, a], [, b]) => b - a)
@@ -177,7 +178,7 @@ export const AnalyticsTab: React.FC<{ sessions: WorkoutLog[]; onRefresh?: () => 
       )}
 
       {/* Fatigue details */}
-      <div className="card" style={{ padding: '8px 10px' }}>
+      <div style={{ ...diaryCard,  padding: '8px 10px' }}>
         <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Метрики усталости</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 4, fontSize: 10 }}>
           <div>

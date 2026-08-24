@@ -34,6 +34,7 @@ import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { recommendPEDMethodology } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -2760,7 +2761,25 @@ export const BbAutoConstructor: React.FC = () => {
         courseIntensity={courseIntensity}
         onIntensity={setCourseIntensity}
       />
-      <PedAdaptationCard adaptation={pedAdapt} />          {/* Рекомендации по питанию */}
+      <PedAdaptationCard adaptation={pedAdapt} />
+      {peds.length > 0 && (() => {
+        try {
+          const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus });
+          return (
+            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.18)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>🧬 PED-методика (не ломает тяж/памп)</div>
+              {meth.jointGuard && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🛡 Joint guard: тяж остаётся тяж, но axial → машины/кабели (темп 4-2-1-0)</div>}
+              {meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>💉 GH+insulin pump window: только памп-дни — intra 30-60г +10г EAA</div>}
+              {meth.bfrAllowed && !meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🩸 BFR доступен (20-30% 1RM, 30-15-15-15)</div>}
+              {meth.periWorkout?.intraNote && <div style={{ fontSize:10, color:'#fbbf24', marginBottom:4 }}>🍚 {meth.periWorkout.intraNote}</div>}
+              {meth.periWorkout?.warning && <div style={{ fontSize:10, color:'#f87171', marginBottom:4 }}>⚠ {meth.periWorkout.warning}</div>}
+              <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>📋 Тяж: {meth.recommendedScheme.heavy} · Памп: {meth.recommendedScheme.pump} {proPreset !== 'none' ? `· Пресет ${proPreset}` : ''}</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:4 }}>🔄 Все сплиты адаптируются под фарму (выбор сохранён, объём ×{(pedAdapt.combinedMrvMultiplier||1).toFixed(2)})</div>
+            </div>
+          );
+        } catch { return null; }
+      })()}
+          {/* Рекомендации по питанию */}
           {(() => {
             const nut: Record<string, { cal: string; pro: string; tip: string }> = {
               mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
