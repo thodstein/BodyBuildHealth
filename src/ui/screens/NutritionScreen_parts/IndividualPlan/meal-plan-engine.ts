@@ -884,7 +884,7 @@ export function snapPortionG(food: FoodItem, grams: number): number {
   const isDairy = cat === 'dairy';
   let brackets: number[];
   if (isPorridge) brackets = [50, 100, 125, 150, 200, 250];
-  else if (isLiquid) brackets = [250, 500];
+  else if (isLiquid) brackets = [250, 500, 750, 1000];
   else if (isOil) brackets = [5, 10, 15, 30];
   else if (isAvocado) brackets = [50, 70, 100, 150];
   else if (isNutDry) brackets = [25, 50, 75, 100];
@@ -893,8 +893,9 @@ export function snapPortionG(food: FoodItem, grams: number): number {
   else if (isFruitVeg) brackets = [100, 150, 200, 250];
   else if (isDairy) brackets = [100, 150, 200, 250];
   else brackets = [50, 100, 150, 200];
-  if (grams < brackets[0] || grams > brackets[brackets.length - 1]) {
-    const step = brackets[0] === 50 ? 25 : brackets[0] === 5 ? 5 : brackets[0] === 25 ? 25 : 10;
+  if (grams < brackets[0]) return brackets[0];
+  if (grams > brackets[brackets.length - 1]) {
+    const step = brackets[0] === 50 ? 25 : brackets[0] === 5 ? 5 : brackets[0] === 25 ? 25 : brackets[0] === 30 ? 25 : 10;
     if (grams > brackets[brackets.length - 1] * 1.5) return Math.max(brackets[brackets.length - 1], Math.round(grams / step) * step);
     return Math.round(grams / step) * step;
   }
