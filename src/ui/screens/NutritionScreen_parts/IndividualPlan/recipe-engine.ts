@@ -40,6 +40,7 @@ export interface RecipeMatchOptions {
   isVegetarian?: boolean;
   maxPrepTimeMin?: number;     // лимит времени на готовку (из cookProfile.timePerDayMin / mealsCount)
   preferredRecipeNames?: Set<string>;
+  goal?: 'mass' | 'cut' | 'recomp' | 'maintenance' | 'bulk';
 }
 
 // ─── Декомпозиция рецепта в MealItem[] ─────────────────────────────────
@@ -289,6 +290,23 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
       for (const fid of recipe.ingredientIds) { if (opts.currentItemIds.has(fid)) overlap++; }
     }
     score += overlap * 8;  // +8 за каждый совпадающий продукт
+  }
+
+  // 9. Цель (масса/сушка/рекомп) — бонус за теги
+  if (opts.goal) {
+    const tagsLower = (recipe.tags || []).map(t => t.toLowerCase());
+    const has = (kw: string) => tagsLower.some(t => t.includes(kw));
+    if (opts.goal === 'mass' || opts.goal === 'bulk') {
+      if (has('масса') || has('масс') || has('гейнер') || has('набор') || has('bulk') || has('meal prep')) score += 8;
+      if (has('высокий белок') && recipe.protein >= 40) score += 5;
+    } else if (opts.goal === 'cut') {
+      if (has('сушка') || has('сушк') || has('шред') || has('рельеф') || has('низкий жир') || has('низкий уголь') || has('леан')) score += 8;
+      if (recipe.fat <= 12 && recipe.protein >= 35) score += 5;
+    } else if (opts.goal === 'recomp' || opts.goal === 'maintenance') {
+      if (has('рекомп') || has('поддержка') || has('пп') || has('здоровое') || has('сбалансир')) score += 6;
+    }
+    if (has('бодибилдинг')) score += 5;
+    if (has('пп')) score += 3;
   }
 
   if (hardReject) score = Math.min(score, 35);  // жёсткий reject — не выше 35
