@@ -31,7 +31,19 @@ export const CombatConstructor: React.FC = () => {
   const [injInput, setInjInput] = useState('');
   const [plan, setPlan] = useState<CombatPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualCB());
+  const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('he_srpe_sessions') || localStorage.getItem('he_training_log') || '[]';
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) {
+        const week = arr.slice(-7).reduce((a:any, s:any)=> a + (s.load || s.sRPE || s.rpe || 0), 0);
+        setDiaryLoad(week);
+      }
+    } catch {}
+  }, [plan]);
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
 
@@ -62,6 +74,29 @@ export const CombatConstructor: React.FC = () => {
     try { const hist = loadCombatPlans().slice(0,6); const ann = buildAnnualFromCB(hist); saveAnnualCB(ann); setAnnual(ann); } catch {}
     setMsg('План сохранён');
     setStep('plan');
+  };
+
+  const updateEx = (wkIdx: number, day: number, exId: string, patch: Partial<{ weight: number; reps: string }>) => {
+    setPlan(prev => {
+      if (!prev) return prev;
+      const copy: CombatPlan = JSON.parse(JSON.stringify(prev));
+      const wk = copy.weeksData[wkIdx];
+      if (!wk) return prev;
+      const sess = wk.sessions.find(s => s.day === day);
+      if (!sess) return prev;
+      const ex = sess.exercises.find(e => e.id === exId);
+      if (!ex) return prev;
+      if (patch.weight != null) { ex.weight = patch.weight; ex.workSets = ex.workSets.map(s=> ({...s, weight: patch.weight! })); }
+      if (patch.reps != null) { ex.reps = patch.reps; const [a,b]= patch.reps.split('-').map(n=> parseInt(n,10)); const avg = Math.round(((a||5)+(b||a||5))/2); ex.workSets = ex.workSets.map(s=> ({...s, reps: avg })); }
+      saveCombatPlan(copy);
+      return copy;
+    });
+  };
+  const exportToUserProgram = () => {
+    if (!plan) return;
+    const prog = { id: plan.id, name: `Единоборства ${plan.discipline} ${plan.weeks}нед`, weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, exercises: s.exercises.map(e=> ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir })) })) })), meta: { source: 'combat', discipline: plan.discipline } };
+    try { localStorage.setItem('he_last_combat_program', JSON.stringify(prog)); setMsg('Экспортировано в he_last_combat_program'); } catch {}
+    try { navigator.clipboard?.writeText(JSON.stringify(prog,null,2)); } catch {}
   };
 
   return (
@@ -189,6 +224,11 @@ export const CombatConstructor: React.FC = () => {
               })}
             </div>
           </div>
+          {diaryLoad != null && (
+            <div style={{ background: diaryLoad > 30 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)', padding: 6, borderRadius: 6, border: `1px solid ${diaryLoad > 30 ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.06)'}`, color: diaryLoad > 30 ? '#f59e0b' : '#fff', fontSize: 10 }}>
+              Дневник (изолированно): нагрузка 7д ≈ {diaryLoad}{diaryLoad > 30 ? ' — высоко, рассмотрите лёгкую неделю' : ' — норма'}
+            </div>
+          )}
           {plan.weeksData.map(wk => (
             <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -206,7 +246,11 @@ export const CombatConstructor: React.FC = () => {
                   </div>
                   {sess.exercises.map(ex => (
                     <div key={ex.id} style={{ color: '#fff', fontSize: 11, marginLeft: 6, marginTop: 4, padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 4 }}>
-                      <div>{ex.name} — {ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}кг` : ''} RIR{ex.rir} · {ex.tempo} · отдых {ex.restSeconds}с</div>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span>{ex.name} — {ex.sets}×{ex.reps}{ex.weight ? ` @ ${ex.weight}кг` : ''} RIR{ex.rir} · {ex.tempo} · отдых {ex.restSeconds}с</span>
+                        <input aria-label="вес" type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ width: 58, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
+                        <input aria-label="повторы" type="text" value={ex.reps} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ width: 54, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
+                      </div>
                       {ex.comment && <div style={{ fontSize: 10, opacity: 0.7, marginLeft: 4, borderLeft: '2px solid rgba(168,85,247,0.3)', paddingLeft: 6 }}>{ex.comment}</div>}
                       {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize: 10, opacity: 0.5 }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
                       <div style={{ fontSize: 10, opacity: 0.45 }}>Сеты: {ex.workSets.map(s=> `${s.reps}×${s.weight? s.weight+'кг' : '—'} RIR${s.rir}`).join(' | ')}</div>
@@ -227,6 +271,7 @@ export const CombatConstructor: React.FC = () => {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
             <button onClick={() => { const txt = buildCombatReport(plan); const w = window.open('', '_blank'); if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap">${txt.replace(/</g,'&lt;')}</pre>`); w.document.close(); w.print(); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Печать</button>
+            <button onClick={exportToUserProgram} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)', cursor: 'pointer' }}>Экспорт в программу</button>
           </div>
           {msg && <div style={{ color: '#a855f7', fontSize: 11 }}>{msg}</div>}
         </div>
