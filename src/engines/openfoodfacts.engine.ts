@@ -138,17 +138,36 @@ export async function saveToCache(product: OFFProduct): Promise<void> {
 
 function sanitizeBarcode(raw: string): string { return (raw || '').replace(/\D/g, '').trim(); }
 
+/** Return equivalent GTIN spellings used by different product databases. */
+function barcodeVariants(raw: string): string[] {
+  const bc = sanitizeBarcode(raw);
+  if (!bc) return [];
+  const variants = new Set([bc]);
+  // UPC-A is the 12-digit form of EAN-13 with a leading zero.
+  if (bc.length === 12) variants.add(`0${bc}`);
+  // Some scanners omit a leading zero from an EAN-13 value.
+  if (bc.length === 13 && bc.startsWith('0')) variants.add(bc.slice(1));
+  return [...variants];
+}
+
 async function fetchFromApi(apiUrl: string, barcode: string): Promise<OFFProduct | null> {
   const bc = sanitizeBarcode(barcode);
   if (!bc) return null;
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeout = controller ? setTimeout(() => controller.abort(), 9000) : undefined;
   try {
-    const res = await fetch(`${apiUrl}/product/${bc}.json`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
+    const res = await fetch(`${apiUrl}/product/${bc}.json`, {
+      signal: controller?.signal,
+      headers: { 'Accept': 'application/json' } as any,
+    });
     if (!res.ok) return null;
     const data = await res.json();
     if (data.status !== 1 || !data.product) return null;
     return normalizeProduct(data.product);
   } catch {
     return null;
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
   }
 }
 
@@ -159,19 +178,23 @@ export async function cacheCustomProduct(p: OFFProduct): Promise<void> {
 }
 
 export async function searchByBarcode(barcode: string): Promise<OFFProduct | null> {
-  const bc = sanitizeBarcode(barcode);
-  if (!bc) return null;
-  const cached = await getCached(bc);
-  if (cached) return cached;
+  const variants = barcodeVariants(barcode);
+  if (variants.length === 0) return null;
+
+  for (const variant of variants) {
+    const cached = await getCached(variant);
+    if (cached) return cached;
+  }
 
   // РФ-приоритет: 460-469 — российские штрихкоды → RU первым, иначе тот же порядок (RU уже первый)
-  const isRuBarcode = /^46\d{11}$/.test(bc) || /^46\d{7}$/.test(bc);
-  const apis = isRuBarcode ? [OFF_API_RU, OFF_API_WORLD, OFF_API_US] : [OFF_API_RU, OFF_API_WORLD, OFF_API_US];
-  for (const api of apis) {
-    const product = await fetchFromApi(api, bc);
-    if (product) {
-      await saveToCache(product);
-      return product;
+  const apis = [OFF_API_RU, OFF_API_WORLD, OFF_API_US];
+  for (const variant of variants) {
+    for (const api of apis) {
+      const product = await fetchFromApi(api, variant);
+      if (product) {
+        await saveToCache(product);
+        return product;
+      }
     }
   }
   return null;
