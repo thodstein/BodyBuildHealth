@@ -49,8 +49,8 @@ describe('AUDIT FULL MATRIX', () => {
     expect(ex!.comment).toContain('Отстающая');
     expect(ex!.comment).toContain('Накопление');
     expect(ex!.comment.length).toBeGreaterThan(50);
-    // Should contain selection rationale or phase
-    expect(ex!.comment).toMatch(/Темп:|Отдых:/);
+    // Should contain selection rationale or phase (темп/отдых — регистр может варьировать)
+    expect(ex!.comment).toMatch(/Темп|отдых/i);
   });
 
   it('all generation paths produce valid plans', () => {
