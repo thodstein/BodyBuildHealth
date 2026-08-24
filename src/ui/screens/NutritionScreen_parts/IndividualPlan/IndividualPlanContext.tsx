@@ -2979,7 +2979,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           if (!per100) return false;
           const rawAmount = Math.min(macro === 'f' ? 25 : 120, Math.max(macro === 'f' ? 5 : 20, Math.round(deficit / per100 * 100)));
           const suppCap = SUPP_CAPS[f.id];
-          const amount = suppCap ? Math.min(suppCap, rawAmount) : rawAmount;
+          const amount = suppCap ? Math.min(suppCap, rawAmount) : (f ? snapPortionG(f, rawAmount) : rawAmount);
           const r = amount / 100;
           targetMeal.items.push({ name: f.name, id: f.id, amount, kcal: Math.round((f.kcal || 0) * r), p: Math.round((f.protein || 0) * r), f: Math.round((f.fat || 0) * r), c: Math.round((f.carbs || 0) * r) });
           targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
@@ -2990,7 +2990,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const fb = FOOD_DB.find(f => f.id === fallbackId);
         if (!pickFood(fb)) return;
       };
-      for (let iter = 0; iter < 3; iter++) {
+      for (let iter = 0; iter < 6; iter++) {
         const devK = Math.abs(totals.kcal - tK) / tK; const devP = Math.abs(totals.p - tP_) / tP_;
         const devF = Math.abs(totals.f - tF_) / tF_; const devC = Math.abs(totals.c - tC_) / tC_;
         if (devK <= TOL && devP <= TOL && devF <= TOL && devC <= TOL) break;
@@ -2999,8 +2999,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const effScale = Math.min(1.3, Math.max(0.7, scales.reduce((s, v) => s + v, 0) / scales.length));
           meals.forEach((m: any) => {
             m.items.forEach((it: any) => {
+              const fd = FOOD_DB.find((f: any) => f.id === it.id);
               const suppCap = ({ creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 } as Record<string, number>)[it.id];
-              let newAmount = Math.round(it.amount * effScale);
+              let newAmount = fd ? snapPortionG(fd, Math.round(it.amount * effScale)) : Math.round(it.amount * effScale);
               if (suppCap) newAmount = Math.min(suppCap, newAmount);
               const ratio = newAmount / (it.amount || 1);
               it.amount = newAmount;
