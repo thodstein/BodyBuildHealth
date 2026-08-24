@@ -380,7 +380,7 @@ async function serverOcrScannedPdf(file: File): Promise<string> {
   return typeof payload.text === 'string' ? payload.text : '';
 }
 
-async function serverOcrImage(file: File): Promise<string> {
+async function serverOcrImage(file: File): Promise<{ text: string; meals?: ParsedMeal[] }> {
   const upload = await prepareImageForServer(file);
   if (upload.size > 10 * 1024 * 1024) {
     throw new Error('Фото слишком большое для мобильного OCR. Уменьшите изображение или сделайте скриншот экрана.');
@@ -422,7 +422,9 @@ async function serverOcrImage(file: File): Promise<string> {
         signal: controller.signal,
       });
       const payload = await response.json().catch(() => ({}));
-      if (response.ok && payload.ok && typeof payload.text === 'string') return payload.text;
+      if (response.ok && payload.ok && typeof payload.text === 'string') {
+        return { text: payload.text, meals: Array.isArray(payload.meals) ? payload.meals : undefined };
+      }
       errors.push(`${endpoint}: ${payload.error || `HTTP ${response.status}`}`);
     } catch (error: any) {
       errors.push(`${endpoint}: ${error?.name === 'AbortError' ? 'таймаут 35 секунд' : error?.message || String(error)}`);
@@ -525,8 +527,10 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   } else if (isImage) {
     source = 'image';
     try {
+      let serverResult: { text: string; meals?: ParsedMeal[] };
       try {
-        rawText = await serverOcrImage(file);
+        serverResult = await serverOcrImage(file);
+        rawText = serverResult.text;
         warnings.push('Фото обработано на сервере OCR.');
       } catch (serverError: any) {
         warnings.push(`Серверный OCR не завершился: ${serverError?.message || String(serverError)}`);
@@ -548,10 +552,13 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
 
         warnings.push(...parsedAll.warnings);
 
-        // Nutrition receives the original OCR layout. This supports
+        // Nutrition receives server-side meals when available. This keeps
+        // mobile parsing independent from a stale frontend bundle.
+        if (serverResult.meals?.length) meals = serverResult.meals;
+        // Nutrition receives the original OCR layout as a fallback. This supports
         // FatSecret/MyFitnessPal screenshots independently of lab recognition.
         try {
-          meals = parseNutritionText(rawText);
+          if (!meals.length) meals = parseNutritionText(rawText);
         } catch (nutritionError: any) {
           warnings.push(`Ошибка разбора питания: ${nutritionError?.message || String(nutritionError)}`);
           meals = [];
