@@ -79,9 +79,17 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
 
 export function buildCombatReport(plan: CombatPlan): string {
   const lines: string[] = [];
-  lines.push(`Единоборства: ${plan.discipline} · ${plan.goal} · ${plan.weeks} нед · ${plan.patternId}`);
-  lines.push(`Сеты/нед: ${plan.weeksData.map(w => `Н${w.week}:${w.totalSets}`).join(' ')}`);
-  if (plan.outsideMetrics) lines.push(`Вне зала: ${plan.outsideMetrics.weeklyLoad} load → ×${plan.outsideMetrics.volumeMultiplier} (${plan.outsideMetrics.interference})`);
-  if (plan.validation?.warnings.length) lines.push(`Предупреждения: ${plan.validation.warnings.join(' | ')}`);
+  lines.push(`Единоборства: ${plan.discipline} · ${plan.goal} · ${plan.level} · ${plan.weeks} нед · ${plan.patternId}`);
+  if (plan.inputSnapshot?.methodology || plan.inputSnapshot?.dupMode || plan.inputSnapshot?.intensityTech) lines.push(`Методика: ${plan.inputSnapshot.methodology || 'compound_first'} · DUP: ${plan.inputSnapshot.dupMode || 'off'} · Техника: ${plan.inputSnapshot.intensityTech || 'none'}`);
+  lines.push(`Сеты/нед: ${plan.weeksData.map(w => `Н${w.week}:${w.totalSets}${w.deload?' (делод)':''}`).join(' | ')}`);
+  for (const wk of plan.weeksData) {
+    const neck = wk.sessions.reduce((a,s)=> a + s.exercises.filter(e=> e.id.includes('neck')).reduce((x,e)=> x+e.sets,0),0);
+    const grip = wk.sessions.reduce((a,s)=> a + s.exercises.filter(e=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((x,e)=> x+e.sets,0),0);
+    lines.push(`Нед ${wk.week} ${wk.phase}: шея ${neck} сетов, хват ${grip}, ${wk.sessions.length} сессий`);
+  }
+  if (plan.outsideMetrics) lines.push(`Вне зала: ${plan.outsideMetrics.weeklyLoad} load → ×${plan.outsideMetrics.volumeMultiplier} (${plan.outsideMetrics.interference}) ${plan.outsideMetrics.rationale.join(' | ')}`);
+  lines.push(`Rationale: ${plan.rationale.slice(0,5).join(' | ')}`);
+  if (plan.validation?.warnings.length) lines.push(`Предупреждения (${plan.validation.warnings.length}): ${plan.validation.warnings.slice(0,5).join(' | ')}`);
+  if (plan.validation && !plan.validation.ok) lines.push(`Ошибки: ${plan.validation.errors.join(' | ')}`);
   return lines.join('\n');
 }

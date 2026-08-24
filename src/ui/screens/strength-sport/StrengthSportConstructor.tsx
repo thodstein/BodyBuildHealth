@@ -97,7 +97,7 @@ export const StrengthSportConstructor: React.FC = () => {
     setStep('plan');
   };
 
-  const updateEx = (wkIdx: number, day: number, exId: string, patch: Partial<{ weight: number; reps: string }>) => {
+  const updateEx = (wkIdx: number, day: number, exId: string, patch: Partial<{ weight: number; reps: string; rir: number }>) => {
     setPlan(prev => {
       if (!prev) return prev;
       const copy: StrengthSportPlan = JSON.parse(JSON.stringify(prev));
@@ -108,6 +108,7 @@ export const StrengthSportConstructor: React.FC = () => {
       const ex = sess.exercises.find(e => e.id === exId);
       if (!ex) return prev;
       if (patch.weight != null) {
+        if (patch.weight < 0 || patch.weight > 500) { setMsg('Вес вне диапазона 0-500'); return prev; }
         ex.weight = patch.weight;
         ex.workSets = ex.workSets.map(s => ({ ...s, weight: patch.weight! }));
       }
@@ -116,6 +117,11 @@ export const StrengthSportConstructor: React.FC = () => {
         const [a,b] = patch.reps.split('-').map(n=> parseInt(n,10));
         const avg = Math.round(((a||5)+(b||a||5))/2);
         ex.workSets = ex.workSets.map(s => ({ ...s, reps: avg }));
+      }
+      if (patch.rir != null) {
+        if (patch.rir < 0 || patch.rir > 5) { setMsg('RIR 0-5'); return prev; }
+        ex.rir = patch.rir;
+        ex.workSets = ex.workSets.map(s => ({ ...s, rir: patch.rir! }));
       }
       saveStrengthSportPlan(copy);
       return copy;
@@ -316,6 +322,7 @@ export const StrengthSportConstructor: React.FC = () => {
                         <span>{ex.name} — {ex.sets}×{ex.reps} @ {ex.weight}кг RIR{ex.rir} · {ex.tempo} · отдых {ex.restSeconds}с{ex.isCompetitionLift ? ' ★ соревн.' : ''}</span>
                         <input aria-label="вес" type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ width: 58, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                         <input aria-label="повторы" type="text" value={ex.reps} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ width: 54, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
+                        <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ width: 44, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                       </div>
                       {ex.comment && <div style={{ fontSize: 10, opacity: 0.7, marginLeft: 4, borderLeft: '2px solid rgba(0,230,138,0.3)', paddingLeft: 6 }}>{ex.comment}</div>}
                       {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize: 10, opacity: 0.5 }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
