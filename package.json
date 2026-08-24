@@ -8,9 +8,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "npm run sync-ocr-assets && tsc && vite build",
-    "vercel-build": "npm run sync-ocr-assets && vite build",
-    "type-check": "tsc --noEmit",
+    "build": "npm run sync-ocr-assets && node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
+    "vercel-build": "npm run sync-ocr-assets && node --max-old-space-size=4096 ./node_modules/vite/bin/vite.js build",
+    "type-check": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
