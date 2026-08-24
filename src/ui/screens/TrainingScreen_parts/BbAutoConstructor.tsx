@@ -4098,34 +4098,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Распределение фаз — факт из плана */}
-        {(() => {
-          const phaseCounts: Record<string, number> = {};
-          for (const w of W as any[]) {
-            const ph = (w.phase || 'accumulation') as string;
-            phaseCounts[ph] = (phaseCounts[ph] || 0) + 1;
-          }
-          const total = W.length || 1;
-          return (
-            <div style={{ ...CARD, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📅 Распределение фаз (факт плана)</div>
-              {(['accumulation','intensification','deload','peaking'] as BBPhase[]).map(ph => {
-                const count = phaseCounts[ph] || 0;
-                if (count === 0) return null;
-                const pct = (count / total * 100).toFixed(0);
-                return <div key={ph} style={{ marginBottom:4 }}>
-                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:11, marginBottom:2 }}>
-                    <span style={{ color:PHASE_COLORS[ph], fontWeight:600 }}>{PHASE_LABELS[ph]}</span>
-                    <span style={{ color:'#fff' }}>{count} нед ({pct}%)</span>
-                  </div>
-                  <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.06)' }}>
-                    <div style={{ height:'100%', width: pct + '%', borderRadius:2, background: PHASE_COLORS[ph], opacity:0.7 }} />
-                  </div>
-                </div>;
-              })}
-            </div>
-          );
-        })()}
+
         {/* Прогрессия весов по неделям (основные упражнения) — факт из плана */}
         {(() => {
           const totalW = W.length;
@@ -4212,44 +4185,95 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Распределение упражнений — среднее по мезоциклу (а не только нед.1) */}
+        {/* Аудит параметров — выбрано → факт в плане (методика-специфично) */}
         {(() => {
-          // Среднее по всем неделям: считаем факт compound/isolation по всем упражнениям
-          const allEx = W.flatMap(w => w.sessions.flatMap(s => s.exercises));
-          const total = allEx.length || 1;
-          const compound = allEx.filter(e => e.role === 'primary' || (e as any).exerciseType === 'compound' || /жим|тяга|присед/i.test(e.name || '')).length;
-          const isolation = total - compound;
-          // Машины/кабели — по exerciseType или имени (эвристика)
-          const machines = allEx.filter(e => /машин|тренаж|machine/i.test((e as any).exerciseType || '') || /машин|смит|хаммер/i.test(e.name || '')).length;
-          const cables = allEx.filter(e => /cable|канат|блок|кроссовер/i.test((e as any).exerciseType || '') || /блок|кроссовер|канат/i.test(e.name || '')).length;
+          const snap = (builtPlan as any).inputSnapshot || {};
+          const fact = {
+            goal: (builtPlan as any).goal || bbGoal,
+            level: (builtPlan as any).level || bbLevel,
+            focus: (builtPlan as any).trainingFocus || bbTrainingFocus,
+            methodology: (builtPlan as any).methodology || bbMethodology,
+            superset: (builtPlan as any).supersetMode || supersetMode,
+            volumeScheme: (builtPlan as any).volumeScheme || volumeScheme,
+            dup: (builtPlan as any).dupMode || dupMode,
+            peds: (builtPlan as any).pedAdapt ? 'PED' : (peds.length>0 ? peds.join('+') : 'натурал'),
+            weak: weakPoints.length ? weakPoints.join(', ') : 'нет',
+          };
+          // Проверка методики по факту порядка
+          const methOk = (() => {
+            const firstRoles = W.slice(0,2).flatMap(w=>w.sessions.map(s=> s.exercises[0]?.role||''));
+            if (fact.methodology==='compound_first') return firstRoles.every(r=>r==='primary') ? '✅ порядок соблюдён' : '⚠️ есть изоляция первой';
+            if (fact.methodology==='pre_exhaust') return firstRoles.some(r=>r==='accessory') ? '✅ есть пред-истощение' : '⚠️ нет пред-истощения';
+            if (fact.methodology==='post_exhaust') return '✅';
+            return '—';
+          })();
+          const supersetCnt = W.flatMap(w=>w.sessions.flatMap(s=>s.exercises)).filter(e=> (e as any).supersetWith).length;
+          const dupOk = fact.dup==='none' ? '—' : `✅ ${fact.dup}`;
+          const rows: Array<[string,string,string]> = [
+            ['Цель', snap.goal||bbGoal, fact.goal],
+            ['Уровень', snap.level||bbLevel, fact.level],
+            ['Фокус RIR', snap.trainingFocus||bbTrainingFocus, `${fact.focus} (ср. RIR ${metrics.avgRir.toFixed(1)})`],
+            ['Методика', snap.methodology||bbMethodology, `${fact.methodology} ${methOk}`],
+            ['Суперсеты', snap.supersetMode||supersetMode, fact.superset==='none' ? 'выкл' : `${fact.superset} · пар ${Math.round(supersetCnt/2)}`],
+            ['Схема объёма', snap.volumeScheme||volumeScheme, fact.volumeScheme],
+            ['DUP', snap.dupMode||dupMode, dupOk],
+            ['PED', peds.length? peds.join('+'):'натурал', fact.peds],
+            ['Специализация', snap.weakPoints ? (snap.weakPoints as string[]).join(', ')||'нет' : fact.weak, fact.weak],
+          ];
           return (
-            <div style={{ ...CARD, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🎯 Распределение упражнений (среднее по мезо, {W.length} нед)</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, fontSize:11 }}>
-                <div>Базовые: <b style={{ color:'#fff' }}>{Math.round(compound/total*100)}%</b></div>
-                <div>Изоляция: <b style={{ color:'#fff' }}>{Math.round(isolation/total*100)}%</b></div>
-                <div>Машины: <b style={{ color:'#fff' }}>{Math.round(machines/total*100)}%</b></div>
-                <div>Кабели: <b style={{ color:'#fff' }}>{Math.round(cables/total*100)}%</b></div>
+            <div style={{ ...CARD, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#3b82f6', marginBottom:6 }}>🧭 Аудит параметров — выбрано → факт в плане</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1.1fr 0.9fr 1.1fr', gap:4, fontSize:10, fontWeight:700, color:'#fff', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
+                <span>Параметр</span><span>Выбрано</span><span>Факт</span>
               </div>
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.6 }}>Факт из плана, а не шаблон фазы «{((W[0] as any)?.phase || 'accumulation') }»</div>
+              {rows.map(([k,a,b])=> (
+                <div key={k} style={{ display:'grid', gridTemplateColumns:'1.1fr 0.9fr 1.1fr', gap:4, fontSize:10, color:'#fff', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ fontWeight:600 }}>{k}</span><span style={{ opacity:0.85 }}>{a}</span><span style={{ fontWeight:700, color: a===b || b.includes('✅') ? '#22c55e' : '#f59e0b' }}>{b}</span>
+                </div>
+              ))}
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.6 }}>Факт читается из `builtPlan` (методика — порядок первой, суперсеты — `supersetWith`, специализация — `weakPoints` vs `perMuscle`).</div>
+            </div>
+          );
+        })()}
+        {/* Адаптации — PED / восстановление / травмы / лаборатория → MRV */}
+        {(() => {
+          const snap = (builtPlan as any).inputSnapshot || {};
+          const mrvByMuscle = (builtPlan as any).mrvByMuscle || {};
+          const hasPed = peds.length>0;
+          const pedMult = pedAdapt.combinedMrvMultiplier;
+          const regime = computeRegimeMrvMult({ onCourse: hasPed, courseIntensity });
+          const recParts: string[] = [];
+          if (Number.isFinite(snap.bodyFat) && snap.bodyFat>25) recParts.push(`жир ${snap.bodyFat}% → MRV×0.9`);
+          if (Number.isFinite(snap.sleepHours) && snap.sleepHours<6) recParts.push(`сон ${snap.sleepHours}ч → MRV×0.85`);
+          if (Number.isFinite(snap.hrvMs) && snap.hrvMs<50) recParts.push(`HRV ${snap.hrvMs}мс → MRV×0.85`);
+          if (Number.isFinite(snap.stressLevel) && snap.stressLevel>6) recParts.push(`стресс ${snap.stressLevel}/10 → MRV×0.85`);
+          if (injuries.length) recParts.push(`травм ${injuries.length} → исключения`);
+          if (snap.labMrvMultiplier && snap.labMrvMultiplier!==1) recParts.push(`лаб ×${Number(snap.labMrvMultiplier).toFixed(2)}`);
+          const mrvSample = Object.entries(mrvByMuscle).slice(0,3).map(([m,v])=> `${m} ${v}`).join(' · ') || '—';
+          return (
+            <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🛡️ Адаптации — PED / восстановление / травмы / анализы → MRV</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10, color:'#fff' }}>
+                <div>Режим: <b>{hasPed? `PED ×${pedMult.toFixed(2)} (режим ×${regime.toFixed(2)})` : 'натурал ×1.0'}</b></div>
+                <div>MRV факт (3 группы): <b>{mrvSample}</b></div>
+                <div style={{ gridColumn:'1 / span 2', marginTop:2, lineHeight:1.4 }}>
+                  {recParts.length ? recParts.join(' · ') : 'Коррекций восстановления/травм нет — базовые MRV'}
+                </div>
+                {snap.labMrvMultiplier && snap.labMrvMultiplier!==1 && <div style={{ gridColumn:'1 / span 2', fontSize:10, color:'#f59e0b' }}>Лабораторная коррекция: ×{Number(snap.labMrvMultiplier).toFixed(2)}</div>}
+              </div>
             </div>
           );
         })()}
         {/* Per-muscle chip table removed — consolidated into Plan step's Detailed Muscle Groups */}
-        {/* Recommendations */}
+        {/* Рекомендации — единственные, детали уже в них (quality.details убраны как дубль) */}
         {quality.recommendations && quality.recommendations.length > 0 && (
           <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации</div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации (из quality + PRO)</div>
             {quality.recommendations.map((r, i) => (
               <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:4, borderLeft:'2px solid #f59e0b' }}>{r}</div>
             ))}
           </div>
         )}
-        {/* Details */}
-        <div style={{ ...CARD }}>
-          <div style={{ fontSize:11, fontWeight:700, color:ACCENT, marginBottom:6 }}>🔍 Детали оценки</div>
-          {quality.details.map((d,i) => <div key={i} style={{ ...SMALL, marginBottom:3, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)' }}>{d}</div>)}
-        </div>
         {/* Volume chart */}
         {(() => {
           const vdata: WeekVolume[] = W.map(w => {
