@@ -34,6 +34,7 @@ import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { recommendPEDMethodology } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -506,6 +507,11 @@ export const BbAutoConstructor: React.FC = () => {
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
+  const [proPreset, setProPreset] = useState<string>('none');
+  const [bfrMode, setBfrMode] = useState<boolean>(false);
+  const [blastCruiseEnabled, setBlastCruiseEnabled] = useState<boolean>(false);
+  const [blastWeeks, setBlastWeeks] = useState<number>(8);
+  const [cruiseWeeks, setCruiseWeeks] = useState<number>(4);
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(() => ({
     chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60,
     ...(prof.workMax || {}),
@@ -2742,7 +2748,33 @@ export const BbAutoConstructor: React.FC = () => {
         courseIntensity={courseIntensity}
         onIntensity={setCourseIntensity}
       />
-      <PedAdaptationCard adaptation={pedAdapt} />          {/* Рекомендации по питанию */}
+      <PedAdaptationCard adaptation={pedAdapt} />
+      {peds.length > 0 && (() => {
+        try {
+          const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus });
+          return (
+            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.18)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>🧬 PED-методика (не ломает тяж/памп)</div>
+              {meth.jointGuard && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🛡 Joint guard: тяж остаётся тяж, но axial → машины/кабели (темп 4-2-1-0)</div>}
+              {meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>💉 GH+insulin pump window: только памп-дни — intra 30-60г +10г EAA</div>}
+              {meth.bfrAllowed && !meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🩸 BFR доступен (20-30% 1RM, 30-15-15-15)</div>}
+              {meth.periWorkout?.intraNote && <div style={{ fontSize:10, color:'#fbbf24', marginBottom:4 }}>🍚 {meth.periWorkout.intraNote}</div>}
+              {meth.periWorkout?.warning && <div style={{ fontSize:10, color:'#f87171', marginBottom:4 }}>⚠ {meth.periWorkout.warning}</div>}
+              <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>📋 Тяж: {meth.recommendedScheme.heavy} · Памп: {meth.recommendedScheme.pump} {proPreset !== 'none' ? `· Пресет ${proPreset}` : ''}</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:4 }}>🔄 Все сплиты адаптируются под фарму (выбор сохранён, объём ×{(pedAdapt.combinedMrvMultiplier||1).toFixed(2)})</div>
+            </div>
+          );
+        } catch { return null; }
+      })()}
+      <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
+        <button onClick={() => setBfrMode(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: bfrMode ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.04)', border: bfrMode ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.1)', color: bfrMode ? '#ec4899' : '#fff' }}>{bfrMode ? '🩸 BFR включён (30-15-15-15)' : '🩸 BFR окклюзия (только памп)'}</button>
+        <button onClick={() => setBlastCruiseEnabled(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: blastCruiseEnabled ? 'rgba(250,204,21,0.18)' : 'rgba(255,255,255,0.04)', border: blastCruiseEnabled ? '1px solid #facc15' : '1px solid rgba(255,255,255,0.1)', color: blastCruiseEnabled ? '#facc15' : '#fff' }}>{blastCruiseEnabled ? `🔄 Blast ${blastWeeks}н / Cruise ${cruiseWeeks}н` : '🔄 Blast/Cruise выкл'}</button>
+        {blastCruiseEnabled && <>
+          <PopupNumber label='Blast нед' value={blastWeeks} min={4} max={12} onChange={setBlastWeeks} />
+          <PopupNumber label='Cruise нед' value={cruiseWeeks} min={2} max={8} onChange={setCruiseWeeks} />
+        </>}
+      </div>
+          {/* Рекомендации по питанию */}
           {(() => {
             const nut: Record<string, { cal: string; pro: string; tip: string }> = {
               mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
