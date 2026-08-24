@@ -37,6 +37,7 @@ import { diagnoseWeakPoint, WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } fro
 import { tempoFor, TEMPO_BY_CHARACTER, REST_BY_CHARACTER, tutForSet } from '../../../engines/bb/bb-tempo-rest';
 import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { VolumeMiniBar, ScoreBadge, Badge, ProgressBar } from './ManualUI';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 
