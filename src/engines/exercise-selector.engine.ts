@@ -381,47 +381,41 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       rationales.push('Любимое +15');
     }
 
-    // 6. Оборудование: предпочитаем доступное
+    // 6. Оборудование — программа-специфично
     if (_equip.length > 0) {
-      // AUDIT-FIX: в каталоге equipment может быть строкой ('barbell'), а не массивом — нормализуем.
       const rawEq = (ex as any).equipment;
       const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
       const hasEquipment = exEq.length === 0 || exEq.some((eq: string) => _equip.includes(eq));
       if (!hasEquipment) {
         score -= 5;
-        rationales.push(`Нет оборудования -5`);
+        rationales.push(`Нет доступа к оборудованию — пропущено для этой программы`);
       }
     }
 
-    // Бонус за предпочитаемое оборудование (фазовая фильтрация)
+    // Бонус за предпочитаемое оборудование (фазовая фильтрация) — программа-специфично
     if (preferEquipment && preferEquipment.length > 0) {
       const rawEq = (ex as any).equipment;
       const exEq: string = Array.isArray(rawEq) ? rawEq[0] || '' : String(rawEq || '');
       if (preferEquipment.includes(exEq)) {
         score += 8;
-        rationales.push(`Приоритетное оборудование +8`);
+        rationales.push(`Оборудование совпадает с фазой — приоритет для этой программы`);
       }
     }
 
-    // Бонус для compound (базовые) — P2-6: повышен с +5 до +10.
-    // Compound (жим лёжа, присед, тяга) — основа гипертрофии (максимальное механическое натяжение).
-    // +5 было недостаточно: canonical isolation (tier+8=58) могла обойти canonical compound (50+8+5=63)
-    // за счёт angle diversity (+10). Теперь compound=50+8+10=68 — гарантированный приоритет.
+    // Бонус для compound — программа-специфично
     if (ex.type === 'compound') score += 10;
 
-    // ▓▓ Тиры «обычности» для ББ-гипертрофии: канонические — предпочитать, экзотику — штраф ▓▓
+    // ▓▓ Тиры «обычности» — программа-специфично
     const _tier = bbExerciseTier(ex);
-    if (_tier === 1) { score += 8; rationales.push('Каноническое упражнение +8'); }
-    else if (_tier === 3) { score -= 15; rationales.push('Экзотика/специфика −15'); }
-    else if (_tier === 4) { score -= 40; rationales.push('Не для дефолтной ББ-гипертрофии −40'); }
-    if (isInappropriateBB(ex) && level && (level === 'beginner' || level === 'intermediate')) { score -= 30; rationales.push('Недоступно на уровне −30'); }
+    if (_tier === 1) { score += 8; rationales.push('Каноническое упражнение — базовый паттерн для гипертрофии'); }
+    else if (_tier === 3) { score -= 15; rationales.push('Экзотика — только для опытных, не в базе этой программы'); }
+    else if (_tier === 4) { score -= 40; rationales.push('Не подходит для гипертрофии в этой программе — исключено'); }
+    if (isInappropriateBB(ex) && level && (level === 'beginner' || level === 'intermediate')) { score -= 30; rationales.push('Недоступно на данном уровне — требует техники'); }
 
-    // 5b. Контекст бодибилдинга: штраф пауэрлифт-подъёмов
-    // Умеренный штраф (-5): compound (+5) всё ещё перевешивает изоляцию,
-    // но соревновательные подъёмы не доминируют над альтернативами.
+    // 5b. Контекст бодибилдинга — программа-специфично
     if (preferBB && isCompetitionLift(ex)) {
       score -= 5;
-      rationales.push('Бодибилдинг: не соревновательный подъём −5');
+      rationales.push('Соревновательный подъём — не приоритет для гипертрофии в этой программе');
     }
 
     // 5c. ББ-спина: hinge/бицепс-бедра лифты (становая/мёртвая/румын/гудморнинг)
@@ -431,10 +425,10 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
       rationales.push('Бодибилдинг: hinge (бицепс бедра), не спина −10');
     }
 
-    // 5d. Безопасность: опасные упражнения для новичков/средних
+    // 5d. Безопасность — программа-специфично
     const exLower = ((ex.name || '') + (ex.id || '')).toLowerCase();
     const isDangerous = (
-      exLower.includes('за голов') ||     // behind-the-neck (тяга/жим)
+      exLower.includes('за голов') ||
       (exLower.includes('гудморнинг') && level !== 'advanced' && level !== 'enhanced') ||
       (exLower.includes('швунг') && (level === 'beginner' || level === 'intermediate')) ||
       (exLower.includes('толчок') && level === 'beginner') ||
@@ -442,28 +436,28 @@ export function selectExercisesSmart(input: SelectorInput): SelectedExercise[] {
     );
     if (isDangerous && (level === 'beginner' || level === 'intermediate')) {
       score -= 30;
-      rationales.push('Безопасность: опасное для уровня −30');
+      rationales.push('Безопасность: опасно для уровня — заменено в этой программе');
     } else if (isDangerous) {
       score -= 10;
-      rationales.push('Безопасность: требует техники −10');
+      rationales.push('Требует техники — осторожно в этой программе');
     }
     if (level === 'beginner' && ex.difficulty && ex.difficulty === 'advanced') score -= 10;
     if (level === 'advanced' && ex.difficulty && ex.difficulty === 'beginner') score -= 3;
 
-    // 7. Техника/образовательная ценность — детальное описание помогает освоить движение без травм
+    // 7. Техника — внутренний бонус, не показываем пользователю
     const hasTechnique = !!(ex as any).technique;
-    if (hasTechnique) { score += 5; rationales.push('Детальная техника выполнения (+5): есть пошаговое описание, легче освоить без ошибок'); }
+    if (hasTechnique) { score += 5; }
     const hasComments = !!(ex as any).comments || !!(ex as any).description;
-    if (hasComments) { score += 3; rationales.push('Методическое сопровождение (+3): есть комментарии по прогрессии и ошибкам'); }
+    if (hasComments) { score += 3; }
 
-    // 8. Уровень-сложность: совпадение даёт +5
-    if (ex.difficulty === level) { score += 5; rationales.push('Сложность~уровню +5'); }
-    else if (level === 'advanced' && ex.difficulty === 'intermediate') { score += 2; rationales.push('Подходит для advanced +2'); }
+    // 8. Уровень-сложность — программа-специфично
+    if (ex.difficulty === level) { score += 5; rationales.push('Сложность соответствует уровню — оптимально для этой программы'); }
+    else if (level === 'advanced' && ex.difficulty === 'intermediate') { score += 2; rationales.push('Подходит для уровня — допустимо в этой программе'); }
 
-    // 9. Целевой RIR: compound с низким RIR (0-1) для тяжёлой фазы, изоляция с высоким (3-4) для накопления
+    // 9. Целевой RIR — программа-специфично
     if (targetRir !== undefined) {
-      if (ex.type === 'compound' && targetRir <= 1) { score += 8; rationales.push('Рекомендован для тяжёлой фазы (RIR ' + targetRir + ') +8'); }
-      else if (ex.type === 'isolation' && targetRir >= 3) { score += 6; rationales.push('Рекомендован для накопления (RIR ' + targetRir + ') +6'); }
+      if (ex.type === 'compound' && targetRir <= 1) { score += 8; rationales.push('Для тяжёлой фазы (RIR ' + targetRir + ') — тяжёлое базовое в этой программе'); }
+      else if (ex.type === 'isolation' && targetRir >= 3) { score += 6; rationales.push('Для накопления (RIR ' + targetRir + ') — памп-изоляция в этой программе'); }
     }
 
     return { ...ex, selectionScore: Math.max(0, score), selectionRationale: rationales };

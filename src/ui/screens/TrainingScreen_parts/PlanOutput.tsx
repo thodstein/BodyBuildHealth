@@ -96,6 +96,12 @@ function roleLabel(role?: string): string {
   }
 }
 
+export const BadgeLegend: React.FC = () => (
+  <div style={{ fontSize: 10, color: '#fff', opacity: 0.75, marginBottom: 8, lineHeight: 1.4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+    <b>Ярлычки:</b> <span style={{ color: '#00e68a' }}>БАЗ</span> — базовое (compound, тяжёлое) · <span style={{ color: '#f59e0b' }}>ИЗО</span> — изоляция · <span style={{ color: '#a855f7' }}>АКС</span> — аксессуар/добивка · <span style={{ color: '#ef4444' }}>тяж</span> — силовой характер · <span style={{ color: '#3b82f6' }}>памп</span> — пампинг · <span style={{ color: '#a855f7' }}>RIR</span> — повторов в запасе · <span style={{ color: '#a855f7' }}>темп</span> — эксц-пауза-конц-пауза · <span style={{ color: '#fff' }}>отдых</span> — сек между подходами
+  </div>
+);
+
 const Badge: React.FC<{ label: string; color: string }> = ({ label, color }) => (
   <span style={{
     fontSize: 11, fontWeight: 700, color, background: color + '22',
@@ -167,6 +173,7 @@ export const DayCard: React.FC<{ day: PlanDayView }> = ({ day }) => {
         {day.volumeTag && <span style={{ fontSize: 11, fontWeight: 700, color: phaseColor, background: phaseColor + '22', padding: '4px 10px', borderRadius: 10, flexShrink: 0, minHeight: 28 }}>{day.volumeTag}</span>}
       </div>
       {day.metaLine && <div style={{ fontSize: 11, color: '#fff', marginBottom: 8, lineHeight: 1.4 }}>{day.metaLine}</div>}
+      {day.exercises && day.exercises.length > 0 && <BadgeLegend />}
       {day.headerActions && <div style={{ marginBottom: 8 }}>{day.headerActions}</div>}
       {day.renderBody
         ? day.renderBody
@@ -191,7 +198,7 @@ export const PhaseBanner: React.FC<{ phase: PhaseKey; desc?: string }> = ({ phas
 
 /** Сетка выбора недель (кликабельные номера) */
 export const WeekStrip: React.FC<{
-  weeks: number; phaseForНеделя: (w: number) => PhaseKey; activeНеделя: number; onPick: (w: number) => void;
+  weeks: number; phaseForWeek: (w: number) => PhaseKey; activeWeek: number; onPick: (w: number) => void;
 }> = ({ weeks, phaseForWeek, activeWeek, onPick }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))', gap: 4 }}>
     {Array.from({ length: weeks }, (_, i) => {

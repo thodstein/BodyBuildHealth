@@ -72,7 +72,7 @@ import { InfoErrorBoundary } from '../SupportScreen_parts/SupportScreenData';
 const RecordModeSelector: React.FC<{
   diary: StrengthDiary;
   historyWorkouts: WorkoutLog[];
-  selectedНеделя: number;
+  selectedWeek: number;
   onSave: () => void;
   sub: 'quick' | 'full';
   onSubChange: (s: 'quick' | 'full') => void;
@@ -114,7 +114,7 @@ interface TrainingDiaryHubProps {
   diaryProgress: WeeklyProgress[];
   historyWorkouts: WorkoutLog[];
   macrocycle: MacrocyclePlan | null;
-  selectedНеделя: number;
+  selectedWeek: number;
   level: string;
   onRefresh: () => void;
   onGoRecord?: () => void;

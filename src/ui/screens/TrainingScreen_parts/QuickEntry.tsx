@@ -27,7 +27,7 @@ const ACCENT = '#00e68a';
 interface QuickEntryProps {
   diary: StrengthDiary;
   historyWorkouts: WorkoutLog[];
-  selectedНеделя: number;
+  selectedWeek: number;
   onSave: () => void;
 }
 

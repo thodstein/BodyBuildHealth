@@ -1014,21 +1014,24 @@ function buildExComment(
   if (isSubstituted) parts.unshift('⚠ Замена (травма):');
   const phaseNames: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
   const charLabel = character === 'тяж' ? 'тяж' : character === 'памп' ? 'памп' : 'лёг';
-  parts.push(`${phaseNames[phase] || phase}, RIR ${rir} (${charLabel})`);
-  parts.push(`${sets}×${reps} @ ${weight} кг`);
-  if (selectionRationale) parts.push(`Выбор: ${selectionRationale}`);
+  parts.push(`${phaseNames[phase] || phase}, RIR ${rir} (${charLabel}) — для этой программы`);
+  parts.push(`${sets}×${reps} @ ${weight} кг — именно так в этом дне/неделе`);
+  // Почему выбрано — программа-специфично, без мусора скоринга
+  if (selectionRationale) {
+    const filtered = selectionRationale.split(';').map(s=>s.trim()).filter(s=> s && !/\+8|−15|−40|Не для дефолтной|Экзотика/i.test(s) && !/Детальная техника|Методическое сопровождение/i.test(s)).join(' · ');
+    if (filtered) parts.push(`Почему в этой программе: ${filtered} — закрывает ${muscle} (${name}) в ${phase} ${charLabel}`);
+  }
   
-  // Конкретные инструкции по выполнению (углы, хват, техника).
-  // FIX-A8: dual-key lookup — EN id (bench_press) + RU name (жим штанги лёжа).
-  // Сначала точный match по exerciseId, потом по name, потом по lowercased name.
+  // Конкретные инструкции — применимо именно к этому упражнению в этом дне программы
   const execNote = exerciseId
     ? EXECUTION_NOTES[exerciseId] || EXECUTION_NOTES[name] || EXECUTION_NOTES[(name || '').toLowerCase()]
     : EXECUTION_NOTES[name] || EXECUTION_NOTES[(name || '').toLowerCase()];
-  if (execNote) parts.push(execNote);
+  if (execNote) parts.push(`Как делать в этой программе: ${execNote}`);
   
   const warn = exerciseRiskWarning(name);
   if (warn) parts.push(warn);
-  parts.push(formatExerciseInstructions({
+  // Короткая программа-специфичная инструкция (без generic паттерн/порядок)
+  const instr = buildExerciseInstructions({
     exerciseId,
     exerciseName: name,
     muscle,
@@ -1037,7 +1040,14 @@ function buildExComment(
     trainingFocus,
     tempo,
     restSeconds: restSec,
-  }));
+  });
+  const progInstrParts: string[] = [];
+  if (instr.cues.length) progInstrParts.push(`Техника: ${instr.cues.slice(0,2).join('; ')}`);
+  progInstrParts.push(`Темп ${instr.tempo}${tempoExplain(instr.tempo) ? ` (${tempoExplain(instr.tempo)})` : ''}, отдых ${instr.restSeconds || restSec}с — именно для этого сета в программе`);
+  if (instr.stretch) progInstrParts.push(`Растяжение: ${instr.stretch}`);
+  if (instr.peak) progInstrParts.push(`Пик: ${instr.peak}`);
+  if (instr.mistakes.length) progInstrParts.push(`Ошибки в этой программе: ${instr.mistakes.slice(0,2).join('; ')}`);
+  parts.push(progInstrParts.join(' · '));
   return cleanInstructionsText(parts.join('. '));
 }
 

@@ -242,10 +242,10 @@ export const PlanSummaryTable: React.FC<{
 /* ───── Панель автопериодизации ───── */
 export const AutoPeriodizationPanel: React.FC<{
   weeks: number; goal: string; level: string;
-  onApply?: (phases: Array<{ startНеделя: number; endНеделя: number; phase: string }>) => void;
+  onApply?: (phases: Array<{ startWeek: number; endWeek: number; phase: string }>) => void;
 }> = ({ weeks, goal, level, onApply }) => {
   if (weeks < 2) return null;
-  let phases: Array<{ startНеделя: number; endНеделя: number; phase: string }> = [];
+  let phases: Array<{ startWeek: number; endWeek: number; phase: string }> = [];
   try { phases = distributePhases(weeks, 0, goal === 'powerlifting' ? 'strength' : 'bulk') || []; } catch { return null; }
   if (!phases.length) return null;
   const pc: Record<string, string> = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' };

@@ -152,7 +152,7 @@ export const QualityScorePanel: React.FC<QualityScorePanelProps> = ({ program, l
 
 interface PlanStatsPanelProps {
   program: UserProgram;
-  execНеделя: number;
+  execWeek: number;
   onCourse: boolean;
 }
 

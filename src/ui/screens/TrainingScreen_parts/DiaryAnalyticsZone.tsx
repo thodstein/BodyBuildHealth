@@ -19,7 +19,7 @@ interface Props {
   diaryProgress: WeeklyProgress[];
   historyWorkouts: WorkoutLog[];
   macrocycle: MacrocyclePlan | null;
-  selectedНеделя: number;
+  selectedWeek: number;
   level: string;
   onRefresh: () => void;
   onTabChange?: (tab: TrainingTab) => void;

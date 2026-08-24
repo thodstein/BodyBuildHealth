@@ -67,6 +67,7 @@ const NAV_BTN_PRIMARY: React.CSSProperties = {
 const WIZARD_KEY = 'he_cardio_wizard_state';
 
 interface WizardState {
+  [key: string]: any;
   goal: CardioGoal;
   totalWeeks: number;
   daysAvailable: number;

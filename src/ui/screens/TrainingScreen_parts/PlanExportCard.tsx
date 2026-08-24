@@ -57,6 +57,7 @@ interface ProfileSummary {
 }
 
 interface PlanExportCardProps {
+  [key: string]: any;
   /** Ручной план */
   manualResult?: ManualResult | null;
   /** BB план (weeks structure) */
@@ -226,7 +227,7 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
     return {
       score: 0, grade: '—', issues: [], muscles: [],
       summary: ['Нет плана для оценки'], recommendations: [],
-      metadata: { totalExercises: 0, totalSets: 0, totalVolume: 0, avgSetsPerДень: 0, pushPullRatio: '0:0', hasDeload: false, weakPointCoverage: 0 },
+      metadata: { totalExercises: 0, totalSets: 0, totalVolume: 0, avgSetsPerDay: 0, pushPullRatio: '0:0', hasDeload: false, weakPointCoverage: 0 },
     };
   }, [manualResult, bbPlan, level, weakPoints, hasDeload, profile?.onCourse, profile?.injuries, meta?.weeks]);
 

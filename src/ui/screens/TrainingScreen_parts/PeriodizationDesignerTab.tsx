@@ -994,7 +994,7 @@ export const PeriodizationDesignerTab: React.FC<{ initialUnifiedMode?: 'micro' |
                       goal: effectiveDiscipline === 'pl' ? 'strength' : 'hypertrophy',
                       level: 'intermediate',
                       weeksUntilGoal: weeks,
-                      currentНеделя: 0,
+                      currentWeek: 0,
                       fatigueLevel: 0.3,
                       recoveryLevel: 0.7,
                       overtrainingRisk: ot.riskPercent,

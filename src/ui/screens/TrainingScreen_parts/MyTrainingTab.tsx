@@ -50,7 +50,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
         if (!logs || logs.length === 0) { setProgressData({ noData: true }); return; }
         const sorted = [...logs].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
         const e1rmByExercise: Record<string, { date: string; e1rm: number }[]> = {};
-        const tonnageByНеделя: Record<string, number> = {};
+        const tonnageByWeek: Record<string, number> = {};
         let totalTonnageAll = 0;
         for (const log of sorted) {
           for (const ex of (log as any).exercises || []) {
@@ -66,7 +66,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
           const dt = (log.date || '').slice(0, 10);
           const wk = dt.slice(0, 7) + '-W' + Math.ceil(parseInt(dt.slice(8, 10)) / 7);
           const vol = ((log as any).exercises || []).reduce((s: number, ex: any) => s + (ex.totalVolume || 0), 0);
-          tonnageByWeek[wk] = (tonnageByWeek[wk] || 0) + vol;
+          (tonnageByWeek as any)[wk] = ((tonnageByWeek as any)[wk] || 0) + vol;
           totalTonnageAll += vol;
         }
         const topExercises = Object.entries(e1rmByExercise)

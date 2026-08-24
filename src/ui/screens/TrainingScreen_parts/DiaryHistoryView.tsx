@@ -189,7 +189,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
             {/* Heatmap — redesigned with month labels + tooltips */}
             {historyWorkouts.length > 0 && (() => {
-              const byДень: Record<string, number> = {};
+              const byDay: Record<string, number> = {};
               historyWorkouts.forEach((w: any) => { byDay[w.date] = (byDay[w.date] || 0) + (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || 0), 0); });
               const cells: { date: string; vol: number; dayOfWeek: number }[] = [];
               const today = new Date();
