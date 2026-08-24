@@ -481,6 +481,7 @@ export function quantityToGrams(qty: string, food?: FoodItem): number {
 }
 
 function normalizeItem(name: string, qty: string, kcal: number, p: number, f: number, c: number, micros: NutritionMicros = {}) {
+  const directId = matchRussianFood(name);
   const food = findFood(name);
   const weight = Math.max(1, quantityToGrams(qty, food));
   const multiplier = weight / 100;
@@ -494,7 +495,7 @@ function normalizeItem(name: string, qty: string, kcal: number, p: number, f: nu
   const macrosPlausible = macroKcal === 0 || safeKcal === 0 || macroKcal <= safeKcal * 1.35;
   const hasMacros = safeKcal > 0 || safeP > 0 || safeF > 0 || safeC > 0;
   const confidence = food
-    ? (hasMacros ? 0.9 : 0.7)
+    ? (directId ? (hasMacros ? 0.95 : 0.85) : 0.4)
     : (hasMacros ? 0.5 : 0.3);
   const displayName = name
     .replace(/^(?:завтрак|обед|ужин|перекус|бранч|полдник|breakfast|lunch|dinner|snack)\s*[:\-–—|,]?\s*/i, '')

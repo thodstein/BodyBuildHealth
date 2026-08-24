@@ -193,6 +193,11 @@ describe('nutrition-ocr-parser', () => {
       expect(impossible.c).toBe(0);
     });
 
+    it('does not trust a fuzzy-only match for a navigation OCR fragment', () => {
+      const item = parseNutritionText('для сулин на мил 20 г 100 ккал Б:1 Ж:1 У:1').flatMap(meal => meal.items)[0];
+      expect(item?.confidence).toBeLessThan(0.8);
+    });
+
     it('keeps a food and its quantity when OCR has no calories row', () => {
       const items = parseNutritionText('Обед\nОгурец\n100 г').flatMap(meal => meal.items);
 
