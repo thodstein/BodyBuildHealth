@@ -180,12 +180,15 @@ describe('CardioConstructor — CSR', () => {
 
   it('дни ног: выбор чипов → предпросмотр отмечает их в «Неделя по дням»', () => {
     render(<CardioConstructor />);
+    // v3: дни ног внутри аккордеона — раскрываем если свёрнуто
+    const equipHeader = screen.queryByRole('button', { name: /Оборудование и ограничения/ });
+    if (equipHeader && equipHeader.getAttribute('aria-expanded') === 'false') fireEvent.click(equipHeader);
     fireEvent.click(screen.getByRole('button', { name: /Ноги: Пн/ }));
     fireEvent.click(screen.getByRole('button', { name: /Ноги: Чт/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
-    expect(screen.getByText(/Дни тяжёлых ног: Пн, Чт/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /🗓 План/ }));
     expect(screen.getAllByText(/🦵/).length).toBeGreaterThanOrEqual(2);
     const saved = loadCardioCycles()[0];
     expect(saved.config?.legDays).toEqual([0, 3]);
@@ -238,7 +241,6 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     expect(screen.getAllByText(/Год кардио/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Итого:/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/нед · в среднем/).length).toBeGreaterThan(0);
   });
 
   it('шаг 5: доступны авто-режим и дневник', () => {
@@ -300,12 +302,14 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     // Выбрать интенсивный вариант на предпросмотре.
+    fireEvent.click(screen.getByRole('button', { name: /Варианты/ }));
     fireEvent.click(screen.getByRole('button', { name: /Вариант: Интенсивный/ }));
     // Вернуться к параметрам через «⚙️ Изменить параметры» — вариант сбрасывается в базовый.
     fireEvent.click(screen.getByRole('button', { name: /Изменить параметры/ }));
     expect(screen.getByRole('button', { name: /Taper перед стартом/ })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Варианты/ }));
     const btn = screen.getByRole('button', { name: /Вариант: Базовый/ });
     expect(btn).toBeTruthy();
   });
@@ -384,7 +388,7 @@ describe('CardioConstructor — CSR', () => {
     const map = JSON.parse(localStorage.getItem(ANNUAL_CARDIO_KEY) || '{}');
     expect(Object.keys(map).length).toBe(annual.length);
     expect(Object.values(map).every((v: string) => annual.some(c => c.id === v))).toBe(true);
-    expect(screen.getAllByText(/Кардио · /).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/собрано/i).length).toBeGreaterThan(0);
   });
 
   it('«🗑 Сбросить»: маппинг и циклы года удаляются', () => {

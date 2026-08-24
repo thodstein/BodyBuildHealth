@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
-import { SectionCard, GroupHeading, ROW, LABEL, HINT, HINT_SM, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, NumberInput, InfoBanner, Badge } from './CardioUI';
+import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_PRIMARY, BTN_DANGER, NumberInput, InfoBanner, Badge } from './CardioUI';
 
 export interface CompDraft { name: string; week: string }
 
@@ -44,13 +44,17 @@ export const CardioCompsStep: React.FC<{
           <span style={HINT_SM}>— настраивается на шаге «Параметры» (Структура фаз).</span>
         </div>
         {comps.length === 0 ? (
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 10, padding: '10px 12px', textAlign: 'center' }}>Старты не добавлены — добавьте хотя бы один, чтобы увидеть taper/пик в предпросмотре.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '18px 12px', textAlign: 'center' }}>
+            <div style={{ fontSize: 28 }}>🏁</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>Стартов пока нет</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 360 }}>Добавьте хотя бы один старт — цикл построит taper и пик-неделю. Без стартов последняя неделя будет переходной.</div>
+          </div>
         ) : (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {comps.map((c, idx) => (
-                <div key={c.id} draggable onDragStart={() => setDragIdx(idx)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const next = [...comps]; const [moved] = next.splice(dragIdx, 1); next.splice(idx, 0, moved); setComps(next); setDragIdx(null); }} onDragEnd={() => setDragIdx(null)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: dragIdx === idx ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px', opacity: dragIdx === idx ? 0.6 : 1 }}>
-                  <span style={{ cursor: 'grab', color: '#fff', fontSize: 12, userSelect: 'none' }} aria-hidden>⋮⋮</span>
+                <div key={c.id} draggable onDragStart={() => setDragIdx(idx)} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); if (dragIdx === null || dragIdx === idx) return; const next = [...comps]; const [moved] = next.splice(dragIdx, 1); next.splice(idx, 0, moved); setComps(next); setDragIdx(null); }} onDragEnd={() => setDragIdx(null)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: dragIdx === idx ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', border: dragIdx === idx ? '1px dashed rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px', opacity: dragIdx === idx ? 0.6 : 1, minHeight: 44 }}>
+                  <span style={{ cursor: 'grab', color: '#fff', fontSize: 14, userSelect: 'none', padding: '4px 6px', minWidth: 24, textAlign: 'center' }} aria-hidden>⋮⋮</span>
                   <span style={{ fontSize: 13, fontWeight: 800, flex: 1, color: '#fff' }}>{c.name}</span>
                   <Badge bg="rgba(59,130,246,0.12)" border="rgba(59,130,246,0.22)" color="#60a5fa">нед {c.week}</Badge>
                   <span style={{ fontSize: 11, color: '#fff' }}>
@@ -60,16 +64,22 @@ export const CardioCompsStep: React.FC<{
                 </div>
               ))}
             </div>
-            <div style={{ height: 28, borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', overflow: 'hidden' }}>
+            <div style={{ height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', overflow: 'hidden', position: 'relative' }}>
               {Array.from({ length: totalWeeks }).map((_, i) => {
                 const week = i + 1;
                 const comp = comps.find(c => c.week === week);
                 const isTaper = taperEnabled && comps.some(c => week >= Math.max(1, c.week - taperWeeks) && week < c.week);
                 const isPeak = !!comp && peakWeek;
-                return <div key={week} style={{ flex: 1, background: comp ? '#ef4444' : isPeak ? '#eab308' : isTaper ? 'rgba(234,179,8,0.32)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: comp ? '#fff' : 'transparent', borderLeft: week > 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }} title={comp ? `${comp.name} нед ${week}` : isTaper ? `taper нед ${week}` : `нед ${week}`}>{comp ? '●' : ''}</div>;
+                const bg = comp ? '#ef4444' : isPeak ? '#eab308' : isTaper ? 'rgba(234,179,8,0.32)' : 'transparent';
+                return <div key={week} style={{ flex: 1, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: comp ? '#fff' : 'transparent', borderLeft: week > 1 ? '1px solid rgba(255,255,255,0.08)' : 'none', position: 'relative' }} title={comp ? `${comp.name} нед ${week}` : isTaper ? `taper нед ${week}` : `нед ${week}`}>{comp ? '●' : isTaper ? '▓' : ''}</div>;
               })}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#fff' }}><span>нед 1</span><span>нед {totalWeeks}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'rgba(255,255,255,0.55)' }}><span>нед 1</span><span>нед {totalWeeks}</span></div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#ef4444', marginRight: 4, verticalAlign: 'middle' }} />старт</span>
+              <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'rgba(234,179,8,0.32)', marginRight: 4 }} />taper</span>
+              <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', marginRight: 4 }} />база</span>
+            </div>
           </>
         )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>

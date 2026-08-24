@@ -251,11 +251,11 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
           <div style={{ fontSize: 11, color: '#fff' }}>
             ✅ {TYPE_LABEL[finished.type]} {finished.durationMin} мин завершена — оцените сессию:
           </div>
-          <div style={ROW}>
-            <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={INPUT} aria-label="RPE" />
-            <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС ср." inputMode="numeric" style={INPUT} aria-label="ЧСС" />
-            <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
-            <button style={BTN_PRIMARY} onClick={save}>💾 Сохранить в дневник</button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: 8 }}>
+            <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="RPE" />
+            <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС ср." inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="ЧСС" />
+            <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 'auto' }} aria-label="Км" title="Дистанция (для бега/езды)" />
+            <button style={{ ...BTN_PRIMARY, minHeight: 44 }} onClick={save}>💾 Сохранить в дневник</button>
           </div>
           {warnings && (
             <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">

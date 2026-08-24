@@ -1,8 +1,7 @@
 /**
- * CardioParamsStep.tsx — шаг 1 мастера кардио. Логичный порядок секций:
- * 1) параметры пользователя, 2) выбор цели и быстрые старты, 3) горизонт,
- * 4) оборудование, 5) дни ног, 6) факторы, 7) структура фаз, 8) итог.
- * Вертикальные секции с заголовками, единый стиль (CardioUI), навигация.
+ * CardioParamsStep.tsx — шаг 1 мастера кардио v3.
+ * Progressive disclosure: 3 слоя — Основное (открыто), Расширенное (свёрнуто), Итог (hero).
+ * 5 аккордеонов вместо 9, sticky сводка, объединённые секции.
  */
 import React, { useMemo } from 'react';
 import {
@@ -13,21 +12,24 @@ import {
 } from '../../../engines/lms/cardio.engine';
 import type { CardioCompetitionRef, CardioPhase } from '../../../engines/lms/cardio.engine';
 import {
-  ROW, LABEL, HINT, HINT_SM, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR, TYPE_COLOR,
-  SectionCard, StatTile, GroupHeading, SectionNav, InfoBanner, Accordion, Badge,
-  NumberInput, SelectInput, Stepper,
+  ROW, LABEL, HINT_SM, BTN_SMALL, CHIP, CHIP_ACTIVE, PHASE_COLOR, TYPE_COLOR,
+  SectionCard, StatTile, SectionNav, InfoBanner, Accordion, Badge, HeroCard,
+  NumberInput, Stepper, CARD_HERO,
 } from './CardioUI';
 
 const GOAL_CARD: React.CSSProperties = {
   flex: '1 1 140px', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
   border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: '#fff',
+  transition: 'all 0.15s ease',
 };
 const GOAL_CARD_ACTIVE: React.CSSProperties = {
   ...GOAL_CARD, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.12)', color: '#fff',
+  boxShadow: '0 0 12px rgba(0,230,138,0.14)',
 };
 const PRESET: React.CSSProperties = {
-  flex: '1 1 130px', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+  flex: '0 0 152px', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
   border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: '#fff',
+  transition: 'all 0.15s ease',
 };
 
 const GOAL_DESC: Record<CardioGoal, string> = {
@@ -165,24 +167,22 @@ export const CardioParamsStep: React.FC<{
 
   const NAV = [
     { id: 'sec-user', label: '👤 Пользователь' },
-    { id: 'sec-goal', label: '🎯 Выбор цели' },
-    { id: 'sec-start', label: '⚡ Старты' },
-    { id: 'sec-horizon', label: '⏱ Горизонт' },
+    { id: 'sec-goal', label: '🎯 Цель' },
+    { id: 'sec-horizon', label: '⏱ Горизонт и фазы' },
     { id: 'sec-equip', label: '🏃 Оборудование' },
-    { id: 'sec-nog', label: '🦵 Дни ног' },
     { id: 'sec-factors', label: '📊 Факторы' },
-    { id: 'sec-phases', label: '🧩 Фазы' },
     { id: 'sec-preview', label: '👁 Итог' },
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <SectionNav items={NAV} />
       {!preview.cycle && comps.length === 0 && (
-        <InfoBanner tone="info">👋 Подсказка: выберите цель (например, Сушка) → пресет «Сушка 16 нед» → проверьте предпросмотр (фазы + прогноз VO2max) → «Далее» и соберите цикл. Taper и дни ног подстроятся сами.</InfoBanner>
+        <InfoBanner tone="info">👋 Подсказка: выберите цель (например, Сушка) → пресет «Сушка 16 нед» → проверьте предпросмотр → «Далее» и соберите цикл.</InfoBanner>
       )}
 
-      <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 10, color: '#fff' }}>{age}л · {bodyWeight}кг{CARDIO_LEVEL_LABELS[level]}</span>}>
+      {/* ── 1. Пользователь — открыт ── */}
+      <Accordion id="sec-user" title="Параметры пользователя" icon="👤" defaultOpen badge={<span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{age}л · {bodyWeight}кг · {CARDIO_LEVEL_LABELS[level]}</span>}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button style={BTN_SMALL} onClick={onFromProfile} title="Загрузить из профиля">📋 Из профиля</button>
           <button style={BTN_SMALL} onClick={onFromDiaryHr} title="ЧСС покоя из дневника АД">❤️ Из АД</button>
@@ -193,7 +193,7 @@ export const CardioParamsStep: React.FC<{
           <NumberInput label="Вес (кг)" value={String(bodyWeight)} onChange={v => setBodyWeight(Math.max(30, Math.min(300, Number(v) || 80)))} min={30} max={300} step={0.5} placeholder="80" ariaLabel="Вес" width={100} suffix="кг" />
           <NumberInput label="ЧСС покоя" value={restingHr} onChange={setRestingHr} min={30} max={120} step={1} placeholder="60" ariaLabel="ЧСС покоя" width={100} suffix="уд/мин" />
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           <div style={ROW}>
             <span style={LABEL}>Пол</span>
             <button style={sex === 'male' ? CHIP_ACTIVE : CHIP} onClick={() => setSex('male')} aria-label="Пол: мужской">♂ Мужской</button>
@@ -215,78 +215,34 @@ export const CardioParamsStep: React.FC<{
         <div style={HINT_SM}>Karvonen: ЧССмакс 220−возраст (жен. 226−). Уровень меняет объём: новичок ×0.8 / продвинутый ×1.15.</div>
       </Accordion>
 
-      <Accordion id="sec-goal" title="Цель цикла" icon="🎯" defaultOpen badge={<Badge bg={TYPE_COLOR[goal] ? TYPE_COLOR[goal] + '22' : undefined} border={TYPE_COLOR[goal] ? TYPE_COLOR[goal] + '44' : undefined} color={TYPE_COLOR[goal] ?? '#fff'}>{CARDIO_GOAL_LABELS[goal]}</Badge>}>
+      {/* ── 2. Цель + пресеты — открыто ── */}
+      <Accordion id="sec-goal" title="Цель цикла и быстрые старты" icon="🎯" defaultOpen badge={<Badge bg={TYPE_COLOR[goal] ? TYPE_COLOR[goal] + '22' : undefined} border={TYPE_COLOR[goal] ? TYPE_COLOR[goal] + '44' : undefined} color={TYPE_COLOR[goal] ?? '#fff'}>{CARDIO_GOAL_LABELS[goal]}</Badge>}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(148px, 1fr))', gap: 8 }}>
           {(Object.keys(CARDIO_GOAL_LABELS) as CardioGoal[]).map(g => (
             <div key={g} style={goal === g ? GOAL_CARD_ACTIVE : GOAL_CARD} onClick={() => setGoal(g)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setGoal(g); } }} aria-pressed={goal === g} aria-label={`Цель: ${CARDIO_GOAL_LABELS[g]}`}>
               <div style={{ fontSize: 12, fontWeight: 850, letterSpacing: -0.1 }}>{CARDIO_GOAL_LABELS[g]}</div>
-              <div style={{ fontSize: 10, marginTop: 4, lineHeight: 1.4, opacity: 0.68 }}>{GOAL_DESC[g]}</div>
+              <div style={{ fontSize: 10, marginTop: 4, lineHeight: 1.4, color: 'rgba(255,255,255,0.62)' }}>{GOAL_DESC[g]}</div>
             </div>
           ))}
         </div>
-      </Accordion>
-
-      <Accordion id="sec-start" title="Быстрые старты" icon="⚡" defaultOpen>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(142px, 1fr))', gap: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginTop: 4 }}>⚡ Быстрые старты</div>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'thin' }}>
           {CARDIO_PRESETS.map(p => (
             <div key={p.id} style={PRESET} onClick={() => applyPreset(p.id)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); applyPreset(p.id); } }} aria-label={`Пресет: ${p.name}`}>
-              <div style={{ fontSize: 12, fontWeight: 800 }}>{p.icon} {p.name}</div>
-              <div style={{ fontSize: 10, marginTop: 3, opacity: 0.65, lineHeight: 1.35 }}>{p.desc}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, whiteSpace: 'nowrap' }}>{p.icon} {p.name}</div>
+              <div style={{ fontSize: 10, marginTop: 3, color: 'rgba(255,255,255,0.62)', lineHeight: 1.35 }}>{p.desc}</div>
             </div>
           ))}
         </div>
       </Accordion>
 
-      <Accordion id="sec-horizon" title="Горизонт" icon="⏱" defaultOpen>
+      {/* ── 3. Горизонт и фазы — открыто ── */}
+      <Accordion id="sec-horizon" title="Горизонт и Структура фаз" icon="⏱" defaultOpen>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
           <Stepper label="Недель" value={totalWeeks} min={1} max={52} step={1} onChange={setTotalWeeks} ariaPrefix="Недель" suffix="нед" width={50} />
           <Stepper label="Дней/нед" value={daysAvailable} min={0} max={7} step={1} onChange={setDaysAvailable} ariaPrefix="Дней" suffix="дн" width={50} />
         </div>
-        <div style={HINT_SM}>Дней в неделю ограничивает частоту сессий — приоритет zone2 → recovery → miss → hiit.</div>
-      </Accordion>
-
-      <Accordion id="sec-equip" title="Оборудование" icon="🏃" defaultOpen badge={equipment.length > 0 ? <Badge>{equipment.map(e => CARDIO_EQUIPMENT_OPTIONS.find(o => o.id === e)?.icon).join(' ')}</Badge> : undefined}>
-        <div style={ROW}>
-          {CARDIO_EQUIPMENT_OPTIONS.map(e => (
-            <button key={e.id} style={equipment.includes(e.id) ? CHIP_ACTIVE : { ...CHIP, opacity: lowImpact && e.impact === 'high' ? 0.35 : 1 }} onClick={() => toggleEquipment(e.id)} disabled={lowImpact && e.impact === 'high'} aria-label={`Оборудование: ${e.label}`}>
-              {e.icon} {e.label}
-            </button>
-          ))}
-        </div>
-        <button style={lowImpact ? CHIP_ACTIVE : CHIP} onClick={() => setLowImpact(!lowImpact)}>
-          {lowImpact ? '🦴 Щадить суставы: вкл' : 'Щадить суставы: выкл'}
-        </button>
-        <div style={HINT_SM}>Низкоударный режим убирает бег и меняет ккал/мин (ходьба ×0.44, вело ×0.77).</div>
-      </Accordion>
-
-      <Accordion id="sec-nog" title="Дни тяжёлых ног" icon="🦵" defaultOpen badge={legDays.length > 0 ? <Badge bg="rgba(245,158,11,0.13)" border="rgba(245,158,11,0.28)" color="#fbbf24">{legDays.length} дн</Badge> : undefined}>
-        <div style={ROW}>
-          {DAY_LABELS_RU.map((d, i) => (
-            <button key={d} style={legDays.includes(i) ? CHIP_ACTIVE : CHIP} onClick={() => setLegDays(legDays.includes(i) ? legDays.filter(x => x !== i) : [...legDays, i])} aria-label={`Ноги: ${d}`}>
-              {d}
-            </button>
-          ))}
-        </div>
-        <div style={HINT_SM}>Zone2/MISS/HIIT не ставятся на эти дни; recovery — можно.</div>
-      </Accordion>
-
-      <Accordion id="sec-factors" title="Факторы восстановления и курса" icon="📊" defaultOpen badge={factorsSummary.length > 0 ? <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.28)" color="#60a5fa">{factorsSummary.length} активно</Badge> : undefined}>
-        <div style={ROW}>
-          <button style={factorsOn.sleep ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('sleep')} aria-label="Фактор: сон">😴 Сон</button>
-          <button style={factorsOn.stress ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('stress')} aria-label="Фактор: стресс">😣 Стресс</button>
-          <button style={factorsOn.hrv ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('hrv')} aria-label="Фактор: HRV">📉 HRV</button>
-          <button style={factorsOn.ped ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('ped')} aria-label="Фактор: PED-курс">💉 PED</button>
-          <button style={factorsOn.joints ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('joints')} aria-label="Фактор: суставы">🦴 Суставы</button>
-        </div>
-        {factorsSummary.length > 0 && (
-          <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
-            {factorsSummary.map((s, i) => <div key={i}>• {s}</div>)}
-          </div>
-        )}
-        <div style={HINT_SM}>Сон &lt;6ч ×0.9 · стресс ≥7 ×0.95+noHIIT · HRV&lt;25 ×0.9 · PED ×1.05 · суставы → lowImpact.</div>
-      </Accordion>
-
-      <Accordion id="sec-phases" title="Структура фаз" icon="🧩" defaultOpen>
+        <div style={HINT_SM}>Дней в неделю ограничивает частоту — приоритет zone2 → recovery → miss → hiit.</div>
         <div style={ROW}>
           <button style={phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: true })}>Авто (по долям)</button>
           <button style={!phaseSplit.auto ? CHIP_ACTIVE : CHIP} onClick={() => setPhaseSplit({ ...phaseSplit, auto: false })}>Вручную</button>
@@ -299,12 +255,12 @@ export const CardioParamsStep: React.FC<{
           </button>
         </div>
         {taperEnabled && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 2 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
             <Stepper label="Недель taper" value={taperWeeks} min={1} max={4} step={1} onChange={setTaperWeeks} ariaPrefix="Недель taper" suffix="нед" width={50} />
           </div>
         )}
         {!phaseSplit.auto && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(['base', 'build', 'maintenance'] as const).map(k => (
               <div key={k} style={ROW}>
                 <span style={{ ...LABEL, minWidth: 120 }}>{k === 'base' ? '🌱 База' : k === 'build' ? '📈 Наращивание' : '🧘 Поддержание'}</span>
@@ -336,8 +292,57 @@ export const CardioParamsStep: React.FC<{
         )}
       </Accordion>
 
-      <SectionCard id="sec-preview" accent title="👁 Предпросмотр цикла" right={<button style={BTN_SMALL} onClick={onReset} aria-label="Сбросить параметры">⟲ Сбросить</button>}>
-        {s && (
+      {/* ── 4. Оборудование и дни ног — всегда открыт для юзабилити ── */}
+      <SectionCard title="🏃 Оборудование и ограничения" id="sec-equip">
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>Оборудование</div>
+        <div style={ROW}>
+          {CARDIO_EQUIPMENT_OPTIONS.map(e => (
+            <button key={e.id} style={equipment.includes(e.id) ? CHIP_ACTIVE : { ...CHIP, opacity: lowImpact && e.impact === 'high' ? 0.35 : 1 }} onClick={() => toggleEquipment(e.id)} disabled={lowImpact && e.impact === 'high'} aria-label={`Оборудование: ${e.label}`}>
+              {e.icon} {e.label}
+            </button>
+          ))}
+        </div>
+        <button style={lowImpact ? CHIP_ACTIVE : CHIP} onClick={() => setLowImpact(!lowImpact)}>
+          {lowImpact ? '🦴 Щадить суставы: вкл' : 'Щадить суставы: выкл'}
+        </button>
+        <div style={HINT_SM}>Низкоударный режим убирает бег и меняет ккал/мин (ходьба ×0.44, вело ×0.77).</div>
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.06)' }} />
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>🦵 Дни тяжёлых ног</div>
+        <div style={ROW}>
+          {DAY_LABELS_RU.map((d, i) => (
+            <button key={d} style={legDays.includes(i) ? CHIP_ACTIVE : CHIP} onClick={() => setLegDays(legDays.includes(i) ? legDays.filter(x => x !== i) : [...legDays, i])} aria-label={`Ноги: ${d}`}>
+              {d}
+            </button>
+          ))}
+        </div>
+        <div style={HINT_SM}>Zone2/MISS/HIIT не ставятся на эти дни; recovery — можно. {legDays.length > 0 ? `Выбрано: ${legDays.map(i => DAY_LABELS_RU[i]).join(', ')}` : ''}</div>
+      </SectionCard>
+
+      {/* ── 5. Факторы — свёрнуто ── */}
+      <Accordion id="sec-factors" title="Факторы восстановления и курса" icon="📊" badge={factorsSummary.length > 0 ? <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.28)" color="#60a5fa">{factorsSummary.length} активно</Badge> : undefined}>
+        <div style={ROW}>
+          <button style={factorsOn.sleep ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('sleep')} aria-label="Фактор: сон">😴 Сон</button>
+          <button style={factorsOn.stress ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('stress')} aria-label="Фактор: стресс">😣 Стресс</button>
+          <button style={factorsOn.hrv ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('hrv')} aria-label="Фактор: HRV">📉 HRV</button>
+          <button style={factorsOn.ped ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('ped')} aria-label="Фактор: PED-курс">💉 PED</button>
+          <button style={factorsOn.joints ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('joints')} aria-label="Фактор: суставы">🦴 Суставы</button>
+        </div>
+        {factorsSummary.length > 0 && (
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', lineHeight: 1.6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+            {factorsSummary.map((sm, i) => <div key={i}>• {sm}</div>)}
+          </div>
+        )}
+        <div style={HINT_SM}>Сон &lt;6ч ×0.9 · стресс ≥7 ×0.95+noHIIT · HRV&lt;25 ×0.9 · PED ×1.05 · суставы → lowImpact.</div>
+      </Accordion>
+
+      {/* ── Hero Итог — всегда открыт ── */}
+      <div style={CARD_HERO} id="sec-preview">
+        <div style={ROW}>
+          <span style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>👁 Предпросмотр цикла</span>
+          <span style={{ flex: 1 }} />
+          <button style={BTN_SMALL} onClick={onReset} aria-label="Сбросить параметры">⟲ Сбросить</button>
+        </div>
+        {s ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             <StatTile label="НЕДЕЛЬ" value={String(totalWeeks)} color="#22c55e" />
             <StatTile label="МИН/НЕД" value={String(s.avgMinutesPerWeek)} color="#3b82f6" />
@@ -346,37 +351,39 @@ export const CardioParamsStep: React.FC<{
             <StatTile label="ЦЕЛЬ" value={CARDIO_GOAL_LABELS[goal]} color="#94a3b8" />
             {preview.cycle && <StatTile label="+VO2MAX" value={`+${cardioFitnessForecast(preview.cycle).vo2GainPct}%`} color="#60a5fa" sub={`${cardioFitnessForecast(preview.cycle).effectiveWeeks} нед`} />}
           </div>
+        ) : (
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.62)' }}>Заполните параметры — появится сводка.</div>
         )}
         {preview.cycle && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={ROW}>
               <span style={LABEL}>🗺 Фазы по неделям</span>
               <span style={{ flex: 1 }} />
-              <span style={{ fontSize: 11, color: taperEnabled ? '#eab308' : '#fff', fontWeight: 800 }}>
+              <span style={{ fontSize: 11, color: taperEnabled ? '#eab308' : 'rgba(255,255,255,0.72)', fontWeight: 800 }}>
                 {taperEnabled ? `📉 taper ${taperWeeks} нед${peakWeek ? ' + пик' : ''}` : 'без taper'}
               </span>
             </div>
             <div style={{ display: 'flex', gap: 2, flexWrap: 'nowrap', overflowX: 'auto', scrollbarWidth: 'none', padding: '2px 0' }}>
               {preview.cycle.weeks.map(w => (
-                <div key={w.week} style={{ flex: '1 0 10px', minWidth: 8, height: 16, borderRadius: 3, background: PHASE_COLOR[w.phase] ?? '#888', opacity: w.deload ? 0.5 : 1, boxShadow: w.deload ? 'inset 0 0 0 1px rgba(255,255,255,0.15)' : 'none' }} title={`Нед ${w.week} · ${w.phase}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}`} />
+                <div key={w.week} style={{ flex: '1 0 10px', minWidth: 8, height: 18, borderRadius: 4, background: PHASE_COLOR[w.phase] ?? '#888', opacity: w.deload ? 0.5 : 1, boxShadow: w.deload ? 'inset 0 0 0 1px rgba(255,255,255,0.18)' : 'none' }} title={`Нед ${w.week} · ${w.phase}${w.deload ? ' · делод' : ''}${w.taper ? ' · taper' : ''}`} />
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {PHASE_ORDER.filter(p => (s?.phaseWeeks[p.phase] ?? 0) > 0).map(p => (
-                <span key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#fff', fontWeight: 600 }}>
+                <span key={p.phase} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: 600 }}>
                   <span style={{ width: 8, height: 8, borderRadius: 2, background: PHASE_COLOR[p.phase] }} />
                   {p.label} · {s?.phaseWeeks[p.phase]}
                 </span>
               ))}
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(96,165,250,0.85)', lineHeight: 1.45, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)', borderRadius: 8, padding: '6px 8px' }}>
-              📈 Прогноз адаптации: +{cardioFitnessForecast(preview.cycle).vo2GainPct}% VO2max за {cardioFitnessForecast(preview.cycle).effectiveWeeks} рабочих нед
+            <div style={{ fontSize: 11, color: 'rgba(96,165,250,0.9)', lineHeight: 1.45, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)', borderRadius: 8, padding: '6px 8px' }}>
+              📈 Прогноз адаптации: +{cardioFitnessForecast(preview.cycle).vo2GainPct}% VO2max за {cardioFitnessForecast(preview.cycle).effectiveWeeks} рабочих нед — Прогноз адаптации VO2max
             </div>
           </div>
         )}
         {preview.warnings.map((w, i) => <InfoBanner key={i} tone="warn">⚠ {w}</InfoBanner>)}
-        {s && <InfoBanner tone="ok">Собранный цикл готов — «Далее» перейдёт к стартам, затем к предпросмотру.</InfoBanner>}
-      </SectionCard>
+        {s && <InfoBanner tone="ok">Готово — «Далее» → старты, затем предпросмотр детально.</InfoBanner>}
+      </div>
     </div>
   );
 };

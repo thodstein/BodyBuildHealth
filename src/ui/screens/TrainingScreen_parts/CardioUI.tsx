@@ -6,65 +6,84 @@
  */
 import React from 'react';
 
-// ─── Токены дизайна v2 ───
+// ─── Токены дизайна v3 ───
 export const ACCENT = '#00e68a';
 export const ACCENT_SOFT = 'rgba(0,230,138,0.14)';
 export const ACCENT_BORDER = 'rgba(0,230,138,0.45)';
+export const ACCENT_HOVER = 'rgba(0,230,138,0.22)';
 export const GLASS_BG = 'linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015))';
 export const GLASS_BORDER = 'rgba(255,255,255,0.08)';
+export const SURFACE_0 = 'rgba(255,255,255,0.015)';
+export const SURFACE_1 = 'rgba(255,255,255,0.035)';
+export const SURFACE_2 = 'linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02))';
+export const TEXT_1 = '#ffffff';
+export const TEXT_2 = 'rgba(255,255,255,0.72)';
+export const TEXT_3 = 'rgba(255,255,255,0.45)';
+export const RADIUS_LG = 16;
+export const RADIUS_MD = 12;
+export const SHADOW_CARD = '0 4px 20px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05)';
+export const SHADOW_ACCENT = '0 4px 24px rgba(0,230,138,0.14), inset 0 1px 0 rgba(255,255,255,0.06)';
 
 // ─── Единые стили ───
 
 export const CARD: React.CSSProperties = {
   background: GLASS_BG,
   border: `1px solid ${GLASS_BORDER}`,
-  borderRadius: 16, padding: 14, display: 'flex', flexDirection: 'column', gap: 11,
-  boxShadow: '0 4px 20px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05)',
+  borderRadius: RADIUS_LG, padding: 14, display: 'flex', flexDirection: 'column', gap: 11,
+  boxShadow: SHADOW_CARD,
   backdropFilter: 'blur(6px)',
 };
 export const CARD_ACCENT: React.CSSProperties = {
   ...CARD,
   borderColor: ACCENT_BORDER,
   background: 'linear-gradient(180deg, rgba(0,230,138,0.12), rgba(0,230,138,0.03))',
-  boxShadow: '0 4px 24px rgba(0,230,138,0.12), inset 0 1px 0 rgba(255,255,255,0.06)',
+  boxShadow: SHADOW_ACCENT,
 };
 export const CARD_SOFT: React.CSSProperties = {
   ...CARD,
-  background: 'rgba(255,255,255,0.02)',
+  background: SURFACE_0,
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+};
+export const CARD_HERO: React.CSSProperties = {
+  background: 'linear-gradient(135deg, rgba(0,230,138,0.14) 0%, rgba(6,182,212,0.08) 55%, rgba(139,92,246,0.06) 100%)',
+  border: '1px solid rgba(0,230,138,0.28)',
+  borderRadius: RADIUS_LG, padding: 14, display: 'flex', flexDirection: 'column', gap: 12,
+  boxShadow: '0 8px 28px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(8px)',
 };
 export const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' };
 export const ROW_TIGHT: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' };
-export const LABEL: React.CSSProperties = { fontSize: 11, color: '#fff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1 };
-export const LABEL_SM: React.CSSProperties = { fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 };
-export const HINT: React.CSSProperties = { fontSize: 11, color: '#fff', lineHeight: 1.55 };
-export const HINT_SM: React.CSSProperties = { fontSize: 10, color: 'rgba(255,255,255,0.42)', lineHeight: 1.5 };
+export const COL: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 8 };
+export const LABEL: React.CSSProperties = { fontSize: 11, color: TEXT_1, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, lineHeight: 1 };
+export const LABEL_SM: React.CSSProperties = { fontSize: 10, color: TEXT_1, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 };
+export const HINT: React.CSSProperties = { fontSize: 12, color: TEXT_2, lineHeight: 1.55 };
+export const HINT_SM: React.CSSProperties = { fontSize: 11, color: TEXT_3, lineHeight: 1.5 };
 export const BTN: React.CSSProperties = {
   padding: '9px 14px', borderRadius: 10, fontSize: 12, fontWeight: 750, cursor: 'pointer',
   border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)',
-  color: '#fff', minHeight: 40, whiteSpace: 'nowrap',
+  color: TEXT_1, minHeight: 44, whiteSpace: 'nowrap',
   boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 1px 6px rgba(0,0,0,0.2)',
   transition: 'all 0.15s ease',
 };
 export const BTN_PRIMARY: React.CSSProperties = { ...BTN, background: 'linear-gradient(180deg, rgba(0,230,138,0.22), rgba(0,230,138,0.14))', border: `1px solid ${ACCENT_BORDER}`, color: ACCENT, boxShadow: '0 0 14px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.08)' };
-export const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#fff' };
+export const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: TEXT_1 };
 export const BTN_DANGER: React.CSSProperties = { ...BTN, background: 'rgba(239,68,68,0.11)', border: '1px solid rgba(239,68,68,0.32)', color: '#f87171' };
-export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 32, padding: '6px 11px', fontSize: 11, borderRadius: 9 };
-export const BTN_XS: React.CSSProperties = { ...BTN, minHeight: 28, padding: '4px 9px', fontSize: 11, borderRadius: 8 };
+export const BTN_SMALL: React.CSSProperties = { ...BTN, minHeight: 36, padding: '7px 12px', fontSize: 11, borderRadius: 9 };
+export const BTN_XS: React.CSSProperties = { ...BTN, minHeight: 32, padding: '4px 9px', fontSize: 11, borderRadius: 8 };
 export const INPUT: React.CSSProperties = {
   background: 'rgba(255,255,255,0.055)', border: '1px solid rgba(255,255,255,0.13)',
-  borderRadius: 10, padding: '9px 11px', color: '#fff', fontSize: 13,
+  borderRadius: 10, padding: '9px 11px', color: TEXT_1, fontSize: 13,
   boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.18)', outline: 'none',
 };
 export const CHIP: React.CSSProperties = {
   padding: '7px 13px', borderRadius: 10, fontSize: 12, fontWeight: 650, cursor: 'pointer',
-  border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.035)',
-  color: '#fff', whiteSpace: 'nowrap', minHeight: 36,
+  border: '1px solid rgba(255,255,255,0.09)', background: SURFACE_1,
+  color: TEXT_1, whiteSpace: 'nowrap', minHeight: 40,
   transition: 'all 0.15s ease',
 };
 export const CHIP_ACTIVE: React.CSSProperties = {
   ...CHIP,
-  border: `1px solid ${ACCENT_BORDER}`, background: ACCENT_SOFT, color: '#fff',
+  border: `1px solid ${ACCENT_BORDER}`, background: ACCENT_SOFT, color: TEXT_1,
   boxShadow: '0 0 10px rgba(0,230,138,0.16), inset 0 1px 0 rgba(255,255,255,0.06)',
 };
 export const CHIP_MUTED: React.CSSProperties = {
@@ -78,6 +97,11 @@ export const PHASE_BG: Record<string, string> = {
   base: 'rgba(34,197,94,0.14)', build: 'rgba(59,130,246,0.14)', maintenance: 'rgba(139,92,246,0.14)', contest_prep: 'rgba(245,158,11,0.14)', taper: 'rgba(234,179,8,0.14)', peak: 'rgba(239,68,68,0.14)', transition: 'rgba(100,116,139,0.14)',
 };
 export const TYPE_COLOR: Record<string, string> = { zone2: '#4ade80', miss: '#60a5fa', hiit: '#a78bfa', recovery: '#94a3b8' };
+export const GOAL_COLOR: Record<string, string> = {
+  health: '#22c55e', mass: '#3b82f6', cut: '#f59e0b', recomp: '#a78bfa',
+  maintenance: '#8b5cf6', recovery: '#71717a', bb_prep: '#ec4899', pl_prep: '#06b6d4', bb_taper: '#ef4444',
+};
+export const CK_COLORS = { phase: PHASE_COLOR, goal: GOAL_COLOR, type: TYPE_COLOR };
 
 // ─── Компоненты ───
 
@@ -411,7 +435,7 @@ export const Tabs: React.FC<{ tabs: { id: string; label: string; icon?: string }
 export const Accordion: React.FC<{ id?: string; title: React.ReactNode; defaultOpen?: boolean; icon?: string; badge?: React.ReactNode; children: React.ReactNode }> = ({ id, title, defaultOpen = false, icon, badge, children }) => {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
-    <div id={id} style={{ ...CARD, padding: 0, overflow: 'hidden', gap: 0, scrollMarginTop: 12 }}>
+    <div id={id} style={{ ...CARD, padding: 0, overflow: 'hidden', gap: 0, scrollMarginTop: 72 }}>
       <button
         onClick={() => setOpen(v => !v)}
         style={{
@@ -420,12 +444,114 @@ export const Accordion: React.FC<{ id?: string; title: React.ReactNode; defaultO
         }}
         aria-expanded={open}
       >
-        <span style={{ fontSize: 12, color: '#fff' }}>{open ? '▾' : '▸'}</span>
+        <span style={{ fontSize: 12, color: '#fff', transition: 'transform 0.18s ease', transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', display: 'inline-block' }}>▾</span>
         {icon && <span style={{ fontSize: 15 }}>{icon}</span>}
         <span style={{ fontSize: 13, fontWeight: 850, color: '#fff', flex: 1 }}>{title}</span>
         {badge}
       </button>
-      {open && <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 11, borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)' }}>{children}</div>}
+      {open && <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 11, borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.015)', animation: 'ckFadeIn 0.18s ease' }}>{children}</div>}
     </div>
   );
 };
+
+// ─── v3 — Hero, Segmented, Timeline ───
+
+export const HeroCard: React.FC<{ icon?: string; title: string; subtitle?: string; right?: React.ReactNode; children?: React.ReactNode }> = ({ icon, title, subtitle, right, children }) => (
+  <div style={CARD_HERO}>
+    <div style={ROW}>
+      {icon && <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{icon}</span>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 900, color: TEXT_1, lineHeight: 1 }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 11, color: TEXT_2, marginTop: 2 }}>{subtitle}</div>}
+      </div>
+      {right}
+    </div>
+    {children}
+  </div>
+);
+
+export const Segmented: React.FC<{
+  options: { value: string; label: string; desc?: string; icon?: string; disabled?: boolean }[];
+  value: string;
+  onChange: (v: string) => void;
+  columns?: number;
+  ariaLabel?: string;
+}> = ({ options, value, onChange, columns, ariaLabel }) => (
+  <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'grid', gridTemplateColumns: columns ? `repeat(${columns},1fr)` : 'repeat(auto-fill, minmax(140px,1fr))', gap: 6 }}>
+    {options.map(o => {
+      const active = value === o.value;
+      return (
+        <button
+          key={o.value}
+          role="radio"
+          aria-checked={active}
+          disabled={o.disabled}
+          onClick={() => !o.disabled && onChange(o.value)}
+          style={{
+            padding: '10px 12px', borderRadius: RADIUS_MD, textAlign: 'left', cursor: o.disabled ? 'not-allowed' : 'pointer',
+            border: active ? `1px solid ${ACCENT_BORDER}` : '1px solid rgba(255,255,255,0.08)',
+            background: active ? ACCENT_SOFT : SURFACE_1,
+            color: TEXT_1, opacity: o.disabled ? 0.45 : 1,
+            boxShadow: active ? '0 0 12px rgba(0,230,138,0.14)' : 'none',
+            transition: 'all 0.15s ease', minHeight: 44,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: active ? 800 : 650, display: 'flex', alignItems: 'center', gap: 6 }}>{o.icon && <span>{o.icon}</span>}{o.label}</div>
+          {o.desc && <div style={{ fontSize: 10, color: TEXT_2, marginTop: 3, lineHeight: 1.35 }}>{o.desc}</div>}
+        </button>
+      );
+    })}
+  </div>
+);
+
+export const SegmentedChips: React.FC<{
+  options: { value: string; label: string; icon?: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  ariaLabel?: string;
+}> = ({ options, value, onChange, ariaLabel }) => (
+  <div role="radiogroup" aria-label={ariaLabel} style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+    {options.map(o => {
+      const active = value === o.value;
+      return (
+        <button key={o.value} role="radio" aria-checked={active} onClick={() => onChange(o.value)} style={active ? CHIP_ACTIVE : CHIP}>
+          {o.icon ? o.icon + ' ' : ''}{o.label}
+        </button>
+      );
+    })}
+  </div>
+);
+
+/** Универсальный Timeline по фазам/неделям — высота 28-36, сегменты + точки стартов */
+export const Timeline: React.FC<{
+  segments: { key: string; weeks: number; color: string; label?: string }[];
+  markers?: { week: number; color?: string; label?: string }[];
+  totalWeeks: number;
+  height?: number;
+}> = ({ segments, markers, totalWeeks, height = 28 }) => {
+  let cursor = 1;
+  return (
+    <div style={{ display: 'flex', height, borderRadius: 8, overflow: 'hidden', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', position: 'relative' }}>
+      {segments.map(s => {
+        const w = s.weeks;
+        if (w <= 0) return null;
+        const el = <div key={s.key} title={`${s.label ?? s.key}: ${w} нед`} style={{ flex: w, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', borderLeft: cursor > 1 ? '1px solid rgba(255,255,255,0.12)' : 'none', position: 'relative' as const }}>{w >= 6 ? s.label ?? '' : ''}</div>;
+        cursor += w;
+        return el;
+      })}
+      {markers?.map((m, i) => {
+        const left = ((m.week - 0.5) / totalWeeks) * 100;
+        return <div key={i} title={m.label ?? `нед ${m.week}`} style={{ position: 'absolute', left: `calc(${left}% - 5px)`, top: 2, width: 10, height: 10, borderRadius: 5, background: m.color ?? '#ef4444', border: '2px solid #fff', boxShadow: '0 1px 6px rgba(0,0,0,0.4)' }} />;
+      })}
+    </div>
+  );
+};
+
+export const Field: React.FC<{ label?: string; hint?: string; error?: string; children: React.ReactNode }> = ({ label, hint, error, children }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 140px', minWidth: 0 }}>
+    {label && <span style={LABEL}>{label}</span>}
+    {children}
+    {hint && !error && <span style={HINT_SM}>{hint}</span>}
+    {error && <span style={{ fontSize: 10, color: '#f87171' }}>⚠ {error}</span>}
+  </div>
+);

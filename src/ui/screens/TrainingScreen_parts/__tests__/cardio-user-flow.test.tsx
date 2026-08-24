@@ -63,6 +63,8 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    // v3: недели в под-табе Детали, график открыт сразу
+    fireEvent.click(screen.getByRole('button', { name: /Детали/ }));
     expect(screen.getByText(/Мин\/нед/)).toBeTruthy();
     expect(screen.getAllByText(/мин ·/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/ккал/).length).toBeGreaterThan(0);
@@ -120,6 +122,7 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Добавить старт/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /План/ }));
     expect(screen.getByText(/План по фазам/)).toBeTruthy();
     expect(screen.getByText(/Taper-план перед стартом/)).toBeTruthy();
     expect(screen.getAllByText(/без HIIT/).length).toBeGreaterThan(0);
@@ -131,6 +134,7 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Варианты/ }));
     const baseMin = loadCardioCycles()[0].weeks[0].totalMinutes;
     fireEvent.click(screen.getByRole('button', { name: /Вариант: Интенсивный/ }));
     fireEvent.click(screen.getByRole('button', { name: /Пересобрать цикл/ }));
@@ -160,8 +164,9 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /План/ }));
     expect(screen.getByText(/Неделя по дням/)).toBeTruthy();
-    for (const d of ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']) expect(screen.getByText(d)).toBeTruthy();
+    for (const d of ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']) expect(screen.getAllByText(d).length).toBeGreaterThan(0);
   });
 
   it('дни тяжёлых ног: zone2-сессии не ставятся в выбранные дни', () => {
@@ -187,6 +192,7 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Сценарии/ }));
     fireEvent.click(screen.getByRole('button', { name: /Сохранить сценарий/ }));
     expect(screen.getByText(/Сценарии \(1\/6\)/)).toBeTruthy();
     expect(screen.getByRole('button', { name: /Загрузить/ })).toBeTruthy();
@@ -210,6 +216,7 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Журнал/ }));
     expect(screen.getByText(/Вес стоит/)).toBeTruthy();
     const z2Before = loadCardioCycles()[0].weeks[0].sessions.find(s => s.type === 'zone2')!.durationMin;
     fireEvent.click(screen.getByRole('button', { name: /Применить \+15 мин Zone 2/ }));
@@ -223,6 +230,7 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /План/ }));
     const protoBtns = screen.getAllByRole('button').filter(b => b.getAttribute('aria-label')?.startsWith('Протокол'));
     if (protoBtns.length > 0) {
       fireEvent.click(protoBtns[0]);
@@ -236,6 +244,7 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /План/ }));
     fireEvent.click(screen.getByRole('button', { name: /К текущей неделе/ }));
     expect(screen.getAllByText(/из 12/).length).toBeGreaterThan(0);
   });
@@ -257,6 +266,7 @@ describe('CardioConstructor — сценарий пользователя', () =
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Детали/ }));
     expect(screen.getByRole('button', { name: /Показать все недели/ })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Показать все недели/ }));
     expect(screen.queryByRole('button', { name: /Показать все недели/ })).toBeNull();

@@ -228,14 +228,14 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         ))}
       </div>
       {editingId && <div style={{ fontSize: 11, color: '#fbbf24' }}>✏️ Редактирование записи — сохраните или нажмите ✕ на строке, чтобы отменить.</div>}
-      <div style={ROW}>
-        <input value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="Мин" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="Минуты" />
-        <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 80 }} aria-label="RPE" />
-        <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 70 }} aria-label="ЧСС" />
-        <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 90 }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
-        <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 60 }} aria-label="Км" title="Дистанция (для бега/езды)" />
-        <button style={BTN_PRIMARY} onClick={add}>{editingId ? '💾 Обновить' : '+ Записать'}</button>
-        <button style={BTN} onClick={() => { setMinutes('30'); setRpe(''); setHr(''); setKcal(''); setKm(''); setEditingId(null); setWarnings(null); }} aria-label="Сбросить форму">✕ Сбросить</button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(96px,1fr))', gap: 6 }}>
+        <input value={minutes} onChange={e => setMinutes(e.target.value)} placeholder="Мин" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Минуты" />
+        <input value={rpe} onChange={e => setRpe(e.target.value)} placeholder="RPE 1-10" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="RPE" />
+        <input value={hr} onChange={e => setHr(e.target.value)} placeholder="ЧСС" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="ЧСС" />
+        <input value={kcal} onChange={e => setKcal(e.target.value)} placeholder="ккал (авто)" inputMode="numeric" style={{ ...INPUT, width: 'auto' }} aria-label="Ккал" title="Оставьте пустым — ккал рассчитаются по весу и типу сессии" />
+        <input value={km} onChange={e => setKm(e.target.value)} placeholder="км" inputMode="decimal" style={{ ...INPUT, width: 'auto' }} aria-label="Км" title="Дистанция (для бега/езды)" />
+        <button style={{ ...BTN_PRIMARY, minHeight: 44 }} onClick={add}>{editingId ? '💾 Обновить' : '+ Записать'}</button>
+        <button style={{ ...BTN, minHeight: 44 }} onClick={() => { setMinutes('30'); setRpe(''); setHr(''); setKcal(''); setKm(''); setEditingId(null); setWarnings(null); }} aria-label="Сбросить форму">✕ Сбросить</button>
       </div>
       {warnings && (
         <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '6px 8px' }} role="alert">
@@ -294,23 +294,25 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
       {log.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {(showAll ? log : log.slice(0, 6)).map(e => (
-            <div key={e.id} style={{ ...ROW, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>
-              <span style={{ fontSize: 11, color: '#fff', width: 84 }}>{e.date}</span>
-              <span style={{ fontSize: 11, minWidth: 60, fontWeight: 700, color: TYPE_COLOR[e.type] ?? '#fff' }}>{TYPE_LABEL[e.type]}</span>
-              {e.completed === false
-                ? <span style={{ fontSize: 10, color: '#f87171', minWidth: 60 }}>⏭ пропущена</span>
-                : <span style={{ fontSize: 11, color: '#fff', minWidth: 60 }}>{e.durationMin} мин</span>}
-              {e.completed !== false && e.rpe != null && <span style={{ fontSize: 11, color: '#fff', minWidth: 40 }}>RPE {e.rpe}</span>}
-              {e.completed !== false && e.avgHr != null && <span style={{ fontSize: 11, color: '#fff', minWidth: 50 }}>{e.avgHr} уд</span>}
-              {e.completed !== false && e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: '#fff', minWidth: 50 }}>{e.calories} ккал</span>}
-              {e.completed !== false && e.distanceKm != null && e.distanceKm > 0 && (
-                <>
-                  <span style={{ fontSize: 11, color: '#fff', minWidth: 50 }}>{e.distanceKm} км</span>
-                  <span style={{ fontSize: 11, color: '#fff', minWidth: 70 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
-                </>
-              )}
-              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>
-              <button style={{ ...BTN, minHeight: 28, padding: '4px 8px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setUndoPrev(log); commitLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
+            <div key={e.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', minWidth: 78, fontWeight: 700 }}>{e.date}</span>
+              <span style={{ fontSize: 11, minWidth: 64, fontWeight: 800, color: TYPE_COLOR[e.type] ?? '#fff', background: `${TYPE_COLOR[e.type] ?? '#fff'}14`, border: `1px solid ${TYPE_COLOR[e.type] ?? '#fff'}28`, borderRadius: 20, padding: '2px 8px', textAlign: 'center' }}>{TYPE_LABEL[e.type]}</span>
+              <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4, flex: 1, alignItems: 'center' }}>
+                {e.completed === false
+                  ? <span style={{ fontSize: 11, color: '#f87171', fontWeight: 700 }}>⏭ пропущена</span>
+                  : <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>{e.durationMin} мин</span>}
+                {e.completed !== false && e.rpe != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>RPE {e.rpe}</span>}
+                {e.completed !== false && e.avgHr != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.avgHr} уд</span>}
+                {e.completed !== false && e.calories != null && e.calories > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.calories} ккал</span>}
+                {e.completed !== false && e.distanceKm != null && e.distanceKm > 0 && (
+                  <>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{e.distanceKm} км</span>
+                    <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }}>{cardioPaceMinPerKm(e.distanceKm, e.durationMin)}</span>
+                  </>
+                )}
+              </span>
+              <button style={{ ...BTN, minHeight: 36, padding: '6px 10px' }} onClick={() => startEdit(e)} aria-label={`Редактировать ${e.date}`} title="Редактировать">✎</button>
+              <button style={{ ...BTN, minHeight: 36, padding: '6px 10px' }} onClick={() => { if (editingId === e.id) setEditingId(null); setUndoPrev(log); commitLog(removeCardioLogEntry(e.id)); }} aria-label={`Удалить ${e.date}`}>✕</button>
             </div>
           ))}
           {log.length > 6 && (

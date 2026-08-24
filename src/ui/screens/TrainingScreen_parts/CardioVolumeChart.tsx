@@ -15,8 +15,8 @@ function todayIso(): string {
 
 const TRIMP_FACTOR: Record<string, number> = { zone2: 2, miss: 3, hiit: 5, recovery: 1 };
 
-export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: CardioLogEntry[] }> = ({ cycle, log = [] }) => {
-  const [open, setOpen] = useState(false);
+export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: CardioLogEntry[]; defaultOpen?: boolean }> = ({ cycle, log = [], defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   const [metric, setMetric] = useState<'minutes' | 'kcal' | 'trimp'>('minutes');
 
   const series = useMemo(() => {

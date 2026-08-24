@@ -25,8 +25,8 @@ function todayIso(): string {
   return toLocalIso(d);
 }
 
-export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle }) => {
-  const [open, setOpen] = useState(false);
+export const CardioCalendar: React.FC<{ cycle: CardioCycle | null; defaultOpen?: boolean }> = ({ cycle, defaultOpen = false }) => {
+  const [open, setOpen] = useState(defaultOpen);
   const [offset, setOffset] = useState(0); // месяцы от старта
   const today = todayIso();
 

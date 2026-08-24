@@ -1,7 +1,7 @@
 /**
- * CardioManageStep.tsx — шаг 4 мастера кардио: интеграции (ПЛ/ББ/ручной,
- * годовой план), экспорт (.ics/.tcx/печать/питание), редактор недели,
- * библиотека с карточками и сценарии. Структура: секции с навигацией.
+ * CardioManageStep.tsx — шаг 4 v3: таб-эксклюзив.
+ * 5 табов: Интеграции | Экспорт | Неделя | Библиотека | Сценарии
+ * Экспорт сгруппирован (Поделиться / Файлы), библиотека grid.
  */
 import React, { useState } from 'react';
 import {
@@ -15,7 +15,7 @@ import { loadCardioLog } from '../../../engines/lms/cardio-diary.engine';
 import { SPORT_LABELS, type CardioLink, type CardioLinkSport } from '../../../engines/lms/cardio-bridge';
 import { applyToPlanner } from './planner-bridge';
 import { CardioWeekEditor } from './CardioWeekEditor';
-import { SectionCard, GroupHeading, ROW, LABEL, HINT_SM, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
+import { SectionCard, ROW, LABEL, BTN, BTN_PRIMARY, BTN_DANGER, BTN_SMALL, InfoBanner, Tabs, Badge, EmptyState } from './CardioUI';
 
 const GOAL_COLOR: Record<string, string> = {
   health: '#22c55e', mass: '#3b82f6', cut: '#f59e0b', recomp: '#a78bfa',
@@ -52,10 +52,8 @@ export const CardioManageStep: React.FC<{
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
 
-  /** Год кардио из библиотеки (до 4 циклов) — для визуализации последовательности. */
   const yearPlan = cardioYearPlan(library.slice(0, 4));
 
-  /** «📆 Год кардио»: последовательность циклов из библиотеки → сводка в буфер. */
   const copyYear = () => {
     const cycles = loadCardioCycles().slice(0, 4);
     const plan = cardioYearPlan(cycles);
@@ -78,7 +76,6 @@ export const CardioManageStep: React.FC<{
     window.setTimeout(() => setCopyFlash(false), 2500);
   };
 
-  /** «🍽 В питание»: расход кардио → заметка для планировщика питания + буфер. */
   const sendToNutrition = () => {
     if (!cycle) return;
     const p = cardioToNutritionPayload(cycle, loadCardioLog());
@@ -141,198 +138,206 @@ export const CardioManageStep: React.FC<{
   ] as const;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-      <Tabs tabs={TABS as unknown as { id: string; label: string; icon?: string }[]} active={tab} onChange={v => { setTab(v as typeof tab); const el = document.getElementById('sec-' + v); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Tabs tabs={TABS as unknown as { id: string; label: string; icon?: string }[]} active={tab} onChange={v => setTab(v as typeof tab)} />
 
-          <GroupHeading icon="🔗" text="Интеграции" desc="Подключите кардио-цикл к силовому плану ссылкой (без копии) или к годовому плану." />
-          <SectionCard id="sec-integrations" title="Силовой план (ссылка, не копия)">
-        {cycle && (
-          <div style={{ fontSize: 10, color: '#fff' }}>
-            Активный цикл: <b style={{ color: '#4ade80' }}>{cycle.name}</b> — будет подключаться к конструкторам.
-          </div>
-        )}
-        {link ? (
-          <div style={ROW}>
-            <span style={{ fontSize: 12, color: '#4ade80' }}>Подключено к {SPORT_LABELS[link.sport]}</span>
-            <button style={BTN_DANGER} onClick={onUnlink}>Отключить</button>
-          </div>
-        ) : (
-          <div style={ROW}>
-            <button style={BTN} onClick={() => onLinkTo('pl')}>🏆 К ПЛ-авто</button>
-            <button style={BTN} onClick={() => onLinkTo('bb')}>💪 К ББ-авто</button>
-            <button style={BTN} onClick={() => onLinkTo('manual')}>✋ К ручному</button>
-          </div>
-        )}
-      </SectionCard>
-
-      <SectionCard title="Годовой план (macrocycle.cardioCycleId)">
-        {macroLink?.cycleId ? (
-          <div style={ROW}>
-            <span style={{ fontSize: 12, color: '#4ade80' }}>Привязано к годовому плану {macroLink.kind === 'pl' ? 'ПЛ' : 'ББ'}</span>
-            <button style={BTN_DANGER} onClick={onDetachMacro}>Отвязать</button>
-          </div>
-        ) : (
-          <div style={ROW}>
-            <button style={BTN} onClick={() => onAttachMacro('pl')}>🏆 К плану ПЛ</button>
-            <button style={BTN} onClick={() => onAttachMacro('bb')}>💪 К плану ББ</button>
-          </div>
-        )}
-      </SectionCard>
-
-      <SectionCard title="❤️ Кардио по блокам года">
-        {onBuildAnnualCardio && (
-          <div style={ROW}>
-            <button style={BTN} onClick={onBuildAnnualCardio} title="Собрать кардио-цикл на каждый блок годового плана (цель из фазы, taper/пик к старту) и сохранить в библиотеку">
-              ❤️ Собрать кардио по блокам года
-            </button>
-            {Object.keys(annualCardioMap ?? {}).length > 0 && onClearAnnualCardio && (
-              <button style={BTN_DANGER} onClick={onClearAnnualCardio} title="Удалить собранные кардио-циклы года из библиотеки и сбросить привязку">
-                🗑 Сбросить
-              </button>
+      {true && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <SectionCard title="🔗 Силовой план (ссылка, не копия)">
+            {cycle && (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>
+                Активный цикл: <b style={{ color: '#4ade80' }}>{cycle.name}</b> — подключается к конструкторам.
+              </div>
             )}
-          </div>
-        )}
-        {Object.keys(annualCardioMap ?? {}).length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
-            {Object.entries(annualCardioMap!).map(([blockKey, cycleId]) => {
-              const c = library.find(x => x.id === cycleId);
-              if (!c) {
-                return (
-                  <div key={blockKey} style={{ fontSize: 10, color: '#fff' }}>
-                    ⚠ Блок {blockKey}: цикл {cycleId} не найден в библиотеке
-                  </div>
-                );
-              }
-              const cs = cardioCycleSummary(c);
+            {link ? (
+              <div style={ROW}>
+                <span style={{ fontSize: 12, color: '#4ade80', fontWeight: 700 }}>Подключено к {SPORT_LABELS[link.sport]}</span>
+                <button style={BTN_DANGER} onClick={onUnlink}>Отключить</button>
+              </div>
+            ) : (
+              <div style={ROW}>
+                <button style={BTN} onClick={() => onLinkTo('pl')}>🏆 К ПЛ-авто</button>
+                <button style={BTN} onClick={() => onLinkTo('bb')}>💪 К ББ-авто</button>
+                <button style={BTN} onClick={() => onLinkTo('manual')}>✋ К ручному</button>
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="🗓 Годовой план (macrocycle.cardioCycleId)">
+            {macroLink?.cycleId ? (
+              <div style={ROW}>
+                <span style={{ fontSize: 12, color: '#4ade80', fontWeight: 700 }}>Привязано к годовому плану {macroLink.kind === 'pl' ? 'ПЛ' : 'ББ'}</span>
+                <button style={BTN_DANGER} onClick={onDetachMacro}>Отвязать</button>
+              </div>
+            ) : (
+              <div style={ROW}>
+                <button style={BTN} onClick={() => onAttachMacro('pl')}>🏆 К плану ПЛ</button>
+                <button style={BTN} onClick={() => onAttachMacro('bb')}>💪 К плану ББ</button>
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="❤️ Кардио по блокам года">
+            {onBuildAnnualCardio && (
+              <div style={ROW}>
+                <button style={BTN_PRIMARY} onClick={onBuildAnnualCardio} title="Собрать кардио на каждый блок годового плана">
+                  ❤️ Собрать кардио по блокам года
+                </button>
+                {Object.keys(annualCardioMap ?? {}).length > 0 && onClearAnnualCardio && (
+                  <button style={BTN_DANGER} onClick={onClearAnnualCardio}>🗑 Сбросить</button>
+                )}
+              </div>
+            )}
+            {Object.keys(annualCardioMap ?? {}).length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {Object.entries(annualCardioMap!).map(([blockKey, cycleId]) => {
+                  const c = library.find(x => x.id === cycleId);
+                  if (!c) return <div key={blockKey} style={{ fontSize: 11, color: '#f87171' }}>⚠ Блок {blockKey}: цикл {cycleId} не найден</div>;
+                  const cs = cardioCycleSummary(c);
+                  return (
+                    <div key={blockKey} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '8px 10px' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: GOAL_COLOR[c.goal] ?? '#fff', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{c.name}</span>
+                      <Badge bg="rgba(255,255,255,0.06)" border="rgba(255,255,255,0.10)" color="rgba(255,255,255,0.72)">{CARDIO_GOAL_LABELS[c.goal]} · {c.totalWeeks} нед</Badge>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{cs.avgMinutesPerWeek} мин · {cs.avgKcalPerWeek} ккал</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', lineHeight: 1.5 }}>
+                Кардио-циклы года не собраны: постройте макроцикл в ПЛ/ББ-авто, затем соберите кардио по блокам.
+              </div>
+            )}
+          </SectionCard>
+
+          <SectionCard title="📆 Год кардио (до 4 циклов)">
+            {yearPlan ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 2, height: 20, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {yearPlan.blocks.map(b => (
+                    <div key={b.cycle.id} title={`${b.cycle.name}: нед ${b.startWeek}-${b.startWeek + b.totalWeeks - 1}`} style={{ flex: b.totalWeeks, background: GOAL_COLOR[b.cycle.goal] ?? '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: '#fff' }}>
+                      {b.totalWeeks >= 8 ? `${b.startWeek}` : ''}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {yearPlan.blocks.map(b => (
+                    <div key={b.cycle.id} style={ROW}>
+                      <span style={{ width: 48, fontSize: 11, fontWeight: 800, color: GOAL_COLOR[b.cycle.goal] ?? '#888' }}>нед {b.startWeek}</span>
+                      <span style={{ flex: 1, fontSize: 12, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.cycle.name}</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>{CARDIO_GOAL_LABELS[b.cycle.goal]} · {b.summary.avgMinutesPerWeek} мин</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)' }}>
+                  Итого: {yearPlan.totalWeeks} нед · {yearPlan.avgMinutesPerWeek} мин/нед · {yearPlan.avgKcalPerWeek} ккал/нед
+                </div>
+                <button style={BTN_SMALL} onClick={copyYear}>{yearFlash ? '✅ Год в буфере' : '📋 Сводка года в буфер'}</button>
+              </div>
+            ) : (
+              <EmptyState icon="📭" title="Циклов пока нет" desc="Соберите и сохраните циклы, чтобы увидеть год." />
+            )}
+          </SectionCard>
+        </div>
+      )}
+
+      {true && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {!cycle ? (
+            <EmptyState icon="📤" title="Нет активного цикла" desc="Соберите цикл на шаге Предпросмотр, чтобы экспортировать." />
+          ) : (
+            <>
+              <SectionCard title="📤 Поделиться">
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 4 }}>Сводки и заметки — в буфер обмена</div>
+                <div style={ROW}>
+                  <button style={BTN} onClick={copySummary}>{copyFlash ? '✅ Сводка скопирована' : '📋 Сводка цикла'}</button>
+                  <button style={{ ...BTN, borderColor: 'rgba(250,204,21,0.32)', color: '#facc15' }} onClick={sendToNutrition}>{nutriFlash ? '✅ Расход передан' : '🍽 В питание'}</button>
+                  <button style={{ ...BTN, borderColor: 'rgba(34,197,94,0.32)', color: '#22c55e' }} onClick={copyYear}>{yearFlash ? '✅ Год в буфере' : '📆 Год кардио'}</button>
+                </div>
+              </SectionCard>
+              <SectionCard title="📁 Файлы">
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 4 }}>Календарь и тренировочные файлы</div>
+                <div style={ROW}>
+                  <button style={BTN} onClick={() => onExport(cycle)}>📅 Календарь .ics</button>
+                  <button style={BTN} onClick={downloadTcx}>📤 Тренировка .tcx</button>
+                  <button style={BTN} onClick={() => onPrint(cycle)}>🖨 Печать / PDF</button>
+                </div>
+              </SectionCard>
+              <SectionCard title="📦 В программу">
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>Откройте кардио как отдельную программу в ручном конструкторе</div>
+                <button style={{ ...BTN_PRIMARY, alignSelf: 'flex-start' }} onClick={sendToProgram}>{copyFlash ? '✅ Отправлено' : '📦 Открыть как программу'}</button>
+              </SectionCard>
+            </>
+          )}
+        </div>
+      )}
+
+      {true && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
+        </div>
+      )}
+
+      {true && (
+        <SectionCard title={`📚 Библиотека (${library.length})`}>
+          {library.length === 0 && <EmptyState icon="📚" title="Пока пусто" desc="Соберите первый цикл на шаге Предпросмотр." />}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
+            {library.map(c => {
+              const s = cardioCycleSummary(c);
+              const active = cycle?.id === c.id;
               return (
-                <div key={blockKey} style={ROW}>
-                  <span style={{ fontSize: 10, color: '#fff', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                  <span style={{ fontSize: 10, color: '#fff' }}>{CARDIO_GOAL_LABELS[c.goal]} · {c.totalWeeks} нед</span>
-                  <span style={{ fontSize: 10, color: '#fff' }}>{cs.avgMinutesPerWeek} мин/нед · {cs.avgKcalPerWeek} ккал</span>
+                <div key={c.id} style={{ padding: 10, borderRadius: 12, background: active ? 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: active ? '1px solid rgba(0,230,138,0.36)' : '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${active ? '#00e68a' : 'rgba(255,255,255,0.16)'}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{active ? '⭐ ' : ''}{c.name}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <Badge bg={GOAL_COLOR[c.goal] ? GOAL_COLOR[c.goal] + '22' : 'rgba(255,255,255,0.06)'} border={GOAL_COLOR[c.goal] ? GOAL_COLOR[c.goal] + '44' : 'rgba(255,255,255,0.12)'} color={GOAL_COLOR[c.goal] ?? '#fff'}>{CARDIO_GOAL_LABELS[c.goal]}</Badge>
+                    <Badge>{c.totalWeeks} нед</Badge>
+                    <Badge>{s.avgMinutesPerWeek} мин/нед</Badge>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {active ? null : <button style={{ ...BTN_PRIMARY, minHeight: 36, padding: '6px 10px', flex: '1 1 auto' }} onClick={() => onActivate(c)}>Активировать</button>}
+                    <button style={{ ...BTN_SMALL, flex: '1 1 auto' }} onClick={() => onDuplicate(c)}>⧉ Копия</button>
+                    <button style={BTN_SMALL} onClick={() => onCompare(c)}>⇄ Сравнить</button>
+                    <button style={BTN_SMALL} onClick={() => onExport(c)}>📅</button>
+                    <button style={BTN_SMALL} onClick={() => onPrint(c)}>🖨</button>
+                    <button style={{ ...BTN_DANGER, minHeight: 36, padding: '6px 10px' }} onClick={() => onRemove(c)}>🗑</button>
+                  </div>
                 </div>
               );
             })}
           </div>
-        ) : (
-          onBuildAnnualCardio && (
-            <div style={{ marginTop: 6, fontSize: 10, color: '#fff' }}>
-              Кардио-циклы года не собраны: постройте макроцикл (ПЛ/ББ-авто, «Годовой план»), затем соберите кардио по блокам — каждый блок получит цикл по фазе (prep/taper/пик у стартов).
-            </div>
-          )
-        )}
-      </SectionCard>
+          {comparison && <InfoBanner tone="info">{comparison}</InfoBanner>}
+        </SectionCard>
+      )}
 
-          <GroupHeading icon="📤" text="Экспорт" desc="Календарь, тренировочный файл, печать, сводка и передача расхода в питание." />
-          {cycle && (
-            <SectionCard id="sec-export" title="Экспорт">
-          <div style={ROW}>
-            <button style={BTN} onClick={() => onExport(cycle)}>📅 Календарь .ics</button>
-            <button style={BTN} onClick={downloadTcx} title="Экспорт сессий в .tcx (Garmin Training Center)">📤 .tcx</button>
-            <button style={BTN} onClick={() => onPrint(cycle)}>🖨 Печать / PDF</button>
-            <button style={BTN} onClick={copySummary} aria-label="Скопировать сводку">
-              {copyFlash ? '✅ Сводка скопирована' : '📋 Сводка'}
-            </button>
-            <button style={{ ...BTN, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToProgram} title="Открыть кардио-цикл как отдельную программу в ручном конструкторе (выполнение как обычная программа)">
-              {copyFlash ? '✅ Отправлено' : '📦 Как отдельную программу'}
-            </button>
-            <button style={{ ...BTN, borderColor: 'rgba(250,204,21,0.4)', color: '#facc15' }} onClick={sendToNutrition} title="Передать расход кардио (ккал/нед + сегодня) в планировщик питания — заметка + буфер">
-              {nutriFlash ? '✅ Расход передан' : '🍽 В питание'}
-            </button>
-            <button style={{ ...BTN, borderColor: 'rgba(34,197,94,0.4)', color: '#22c55e' }} onClick={copyYear} title="Сводка «Год кардио»: последовательность циклов из библиотеки (до 4) в буфер">
-              {yearFlash ? '✅ Год в буфере' : '📆 Год кардио'}
-            </button>
+      {true && (
+        <SectionCard title={`📸 Сценарии (${scenarios.length}/6)`} right={<button style={BTN_PRIMARY} onClick={onSaveScenario}>💾 Сохранить сценарий</button>}>
+          {scenarios.length === 0 && <EmptyState icon="📸" title="Сценариев нет" desc="Сохраните текущий цикл для сравнения вариантов." />}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 8 }}>
+            {scenarios.map(sc => {
+              const s = cardioCycleSummary(sc.cycle);
+              return (
+                <div key={sc.id} style={{ padding: 10, borderRadius: 12, background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)', borderLeft: '3px solid rgba(167,139,250,0.55)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={ROW}>
+                    <span style={{ fontSize: 13, fontWeight: 800, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.name}</span>
+                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{new Date(sc.savedAt).toLocaleDateString('ru-RU')}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    <Badge>{sc.cycle.totalWeeks} нед</Badge>
+                    <Badge>{s.avgMinutesPerWeek} мин/нед</Badge>
+                    <Badge bg="rgba(167,139,250,0.14)" border="rgba(167,139,250,0.28)" color="#a78bfa">{s.hiitWeeks} HIIT</Badge>
+                  </div>
+                  <div style={ROW}>
+                    <button style={{ ...BTN_PRIMARY, flex: 1 }} onClick={() => onLoadScenario(sc)}>Загрузить</button>
+                    <button style={BTN_DANGER} onClick={() => onRemoveScenario(sc.id)}>🗑</button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </SectionCard>
       )}
-      <GroupHeading icon="📆" text="Год кардио" desc="Последовательность циклов из библиотеки (до 4) — как блоки года." />
-      <SectionCard id="sec-year" title="📆 Год кардио" right={
-        <button style={BTN} onClick={copyYear} title="Сводка «Год кардио» в буфер" aria-label="Год кардио в буфер">
-          {yearFlash ? '✅ Год в буфере' : '📋 Сводка в буфер'}
-        </button>
-      }>
-        {yearPlan ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 2, height: 18, borderRadius: 3, overflow: 'hidden' }}>
-              {yearPlan.blocks.map(b => (
-                <div key={b.cycle.id} title={`${b.cycle.name}: нед ${b.startWeek}-${b.startWeek + b.totalWeeks - 1}`} style={{ flex: b.totalWeeks, background: GOAL_COLOR[b.cycle.goal] ?? '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#fff', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                  {b.totalWeeks >= 10 ? `${b.startWeek}` : ''}
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {yearPlan.blocks.map(b => (
-                <div key={b.cycle.id} style={ROW}>
-                  <span style={{ width: 40, fontSize: 11, fontWeight: 800, color: GOAL_COLOR[b.cycle.goal] ?? '#888' }}>нед {b.startWeek}</span>
-                  <span style={{ flex: 1, fontSize: 11, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.cycle.name}</span>
-                  <span style={{ fontSize: 10, color: '#fff' }}>{CARDIO_GOAL_LABELS[b.cycle.goal]} · {b.totalWeeks} нед</span>
-                  <span style={{ fontSize: 10, color: '#fff' }}>{b.summary.avgMinutesPerWeek} мин/нед</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: 10, color: '#fff' }}>
-              Итого: {yearPlan.totalWeeks} нед · в среднем {yearPlan.avgMinutesPerWeek} мин/нед · {yearPlan.avgKcalPerWeek} ккал/нед
-            </div>
-          </div>
-        ) : (
-          <div style={{ fontSize: 11, color: '#fff' }}>
-            Циклов в библиотеке пока нет — соберите и сохраните циклы, чтобы увидеть их последовательность за год.
-          </div>
-        )}
-      </SectionCard>
-
-          <GroupHeading icon="🛠" text="Конструктор недели" desc="Раскладка по дням, ±10% минут и редактор сессий конкретной недели." />
-          <div id="sec-week">
-            <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
-          </div>
-
-          <GroupHeading icon="📚" text="Библиотека циклов" desc="Сохранённые циклы: активировать, копировать, сравнить, экспортировать." />
-          <SectionCard id="sec-library" title={`Библиотека (${library.length})`}>
-        {library.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>Пока пусто — соберите первый цикл на шаге «Предпросмотр».</div>}
-        {library.map(c => {
-          const s = cardioCycleSummary(c);
-          return (
-            <div key={c.id} className="ck-week" style={{ padding: 8, borderRadius: 10, background: cycle?.id === c.id ? 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: cycle?.id === c.id ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${cycle?.id === c.id ? '#00e68a' : 'rgba(255,255,255,0.18)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={ROW}>
-                <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {cycle?.id === c.id ? '⭐ ' : ''}{c.name}
-                </span>
-                <span style={{ fontSize: 10, color: '#fff' }}>{c.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {CARDIO_GOAL_LABELS[c.goal]}</span>
-              </div>
-              <div style={ROW}>
-                {cycle?.id !== c.id && <button style={{ ...BTN_PRIMARY, minHeight: 32, padding: '5px 10px' }} onClick={() => onActivate(c)}>Активировать</button>}
-                <button style={{ ...BTN, minHeight: 32, padding: '5px 10px' }} onClick={() => onDuplicate(c)}>⧉ Копия</button>
-                <button style={{ ...BTN, minHeight: 32, padding: '5px 10px' }} onClick={() => onCompare(c)}>⇄ Сравнить</button>
-                <button style={{ ...BTN, minHeight: 32, padding: '5px 10px' }} onClick={() => onExport(c)}>📅</button>
-                <button style={{ ...BTN, minHeight: 32, padding: '5px 10px' }} onClick={() => onPrint(c)}>🖨</button>
-                <button style={{ ...BTN_DANGER, minHeight: 32, padding: '5px 10px' }} onClick={() => onRemove(c)}>🗑</button>
-              </div>
-            </div>
-          );
-        })}
-        {comparison && <InfoBanner tone="info">{comparison}</InfoBanner>}
-      </SectionCard>
-
-          <GroupHeading icon="📸" text="Сценарии" desc="Снапшоты циклов для сравнения вариантов (до 6)." />
-          <SectionCard id="sec-scenarios" title={`Сценарии (${scenarios.length}/6)`} right={
-            <button style={BTN_PRIMARY} onClick={onSaveScenario} title="Сохранить текущий активный цикл как сценарий">💾 Сохранить сценарий</button>
-          }>
-        {scenarios.length === 0 && <div style={{ fontSize: 11, color: '#fff' }}>Сценариев нет — сохраните текущий цикл для сравнения вариантов.</div>}
-        {scenarios.map(sc => {
-          const s = cardioCycleSummary(sc.cycle);
-          return (
-            <div key={sc.id} className="ck-week" style={{ padding: 8, borderRadius: 10, background: 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border: '1px solid rgba(255,255,255,0.07)', borderLeft: '3px solid rgba(167,139,250,0.55)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={ROW}>
-                <span style={{ fontSize: 12, fontWeight: 700, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sc.name}</span>
-                <span style={{ fontSize: 10, color: '#fff' }}>{new Date(sc.savedAt).toLocaleDateString('ru-RU')} · {sc.cycle.totalWeeks} нед · {s.avgMinutesPerWeek} мин/нед · {s.hiitWeeks} HIIT</span>
-              </div>
-              <div style={ROW}>
-                <button style={{ ...BTN_PRIMARY, minHeight: 32, padding: '5px 10px' }} onClick={() => onLoadScenario(sc)}>Загрузить</button>
-                <button style={{ ...BTN_DANGER, minHeight: 32, padding: '5px 10px' }} onClick={() => onRemoveScenario(sc.id)}>🗑</button>
-              </div>
-            </div>
-          );
-        })}
-      </SectionCard>
     </div>
   );
 };
