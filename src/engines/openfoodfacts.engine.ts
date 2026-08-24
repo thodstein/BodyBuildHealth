@@ -153,22 +153,29 @@ function barcodeVariants(raw: string): string[] {
 async function fetchFromApi(apiUrl: string, barcode: string): Promise<OFFProduct | null> {
   const bc = sanitizeBarcode(barcode);
   if (!bc) return null;
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timeout = controller ? setTimeout(() => controller.abort(), 9000) : undefined;
-  try {
-    const res = await fetch(`${apiUrl}/product/${bc}.json`, {
-      signal: controller?.signal,
-      headers: { 'Accept': 'application/json' } as any,
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.status !== 1 || !data.product) return null;
-    return normalizeProduct(data.product);
-  } catch {
-    return null;
-  } finally {
-    if (timeout !== undefined) clearTimeout(timeout);
+  const urls = [
+    `${apiUrl}/product/${bc}.json`,
+    `${apiUrl.replace('/api/v0', '/api/v2')}/product/${bc}.json`,
+  ];
+  for (const url of urls) {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), 9000) : undefined;
+    try {
+      const res = await fetch(url, {
+        signal: controller?.signal,
+        headers: { Accept: 'application/json' } as any,
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const found = data.status === 1 || data.status === '1' || data.status === true;
+      if (found && data.product) return normalizeProduct(data.product);
+    } catch {
+      // Try the v2 endpoint before reporting a miss.
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+    }
   }
+  return null;
 }
 
 // Экспортируем для ручного оффлайн-создания (штрихкод не найден → создать свою еду)
@@ -187,15 +194,13 @@ export async function searchByBarcode(barcode: string): Promise<OFFProduct | nul
   }
 
   // РФ-приоритет: 460-469 — российские штрихкоды → RU первым, иначе тот же порядок (RU уже первый)
-  const apis = [OFF_API_RU, OFF_API_WORLD, OFF_API_US];
-  for (const variant of variants) {
-    for (const api of apis) {
-      const product = await fetchFromApi(api, variant);
-      if (product) {
-        await saveToCache(product);
-        return product;
-      }
-    }
+  const requests = variants.flatMap(variant => [OFF_API_RU, OFF_API_WORLD, OFF_API_US]
+    .map(api => fetchFromApi(api, variant)));
+  const results = await Promise.all(requests);
+  const product = results.find(Boolean);
+  if (product) {
+    await saveToCache(product);
+    return product;
   }
   return null;
 }
