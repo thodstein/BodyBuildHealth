@@ -56,6 +56,14 @@ export interface Recipe {
   tags: string[];
   usefulness?: number;
   description?: string;
+  ingredientIds?: string[];
+  portions?: Record<string, number>;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  servings?: number;
+  flavorProfile?: { sweet?: number; salty?: number; sour?: number; spicy?: number; umami?: number; };
+  pairsWith?: string[];
+  batchFriendly?: boolean;
+  cookSkill?: 'basic' | 'medium' | 'advanced';
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

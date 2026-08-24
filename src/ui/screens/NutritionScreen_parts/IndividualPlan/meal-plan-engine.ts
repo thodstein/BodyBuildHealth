@@ -25,7 +25,7 @@
 
 import { FOOD_DB, FOOD_ALLERGEN_DIET } from "../../../../core/nutrition-database";
 import { filterBySpecificity, filterByIntolerance, matchesCategoryPref, isPreferredCategory, tasteMatchScore, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences";
-import { analyzeMicroCoverage, type MicroCoverageEntry } from "./planner-micro-coverage";
+import { analyzeMicroCoverage, sumMicros, type MicroCoverageEntry } from "./planner-micro-coverage";
 import { detectMealInteractions, cookMethodGuidance } from "./planner-food-interactions";
 import type { FoodItem } from "../../../../core/nutrition-database";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -473,8 +473,8 @@ export const BREAKFAST_TEMPLATES: BreakfastTemplate[] = [
   },
   {
     id: 'protein_flakes', label: '🌾 Хлопья + протеин + сухофрукты + миндаль',
-    foods: ['oats', 'whey_isolate', 'dates', 'dried_apricots', 'almonds'], milk: true,
-    portions: { oats: 70, whey_isolate: 30, dates: 30, dried_apricots: 20, almonds: 15 },
+    foods: ['corn_flakes', 'whey_isolate', 'dates', 'dried_apricots', 'almonds'], milk: true,
+    portions: { corn_flakes: 50, whey_isolate: 30, dates: 30, dried_apricots: 20, almonds: 15 },
   },
   {
     id: 'eggs_toast', label: '🍳 Яйца + тост + авокадо + шпинат',
@@ -483,8 +483,8 @@ export const BREAKFAST_TEMPLATES: BreakfastTemplate[] = [
   },
   {
     id: 'cottage_berries', label: '🥛 Творог + хлопья + черника + грецкие орехи',
-    foods: ['cottage_cheese_5', 'oats', 'blueberries', 'walnut'], milk: false,
-    portions: { cottage_cheese_5: 200, oats: 50, blueberries: 80, walnut: 15 },
+    foods: ['cottage_cheese_5', 'oats', 'blueberries', 'walnuts'], milk: false,
+    portions: { cottage_cheese_5: 200, oats: 50, blueberries: 80, walnuts: 15 },
   },
 ];
 
@@ -855,6 +855,40 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   else base = snap(base, [50, 100, 150, 200]);
   const supplementCap = SUPPLEMENT_MAX_G[food.id];
   return supplementCap ? Math.min(supplementCap, base) : base;
+}
+
+function snapPortionG(food: FoodItem, grams: number): number {
+  if (grams <= 0) return grams;
+  const id = (food.id || '').toLowerCase();
+  const cat = food.category;
+  const isOil = id.includes('oil') || id.includes('масло') || (cat === 'fat' && (food.fat || 0) >= 90);
+  const isAvocado = id.includes('avocado') || id.includes('авокадо');
+  const isNutDry = !isOil && !isAvocado && (cat === 'fat' || id.includes('nut') || id.includes('almond') || id.includes('cashew') || id.includes('walnut') || id.includes('hazel') || id.includes('pistach') || id.includes('peanut') || id.includes('dried') || id.includes('raisin') || id.includes('goji') || id.includes('chia') || id.includes('seed') || id.includes('apricot') || id.includes('prune') || id.includes('date'));
+  const isPorridge = cat === 'grain' || cat === 'carb';
+  const isLiquid = food.foodState === 'liquid' || id.includes('kefir') || id.includes('milk') || id.includes('yogurt') || id.includes('ayran') || id.includes('cream') || id.includes('water') || (cat === 'dairy' && (id.includes('milk') || id.includes('kefir') || id.includes('yogurt')));
+  const isProteinPowder = cat === 'supplement' && (id.includes('whey') || id.includes('casein') || id.includes('isolate') || id.includes('protein') || id.includes('bcaa') || id.includes('eaa') || id.includes('creatine') || id.includes('collagen') || id.includes('amylo') || id.includes('dextrose') || id.includes('maltodextrin'));
+  const isMeatFish = cat === 'protein';
+  const isFruitVeg = cat === 'veg_fruit';
+  const isDairy = cat === 'dairy';
+  let brackets: number[];
+  if (isPorridge) brackets = [50, 100, 125, 150, 200, 250];
+  else if (isLiquid) brackets = [250, 500];
+  else if (isOil) brackets = [5, 10, 15, 30];
+  else if (isAvocado) brackets = [50, 70, 100, 150];
+  else if (isNutDry) brackets = [25, 50, 75, 100];
+  else if (isProteinPowder) brackets = [30, 60, 90];
+  else if (isMeatFish) brackets = [100, 150, 200, 250];
+  else if (isFruitVeg) brackets = [100, 150, 200, 250];
+  else if (isDairy) brackets = [100, 150, 200, 250];
+  else brackets = [50, 100, 150, 200];
+  if (grams < brackets[0] || grams > brackets[brackets.length - 1]) {
+    const step = brackets[0] === 50 ? 25 : brackets[0] === 5 ? 5 : brackets[0] === 25 ? 25 : 10;
+    if (grams > brackets[brackets.length - 1] * 1.5) return Math.max(brackets[brackets.length - 1], Math.round(grams / step) * step);
+    return Math.round(grams / step) * step;
+  }
+  let best = brackets[0]; let bestDiff = Math.abs(grams - best);
+  for (const b of brackets) { const d = Math.abs(grams - b); if (d < bestDiff || (d === bestDiff && b > best)) { bestDiff = d; best = b; } }
+  return best;
 }
 
 function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealItem {
@@ -2479,7 +2513,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
           const addGrams = Math.round(kcalPerItem / (food.kcal || 1) * 100);
-          const newAmount = Math.min(maxGramPerItem(_currentBudget), item.amount + addGrams);
+          const newAmount = snapPortionG(food, Math.min(maxGramPerItem(_currentBudget), item.amount + addGrams));
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
@@ -2509,7 +2543,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const reduceGrams = Math.round(reducePerItem / food.protein * 100);
           // Быстрый/медленный белок (сыворотка/казеин) не режем ниже 20 г — минимум MPS-порции.
           const floor = (item.role === 'fast_protein' || item.role === 'slow_protein') ? 20 : 10;
-          const newAmount = Math.max(floor, item.amount - reduceGrams);
+          const newAmount = snapPortionG(food, Math.max(floor, item.amount - reduceGrams));
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount;
           item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
@@ -2554,7 +2588,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
           const addGrams = Math.min(Math.round(item.amount * 1.5), Math.round(addPerItem / food.fat * 100));
-          const newAmount = Math.min(maxGramPerItem(_currentBudget), item.amount + addGrams);
+          const newAmount = snapPortionG(food, Math.min(maxGramPerItem(_currentBudget), item.amount + addGrams));
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
@@ -2792,7 +2826,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Считаем ПОСЛЕ activelyCloseTopDeficiency (учитывает добавленный продукт).
   const _microItems = meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount })));
   const _microRes = _qualityMode === 'full' ? analyzeMicroCoverage(
-    (() => { const tot: Record<string, number> = {}; _microItems.forEach(it => { const f = FOOD_DB.find(x => x.id === it.id); if (f && f.micros) { const r = (it.amount||0)/100; for (const [k,v] of Object.entries(f.micros)) tot[k] = (tot[k]||0) + (v||0)*r; } }); for (const k of Object.keys(tot)) tot[k] = Math.round(tot[k]*10)/10; return tot; })(),
+    sumMicros(_microItems, FOOD_DB as any),
     input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride,
   ) : { coverage: [], topDeficitNutrient: null, surpluses: [], totals: {} };
   // D-28 fix (жалоба «при дефиците нутриентов изотоник не включается»):
@@ -2952,9 +2986,12 @@ function getMicroFromFood(food: FoodItem, field: string): number {
   const t = food.trace_elements_100g as Record<string, number> | undefined;
   const v = food.vitamins_100g as Record<string, number> | undefined;
   const mg = food.macro_100g as Record<string, number> | undefined;
-  // Direct match in micros (primary source)
+  // Direct match in micros (primary source) — с нормализацией единиц (Omega3 г→мг)
   const direct = m?.[field];
-  if (direct !== undefined) return direct;
+  if (direct !== undefined) {
+    if (field === 'Omega3' && direct < 100) return direct * 1000;
+    return direct;
+  }
   // Field-specific fallbacks for alternative naming
   const fieldMap: Record<string, string[]> = {
     Fe: ['iron_total_mg'], Mg: ['magnesium_mg'], Zn: ['zinc_mg'], K: ['potassium_mg'],

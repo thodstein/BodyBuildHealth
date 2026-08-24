@@ -1179,19 +1179,33 @@ export const IndividualPlanResults: React.FC = () => {
                       const packSize = PACK_SIZES[data.id];
                       const packEstimate = packSize ? `~${Math.max(1, Math.round(data.amount / packSize))} уп.` : '';
                       return (
-                      <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: isChecked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)', textDecoration: isChecked ? 'line-through' : 'none', transition: 'all 0.2s' }}>
-                        <span style={{display:'flex',alignItems:'center',gap:4}}>
-                          <span onClick={() => toggleChecked(data.id)} style={{cursor:'pointer',fontSize:11,color:isChecked?'#22c55e':'rgba(255,255,255,0.2)',userSelect:'none',width:16,textAlign:'center'}}>{isChecked ? '☑' : '☐'}</span>
-                          <span>{data.name}</span>
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          {packEstimate && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{packEstimate}</span>}
-                          {data.batchCook && <span title={data.batchCook} style={{ fontSize: 6, color: '#22c55e', fontWeight: 700, padding: '1px 4px', borderRadius: 4, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>🍳{data.dayCount}д</span>}
-                          <span style={{ color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                            {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
+                      <div key={data.name + i} style={{ fontSize: 9, padding: '3px 0 3px 8px', display: 'flex', flexDirection: 'column', gap: 1, color: isChecked ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)', textDecoration: isChecked ? 'line-through' : 'none', transition: 'all 0.2s' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{display:'flex',alignItems:'center',gap:4}}>
+                            <span onClick={() => toggleChecked(data.id)} style={{cursor:'pointer',fontSize:11,color:isChecked?'#22c55e':'rgba(255,255,255,0.2)',userSelect:'none',width:16,textAlign:'center'}}>{isChecked ? '☑' : '☐'}</span>
+                            <span>{data.name}</span>
                           </span>
-                          <button onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} style={{ padding: '2px 4px', borderRadius: 4, border: 'none', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 7 }}>🛒</button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {packEstimate && <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{packEstimate}</span>}
+                            {data.batchCook && <span title={data.batchCook} style={{ fontSize: 6, color: '#22c55e', fontWeight: 700, padding: '1px 4px', borderRadius: 4, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>🍳{data.dayCount}д</span>}
+                            <span style={{ color: isChecked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                              {data.amount >= 1000 ? `${(data.amount / 1000).toFixed(1)} кг` : `${Math.round(data.amount)} г`}
+                            </span>
+                            <button onClick={() => addToCart({ name: data.name, kcal: data.kcal || 0, amount: data.amount, category: data.catLabel || data.category })} style={{ padding: '2px 4px', borderRadius: 4, border: 'none', background: 'rgba(249,115,22,0.12)', color: '#f97316', cursor: 'pointer', fontSize: 7 }}>🛒</button>
+                          </div>
                         </div>
+                        {(() => {
+                          const per100 = data.amount > 0 ? { kcal: Math.round((data.kcal || 0) / data.amount * 100), p: Math.round((data.p || 0) / data.amount * 100 * 10) / 10, f: Math.round((data.f || 0) / data.amount * 100 * 10) / 10, c: Math.round((data.c || 0) / data.amount * 100 * 10) / 10 } : null;
+                          return (
+                            <div style={{ display: 'flex', gap: 6, paddingLeft: 20, fontSize: 7, fontWeight: 500, color: isChecked ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.55)', flexWrap: 'wrap' }}>
+                              <span style={{ color: '#22c55e' }}>К:{Math.round(data.kcal || 0)} ккал</span>
+                              <span style={{ color: '#3b82f6' }}>Б:{Math.round((data.p || 0) * 10) / 10}г</span>
+                              <span style={{ color: '#f59e0b' }}>Ж:{Math.round((data.f || 0) * 10) / 10}г</span>
+                              <span style={{ color: '#f97316' }}>У:{Math.round((data.c || 0) * 10) / 10}г</span>
+                              {per100 && <span style={{ color: 'rgba(255,255,255,0.35)' }}>· на 100г: {per100.kcal}ккал Б{per100.p} Ж{per100.f} У{per100.c}</span>}
+                            </div>
+                          );
+                        })()}
                       </div>
                       );
                     })}

@@ -9,6 +9,7 @@
  */
 
 import type { FoodItem } from "../../../../core/nutrition-database";
+import { sumMicros, analyzeMicroCoverage, getMicroTargets, type Sex, type CyclePhase, type FoodDbLike } from "./planner-micro-coverage";
 
 export interface AllergenReport { conflicts: { food: string; allergens: string[] }[]; riskLevel: 'low' | 'medium' | 'high'; summary: string; }
 export interface NutrientReport { micros: Record<string, any>; gaps: string[]; }
@@ -48,22 +49,25 @@ export function generateAllergenReportPure(dayPlan: any, allergens: string[], fo
 }
 
 export function generateNutrientReportPure(dayPlan: any, foodDb: FoodItem[]): NutrientReport {
+  return generateNutrientReportDetailed(dayPlan, foodDb, 'male', 80, undefined, false);
+}
+
+export function generateNutrientReportDetailed(
+  dayPlan: any, foodDb: FoodItem[],
+  sex: Sex, weightKg: number, phase: CyclePhase, isTrainingDay: boolean,
+): NutrientReport {
   if (!dayPlan) return { micros: {}, gaps: [] };
-  const micros: Record<string, number> = {};
-  planItems(dayPlan).forEach((it: any) => {
-    const food = foodDb.find(f => f.id === it.id || f.name === it.name);
-    if (food?.micros) Object.entries(food.micros).forEach(([k, v]) => { if (v) micros[k] = (micros[k] || 0) + (v as number) * (it.amount / 100); });
-  });
-  const targets: Record<string, number> = { Ca: 1000, Fe: 18, Mg: 400, Zn: 15, K: 3500, Se: 55, VitC: 100, VitD: 15, VitB12: 2.4, Omega3: 1.6 };
+  const items = planItems(dayPlan).map((it: any) => ({ id: it.id, amount: it.amount || 0 }));
+  const totals = sumMicros(items, foodDb as unknown as FoodDbLike[]);
+  const res = analyzeMicroCoverage(totals, sex, weightKg, phase, isTrainingDay);
   const results: Record<string, any> = {};
-  const gaps: string[] = [];
-  Object.entries(targets).forEach(([k, t]) => {
-    const actual = Math.round((micros[k] || 0) * 10) / 10;
-    const pct = Math.round(actual / t * 100);
-    results[k] = { actual, target: t, pct, status: pct >= 80 ? 'ok' : pct >= 50 ? 'low' : 'critical' };
-    if (pct < 80) gaps.push(`${k}: ${actual} из ${t} (${pct}%)`);
-  });
-  return { micros: results, gaps: gaps.length === 0 ? ['✅: всё в норме'] : gaps };
+  for (const c of res.coverage) {
+    results[c.nutrient] = { actual: c.actual, target: c.target, pct: c.pct, status: c.status === 'ok' ? 'ok' : c.status === 'high' ? 'high' : c.status === 'low' ? 'low' : 'critical', unit: c.unit };
+  }
+  const gaps = res.deficits.length === 0 && res.surpluses.length === 0
+    ? ['✅: всё в норме']
+    : [...res.deficits, ...res.surpluses];
+  return { micros: results, gaps };
 }
 
 export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: FoodItem[]): QualityReport {

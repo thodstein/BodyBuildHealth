@@ -54,6 +54,7 @@ export const IndividualPlanSettings: React.FC = () => {
   const {
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
+    cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking, useRecipesInPlan, setUseRecipesInPlan,
     trainType, setTrainType, trainIntensity, setTrainIntensity,
     intraWorkoutEnabled, setIntraWorkoutEnabled,
     householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
@@ -389,6 +390,18 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
         <div style={{ marginBottom: 6 }}>
           <PopupNumber label="🍳 Время на готовку" value={cookTimeMin} min={0} max={300} step={5} suffix="мин" onChange={setCookTimeMin} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+          <PopupSelect label="👨‍🍳 Навык готовки" value={cookingSkill} options={[{id:'basic',label:'Базовый (простые блюда)'},{id:'medium',label:'Средний (готовлю регулярно)'},{id:'advanced',label:'Продвинутый (сложные рецепты)'}]} onChange={v => setCookingSkill(v as any)} />
+          <PopupSelect label="📅 Частота готовки" value={cookingFrequency} options={[{id:'daily',label:'Каждый день'},{id:'every_3_days',label:'Раз в 3 дня'},{id:'weekly',label:'Раз в неделю (meal prep)'}]} onChange={v => setCookingFrequency(v as any)} />
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+          <button onClick={() => setBatchCooking(!batchCooking)} style={{ flex: 1, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, textAlign: 'left', background: batchCooking ? 'rgba(34,197,94,0.08)' : '#202023', border: `1px solid ${batchCooking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: batchCooking ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
+            🍳 Готовка впрок: {batchCooking ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
+          <button onClick={() => setUseRecipesInPlan(!useRecipesInPlan)} style={{ flex: 1, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, textAlign: 'left', background: useRecipesInPlan ? 'rgba(249,115,22,0.08)' : '#202023', border: `1px solid ${useRecipesInPlan ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.1)'}`, color: useRecipesInPlan ? '#f97316' : 'rgba(255,255,255,0.5)' }}>
+            🍲 Рецепты в рационе: {useRecipesInPlan ? 'ВКЛ' : 'ВЫКЛ'}
+          </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupSelect label="🏋️ Тип тренировок" value={trainType} options={[{id:'strength',label:'Силовые'},{id:'cardio',label:'Кардио'},{id:'mixed',label:'Смешанные'},{id:'hiit',label:'HIIT'}]} onChange={v => setTrainType(v as string)} />

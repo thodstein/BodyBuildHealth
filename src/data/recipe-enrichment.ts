@@ -12,7 +12,7 @@
  * Приоритет: рецепты с высоким usefulness ≥ 8.0 — те, что чаще всего предлагаются.
  */
 
-import type { Recipe } from '../../../engines/nutrition-periodization.engine';
+import type { Recipe } from '../engines/nutrition-periodization.engine';
 
 export interface RecipeEnrichment {
   ingredientIds: string[];

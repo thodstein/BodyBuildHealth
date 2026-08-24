@@ -50,6 +50,7 @@ const RDA_BASE: Record<string, { male: number; female: number; unit: string; lab
 const DEFICIT_PCT = 70;
 const LOW_PCT = 90;
 // Верхние пределы (только для нутриентов с риском избытка).
+// Расширено: VitC (UL 2000мг), Ca (UL 2500мг), Mg (UL 350мг из добавок), Omega3 (6000мг).
 const UPPER_LIMIT: Record<string, number> = {
   Na: 5000,    // мг — гипертензия
   Se: 400,     // мкг — токсичность
@@ -57,6 +58,10 @@ const UPPER_LIMIT: Record<string, number> = {
   VitA: 3000,  // мкг — гипервитаминоз
   VitD: 100,   // мкг
   Zn: 40,      // мг
+  VitC: 2000,  // мг — IOM UL
+  Ca: 2500,    // мг — IOM UL
+  Mg: 350,     // мг из добавок (IOM UL)
+  Omega3: 6000, // мг EPA+DHA — FDA/EFSA
 };
 
 /**
@@ -95,6 +100,16 @@ export function getMicroTargets(sex: Sex, weightKg: number, phase: CyclePhase, i
   });
 }
 
+const MICRO_CONVERSIONS: Record<string, (v: number) => number> = {
+  Omega3: (v: number) => v < 100 ? v * 1000 : v,
+};
+
+function normalizeMicroValue(key: string, value: number): number {
+  const conv = MICRO_CONVERSIONS[key];
+  if (conv) return conv(value);
+  return value;
+}
+
 /** Суммировать микронутриенты по всем items плана (через FOOD_DB lookup). */
 export function sumMicros(items: FoodLike[], foodDb: FoodDbLike[]): Record<string, number> {
   const totals: Record<string, number> = {};
@@ -103,10 +118,10 @@ export function sumMicros(items: FoodLike[], foodDb: FoodDbLike[]): Record<strin
     if (!food || !food.micros) continue;
     const r = (it.amount || 0) / 100;
     for (const [k, v] of Object.entries(food.micros)) {
-      totals[k] = (totals[k] || 0) + (v || 0) * r;
+      const nv = normalizeMicroValue(k, (v || 0));
+      totals[k] = (totals[k] || 0) + nv * r;
     }
   }
-  // округление
   for (const k of Object.keys(totals)) totals[k] = Math.round(totals[k] * 10) / 10;
   return totals;
 }

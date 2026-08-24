@@ -39,11 +39,15 @@ export interface UsefulnessScore {
   color: string;
 }
 
-const MICRO_RDA: Record<string, number> = {
-  Ca: 100, Fe: 14, Mg: 60, P: 150, K: 350, Zn: 2, Se: 10, Cu: 0.3, Mn: 0.5,
-  VitA: 100, VitB1: 0.2, VitB2: 0.2, VitB3: 2, VitB5: 0.5, VitB6: 0.2, VitB9: 20, VitB12: 0.2,
-  VitC: 8, VitD: 0.5, VitE: 1.5, VitK: 5, Omega3: 0.1,
+const MEALS_PER_DAY = 4.5;
+const DAILY_RDA: Record<string, number> = {
+  Ca: 1000, Fe: 14, Mg: 420, P: 700, K: 3500, Zn: 11, Se: 55, Cu: 0.9, Mn: 2.3,
+  VitA: 900, VitB1: 1.2, VitB2: 1.3, VitB3: 16, VitB5: 5, VitB6: 1.7, VitB9: 400, VitB12: 2.4,
+  VitC: 90, VitD: 15, VitE: 15, VitK: 120, Omega3: 1600,
 };
+const MICRO_RDA: Record<string, number> = Object.fromEntries(
+  Object.entries(DAILY_RDA).map(([k, v]) => [k, Math.round((v / MEALS_PER_DAY) * 100) / 100])
+);
 
 const ESTIMATED_PRICES: Record<string, number> = {
   chicken_breast: 350, turkey_breast: 400, beef_lean: 500, beef_medium: 450, beef_fat: 350, pork_tenderloin: 350,
@@ -285,7 +289,8 @@ export function calcMealScore(
     if (food.micros) {
       for (const [key, val] of Object.entries(food.micros)) {
         if (val != null) {
-          microTotals[key] = (microTotals[key] || 0) + val * ratio;
+          const nv = key === 'Omega3' && val < 100 ? val * 1000 : val;
+          microTotals[key] = (microTotals[key] || 0) + nv * ratio;
         }
       }
     }

@@ -57,10 +57,10 @@ describe('D1: завтрак не получает мясную ротацию (
     }
   });
 
-  it('завтрак-шаблон «хлопья + протеин» даёт хлопья/овсянку + сыворотку и НЕ содержит говядины', () => {
+  it('завтрак-шаблон «хлопья + протеин» даёт хлопья + сыворотку и НЕ содержит говядины', () => {
     const plan = buildDayPlan(base({ mealsCount: 4, breakfastTemplate: 'protein_flakes' as any }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
-    expect(breakfast.items.some(it => it.id === 'oats')).toBe(true);
+    expect(breakfast.items.some(it => it.id === 'corn_flakes')).toBe(true);
     expect(breakfast.items.some(it => it.id === 'whey_isolate')).toBe(true);
     const hasMeat = breakfast.items.some(it => BREAKFAST_FORBIDDEN.some(k => it.id.includes(k)));
     expect(hasMeat).toBe(false);
@@ -219,7 +219,7 @@ describe('Хлопья на работе (portable) — завтрак-шабл�
   it('portable + шаблон protein_flakes: завтрак содержит хлопья и протеин, без мяса', () => {
     const plan = buildDayPlan(base({ portableMode: true, breakfastTemplate: 'protein_flakes' as any }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
-    expect(breakfast.items.some(it => it.id === 'oats')).toBe(true);
+    expect(breakfast.items.some(it => it.id === 'corn_flakes')).toBe(true);
     expect(breakfast.items.some(it => it.id === 'whey_isolate' || it.id === 'whey_protein')).toBe(true);
     expect(breakfast.items.some(it => ['beef','pork','chicken','turkey','salmon'].some(k => it.id.includes(k)))).toBe(false);
   });
