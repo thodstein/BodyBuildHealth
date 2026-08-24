@@ -2170,7 +2170,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             // Работа: окно смены для сдвига обеда/ужина (раньше только классика)
             workStartMin: (()=>{ try{ const [h,m]=(workStartTime||'09:00').split(':').map(Number); return h*60+m; }catch{ return 9*60; }})(),
             workEndMin: (()=>{ try{ const [h,m]=(workEndTime||'18:00').split(':').map(Number); return h*60+m; }catch{ return 18*60; }})(),
-            isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return false; const ws = workScheduleType; if (ws === 'shift_day_night') { return (offset % 4) < 2; } if (typeof ws === 'string' && ws.startsWith('shift_')) { const parts = ws.split('_'); const workLen = parseInt(parts[1]) || 1; const offLen = parseInt(parts[2]) || workLen; const cycleLen = workLen + offLen; const pos = ((offset % cycleLen) + cycleLen) % cycleLen; return pos < workLen; } const dow=(new Date().getDay()+6)%7; return !!workDays[(dow+offset)%7]; }catch{ return false; }})(),
+            isWorkDay: (()=>{ try{ if(!workScheduleEnabled) return workFood === 'portable'; const ws = workScheduleType; if (ws === 'shift_day_night') { return (offset % 4) < 2; } if (typeof ws === 'string' && ws.startsWith('shift_')) { const parts = ws.split('_'); const workLen = parseInt(parts[1]) || 1; const offLen = parseInt(parts[2]) || workLen; const cycleLen = workLen + offLen; const pos = ((offset % cycleLen) + cycleLen) % cycleLen; return pos < workLen; } const dow=(new Date().getDay()+6)%7; return !!workDays[(dow+offset)%7]; }catch{ return false; }})(),
           };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
@@ -2339,8 +2339,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       }
     }
     // P2-fix: nutrMult удалён (dead code) — multiplier уже включён в effectiveKcal/P/F/C
+    // FIX: simple/fast — реально простые (minimal variety/budget, без тренировки), а не клон pro с разбегом
+    const _isSimple = plannerModeRef.current === 'simple';
+    const _isMinimal = plannerModeRef.current === 'minimal';
+    const effBudget: BudgetLevel = _isMinimal ? 'low' : _isSimple ? 'medium' : budget;
+    const effVariety = _isMinimal ? 'minimal' as const : _isSimple ? 'medium' as const : variety;
+    const effIsTrainingDay = (off: number) => (_isSimple || _isMinimal) ? false : isTrainDay(off);
     const budgetFilter = (id: BudgetLevel): number[] => { const map: Record<string, number[]> = { low:[0,5],medium:[5,8],max:[8,10],enhanced:[9,15] }; return map[id] || [5,10]; };
-    const [bMin, bMax] = budgetFilter(budget);
+    const [bMin, bMax] = budgetFilter(effBudget);
     const qualityRange = (pool: any[]) => pool.filter((f: any) => { const q = compositeQualityScore(f); return q >= bMin && q <= bMax; });
      const effectivePlanType = (dietPrefs || []).includes('vegetarian') ? ('vegetarian' as PlanType) : planType;
      const planTypeMod = PLAN_TYPES.find(p => p.id === effectivePlanType);
@@ -2368,13 +2374,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const qualitySort = (pool: any[], highFirst: boolean) => [...pool].sort((a, b) => highFirst ? ((b.bb_quality_score || 5) - (a.bb_quality_score || 5)) : ((a.bb_quality_score || 5) - (b.bb_quality_score || 5)));
     const limitPool = (pool: any[], seed: number) => {
       if (pool.length <= 8) return pool;
-      const highQuality = budget === 'max' || budget === 'enhanced';
-      const lowQuality = budget === 'low';
+      const highQuality = effBudget === 'max' || effBudget === 'enhanced';
+      const lowQuality = effBudget === 'low';
       let sorted = [...pool];
       if (highQuality) sorted = qualitySort(sorted, true);
       else if (lowQuality) sorted = qualitySort(sorted, false);
       else sorted = [...sorted].sort(() => Math.random() - 0.5);
-      return sorted.slice(0, variety === 'minimal' ? 4 : variety === 'medium' ? 8 : 12);
+      return sorted.slice(0, effVariety === 'minimal' ? 4 : effVariety === 'medium' ? 8 : 12);
     };
     // N1: track used food IDs across meals to avoid duplicates when budget=max
     const usedFoodIds = new Set<string>();
@@ -2637,6 +2643,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         }
         workStartMin = toMin(workStartTime);
         workEndMin = toMin(workEndTime);
+      } else if (workFood === 'portable') {
+        // portable без графика — считаем весь день рабочим (глобальный фильтр)
+        isWorkDay = true;
+        workStartMin = 0;
+        workEndMin = 1440;
       }
       const portableFilter = (pool: any[], mealTime?: string) => { if (workFood !== 'portable' || !isWorkDay) return pool; if (mealTime && Number.isFinite(workStartMin) && Number.isFinite(workEndMin) && !isTimeInWorkWindowLocal(mealTime, workStartMin, workEndMin)) return pool; const nonPortableIds = new Set(['kfc_wings','kfc_soup','kfc_bucket','mcd_big_mac','mcd_royale','bk_whopper','vt_big_smoke','pizza_margherita','french_fries','soup_chicken','soup_borscht','soup_mushroom','porridge_oat','porridge_buckwheat','rice_white_cooked','pasta_durum','mayonnaise','ketchup','cream_sauce','bouillon_cube','soda','coca_cola','juice_apple','juice_orange','ice_cream','condensed_milk','cheese_processed','marmalade','cookie','chocolate']); return pool.filter((f: any) => !nonPortableIds.has(f.id)); };
       const applyFoodPrefs = (pool: any[], prefType: string, mealTime?: string) => { const lower = prefType.toLowerCase(); if (pool.length <= 3) return pool; return portableFilter(pool, mealTime).filter((f: any) => !excludedIds.has(f.id) && [...allergenIds].every((a: string) => !getFoodAllergenTags(f.id, FOOD_DB).includes(a) && !allergenTextMatches(a, f.name))); };
@@ -2646,7 +2657,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const effectiveLunch = isWorkDay && workScheduleEnabled ? workStartMin + Math.round((workEndMin - workStartMin + (isNightShift ? 1440 : 0)) / 2) % 1440 : lunchMin;
       const effectiveDinner = isWorkDay && workScheduleEnabled ? (isNightShift ? workEndMin + 60 : Math.min(workEndMin + 30, 1380)) : dinnerMin;
 
-      const effectiveMealsCount = lazyDayMode ? Math.min(3, mealsCount) : cookTimeMin < 30 ? Math.min(3, mealsCount) : cookTimeMin < 60 ? Math.min(4, mealsCount) : mealsCount;
+      let effectiveMealsCount = lazyDayMode ? Math.min(3, mealsCount) : cookTimeMin < 30 ? Math.min(3, mealsCount) : cookTimeMin < 60 ? Math.min(4, mealsCount) : mealsCount;
+      if (_isMinimal) effectiveMealsCount = 3;
+      else if (_isSimple) effectiveMealsCount = Math.min(4, effectiveMealsCount);
       const mealDefs: { label: string; anchor?: number }[] = [];
       mealDefs.push({ label: 'Завтрак', anchor: effectiveWake + 30 });
       if (effectiveMealsCount >= 5) mealDefs.push({ label: 'Второй завтрак' });
@@ -3103,13 +3116,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const dayIdx = days === 1 ? selectedDayIndex : 0;
     await maybeYield();
-    const d1 = buildDay(dayIdx, isTrainDay(dayIdx));
+    const d1 = buildDay(dayIdx, effIsTrainingDay(dayIdx));
     // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
     // и загрязняя usedFoodIds для 1-дневного плана).
     await maybeYield();
-    const d2 = days >= 3 ? buildDay(1, isTrainDay(1)) : null;
+    const d2 = days >= 3 ? buildDay(1, effIsTrainingDay(1)) : null;
     await maybeYield();
-    const d3 = days >= 3 ? buildDay(2, isTrainDay(2)) : null;
+    const d3 = days >= 3 ? buildDay(2, effIsTrainingDay(2)) : null;
     setDayPlan(d1);
     if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
     let weekDays: any[] | null = null;
@@ -3119,7 +3132,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const _weekAcc: any[] = [];
       for (let _i = 0; _i < 7; _i++) {
         await maybeYield();
-        _weekAcc.push(buildDay(_weekBase + _i, isTrainDay(_weekBase + _i)));
+        _weekAcc.push(buildDay(_weekBase + _i, effIsTrainingDay(_weekBase + _i)));
       }
       weekDays = _weekAcc;
       if (periodizationEnabled) {
