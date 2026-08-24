@@ -9,8 +9,8 @@ import {
 } from '../../../engines/training-plan-save.engine';
 
 const CARD: React.CSSProperties = {
-  padding: 12, borderRadius: 14,
-  background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any,
+  padding: 10, borderRadius: 12,
+  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(139,92,246,0.2)',
   marginBottom: 8,
 };
 

@@ -34,7 +34,6 @@ import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
-import { recommendPEDMethodology } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { canonicalMuscle, expandDonorMuscles, isSpecializationTargetConflict as isRegionConflict, normalizeSpecializationTargets } from '../../../engines/bb/bb-specialization.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -101,9 +100,7 @@ import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feed
 import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
-import { sessionTagLabel, muscleLabel, exerciseTargetNote, movementPatternLabel } from './bb-labels';
-import { EQUIP_RU } from './ExerciseLabShared';
-import { strictGroupMembersOf } from '../../../engines/bb/bb-exercise-selection.engine';
+import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
 import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
@@ -126,6 +123,12 @@ const WEAK_GROUPS = [
 ] as const;
 const BB_WM_KEYS = ['chest','back','quads','hamstrings','shoulders','biceps','triceps','glutes','calves','abs'] as const;
 const BB_WM_RU: Record<string,string> = { chest:'Грудь', back:'Спина', quads:'Квадрицепсы', hamstrings:'Бицепс бедра', shoulders:'Плечи', biceps:'Бицепс', triceps:'Трицепс', glutes:'Ягодичные', calves:'Икры', abs:'Пресс' };
+const TAG_LABELS_RU: Record<string, string> = {
+  Push: 'Толкающие', Pull: 'Тянущие', Legs: 'Ноги', Upper: 'Верх', Lower: 'Низ',
+  FullBody: 'Всё тело', Chest: 'Грудь', Back: 'Спина', Shoulders: 'Плечи', Arms: 'Руки',
+  ChestBack: 'Грудь+Спина', ShouldersArms: 'Плечи+Руки', Torso: 'Торс', Limbs: 'Конечности',
+  UpperPower: 'Верх(сила)', LowerPower: 'Низ(сила)', UpperHyp: 'Верх(гиперт)', LowerHyp: 'Низ(гиперт)',
+  };
 export const PHASE_TECHNIQUES: Record<BBPhase, string[]> = {
   accumulation: ['Темповые повторы (TUT)', 'Пауза в растянутой позиции', 'Суперсеты антагонистов'],
   intensification: ['Дроп-сеты (последний подход)', 'Рест-пауза (compounds)', 'Форсированные повторы (с партнёром)'],
@@ -286,7 +289,7 @@ function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: strin
   if (ex.character === 'тяж') parts.push('💪 Силовая нагрузка');
   else if (ex.character === 'памп') parts.push('🩸 Нагнетание крови');
   const catalogEx = EXERCISE_CATALOG.find(e => e.name === ex.name || e.name === ex.muscle);
-  if (catalogEx?.movementPattern) parts.push('🧬 ' + movementPatternLabel(catalogEx.movementPattern));
+  if (catalogEx?.movementPattern) parts.push('🧬 ' + catalogEx.movementPattern);
   if (catalogEx?.targetMuscle) {
     const targets = catalogEx.targetMuscle.split(',').map(t => t.trim()).filter(t => t !== ex.muscle);
     if (targets.length > 0) parts.push('🎯 Доп. нагрузка: ' + targets.join(', '));
@@ -503,13 +506,6 @@ export const BbAutoConstructor: React.FC = () => {
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({ AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4 });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
-  // PRO-пресеты методик (DC/Fortitude/Meadows) — применяется поверх сплита
-  const [proPreset, setProPreset] = useState<string>('none');
-  // BFR + Blast/Cruise
-  const [bfrMode, setBfrMode] = useState<boolean>(false);
-  const [blastCruiseEnabled, setBlastCruiseEnabled] = useState<boolean>(false);
-  const [blastWeeks, setBlastWeeks] = useState<number>(8);
-  const [cruiseWeeks, setCruiseWeeks] = useState<number>(4);
   const [bbWorkMax, setBbWorkMax] = useState<Record<string, number>>(() => ({
     chest: 100, back: 110, quads: 140, hamstrings: 90, shoulders: 60, biceps: 50, triceps: 60, glutes: 160, calves: 120, abs: 60,
     ...(prof.workMax || {}),
@@ -1088,10 +1084,7 @@ export const BbAutoConstructor: React.FC = () => {
     focusGroup: specTargets[0] || undefined,
     donorMuscles: specBlocks.flatMap(b => b.donors),
     specialization: specTargets.length > 0,
-    peds: peds as any,
-    pedDoses: pedDoses as any,
-    preset: proPreset,
-  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, peds, pedDoses, proPreset]);
+  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex]);
   const bestSplit = ranked[0];
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
@@ -1529,10 +1522,6 @@ export const BbAutoConstructor: React.FC = () => {
           proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
           calorieSurplus,
           eccentricMult,
-          bfrMode,
-          blastCruiseEnabled,
-          blastWeeks,
-          cruiseWeeks,
           mobilityRestrictions,
           // PRO: cross-mesocycle continuity — передаём последний сохранённый план
           previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
@@ -2361,23 +2350,6 @@ export const BbAutoConstructor: React.FC = () => {
                       ]}
                     />
                     <PopupSelect
-                      label='🏆 Pro-пресет методики'
-                      value={proPreset}
-                      onChange={v => {
-                        setProPreset(v);
-                        const p = (v === 'dc' ? 'dc_rp' : v === 'fortitude' ? 'myo_reps' : v === 'meadows' ? 'lengthened_partial' : null);
-                        if (v === 'dc' && dupMode === 'none') setDupMode('strength_hypertrophy' as any);
-                        if (v === 'fortitude') { setSupersetMode('giant' as any); if (volumeScheme === 'standard') setVolumeScheme('fst7' as any); }
-                      }}
-                      hint='DC (RP 11-15 + stretch), Fortitude (MR 4×6), Meadows (pre-exhaust + lengthened) — все сплиты адаптируются'
-                      options={[
-                        { id: 'none', label: 'Без пресета (стандарт)' },
-                        { id: 'dc', label: 'DC Training (1 RP all-out)' },
-                        { id: 'fortitude', label: 'Fortitude (Muscle Rounds)' },
-                        { id: 'meadows', label: 'Meadows Mountain Dog' },
-                      ]}
-                    />
-                    <PopupSelect
                       label='📈 Стратегия прогрессии'
                       value={loadStrategy}
                       onChange={v => setLoadStrategy(v as LoadStrategy)}
@@ -2770,33 +2742,7 @@ export const BbAutoConstructor: React.FC = () => {
         courseIntensity={courseIntensity}
         onIntensity={setCourseIntensity}
       />
-      <PedAdaptationCard adaptation={pedAdapt} />
-      {peds.length > 0 && (() => {
-        try {
-          const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus });
-          return (
-            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.18)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>🧬 PED-методика (не ломает тяж/памп)</div>
-              {meth.jointGuard && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🛡 Joint guard: тяж остаётся тяж, но axial → машины/кабели (темп 4-2-1-0)</div>}
-              {meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>💉 GH+insulin pump window: только памп-дни — intra 30-60г +10г EAA</div>}
-              {meth.bfrAllowed && !meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🩸 BFR доступен (20-30% 1RM, 30-15-15-15)</div>}
-              {meth.periWorkout?.intraNote && <div style={{ fontSize:10, color:'#fbbf24', marginBottom:4 }}>🍚 {meth.periWorkout.intraNote}</div>}
-              {meth.periWorkout?.warning && <div style={{ fontSize:10, color:'#f87171', marginBottom:4 }}>⚠ {meth.periWorkout.warning}</div>}
-              <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>📋 Тяж: {meth.recommendedScheme.heavy} · Памп: {meth.recommendedScheme.pump} {proPreset !== 'none' ? `· Пресет ${proPreset}` : ''}</div>
-              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:4 }}>🔄 Все сплиты адаптируются под фарму (выбор сохранён, объём ×{(pedAdapt.combinedMrvMultiplier||1).toFixed(2)})</div>
-            </div>
-          );
-        } catch { return null; }
-      })()}
-      <div style={{ display:'flex', gap:8, marginTop:8, flexWrap:'wrap' }}>
-        <button onClick={() => setBfrMode(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: bfrMode ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.04)', border: bfrMode ? '1px solid #ec4899' : '1px solid rgba(255,255,255,0.1)', color: bfrMode ? '#ec4899' : '#fff' }}>{bfrMode ? '🩸 BFR включён (30-15-15-15)' : '🩸 BFR окклюзия (только памп)'}</button>
-        <button onClick={() => setBlastCruiseEnabled(v=>!v)} style={{ padding:'6px 12px', borderRadius:10, fontSize:11, fontWeight:700, cursor:'pointer', background: blastCruiseEnabled ? 'rgba(250,204,21,0.18)' : 'rgba(255,255,255,0.04)', border: blastCruiseEnabled ? '1px solid #facc15' : '1px solid rgba(255,255,255,0.1)', color: blastCruiseEnabled ? '#facc15' : '#fff' }}>{blastCruiseEnabled ? `🔄 Blast ${blastWeeks}н / Cruise ${cruiseWeeks}н` : '🔄 Blast/Cruise выкл'}</button>
-        {blastCruiseEnabled && <>
-          <PopupNumber label='Blast нед' value={blastWeeks} min={4} max={12} onChange={setBlastWeeks} />
-          <PopupNumber label='Cruise нед' value={cruiseWeeks} min={2} max={8} onChange={setCruiseWeeks} />
-        </>}
-      </div>
-          {/* Рекомендации по питанию */}
+      <PedAdaptationCard adaptation={pedAdapt} />          {/* Рекомендации по питанию */}
           {(() => {
             const nut: Record<string, { cal: string; pro: string; tip: string }> = {
               mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
@@ -2883,7 +2829,7 @@ export const BbAutoConstructor: React.FC = () => {
             {sel && <div style={{ marginTop:6, fontSize:11, color:'#fff' }}>{r.rationale.map((x,i) => <div key={i}>✓ {x}</div>)}</div>}
             <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
               {mf.map(f => (
-                <span key={f.tag} style={{ fontSize:11, padding:'1px 6px', borderRadius:4, background:f.freq >= 2 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', color:f.freq >= 2 ? '#00e68a' : '#fff' }}>{sessionTagLabel(f.tag)} ~ {f.freq}×/нед</span>
+                <span key={f.tag} style={{ fontSize:11, padding:'1px 6px', borderRadius:4, background:f.freq >= 2 ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', color:f.freq >= 2 ? '#00e68a' : '#fff' }}>{TAG_LABELS_RU[f.tag] || f.tag} ~ {f.freq}×/нед</span>
               ))}
             </div>
             <button onClick={() => setSelectedSplitId(r.pattern.id)} style={{ marginTop:8, padding:'6px 12px', borderRadius:8, fontSize:11, fontWeight:700, cursor:'pointer', background:sel?'#00e68a':'rgba(255,255,255,0.06)', color:sel?'#000':'#fff', border:'1px solid '+(sel?'#00e68a':'rgba(255,255,255,0.1)'), width:'100%' }}>{sel ? '✓ Выбран' : 'Выбрать этот сплит'}</button>
@@ -2921,6 +2867,428 @@ export const BbAutoConstructor: React.FC = () => {
           </button>
           </div>
         </div>
+
+        {/* Верхняя инфо перенесена в шаг Качество — здесь только план упражнений */}
+        {(() => {
+          const vol = builtPlan.rotationMuscleVolume || {};
+          const lm = builtPlan.volumeLandmarks || [];
+          const MUSCLE_RU_H: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадр', hamstrings: 'Бицепс б', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предпл', abs: 'Пресс', traps: 'Трапец' };
+          const muscles = Object.keys(vol).filter(m => MUSCLE_RU_H[m]);
+          if (muscles.length === 0) return null;
+          // Color: green (MEV) → yellow (MAV) → red (MRV)
+          const colorFor = (sets: number, landmark?: any) => {
+            if (!landmark) return '#374151';
+            if (sets > landmark.mrv + 1) return '#ef4444'; // red — over MRV
+            if (sets > landmark.mav) return '#f59e0b';     // yellow — above MAV
+            if (sets >= landmark.mev) return '#22c55e';    // green — MEV-MAV range
+            return '#3b82f6';                               // blue — below MEV
+          };
+          const findLandmark = (m: string) => lm.find((l: any) => l.group === m || l.label === m);
+          return (
+            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', marginBottom:8 }}>🔥 Muscle Volume Heatmap</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(100px, 1fr))', gap:6 }}>
+                {muscles.sort((a,b) => (vol[b]||0) - (vol[a]||0)).map(m => {
+                  const sets = vol[m] || 0;
+                  const landmark = findLandmark(m);
+                  const color = colorFor(sets, landmark);
+                  const pct = landmark ? Math.min(100, Math.round((sets / (landmark.mrv || sets || 1)) * 100)) : 50;
+                  return (
+                    <div key={m} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:`2px solid ${color}` }}>
+                      <div style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{MUSCLE_RU_H[m]}</div>
+                      <div style={{ fontSize:16, fontWeight:800, color }}>{sets}</div>
+                      <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.1)', marginTop:4 }}>
+                        <div style={{ height:'100%', borderRadius:2, background:color, width:`${pct}%` }} />
+                      </div>
+                      {landmark && (
+                        <div style={{ fontSize:8, color:'#fff', marginTop:2 }}>
+                          MEV{landmark.mev} · MAV{landmark.mav} · MRV{landmark.mrv}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:6, fontSize:9, color:'#fff', display:'flex', gap:12 }}>
+                <span>🟢 MEV-MAV</span><span>🟡 Above MAV</span><span>🔴 Over MRV</span><span>🔵 Below MEV</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* PRO: Per-muscle frequency optimization recommendations */}
+        {freqOptResult && freqOptResult.totalAdjustments > 0 && (
+          <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🔧 Frequency Optimization ({freqOptResult.totalAdjustments} корректировок)</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              {freqOptResult.recommendations.map((rec: any, i: number) => {
+                const direction = rec.recommendedFrequency > rec.currentFrequency ? '↑' : '↓';
+                const color = rec.recommendedFrequency > rec.currentFrequency ? '#22c55e' : '#ef4444';
+                return (
+                  <div key={i} style={{ fontSize:11, color:'#fff', display:'flex', gap:8 }}>
+                    <span style={{ color, fontWeight:700 }}>{direction} {rec.muscle}:</span>
+                    <span>{rec.currentFrequency}→{rec.recommendedFrequency}×/нед</span>
+                    <span style={{ color:'#fff' }}>({rec.reason})</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PRO: Auto-regulation status panel — что сделал diary feedback loop */}
+        {(() => {
+          const summary = summarizeAutoRegulation(builtPlan);
+          if (summary.adjustedExercises === 0) return null;
+          return (
+            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#a855f7', marginBottom:6 }}>
+                ↻ Auto-regulation: {summary.adjustedExercises}/{summary.totalExercises} упражнений скорректировано из дневника
+              </div>
+              <div style={{ display:'flex', gap:12, fontSize:11, color:'#fff', marginBottom:6 }}>
+                {summary.weightIncreases > 0 && <span style={{ color:'#22c55e' }}>↑ Вес +{summary.weightIncreases}</span>}
+                {summary.weightDecreases > 0 && <span style={{ color:'#ef4444' }}>↓ Вес −{summary.weightDecreases}</span>}
+                {summary.rirAdjustments > 0 && <span style={{ color:'#f59e0b' }}>RIR ±{summary.rirAdjustments}</span>}
+                {summary.plateauDetected > 0 && <span style={{ color:'#ef4444' }}>⚠ Plateau: {summary.plateauDetected}</span>}
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                {summary.details.slice(0, 5).map((d, i) => (
+                  <div key={i} style={{ fontSize:10, color:'#fff' }}>
+                    {d.exercise}: {d.from} → {d.to}
+                  </div>
+                ))}
+                {summary.details.length > 5 && <div style={{ fontSize:10, color:'#fff' }}>+{summary.details.length - 5} ещё...</div>}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Overload targets for this week */}
+        {(() => {
+           // Per-muscle частота и объём
+           const freq = builtPlan.muscleFrequency || {};
+           const vol = builtPlan.rotationMuscleVolume || {};
+           const actualVolume = builtPlan.weeklyVolume?.[wk.week] || {};
+            const muscleEntries = Object.keys(freq).map(m => {
+              const metric = metrics?.perMuscle.find(x => x.muscle === m);
+              const target = builtPlan.volumeTargets?.[m];
+               const actual = actualVolume[m];
+              const landmarks = metric ? { mev: metric.mev, mav: metric.mav, mrv: metric.mrv } : null;
+              const status = landmarks
+                ? ((actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mrv ? 'MRV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mav ? 'MAV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) >= landmarks.mev ? 'OK' : 'MEV-')
+                : '—';
+              return {
+                muscle: m,
+                freq: freq[m] || 0,
+                sets: actual?.directSets ?? metric?.directSets ?? vol[m] ?? 0,
+                effectiveSets: actual?.effectiveSets ?? metric?.effectiveSets ?? metric?.totalSets ?? vol[m] ?? 0,
+               targetSets: target?.targetSets ?? vol[m] ?? 0,
+                 status,
+               };
+           }).sort((a, b) => b.effectiveSets - a.effectiveSets);
+          if (muscleEntries.length === 0) return null;
+          const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
+          const freqColor = (f: number) => f >= 3 ? '#ef4444' : f === 2 ? '#22c55e' : '#f59e0b';
+          const freqLabel = (f: number) => f >= 3 ? `${f}×/нед (высокая)` : f === 2 ? `${f}×/нед (оптимум)` : `${f}×/нед`;
+          return (
+            <ExpandableCard title="📊 Частота и объём по мышцам" icon="📊"
+              short={`${muscleEntries.length} групп · ${muscleEntries.filter(e => e.freq >= 2).length} ×2+/нед`}
+              full={
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                    {muscleEntries.map(({ muscle, freq: f, sets, effectiveSets, targetSets, status }) => (
+                    <div key={muscle} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: freqColor(f), flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{MUSCLE_RU[muscle] || muscle}</div>
+                         <div style={{ fontSize: 10, color: status === 'MRV+' ? '#ef4444' : status === 'MEV-' ? '#f59e0b' : '#22c55e' }}>{freqLabel(f)} · нед. direct {sets} · effective {Math.round(effectiveSets * 10) / 10} · target {targetSets} · {status}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan.expandedSummary && (() => {
+          const sum = builtPlan.expandedSummary;
+          const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
+          const entries = Object.entries(sum.byMuscle).sort((a, b) => b[1].workingSets - a[1].workingSets);
+          return (
+            <ExpandableCard title="📋 Недельная сводка сетов" icon="📋"
+              short={`${entries.length} групп · ${sum.totalWorkingSets} раб. сетов/нед`}
+              full={
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {entries.map(([m, v]) => {
+                    const isExpanded = expandedMuscles.has(m);
+                    const byEx = (v as any).byExercise as Record<string, number> | undefined;
+                    const subGroups = (v as any).subGroups as Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number>; explanation?: { why: string; how: string; patternRu: string; labelRu: string } }> | undefined;
+                    return (
+                    <div key={m} onClick={() => setExpandedMuscles(prev => { const n = new Set(prev); if (n.has(m)) n.delete(m); else n.add(m); return n; })} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
+                      {(() => {
+                        const lm = (builtPlan.volumeLandmarks || []).find((l: any) => l.group === m);
+                        const freqVal = (builtPlan.muscleFrequency?.[m] ?? v.sessionsPerWeek) as number;
+                        const targetSets = (builtPlan as any).volumeTargets?.[m]?.targetSets ?? lm?.mav ?? v.workingSets;
+                        const pedMult = (builtPlan as any).pedAdaptation?.combinedMrvMultiplier || 1;
+                        const freqColor = freqVal >= 3 ? '#ef4444' : freqVal === 2 ? '#22c55e' : '#f59e0b';
+                        const volColor = (() => {
+                          if (!lm) return '#374151';
+                          if (v.workingSets > (lm.mrv + 1)) return '#ef4444';
+                          if (v.workingSets > lm.mav) return '#f59e0b';
+                          if (v.workingSets >= lm.mev) return '#22c55e';
+                          return '#3b82f6';
+                        })();
+                        const pct = lm ? Math.min(100, Math.round((v.workingSets / (lm.mrv || v.workingSets || 1)) * 100)) : 50;
+                        return (<>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <span>{MUSCLE_RU[m] || m} — <span style={{ color: freqColor }}>{freqVal}×/нед</span> · {v.workingSets} раб.{targetSets ? `/${targetSets} цель` : ''} · {v.warmupSets} разм.{pedMult > 1 ? ` · PED ×${pedMult.toFixed(2)}` : ''}</span>
+                        <span style={{ fontSize:10, color:'#fff' }}>{isExpanded ? '▲' : '▼'}</span>
+                      </div>
+                      {lm && (
+                        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
+                          <div style={{ flex:1, height:4, borderRadius:2, background:'rgba(255,255,255,0.08)', position:'relative', overflow:'hidden' }}>
+                            <div style={{ position:'absolute', left:`${(lm.mev/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(59,130,246,0.6)' }} />
+                            <div style={{ position:'absolute', left:`${(lm.mav/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(245,158,11,0.6)' }} />
+                            <div style={{ height:'100%', borderRadius:2, background:volColor, width:`${pct}%`, transition:'width 0.3s' }} />
+                          </div>
+                          <span style={{ fontSize:8, color:volColor, fontWeight:700, whiteSpace:'nowrap' }}>MEV{lm.mev}·MAV{lm.mav}·MRV{lm.mrv}</span>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 10, color: '#fff', marginTop:4 }}>
+                        паттерн: {Object.entries(v.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'} · direct {v.directSets} · косв. {Math.round(v.indirectSets)}
+                      </div>
+                        </>);
+                      })()}
+                      {isExpanded && (
+                        <>
+                          <div style={{ fontSize:10, color:'#fff', marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+                            упражнения: {byEx ? Object.entries(byEx).map(([e, n]) => `${e} ${n}`).join(', ') : '—'}
+                          </div>
+                          {subGroups && Object.keys(subGroups).length > 0 && (
+                            <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
+                              {Object.entries(subGroups).map(([subId, sub]) => {
+                                const expl = (sub as any).explanation as { why?: string; how?: string; patternRu?: string; labelRu?: string } | undefined;
+                                const label = expl?.labelRu || subId;
+                                return (
+                                <div key={subId} style={{ fontSize:10, color:'#fff', padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                                  <div style={{ display:'flex', justifyContent:'space-between', gap:6 }}>
+                                    <b style={{ color:'#e5e7eb' }}>{label}</b>
+                                    <span style={{ fontWeight:700, color:'#22c55e' }}>{sub.workingSets} сетов</span>
+                                  </div>
+                                  <div style={{ color:'#fff', marginTop:2 }}>паттерн: {Object.entries(sub.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'}{expl?.patternRu ? ` · ${expl.patternRu}` : ''}</div>
+                                  <div style={{ color:'#fff' }}>упражнения: {Object.entries(sub.byExercise).map(([e, n]) => `${e} ${n}`).join(', ') || '—'}</div>
+                                  {expl?.why && <div style={{ color:'#fbbf24', marginTop:3, lineHeight:1.35 }}>▸ Чем хорошо: {expl.why}</div>}
+                                  {expl?.how && <div style={{ color:'#93c5fd', lineHeight:1.35 }}>▸ Как работает: {expl.how}</div>}
+                                </div>
+                              );})}
+                            </div>
+                          )}
+                          <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>
+                            {v.bySession.map((sess, idx) => `тр${sess.day || idx+1}: ${sess.working}р/${sess.warmup}р`).join(' · ')}
+                          </div>
+                        </>
+                      )}
+                      {!isExpanded && v.bySession.length > 0 && (
+                        <div style={{ fontSize: 10, color: '#fff' }}>нажмите для развертки — подгруппы/паттерны/пояснения (чем хорошо / как работает)</div>
+                      )}
+                    </div>
+                  );})}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>Итого: {sum.totalWorkingSets} рабочих сетов/нед</div>
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan && (() => {
+          const methods = buildBBMethodologySummary(builtPlan);
+          if (methods.length === 0) return null;
+          return (
+            <ExpandableCard title="🧩 Применённые методики" icon="🧩"
+              short={`${methods.length} методик · ${methods[0]}`}
+              full={<div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11 }}>
+                {methods.map((m, i) => <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>✓ {m}</div>)}
+              </div>}
+            />
+          );
+        })()}
+
+        {builtPlan.rotationReport && (() => {
+          const report = builtPlan.rotationReport;
+          const primaryCount = Object.keys(report.primaryByMuscle).length;
+          const warningCount = report.issues.length;
+          return (
+            <ExpandableCard title="🔁 Ротация упражнений" icon="🔁"
+              short={`${primaryCount} primary · ${warningCount} предупреждений`}
+              full={
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ fontSize:11, color:'#fff' }}>
+                    Primary сохраняются стабильными, аксессуары ротируются по паттернам и фазе.
+                  </div>
+                  {report.issues.length === 0
+                    ? <div style={{ fontSize:11, color:'#22c55e' }}>✅ Конфликтов ротации не обнаружено.</div>
+                    : report.issues.slice(0, 8).map((issue: { code?: string; phase?: string; message: string }, i: number) => (
+                      <div key={i} style={{ fontSize:11, color: issue.code === 'primary_changed' ? '#f59e0b' : '#fff' }}>
+                         {issue.phase ? `[${PHASE_LABELS[issue.phase as BBPhase] || issue.phase}] ` : ''}{issue.message}
+                      </div>
+                    ))}
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan.fatigueReport && (() => {
+          const current = builtPlan.fatigueReport.find(item => item.week === wk.week) || builtPlan.fatigueReport[0];
+          const time = current.sessions.reduce((sum, session) => sum + session.timeSeconds, 0);
+          const axial = current.sessions.reduce((sum, session) => sum + session.axial, 0);
+          const systemic = current.sessions.reduce((sum, session) => sum + session.systemic, 0);
+          return (
+            <ExpandableCard title="⚙️ Усталость и длительность" icon="⚙️"
+              short={`${Math.round(time / 60)} мин · axial ${axial.toFixed(1)}`}
+              full={<div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, fontSize:11 }}>
+                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Время<br/><b>{Math.round(time / 60)} мин</b></div>
+                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Systemic<br/><b>{systemic.toFixed(1)}</b></div>
+                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Axial<br/><b>{axial.toFixed(1)}</b></div>
+              </div>}
+            />
+          );
+        })()}
+
+        {builtPlan.report && (() => {
+          const report = builtPlan.report;
+          return (
+            <ExpandableCard title="📋 Итоговый отчёт программы" icon="📋"
+              short={`${report.weeks} нед · ${report.totalDirectSets} direct-сетов · пик Н${report.peakWeek}`}
+              full={
+                <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'#fff', lineHeight:1.45 }}>
+                    <b>Настройки:</b> Уровень {(builtPlan as any).level || '—'} · Цель {(builtPlan as any).goal || '—'} · Фокус {(builtPlan as any).trainingFocus || '—'} · Методика {(builtPlan as any).methodology || '—'} · Объём {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (' + ((builtPlan as any).volumeScheme || 'MRV') + ', кап 5)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'MAV') + ')'} · Стаж {(builtPlan as any).trainingYears ?? '—'} лет · Капы {(builtPlan as any).maxWorkingSets}/{ (builtPlan as any).maxExercises}
+                    {pedAdapt.activePEDs.length > 0 && (
+                      <div style={{ marginTop:3, padding:'4px 6px', borderRadius:6, background: pedAdapt.combinedMrvMultiplier > 1.2 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(245,158,11,0.2)' }}>
+                        <b>PED:</b> {pedAdapt.activePEDs.join(', ')} MRV x{pedAdapt.combinedMrvMultiplier.toFixed(2)} Recovery x{(pedAdapt as any).combinedRecoveryMultiplier?.toFixed(2) || '—'}
+                        {Object.keys(pedDoses).length > 0 && <> Doses: {Object.entries(pedDoses).map(([k,v])=>`${k}:${v}`).join(', ')}</>}
+                      </div>
+                    )}
+                    {(() => {
+                      const pp = (linked as any)?.profile?.settings?.personal;
+                      if (!pp || (!pp.weight && !pp.bodyFat && !pp.sex)) return null;
+                      const leanMass = pp.weight && pp.bodyFat ? (pp.weight * (1 - pp.bodyFat/100)).toFixed(1) : null;
+                      return (
+                        <div style={{ marginTop:3, fontSize:10, color:'#fff' }}>
+                          <b>Patient:</b> {pp.sex || '—'} {pp.age ? `${pp.age}y` : '—'} {pp.weight ? `${pp.weight}kg` : '—'}{pp.height ? `/${pp.height}cm` : ''} {pp.bodyFat ? ` BF ${pp.bodyFat}%` : ''} {leanMass ? ` LBM ${leanMass}kg` : ''}
+                        </div>
+                      );
+                    })()}
+                    {((builtPlan as any).supersetMode || (builtPlan as any).dupMode || (builtPlan as any).priorityMuscles?.length) && (
+                      <><br/>Суперсеты {(builtPlan as any).supersetMode || 'нет'} · DUP {(builtPlan as any).dupMode || 'нет'}{(builtPlan as any).priorityMuscles?.length ? ` · Спец: ${(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}` : ''}</>
+                    )}
+                    {(() => {
+                      const s = (builtPlan as any).inputSnapshot;
+                      if (!s) return null;
+                      const parts: string[] = [];
+                      if (s.rotationMode) parts.push(`Ротация: ${s.rotationMode}`);
+                      if (s.intensityLevel) parts.push(`Интенс: ${s.intensityLevel}`);
+                      if (s.avoidAxialLoad) parts.push('Без осевой');
+                      if (s.equipment?.length) parts.push(`Оборуд: ${s.equipment.slice(0, 3).join(',')}${s.equipment.length > 3 ? '…' : ''}`);
+                      if (s.injuries?.length) parts.push(`Травм: ${s.injuries.length}`);
+                      if (s.mobilityRestrictions?.length) parts.push(`Мобильн: ${s.mobilityRestrictions.join(',')}`);
+                      if (s.autoDeload != null) parts.push(`Авто-делод: ${s.autoDeload ? 'да' : 'нет'}`);
+                      if (s.eccentricMult && s.eccentricMult !== 1) parts.push(`Эксцентрик ×${s.eccentricMult}`);
+                      return parts.length ? <><br/>{parts.join(' · ')}</> : null;
+                    })()}
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', color:'#fff', lineHeight:1.45 }}>
+                    <b>Фазы:</b> {(() => {
+                      const ru: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+                      const seq: Array<{ p: string; from: number; to: number }> = [];
+                      for (const wk of (builtPlan as any).weeks || []) {
+                        const ph = String(wk.phase || '').toLowerCase();
+                        const last = seq[seq.length - 1];
+                        if (last && last.p === ph) last.to = wk.week; else seq.push({ p: ph, from: wk.week, to: wk.week });
+                      }
+                      return seq.map(s => `${ru[s.p] || s.p}: нед ${s.from}${s.to !== s.from ? '-' + s.to : ''}${(builtPlan as any).weeks.find((w: any) => w.week === s.to)?.deload ? ' (делод)' : ''}`).join(' · ');
+                    })()}
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация<br/><b>{report.sessionsPerWeek} сессий</b></div>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Пик объёма<br/><b>неделя {report.peakWeek}</b></div>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация warnings<br/><b>{report.rotationWarnings}</b></div>
+                  </div>
+                  <div style={{ color:'#fff' }}>
+                    Максимум за сессию: {report.maxSessionMinutes} мин · axial cost: {report.maxAxialCost.toFixed(1)} · muscle leakage: {report.sessionLeakWarnings}
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
+        {builtPlan.balanceReport && (
+          <ExpandableCard title="⚖️ Баланс паттернов и позиций" icon="⚖️"
+            short={`жимы ${builtPlan.balanceReport.press} · тяги ${builtPlan.balanceReport.pull} · растяжка ${builtPlan.balanceReport.lengthened}`}
+            full={<div style={{ fontSize: 11, lineHeight: 1.5 }}>
+              <div>Жимы: <b>{builtPlan.balanceReport.press}</b> сетов · Тяги: <b>{builtPlan.balanceReport.pull}</b> · Подъёмы/разводки: <b>{builtPlan.balanceReport.raise}</b></div>
+              <div>Верх: тяги/жимы ratio <b>{builtPlan.balanceReport.pullPressRatio}</b> ({builtPlan.balanceReport.upperPull}/{builtPlan.balanceReport.upperPress})</div>
+              <div>Compound: {builtPlan.balanceReport.compound} · Isolation: {builtPlan.balanceReport.isolation}</div>
+              <div>Растянутая: {builtPlan.balanceReport.lengthened} · Средняя: {builtPlan.balanceReport.midRange} · Сокращённая: {builtPlan.balanceReport.shortened}</div>
+              <div style={{ marginTop: 4 }}>По мышцам: {Object.entries(builtPlan.balanceReport.byMuscle).map(([muscle, coverage]) => `${muscle} ${Object.keys(coverage.patterns).length} патт. / ${coverage.lengthened}-${coverage.midRange}-${coverage.shortened}`).join(' · ')}</div>
+              {builtPlan.balanceReport.issues.map((issue, index) => <div key={index} style={{ color: '#f59e0b' }}>⚠ {issue}</div>)}
+            </div>}
+          />
+        )}
+
+        {builtPlan.validation && !builtPlan.validation.valid && (
+          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', marginBottom:5 }}>🚫 План требует исправления</div>
+            {builtPlan.validation.issues.filter((i: { level?: string }) => i.level === 'error').slice(0, 5).map((issue: { message: string }, i: number) => (
+              <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>
+            ))}
+          </div>
+        )}
+
+        {builtPlan.validation && (() => {
+          const warnings = builtPlan.validation.issues.filter((issue: { level?: string; code: string }) => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow', 'low_training_frequency', 'goal_focus_mismatch'].includes(issue.code));
+          if (warnings.length === 0) return null;
+          return (
+            <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:5 }}>⚠️ Объём и бюджет требуют внимания</div>
+              {warnings.slice(0, 8).map((issue: { message: string }, i: number) => <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>)}
+              <div style={{ marginTop:5, fontSize:10, color:'#fff' }}>Это предупреждения, а не блокировка. Ограничения оборудования, времени и восстановления могут объяснять недобор.</div>
+            </div>
+          );
+        })()}
+
+        {/* PRO: Actionable recommendations — конкретные шаги по улучшению плана */}
+        {builtPlan.validation && (() => {
+          const recs = generateActionableRecommendations(builtPlan, builtPlan.validation.issues);
+          if (recs.length === 0 || (recs.length === 1 && recs[0].code === 'all_clear')) return null;
+          const colorFor = (p: string) => p === 'high' ? '#ef4444' : p === 'medium' ? '#f59e0b' : '#22c55e';
+          return (
+            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>💡 Рекомендации по улучшению</div>
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                {recs.slice(0, 8).map((rec, i) => (
+                  <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4, display:'flex', gap:6 }}>
+                    <span style={{ color: colorFor(rec.priority), fontWeight:700 }}>{rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}</span>
+                    <span>{rec.action}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {(() => {
+          const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks, currentPhase).slice(0, 6);
+          if (targets.length === 0) return null;
+          return (
+            <ExpandableCard title={'🎯 Цели прогрессии на эту неделю (' + loadStrategy.replace('_', ' ') + ')'} icon="🎯" short={targets[0].nextTarget + (targets.length > 1 ? (' + ещё ' + (targets.length - 1)) : '')} full={
+              <div>{targets.map((t, i) => <div key={i} style={{ padding:'4px 8px', marginBottom:4, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', fontSize:11, color:'#fff' }}>
+                <b>{t.exerciseName}</b>: {t.nextTarget}
+              </div>)}</div>
+            } />
+          );
+        })()}
 
         {/* Week selector with phase colors */}
         <div style={{ marginTop:10 }}>
@@ -3446,433 +3814,6 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         {/* Объём vs MRV (volume-landmarks, единый источник) */}
         {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
-        {/* Верхняя инфо перенесена в шаг Качество — здесь только план упражнений */}
-        {(() => {
-          const vol = builtPlan.rotationMuscleVolume || {};
-          const lm = builtPlan.volumeLandmarks || [];
-          const MUSCLE_RU_H: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадр', hamstrings: 'Бицепс б', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предпл', abs: 'Пресс', traps: 'Трапец' };
-          const muscles = Object.keys(vol).filter(m => MUSCLE_RU_H[m]);
-          if (muscles.length === 0) return null;
-          // Color: green (MEV) → yellow (MAV) → red (MRV)
-          const colorFor = (sets: number, landmark?: any) => {
-            if (!landmark) return '#374151';
-            if (sets > landmark.mrv + 1) return '#ef4444'; // red — over MRV
-            if (sets > landmark.mav) return '#f59e0b';     // yellow — above MAV
-            if (sets >= landmark.mev) return '#22c55e';    // green — MEV-MAV range
-            return '#3b82f6';                               // blue — below MEV
-          };
-          const findLandmark = (m: string) => lm.find((l: any) => l.group === m || l.label === m);
-          return (
-            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', marginBottom:8 }}>🔥 Muscle Volume Heatmap</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(100px, 1fr))', gap:6 }}>
-                {muscles.sort((a,b) => (vol[b]||0) - (vol[a]||0)).map(m => {
-                  const sets = vol[m] || 0;
-                  const landmark = findLandmark(m);
-                  const color = colorFor(sets, landmark);
-                  const pct = landmark ? Math.min(100, Math.round((sets / (landmark.mrv || sets || 1)) * 100)) : 50;
-                  return (
-                    <div key={m} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:`2px solid ${color}` }}>
-                      <div style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{MUSCLE_RU_H[m]}</div>
-                      <div style={{ fontSize:16, fontWeight:800, color }}>{sets}</div>
-                      <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.1)', marginTop:4 }}>
-                        <div style={{ height:'100%', borderRadius:2, background:color, width:`${pct}%` }} />
-                      </div>
-                      {landmark && (
-                        <div style={{ fontSize:8, color:'#fff', marginTop:2 }}>
-                          MEV{landmark.mev} · MAV{landmark.mav} · MRV{landmark.mrv}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop:6, fontSize:9, color:'#fff', display:'flex', gap:12 }}>
-                <span>🟢 MEV-MAV</span><span>🟡 Above MAV</span><span>🔴 Over MRV</span><span>🔵 Below MEV</span>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* PRO: Per-muscle frequency optimization recommendations */}
-        {freqOptResult && freqOptResult.totalAdjustments > 0 && (
-          <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🔧 Frequency Optimization ({freqOptResult.totalAdjustments} корректировок)</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-              {freqOptResult.recommendations.map((rec: any, i: number) => {
-                const direction = rec.recommendedFrequency > rec.currentFrequency ? '↑' : '↓';
-                const color = rec.recommendedFrequency > rec.currentFrequency ? '#22c55e' : '#ef4444';
-                return (
-                  <div key={i} style={{ fontSize:11, color:'#fff', display:'flex', gap:8 }}>
-                    <span style={{ color, fontWeight:700 }}>{direction} {rec.muscle}:</span>
-                    <span>{rec.currentFrequency}→{rec.recommendedFrequency}×/нед</span>
-                    <span style={{ color:'#fff' }}>({rec.reason})</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* PRO: Auto-regulation status panel — что сделал diary feedback loop */}
-        {(() => {
-          const summary = summarizeAutoRegulation(builtPlan);
-          if (summary.adjustedExercises === 0) return null;
-          return (
-            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#a855f7', marginBottom:6 }}>
-                ↻ Auto-regulation: {summary.adjustedExercises}/{summary.totalExercises} упражнений скорректировано из дневника
-              </div>
-              <div style={{ display:'flex', gap:12, fontSize:11, color:'#fff', marginBottom:6 }}>
-                {summary.weightIncreases > 0 && <span style={{ color:'#22c55e' }}>↑ Вес +{summary.weightIncreases}</span>}
-                {summary.weightDecreases > 0 && <span style={{ color:'#ef4444' }}>↓ Вес −{summary.weightDecreases}</span>}
-                {summary.rirAdjustments > 0 && <span style={{ color:'#f59e0b' }}>RIR ±{summary.rirAdjustments}</span>}
-                {summary.plateauDetected > 0 && <span style={{ color:'#ef4444' }}>⚠ Plateau: {summary.plateauDetected}</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                {summary.details.slice(0, 5).map((d, i) => (
-                  <div key={i} style={{ fontSize:10, color:'#fff' }}>
-                    {d.exercise}: {d.from} → {d.to}
-                  </div>
-                ))}
-                {summary.details.length > 5 && <div style={{ fontSize:10, color:'#fff' }}>+{summary.details.length - 5} ещё...</div>}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Overload targets for this week */}
-        {(() => {
-           // Per-muscle частота и объём
-           const freq = builtPlan.muscleFrequency || {};
-           const vol = builtPlan.rotationMuscleVolume || {};
-           const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
-           const actualVolume = builtPlan.weeklyVolume?.[wk.week] || {};
-            const muscleEntries = Object.keys(freq).map(m => {
-              const metric = metrics?.perMuscle.find(x => x.muscle === m);
-              const target = builtPlan.volumeTargets?.[m];
-               const actual = actualVolume[m];
-              const landmarks = metric ? { mev: metric.mev, mav: metric.mav, mrv: metric.mrv } : null;
-              const status = landmarks
-                ? ((actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mrv ? 'MRV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mav ? 'MAV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) >= landmarks.mev ? 'OK' : 'MEV-')
-                : '—';
-              return {
-                muscle: m,
-                freq: freq[m] || 0,
-                sets: actual?.directSets ?? metric?.directSets ?? vol[m] ?? 0,
-                effectiveSets: actual?.effectiveSets ?? metric?.effectiveSets ?? metric?.totalSets ?? vol[m] ?? 0,
-               targetSets: target?.targetSets ?? vol[m] ?? 0,
-                 status,
-               };
-           }).sort((a, b) => b.effectiveSets - a.effectiveSets);
-          if (muscleEntries.length === 0) return null;
-          const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
-          const freqColor = (f: number) => f >= 3 ? '#ef4444' : f === 2 ? '#22c55e' : '#f59e0b';
-          const freqLabel = (f: number) => f >= 3 ? `${f}×/нед (высокая)` : f === 2 ? `${f}×/нед (оптимум)` : `${f}×/нед`;
-          return (
-            <ExpandableCard title="📊 Частота и объём по мышцам" icon="📊"
-              short={`${muscleEntries.length} групп · ${muscleEntries.filter(e => e.freq >= 2).length} ×2+/нед`}
-              full={
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    {muscleEntries.map(({ muscle, freq: f, sets, effectiveSets, targetSets, status }) => (
-                    <div key={muscle} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: freqColor(f), flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{MUSCLE_RU[muscle] || muscle}</div>
-                         <div style={{ fontSize: 10, color: status === 'MRV+' ? '#ef4444' : status === 'MEV-' ? '#f59e0b' : '#22c55e' }}>{freqLabel(f)} · нед. direct {sets} · effective {Math.round(effectiveSets * 10) / 10} · target {targetSets} · {status}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              }
-            />
-          );
-        })()}
-
-        {builtPlan.expandedSummary && (() => {
-          const sum = builtPlan.expandedSummary;
-          const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
-          const entries = Object.entries(sum.byMuscle).sort((a, b) => b[1].workingSets - a[1].workingSets);
-          return (
-            <ExpandableCard title="📋 Недельная сводка сетов" icon="📋"
-              short={`${entries.length} групп · ${sum.totalWorkingSets} раб. сетов/нед`}
-              full={
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {entries.map(([m, v]) => {
-                    const isExpanded = expandedMuscles.has(m);
-                    const byEx = (v as any).byExercise as Record<string, number> | undefined;
-                    const subGroups = (v as any).subGroups as Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number>; explanation?: { why: string; how: string; patternRu: string; labelRu: string } }> | undefined;
-                    return (
-                    <div key={m} onClick={() => setExpandedMuscles(prev => { const n = new Set(prev); if (n.has(m)) n.delete(m); else n.add(m); return n; })} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
-                      {(() => {
-                        const lm = (builtPlan.volumeLandmarks || []).find((l: any) => l.group === m);
-                        const freqVal = (builtPlan.muscleFrequency?.[m] ?? v.sessionsPerWeek) as number;
-                        const targetSets = (builtPlan as any).volumeTargets?.[m]?.targetSets ?? lm?.mav ?? v.workingSets;
-                        const pedMult = (builtPlan as any).pedAdaptation?.combinedMrvMultiplier || 1;
-                        const freqColor = freqVal >= 3 ? '#ef4444' : freqVal === 2 ? '#22c55e' : '#f59e0b';
-                        const volColor = (() => {
-                          if (!lm) return '#374151';
-                          if (v.workingSets > (lm.mrv + 1)) return '#ef4444';
-                          if (v.workingSets > lm.mav) return '#f59e0b';
-                          if (v.workingSets >= lm.mev) return '#22c55e';
-                          return '#3b82f6';
-                        })();
-                        const pct = lm ? Math.min(100, Math.round((v.workingSets / (lm.mrv || v.workingSets || 1)) * 100)) : 50;
-                        return (<>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span>{MUSCLE_RU[m] || m} — <span style={{ color: freqColor }}>{freqVal}×/нед</span> · {v.workingSets} раб.{targetSets ? `/${targetSets} цель` : ''} · {v.warmupSets} разм.{pedMult > 1 ? ` · PED ×${pedMult.toFixed(2)}` : ''}</span>
-                        <span style={{ fontSize:10, color:'#fff' }}>{isExpanded ? '▲' : '▼'}</span>
-                      </div>
-                      {lm && (
-                        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
-                          <div style={{ flex:1, height:4, borderRadius:2, background:'rgba(255,255,255,0.08)', position:'relative', overflow:'hidden' }}>
-                            <div style={{ position:'absolute', left:`${(lm.mev/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(59,130,246,0.6)' }} />
-                            <div style={{ position:'absolute', left:`${(lm.mav/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(245,158,11,0.6)' }} />
-                            <div style={{ height:'100%', borderRadius:2, background:volColor, width:`${pct}%`, transition:'width 0.3s' }} />
-                          </div>
-                          <span style={{ fontSize:8, color:volColor, fontWeight:700, whiteSpace:'nowrap' }}>MEV{lm.mev}·MAV{lm.mav}·MRV{lm.mrv}</span>
-                        </div>
-                      )}
-                      <div style={{ fontSize: 10, color: '#fff', marginTop:4 }}>
-                        паттерн: {Object.entries(v.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'} · direct {v.directSets} · косв. {Math.round(v.indirectSets)}
-                      </div>
-                        </>);
-                      })()}
-                      {isExpanded && (
-                        <>
-                          <div style={{ fontSize:10, color:'#fff', marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-                            упражнения: {byEx ? Object.entries(byEx).map(([e, n]) => `${e} ${n}`).join(', ') : '—'}
-                          </div>
-                          {subGroups && Object.keys(subGroups).length > 0 && (
-                            <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
-                              {Object.entries(subGroups).map(([subId, sub]) => {
-                                const expl = (sub as any).explanation as { why?: string; how?: string; patternRu?: string; labelRu?: string } | undefined;
-                                const label = expl?.labelRu || subId;
-                                return (
-                                <div key={subId} style={{ fontSize:10, color:'#fff', padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                                  <div style={{ display:'flex', justifyContent:'space-between', gap:6 }}>
-                                    <b style={{ color:'#e5e7eb' }}>{label}</b>
-                                    <span style={{ fontWeight:700, color:'#22c55e' }}>{sub.workingSets} сетов</span>
-                                  </div>
-                                  <div style={{ color:'#fff', marginTop:2 }}>паттерн: {Object.entries(sub.byPattern).map(([p, n]) => `${p} ${n}`).join(', ') || '—'}{expl?.patternRu ? ` · ${expl.patternRu}` : ''}</div>
-                                  <div style={{ color:'#fff' }}>упражнения: {Object.entries(sub.byExercise).map(([e, n]) => `${e} ${n}`).join(', ') || '—'}</div>
-                                  {expl?.why && <div style={{ color:'#fbbf24', marginTop:3, lineHeight:1.35 }}>▸ Чем хорошо: {expl.why}</div>}
-                                  {expl?.how && <div style={{ color:'#93c5fd', lineHeight:1.35 }}>▸ Как работает: {expl.how}</div>}
-                                </div>
-                              );})}
-                            </div>
-                          )}
-                          <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>
-                            {v.bySession.map((sess, idx) => `тр${sess.day || idx+1}: ${sess.working}р/${sess.warmup}р`).join(' · ')}
-                          </div>
-                        </>
-                      )}
-                      {!isExpanded && v.bySession.length > 0 && (
-                        <div style={{ fontSize: 10, color: '#fff' }}>нажмите для развертки — подгруппы/паттерны/пояснения (чем хорошо / как работает)</div>
-                      )}
-                    </div>
-                  );})}
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>Итого: {sum.totalWorkingSets} рабочих сетов/нед</div>
-                </div>
-              }
-            />
-          );
-        })()}
-
-        {builtPlan && (() => {
-          const methods = buildBBMethodologySummary(builtPlan);
-          if (methods.length === 0) return null;
-          return (
-            <ExpandableCard title="🧩 Применённые методики" icon="🧩"
-              short={`${methods.length} методик · ${methods[0]}`}
-              full={<div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11 }}>
-                {methods.map((m, i) => <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>✓ {m}</div>)}
-              </div>}
-            />
-          );
-        })()}
-
-        {builtPlan.rotationReport && (() => {
-          const report = builtPlan.rotationReport;
-          const primaryCount = Object.keys(report.primaryByMuscle).length;
-          const warningCount = report.issues.length;
-          return (
-            <ExpandableCard title="🔁 Ротация упражнений" icon="🔁"
-              short={`${primaryCount} primary · ${warningCount} предупреждений`}
-              full={
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  <div style={{ fontSize:11, color:'#fff' }}>
-                    Primary сохраняются стабильными, аксессуары ротируются по паттернам и фазе.
-                  </div>
-                  {report.issues.length === 0
-                    ? <div style={{ fontSize:11, color:'#22c55e' }}>✅ Конфликтов ротации не обнаружено.</div>
-                    : report.issues.slice(0, 8).map((issue: { code?: string; phase?: string; message: string }, i: number) => (
-                      <div key={i} style={{ fontSize:11, color: issue.code === 'primary_changed' ? '#f59e0b' : '#fff' }}>
-                         {issue.phase ? `[${PHASE_LABELS[issue.phase as BBPhase] || issue.phase}] ` : ''}{issue.message}
-                      </div>
-                    ))}
-                </div>
-              }
-            />
-          );
-        })()}
-
-        {builtPlan.fatigueReport && (() => {
-          const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
-          const current = builtPlan.fatigueReport.find(item => item.week === wk.week) || builtPlan.fatigueReport[0];
-          const time = current.sessions.reduce((sum, session) => sum + session.timeSeconds, 0);
-          const axial = current.sessions.reduce((sum, session) => sum + session.axial, 0);
-          const systemic = current.sessions.reduce((sum, session) => sum + session.systemic, 0);
-          return (
-            <ExpandableCard title="⚙️ Усталость и длительность" icon="⚙️"
-              short={`${Math.round(time / 60)} мин · axial ${axial.toFixed(1)}`}
-              full={<div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, fontSize:11 }}>
-                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Время<br/><b>{Math.round(time / 60)} мин</b></div>
-                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Systemic<br/><b>{systemic.toFixed(1)}</b></div>
-                <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Axial<br/><b>{axial.toFixed(1)}</b></div>
-              </div>}
-            />
-          );
-        })()}
-
-        {builtPlan.report && (() => {
-          const report = builtPlan.report;
-          return (
-            <ExpandableCard title="📋 Итоговый отчёт программы" icon="📋"
-              short={`${report.weeks} нед · ${report.totalDirectSets} direct-сетов · пик Н${report.peakWeek}`}
-              full={
-                <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
-                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'#fff', lineHeight:1.45 }}>
-                    <b>Настройки:</b> Уровень {(builtPlan as any).level || '—'} · Цель {(builtPlan as any).goal || '—'} · Фокус {(builtPlan as any).trainingFocus || '—'} · Методика {(builtPlan as any).methodology || '—'} · Объём {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (' + ((builtPlan as any).volumeScheme || 'MRV') + ', кап 5)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'MAV') + ')'} · Стаж {(builtPlan as any).trainingYears ?? '—'} лет · Капы {(builtPlan as any).maxWorkingSets}/{ (builtPlan as any).maxExercises}
-                    {pedAdapt.activePEDs.length > 0 && (
-                      <div style={{ marginTop:3, padding:'4px 6px', borderRadius:6, background: pedAdapt.combinedMrvMultiplier > 1.2 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(245,158,11,0.2)' }}>
-                        <b>PED:</b> {pedAdapt.activePEDs.join(', ')} MRV x{pedAdapt.combinedMrvMultiplier.toFixed(2)} Recovery x{(pedAdapt as any).combinedRecoveryMultiplier?.toFixed(2) || '—'}
-                        {Object.keys(pedDoses).length > 0 && <> Doses: {Object.entries(pedDoses).map(([k,v])=>`${k}:${v}`).join(', ')}</>}
-                      </div>
-                    )}
-                    {(() => {
-                      const pp = (linked as any)?.profile?.settings?.personal;
-                      if (!pp || (!pp.weight && !pp.bodyFat && !pp.sex)) return null;
-                      const leanMass = pp.weight && pp.bodyFat ? (pp.weight * (1 - pp.bodyFat/100)).toFixed(1) : null;
-                      return (
-                        <div style={{ marginTop:3, fontSize:10, color:'#fff' }}>
-                          <b>Patient:</b> {pp.sex || '—'} {pp.age ? `${pp.age}y` : '—'} {pp.weight ? `${pp.weight}kg` : '—'}{pp.height ? `/${pp.height}cm` : ''} {pp.bodyFat ? ` BF ${pp.bodyFat}%` : ''} {leanMass ? ` LBM ${leanMass}kg` : ''}
-                        </div>
-                      );
-                    })()}
-                    {((builtPlan as any).supersetMode || (builtPlan as any).dupMode || (builtPlan as any).priorityMuscles?.length) && (
-                      <><br/>Суперсеты {(builtPlan as any).supersetMode || 'нет'} · DUP {(builtPlan as any).dupMode || 'нет'}{(builtPlan as any).priorityMuscles?.length ? ` · Спец: ${(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}` : ''}</>
-                    )}
-                    {(() => {
-                      const s = (builtPlan as any).inputSnapshot;
-                      if (!s) return null;
-                      const parts: string[] = [];
-                      if (s.rotationMode) parts.push(`Ротация: ${s.rotationMode}`);
-                      if (s.intensityLevel) parts.push(`Интенс: ${s.intensityLevel}`);
-                      if (s.avoidAxialLoad) parts.push('Без осевой');
-                      if (s.equipment?.length) parts.push(`Оборуд: ${s.equipment.slice(0, 3).join(',')}${s.equipment.length > 3 ? '…' : ''}`);
-                      if (s.injuries?.length) parts.push(`Травм: ${s.injuries.length}`);
-                      if (s.mobilityRestrictions?.length) parts.push(`Мобильн: ${s.mobilityRestrictions.join(',')}`);
-                      if (s.autoDeload != null) parts.push(`Авто-делод: ${s.autoDeload ? 'да' : 'нет'}`);
-                      if (s.eccentricMult && s.eccentricMult !== 1) parts.push(`Эксцентрик ×${s.eccentricMult}`);
-                      return parts.length ? <><br/>{parts.join(' · ')}</> : null;
-                    })()}
-                  </div>
-                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', color:'#fff', lineHeight:1.45 }}>
-                    <b>Фазы:</b> {(() => {
-                      const ru: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
-                      const seq: Array<{ p: string; from: number; to: number }> = [];
-                      for (const wk of (builtPlan as any).weeks || []) {
-                        const ph = String(wk.phase || '').toLowerCase();
-                        const last = seq[seq.length - 1];
-                        if (last && last.p === ph) last.to = wk.week; else seq.push({ p: ph, from: wk.week, to: wk.week });
-                      }
-                      return seq.map(s => `${ru[s.p] || s.p}: нед ${s.from}${s.to !== s.from ? '-' + s.to : ''}${(builtPlan as any).weeks.find((w: any) => w.week === s.to)?.deload ? ' (делод)' : ''}`).join(' · ');
-                    })()}
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация<br/><b>{report.sessionsPerWeek} сессий</b></div>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Пик объёма<br/><b>неделя {report.peakWeek}</b></div>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация warnings<br/><b>{report.rotationWarnings}</b></div>
-                  </div>
-                  <div style={{ color:'#fff' }}>
-                    Максимум за сессию: {report.maxSessionMinutes} мин · axial cost: {report.maxAxialCost.toFixed(1)} · muscle leakage: {report.sessionLeakWarnings}
-                  </div>
-                </div>
-              }
-            />
-          );
-        })()}
-        {builtPlan.balanceReport && (
-          <ExpandableCard title="⚖️ Баланс паттернов и позиций" icon="⚖️"
-            short={`жимы ${builtPlan.balanceReport.press} · тяги ${builtPlan.balanceReport.pull} · растяжка ${builtPlan.balanceReport.lengthened}`}
-            full={<div style={{ fontSize: 11, lineHeight: 1.5 }}>
-              <div>Жимы: <b>{builtPlan.balanceReport.press}</b> сетов · Тяги: <b>{builtPlan.balanceReport.pull}</b> · Подъёмы/разводки: <b>{builtPlan.balanceReport.raise}</b></div>
-              <div>Верх: тяги/жимы ratio <b>{builtPlan.balanceReport.pullPressRatio}</b> ({builtPlan.balanceReport.upperPull}/{builtPlan.balanceReport.upperPress})</div>
-              <div>Compound: {builtPlan.balanceReport.compound} · Isolation: {builtPlan.balanceReport.isolation}</div>
-              <div>Растянутая: {builtPlan.balanceReport.lengthened} · Средняя: {builtPlan.balanceReport.midRange} · Сокращённая: {builtPlan.balanceReport.shortened}</div>
-              <div style={{ marginTop: 4 }}>По мышцам: {Object.entries(builtPlan.balanceReport.byMuscle).map(([muscle, coverage]) => `${muscle} ${Object.keys(coverage.patterns).length} патт. / ${coverage.lengthened}-${coverage.midRange}-${coverage.shortened}`).join(' · ')}</div>
-              {builtPlan.balanceReport.issues.map((issue, index) => <div key={index} style={{ color: '#f59e0b' }}>⚠ {issue}</div>)}
-            </div>}
-          />
-        )}
-
-        {builtPlan.validation && !builtPlan.validation.valid && (
-          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
-            <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', marginBottom:5 }}>🚫 План требует исправления</div>
-            {builtPlan.validation.issues.filter((i: { level?: string }) => i.level === 'error').slice(0, 5).map((issue: { message: string }, i: number) => (
-              <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>
-            ))}
-          </div>
-        )}
-
-        {builtPlan.validation && (() => {
-          const warnings = builtPlan.validation.issues.filter((issue: { level?: string; code: string }) => issue.level === 'warning' && ['target_volume_deficit', 'session_working_set_cap', 'effective_mrv_overflow', 'low_training_frequency', 'goal_focus_mismatch'].includes(issue.code));
-          if (warnings.length === 0) return null;
-          return (
-            <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)' }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:5 }}>⚠️ Объём и бюджет требуют внимания</div>
-              {warnings.slice(0, 8).map((issue: { message: string }, i: number) => <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>)}
-              <div style={{ marginTop:5, fontSize:10, color:'#fff' }}>Это предупреждения, а не блокировка. Ограничения оборудования, времени и восстановления могут объяснять недобор.</div>
-            </div>
-          );
-        })()}
-
-        {/* PRO: Actionable recommendations — конкретные шаги по улучшению плана */}
-        {builtPlan.validation && (() => {
-          const recs = generateActionableRecommendations(builtPlan, builtPlan.validation.issues);
-          if (recs.length === 0 || (recs.length === 1 && recs[0].code === 'all_clear')) return null;
-          const colorFor = (p: string) => p === 'high' ? '#ef4444' : p === 'medium' ? '#f59e0b' : '#22c55e';
-          return (
-            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>💡 Рекомендации по улучшению</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                {recs.slice(0, 8).map((rec, i) => (
-                  <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4, display:'flex', gap:6 }}>
-                    <span style={{ color: colorFor(rec.priority), fontWeight:700 }}>{rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}</span>
-                    <span>{rec.action}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {(() => {
-          const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
-          const currentPhase = phaseForWeek(wk.week, bbWeeks);
-          const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks, currentPhase).slice(0, 6);
-          if (targets.length === 0) return null;
-          return (
-            <ExpandableCard title={'🎯 Цели прогрессии на эту неделю (' + loadStrategy.replace('_', ' ') + ')'} icon="🎯" short={targets[0].nextTarget + (targets.length > 1 ? (' + ещё ' + (targets.length - 1)) : '')} full={
-              <div>{targets.map((t, i) => <div key={i} style={{ padding:'4px 8px', marginBottom:4, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', fontSize:11, color:'#fff' }}>
-                <b>{t.exerciseName}</b>: {t.nextTarget}
-              </div>)}</div>
-            } />
-          );
-        })()}
-
-
         {/* Логика построения — реальные изменения, а не шаблон */}
         <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
           <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой</div>
@@ -5877,14 +5818,8 @@ export const BbAutoConstructor: React.FC = () => {
   // ── Exercise swap modal ──
   const renderExSwapModal = () => {
     if (!exSwapModal || !builtPlan) return null;
-    // Замена ТОЛЬКО внутри жёсткой группы (требование пользователя): разводки ↔
-    // пек-дек, жим 30° ↔ Смит/штанга, верхний блок прямой/параллельный, seal/T-тяга,
-    // сгибания ног лёжа/сидя, присед/гакк, разгибания ног сидя.
-    const groupMembers = strictGroupMembersOf({ name: exSwapModal.currentName }, exSwapModal.muscle);
-    const baseCandidates = groupMembers.length > 0
-      ? groupMembers
-      : EXERCISE_CATALOG.filter(e => (e.group || '') === exSwapModal.muscle);
-    const filtered = baseCandidates
+    const filtered = EXERCISE_CATALOG
+      .filter(e => (e.group || '') === exSwapModal.muscle)
       .filter(e => e.name.toLowerCase().includes(exSwapSearch.toLowerCase()));
     return (
       <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.85)' }}
@@ -5893,7 +5828,6 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ height:3, background:'linear-gradient(90deg,#00e68a,#00c853)' }} />
           <div style={{ padding:'14px 16px', maxHeight:'calc(78vh - 3px)', overflowY:'auto' }}>
             <div style={{ fontSize:14, fontWeight:700, color:'#00e68a', marginBottom:10 }}>🔄 Замена: {exSwapModal.currentName}</div>
-            <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.4 }}>💡 Меняется только внутри своей группы (разводки ↔ пек-дек, жим 30° ↔ Смит/штанга, верхний блок ↔ параллельный хват, seal ↔ Т-тяга, сгибания ног лёжа/сидя, присед ↔ гакк, разгибания ног сидя).</div>
             <input type="text" placeholder="Поиск упражнений..." value={exSwapSearch} autoFocus
               onChange={e => setExSwapSearch(e.target.value)}
               style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.1)', background:'rgba(0,0,0,0.3)', color:'#fff', fontSize:13, boxSizing:'border-box', marginBottom:10 }} />
@@ -5904,7 +5838,7 @@ export const BbAutoConstructor: React.FC = () => {
                   style={{ display:'block', width:'100%', padding:'8px 10px', borderRadius:10, cursor:isCurrent?'default':'pointer', textAlign:'left', fontSize:11, fontWeight:isCurrent?400:500, background:isCurrent?'rgba(255,255,255,0.02)':'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:isCurrent?'#fff':'#fff', opacity:isCurrent?0.5:1 }}>
                   <div style={{ display:'flex', justifyContent:'space-between' }}>
                     <span>{ex.name}</span>
-                    <span style={{ fontSize:11, color:'#fff' }}>{ex.type === 'compound' ? 'База' : 'Изо'} · {EQUIP_RU[ex.equipment] || ex.equipment}</span>
+                    <span style={{ fontSize:11, color:'#fff' }}>{ex.type} · {ex.equipment}</span>
                   </div>
                   {isCurrent && <div style={{ fontSize:11, color:'#00e68a', marginTop:2 }}>✓ текущее</div>}
                 </button>;

@@ -1631,7 +1631,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             }));
             const maxT = Math.max(1, ...weekData.map(w => w.tonnage));
             return (
-              <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any }}>
+              <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)' }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#fb7185', marginBottom: 6 }}>🔥 Объём по неделям (heatmap)</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(34px, 1fr))', gap: 4 }}>
                   {weekData.map(w => {
@@ -1642,13 +1642,13 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                     );
                   })}
                 </div>
-                <div style={{ fontSize: 10, color: '#fff', marginTop: 6 }}>Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг. Светло-зелёные — разгрузки/тапер.</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>Цвет = относительный тонаж недели (зелёный → красный). Наведите на ячейку для сетов/кг. Светло-зелёные — разгрузки/тапер.</div>
               </div>
             );
           })()}
           <TrainingMetricsChart lms={lmsChart} bb={undefined} />
           {/* 📈 Тренды e1RM из дневника (план: шаг 4 — графики) */}
-          <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 14, background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)' as any }}>
+          <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.15)' }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>📈 Тренды e1RM (из дневника тренировок)</div>
             {e1rmSeries.length === 0 ? (
               <div style={{ fontSize: 11, color: '#fff' }}>Нет данных дневника — выполняйте тренировки, и здесь появятся графики приседа/жима/тяги.</div>
@@ -1691,7 +1691,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                 </div>
                 {selectedTrendEx && (() => {
                   if (exTrendSeries.length < 2) {
-                    return <div style={{ fontSize: 10, color: '#fff' }}>нужно ≥2 тренировок с «{selectedTrendEx}» для графика (найдено {exTrendSeries.length})</div>;
+                    return <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>нужно ≥2 тренировок с «{selectedTrendEx}» для графика (найдено {exTrendSeries.length})</div>;
                   }
                   const vals = exTrendSeries.map(p => p.e1);
                   const W = 100, H = 40;
@@ -1712,6 +1712,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               </>
             )}
           </div>
+          <div style={{ marginTop: 8 }}><ProMetricsPanel /></div>
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', gap: 4, flexWrap: 'wrap' }}>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('plan')}>← 3 План</button>
             <button style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10 }} onClick={() => setSubView('reference')}>5 Справка и отчёты →</button>
@@ -1797,7 +1798,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
             {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={400} suffix=' кг' onChange={v => setBbWm(k, v)} />)}
           </div>
           <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: ACCENT }}>🎯 Слабые группы мышц (ББ-акцент, сохраняются в профиль)</div>
-          <div style={{ fontSize: 11, color: '#fff', marginTop: 2, marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2, marginBottom: 4 }}>
             💪 ББ: pump-finisher (3×15 @ RIR 4) для каждой слабой группы; +accessoryCompound-первым.
           </div>
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4, marginBottom: 6, minWidth: 0, maxWidth: '100%' }}>{WEAK_GROUPS.map(([id, l]) => { const on = weakPoints.includes(id); return <button key={id} onClick={() => toggleWeak(id)} style={{ padding: "5px 10px", borderRadius: 14, fontSize: 11, fontWeight: 700, cursor: "pointer", border: on ? "1px solid var(--accent)" : "1px solid rgba(255,255,255,0.08)", background: on ? "rgba(0,230,138,0.15)" : "rgba(255,255,255,0.02)", color: on ? "var(--accent)" : '#fff', minWidth: 0, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l}{on ? " ✓" : ""}</button>; })}</div>
@@ -1913,7 +1914,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                       </div>
                     ) : (
                     <div style={{ padding: '4px 0', overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                      <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.7fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr)', gap:2, padding:'4px 10px', fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.7fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr) minmax(0,0.6fr)', gap:2, padding:'4px 10px', fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase' }}>
                         <span>Мышца</span><span>Характер</span><span>Сеты×повт</span><span>RIR</span><span>Вес</span><span>Темп</span>
                       </div>
                       {s.exercises.map((e, ei) => {
@@ -1951,7 +1952,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
               {/* Объём по мышцам */}
               <MetricCard title="Объём по мышцам (сетов/нед)" icon="🏋️" accent="#a855f7">
               <div style={{ overflowX:'auto', WebkitOverflowScrolling:'touch', scrollbarWidth:'none' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr)', gap:2, fontSize:10, fontWeight:700, color:'#fff', textTransform:'uppercase', padding:'2px 0' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'minmax(0,1.4fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr) minmax(0,0.5fr)', gap:2, fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', padding:'2px 0' }}>
                   <span>Мышца</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
                 </div>
                 {m.perMuscle.map(mm => { const over = mm.totalSets > (mm.mrv || 999); return (
@@ -2077,7 +2078,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
                               </span>
                             ))}
                           </div>
-                          <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
                             Объём: {e.totalVolume.toFixed(0)} кг·пов · {e.sets.length} подходов
                             {e.avgRPE > 0 ? ` · ср.RPE ${e.avgRPE.toFixed(1)}` : ''}
                           </div>
@@ -2125,7 +2126,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
             <button onClick={() => setMacroPostMeet(v => !v)} style={{ ...BTN_GHOST, minHeight: 36, fontSize: 10, flex: 1, minWidth: 180, border: macroPostMeet ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.08)', background: macroPostMeet ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.02)', color: macroPostMeet ? '#34d399' : '#fff' }}>🔄 Пост-старт восстановление{macroPostMeet ? ' ✓' : ''}</button>
-            <span style={{ alignSelf: 'center', fontSize: 10, color: '#fff', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
+            <span style={{ alignSelf: 'center', fontSize: 10, color: 'rgba(255,255,255,0.45)', flex: 2, minWidth: 200 }}>Применяется при «✓ Применить макроцикл»: тапер к peak-блокам, прикиды на неделях соревнований, mock meet и пост-разгрузка — для КАЖДОГО старта.</span>
           </div>
         </div>
       )}

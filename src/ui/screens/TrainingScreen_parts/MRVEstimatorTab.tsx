@@ -47,7 +47,7 @@ function perWeek(sessions: SRPESession[], readiness: ReadinessHistoryPoint[]): W
     const ws = weekStart(s.date);
     dailyMap[ws] = (dailyMap[ws] || 0) + s.sRPE * s.durationMin;
   }
-  const readinessByWeek: Record<string, { rec: number[]; fat: number[] }> = {};
+  const readinessByНеделя: Record<string, { rec: number[]; fat: number[] }> = {};
   for (const r of readiness) {
     const ws = weekStart(r.date);
     if (!readinessByWeek[ws]) readinessByWeek[ws] = { rec: [], fat: [] };

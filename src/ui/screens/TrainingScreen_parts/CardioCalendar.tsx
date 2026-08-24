@@ -41,7 +41,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
     const rows = Math.ceil(totalCells / 7);
     // Карта даты → сессии + фаза + legDay
     const legDays = new Set((cycle.config?.legDays ?? []).filter(d => d >= 0 && d <= 6));
-    const map = new Map<string, { phase: string; sessions: { type: CardioType; durationMin: number; dayOfWeek: number }[]; isLegDay: boolean; weekNo: number | null }>();
+    const map = new Map<string, { phase: string; sessions: { type: CardioType; durationMin: number; dayOfНеделя: number }[]; isLegДень: boolean; weekNo: number | null }>();
     for (const w of cycle.weeks) {
       const laid = spreadSessionsAcrossDays(w);
       // week start date
@@ -51,7 +51,7 @@ export const CardioCalendar: React.FC<{ cycle: CardioCycle | null }> = ({ cycle 
         const dayOfWeek = (new Date(dateIso).getDay() + 6) % 7;
         const sess = laid.filter(s => s.dayOfWeek === dayOfWeek);
         const isLeg = legDays.has(dayOfWeek);
-        map.set(dateIso, { phase: w.phase, sessions: sess as never, isLegDay: isLeg, weekNo: w.week });
+        map.set(dateIso, { phase: w.phase, sessions: sess as never, isLegДень: isLeg, weekNo: w.week });
       }
     }
     return { monthStart, monthEnd, firstDow, daysInMonth, rows, map };

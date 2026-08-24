@@ -189,13 +189,13 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
             </div>
             {/* Heatmap — redesigned with month labels + tooltips */}
             {historyWorkouts.length > 0 && (() => {
-              const byDay: Record<string, number> = {};
+              const byДень: Record<string, number> = {};
               historyWorkouts.forEach((w: any) => { byDay[w.date] = (byDay[w.date] || 0) + (w.exercises || []).reduce((s: number, e: any) => s + (e.totalVolume || 0), 0); });
-              const cells: { date: string; vol: number; dayOfWeek: number }[] = [];
+              const cells: { date: string; vol: number; dayOfНеделя: number }[] = [];
               const today = new Date();
               for (let i = 83; i >= 0; i--) {
                 const d = new Date(today); d.setDate(d.getDate() - i);
-                cells.push({ date: d.toISOString().slice(0, 10), vol: byDay[d.toISOString().slice(0, 10)] || 0, dayOfWeek: (d.getDay() + 6) % 7 });
+                cells.push({ date: d.toISOString().slice(0, 10), vol: byDay[d.toISOString().slice(0, 10)] || 0, dayOfНеделя: (d.getDay() + 6) % 7 });
               }
               const maxVol = Math.max(1, ...cells.map(c => c.vol));
               const heatColor = (v: number) => {
@@ -207,7 +207,7 @@ export const DiaryHistoryView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                 return 'rgba(0,230,138,0.9)';
               };
               // Group by weeks (columns)
-              const weeks: { date: string; vol: number; dayOfWeek: number }[][] = [];
+              const weeks: { date: string; vol: number; dayOfНеделя: number }[][] = [];
               for (let w = 0; w < 12; w++) weeks.push(cells.slice(w * 7, w * 7 + 7));
               // Month labels: find first day of each week column
               const monthNames = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];

@@ -19,11 +19,11 @@ export interface DiaryHubCtx {
   linked: any;
   trainingOutput: TrainingOutput | null;
   macrocycle: MacrocyclePlan | null;
-  selectedWeek: number;
+  selectedНеделя: number;
   mesoLength: number;
   curPhase: any;
   goal: string;
-  daysPerWeek: number;
+  daysPerНеделя: number;
   splitType: string;
   periodizationType: string;
   trainingArchive: any[];

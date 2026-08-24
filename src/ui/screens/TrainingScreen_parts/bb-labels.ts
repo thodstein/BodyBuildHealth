@@ -35,40 +35,6 @@ export function sessionTagLabel(tag?: string): string {
   return SESSION_TAG_RU[tag] || tag;
 }
 
-/** movementPattern (EXERCISE_CATALOG, EN) → русская подпись паттерна.
- *  Полное покрытие всех значений каталога (25 ключей). */
-export const MOVEMENT_PATTERN_RU: Record<string, string> = {
-  horizontal_push: 'Горизонтальный жим',
-  incline_push: 'Жим под наклоном',
-  decline_push: 'Жим на отрицательном наклоне',
-  dip_push: 'Брусья (отжимания)',
-  vertical_push: 'Вертикальный жим',
-  isolation_chest: 'Изоляция груди',
-  vertical_pull: 'Вертикальная тяга',
-  horizontal_pull: 'Горизонтальная тяга',
-  isolation_back: 'Изоляция спины',
-  hinge: 'Тазобедренный шарнир',
-  squat: 'Присед',
-  lunge: 'Выпады',
-  isolation_legs_quad: 'Изоляция квадрицепса',
-  isolation_legs_ham: 'Изоляция бицепса бедра',
-  glute_squat: 'Ягодичный паттерн',
-  isolation_glutes: 'Изоляция ягодиц',
-  isolation_calves: 'Икры',
-  isolation_shoulders: 'Изоляция плеч',
-  isolation_arms: 'Изоляция рук',
-  anti_rotation: 'Антиротация кора',
-  rotation: 'Ротация кора',
-  carry: 'Перенос',
-  core: 'Кор',
-};
-
-/** Подпись паттерна движения: movementPattern → RU (fallback на исходный ключ). */
-export function movementPatternLabel(pattern?: string): string {
-  if (!pattern) return '';
-  return MOVEMENT_PATTERN_RU[pattern] || pattern;
-}
-
 /** Подпись мышцы: canonical EN-ключ → RU. */
 export function muscleLabel(muscle?: string): string {
   if (!muscle) return '';

@@ -1,18 +1,28 @@
 /**
  * LiftMasterCard.tsx — ЕДИНЫЙ ИНСТРУМЕНТ НА ДВИЖЕНИЕ (универсальный: 9 лифтов).
- * Стекло rgba(24,24,27,0.42) border 0.07 blur12 radius14, белый #fff, заголовки-кнопки ▶/▼ для каждого блока,
- * подвкладки gradient активные, видео BlazePose всегда видно (в блоке VBT+видео), без sticky.
- * Актуальные описания — без "полный вариант как в ПЛ-авто".
+ *
+ * Сливает в один экран 5 слоёв + геометрию:
+ *  1. Слабые мышцы (e1RM-тренд + выбор по циклу)
+ *  2. Слабые точки (фаза срыва)
+ *  3. Мёртвые точки (углы/сустав/биомеханика)
+ *  4. Движение штанги (bar-path)
+ *  5. Геометрия техники (technique_geometry — хват/локти/мост/ноги/кисть/траектория для жима; стойка/глубина для приседа и т.д.)
+ *  6. VBT (скорость)
+ *  7. Дневник (подсказка фазы по RPE/повторам)
+ *  8. Остальные лимитирующие факторы (сжатый перечень)
+ *
+ * Универсален для всех Lift (bench/squat/deadlift/ohp/row/pulldown/incline/sumo/biceps), дефолт bench. Срывы (StickingPointAnalysisCard) — ОТДЕЛЬНО: авто-анализ дневника RPE≥8, не ручной ввод.
+ * Оставляет LimiterCalculatorCard как эксперт-режим (категория-first), данный мастер — lift-first.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  LIMITER_CATEGORIES, limiterOptionsFor, analyzeLimiterOption,
+  LIMITER_CATEGORIES, limiterOptionsFor, analyzeLimiterOption, limiterOptionById,
   type LimiterOption, type LimiterCategory, type LimiterExerciseItem,
 } from '../../../engines/pro/limiter-calculator.engine';
 import { unifiedLiftDiagnosis, groupsForPhase } from '../../../engines/pro/unified-lift-diagnosis.engine';
-import { diagnoseMovement, barPathIssuesForLift, phaseForReps, type BarPathIssue } from '../../../engines/pro/lift-diagnostics.engine';
+import { diagnoseMovement, barPathIssuesForLift, BAR_PATH_ISSUES, phaseForReps, type BarPathIssue } from '../../../engines/pro/lift-diagnostics.engine';
 import { analyzePhaseAssistance, analyzeStickingCorrections, analyzeBarPathAssistance, protocolFromCycle } from '../../../engines/pro/lift-assistance.engine';
-import { WEAK_POINTS_BY_LIFT, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
+import { WEAK_POINTS_BY_LIFT, diagnoseWeakPoint, type Lift, type WeakPoint } from '../../../engines/lms/weakpoint-pl';
 import { detectWeakMusclesByE1rm } from '../../../engines/pro/weak-muscle-detection.engine';
 import { diagnoseVelocity } from '../../../engines/pro/vbt.engine';
 import { getPLWeakGroupExerciseCandidates } from '../../../engines/lms/lms-builder.engine';
@@ -25,11 +35,12 @@ import MesoCorrectionCard from './MesoCorrectionCard';
 import type { TrainingProfile } from './training-profile';
 
 const ACCENT = '#00e68a';
-const DIM = '#fff';
+const DIM = '#ffffff';
 
-const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', borderRadius:14 } as any;
-const CARD: React.CSSProperties = { ...GLASS, padding:12, marginTop:10 } as any;
-const CARD_COLLAPSIBLE: React.CSSProperties = { ...GLASS, padding:0, overflow:'hidden', marginTop:10 } as any;
+const CARD: React.CSSProperties = {
+  padding: 12, borderRadius: 10, background: 'rgba(24,24,27,0.45)',
+  border: '1px solid rgba(255,255,255,0.08)', marginTop: 8,
+};
 const btn: React.CSSProperties = { padding: '5px 10px', borderRadius: 7, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 32 };
 
 const CATEGORY_COLOR: Record<LimiterCategory, { color: string; bg: string }> = {
@@ -68,6 +79,7 @@ const ISSUE_RU: Record<BarPathIssue, string> = {
   asymmetric: 'Асимметрия сторон',
 };
 
+// ── слабые мышцы детали (копия из PlDeadpointsBarPathCard для parity) ──
 const WEAK_MUSCLE_DETAIL: Array<{ id: string; label: string; subs: Array<{ sub: string; label: string; patterns: string[]; nameRe?: RegExp }> }> = [
   { id: 'chest', label: 'Грудь', subs: [
     { sub: 'upper', label: 'Верх груди', patterns: ['incline_push'] },
@@ -170,16 +182,16 @@ const protocolText = (p: { sets:number; reps:number; pct:number; rir:number; tem
   return extras? `${base} · ${extras}`: base;
 };
 
-const ExerciseRow: React.FC<{ item: any; selected:boolean; onToggle:()=>void; onAdd:()=>void; tag?:string }> = ({ item, selected, onToggle, onAdd, tag }) => (
-  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'6px 7px', marginTop:4, borderRadius:8, background: selected?'rgba(0,230,138,0.09)':'rgba(255,255,255,0.03)', border: selected?'1px solid rgba(0,230,138,0.28)':'1px solid rgba(255,255,255,0.07)' }}>
-    <button onClick={onToggle} style={{ minWidth:24, height:24, borderRadius:6, cursor:'pointer', border:'none', background: selected?ACCENT:'rgba(255,255,255,0.10)', color:selected?'#000':'#fff', fontWeight:800, fontSize:12, flexShrink:0 }}>{selected?'✓':'＋'}</button>
+const ExerciseRow: React.FC<{ item: LimiterExerciseItem | any; selected:boolean; onToggle:()=>void; onAdd:()=>void; tag?:string }> = ({ item, selected, onToggle, onAdd, tag }) => (
+  <div style={{ display:'flex', alignItems:'center', gap:6, padding:'5px 6px', marginTop:3, borderRadius:6, background: selected?'rgba(0,230,138,0.1)':'rgba(255,255,255,0.02)', border: selected?'1px solid rgba(0,230,138,0.35)':'1px solid rgba(255,255,255,0.05)' }}>
+    <button onClick={onToggle} style={{ minWidth:24, height:24, borderRadius:5, cursor:'pointer', border:'none', background: selected?ACCENT:'rgba(255,255,255,0.1)', color:selected?'#000':DIM, fontWeight:800, fontSize:12 }}>{selected?'✓':'＋'}</button>
     <div style={{ flex:1, minWidth:0 }}>
-      <div style={{ fontSize:10, fontWeight:700, color:'#fff', lineHeight:1.3 }}>
-        {item.optimal?'⭐ ':''}{item.exercise.name} <span style={{ color:ACCENT, fontWeight:800 }}>{protocolText(item.protocol)}</span>{tag ? <span style={{ fontSize:8, marginLeft:6, padding:'1px 5px', borderRadius:4, background:'rgba(56,189,248,0.14)', color:'#fff', fontWeight:700, border:'1px solid rgba(255,255,255,0.07)' }}>{tag}</span> : null}
+      <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>
+        {item.optimal?'⭐ ':''}{item.exercise.name} <span style={{ color:ACCENT, fontWeight:800 }}>{protocolText(item.protocol)}</span>{tag ? <span style={{ fontSize:8, marginLeft:6, padding:'1px 5px', borderRadius:4, background:'rgba(56,189,248,0.15)', color:'#38bdf8', fontWeight:700 }}>{tag}</span> : null}
       </div>
-      <div style={{ fontSize:9, color:'#fff', lineHeight:1.35, marginTop:2, opacity:0.92 }}>{item.rationale}</div>
+      <div style={{ fontSize:9, color:DIM, lineHeight:1.3, marginTop:1 }}>{item.rationale}</div>
     </div>
-    <button onClick={onAdd} style={{ ...btn, background:'rgba(0,230,138,0.14)', color:'#fff', border:'1px solid rgba(255,255,255,0.07)', flexShrink:0 }}>➕</button>
+    <button onClick={onAdd} style={{ ...btn, background:'rgba(0,230,138,0.12)', color:ACCENT, border:'1px solid rgba(0,230,138,0.25)' }}>➕</button>
   </div>
 );
 
@@ -206,8 +218,6 @@ export const LiftMasterCard: React.FC<{
   const [vbtBest, setVbtBest] = useState(initial.vbtBest);
   const [vbtLast, setVbtLast] = useState(initial.vbtLast);
   const [vbtWeight, setVbtWeight] = useState(initial.vbtWeight);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const toggleCollapse = (id:string) => setCollapsed(p=>({...p,[id]:!p[id]}));
   const [armSpanInput, setArmSpanInput] = useState('');
   const [shoulderInput, setShoulderInput] = useState('');
   useEffect(()=>{
@@ -219,7 +229,7 @@ export const LiftMasterCard: React.FC<{
     }catch{}
   }, []);
 
-  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight }); }, [lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight]);
+  useEffect(()=>{ saveMaster({ lift, phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight }); }, [phase, issues, selectedGeom, daysGeom, selectedDiag, daysDiag, weakMuscleGroups, weakMuscleSubs, asymSide, vbtBest, vbtLast, vbtWeight]);
 
   const diag = useMemo(()=> unifiedLiftDiagnosis({ lift, phase, barPathIssues: issues, vbtBest, vbtLast, vbtWeight, sessions, template }), [lift, phase, issues, vbtBest, vbtLast, vbtWeight, sessions, template]);
   const effectivePhase = diag.phases.effectivePhase;
@@ -233,6 +243,7 @@ export const LiftMasterCard: React.FC<{
   const stickingAnalysis = useMemo(()=> effectivePhase ? analyzeStickingCorrections(lift, effectivePhase as WeakPoint, template ?? undefined) : null, [lift, effectivePhase, template]);
   const barAnalyses = useMemo(()=> Object.fromEntries(issues.map(i=>[i, analyzeBarPathAssistance(lift, i, template ?? undefined)])), [issues, lift, template]);
 
+  // diary hint (каноника phaseForReps)
   const diaryHint = useMemo(()=>{
     if (!sessions.length) return null;
     const counts: Record<string,number> = {};
@@ -263,10 +274,10 @@ export const LiftMasterCard: React.FC<{
       const height = personal?.height;
       if (typeof armSpan === 'number' && typeof height === 'number' && height>0) {
         const diff = Math.round(armSpan - height);
-        if (diff > 5) return `🦴 Длинные руки (размах +${diff}см к росту) → уже хват (1.0×) + локти 30-45° tucked + трицепс/широчайшие.`;
-        if (diff < -5) return `🦴 Короткие руки (размах ${diff}см) → шире хват (до 81см) + локти 60-70° flared + грудь-доминант.`;
+        if (diff > 5) return `🦴 Длинные руки (размах +${diff}см к росту) → рекомендуем уже хват (1.0×) + локти 30-45° tucked + акцент на трицепс/широчайшие.`;
+        if (diff < -5) return `🦴 Короткие руки (размах ${diff}см) → выгодно шире хват (до 81см) + локти 60-70° flared + грудь-доминант.`;
       }
-      if (typeof personal?.shoulderWidthCm === 'number') return `🦴 Ширина плеч ${personal.shoulderWidthCm}см — narrow = 1.0× биакром., wide = 1.5×.`;
+      if (typeof personal?.shoulderWidthCm === 'number') return `🦴 Ширина плеч ${personal.shoulderWidthCm}см — ориентир: narrow = 1.0× биакром., wide = 1.5×.`;
       return null;
     } catch { return null; }
   }, []);
@@ -289,17 +300,35 @@ export const LiftMasterCard: React.FC<{
     const k=geomKey(o);
     setDaysGeom(cur=>{ const s=new Set(cur[k]||[]); if(s.has(day)) s.delete(day); else s.add(day); return {...cur, [k]:[...s].sort((a,b)=>a-b)}; });
   };
+  const diagKey = (prefix:string, id:string)=> `${lift}|${prefix}|${id}`;
   const toggleDiag = (k:string, name:string)=> setSelectedDiag(cur=>{ const s=new Set(cur[k]||[]); if(s.has(name)) s.delete(name); else s.add(name); return {...cur, [k]:[...s]}; });
   const addDiag = (k:string, names:string[])=>{ if(!names.length) return; setSelectedDiag(cur=> ({...cur, [k]:[...new Set([...(cur[k]||[]), ...names])]})); };
+  const toggleDiagDay = (k:string, day:number)=> setDaysDiag(cur=>{ const s=new Set(cur[k]||[]); if(s.has(day)) s.delete(day); else s.add(day); return {...cur, [k]:[...s].sort((a,b)=>a-b)}; });
 
   const applyAll = ()=>{
+    // 1) слабые мышцы + слабые точки + bar-path + sticking через weakpoints
     const weakGroups = [...new Set([...weakMuscleSubs.map(k=>k.split('|')[0]), ...groupsForPhase(lift, effectivePhase as WeakPoint).filter(Boolean)])];
     const plWeakPoints = effectivePhase ? [{ lift, weakPoint: effectivePhase, days: daysDiag[`${lift}|${effectivePhase}`] ?? [] }] : [];
+    // добавим technique_geometry как диагностические? Нет — как limiter
     const diagnosticExerciseMap: Record<string,string[]> = { ...selectedDiag };
+    // добавим выделенные слабые мышцы (по циклу) — 5 кандидатов каждая
+    for (const k of weakMuscleSubs) {
+      const [group, subId] = k.split('|');
+      const detail = WEAK_MUSCLE_DETAIL.find(d=>d.id===group);
+      const sub = detail?.subs.find(s=>s.sub===subId);
+      if (!sub) continue;
+      const cands = template ? getPLWeakGroupExerciseCandidates(template, group).filter(ex=> sub.patterns.includes(ex.movementPattern||'')).filter(ex=> !sub.nameRe || sub.nameRe.test(`${ex.name} ${ex.targetMuscle||''}`)).slice(0,5) : [];
+      const key = `${group}|${subId}`;
+      // если пользователь отметил конкретные упражнения — уже в selectedDiag, иначе не добавляем автоматом
+      void cands;
+      void key;
+    }
+    // weakpoints apply
     const hasWeak = weakGroups.length>0 || plWeakPoints.length>0 || Object.keys(diagnosticExerciseMap).length>0;
     if (hasWeak) {
       applyToPlanner({ kind:'weakpoints', label:`Мастер ${LIFT_RU[lift]}: слабые ${weakGroups.join(', ')||'—'} + фаза ${effectivePhase||'—'}`, data:{ groups: weakGroups, plWeakPoints, diagnosticExerciseMap, diagnosticDayMap: daysDiag, weakGroupExerciseMap: {}, weakGroupDayMap:{} } });
     }
+    // 2) лимитеры (геометрия + остальные 10 категорий) — один kind limiter
     const limiterExerciseMap: Record<string,string[]> = { ...selectedGeom };
     const limiterProtocolMap: Record<string,{protocol:any; category:string}> = {};
     const limiterDayMap: Record<string,number[]> = { ...daysGeom };
@@ -314,6 +343,7 @@ export const LiftMasterCard: React.FC<{
       applyToPlanner({ kind:'limiter', label:`Мастер ${LIFT_RU[lift]}: геометрия ${geomCnt} + лимитеры ${otherCnt} = ${totalLim} упр.`, data:{ limiterExerciseMap, limiterProtocolMap, limiterDayMap } });
     }
     if (!hasWeak && totalLim===0) {
+      // если ничего не выбрано — подсказка
       applyToPlanner({ kind:'limiter', label:`Мастер ${LIFT_RU[lift]}: просмотр (ничего не выбрано)`, data:{ limiterExerciseMap:{}, limiterProtocolMap:{}, limiterDayMap:{} } });
     }
   };
@@ -322,6 +352,7 @@ export const LiftMasterCard: React.FC<{
   const selectedDiagCount = Object.values(selectedDiag).reduce((s,n)=>s+n.length,0);
   const totalSelected = selectedGeomCount + selectedDiagCount + weakMuscleSubs.length;
 
+  // analyses for weak muscle subs
   const muscleAnalyses = useMemo(()=>{
     if (!template) return {} as Record<string, any>;
     const out: Record<string, any> = {};
@@ -336,55 +367,42 @@ export const LiftMasterCard: React.FC<{
     return out;
   }, [template, weakMuscleSubs]);
 
-  const HeaderBtn: React.FC<{ icon:string; title:string; count?:string; collapsed:boolean; onToggle:()=>void; accent:string }> = ({ icon, title, count, collapsed: isCol, onToggle, accent }) => (
-    <button onClick={onToggle} style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'11px 14px', background:'rgba(255,255,255,0.02)', border:'none', borderBottom: isCol ? 'none' : '1px solid rgba(255,255,255,0.07)', cursor:'pointer', color:'#fff', textAlign:'left' as any }}>
-      <span style={{ fontSize:11, fontWeight:800, display:'flex', alignItems:'center', gap:7, color:'#fff' }}><span style={{ width:24, height:24, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:`${accent}18`, border:`1px solid ${accent}30`, fontSize:12, flexShrink:0 }}>{icon}</span> {title} {count ? <span style={{ fontSize:9, padding:'2px 6px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', fontWeight:700 }}>{count}</span> : null}</span>
-      <span style={{ fontSize:11, width:26, height:26, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', background: isCol ? 'rgba(255,255,255,0.06)' : `${accent}18`, border:`1px solid ${isCol ? 'rgba(255,255,255,0.07)' : `${accent}30`}`, color: isCol ? '#fff' : accent, fontWeight:800, flexShrink:0 }}>{isCol ? '▶' : '▼'}</span>
-    </button>
-  );
-
   return (
     <div style={{ padding:12, color:'#fff', maxWidth:760, margin:'0 auto' }}>
-      {/* hero */}
-      <div style={{ ...GLASS, padding:'14px 14px 12px', position:'relative', overflow:'hidden', marginBottom:10 }}>
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(135deg,rgba(0,230,138,0.07),rgba(96,165,250,0.06))', pointerEvents:'none' }} />
-        <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(0,230,138,0.12),transparent 70%)', pointerEvents:'none' }} />
-        <div style={{ position:'relative', display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
-          <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:16, flexShrink:0 }}>🏋️</div>
-          <div style={{ flex:1, minWidth:0 }}>
+      <div style={{ background:'linear-gradient(135deg,rgba(0,230,138,0.12),rgba(96,165,250,0.10))', border:'1px solid rgba(0,230,138,0.18)', borderRadius:14, padding:'14px 14px 12px', position:'relative', overflow:'hidden', marginBottom:8 }}>
+        <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(0,230,138,0.14),transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+          <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:16 }}>🏋️</div>
+          <div style={{ flex:1 }}>
             <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>{LIFT_RU[lift]} — единый инструмент</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.35, marginTop:2, opacity:0.92 }}>Диагностика движения: техника, углы, траектория, скорость и коррекция — всё по текущему движению.</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3, opacity:0.9 }}>8 блоков: слабые мышцы → слабые точки → мёртвые точки → траектория → геометрия → VBT + видео → дневник → лимитирующие</div>
           </div>
-          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.10)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', fontWeight:800, whiteSpace:'nowrap' }}>9 движений</span>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>9 движений</span>
         </div>
-        <div style={{ position:'relative', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:10, padding:'8px 10px', lineHeight:1.5 }}>
-          Нажми на заголовок блока — скрыть/раскрыть (▶/▼). Протокол упражнений — из цикла, скорость — из видео или ручного VBT. 8 блоков ниже полностью отрендерены, без лишнего sticky.
+        <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
+          Один экран — полный выбор по движению, <b style={{ color:ACCENT }}>видео</b> (BlazePose) и доп.движения. Выбери движение ниже — все блоки перестроятся.
         </div>
       </div>
-
-      <div style={{ ...CARD, padding:'7px 9px', borderRadius:14, fontSize:10, color:'#fff', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-        <span style={{ fontSize:10, fontWeight:800, color:'#fff' }}>📐 Геометрия:</span><span style={{ color:'#fff', opacity:0.92 }}>{diag.limiter.techniqueGeometry.length} парам. для {LIFT_RU[lift]}</span><span style={{ marginLeft:6, padding:'2px 7px', borderRadius:7, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:9 }}>{diag.headerHint}</span>
+      <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(56,189,248,0.08)', border:'1px solid rgba(56,189,248,0.2)', fontSize:10, color:'#38bdf8', marginBottom:8 }}>
+        📐 Геометрия техники — {diag.limiter.techniqueGeometry.length} парам. для {LIFT_RU[lift]} · {diag.headerHint}
       </div>
-
       {anthroHint && (
-        <div style={{ ...CARD, padding:'8px 10px', fontSize:10, color:'#fff', lineHeight:1.5, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)' }}>
-          <span style={{ color:'#a78bfa' }}>{anthroHint}</span> <span style={{ color:'#fff', opacity:0.85 }}>(размах/плечи задаются ниже).</span>
+        <div style={{ marginTop:6, padding:'7px 9px', borderRadius:8, background:'rgba(167,139,250,0.08)', border:'1px solid rgba(167,139,250,0.25)', fontSize:10, color:'#a78bfa', lineHeight:1.4 }}>
+          {anthroHint} <span style={{ color:DIM }}>(задаётся ниже; пока без видео — планируем VBT/видео-замер скорости и углов).</span>
         </div>
       )}
-
-      {/* выбор движения — без sticky, gradient активные */}
-      <div style={{ ...CARD, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-        <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginRight:2, letterSpacing:0.3 }}>ДВИЖЕНИЕ:</div>
-        {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:34, padding:'6px 11px', borderRadius:20, cursor:'pointer', border: on?'1px solid #00e68a':'1px solid rgba(255,255,255,0.07)', background: on?'linear-gradient(135deg,#00e68a,#00c853)': 'rgba(255,255,255,0.04)', color: on?'#000':'#fff', fontWeight:800, fontSize:10, transition:'all 0.15s' }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
+      {/* выбор движения — sticky */}
+      <div style={{ ...CARD, display:'flex', gap:5, flexWrap:'wrap', alignItems:'center', position:'sticky', top:0, zIndex:4, backdropFilter:'blur(10px)' as any, background:'rgba(10,10,12,0.72)', border:'1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:ACCENT, marginRight:6 }}>Движение:</div>
+        {(Object.keys(LIFT_RU) as Lift[]).map(l=>{ const on=lift===l; return <button key={l} onClick={()=>{ setLift(l); setPhase('' as WeakPoint|''); setIssues([]); }} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid '+ACCENT:'1px solid rgba(255,255,255,0.1)', background: on?'rgba(0,230,138,0.15)':'transparent', color: on?ACCENT:DIM, fontWeight:700, fontSize:10 }}>{LIFT_RU[l]}{on?' ✓':''}</button>; })}
       </div>
-
-      {/* антропометрия — стекло */}
-      <div style={{ ...CARD }}>
-        <div style={{ fontSize:11, fontWeight:800, color:'#fff' }}>📏 Антропометрия (для геометрии)</div>
-        <div style={{ fontSize:10, color:'#fff', marginTop:3, lineHeight:1.45, opacity:0.9 }}>Размах рук и ширина плеч уточняют рекомендации по хвату и локтям. Сохраняется в профиль.</div>
-        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8, alignItems:'center' }}>
-          <label style={{ fontSize:10, color:'#fff' }}>Размах (см): <input value={armSpanInput} onChange={e=>setArmSpanInput(e.target.value)} placeholder="180" style={{ width:74, marginLeft:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', borderRadius:8, padding:'5px 7px', fontSize:11 }} /></label>
-          <label style={{ fontSize:10, color:'#fff' }}>Плечи (см): <input value={shoulderInput} onChange={e=>setShoulderInput(e.target.value)} placeholder="42" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', borderRadius:8, padding:'5px 7px', fontSize:11 }} /></label>
+      {/* антропометрия редактор */}
+      <div style={{ ...CARD, border:'1px solid rgba(167,139,250,0.18)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>📏 Антропометрия (для геометрии)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Размах рук и ширина плеч влияют на подсказки хвата/локтей. Сохраняется в профиль.</div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
+          <label style={{ fontSize:10, color:DIM }}>Размах рук (см): <input value={armSpanInput} onChange={e=>setArmSpanInput(e.target.value)} placeholder="180" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Плечи (см): <input value={shoulderInput} onChange={e=>setShoulderInput(e.target.value)} placeholder="42" style={{ width:60, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
           <button onClick={()=>{
             try{
               const raw = JSON.parse(localStorage.getItem('he_profile_v2')||'{}');
@@ -393,320 +411,293 @@ export const LiftMasterCard: React.FC<{
               const sh = parseFloat(shoulderInput); if(Number.isFinite(sh)&&sh>0) personal.shoulderWidthCm=sh;
               if(raw.personal) raw.personal=personal; else if(raw.settings?.personal) raw.settings.personal=personal; else raw.personal=personal;
               localStorage.setItem('he_profile_v2', JSON.stringify(raw));
+              // force re-render hint
               setArmSpanInput(''); setShoulderInput('');
               location.reload();
             }catch{}
-          }} style={{ ...btn, background:'linear-gradient(135deg,#a78bfa,#7c3aed)', color:'#fff', border:'1px solid rgba(255,255,255,0.07)' }}>💾 Сохранить</button>
+          }} style={{ ...btn, background:'rgba(167,139,250,0.15)', color:'#a78bfa', border:'1px solid rgba(167,139,250,0.3)' }}>💾 Сохранить</button>
         </div>
       </div>
 
       {/* ── 1. Слабые мышцы + BB-грануляр ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="💪" title="1 · Слабые мышцы · BB-грануляр (головки)" collapsed={!!collapsed['sec-1-bb']} onToggle={()=>toggleCollapse('sec-1-bb')} accent="#4ade80" />
-        {!collapsed['sec-1-bb'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>Отметь слабую мышцу — получи 5 ассистентов из раскладки цикла. Ниже — 12 гранулярных BB-изолятов по головкам (ключичная/середина/низ груди, 3 дельты, 3 трицепса, 3 бицепса).</div>
-          <div style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(255,255,255,0.07)' }}>
-            <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:7 }}>💎 BB-грануляр — 12 изолятов по головкам</div>
-            <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-              {[
-                {id:'bb_cable_upper', label:'Верх груди (ключичная)'}, {id:'bb_cable_mid', label:'Середина груди'}, {id:'bb_cable_lower', label:'Низ груди'},
-                {id:'bb_lateral_mid', label:'Средняя дельта'}, {id:'bb_rear_cable', label:'Задняя дельта'}, {id:'bb_front_raise', label:'Передняя дельта'},
-                {id:'bb_triceps_long', label:'Трицепс длинная'}, {id:'bb_triceps_lateral', label:'Трицепс латер.'}, {id:'bb_triceps_medial', label:'Трицепс медиал.'},
-                {id:'bb_biceps_long', label:'Бицепс длинная'}, {id:'bb_biceps_short', label:'Бицепс короткая'}, {id:'bb_brachialis', label:'Брахиалис'},
-              ].map(g=>{
-                const k = `bb|${g.id}`; const on = selectedDiag[k]?.length>0;
-                return <button key={g.id} onClick={()=>{
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#4ade80' }}>1 · Слабые мышцы · BB-грануляр (головки)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Выберите слабую мышцу — 5 ассистентов из раскладки цикла. Ниже — 12 гранулярных BB-изолятов (верх/середина/низ груди, 3 головки дельт, 3 трицепса, 3 бицепса) — точечно по головкам.</div>
+        <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.15)' }}>
+          <div style={{ fontSize:10, fontWeight:700, color:'#ec4899', marginBottom:6 }}>💎 BB-грануляр — 12 изолятов по головкам</div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+            {[
+              {id:'bb_cable_upper', label:'Верх груди (ключичная)'}, {id:'bb_cable_mid', label:'Середина груди'}, {id:'bb_cable_lower', label:'Низ груди'},
+              {id:'bb_lateral_mid', label:'Средняя дельта'}, {id:'bb_rear_cable', label:'Задняя дельта'}, {id:'bb_front_raise', label:'Передняя дельта'},
+              {id:'bb_triceps_long', label:'Трицепс длинная'}, {id:'bb_triceps_lateral', label:'Трицепс латер.'}, {id:'bb_triceps_medial', label:'Трицепс медиал.'},
+              {id:'bb_biceps_long', label:'Бицепс длинная'}, {id:'bb_biceps_short', label:'Бицепс короткая'}, {id:'bb_brachialis', label:'Брахиалис'},
+            ].map(g=>{
+              const k = `bb|${g.id}`; const on = selectedDiag[k]?.length>0;
+              return <button key={g.id} onClick={()=>{
+                const name = (()=>{
                   const m: Record<string,string> = { bb_cable_upper:'Сведение в кроссовере с верхнего блока (верх груди)', bb_cable_mid:'Сведение в кроссовере (середина груди)', bb_cable_lower:'Сведение в кроссовере с нижнего блока (низ груди)', bb_lateral_mid:'Махи в стороны с задержкой (средняя дельта)', bb_rear_cable:'Отведение на заднюю дельту в кроссовере', bb_front_raise:'Подъём гантелей перед собой (передняя дельта)', bb_triceps_long:'Французский жим с гантелью над головой (длинная головка трицепса)', bb_triceps_lateral:'Разгибание с канатной рукоятью (латеральная головка)', bb_triceps_medial:'Разгибание обратным хватом (медиальная головка)', bb_biceps_long:'Подъём гантели на наклонной (длинная головка бицепса)', bb_biceps_short:'Подъём на скамье Скотта (короткая головка бицепса)', bb_brachialis:'Молот с канатной рукоятью (брахиалис)' };
-                  const name = m[g.id] ?? g.id;
-                  if (on) setSelectedDiag(cur=>{ const n={...cur}; delete n[k]; return n; });
-                  else addDiag(k, [name]);
-                }} style={{ padding:'5px 9px', borderRadius:20, cursor:'pointer', fontSize:9, fontWeight:700, border: on?'1px solid #ec4899':'1px solid rgba(255,255,255,0.07)', background: on?'linear-gradient(135deg,#ec4899,#be185d)':'rgba(255,255,255,0.04)', color:'#fff' }}>{g.label}{on?' ✓':''}</button>;
+                  return m[g.id] ?? g.id;
+                })();
+                if (on) setSelectedDiag(cur=>{ const n={...cur}; delete n[k]; return n; });
+                else addDiag(k, [name]);
+              }} style={{ padding:'4px 8px', borderRadius:7, cursor:'pointer', fontSize:9, border: on?'1px solid #ec4899':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(236,72,153,0.12)':'rgba(255,255,255,0.02)', color: on?'#ec4899':DIM, fontWeight:700 }}>{g.label}{on?' ✓':''}</button>;
+            })}
+          </div>
+          <div style={{ fontSize:9, color:DIM, marginTop:6, lineHeight:1.3 }}>Клик — добавить/убрать изолят (протокол гипертрофии блока 8: 3×10 @65% RIR2, дни Авто). Точная головка — из EXERCISE_CATALOG bb_*.</div>
+        </div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
+          {WEAK_MUSCLE_DETAIL.map(d=>{ const on=weakMuscleGroups.includes(d.id); return <button key={d.id} onClick={()=>toggleWeakGroup(d.id)} style={{ minHeight:32, padding:'5px 10px', borderRadius:14, cursor:'pointer', border: on?'1px solid #4ade80':'1px solid rgba(255,255,255,0.08)', background: on?'rgba(74,222,128,0.15)':'transparent', color: on?'#4ade80':DIM, fontWeight:700, fontSize:10 }}>{d.label}{on?' ✓':''}</button>; })}
+        </div>
+        {weakHints.length>0 && (
+          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#fbbf24', marginBottom:4 }}>📊 Дневник: e1RM-тренд (28д) — подсказка</div>
+            {weakHints.map(s=> (
+              <div key={s.group} style={{ display:'flex', gap:6, alignItems:'center', marginTop:3, flexWrap:'wrap' }}>
+                <span style={{ fontSize:10, color:DIM }}>{s.status==='weak'?'📉':'🟡'} {s.label}: {s.currentE1rm}{s.priorE1rm>0?` кг (было ${s.priorE1rm}, ${s.deltaPct>0?'+':''}${s.deltaPct}%)`:' кг'} · {s.sessions} сесс.</span>
+                <button onClick={()=>{ if(!weakMuscleGroups.includes(s.group)) toggleWeakGroup(s.group); }} style={{ padding:'2px 8px', borderRadius:6, cursor:'pointer', fontSize:9, border:'1px solid rgba(245,158,11,0.3)', background:'rgba(245,158,11,0.1)', color:'#fbbf24', fontWeight:700, minHeight:26 }}>➕ в слабые</button>
+              </div>
+            ))}
+          </div>
+        )}
+        {!template && <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Выберите цикл в ПЛ-авто — ассистенты подбираются по его раскладке.</div>}
+        {weakMuscleGroups.map(group=>{
+          const detail=WEAK_MUSCLE_DETAIL.find(d=>d.id===group); if(!detail) return null;
+          return (
+            <div key={group} style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(74,222,128,0.04)', border:'1px solid rgba(74,222,128,0.12)' }}>
+              <div style={{ fontSize:10, fontWeight:700, color:'#4ade80', marginBottom:4 }}>{detail.label} — выберите мышцу:</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {detail.subs.map(s=>{ const k=`${group}|${s.sub}`; const on=weakMuscleSubs.includes(k); return <button key={s.sub} onClick={()=>toggleWeakSub(k)} style={{ minHeight:28, padding:'4px 9px', borderRadius:10, cursor:'pointer', fontSize:9, border: on?'1px solid #4ade80':'1px solid rgba(255,255,255,0.08)', background: on?'rgba(74,222,128,0.18)':'transparent', color: on?'#4ade80':DIM, fontWeight:700 }}>{s.label}{on?' ✓':''}</button>; })}
+              </div>
+              {detail.subs.filter(s=>weakMuscleSubs.includes(`${group}|${s.sub}`)).map(s=>{
+                const k=`${group}|${s.sub}`; const an=muscleAnalyses[k]; if(!an||!an.items.length) return null;
+                return (
+                  <div key={k} style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(74,222,128,0.05)', border:'1px solid rgba(74,222,128,0.15)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#4ade80', marginBottom:4 }}>🏋️ {s.label} — ассистенты (выберите):</div>
+                    {an.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[k]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(k,it.exercise.name)} onAdd={()=>addDiag(k,[it.exercise.name])} />)}
+                  </div>
+                );
               })}
             </div>
-            <div style={{ fontSize:9, color:'#fff', marginTop:7, lineHeight:1.4, opacity:0.75 }}>Клик — добавить/убрать изолят. Протокол гипертрофии: 3×10 @65% RIR 2, дни — Авто.</div>
-          </div>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10 }}>
-            {WEAK_MUSCLE_DETAIL.map(d=>{ const on=weakMuscleGroups.includes(d.id); return <button key={d.id} onClick={()=>toggleWeakGroup(d.id)} style={{ minHeight:34, padding:'6px 12px', borderRadius:20, cursor:'pointer', border: on?'1px solid #4ade80':'1px solid rgba(255,255,255,0.07)', background: on?'linear-gradient(135deg,#4ade80,#16a34a)':'rgba(255,255,255,0.04)', color:on?'#000':'#fff', fontWeight:800, fontSize:10 }}>{d.label}{on?' ✓':''}</button>; })}
-          </div>
-          {weakHints.length>0 && (
-            <div style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(255,255,255,0.07)' }}>
-              <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:6 }}>📊 Дневник: e1RM-тренд (28д) — подсказка</div>
-              {weakHints.map(s=> (
-                <div key={s.group} style={{ display:'flex', gap:6, alignItems:'center', marginTop:4, flexWrap:'wrap' }}>
-                  <span style={{ fontSize:10, color:'#fff' }}>{s.status==='weak'?'📉':'🟡'} {s.label}: {s.currentE1rm}{s.priorE1rm>0?` кг (было ${s.priorE1rm}, ${s.deltaPct>0?'+':''}${s.deltaPct}%)`:' кг'} · {s.sessions} сесс.</span>
-                  <button onClick={()=>{ if(!weakMuscleGroups.includes(s.group)) toggleWeakGroup(s.group); }} style={{ padding:'3px 9px', borderRadius:7, cursor:'pointer', fontSize:9, border:'1px solid rgba(255,255,255,0.07)', background:'rgba(245,158,11,0.18)', color:'#fff', fontWeight:700, minHeight:28 }}>➕ в слабые</button>
-                </div>
-              ))}
-            </div>
-          )}
-          {!template && <div style={{ marginTop:8, fontSize:10, color:'#fff', opacity:0.7 }}>Выбери цикл в ПЛ-авто — ассистенты подберутся по его раскладке.</div>}
-          {weakMuscleGroups.map(group=>{
-            const detail=WEAK_MUSCLE_DETAIL.find(d=>d.id===group); if(!detail) return null;
-            return (
-              <div key={group} style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(74,222,128,0.05)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:6 }}>{detail.label} — выбери подгруппу:</div>
-                <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
-                  {detail.subs.map(s=>{ const k=`${group}|${s.sub}`; const on=weakMuscleSubs.includes(k); return <button key={s.sub} onClick={()=>toggleWeakSub(k)} style={{ minHeight:30, padding:'5px 10px', borderRadius:20, cursor:'pointer', fontSize:9, border: on?'1px solid #4ade80':'1px solid rgba(255,255,255,0.07)', background: on?'linear-gradient(135deg,#4ade80,#22c55e)':'rgba(255,255,255,0.04)', color: on?'#000':'#fff', fontWeight:700 }}>{s.label}{on?' ✓':''}</button>; })}
-                </div>
-                {detail.subs.filter(s=>weakMuscleSubs.includes(`${group}|${s.sub}`)).map(s=>{
-                  const k=`${group}|${s.sub}`; const an=muscleAnalyses[k]; if(!an||!an.items.length) return null;
-                  return (
-                    <div key={k} style={{ marginTop:9, padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                      <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:5 }}>🏋️ {s.label} — ассистенты (отметь):</div>
-                      {an.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[k]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(k,it.exercise.name)} onAdd={()=>addDiag(k,[it.exercise.name])} />)}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>}
+          );
+        })}
       </div>
 
       {/* ── 2. Слабые точки ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="🎯" title="2 · Слабые точки (фаза срыва)" collapsed={!!collapsed['sec-2-weak']} onToggle={()=>toggleCollapse('sec-2-weak')} accent="#a855f7" />
-        {!collapsed['sec-2-weak'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>Фаза, где теряется скорость и штанга «застревает». Выбери чип — увидишь причину и упражнения из цикла.</div>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10 }}>
-            {(WEAK_POINTS_BY_LIFT[lift]??[]).map(p=>{ const on=effectivePhase===p; return <button key={p} onClick={()=>setPhase(p as WeakPoint)} style={{ minHeight:34, padding:'6px 12px', borderRadius:20, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.07)', background: on?'linear-gradient(135deg,#a855f7,#7c3aed)':'rgba(255,255,255,0.04)', color:'#fff', fontWeight:800, fontSize:10 }}>{PHASE_RU[p]||p}{on?' ✓':''}</button>; })}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:ACCENT }}>2 · Слабые точки (фаза срыва)</div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:6 }}>
+          {(WEAK_POINTS_BY_LIFT[lift]??[]).map(p=>{ const on=effectivePhase===p; return <button key={p} onClick={()=>setPhase(p as WeakPoint)} style={{ minHeight:34, padding:'5px 10px', borderRadius:8, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.16)':'transparent', color: on?'#c084fc':DIM, fontWeight:700, fontSize:10 }}>{PHASE_RU[p]||p}</button>; })}
+        </div>
+        {diaryHint && (
+          <div style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(251,191,36,0.07)', border:'1px solid rgba(251,191,36,0.25)', fontSize:10, color:'#fbbf24', lineHeight:1.5 }}>
+            📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов срываются в «{PHASE_RU[diaryHint.phase]||diaryHint.phase}» (эвристика phaseForReps).
           </div>
-          {diaryHint && (
-            <div style={{ marginTop:10, padding:'8px 10px', borderRadius:10, background:'rgba(251,191,36,0.07)', border:'1px solid rgba(255,255,255,0.07)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
-              📊 Дневник: {diaryHint.count} из {diaryHint.totalHard} тяжёлых подходов — фаза «{PHASE_RU[diaryHint.phase]||diaryHint.phase}».
-            </div>
-          )}
-          {movement && (
-            <div style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-              <div style={{ fontWeight:800, color:'#fff', fontSize:11 }}>⚠ {movement.weakPoint.label}</div>
-              <div style={{ fontSize:10, color:'#fff', marginTop:3, lineHeight:1.5, opacity:0.9 }}>{movement.weakPoint.description}</div>
-              {phaseAnalysis && phaseAnalysis.items.length>0 && (
-                <div style={{ marginTop:9 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:5 }}>🏋️ Упражнения фазы — из цикла:</div>
-                  {phaseAnalysis.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|${effectivePhase}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|${effectivePhase}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|${effectivePhase}`, [it.exercise.name])} />)}
-                  <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
-                    <button onClick={()=>addDiag(`${lift}|${effectivePhase}`, phaseAnalysis.items.filter((i:any)=>i.optimal).map((i:any)=>i.exercise.name))} style={{ ...btn, background:'linear-gradient(135deg,#a855f7,#7c3aed)', color:'#fff', border:'1px solid rgba(255,255,255,0.07)' }}>➕ Рекомендуемые</button>
-                    <button onClick={()=>addDiag(`${lift}|${effectivePhase}`, phaseAnalysis.items.map((i:any)=>i.exercise.name))} style={{ ...btn, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.07)' }}>➕ Все</button>
-                  </div>
+        )}
+        {movement && (
+          <div style={{ marginTop:8 }}>
+            <div style={{ fontWeight:800, color:'#ef4444', fontSize:12 }}>⚠ {movement.weakPoint.label}</div>
+            <div style={{ fontSize:10, color:DIM, marginTop:2 }}>{movement.weakPoint.description}</div>
+            {phaseAnalysis && phaseAnalysis.items.length>0 && (
+              <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+                <div style={{ fontSize:10, fontWeight:700, color:ACCENT, marginBottom:4 }}>🏋️ Упражнения фазы (из раскладки цикла):</div>
+                {phaseAnalysis.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|${effectivePhase}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|${effectivePhase}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|${effectivePhase}`, [it.exercise.name])} />)}
+                <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                  <button onClick={()=>addDiag(`${lift}|${effectivePhase}`, phaseAnalysis.items.filter((i:any)=>i.optimal).map((i:any)=>i.exercise.name))} style={{ ...btn, background:'rgba(0,230,138,0.15)', color:ACCENT, border:'1px solid rgba(0,230,138,0.3)' }}>➕ Рекомендуемые</button>
+                  <button onClick={()=>addDiag(`${lift}|${effectivePhase}`, phaseAnalysis.items.map((i:any)=>i.exercise.name))} style={{ ...btn, background:'rgba(96,165,250,0.12)', color:'#60a5fa', border:'1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
                 </div>
-              )}
-            </div>
-          )}
-        </div>}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── 3. Мёртвые точки ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="🧱" title={`3 · Мёртвые точки (углы)${effectivePhase ? ' · '+(PHASE_RU[effectivePhase]||effectivePhase) : ''}`} collapsed={!!collapsed['sec-3-stick']} onToggle={()=>toggleCollapse('sec-3-stick')} accent="#60a5fa" />
-        {!collapsed['sec-3-stick'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>Углы суставов и биомеханика фазы: где момент максимален и какие мышцы лимитируют.</div>
-          {movement?.sticking ? (
-            <div style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(255,255,255,0.07)', fontSize:10, color:'#fff', lineHeight:1.6 }}>
-              <div>📐 Угол: <b style={{color:'#fff'}}>{movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}°</b> · сустав: {movement.sticking.keyJoint}</div>
-              <div style={{ marginTop:3, opacity:0.92 }}>🧠 {movement.sticking.biomechanicalReason}</div>
-              <div style={{ marginTop:3 }}>💪 Слабые мышцы: {movement.sticking.weakMuscles.join(', ')}</div>
-              <div style={{ color:'#fbbf24', marginTop:4 }}>Коррекции: {movement.sticking.corrections.join(' · ')}</div>
-              <div style={{ color:'#fff', marginTop:4, opacity:0.92 }}>💡 Cue: {movement.sticking.loadCues}</div>
-            </div>
-          ) : <div style={{ marginTop:10, fontSize:10, color:'#fff', opacity:0.7, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>Выбери фазу в блоке 2 — здесь появятся углы и мышцы-лимитеры.</div>}
-          {stickingAnalysis && stickingAnalysis.items.length>0 && (
-            <div style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-              <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:5 }}>🏋️ Коррекции мёртвой точки:</div>
-              {stickingAnalysis.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|sticking|${effectivePhase}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|sticking|${effectivePhase}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|sticking|${effectivePhase}`, [it.exercise.name])} />)}
-            </div>
-          )}
-        </div>}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>3 · Мёртвые точки (углы) · {effectivePhase ? (PHASE_RU[effectivePhase]||effectivePhase) : ''}</div>
+        {movement?.sticking ? (
+          <div style={{ marginTop:6, padding:8, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', fontSize:10, color:DIM, lineHeight:1.5 }}>
+            <div>📐 Угол: {movement.sticking.angleRangeDeg[0]}°–{movement.sticking.angleRangeDeg[1]}° · сустав: {movement.sticking.keyJoint}</div>
+            <div style={{ marginTop:2 }}>🧠 {movement.sticking.biomechanicalReason}</div>
+            <div style={{ marginTop:2 }}>💪 Слабые мышцы: {movement.sticking.weakMuscles.join(', ')}</div>
+            <div style={{ color:'#f59e0b', marginTop:3 }}>Коррекции: {movement.sticking.corrections.join(' · ')}</div>
+            <div style={{ color:'#818cf8', marginTop:3 }}>💡 Cue: {movement.sticking.loadCues}</div>
+          </div>
+        ) : <div style={{ marginTop:6, fontSize:10, color:DIM }}>Угловая диагностика недоступна для этой фазы — используйте блок 2.</div>}
+        {stickingAnalysis && stickingAnalysis.items.length>0 && (
+          <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.18)' }}>
+            <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>🏋️ Коррекции мёртвой точки:</div>
+            {stickingAnalysis.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|sticking|${effectivePhase}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|sticking|${effectivePhase}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|sticking|${effectivePhase}`, [it.exercise.name])} />)}
+          </div>
+        )}
       </div>
 
       {/* ── 4. Движение штанги ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="📈" title="4 · Движение штанги (bar-path)" collapsed={!!collapsed['sec-4-bar']} onToggle={()=>toggleCollapse('sec-4-bar')} accent="#f59e0b" />
-        {!collapsed['sec-4-bar'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>Отклонения траектории: уход вперёд, таз, good-morning, петля, асимметрия. Отметь — получи причину и упражнения-коррекции.</div>
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:10 }}>
-            {barPathIssuesForLift(lift).map(iss=>{ const on=issues.includes(iss); return <button key={iss} onClick={()=>toggleIssue(iss)} style={{ minHeight:34, padding:'6px 11px', borderRadius:20, cursor:'pointer', border: on?'1px solid #f59e0b':'1px solid rgba(255,255,255,0.07)', background: on?'linear-gradient(135deg,#f59e0b,#d97706)':'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, fontWeight:700 }}>{ISSUE_RU[iss]}{on?' ✓':''}</button>; })}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a855f7' }}>4 · Движение штанги (bar-path)</div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap', marginTop:8 }}>
+          {barPathIssuesForLift(lift).map(iss=>{ const on=issues.includes(iss); return <button key={iss} onClick={()=>toggleIssue(iss)} style={{ minHeight:34, padding:'5px 8px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.14)':'transparent', color: on?'#c084fc':DIM, fontSize:10 }}>{ISSUE_RU[iss]}</button>; })}
+        </div>
+        {issues.includes('asymmetric' as BarPathIssue) && (
+          <div style={{ marginTop:6, padding:6, borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+            <div style={{ fontSize:10, color:DIM, marginBottom:4 }}>⚖️ Какая сторона слабее?</div>
+            <div style={{ display:'flex', gap:5 }}>
+              {(['left','right'] as const).map(side=>{ const on=asymSide===side; return <button key={side} onClick={()=>setAsymSide(cur=> cur===side?null:side)} style={{ minHeight:30, padding:'4px 12px', borderRadius:7, cursor:'pointer', border: on?'1px solid #a855f7':'1px solid rgba(255,255,255,0.1)', background: on?'rgba(168,85,247,0.18)':'transparent', color: on?'#c084fc':DIM, fontSize:10, fontWeight:700 }}>{side==='left'?'Левая':'Правая'}{on?' ✓':''}</button>; })}
+            </div>
           </div>
-          {issues.includes('asymmetric' as BarPathIssue) && (
-            <div style={{ marginTop:10, padding:8, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-              <div style={{ fontSize:10, color:'#fff', marginBottom:6, fontWeight:700 }}>⚖️ Какая сторона слабее?</div>
-              <div style={{ display:'flex', gap:6 }}>
-                {(['left','right'] as const).map(side=>{ const on=asymSide===side; return <button key={side} onClick={()=>setAsymSide(cur=> cur===side?null:side)} style={{ minHeight:32, padding:'5px 13px', borderRadius:20, cursor:'pointer', border: on?'1px solid #f59e0b':'1px solid rgba(255,255,255,0.07)', background: on?'linear-gradient(135deg,#f59e0b,#d97706)':'rgba(255,255,255,0.04)', color:'#fff', fontSize:10, fontWeight:700 }}>{side==='left'?'Левая':'Правая'}{on?' ✓':''}</button>; })}
-              </div>
-              {asymSide && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>Слабее: <b>{asymSide==='left'?'левая':'правая'}</b> сторона → унилатеральная работа в плане.</div>}
+        )}
+        {diag.barPath.analysis && diag.barPath.analysis.diagnoses.map((d:any)=>(
+          <div key={d.issue} style={{ marginTop:6, padding:7, borderRadius:8, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.15)', fontSize:10 }}>
+            <div style={{ fontWeight:700, color:'#c084fc' }}>{(ISSUE_RU as Record<string,string>)[d.issue]}{d.relatedPhase?` · фаза ${String(d.relatedPhase)}`:''}</div>
+            <div style={{ color:DIM, marginTop:2 }}>{d.cause} <span style={{ color:ACCENT }}>→ {d.correction}</span></div>
+            <div style={{ marginTop:4 }}>
+              {(barAnalyses[d.issue]?.items ?? []).map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|barpath|${d.issue}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|barpath|${d.issue}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|barpath|${d.issue}`, [it.exercise.name])} />)}
             </div>
-          )}
-          {diag.barPath.analysis && diag.barPath.analysis.diagnoses.map((d:any)=>(
-            <div key={d.issue} style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', fontSize:10 }}>
-              <div style={{ fontWeight:800, color:'#fff' }}>{(ISSUE_RU as Record<string,string>)[d.issue]}{d.relatedPhase?` · фаза ${String(d.relatedPhase)}`:''}</div>
-              <div style={{ color:'#fff', marginTop:4, lineHeight:1.5, opacity:0.92 }}>{d.cause} <span style={{ color:ACCENT }}>→ {d.correction}</span></div>
-              <div style={{ marginTop:6 }}>
-                {(barAnalyses[d.issue]?.items ?? []).map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[`${lift}|barpath|${d.issue}`]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(`${lift}|barpath|${d.issue}`, it.exercise.name)} onAdd={()=>addDiag(`${lift}|barpath|${d.issue}`, [it.exercise.name])} />)}
-              </div>
-            </div>
-          ))}
-        </div>}
+          </div>
+        ))}
       </div>
 
-      {/* ── 5. Геометрия техники ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="📐" title={`5 · Геометрия техники — ${geomRawOptions.length} парам. для ${LIFT_RU[lift]}`} collapsed={!!collapsed['sec-5-geom']} onToggle={()=>toggleCollapse('sec-5-geom')} accent="#38bdf8" />
-        {!collapsed['sec-5-geom'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>{lift==='bench'?'Хват, локти, мост, ноги, кисть, касание — то, что на бумаге «по плану», а на помосте не едет.':'Постановка, хват, трекинг и брейсинг для выбранного движения — та же логика, что для жима, но под его механику.'} Каждая — метод + протокол + упражнения.</div>
-          {geomRawOptions.map(opt=>{
-            const an = analyzeLimiterOption(opt);
-            const k=geomKey(opt); const col=CATEGORY_COLOR[opt.category];
-            return (
-              <div key={opt.id} style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ fontSize:10, fontWeight:800, color:'#fff' }}>{opt.label}</div>
-                <div style={{ fontSize:9, color:'#fff', marginTop:3, lineHeight:1.45, opacity:0.85 }}>{opt.description}</div>
-                <div style={{ fontSize:9, color:'#fff', marginTop:4, lineHeight:1.4, opacity:0.92 }}>📋 {opt.method}</div>
-                <div style={{ fontSize:9, color:'#fff', marginTop:3, lineHeight:1.4, opacity:0.9 }}>🧠 {opt.rationale}</div>
-                {an.items.map((it,idx)=> <ExerciseRow key={idx} item={it} selected={!!selectedGeom[k]?.includes(it.exercise.name)} onToggle={()=>toggleGeom(opt,it.exercise.name)} onAdd={()=>addGeom(opt,[it.exercise.name])} tag={`📐 ${opt.label.split(' ')[0]}`} />)}
-                <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap', alignItems:'center' }}>
-                  <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background:'linear-gradient(135deg,#38bdf8,#0ea5e9)', color:'#000', border:'1px solid rgba(255,255,255,0.07)' }}>➕ Рекомендуемое</button>
-                  <button onClick={()=>addGeom(opt, an.items.map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.07)' }}>➕ Все</button>
-                  <span style={{ fontSize:9, color:'#fff', opacity:0.7 }}>Дни:</span>
-                  <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ padding:'4px 8px', borderRadius:20, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.07)', background: !daysGeom[k]?.length?'linear-gradient(135deg,#38bdf8,#0ea5e9)':'rgba(255,255,255,0.04)', color: !daysGeom[k]?.length?'#000':'#fff', fontWeight:700 }}>Авто</button>
-                  {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ padding:'4px 8px', borderRadius:20, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.07)', background: daysGeom[k]?.includes(d)?'linear-gradient(135deg,#38bdf8,#0ea5e9)':'rgba(255,255,255,0.04)', color: daysGeom[k]?.includes(d)?'#000':'#fff', fontWeight:700 }}>Д{d}</button>)}
+      {/* ── 5. Геометрия техники — для выбранного движения ── */}
+      <div style={{ ...CARD, border:'1px solid rgba(56,189,248,0.18)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8' }}>5 · Геометрия техники — {geomRawOptions.length} парам. для {LIFT_RU[lift]}</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>{lift==='bench'?'Хват / локти / мост / ноги / кисть / траектория — частые лимитеры «на бумаге всё по плану, а жим не идёт»':'Геометрия постановки/хвата/трекинга/брейсинга для выбранного движения — то же, что для жима, но под его механику.'} Каждая — метод + протокол + упражнения.</div>
+        {geomRawOptions.map(opt=>{
+          const k=geomKey(opt); const an=analyzeLimiterOption(opt); const col=CATEGORY_COLOR[opt.category];
+          return (
+            <div key={opt.id} style={{ marginTop:8, padding:9, borderRadius:8, background:'rgba(56,189,248,0.04)', border:'1px solid rgba(56,189,248,0.14)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:col.color }}>{opt.label}</div>
+              <div style={{ fontSize:9, color:DIM, marginTop:2, lineHeight:1.4 }}>{opt.description}</div>
+              <div style={{ fontSize:9, color:'#38bdf8', marginTop:4, lineHeight:1.4 }}>📋 {opt.method}</div>
+              <div style={{ fontSize:9, color:'#ffffff', marginTop:3, lineHeight:1.4 }}>🧠 {opt.rationale}</div>
+              {an.items.map((it,idx)=> <ExerciseRow key={idx} item={it} selected={!!selectedGeom[k]?.includes(it.exercise.name)} onToggle={()=>toggleGeom(opt,it.exercise.name)} onAdd={()=>addGeom(opt,[it.exercise.name])} tag={`📐 ${opt.label.split(' ')[0]}`} />)}
+              <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
+                <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(56,189,248,0.15)', color:'#38bdf8', border:'1px solid rgba(56,189,248,0.3)' }}>➕ Рекомендуемое</button>
+                <button onClick={()=>addGeom(opt, an.items.map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(96,165,250,0.12)', color:'#60a5fa', border:'1px solid rgba(96,165,250,0.25)' }}>➕ Все</button>
+                <span style={{ fontSize:9, color:DIM }}>Дни:</span>
+                <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: !daysGeom[k]?.length?'rgba(56,189,248,0.12)':'transparent', color: !daysGeom[k]?.length?'#38bdf8':DIM }}>Авто</button>
+                {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?'1px solid #38bdf8':'1px solid rgba(255,255,255,0.1)', background: daysGeom[k]?.includes(d)?'rgba(56,189,248,0.12)':'transparent', color: daysGeom[k]?.includes(d)?'#38bdf8':DIM }}>Д{d}</button>)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── 6. VBT ── */}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#f472b6' }}>6 · VBT: скорость штанги (м/с)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Лучший vs последний повтор → потеря скорости → зона → вероятная фаза срыва (максимальный момент). План не меняется — диагностика.</div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6, alignItems:'center' }}>
+          <label style={{ fontSize:10, color:DIM }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>setVbtBest(e.target.value)} placeholder="0.60" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Последний (м/с): <input type="number" step="0.01" min="0" value={vbtLast} onChange={e=>setVbtLast(e.target.value)} placeholder="0.40" style={{ width:70, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+          <label style={{ fontSize:10, color:DIM }}>Вес (кг): <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e=>setVbtWeight(e.target.value)} placeholder="100" style={{ width:64, marginLeft:4, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', borderRadius:6, padding:'4px 6px', fontSize:11 }} /></label>
+        </div>
+        {(()=>{
+          const best=parseFloat(vbtBest), last=parseFloat(vbtLast);
+          if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:6, fontSize:10, color:'#ffffff' }}>Введите скорости (последний не может быть быстрее лучшего).</div>;
+          const weight=parseFloat(vbtWeight);
+          const d=diagnoseVelocity(lift, best, last, Number.isFinite(weight)&&weight>0?weight:undefined);
+          const vbtPhase=(d.suggestedPhase ?? effectivePhase) as WeakPoint|null;
+          const vbtSticking = vbtPhase ? analyzeStickingCorrections(lift, vbtPhase, template ?? undefined) : null;
+          const vbtKey=`${lift}|vbt|${vbtPhase??'none'}`;
+          return (
+            <div style={{ marginTop:6, padding:8, borderRadius:8, background: d.exceeded?'rgba(239,68,68,0.07)':'rgba(244,114,182,0.05)', border:`1px solid ${d.exceeded?'rgba(239,68,68,0.25)':'rgba(244,114,182,0.2)'}` }}>
+              <div style={{ fontSize:10, color:'#f472b6', fontWeight:700 }}>Потеря скорости: {d.lossPct}% · {d.zone}</div>
+              {d.e1RMByVelocity!=null && <div style={{ fontSize:10, color:DIM, marginTop:2 }}>e1RM по скорости: {d.e1RMByVelocity} кг</div>}
+              {d.exceeded && d.suggestedPhase && <div style={{ marginTop:4, fontSize:10, color:'#fbbf24' }}>⚠ Отказ близко — вероятная фаза «{PHASE_RU[d.suggestedPhase]||d.suggestedPhase}» (максимальный момент).</div>}
+              {vbtSticking && vbtSticking.items.length>0 && (
+                <div style={{ marginTop:6 }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#f472b6', marginBottom:3 }}>🏋️ Коррекции фазы «{PHASE_RU[vbtPhase!]||vbtPhase}»:</div>
+                  {vbtSticking.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[vbtKey]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(vbtKey,it.exercise.name)} onAdd={()=>addDiag(vbtKey,[it.exercise.name])} />)}
                 </div>
-              </div>
-            );
-          })}
-        </div>}
+              )}
+            </div>
+          );
+        })()}
       </div>
 
-      {/* ── 6. VBT + видео ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="⚡" title="6 · VBT + видео (BlazePose) — скорость штанги" collapsed={!!collapsed['sec-6-vbt']} onToggle={()=>toggleCollapse('sec-6-vbt')} accent="#f472b6" />
-        {!collapsed['sec-6-vbt'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>Лучший vs последний повтор → потеря скорости → зона → вероятная фаза срыва. Видео — или скорость вручную, или из BlazePose.</div>
-          <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginTop:10, alignItems:'center' }}>
-            <label style={{ fontSize:10, color:'#fff' }}>Лучший (м/с): <input type="number" step="0.01" min="0" value={vbtBest} onChange={e=>setVbtBest(e.target.value)} placeholder="0.60" style={{ width:74, marginLeft:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', borderRadius:8, padding:'5px 7px', fontSize:11 }} /></label>
-            <label style={{ fontSize:10, color:'#fff' }}>Последний (м/с): <input type="number" step="0.01" min="0" value={vbtLast} onChange={e=>setVbtLast(e.target.value)} placeholder="0.40" style={{ width:74, marginLeft:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', borderRadius:8, padding:'5px 7px', fontSize:11 }} /></label>
-            <label style={{ fontSize:10, color:'#fff' }}>Вес (кг): <input type="number" step="0.5" min="0" value={vbtWeight} onChange={e=>setVbtWeight(e.target.value)} placeholder="100" style={{ width:68, marginLeft:4, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', borderRadius:8, padding:'5px 7px', fontSize:11 }} /></label>
-          </div>
-          {(()=>{
-            const best=parseFloat(vbtBest), last=parseFloat(vbtLast);
-            if (!Number.isFinite(best)||!Number.isFinite(last)||best<=0||last<=0||last>best) return <div style={{ marginTop:8, fontSize:10, color:'#fff', opacity:0.75, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>Введи скорости (последний ≤ лучшего) — или сними видео ниже, скорость подставится автоматически.</div>;
-            const weight=parseFloat(vbtWeight);
-            const d=diagnoseVelocity(lift, best, last, Number.isFinite(weight)&&weight>0?weight:undefined);
-            const vbtPhase=(d.suggestedPhase ?? effectivePhase) as WeakPoint|null;
-            const vbtSticking = vbtPhase ? analyzeStickingCorrections(lift, vbtPhase, template ?? undefined) : null;
-            const vbtKey=`${lift}|vbt|${vbtPhase??'none'}`;
-            return (
-              <div style={{ marginTop:10, padding:9, borderRadius:10, background: d.exceeded?'rgba(239,68,68,0.07)':'rgba(244,114,182,0.06)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ fontSize:10, color:'#fff', fontWeight:800 }}>Потеря скорости: {d.lossPct}% · {d.zone}</div>
-                {d.e1RMByVelocity!=null && <div style={{ fontSize:10, color:'#fff', marginTop:3, opacity:0.9 }}>e1RM по скорости: {d.e1RMByVelocity} кг</div>}
-                {d.exceeded && d.suggestedPhase && <div style={{ marginTop:5, fontSize:10, color:'#fbbf24' }}>⚠ Отказ близко — фаза «{PHASE_RU[d.suggestedPhase]||d.suggestedPhase}» (макс. момент).</div>}
-                {vbtSticking && vbtSticking.items.length>0 && (
-                  <div style={{ marginTop:7 }}>
-                    <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:4 }}>🏋️ Коррекции фазы «{PHASE_RU[vbtPhase!]||vbtPhase}»:</div>
-                    {vbtSticking.items.map((it:any,idx:number)=> <ExerciseRow key={idx} item={it} selected={!!selectedDiag[vbtKey]?.includes(it.exercise.name)} onToggle={()=>toggleDiag(vbtKey,it.exercise.name)} onAdd={()=>addDiag(vbtKey,[it.exercise.name])} />)}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-          <div style={{ marginTop:10 }}>
-            <VideoCaptureCard lift={lift} onResult={r=>{
-              if (r.barVelocity!=null) {
-                const v = r.barVelocity;
-                setVbtBest((v+0.15).toFixed(2));
-                setVbtLast(v.toFixed(2));
-              }
-            }} />
-          </div>
-        </div>}
-      </div>
+      {/* ── 6b. Видео + гид ── */}
+      <VideoCaptureCard lift={lift} onResult={r=>{
+        // автоподстановка в VBT поля для демо: скорость → best/last
+        if (r.barVelocity!=null) {
+          const v = r.barVelocity;
+          setVbtBest((v+0.15).toFixed(2));
+          setVbtLast(v.toFixed(2));
+        }
+      }} />
 
-      {/* ── 7. Срывы ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="💥" title="7 · Срывы (из дневника, RPE≥8)" collapsed={!!collapsed['sec-7-sryv']} onToggle={()=>toggleCollapse('sec-7-sryv')} accent="#ef4444" />
-        {!collapsed['sec-7-sryv'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>срывы — авто-детект тяжёлых подходов по дневнику (phaseForReps, ≥6 повт. — без фазы). Ручной ввод — вкладка «Вручную» внутри.</div>
-          <div style={{ marginTop:8 }}>
-            <StickingPointAnalysisCard sessions={sessions} />
-          </div>
-        </div>}
+      {/* ── 7. Дневник срывы ── */}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24' }}>7 · Срывы (из дневника, RPE≥8)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Авто-детект тяжёлых подходов (фаза по phaseForReps, ≥6 повт. = неопределена). «Слабые мышцы → планировщик» — одним кликом.</div>
+        <StickingPointAnalysisCard sessions={sessions} />
       </div>
 
       {/* ── 8. RIR-калибровка ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="🎚️" title="8 · RIR-калибровка (bias из дневника)" collapsed={!!collapsed['sec-8-rir']} onToggle={()=>toggleCollapse('sec-8-rir')} accent="#60a5fa" />
-        {!collapsed['sec-8-rir'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>Насколько ты переоцениваешь/недооцениваешь запас повторов. Подвкладки — «Вручную» / «Из дневника» с gradient активными.</div>
-          <div style={{ marginTop:8 }}>
-            <RIRCalibrationCard />
-          </div>
-        </div>}
+      <div style={CARD}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>8 · RIR-калибровка (bias из дневника)</div>
+        <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>Насколько вы пере-/недооцениваете RIR. «Применить калибровку к плану» — сдвиг RIR одним кликом.</div>
+        <RIRCalibrationCard />
       </div>
 
       {/* ── 9. Коррекция мезоцикла ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="🔄" title="9 · Коррекция мезоцикла (объём / RIR / делоад)" collapsed={!!collapsed['sec-9-meso']} onToggle={()=>toggleCollapse('sec-9-meso')} accent="#a78bfa" />
-        {!collapsed['sec-9-meso'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>ACWR, монотонность, готовность и дневник — рекомендуемые объём, RIR и частота делоада. Одной кнопкой в планировщик.</div>
-          {profile ? (
-            <div style={{ marginTop:8 }}>
-            <MesoCorrectionCard
-              profile={profile}
-              acwr={acwr ?? 1}
-              monotony={monotony ?? 1}
-              avgReadiness={readinessRecovery}
-              mesoWeeks={mesoWeeks}
-              missedSessions={missedSessions}
-              exercises={exercises}
-              currentVolume={currentVolume}
-              currentRir={currentRir}
-            />
-            </div>
-          ) : <div style={{ marginTop:8, fontSize:10, color:'#fff', opacity:0.7, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>Профиль не загружен — блок доступен после выбора плана.</div>}
-        </div>}
-      </div>
+      {profile && (
+        <div style={CARD}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>9 · Коррекция мезоцикла (объём/RIR/делод)</div>
+          <div style={{ fontSize:10, color:DIM, lineHeight:1.4, marginTop:2 }}>По ACWR, монотонности, готовности и дневнику — рекомендованный объём, RIR и частота делода. «Применить» — в планировщик.</div>
+          <MesoCorrectionCard
+            profile={profile}
+            acwr={acwr ?? 1}
+            monotony={monotony ?? 1}
+            avgReadiness={readinessRecovery}
+            mesoWeeks={mesoWeeks}
+            missedSessions={missedSessions}
+            exercises={exercises}
+            currentVolume={currentVolume}
+            currentRir={currentRir}
+          />
+        </div>
+      )}
 
-      {/* ── 10. Остальные лимитирующие ── */}
-      <div style={CARD_COLLAPSIBLE}>
-        <HeaderBtn icon="🧩" title={`10 · Остальные лимитирующие факторы — для ${LIFT_RU[lift]}`} collapsed={!!collapsed['sec-10-lim']} onToggle={()=>toggleCollapse('sec-10-lim')} accent="#a78bfa" />
-        {!collapsed['sec-10-lim'] && <div style={{ padding:12 }}>
-          <div style={{ fontSize:10, color:'#fff', lineHeight:1.5, opacity:0.92 }}>Дополнительно к геометрии (блок 5) — ещё 10 категорий лимитеров (скорость-силы, амплитуда, стабилизация, режимы сокращения, антропометрия и др.). Выбор по текущему движению, протокол из цикла, добавление одним кликом ниже.</div>
-          {LIMITER_CATEGORIES.filter(c=>c.id!=='technique_geometry').map(cat=>{
-            const opts = limiterOptionsFor(cat.id, lift);
-            if (opts.length===0) return null;
-            const col = CATEGORY_COLOR[cat.id];
-            return (
-              <div key={cat.id} style={{ marginTop:10, padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                <div style={{ fontSize:10, fontWeight:800, color:'#fff' }}>{cat.icon} {cat.label} · {opts.length} парам.</div>
-                <div style={{ fontSize:9, color:'#fff', marginTop:3, lineHeight:1.4, opacity:0.75 }}>{cat.description}</div>
-                {opts.map(opt=>{
-                  const k=geomKey(opt); const an=analyzeLimiterOption(opt);
-                  return (
-                    <div key={opt.id} style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)' }}>
-                      <div style={{ fontSize:10, fontWeight:800, color:'#fff' }}>{opt.label}</div>
-                      <div style={{ fontSize:9, color:'#fff', marginTop:3, lineHeight:1.4, opacity:0.75 }}>{opt.description}</div>
-                      <div style={{ fontSize:9, color:'#fff', marginTop:3, lineHeight:1.4, opacity:0.9 }}>📋 {opt.method}</div>
-                      {an.items.map((it,idx)=> <ExerciseRow key={idx} item={it} selected={!!selectedGeom[k]?.includes(it.exercise.name)} onToggle={()=>toggleGeom(opt,it.exercise.name)} onAdd={()=>addGeom(opt,[it.exercise.name])} tag={cat.icon} />)}
-                      <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap', alignItems:'center' }}>
-                        <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background: `${col.bg}`, color:'#fff', border:'1px solid rgba(255,255,255,0.07)' }}>➕ Рекомендуемое</button>
-                        <button onClick={()=>addGeom(opt, an.items.map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.07)' }}>➕ Все</button>
-                        <span style={{ fontSize:9, color:'#fff', opacity:0.7 }}>Дни:</span>
-                        <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ padding:'4px 8px', borderRadius:20, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.07)', background: !daysGeom[k]?.length?col.bg:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700 }}>Авто</button>
-                        {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ padding:'4px 8px', borderRadius:20, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.07)', background: daysGeom[k]?.includes(d)?col.bg:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700 }}>Д{d}</button>)}
-                      </div>
+      {/* ── 10. Остальные лимитирующие — ПОЛНЫЙ СПИСОК для выбранного движения ── */}
+      <div style={{ ...CARD, border:'1px solid rgba(167,139,250,0.18)' }}>
+        <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa' }}>10 · Остальные лимитирующие факторы — для {LIFT_RU[lift]} (все калькуляторы)</div>
+        <div style={{ fontSize:10, color:DIM, marginTop:2, lineHeight:1.4 }}>Кроме геометрии (блок 5) — ещё 10 категорий. Каждая — как в эксперт-режиме, но прямо здесь: выберите параметр → упражнения → дни. Один клик внизу добавит и геометрию, и эти.</div>
+        {LIMITER_CATEGORIES.filter(c=>c.id!=='technique_geometry').map(cat=>{
+          const opts = limiterOptionsFor(cat.id, lift);
+          if (opts.length===0) return null;
+          const col = CATEGORY_COLOR[cat.id];
+          return (
+            <div key={cat.id} style={{ marginTop:10, padding:9, borderRadius:8, background:'rgba(167,139,250,0.04)', border:`1px solid ${col.color}22` }}>
+              <div style={{ fontSize:10, fontWeight:800, color:col.color }}>{cat.icon} {cat.label} · {opts.length} парам.</div>
+              <div style={{ fontSize:9, color:DIM, marginTop:2, lineHeight:1.3 }}>{cat.description}</div>
+              {opts.map(opt=>{
+                const k=geomKey(opt); const an=analyzeLimiterOption(opt);
+                return (
+                  <div key={opt.id} style={{ marginTop:8, padding:8, borderRadius:7, background:'rgba(255,255,255,0.02)', border:`1px solid ${col.color}18` }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#fff' }}>{opt.label}</div>
+                    <div style={{ fontSize:9, color:DIM, marginTop:2, lineHeight:1.3 }}>{opt.description}</div>
+                    <div style={{ fontSize:9, color:col.color, marginTop:3, lineHeight:1.3 }}>📋 {opt.method}</div>
+                    {an.items.map((it,idx)=> <ExerciseRow key={idx} item={it} selected={!!selectedGeom[k]?.includes(it.exercise.name)} onToggle={()=>toggleGeom(opt,it.exercise.name)} onAdd={()=>addGeom(opt,[it.exercise.name])} tag={cat.icon} />)}
+                    <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
+                      <button onClick={()=>addGeom(opt, an.items.filter(i=>i.optimal).map(i=>i.exercise.name))} style={{ ...btn, background:col.bg, color:col.color, border:`1px solid ${col.color}40` }}>➕ Рекомендуемое</button>
+                      <button onClick={()=>addGeom(opt, an.items.map(i=>i.exercise.name))} style={{ ...btn, background:'rgba(255,255,255,0.04)', color:DIM, border:'1px solid rgba(255,255,255,0.1)' }}>➕ Все</button>
+                      <span style={{ fontSize:9, color:DIM }}>Дни:</span>
+                      <button onClick={()=>{ setDaysGeom(cur=>{ const n={...cur}; delete n[k]; return n; }); }} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: !daysGeom[k]?.length?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: !daysGeom[k]?.length?col.bg:'transparent', color: !daysGeom[k]?.length?col.color:DIM }}>Авто</button>
+                      {Array.from({length:Math.max(1,dayCount)},(_,i)=>i+1).map(d=> <button key={d} onClick={()=>toggleGeomDay(opt,d)} style={{ padding:'3px 7px', borderRadius:6, cursor:'pointer', fontSize:9, border: daysGeom[k]?.includes(d)?`1px solid ${col.color}`:'1px solid rgba(255,255,255,0.1)', background: daysGeom[k]?.includes(d)?col.bg:'transparent', color: daysGeom[k]?.includes(d)?col.color:DIM }}>Д{d}</button>)}
                     </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
 
       {/* ── Footer ── */}
-      <button onClick={applyAll} style={{ width:'100%', minHeight:44, marginTop:12, border:'1px solid rgba(255,255,255,0.07)', borderRadius:14, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800, fontSize:12 }}>
+      <button onClick={applyAll} style={{ width:'100%', minHeight:44, marginTop:10, border:'none', borderRadius:9, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:800 }}>
         🛠 Добавить в ПЛ-авто — геометрия {selectedGeomCount} + диагностика {selectedDiagCount} + слабые {weakMuscleSubs.length} (всего {totalSelected})
       </button>
-      <div style={{ marginTop:8, padding:9, borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:10, lineHeight:1.5, opacity:0.92 }}>
-        Правило: упражнения цикла не меняются — добавляются только ассистенты. Геометрия — протокол категории, остальная диагностика — протокол из раскладки цикла.
+      <div style={{ marginTop:8, padding:9, borderRadius:8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.18)', color:'#fbbf24', fontSize:10, lineHeight:1.45 }}>
+        Правило ПЛ-авто: исходные упражнения цикла не меняются — добавляются только ассистенты. Геометрия — 4×4-6 @70-75% (категорийный протокол), остальная диагностика — протокол из раскладки цикла.
       </div>
     </div>
   );

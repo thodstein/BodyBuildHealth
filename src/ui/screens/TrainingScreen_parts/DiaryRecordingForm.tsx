@@ -43,7 +43,7 @@ interface ExerciseRecord {
 
 interface DiaryRecordingFormProps {
   diary: any;
-  selectedWeek: number;
+  selectedНеделя: number;
   onSave: () => void;
   historyWorkouts?: WorkoutLog[];
   /** План дня для предзаполнения (кнопка «Записать по плану»). */

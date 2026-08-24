@@ -228,7 +228,7 @@ export const TrainingMixTab: React.FC = () => {
           mgfDose: mixDrugMGF, mgfTiming: 'pre' as const,
         },
         hasNandrolone, userElectrolytes: { sodiumMmolL: na, potassiumMmolL: kVal, chlorideMmolL: cl },
-        workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay,
+        workoutType: mixWorkoutType, timeOfДень: mixTimeOfDay,
         workoutDurationMin: Math.round(durHrs * 60),
         experience: mixExperience, dayType: mixDayType, aas: aasIds,
       };
@@ -398,7 +398,7 @@ export const TrainingMixTab: React.FC = () => {
             <button onClick={() => {
               const kit = {
                 id: Date.now(), type: 'mix',
-                goal: mixGoal, timing: mixTiming, workoutType: mixWorkoutType, timeOfDay: mixTimeOfDay,
+                goal: mixGoal, timing: mixTiming, workoutType: mixWorkoutType, timeOfДень: mixTimeOfDay,
                 bw, multiplier, isOnCycle,
                 stack: stack.filter(sItem => sItem.mg > 0),
                 score: score.compositeScore,

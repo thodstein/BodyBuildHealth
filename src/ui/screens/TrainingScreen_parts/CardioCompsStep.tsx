@@ -17,7 +17,7 @@ export const CardioCompsStep: React.FC<{
   totalWeeks: number;
   taperWeeks: number;
   taperEnabled: boolean;
-  peakWeek: boolean;
+  peakНеделя: boolean;
 }> = ({ comps, setComps, draft, setDraft, totalWeeks, taperWeeks, taperEnabled, peakWeek }) => {
   const [dragIdx, setDragIdx] = React.useState<number | null>(null);
   const add = () => {

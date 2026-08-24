@@ -335,7 +335,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
       const options = {
         level: macroLevel,
         goal: dir === 'hybrid' ? 'hypertrophy' : program.meta.goal,
-        daysPerWeek: dir === 'hybrid' ? Math.max(1, program.meta.daysPerWeek - 3) : program.meta.daysPerWeek,
+        daysPerНеделя: dir === 'hybrid' ? Math.max(1, program.meta.daysPerWeek - 3) : program.meta.daysPerWeek,
         weakPoints: (tprofile.weakPoints ?? []) as string[],
         equipment: program.bb?.constraints?.equipment ?? [],
         trainingFocus: program.meta.trainingFocus,
@@ -989,7 +989,7 @@ return (
                       const newProg = macrocycleToBBProgram(macro, {
                         level: macroLevel,
                         goal: program.meta.goal,
-                        daysPerWeek: program.meta.daysPerWeek,
+                        daysPerНеделя: program.meta.daysPerWeek,
                         weakPoints: (tprofile.weakPoints ?? []) as string[],
                         equipment: program.bb?.constraints?.equipment ?? [],
                         trainingFocus: program.meta.trainingFocus,
@@ -1024,7 +1024,7 @@ return (
                       const bbProg = macrocycleToBBProgram(macro, {
                         level: macroLevel,
                         goal: 'hypertrophy',
-                        daysPerWeek: Math.max(2, program.meta.daysPerWeek - 3),
+                        daysPerНеделя: Math.max(2, program.meta.daysPerWeek - 3),
                         weakPoints: (tprofile.weakPoints ?? []) as string[],
                         equipment: program.bb?.constraints?.equipment ?? [],
                         trainingFocus: program.meta.trainingFocus,
@@ -1508,7 +1508,7 @@ return (
                       if (!ok) { e.target.value = String(program.meta.daysPerWeek); return; }
                     }
                   }
-                  const newMeta = { ...program.meta, daysPerWeek: v };
+                  const newMeta = { ...program.meta, daysPerНеделя: v };
                   let newProgram = { ...program, meta: newMeta };
                   // Каскад на bb.weeks: выровнять кол-во сессий
                    if (program.bb) {
@@ -1712,7 +1712,7 @@ return (
                   const weeks = Math.max(1, program.meta.weeks ?? 4);
                   const pattern = SPLIT_PATTERNS.find(pp => pp.sessionsPerRotation === bbDays && pp.schedule.some(d => d.kind === 'тренировка')) ?? [...SPLIT_PATTERNS].sort((a,b)=>Math.abs(a.sessionsPerRotation-bbDays)-Math.abs(b.sessionsPerRotation-bbDays))[0] ?? SPLIT_PATTERNS[0];
                   if (!pattern) { showToast('⚠ Сплит не найден'); return; }
-                  const sessions = pattern.schedule.filter(d=>d.kind==='тренировка').map((d,si)=>({ id: newId('ses'), name: 'День '+(si+1), dayOfWeek: si as any, focus: (d as any).sessionTag ?? '', blocks: [] as any }));
+                  const sessions = pattern.schedule.filter(d=>d.kind==='тренировка').map((d,si)=>({ id: newId('ses'), name: 'День '+(si+1), dayOfНеделя: si as any, focus: (d as any).sessionTag ?? '', blocks: [] as any }));
                   const bbWeeks = Array.from({ length: weeks }, (_,wi)=>({ week: wi+1, phase: 'accumulation' as const, deload: false, sessions: sessions.map(s=>({ ...s, id: newId('ses') })) }));
                   update({ hybrid: { ...program.hybrid!, bbWeeks } });
                   showToast('⚡ ББ-часть создана: ' + weeks + ' нед × ' + bbDays + 'д — заполните упражнения ниже');

@@ -250,14 +250,12 @@ export const MobilityTab: React.FC<{ hub: DiaryHubCtx }> = () => {
   }, [libSearch, libSlot]);
 
   const btn: React.CSSProperties = { padding: '7px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,var(--accent),#00cc7a)', color: '#000', fontWeight: 700, fontSize: 11, minHeight: 40 };
-  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(24,24,27,0.42)', backdropFilter: 'blur(12px)' as any, color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
+  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
   const chip = (on: boolean, color = ACCENT): React.CSSProperties => ({
-    padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 30,
-    border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.07)',
-    background: on ? 'linear-gradient(135deg,var(--accent),#00c853)' : 'rgba(24,24,27,0.42)',
-    color: on ? '#000' : '#fff',
-    boxShadow: on ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
-    backdropFilter: on ? undefined : 'blur(12px)' as any,
+    padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontSize: 10, fontWeight: 600, minHeight: 30,
+    border: on ? `1px solid ${color}` : '1px solid rgba(255,255,255,0.08)',
+    background: on ? `${color}22` : 'rgba(255,255,255,0.04)',
+    color: on ? color : '#fff',
   });
 
   const downloadCSV = () => {

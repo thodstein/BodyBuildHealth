@@ -144,7 +144,7 @@ const OptionBlock: React.FC<{
   o: LimiterOption; analysis: { option: LimiterOption; items: LimiterExerciseItem[] };
   keyOf: string; selected: Record<string, string[]>; days: Record<string, number[]>;
   dayCount: number; onToggle: (name: string) => void; onAdd: (names: string[]) => void;
-  onDay: (day: number) => void; onAuto: () => void;
+  onДень: (day: number) => void; onAuto: () => void;
 }> = ({ o, analysis, keyOf, selected, days, dayCount, onToggle, onAdd, onDay, onAuto }) => {
   const col = CATEGORY_COLOR[o.category];
   const inPlanDays = days[keyOf] || [];

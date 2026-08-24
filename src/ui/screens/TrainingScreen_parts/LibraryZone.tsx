@@ -24,7 +24,7 @@ interface Props {
   historyWorkouts: WorkoutLog[];
   goal: string;
   level: string;
-  daysPerWeek: number;
+  daysPerНеделя: number;
   recovery: number;
   fatigue: number;
   appliedMethods: Record<string, string>;

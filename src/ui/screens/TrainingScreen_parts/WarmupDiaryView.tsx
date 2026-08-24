@@ -80,7 +80,7 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
     } catch { /* SSR/блокировка — игнор */ }
   }, [log, adherence, quality, insights, skipCounts]);
 
-  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(24,24,27,0.42)', backdropFilter: 'blur(12px)' as any, color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
+  const ghost: React.CSSProperties = { padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 10, minHeight: 36 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, color: '#fff' }}>

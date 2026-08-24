@@ -28,7 +28,7 @@ function buildBBSessionsFromPattern(pattern: SplitPattern, deload: boolean) {
     .map((x, si) => ({
       id: newId('ses'),
       name: x.d.sessionTag ?? 'День ' + (si + 1),
-      dayOfWeek: x.di,
+      dayOfНеделя: x.di,
       focus: x.d.sessionTag ?? '',
       blocks: [] as any[],
     }));
@@ -90,7 +90,7 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
         // Сохраняем блоки по индексу сессии где возможно, иначе пусто
         const sessions = sessionsTpl.map((tpl, si) => {
           const ex = existing.sessions[si];
-          if (ex) return { ...ex, id: ex.id, name: ex.name || tpl.name, dayOfWeek: tpl.dayOfWeek, focus: ex.focus || tpl.focus };
+          if (ex) return { ...ex, id: ex.id, name: ex.name || tpl.name, dayOfНеделя: tpl.dayOfWeek, focus: ex.focus || tpl.focus };
           return { ...tpl, id: newId('ses') };
         });
         // Если новый сплит короче старого — проверить контент в отрезаемых сессиях
@@ -106,7 +106,7 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
       return { week: wi + 1, phase: 'accumulation' as const, deload: false, sessions: sessionsTpl.map(s => ({ ...s, id: newId('ses') })) };
     });
     // Синхронизируем meta.daysPerWeek под сплит
-    onChange({ ...program, meta: { ...program.meta, daysPerWeek: pattern.sessionsPerRotation }, bb: { ...program.bb, weeks: newWeeks } });
+    onChange({ ...program, meta: { ...program.meta, daysPerНеделя: pattern.sessionsPerRotation }, bb: { ...program.bb, weeks: newWeeks } });
     showToast('🔄 Сплит применён: ' + pattern.name + ' · ' + pattern.sessionsPerRotation + 'д/нед');
   };
 
@@ -122,11 +122,11 @@ export const CycleTemplatesPanel: React.FC<Props> = ({ program, onChange, showTo
     const newDays = cycle.meta.sessionsPerWeek;
     onChange({
       ...program,
-      meta: { ...program.meta, weeks: newMetaWeeks, daysPerWeek: newDays },
+      meta: { ...program.meta, weeks: newMetaWeeks, daysPerНеделя: newDays },
       pl: {
         ...program.pl,
         sourceCycleId: cycle.meta.id,
-        schedule: Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfWeek: i % 7 })),
+        schedule: Array.from({ length: sessCount }, (_, i) => ({ sessionIdx: i, dayOfНеделя: i % 7 })),
         // keep workMax/weakPoints/notes
       },
     });

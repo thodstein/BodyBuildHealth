@@ -48,7 +48,7 @@ export const TrainingProfileCard: React.FC<{ profile: TrainingProfile; update: (
       <div style={LABEL}>Антропометрия и восстановление</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
         <PopupNumber label="Вес тела" value={profile.bodyWeight} min={40} max={200} suffix=" кг" onChange={v => update({ bodyWeight: v })} />
-        <PopupNumber label="Дней/нед" value={profile.daysPerWeek} min={2} max={7} onChange={v => update({ daysPerWeek: v })} />
+        <PopupNumber label="Дней/нед" value={profile.daysPerWeek} min={2} max={7} onChange={v => update({ daysPerНеделя: v })} />
         <PopupNumber label="Сон" value={profile.sleepHours} min={3} max={12} suffix=" ч" onChange={v => update({ sleepHours: v })} />
         <PopupNumber label="Стресс" value={profile.stressLevel} min={1} max={10} onChange={v => update({ stressLevel: v })} />
         <PopupNumber label="Восст." value={profile.recovery} min={1} max={10} onChange={v => update({ recovery: v })} />
