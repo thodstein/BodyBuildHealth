@@ -117,8 +117,8 @@ export const CombatConstructor: React.FC = () => {
   };
   const exportToUserProgram = () => {
     if (!plan) return;
-    const prog = { id: plan.id, name: `Единоборства ${plan.discipline} ${plan.weeks}нед`, weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, exercises: s.exercises.map(e=> ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir })) })) })), meta: { source: 'combat', discipline: plan.discipline } };
-    try { localStorage.setItem('he_last_combat_program', JSON.stringify(prog)); setMsg('Экспортировано в he_last_combat_program'); } catch {}
+    const prog = { id: plan.id, name: `Единоборства ${plan.discipline} ${plan.weeks}нед`, weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, deload: w.deload, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, character: s.character, exercises: s.exercises.map(e=> ({ id: e.id, name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir, tempo: e.tempo, rest: e.restSeconds, technique: (e as any).technique, warmup: e.warmupSets, workSets: e.workSets })) })) })), meta: { source: 'combat', discipline: plan.discipline, level: plan.level, methodology: plan.inputSnapshot?.methodology, dupMode: (plan.inputSnapshot as any)?.dupMode, intensityTech: (plan.inputSnapshot as any)?.intensityTech }, outside: plan.outsideMetrics, validation: plan.validation };
+    try { localStorage.setItem('he_last_combat_program', JSON.stringify(prog)); setMsg('Экспортировано в he_last_combat_program (детально)'); } catch {}
     try { navigator.clipboard?.writeText(JSON.stringify(prog,null,2)); } catch {}
   };
 

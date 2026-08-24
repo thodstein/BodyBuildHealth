@@ -128,8 +128,8 @@ function weightForExercise(id: string, input: StrengthSportInput, pct: number, w
   return Math.round((pm || base) * pct * adj / 2.5) * 2.5;
 }
 
-function buildWarmup(weight: number): StrengthSportSet[] {
-  return warmupRampFor(weight).map(s => ({ reps: s.reps, rir: s.rir, weight: s.weight } as StrengthSportSet));
+function buildWarmup(weight: number, id?: string): StrengthSportSet[] {
+  return warmupRampFor(weight, id).map(s => ({ reps: s.reps, rir: s.rir, weight: s.weight } as StrengthSportSet));
 }
 
 function buildExerciseSets(id: string, tag: string, phase: string, input: StrengthSportInput, isPrimary: boolean, week: number): { sets: number; reps: [number, number]; rir: number; weight: number; workSets: StrengthSportSet[] } {
@@ -259,18 +259,44 @@ const SS_TECHNIQUE: Record<string,string> = {
   overhead_squat_v2:'Оверхед: штанга над головой, глубокий сед',
   back_squat:'Гриф на трапециях, глубина ниже параллели',
   front_squat:'Гриф на груди, вертикальный корпус',
+  front_squat_clean_grip:'Фронт хватом чистого, локти высоко',
   clean_and_jerk:'Толчок: взятие + толчок в ножницы',
   hang_clean:'С виса, локти высоко',
   power_clean:'Силой, без полного седа',
+  muscle_clean:'Силой без подседа, тяга',
   push_jerk:'Подсед + выталкивание, полуприсед',
   split_jerk:'Ножницы, фиксация',
   push_press:'Толчок ногами + жим',
+  clean_pull:'Узкий хват, тяга до груди, 90-110% взятия',
+  jerk_dip:'Подсед 8-12см, вертикально',
+  hack_squat:'Спина прижата, колени по носкам',
+  leg_press:'Стопы на ширине плеч, не блокировать колени',
+  bulgarian_split:'Задняя нога на скамье, корпус вертикально',
+  calf_raise:'Полная амплитуда, пауза вверху',
   log_press:'Бревно на груди, локти высоко, толчок',
+  circus_db_press:'Толстая гантель, заброс + толчок одной',
+  axle_deadlift:'Толстый гриф, двойной хват без лямок',
   yoke_walk:'Кор напряжён, короткие шаги, не округлять',
   farmers_walk_heavy:'Хват без лямок, грудь вверх',
   atlas_stone_load:'Обхват, через колени, мощное разгибание',
+  stone_lift:'Камень: обхват, подъём через колени',
+  sandbag_shoulder:'Мешок: взрыв на плечо',
+  zercher_carry:'Зерчер: штанга в сгибах локтей, кор напряжён',
+  tire_flip:'Покрышка: присед + взрыв + толчок коленом',
+  sled_push_sprint:'Сани: лёгкий вес, спринт 20-30м',
   deadlift:'Нейтральная спина, гриф по ногам',
+  sumo_dl:'Сумо: ноги широко, носки наружу',
+  rdl:'Таз назад, гриф по ногам, растяжение бицепса бедра',
   squat:'Глубина, колени по носкам',
+  bench_bar:'Лопатки сведены, грудь вверх',
+  ohp:'Кор напряжён, без прогиба',
+  db_press:'Гантели на уровне ушей, сведение вверху',
+  row_bar:'Тяга к низу живота, сведение лопаток',
+  row_db:'Упор, тяга к поясу, разворот',
+  pullup:'Тяга грудью к перекладине, без раскачки',
+  lateral_raise:'Махи до уровня плеч, мизинец вверх',
+  face_pull:'Трос к лицу, разворот кистей',
+  hip_thrust:'Таз вверх, пауза 2с, без переразгиба',
 };
 function getExerciseMeta(id: string): { name: string; group: string; pattern: string; equipment: string; technique?: string } | null {
   const m = SS_EX_META[id];
@@ -350,7 +376,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           rir: finalRir,
           weight: finalWeight,
           workSets,
-          warmupSets: isPrimary ? buildWarmup(finalWeight) : [],
+          warmupSets: isPrimary ? buildWarmup(finalWeight, id) : [],
           tempo: tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase),
           restSeconds: restForSS(isPrimary ? 'тяж' : 'памп', isPrimary),
           comment: deload ? 'Делод — лёгкая неделя' : gentle < 1 ? 'Щадящий режим: снижен вес, +RIR' : (meta as any).technique || undefined,

@@ -150,10 +150,12 @@ export const StrengthSportConstructor: React.FC = () => {
     const prog = {
       id: plan.id,
       name: `Стронг+ТА ${plan.mode} ${plan.weeks}нед`,
-      weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, exercises: s.exercises.map(e=> ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir })) })) })),
-      meta: { source: 'strength-sport', mode: plan.mode, level: plan.level },
+      weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, deload: w.deload, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, character: s.character, exercises: s.exercises.map(e=> ({ id: e.id, name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir, tempo: e.tempo, rest: e.restSeconds, technique: (e as any).technique, warmup: e.warmupSets, workSets: e.workSets })) })) })),
+      meta: { source: 'strength-sport', mode: plan.mode, level: plan.level, focus: plan.inputSnapshot?.focus, methodology: plan.inputSnapshot?.methodology, dupMode: (plan.inputSnapshot as any)?.dupMode, intensityTech: (plan.inputSnapshot as any)?.intensityTech },
+      outside: plan.outsideMetrics,
+      validation: plan.validation,
     };
-    try { localStorage.setItem('he_last_strength_program', JSON.stringify(prog)); setMsg('Экспортировано в he_last_strength_program'); } catch {}
+    try { localStorage.setItem('he_last_strength_program', JSON.stringify(prog)); setMsg('Экспортировано в he_last_strength_program (детально)'); } catch {}
     try { navigator.clipboard?.writeText(JSON.stringify(prog, null, 2)); } catch {}
   };
 
