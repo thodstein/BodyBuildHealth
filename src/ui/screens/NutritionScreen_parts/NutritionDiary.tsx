@@ -266,8 +266,13 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), 45_000)),
       ]);
       if (result.meals.length > 0) {
-        setParsedItems(prev => [...prev, ...convertOCRItems(result.meals, usdaFoods)]);
-        setOcrHint(`Распознано позиций: ${result.meals.reduce((total, meal) => total + meal.items.length, 0)}. Проверьте очередь перед сохранением.`);
+        const converted = convertOCRItems(result.meals, usdaFoods);
+        // A new photo is a new recognition attempt, not another append to a
+        // possibly wrong previous attempt. Replace the queue so stale OCR rows
+        // cannot survive retries and look like current recognition output.
+        setParsedItems(converted);
+        setOcrError('');
+        setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь перед сохранением.`);
       }
       if (result.meals.length === 0 && result.labs.length === 0) setOcrError(result.warnings[0] || 'Не удалось распознать данные питания.'); 
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } 
