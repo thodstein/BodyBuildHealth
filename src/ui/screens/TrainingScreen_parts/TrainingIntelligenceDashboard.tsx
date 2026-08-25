@@ -68,7 +68,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '📐', label: 'Объём-хаб', desc: 'Единый: MEV/MAV/MRV + тоннаж/КПШ + блины', tab: 'volume_hub' as any },
         { icon: '🏋️', label: 'Лаборатория упражнений', desc: 'Каталог, биомеханика, подбор по группе', tab: 'exercise_lab' },
-        { icon: '🧠', label: 'PRI / схема повторов', desc: 'PRI готовность → объём/RIR + схема повторов', tab: 'tools_hub' as any },
+        { icon: '⏱️', label: 'Темп повторений', desc: 'Эксцентрика/пауза/концентрика/пауза по цели — полный контроль TUT', tab: 'tempo_hub' as any },
       ],
     },
     {

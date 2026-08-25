@@ -44,8 +44,8 @@ export type TrainingTab =
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
-  | 'strength_analysis' | 'load_management' | 'diagnostics' | 'diagnostics_hub' | 'quality_hub' | 'periodization_hub' | 'periodization_taper_hub' | 'quality_diagnostics' | 'quality_joint_hub' | 'volume_hub'
-   | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'rir_calibration' | 'readiness_forecast' | 'rir_forecast_hub' | 'tools_hub' | 'taper_planner' | 'joint_health' | 'joints_ortho' | 'intelligence_hub' | 'metabolic_hub';
+   | 'strength_analysis' | 'load_management' | 'diagnostics' | 'diagnostics_hub' | 'quality_hub' | 'periodization_hub' | 'periodization_taper_hub' | 'quality_diagnostics' | 'quality_joint_hub' | 'volume_hub'
+    | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'rir_calibration' | 'readiness_forecast' | 'rir_forecast_hub' | 'tools_hub' | 'taper_planner' | 'joint_health' | 'joints_ortho' | 'intelligence_hub' | 'metabolic_hub' | 'tempo_hub';
 export type TrainingPage = 'hero' | 'planning' | 'constructor' | 'tabs';
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
@@ -112,12 +112,13 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   rir_calibration: '🎯 RIR калибратор (→ хаб)',
   readiness_forecast: '🔮 Прогноз готовности (→ хаб)',
   rir_forecast_hub: '🎯 RIR + Прогноз — единый хаб',
-  tools_hub: '🧠 PRI / схема повторов',
-  taper_planner: '📉 Планировщик тейпера (→ тейпер-хаб)',
-   joint_health: '🦴 Суставы и ортопедия (→ единый)',
-  joints_ortho: '🦴 Суставы и ортопедия',
-  intelligence_hub: '⚡ Интеллект — единый пульт',
-  metabolic_hub: '⚖️ Метаболика',
+   tools_hub: '🧠 PRI / схема повторов',
+   taper_planner: '📉 Планировщик тейпера (→ тейпер-хаб)',
+    joint_health: '🦴 Суставы и ортопедия (→ единый)',
+   joints_ortho: '🦴 Суставы и ортопедия',
+   intelligence_hub: '⚡ Интеллект — единый пульт',
+   metabolic_hub: '⚖️ Метаболика',
+   tempo_hub: '⏱️ Темп повторений',
 
 };
 
