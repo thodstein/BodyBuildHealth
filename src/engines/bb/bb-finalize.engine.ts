@@ -1892,8 +1892,9 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
         session.exercises.push({
           muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп', sets,
           repsRange: [12, 20], rir: 3, workSets, tempoSpec: '3-0-1-0', restSeconds: 45,
-          comment: `MEV feeder: ${sets}×15-20 для покрытия effective MEV ${landmarks.mev} сетов @${weight} кг; session cap ${maxSetsPerSession}. Target deficit: ${target ? target.targetSets - effectiveSets : 0} sets.`,
-          rationale: 'Добивка до минимума MEV (адекватный объём)', warmupSets: [],
+          comment: `Добивка до минимума MEV: ${sets}×12-20 (RIR 3, темп 3-0-1-0, отдых 45с) для покрытия минимума MEV ${landmarks.mev} сетов @${weight} кг; лимит сессии ${maxSetsPerSession}. Дефицит до цели: ${target ? target.targetSets - effectiveSets : 0} сетов — добивка даёт базовый стимул, не перегружая.`,
+          rationale: `Авто-добивка до MEV для «${muscle}»: добавлен ${candidate.name} ${sets}×12-20 — минимум для роста, без перегрузки`,
+          warmupSets: [],
         });
         used.add(candidate.name);
         remaining -= sets;
@@ -3025,24 +3026,46 @@ for (const week of next.weeks) {
     }
   }
   // Enrich: каждое упражнение — executionProfile/comment/tempo не пустые (качество подбора, вкладки)
+  // FIX: авто-MEV, GVT и другие добивки получали минимальный comment — дополняем до полной инструкции
   for (const week of next.weeks) for (const session of week.sessions) for (const ex of session.exercises) {
     if (!(ex as any).executionProfile) {
       try {
         (ex as any).executionProfile = buildExerciseInstructions({ exerciseName: ex.name, muscle: ex.muscle, role: ex.role, level: options.level, trainingFocus: (options as any).trainingFocus as any, tempo: (ex as any).tempoSpec, restSeconds: ex.restSeconds } as any);
       } catch {}
     }
-    if (!ex.comment || ex.comment.trim().length < 10) {
-      const prof = (ex as any).executionProfile;
-      if (prof?.cues?.[0]) ex.comment = (ex.comment ? ex.comment + ' · ' : '') + prof.cues[0];
-      else if (prof?.pattern) ex.comment = (ex.comment ? ex.comment + ' · ' : '') + `Паттерн: ${prof.pattern} — ${prof.order}`;
-      else ex.comment = (ex.comment || '') + ` · ${ex.muscle} — ${ex.name}`;
+    const prof: any = (ex as any).executionProfile;
+    // Дополняем comment полной инструкцией, даже если уже есть короткий feeder/GVT комментарий
+    if (prof) {
+      if (!ex.comment || !ex.comment.includes(prof.pattern)) {
+        ex.comment = (ex.comment ? ex.comment + ' · ' : '') + `Паттерн: ${prof.pattern} — ${prof.order}`;
+      }
+      if (prof.cues?.[0] && !ex.comment.includes(prof.cues[0].slice(0, 20))) {
+        ex.comment = ex.comment + ' · ' + prof.cues[0];
+      }
+      if (prof.cues?.[1] && ex.comment.split('·').length < 4 && !ex.comment.includes(prof.cues[1].slice(0, 20))) {
+        ex.comment = ex.comment + ' · ' + prof.cues[1];
+      }
+    } else if (!ex.comment || ex.comment.trim().length < 10) {
+      ex.comment = (ex.comment || '') + ` · ${ex.muscle} — ${ex.name}`;
     }
     if (!ex.workSets?.[0]?.tempo && !(ex as any).tempoSpec) {
-      const prof = (ex as any).executionProfile;
-      if (prof?.tempo) {
-        for (const ws of ex.workSets || []) if (!(ws as any).tempo) (ws as any).tempo = prof.tempo;
-        (ex as any).tempoSpec = prof.tempo;
+      const prof2: any = (ex as any).executionProfile;
+      if (prof2?.tempo) {
+        for (const ws of ex.workSets || []) if (!(ws as any).tempo) (ws as any).tempo = prof2.tempo;
+        (ex as any).tempoSpec = prof2.tempo;
       }
+    }
+  }
+  // Гарантия: разминка-активация всегда первая в дне — даже после GVT/ротации/добивок
+  for (const week of next.weeks) for (const session of week.sessions) {
+    const warmups: any[] = (session.exercises as any[]).filter((e: any) => (e as any).warmupActivator);
+    const rest: any[] = (session.exercises as any[]).filter((e: any) => !(e as any).warmupActivator);
+    if (warmups.length) {
+      // Сохраняем порядок остальных через orderSessionExercises, но warmup — вне очереди, первым
+      const orderedRest = (() => {
+        try { return tidySessionExercises(rest as any, undefined, (session as any).sessionTag, options.priorityMuscles, options.methodology, undefined) as any; } catch { return rest; }
+      })();
+      (session as any).exercises = [...warmups, ...orderedRest];
     }
   }
   syncBBPlanSetShape(next);

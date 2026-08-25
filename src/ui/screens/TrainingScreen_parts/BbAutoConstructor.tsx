@@ -2862,10 +2862,10 @@ export const BbAutoConstructor: React.FC = () => {
           const meth = recommendPEDMethodology({ peds: peds as any, pedDoses, level: bbLevel, goal: bbGoal, focus: bbTrainingFocus });
           return (
             <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.18)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>🧬 PED-методика (не ломает тяж/памп)</div>
-              {meth.jointGuard && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🛡 Joint guard: тяж остаётся тяж, но axial → машины/кабели (темп 4-2-1-0)</div>}
-              {meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>💉 GH+insulin pump window: только памп-дни — intra 30-60г +10г EAA</div>}
-              {meth.bfrAllowed && !meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4 }}>🩸 BFR доступен (20-30% 1RM, 30-15-15-15)</div>}
+              <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>🧬 PED-методика — адаптация плана под курс (тяж/памп не ломаются)</div>
+              {meth.jointGuard && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(59,130,246,0.08)', borderRadius:6, border:'1px solid rgba(59,130,246,0.15)' }}>🛡️ Защита суставов: тяжёлые базовые остаются тяжёлыми (RIR 1-2), но осевая нагрузка на позвоночник (присед/становая/жим стоя) заменяется на машины/блоки/тросы, темп 4-2-1-0 для контроля. Сухожилия на курсе отстают от мышц — снижаем риск травмы.</div>}
+              {meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(168,85,247,0.08)', borderRadius:6, border:'1px solid rgba(168,85,247,0.15)' }}>💉 Окно пампа GH+инсулин: только в памп-дни — внутри тренировки 30-60 г быстрых углеводов + 10 г EAA (незаменимые аминокислоты) для суперкомпенсации гликогена и пампа. Только на курсе GH+инсулин.</div>}
+              {meth.bfrAllowed && !meth.insulinPumpWindow && <div style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'5px 7px', background:'rgba(236,72,153,0.08)', borderRadius:6, border:'1px solid rgba(236,72,153,0.15)' }}>🩸 BFR доступен: окклюзионный тренинг 20-30% от 1ПМ, схема 30-15-15-15 с паузой 30 сек, только для памп-изоляций (бицепс/трицепс/дельты), не для базы. Усиливает метаболический стресс без высокой механической нагрузки.</div>}
               {meth.periWorkout?.intraNote && <div style={{ fontSize:10, color:'#fbbf24', marginBottom:4 }}>🍚 {meth.periWorkout.intraNote}</div>}
               {meth.periWorkout?.warning && <div style={{ fontSize:10, color:'#f87171', marginBottom:4 }}>⚠ {meth.periWorkout.warning}</div>}
               <div style={{ fontSize:10, color:'#fff', opacity:0.85 }}>📋 Тяж: {meth.recommendedScheme.heavy} · Памп: {meth.recommendedScheme.pump} {proPreset !== 'none' ? `· Пресет ${proPreset}` : ''}</div>
@@ -2881,9 +2881,28 @@ export const BbAutoConstructor: React.FC = () => {
           <PopupNumber label='Blast нед' value={blastWeeks} min={4} max={12} onChange={setBlastWeeks} />
           <PopupNumber label='Cruise нед' value={cruiseWeeks} min={2} max={8} onChange={setCruiseWeeks} />
         </>}
-        <PopupSelect label='🏆 Pro-пресет' value={proPreset} onChange={v=>{ setProPreset(v); if(v==='dc'&&dupMode==='none') setDupMode('strength_hypertrophy' as any); if(v==='fortitude'){ setSupersetMode('giant' as any); if(volumeScheme==='standard') setVolumeScheme('fst7' as any);} }} hint='DC (RP 11-15), Fortitude (MR 4×6), Meadows (lengthened)' options={[{id:'none',label:'Без пресета'},{id:'dc',label:'DC Training'},{id:'fortitude',label:'Fortitude'},{id:'meadows',label:'Meadows'}]} />
+        <PopupSelect label='🏆 Pro-пресет (методики профи)' value={proPreset} onChange={v=>{ setProPreset(v); if(v==='dc'&&dupMode==='none') setDupMode('strength_hypertrophy' as any); if(v==='fortitude'){ setSupersetMode('giant' as any); if(volumeScheme==='standard') setVolumeScheme('fst7' as any);} }} hint='Готовые связки методик от профи-тренеров — в коде: none/dc/fortitude/meadows' options={[
+          {id:'none',label:'Без пресета',desc:'Стандартная сборка по вашим параметрам без пресета'},
+          {id:'dc',label:'DC Training (DoggCrapp)',desc:'Низкообъёмный, высокоинтенсивный: 1 тяжёлый сет Rest-Pause 11-15 повторов, прогрессия каждый раз, для продвинутых (≥3 года)'},
+          {id:'fortitude',label:'Fortitude (Скотт Стивенсон)',desc:'4×6, гигант-сеты, FST-7, волновая нагрузка — объёмный пресет для опытных, требует восстановления'},
+          {id:'meadows',label:'Meadows (Джон Медоуз)',desc:'Акцент на растянутой позиции, памп, медленный эксцентрик, проработка слабых мест — для гипертрофии'},
+        ]} />
       </div>
-          {/* Рекомендации по питанию */}
+      {bfrMode && (
+        <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(236,72,153,0.06)', border:'1px solid rgba(236,72,153,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+          <div style={{ fontWeight:800, color:'#ec4899', marginBottom:4 }}>🩸 Что такое BFR и как работает</div>
+          <div>Окклюзия — жгуты на верхней части конечности, 20-30% от 1ПМ, схема 30 повторов + 15+15+15 с паузой 30 сек. Кровь задерживается, метаболиты копятся, рост без тяжёлых весов. Только для памп-изоляций (бицепс/трицепс/дельты/икры), не для базы. На курсе — усиливает памп, вне курса — для отстающих с малым весом.</div>
+          <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.85, padding:'5px 7px', background:'rgba(236,72,153,0.08)', borderRadius:6 }}>В плане: памп-изоляции получат пометку <b>BFR 30-15-15-15 @25% 1ПМ, отдых 30 сек, RIR 2</b>. Тяжёлые базовые не трогаются. Не для новичков и при проблемах с сосудами.</div>
+        </div>
+      )}
+      {blastCruiseEnabled && (
+        <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(250,204,21,0.06)', border:'1px solid rgba(250,204,21,0.18)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+          <div style={{ fontWeight:800, color:'#facc15', marginBottom:4 }}>🔄 Что такое Blast/Cruise и как работает</div>
+          <div>Blast — 8 недель высокой дозы (объём ×1.15), Cruise — 4 недели низкой (×0.85), чередование для долгосрочного курса. Позволяет держать высокий объём без перетрена, как периодизация на курсе. Настраивается: Blast 4-12 недель, Cruise 2-8 недель.</div>
+          <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.85, padding:'5px 7px', background:'rgba(250,204,21,0.08)', borderRadius:6 }}>В плане: недели Blast получат <b>+15% сетов</b>, Cruise — <b>−15% и RIR +1</b>. Автоматически применяется к объёму и восстановлению. Для натуралов — выкл.</div>
+        </div>
+      )}
+           {/* Рекомендации по питанию */}
           {(() => {
             const nut: Record<string, { cal: string; pro: string; tip: string }> = {
               mass: { cal: 'Профицит 300-500 ккал/день', pro: '1.8-2.2 г/кг (≥160 г/день)', tip: 'Углеводы вокруг тренировки. 4-6 приёмов пищи.' },
