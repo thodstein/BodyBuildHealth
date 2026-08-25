@@ -237,6 +237,9 @@ export const IndividualPlanSettings: React.FC = () => {
             <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} onChange={v => setSex(v as 'male'|'female')} />
             <PopupNumber label="Приёмов пищи" value={mealsCount} min={3} max={10} onChange={setMealsCount} />
           </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:5, marginBottom:6 }}>
+            <PopupSelect label="Еда на работе" value={workFood} options={[{id:'any',label:'Любая (можно разогреть)'},{id:'portable',label:'Только порошок/хлопья/протеин'}]} onChange={v=>setWorkFood(v as any)} />
+          </div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:8 }}>
             {MINIMAL_GOALS.map(g => <PillBtn key={g.id} active={goal === g.id} onClick={() => { setGoal(g.id); setGoalUserSet(true); }} color="#f59e0b">{g.icon} {g.label}</PillBtn>)}
           </div>

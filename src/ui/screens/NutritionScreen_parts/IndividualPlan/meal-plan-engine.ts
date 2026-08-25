@@ -3028,18 +3028,25 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const targetP = (typeof adjustedProteinG === 'number' ? adjustedProteinG : 0) || input.goalProteinG;
     const targetC = (typeof carbsTotal === 'number' ? carbsTotal : 0) || input.goalCarbsG;
     const targetF = (typeof fatTotal === 'number' ? fatTotal : 0) || input.goalFatG;
+    const targetK = targetP*4 + targetF*9 + targetC*4;
     // Если цели некорректны — пропускаем
     if (targetP > 0 && targetC > 0 && targetF > 0) {
       for (let iter = 0; iter < 30; iter++) {
         const dP = (totals.p - targetP) / targetP;
         const dC = (totals.c - targetC) / targetC;
         const dF = (totals.f - targetF) / targetF;
-        if (Math.abs(dP) <= 0.03 && Math.abs(dC) <= 0.03 && Math.abs(dF) <= 0.03) break;
+        const dK = (totals.kcal - targetK) / targetK;
+        if (Math.abs(dP) <= 0.03 && Math.abs(dC) <= 0.03 && Math.abs(dF) <= 0.03 && Math.abs(dK) <= 0.03) break;
         // выбираем худший макрос по абсолютному отклонению
-        let worst: 'p'|'c'|'f' = 'p';
+        let worst: 'p'|'c'|'f'|'k' = 'p';
         let worstDev = dP;
         if (Math.abs(dC) > Math.abs(worstDev)) { worst = 'c'; worstDev = dC; }
         if (Math.abs(dF) > Math.abs(worstDev)) { worst = 'f'; worstDev = dF; }
+        if (Math.abs(dK) > Math.abs(worstDev)) { worst = 'k'; worstDev = dK; }
+        if (worst === 'k') {
+          // для калорий корректируем тот макрос, который дальше всего от цели
+          worst = Math.abs(dP) >= Math.abs(dC) && Math.abs(dP) >= Math.abs(dF) ? 'p' : Math.abs(dC) >= Math.abs(dF) ? 'c' : 'f';
+        }
         const need = worst === 'p' ? targetP - totals.p : worst === 'c' ? targetC - totals.c : targetF - totals.f;
         const roles = worst === 'p' ? ['protein','fast_protein','slow_protein'] : worst === 'c' ? ['carb_slow','carb_fast','fruit','liquid','veg'] : ['fat'];
         let best: { m: Meal; it: MealItem; food: FoodItem; per100: number; maxCap: number; minAmt: number } | null = null;

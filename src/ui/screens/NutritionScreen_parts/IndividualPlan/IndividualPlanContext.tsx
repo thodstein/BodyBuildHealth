@@ -2098,7 +2098,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           }
         } catch {}
         const _effMealsRaw = _fastingDay ? Math.max(3, (opts?.overrides?.mealsCount ?? mealsCount) - 1) : (opts?.overrides?.mealsCount ?? mealsCount);
-        const _effMealsCount = plannerModeRef.current === 'minimal' ? Math.min(3, _effMealsRaw) : plannerModeRef.current === 'simple' ? Math.min(4, _effMealsRaw) : _effMealsRaw;
+        const _effMealsCount = _effMealsRaw;
         const _inPrepWindow = bbPrepPlan ? prepPhaseForDate(bbPrepPlan, _prepDate) !== null : false;
         // 🗓 Годовой план: активный блок на дату (для подсказки про contest prep).
         const _annualPhase = annualPlan ? annualPlanPhaseForDate(annualPlan, _prepDate) : null;
@@ -2692,8 +2692,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const effectiveDinner = isWorkDay && workScheduleEnabled ? (isNightShift ? workEndMin + 60 : Math.min(workEndMin + 30, 1380)) : dinnerMin;
 
       let effectiveMealsCount = lazyDayMode ? Math.min(3, mealsCount) : cookTimeMin < 30 ? Math.min(3, mealsCount) : cookTimeMin < 60 ? Math.min(4, mealsCount) : mealsCount;
-      if (_isMinimal) effectiveMealsCount = 3;
-      else if (_isSimple) effectiveMealsCount = Math.min(4, effectiveMealsCount);
       const mealDefs: { label: string; anchor?: number }[] = [];
       mealDefs.push({ label: 'Завтрак', anchor: effectiveWake + 30 });
       if (effectiveMealsCount >= 5) mealDefs.push({ label: 'Второй завтрак' });
