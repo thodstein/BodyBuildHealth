@@ -3390,12 +3390,12 @@ export const BbAutoConstructor: React.FC = () => {
                     })()}
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация<br/><b>{report.sessionsPerWeek} сессий</b></div>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Пик объёма<br/><b>неделя {report.peakWeek}</b></div>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>Ротация warnings<br/><b>{report.rotationWarnings}</b></div>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Сессий в неделю</div><b style={{ color:'#fff' }}>{report.sessionsPerWeek}</b></div>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Пик объёма</div><b style={{ color:'#f59e0b' }}>неделя {report.peakWeek}</b></div>
+                    <div style={{ padding:6, borderRadius:8, background: report.rotationWarnings > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border: `1px solid ${report.rotationWarnings > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(34,197,94,0.15)'}`, textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Предупреждений ротации</div><b style={{ color: report.rotationWarnings > 0 ? '#f59e0b' : '#22c55e' }}>{report.rotationWarnings}</b></div>
                   </div>
-                  <div style={{ color:'#fff' }}>
-                    Максимум за сессию: {report.maxSessionMinutes} мин · axial cost: {report.maxAxialCost.toFixed(1)} · muscle leakage: {report.sessionLeakWarnings}
+                  <div style={{ color:'#fff', fontSize:10, lineHeight:1.4, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
+                    <b>Нагрузка пиковой сессии:</b> {report.maxSessionMinutes} мин · осевая нагрузка {report.maxAxialCost.toFixed(1)} (на позвоночник) · утечек по мышцам {report.sessionLeakWarnings} {report.sessionLeakWarnings > 0 ? '— упражнение стоит не в свой день' : '— всё по дням'}
                   </div>
                 </div>
               }

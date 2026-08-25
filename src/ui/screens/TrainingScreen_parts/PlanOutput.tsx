@@ -97,8 +97,10 @@ function roleLabel(role?: string): string {
 }
 
 export const BadgeLegend: React.FC = () => (
-  <div style={{ fontSize: 10, color: '#fff', opacity: 0.75, marginBottom: 8, lineHeight: 1.4, padding: '6px 8px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
-    <b>Ярлычки:</b> <span style={{ color: '#00e68a' }}>БАЗ</span> — базовое (compound, тяжёлое) · <span style={{ color: '#f59e0b' }}>ИЗО</span> — изоляция · <span style={{ color: '#a855f7' }}>АКС</span> — аксессуар/добивка · <span style={{ color: '#ef4444' }}>тяж</span> — силовой характер · <span style={{ color: '#3b82f6' }}>памп</span> — пампинг · <span style={{ color: '#a855f7' }}>RIR</span> — повторов в запасе · <span style={{ color: '#a855f7' }}>темп</span> — эксц-пауза-конц-пауза · <span style={{ color: '#fff' }}>отдых</span> — сек между подходами
+  <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginBottom: 8, lineHeight: 1.45, padding: '7px 9px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.05)' }}>
+    <b>Ярлычки (все на русском, код EN в скобках):</b><br/>
+    <span style={{ color: '#00e68a' }}>БАЗ</span> — базовое, многосуставное, тяжёлое (compound) · <span style={{ color: '#f59e0b' }}>ИЗО</span> — изоляция, односуставное · <span style={{ color: '#a855f7' }}>АКС</span> — аксессуар/добивка (accessory) · <span style={{ color: '#ef4444' }}>тяж</span> — силовой характер (6-10 повт, RIR 1-2) · <span style={{ color: '#3b82f6' }}>памп</span> — пампинг (12-20, RIR 3) · <span style={{ color: '#a855f7' }}>RIR</span> — повторов в запасе (Reps In Reserve) · <span style={{ color: '#a855f7' }}>темп</span> — 4 цифры эксц-пауза-конц-пауза (напр. 3-1-1-0) · <span style={{ color: '#fff' }}>отдых</span> — секунды между подходами<br/>
+    <span style={{ fontSize:9, opacity:0.7 }}>Дополнительно: 💥 — интенсив-техника (дроп-сет, отдых-пауза), 🔗 — суперсет, 📦 — схема объёма (GVT/FST-7), 🌊 — волновая периодизация DUP · Все коды в программе EN, отображение RU.</span>
   </div>
 );
 
