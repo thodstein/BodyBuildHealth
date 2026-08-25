@@ -97,9 +97,9 @@ async function prepareImageForServer(file: File): Promise<Blob> {
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close();
     const compressed = await encodeCanvas(canvas);
-    // Keep the JSON/base64 request below Vercel's body limit. A 12 MB binary
-    // becomes roughly 16 MB after base64 encoding plus JSON overhead.
-    return compressed && (compressed.size < file.size || file.size > 9 * 1024 * 1024) ? compressed : file;
+    // Screenshots are already ~0.5 MB PNG — re-encoding to JPEG at 0.65 can hurt OCR.
+    // Only use compressed if it's meaningfully smaller and original is large.
+    return compressed && compressed.size < file.size * 0.85 && file.size > 2 * 1024 * 1024 ? compressed : file;
   } catch {
     // Older Telegram WebViews may not implement createImageBitmap. Decode via
     // an HTMLImageElement instead of falling back to the full camera file.
@@ -128,7 +128,7 @@ async function prepareImageForServer(file: File): Promise<Blob> {
         }
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
         const compressed = await encodeCanvas(canvas);
-        if (compressed && compressed.size < file.size) return compressed;
+        if (compressed && compressed.size < file.size * 0.85 && file.size > 2 * 1024 * 1024) return compressed;
         if (file.size > 5 * 1024 * 1024) throw new Error('Фото слишком большое даже после сжатия. Сделайте скриншот экрана.');
         return file;
       } finally {
