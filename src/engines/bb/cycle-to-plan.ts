@@ -1673,6 +1673,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   if (focusGroup) rationale.push(`⭐ Фокус-группа (+30% объём): ${focusGroup}`);
   if (excludedMuscles.size > 0) rationale.push(`⚠ Исключены мышцы (травма): ${[...excludedMuscles].join(', ')}`);
   if (opts.peds && opts.peds.length > 0) rationale.push(`💉 PED: MRV ×${mrvMult.toFixed(2)}`);
+  if ((opts as any).bfrMode) rationale.push(`🩸 BFR включен (памп-добивка 30-15-15-15)`);
+  if ((opts as any).blastCruiseEnabled) rationale.push(`🔄 Blast/Cruise: ${ (opts as any).blastWeeks || 8 }н blast / ${ (opts as any).cruiseWeeks || 4 }н cruise`);
   if (opts.avoidAxialLoad) rationale.push(`🦴 Без осевой нагрузки`);
   if (_labMultProgram < 1) {
     rationale.push(`🧪 Лабораторная коррекция: MRV ×${_labMultProgram.toFixed(2)} (печень/почки/воспаление/гормоны) → эффективный MRV-множитель ×${effectiveMrvMult.toFixed(2)}.`);
@@ -1792,6 +1794,14 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
             if (rep) finalExName = rep.name;
           }
         }
+        // fewerCompound: сместить к машинам/Смит/поддержанным (как в convertCycleToBBPlan)
+        if ((opts as any).fewerCompound && catEntry) {
+          const n = (finalExName || '').toLowerCase();
+          if (/присед|squat|тяга.*штанг|тяга.*наклон|жим.*штанг/.test(n)) {
+            const rep = findReplacementForCycle(finalExName, muscleGroupFromExName(finalExName, EXERCISE_CATALOG), favNames, favIds, new Set(exercises.map(e => e.name)));
+            if (rep && /гакк|смит|жим ногами|тренаж|поддержан|на лавке|chest.?supported/i.test(rep.name.toLowerCase())) finalExName = rep.name;
+          }
+        }
 
         // JUNK-фильтр: проверить trueMuscleOf → skip ПЛ-движения (ПЛ-становая, overs/deficit
         // трап-гриф, ол. snatch — все они дают trueMuscleOf === null после моего предыдущего фикса).
@@ -1834,12 +1844,15 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           tempo: undefined,
         }));
 
-        // Adapt mode: weak/focus/PED boost — добираем добавочные сеты (НЕ меняем faithfull %
+        // Adapt mode: weak/focus/PED/volumeGoal boost — добираем добавочные сеты (НЕ меняем faithfull %
         // основной прогрессии). Apply к RIR слабой группы (стимул упорнее), увеличиваем sets.
         let adjSets = sets;
         let adjRir = rir;
         let usedSets = workSets;
         if (mode === 'adapt') {
+          // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (как в convertCycleToBBPlan)
+          const volGoalMultProgram = (opts as any).volumeGoal === 'mev' ? 0.70 : (opts as any).volumeGoal === 'mrv' ? 1.15 : 1.0;
+          if (volGoalMultProgram !== 1.0) adjSets = Math.round(adjSets * volGoalMultProgram);
           // Единый резолвер акцентов НЕДЕЛИ: focus ×1.3 / weak ×1.15 — без стэкинга.
           const isWeakMuscle = isSpecializationWeak(muscle, weekSpec);
           const isFocus = isSpecializationFocus(muscle, weekSpec);
@@ -1856,6 +1869,19 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           // PED arm boost (как в buildBBPlan): arms/shoulders ×1.4 при mrvMult≥1.3
           if (opts.peds && opts.peds.length > 0 && mrvMult >= 1.3 && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle)) {
             adjSets = Math.round(adjSets * 1.4);
+          }
+          // BFR: памп-изоляции получают +1 сет (как в buildBBPlan) — только accessory памп
+          if ((opts as any).bfrMode && role === 'accessory') {
+            adjSets = adjSets + 1;
+          }
+          // Blast/Cruise: blast +15%, cruise -15% (цикл 8/4)
+          if ((opts as any).blastCruiseEnabled) {
+            const bw = (opts as any).blastWeeks || 8;
+            const cw = (opts as any).cruiseWeeks || 4;
+            const cycleLen = bw + cw;
+            const isBlast = ((weekNum - 1) % cycleLen) < bw;
+            adjSets = Math.round(adjSets * (isBlast ? 1.15 : 0.85));
+            if (!isBlast) adjRir = Math.min(5, adjRir + 1);
           }
           // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult.
           // Parity с generic: кап цели специализации поднимается specMrv (weak ×1.2,
