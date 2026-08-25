@@ -3153,18 +3153,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     await maybeYield();
     const snapDayMeals = (day: any) => {
       if (!day || !Array.isArray(day.meals)) return day;
-      let snapKcal = 0, snapP = 0, snapF = 0, snapC = 0;
-      let origKcal = 0, origP = 0, origF = 0, origC = 0;
-      for (const m of day.meals) for (const it of (m.items || [])) {
-        const fd = FOOD_DB.find((f: any) => f.id === it.id);
-        const snapped = fd ? snapPortionG(fd, it.amount) : it.amount;
-        const factor = it.amount > 0 ? snapped / it.amount : 1;
-        snapKcal += Math.round((it.kcal||0) * factor); snapP += Math.round((it.p||0) * factor * 10)/10; snapF += Math.round((it.f||0) * factor * 10)/10; snapC += Math.round((it.c||0) * factor * 10)/10;
-        origKcal += it.kcal||0; origP += it.p||0; origF += it.f||0; origC += it.c||0;
-      }
-      const devOrig = Math.max(Math.abs(origKcal-(day.totals?.kcal||origKcal))/Math.max(1,day.totals?.kcal||1));
-      const devSnapDelta = Math.abs(snapKcal - origKcal)/Math.max(1, origKcal);
-      if (devSnapDelta > 0.08) return day;
       for (const m of day.meals) {
         if (!Array.isArray(m.items)) continue;
         for (const it of m.items) {
