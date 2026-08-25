@@ -568,13 +568,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {/* ─── PLANNING WINDOW — уровень 2: выбор конструктора — современно, стеклянные карточки ─── */}
       {page === 'planning' && (
         <div style={{ position:'fixed', inset:0, zIndex:101, display:'flex', flexDirection:'column', background:'radial-gradient(1100px 520px at 15% -10%, rgba(0,230,138,0.14), transparent 60%), radial-gradient(900px 460px at 92% 4%, rgba(99,102,241,0.12), transparent 60%), radial-gradient(700px 380px at 60% 100%, rgba(236,72,153,0.08), transparent 60%), #0a0a0a', overflow:'auto' }}>
-          <div style={{ position:'sticky', top:0, zIndex:2, flexShrink:0, padding:'12px 14px 12px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:10 }}>
-            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'7px 12px', borderRadius:10, fontSize:12, fontWeight:800, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', backdropFilter:'blur(8px)' }}>← На главную</button>
+          <div style={{ position:'sticky', top:0, zIndex:2, flexShrink:0, padding:'8px 10px', background:'rgba(10,10,12,0.75)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:8 }}>
+            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'5px 10px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff' }}>← На главную</button>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:15, fontWeight:900, color:'#fff', letterSpacing:-0.2, lineHeight:1 }}>🏗 Планирование</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:1, lineHeight:1.3 }}>Выберите конструктор — каждый откроется в новом окне · без потерь</div>
+              <div style={{ fontSize:13, fontWeight:800, color:'#fff', letterSpacing:-0.2, lineHeight:1 }}>🏗 Планирование</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.60)', marginTop:1, lineHeight:1.2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>6 конструкторов · один клик</div>
             </div>
-            <span style={{ fontSize:11, fontWeight:800, color:'#00e68a', background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,230,138,0.08))', border:'1px solid rgba(0,230,138,0.26)', borderRadius:20, padding:'6px 11px', boxShadow:'0 2px 10px rgba(0,230,138,0.14)', whiteSpace:'nowrap' }}>Шаг 2 из 3</span>
+            <span style={{ fontSize:10, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'4px 9px', whiteSpace:'nowrap' }}>Шаг 2/3</span>
           </div>
           <div style={{ padding:'16px 14px 28px', maxWidth:760, width:'100%', margin:'0 auto', display:'flex', flexDirection:'column', gap:14 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
@@ -628,14 +628,14 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       {/* ─── CONSTRUCTOR WINDOW — уровень 3: сам конструктор (новое окно, 100% контента) ─── */}
       {page === 'constructor' && (
         <div style={{ position:'fixed', inset:0, zIndex:102, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'hidden' }}>
-          <div style={{ flexShrink:0, padding:'8px 10px', background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(16,185,129,0.06))', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:8 }}>
-            <button onClick={() => { hapticImpact('light'); setPage('planning'); }} style={{ padding:'6px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← К выбору</button>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.icon ?? '🏗'} {PLANNER_MODES.find(x=>x.id===planningTrack)?.label ?? 'Конструктор'}</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.hint ?? ''}</div>
+          <div style={{ flexShrink:0, padding:'6px 8px', background:'rgba(0,230,138,0.08)', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:6 }}>
+            <button onClick={() => { hapticImpact('light'); setPage('planning'); }} style={{ padding:'4px 8px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← К выбору</button>
+            <div style={{ flex:1, minWidth:0, display:'flex', alignItems:'center', gap:6 }}>
+              <span style={{ fontSize:12 }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.icon ?? '🏗'}</span>
+              <span style={{ fontSize:11, fontWeight:700, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.label ?? 'Конструктор'}</span>
             </div>
-            <span style={{ fontSize:11, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'4px 10px', flexShrink:0 }}>Шаг 3 из 3</span>
-            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'6px 8px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕ На главную</button>
+            <span style={{ fontSize:10, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'3px 8px', flexShrink:0 }}>3/3</span>
+            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'4px 7px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕</button>
           </div>
           <div style={{ flex:1, overflow:'auto', padding:'12px', WebkitOverflowScrolling:'touch' }}>
             {planningTrack === 'pl' && <PlannerPlAuto />}
@@ -648,17 +648,17 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         </div>
       )}
 
-      {/* ─── TAB VIEW HEADER (компактный, без обрезки) — только для остальных зон (tabs) ─── */}
+      {/* ─── TAB VIEW HEADER — ультракомпактный ─── */}
       {page === 'tabs' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.08)', minHeight: 36 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.06)', minHeight: 30 }}>
           <button onClick={() => { setPage('hero'); setZone(null); }} style={{
-            padding: '4px 8px', cursor: 'pointer', fontSize: 13,
+            padding: '3px 7px', cursor: 'pointer', fontSize: 11,
             color: '#fff', border: 'none', background: 'transparent',
             display: 'flex', alignItems: 'center', gap: 3,
             fontWeight: 600, whiteSpace: 'nowrap',
           }}>← На главную</button>
           {zone && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: ZONES[zone].color, marginLeft: 2, whiteSpace: 'nowrap', overflow: 'visible' }}>{ZONES[zone].title}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: ZONES[zone].color, marginLeft: 2, whiteSpace: 'nowrap', overflow: 'visible' }}>{ZONES[zone].title}</span>
           )}
         </div>
       )}
