@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { ACCENT, IN } from './training-ui';
 
-const EditorOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
+export const EditorOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
   if (typeof document === 'undefined') return null;
   return ReactDOM.createPortal(
     <div data-testid="editor-popup-overlay" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }}>

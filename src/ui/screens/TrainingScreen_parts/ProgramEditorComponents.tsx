@@ -7,7 +7,6 @@
  * Constants: WEAK_OPTS, EQUIPMENT_OPTS, LOAD_STRATEGY_OPTS, DELOAD_PROTOCOL_OPTS, INTENSITY_TECHNIQUE_OPTS
  */
 import React, { useMemo, useState } from 'react';
-import ReactDOM from 'react-dom';
 import { SET_TEMPLATES, GROUP_RU, ALL_GROUPS } from './program-types';
 import { ACCENT, ACCENT_LINE, BTN, BTN_GHOST, CARD, DIM, DIM_STRONG, IN, SMALL, panelStyle, UI_METRICS } from './training-ui';
 import { useConfirmDialog } from './ConfirmDialog';
@@ -45,120 +44,48 @@ import { MesoHeatmap } from './MesoHeatmap';
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
 
-/* ─── Попап-выбор в редакторе: замена нативных select (дни недели, фазы).
-   Нативный select рендерит попап в светлой схеме ОС (белый фон + белый текст
-   тёмной темы → опции невидимы). Попап-карточки: тёмный sheet, portal в body. */
-const EditorOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
-  if (typeof document === 'undefined') return null;
-  return ReactDOM.createPortal(
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 250, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)' }}>
-      {children}
-    </div>,
-    document.body,
-  );
-};
+/* ─── Попап-выбор в редакторе: DayOfWeekPicker и PhasePicker теперь используют
+   единый EditorPopupSelect (один портал, единый стиль, нет вложенных overlay). */
 
-const editorSheet: React.CSSProperties = {
-  width: '88%', maxWidth: 340, maxHeight: '78vh', borderRadius: 16,
-  background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
-};
-
-const editorSheetCloseBtn: React.CSSProperties = {
-  width: '100%', marginTop: 12, padding: '10px', borderRadius: 8,
-  border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-  color:'#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
-};
-
-/** Попап-выбор дня недели (карточки, занятые дни отключаются). */
+/** Попап-выбор дня недели (через EditorPopupSelect, занятые дни исключаются). */
 const DayOfWeekPicker: React.FC<{
   value: number;
   occupied?: number[];
   onChange: (d: number) => void;
   ariaLabel?: string;
 }> = ({ value, occupied = [], onChange, ariaLabel }) => {
-  const [open, setOpen] = useState(false);
-  const sel = TRAINING_DAY_NAMES[value] ?? '—';
+  const opts = TRAINING_DAY_NAMES
+    .map((d, i) => ({ id: String(i), label: d + (occupied.includes(i) ? ' · занято' : '') }))
+    .filter(o => !occupied.includes(Number(o.id)));
   return (
-    <>
-      <button type="button" aria-label={ariaLabel} onClick={() => setOpen(true)}
-        style={{ ...IN, padding: '6px 8px', fontSize: 11, minHeight: 44, flex: '0 0 74px', cursor: 'pointer', fontWeight: 700, textAlign: 'center' }}>
-        {sel}
-      </button>
-      {open && (
-        <EditorOverlay onClose={() => setOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={editorSheet}>
-            <div style={{ height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' }} />
-            <div style={{ padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 10 }}>День недели</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {TRAINING_DAY_NAMES.map((d, di) => {
-                  const isSel = di === value;
-                  const isOcc = occupied.includes(di);
-                  return (
-                    <button key={di} type="button" disabled={isOcc} onClick={() => { onChange(di); setOpen(false); }}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: isOcc ? 'not-allowed' : 'pointer', textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
-                        background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                        border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : isOcc ? '#fff' : '#fff' }}>
-                      <span>{d}{isOcc ? ' · занято' : ''}</span>
-                      {isSel && <span style={{ fontSize: 10 }}>✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <button onClick={() => setOpen(false)} style={editorSheetCloseBtn}>Закрыть</button>
-            </div>
-          </div>
-        </EditorOverlay>
-      )}
-    </>
+    <EditorPopupSelect
+      value={String(value)}
+      options={opts}
+      onChange={v => onChange(Number(v))}
+      title="День недели"
+      ariaLabel={ariaLabel}
+      placeholder={TRAINING_DAY_NAMES[value] ?? '—'}
+      buttonStyle={{ flex: '0 0 74px' }}
+    />
   );
 };
 
-/** Попап-выбор фазы недели. */
+/** Попап-выбор фазы недели (через EditorPopupSelect). */
 const PhasePicker: React.FC<{
   value: string;
   options: Array<{ id: string; label: string }>;
   onChange: (v: string) => void;
   ariaLabel?: string;
-}> = ({ value, options, onChange, ariaLabel }) => {
-  const [open, setOpen] = useState(false);
-  const sel = options.find(o => o.id === value);
-  return (
-    <>
-      <button type="button" aria-label={ariaLabel} onClick={() => setOpen(true)}
-        style={{ ...IN, padding: '6px 8px', fontSize: 11, minHeight: 44, flex: '0 0 auto', cursor: 'pointer', fontWeight: 700, textAlign: 'center' }}>
-        {sel?.label ?? '—'}
-      </button>
-      {open && (
-        <EditorOverlay onClose={() => setOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={editorSheet}>
-            <div style={{ height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' }} />
-            <div style={{ padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: ACCENT, marginBottom: 10 }}>Фаза недели</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {options.map(o => {
-                  const isSel = o.id === value;
-                  return (
-                    <button key={o.id} type="button" onClick={() => { onChange(o.id); setOpen(false); }}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', fontSize: 11, fontWeight: isSel ? 700 : 400,
-                        background: isSel ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-                        border: isSel ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        color: isSel ? ACCENT : '#fff' }}>
-                      <span>{o.label}</span>
-                      {isSel && <span style={{ fontSize: 10 }}>✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <button onClick={() => setOpen(false)} style={editorSheetCloseBtn}>Закрыть</button>
-            </div>
-          </div>
-        </EditorOverlay>
-      )}
-    </>
-  );
-};
+}> = ({ value, options, onChange, ariaLabel }) => (
+  <EditorPopupSelect
+    value={value}
+    options={options}
+    onChange={onChange}
+    title="Фаза недели"
+    ariaLabel={ariaLabel}
+    placeholder={options.find(o => o.id === value)?.label ?? '—'}
+  />
+);
 
 /** Быстрые шаблоны тренировочных дней — день с готовыми упражнениями из каталога. */
 const DAY_TEMPLATES: Array<{

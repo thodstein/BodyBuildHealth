@@ -707,17 +707,16 @@ return (
             <button style={{ ...BTN, padding: '8px 14px', fontSize: 11, minHeight: 40 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу (Ctrl+S)">
               {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
             </button>
-            <button style={{ ...BTN_GHOST, padding: '6px 12px', fontSize: 11, minHeight: 40 }} onClick={() => setShowMore(v => !v)} title="Дополнительные инструменты" aria-expanded={showMore}>⋯ Ещё</button>
           </div>
         </div>
-        {/* Быстрые действия — всегда видны (undo/redo/таблица/PDF/выполнение) */}
+        {/* Быстрые действия + раскрывающиеся (⋯) — единый блок без отдельной панели */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4, alignItems: 'center' }}>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: showTableView ? 'rgba(0,230,138,0.6)' : 'rgba(255,255,255,0.15)', color: showTableView ? '#00e68a' : DIM }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Переключить в редактор' : 'Показать таблицу плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36 }} onClick={undo} title="Отменить (Ctrl+Z)">↩</button>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36 }} onClick={redo} title="Повторить (Ctrl+Shift+Z)">↪</button>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={printProgram} title="Печать / PDF">🖨 PDF</button>
           <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(0,230,138,0.35)', color: '#00e68a' }} onClick={() => { try { const ics = buildProgramIcs(program); downloadIcs((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); showToast('📅 ICS скачан'); } catch { showToast('⚠ Не удалось собрать ICS', 'error'); } }} title="Скачать календарь (.ics) — все тренировки по неделям">📅 ICS</button>
-           {(dir === 'bb' || dir === 'pl') && (
+          {(dir === 'bb' || dir === 'pl') && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 2 }}>
               <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 3 }}>
                 Нед
@@ -727,38 +726,23 @@ return (
               {dir === 'pl' && program.pl && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-неделю к выполнению">🚚 К вып.</button>}
             </span>
           )}
+          <button style={{ ...BTN_GHOST, padding: '6px 8px', fontSize: 11, minHeight: 36, borderColor: showMore ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.15)', color: showMore ? '#00e68a' : DIM }} onClick={() => setShowMore(v => !v)} title="Ещё действия" aria-expanded={showMore}>⋯</button>
           <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
             {isDirty ? <span style={{ color: '#f59e0b', fontWeight: 700 }}>● не сохранено</span> : <span style={{ color: '#22c55e' }}>✓ сохранено</span>}
-            <span style={{ opacity: 0.6 }}>| Ctrl+Z отмена</span>
+            <span style={{ opacity: 0.6 }}>| Ctrl+Z</span>
           </span>
         </div>
         {showMore && (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {/* Авто-сборка — доступна в обоих режимах, в standard с подсказкой про профиль */}
-            <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title={isPro ? "Заполнить черновик на основе цели/уровня/дней и профиля тренированности" : "⚡ Быстро собрать качественную программу — 1 клик (использует ваш профиль: уровень, оборудование, слабые группы)"}>{isAutoFilling ? '⏳ Создание...' : isPro ? '⚡ Авто-черновик' : '⚡ Собрать качественно — 1 клик'}</button>
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }}
-              onClick={() => { if (dir === 'bb') setEditorLibOpen('bb'); else if (dir === 'pl') setEditorLibOpen('pl'); }}
-              title="Загрузить программу или цикл из библиотеки для редактирования"
-            >📥 Загрузить</button>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <button disabled={isAutoFilling} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1 }} onClick={autoFillDraft} title={isPro ? "Авто-черновик из профиля" : "⚡ Быстро собрать — 1 клик"}>{isAutoFilling ? '⏳...' : isPro ? '⚡ Авто' : '⚡ Собрать'}</button>
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(245,158,11,0.4)', color: '#f59e0b' }} onClick={() => { if (dir === 'bb') setEditorLibOpen('bb'); else if (dir === 'pl') setEditorLibOpen('pl'); }}>📥 Загрузить</button>
             {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
-              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
-                onClick={() => { const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) }; update({ bb: updated }); showToast('📈 Фазовая периодизация применена: RIR/фазы/повторения по неделям'); }}
-                title="Применить фазовую периодизацию (RIR/объём/повторения по неделям)"
-              >📈 Применить фазы</button>
+              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }}
+                onClick={() => { const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) }; update({ bb: updated }); showToast('📈 Фазы применены'); }}>📈 Фазы</button>
             )}
-            {isPro && (
-              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(245,158,11,0.5)', color: '#f59e0b' }}
-                onClick={() => { setMacroLevel(program.meta.level); setMacroGoal(mapGoalToMacro(program.meta.goal)); setEditorLibOpen('macro'); }}
-                title="Годовое планирование: построить макроцикл (5 фаз) и применить к программе"
-              >🗓 Годовой план</button>
-            )}
-            {isPro && (
-              <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }}
-                onClick={() => setEditorLibOpen('methods')}
-                title="Справочник тренировочных методик"
-              >📚 Методики</button>
-            )}
-            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 40, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={() => setCardioView('card')} title="Кардио: подключённый цикл, «Сегодня», пересчёт под ACWR и конструктор">❤️ Кардио</button>
+            {isPro && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(245,158,11,0.5)', color: '#f59e0b' }} onClick={() => { setMacroLevel(program.meta.level); setMacroGoal(mapGoalToMacro(program.meta.goal)); setEditorLibOpen('macro'); }}>🗓 Год</button>}
+            {isPro && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={() => setEditorLibOpen('methods')}>📚 Методики</button>}
+            <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(0,230,138,0.4)', color: '#00e68a' }} onClick={() => setCardioView('card')}>❤️ Кардио</button>
           </div>
         )}
         </div>
