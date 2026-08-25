@@ -1079,8 +1079,8 @@ const FavoritesTab: React.FC = () => {
               {cat} <span style={{ fontSize:7, color:'rgba(255,255,255,0.85)', fontWeight:400 }}>({items.length})</span>
             </div>
             {items.map(f => (
-              <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.04)', marginBottom:2 }}>
-                <div><div style={{ fontSize:10, fontWeight:600, color:'#fff' }}>{f.name}</div><div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div></div>
+              <div key={f.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', marginBottom:4, boxShadow:'0 2px 8px rgba(0,0,0,0.08)' }}>
+                <div><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{f.name}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.6)', marginTop:2 }}>{f.kcal}ккал • Б{f.protein} Ж{f.fat} У{f.carbs}</div></div>
                 <div style={{ display:'flex', gap:2, alignItems:'center' }}>
                   <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category })} style={{ padding:'3px 6px', borderRadius:5, fontSize:8, cursor:'pointer', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a' }}>🛒</button>
                   <button onClick={() => removeFav(f.id)} style={{ padding:'3px 6px', borderRadius:5, border:'none', cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:8 }}>✕</button>
