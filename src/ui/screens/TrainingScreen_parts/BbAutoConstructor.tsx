@@ -5143,6 +5143,10 @@ export const BbAutoConstructor: React.FC = () => {
             } />
           ))}
         </div>
+        <div style={{ display:'flex', gap:8, marginTop:12 }}>
+          <button style={{ ...BTN, flex:1 }} onClick={() => setStep('contest')}>Далее: Contest prep →</button>
+          <button style={BTN_GHOST} onClick={() => setStep('quality')}>← Назад</button>
+        </div>
       </div>
     );
   };
@@ -5867,11 +5871,15 @@ export const BbAutoConstructor: React.FC = () => {
               <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => setStep('adjust')}>← К коррекции плана</button>
               {prepApplied && <span style={{ fontSize:10, color:'#4ade80', alignSelf:'center' }}>✓ Применено к плану</span>}
             </div>
+            </div>
+          )}
+          <div style={{ display:'flex', gap:8, marginTop:12 }}>
+            <button style={{ ...BTN, flex:1 }} onClick={() => setStep('annual')}>Далее: Годовой план →</button>
+            <button style={BTN_GHOST} onClick={() => setStep('adjust')}>← Назад</button>
           </div>
-        )}
-      </div>
-    );
-  };
+        </div>
+      );
+    };
 
   // ── 🏁 Prep-цикл: отдельный режим подготовки к соревнованиям ──
   const PREP_MUSCLE_RU: Record<string, string> = {
@@ -6621,6 +6629,10 @@ export const BbAutoConstructor: React.FC = () => {
             );
           })()}
           <div style={{ marginTop: 8 }}><CardioLinkCard /></div>
+          <div style={{ display:'flex', gap:8, marginTop:12 }}>
+            <button style={{ ...BTN, flex:1 }} onClick={() => setStep('tools')}>Далее: Инструменты →</button>
+            <button style={BTN_GHOST} onClick={() => setStep('contest')}>← Назад</button>
+          </div>
         </div>
       )}
       {/* Глобальное уведомление (flash) — видно на ВСЕХ шагах, не только в параметрах */}
