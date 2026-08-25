@@ -1376,30 +1376,28 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           {methodNote}
         </div>
       )}
-      {/* sub-view pill nav for PL/BB — структурировано: группы + прогресс, фрост-гласс */}
+      {/* sub-view pill nav for PL/BB — структурировано, современно, без прыжков */}
       {mainTab !== 'manual' && subViewList[mainTab].length > 0 && (() => {
         const list = subViewList[mainTab];
-        const idx = Math.max(0, list.findIndex(s => s.key === subView));
         const groups: Record<string, string[]> = mainTab === 'pl'
-          ? { 'Сборка': ['settings','diagnostics','plan'], 'Анализ': ['charts','reference'], 'Система': ['competition','macro','tools'] }
-          : { 'План': ['plan','macro','tools'], 'Работа': ['bridge','peak_bb'], 'Анализ': ['methods','analytics','prometrics','charts'] };
-        const groupFor = (k: string) => Object.entries(groups).find(([, arr]) => (arr as string[]).includes(k))?.[0] ?? '';
+          ? { 'СБОРКА': ['settings','diagnostics','plan'], 'АНАЛИЗ': ['charts','reference'], 'СИСТЕМА': ['competition','macro','tools'] }
+          : { 'ПЛАН': ['plan','macro','tools'], 'РАБОТА': ['bridge','peak_bb'], 'АНАЛИЗ': ['methods','analytics','prometrics','charts'] };
         return (
-          <div style={{ position: 'sticky', top: 0, zIndex: 5, background: 'rgba(24,24,27,0.72)', backdropFilter: 'blur(16px) saturate(140%)', WebkitBackdropFilter: 'blur(16px) saturate(140%)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '8px 8px 6px', marginBottom: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '0 2px' }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: ACCENT, letterSpacing: 0.4, textTransform: 'uppercase' as const }}>{mainTab === 'pl' ? 'ПЛ-авто' : 'ББ-авто'} • {list[idx]?.label || subView}</span>
-              <span style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 8 }}>{idx + 1} / {list.length}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, paddingBottom: 2 }}>
-              {list.map(({ key, label }) => {
-                const active = subView === key;
-                const g = groupFor(key);
-                return <button key={key} title={g ? `${g}: ${label}` : label} style={{ ...PILL(active), position: 'relative' as const, display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px' }} onClick={() => setSubView(key)}>{g && <span style={{ fontSize: 8, opacity: 0.75, fontWeight: 700 as const, background: active ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: 4 }}>{g.slice(0,2)}</span>}{label}</button>;
-              })}
-            </div>
-            <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, marginTop: 6, overflow: 'hidden' as const }}>
-              <div style={{ width: `${((idx + 1) / list.length) * 100}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent), #00c8a0)', transition: 'width 0.35s ease' }} />
-            </div>
+          <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '10px', marginBottom: 10 }}>
+            {Object.entries(groups).map(([gLabel, keys]) => {
+              const items = list.filter(s => (keys as string[]).includes(s.key));
+              if (items.length === 0) return null;
+              return (
+                <div key={gLabel} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.6, marginBottom: 4 }}>{gLabel}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+                    {items.map(({ key, label }) => (
+                      <button key={key} style={{ ...PILL(subView === key), padding: '8px 14px', fontSize: 12 }} onClick={() => setSubView(key)}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         );
       })()}

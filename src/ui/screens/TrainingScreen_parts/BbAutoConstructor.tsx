@@ -2107,28 +2107,27 @@ export const BbAutoConstructor: React.FC = () => {
   const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','quality','adjust','contest','annual','tools'];
   const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
   const renderStepNav = () => {
-    const idx = Math.max(0, stepList.indexOf(step));
     const groups: Record<string, string[]> = planMode === 'bb_cycle'
-      ? { 'Параметры': ['params','ped'], 'План': ['plan','quality','adjust'], 'Цикл': ['contest','annual','tools'] }
-      : { 'Параметры': ['params','ped','split'], 'План': ['plan','quality','adjust'], 'Цикл': ['contest','annual','tools'] };
-    const groupFor = (s: string) => Object.entries(groups).find(([, arr]) => (arr as string[]).includes(s))?.[0] ?? '';
+      ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
+      : { 'ПАРАМЕТРЫ': ['params','ped','split'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] };
     return (
-      <div style={{ position: 'sticky', top: 0, zIndex: 4, background: 'rgba(24,24,27,0.72)', backdropFilter: 'blur(16px) saturate(140%)', WebkitBackdropFilter: 'blur(16px) saturate(140%)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '8px 8px 6px', boxShadow: '0 8px 24px rgba(0,0,0,0.25)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '0 2px' }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: ACCENT, letterSpacing: 0.4, textTransform: 'uppercase' as const }}>ББ-авто • {stepLabels[step]}</span>
-          <span style={{ fontSize: 10, color: '#fff', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 8 }}>{idx + 1} / {stepList.length}</span>
-        </div>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, overflowX: 'auto' as const }}>
-          {stepList.map(s => {
-            const active = step === s;
-            const g = groupFor(s);
-            const disabled = (s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan;
-            return <button key={s} disabled={disabled} title={g ? `${g}: ${stepLabels[s]}` : stepLabels[s]} onClick={() => { if (disabled) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={{ ...STEP_PILL(active), opacity: disabled ? 0.45 : 1, display: 'flex', alignItems: 'center', gap: 4, padding: '7px 10px' }}>{g && <span style={{ fontSize: 8, opacity: 0.75, fontWeight: 700 as const, background: active ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: 4 }}>{g.slice(0,2)}</span>}{stepLabels[s]}</button>;
-          })}
-        </div>
-        <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, marginTop: 6, overflow: 'hidden' as const }}>
-          <div style={{ width: `${((idx + 1) / stepList.length) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #00e68a, #00c8a0)', transition: 'width 0.35s ease' }} />
-        </div>
+      <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '10px', marginBottom: 10 }}>
+        {Object.entries(groups).map(([gLabel, keys]) => {
+          const items = stepList.filter(s => (keys as string[]).includes(s));
+          if (items.length === 0) return null;
+          return (
+            <div key={gLabel} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.6, marginBottom: 4 }}>{gLabel}</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+                {items.map(s => {
+                  const active = step === s;
+                  const disabled = (s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan;
+                  return <button key={s} disabled={disabled} onClick={() => { if (disabled) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={{ ...STEP_PILL(active), opacity: disabled ? 0.45 : 1, padding: '8px 14px', fontSize: 12 }}>{stepLabels[s]}</button>;
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };

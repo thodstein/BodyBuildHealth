@@ -284,8 +284,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       } else if (result.meals.length === 0 && result.labs.length === 0) {
         setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');
       }
-    } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } 
-    finally { if (backup) clearTimeout(backup); setOcrFileLoading(false); } 
+    } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); }
+    finally { if (backup) clearTimeout(backup); setOcrFileLoading(false); }
    }, [convertOCRItems, usdaFoods]);
 
   const handleOCR = useCallback(() => { 
