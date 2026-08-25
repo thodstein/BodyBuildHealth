@@ -106,6 +106,14 @@ export interface OrderOpts {
 
 export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts = {}): BBExercise[] {
   if (exercises.length <= 1) return exercises.slice();
+  // Разминочные упражнения (warmupActivator) — всегда первые в дне, вне очереди основной сортировки.
+  // Чтобы методика compound_first/pre_exhaust и мышечная приоритизация не сдвигали разминку,
+  // отделяем её до вычисления primaryMuscle и сортировки.
+  const warmups = (exercises as any[]).filter((ex: any) => !!ex.warmupActivator);
+  const rest = (exercises as any[]).filter((ex: any) => !ex.warmupActivator);
+  if (warmups.length && rest.length === 0) return warmups.slice() as BBExercise[];
+  const forOrder: BBExercise[] = warmups.length ? (rest as BBExercise[]) : exercises;
+  if (forOrder.length <= 1) return warmups.length ? ([...warmups, ...forOrder] as BBExercise[]) : forOrder.slice();
   const tagMuscles = TAG_MUSCLES[opts.sessionTag || ''] || [];
   // Основная мышца дня: явная опция → первая из тега → иначе мышца первого primary+тяж.
   // BUG-B11: для FullBody НЕ берём tagMuscles[0] (всегда 'chest' → день ног начинается с груди).
@@ -116,8 +124,8 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     primaryMuscle = opts.primaryMuscle;
   } else if (isFullBody) {
     // FB: primary = первый primary+тяж exercise из списка (отражает fbSchedule из buildBBPlan)
-    const firstPrimary = exercises.find(e => e.role === 'primary' && e.character === 'тяж');
-    primaryMuscle = firstPrimary?.muscle || exercises.find(e => e.role === 'primary')?.muscle || '';
+    const firstPrimary = forOrder.find(e => e.role === 'primary' && (e as any).character === 'тяж');
+    primaryMuscle = firstPrimary?.muscle || forOrder.find(e => e.role === 'primary')?.muscle || '';
   } else {
     // ★ Arms day: triceps первым (compound-first — больше мышечная масса, жим узким хватом),
     // не biceps (tagMuscles[0]='biceps'). Для Legs: quads первым (присед перед RDL).
@@ -127,14 +135,14 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     else primaryMuscle = tagMuscles[0] || '';
   }
   if (!primaryMuscle) {
-    const firstHeavy = exercises.find(e => e.role === 'primary' && e.character === 'тяж');
-    primaryMuscle = firstHeavy?.muscle || exercises.find(e => e.role === 'primary')?.muscle || exercises[0]?.muscle || '';
+    const firstHeavy = forOrder.find(e => e.role === 'primary' && (e as any).character === 'тяж');
+    primaryMuscle = firstHeavy?.muscle || forOrder.find(e => e.role === 'primary')?.muscle || forOrder[0]?.muscle || '';
   }
   const tagMuscleSet = new Set(tagMuscles.map(m => collapseMuscle(m)));
 
   const methodology = opts.methodology || 'compound_first';
   const priorityMuscles = new Set((opts.priorityMuscles || []).map(collapseMuscle));
-  const indexed = exercises.map((ex, idx) => ({ ex, idx, key: rankKey(ex, primaryMuscle, tagMuscleSet, methodology, priorityMuscles) }));
+  const indexed = forOrder.map((ex, idx) => ({ ex, idx, key: rankKey(ex, primaryMuscle, tagMuscleSet, methodology, priorityMuscles) }));
   // Лексикографическое сравнение кортежа.
   indexed.sort((a, b) => {
     const ka = a.key, kb = b.key;
@@ -143,7 +151,8 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     }
     return a.idx - b.idx; // стабильность при полном равенстве
   });
-  return indexed.map(x => x.ex);
+  const sortedRest = indexed.map(x => x.ex);
+  return warmups.length ? ([...warmups, ...sortedRest] as BBExercise[]) : sortedRest;
 }
 
 /**
@@ -242,7 +251,11 @@ const MUSCLE_EX_CAP: Record<string, number> = {
 // backCap: опытный enhanced (6+ лет) с про-объёмом спины получает до 6 паттернов —
 // cap 4 срезал бы vertical/lat-работу после allocation (паттерны, не сеты).
 export function capExercisesPerMuscle(exercises: BBExercise[], backCap = 4): BBExercise[] {
-  const ranked = exercises.map((ex, i) => ({ ex, i }));
+  // Разминка (warmupActivator) не участвует в капе и никогда не удаляется капом.
+  const warmups = (exercises as any[]).filter((e: any) => !!e.warmupActivator);
+  const rest = (exercises as any[]).filter((e: any) => !e.warmupActivator) as BBExercise[];
+  if (!rest.length) return exercises.slice();
+  const ranked = rest.map((ex, i) => ({ ex, i }));
   ranked.sort((a, b) => {
     const ra = (a.ex.role === "primary" ? 0 : 1) - (b.ex.role === "primary" ? 0 : 1);
     if (ra !== 0) return ra;
@@ -260,7 +273,8 @@ export function capExercisesPerMuscle(exercises: BBExercise[], backCap = 4): BBE
     counts[m] = (counts[m] || 0) + 1;
     keep.add(ex);
   }
-  return exercises.filter((e) => keep.has(e));
+  const keptRest = rest.filter((e) => keep.has(e as any));
+  return warmups.length ? ([...warmups, ...keptRest] as BBExercise[]) : keptRest;
 }
 
 // Cap redundancy then apply coaching-grade ordering for a session.

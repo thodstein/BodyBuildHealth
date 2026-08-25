@@ -2994,10 +2994,12 @@ for (const week of next.weeks) {
     }
     // Финальная дедупликация головок рук: 2 overhead в Arms-дне — ужас, один заменяется на pushdown
     // (паттерн-дубль из ensureArmHeadCoverage + selection). Держим 1 overhead + 1 pushdown.
+    // Разминка (warmupActivator) не участвует — она всегда первая и не считается за головку.
     for (const week of next.weeks) for (const session of week.sessions) {
       const seen = new Set<string>();
       const filtered: any[] = [];
       for (const e of session.exercises) {
+        if ((e as any).warmupActivator) { filtered.push(e); continue; }
         if (e.muscle === 'triceps' || e.muscle === 'biceps') {
           const pat = classifyArmExercise(e.name).pattern;
           const key = e.muscle + ':' + pat;
