@@ -5,6 +5,7 @@ import { getRecipes, calculateUserRecipeUsefulness } from '../../engines/nutriti
 import { calcNutrition } from '../../engines/nutrition.engine';
 import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
+import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
 import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CART_CAT_LABELS, CartStore, CartItemEnhanced } from '../../core/nutrition-utils';
@@ -296,15 +297,31 @@ const CatalogTab: React.FC = () => {
     try { const ids: string[] = JSON.parse(localStorage.getItem('he_food_favs') || '[]'); const updated = [food.id, ...ids.filter(f => f !== food.id)].slice(0, 100); localStorage.setItem('he_food_favs', JSON.stringify(updated)); } catch {}
   };
   const filtered = React.useMemo(() => {
-    const q = (catSearch || '').toLowerCase().trim();
+    const q = (catSearch || '').toLowerCase().replace(/ё/g,'е').trim();
     let result = allFoods;
     if (catFilter !== 'all') result = result.filter((f: any) => f.category === catFilter);
     if (showExclusive) result = result.filter((f: any) => f.tier === 'max');
     if (q) {
-      result = result.filter((f: any) => (f.name || '').toLowerCase().includes(q) || (f.description || '').toLowerCase().includes(q));
+      const norm = (s:string) => (s||'').toLowerCase().replace(/ё/g,'е');
+      result = result.filter((f: any) => norm(f.name).includes(q) || norm(f.description).includes(q) || norm(f.category).includes(q));
     }
     return result.slice(0, 120);
   }, [catFilter, catSearch, showExclusive, allFoods]);
+  const [catInternet, setCatInternet] = React.useState<any[]>([]);
+  const [catSearching, setCatSearching] = React.useState(false);
+  React.useEffect(() => {
+    const q = catSearch.trim();
+    if (!q || q.length < 3) { setCatInternet([]); return; }
+    if (filtered.length >= 6) { setCatInternet([]); return; }
+    let cancelled = false;
+    setCatSearching(true);
+    searchOFF(q, 8).then(res => {
+      if (cancelled) return;
+      const mapped = res.map(productToFoodItem as any).filter((f:any)=> f && f.kcal > 0).slice(0, 6);
+      setCatInternet(mapped);
+    }).catch(()=>{ if(!cancelled) setCatInternet([]); }).finally(()=>{ if(!cancelled) setCatSearching(false); });
+    return () => { cancelled = true; };
+  }, [catSearch]);
   const toggleExpanded = (id: string) => setCatExpanded(prev => prev === id ? null : id);
   const exclusiveCount = allFoods.filter((f: any) => f.tier === 'max').length;
   return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -408,7 +425,49 @@ const CatalogTab: React.FC = () => {
         );
       })}
     </div>
-    {filtered.length===0 && <div style={{ ...modernCardBg, padding:24, textAlign:'center' }}><div style={{fontSize:22}}>🔍</div><div style={{fontSize:12,fontWeight:700,color:'#fff',marginTop:6}}>Ничего не нашлось</div><div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:4}}>Попробуй сбросить фильтр или изменить запрос</div></div>}
+    {catSearching && <div style={{ ...modernCardBg, padding:12, textAlign:'center', fontSize:11, color:'rgba(96,165,250,0.8)', border:'1px solid rgba(59,130,246,0.12)', background:'rgba(59,130,246,0.06)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}><span style={{ width:14, height:14, border:'2px solid rgba(96,165,250,0.3)', borderTop:'2px solid #60a5fa', borderRadius:'50%', display:'inline-block', animation:'spin 0.8s linear infinite' }} /> 🌐 Ищем в базе РФ...</div>}
+    {catInternet.length>0 && (
+      <div style={{ ...modernCardBg, padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>🌐 Найдено в интернете (РФ) <span style={{ fontSize:9, padding:'2px 6px', borderRadius:999, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.18)' }}>{catInternet.length}</span></div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:8 }}>
+          {catInternet.map(f => {
+            const isExpanded = catExpanded === f.id;
+            return (
+              <div key={f.id} style={{ padding:12, borderRadius:16, background:'#202023', border: isExpanded ? '1px solid rgba(59,130,246,0.18)' : '1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <span style={{ width:26, height:26, borderRadius:8, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.18)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>🌐</span>
+                      <span style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{f.name}</span>
+                    </div>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:3 }}>{f.brand || 'Интернет'} • {f.servingSize || '100г'}</div>
+                  </div>
+                  <span style={{ fontSize:8, fontWeight:800, padding:'2px 6px', borderRadius:999, background:'rgba(59,130,246,0.12)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.18)' }}>RF</span>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
+                  {[
+                    {l:'ккал',v:f.kcal,col:'#60a5fa',bg:'rgba(59,130,246,0.08)'},
+                    {l:'Б',v:f.protein,col:'#60a5fa',bg:'rgba(96,165,250,0.08)'},
+                    {l:'Ж',v:f.fat,col:'#fbbf24',bg:'rgba(251,191,36,0.08)'},
+                    {l:'У',v:f.carbs,col:'#fb923c',bg:'rgba(251,146,60,0.08)'},
+                  ].map(b => (
+                    <div key={b.l} style={{ background:b.bg, border:`1px solid ${b.col}18`, borderRadius:10, padding:'5px 2px', textAlign:'center' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
+                      <div style={{ fontSize:11, fontWeight:800, color:b.col }}>{b.v}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button onClick={() => addFav(f)} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(59,130,246,0.18)', background:'rgba(59,130,246,0.08)', color:'#60a5fa', cursor:'pointer', fontSize:10, fontWeight:600 }}>⭐ В избранное</button>
+                  <button onClick={() => addToCart({ name: f.name, kcal: f.kcal, amount: 100, category: f.category } as any)} style={{ flex:1, padding:'7px 8px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>🛒 В корзину</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+    {filtered.length===0 && catInternet.length===0 && !catSearching && <div style={{ ...modernCardBg, padding:24, textAlign:'center' }}><div style={{fontSize:22}}>🔍</div><div style={{fontSize:12,fontWeight:700,color:'#fff',marginTop:6}}>Ничего не нашлось</div><div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:4}}>Попробуй сбросить фильтр или изменить запрос — или проверь написание «Ратимир»</div></div>}
   </div>);
 };
 const RecipesTab = RecipesTabModern;

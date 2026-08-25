@@ -3,9 +3,10 @@ import { FOOD_DB } from '../../../../core/nutrition-database';
 import { CAT_MAP_EMOJI } from '../../../../core/nutrition-utils';
 import { type FoodItemLike } from '../NutritionDiary';
 import { BarcodeScanner } from '../../../components/BarcodeScanner';
-import { type OFFProduct, productToFoodItem } from '../../../../engines/openfoodfacts.engine';
+import { type OFFProduct, productToFoodItem, searchByName as searchOFF } from '../../../../engines/openfoodfacts.engine';
 import { processUploadedFile } from '../../../../core/ocr-engine';
 import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
+import { readDiaryV2 } from '../diary-storage-v2';
 
 interface AddFoodPanelProps {
   foodSearch: string;
@@ -77,6 +78,27 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   }, [debouncedSearch, usdaFoods]);
 
   const [history, setHistory] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_search_history') || '[]'); return Array.isArray(v) ? v.filter((x:any)=>typeof x==='string').slice(0,5) : []; } catch { return []; } });
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickTab, setQuickTab] = useState<'fav'|'recent'|'last'|'presets'>('fav');
+  const [lastAdded, setLastAdded] = useState<any[]>(() => {
+    try {
+      const diary = readDiaryV2();
+      const all: any[] = [];
+      Object.values(diary as any).forEach((day: any) => {
+        Object.values(day.meals || {}).forEach((items: any) => (items as any[]).forEach(it => all.push(it)));
+      });
+      const seen = new Map<string, any>();
+      for (let i = all.length - 1; i >= 0 && seen.size < 8; i--) {
+        const it = all[i];
+        const key = (it.foodId || it.name || '').toLowerCase();
+        if (key && !seen.has(key)) seen.set(key, it);
+      }
+      return [...seen.values()];
+    } catch { return []; }
+  });
+  const [internetResults, setInternetResults] = useState<any[]>([]);
+  const [isSearchingNet, setIsSearchingNet] = useState(false);
+
   useEffect(() => {
     if (debouncedSearch.trim() && foodSearchResults.length>0) {
       const q = debouncedSearch.trim();
@@ -89,6 +111,38 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     }
   }, [debouncedSearch, foodSearchResults.length]);
 
+  useEffect(() => {
+    if (!showQuickAdd) return;
+    try {
+      const diary = readDiaryV2();
+      const all: any[] = [];
+      Object.values(diary as any).forEach((day: any) => {
+        Object.values(day.meals || {}).forEach((items: any) => (items as any[]).forEach(it => all.push(it)));
+      });
+      const seen = new Map<string, any>();
+      for (let i = all.length - 1; i >= 0 && seen.size < 8; i--) {
+        const it = all[i];
+        const key = (it.foodId || it.name || '').toLowerCase();
+        if (key && !seen.has(key)) seen.set(key, it);
+      }
+      setLastAdded([...seen.values()]);
+    } catch {}
+  }, [showQuickAdd, parsedItems.length]);
+
+  useEffect(() => {
+    const q = debouncedSearch.trim();
+    if (!q || q.length < 3) { setInternetResults([]); return; }
+    if (foodSearchResults.length >= 4) { setInternetResults([]); return; }
+    let cancelled = false;
+    setIsSearchingNet(true);
+    searchOFF(q, 8).then(res => {
+      if (cancelled) return;
+      const mapped = res.map(productToFoodItem as any).filter((f: any) => f && f.kcal > 0).slice(0, 6);
+      setInternetResults(mapped);
+    }).catch(() => { if (!cancelled) setInternetResults([]); }).finally(() => { if (!cancelled) setIsSearchingNet(false); });
+    return () => { cancelled = true; };
+  }, [debouncedSearch]);
+
   const [editingIdx, setEditingIdx] = useState<number>(-1);
   const [editName, setEditName] = useState('');
   const [editQty, setEditQty] = useState(100);
@@ -96,8 +150,6 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   const [editP, setEditP] = useState(0);
   const [editF, setEditF] = useState(0);
   const [editC, setEditC] = useState(0);
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [quickTab, setQuickTab] = useState<'fav'|'recent'|'presets'>('fav');
 
   const startEdit = (idx: number, item: any) => {
     setEditingIdx(idx);
@@ -157,7 +209,41 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             ))}
           </div>
         )}
-        {debouncedSearch.trim() && foodSearchResults.length===0 && (
+        {isSearchingNet && (
+          <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(96,165,250,0.8)', textAlign: 'center', padding: '8px 10px', background: 'rgba(59,130,246,0.06)', borderRadius: 8, border: '1px solid rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <span style={{ width: 12, height: 12, border: '2px solid rgba(96,165,250,0.3)', borderTop: '2px solid #60a5fa', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+            🌐 Ищем в базе РФ...
+          </div>
+        )}
+        {internetResults.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>🌐 Найдено в интернете (РФ)</span>
+              <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.18)' }}>{internetResults.length}</span>
+            </div>
+            <div style={{ maxHeight: 200, overflowY: 'auto', borderRadius: 10, background: '#202023', border: '1px solid rgba(59,130,246,0.12)' }}>
+              {internetResults.map(f => (
+                <div key={f.id} style={{ padding: '10px 12px', fontSize: 11, borderBottom: '1px solid rgba(59,130,246,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 48, background: 'rgba(59,130,246,0.03)', borderRadius: 8, margin: '2px 4px' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(59,130,246,0.08)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(59,130,246,0.03)'}>
+                  <div onClick={() => onAddFoodFromDB(f)} role="button" style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer' }}>
+                    <span style={{ fontSize: 16, width: 20, textAlign: 'center' }}>🌐</span>
+                    <span style={{ fontWeight: 600, flex: 1, lineHeight: 1.2 }}>{f.name}{f.brand ? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 10 }}> • {f.brand}</span> : null}</span>
+                    <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.7)', flexShrink: 0 }}>
+                      <span style={{ color: '#00e68a', fontWeight: 700 }}>{f.kcal}</span>
+                      <span style={{ color: '#3b82f6' }}>Б{f.protein}</span>
+                      <span style={{ color: '#f59e0b' }}>Ж{f.fat}</span>
+                      <span style={{ color: '#f97316' }}>У{f.carbs}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, marginLeft: 8, flexShrink: 0 }}>
+                    <button onClick={() => onAddFoodFromDB(f)} style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa', fontSize: 10, cursor: 'pointer', minHeight: 28 }}>＋</button>
+                    {onDirectAdd && <button onClick={() => onDirectAdd(f)} style={{ padding: '5px 9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 28 }}>⚡ 100г</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {debouncedSearch.trim() && foodSearchResults.length===0 && internetResults.length===0 && !isSearchingNet && (
           <div style={{ marginTop:8, fontSize:10, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>Ничего не найдено — попробуйте другое написание или создайте <span style={{ color:'#8b5cf6' }}>свою еду</span></div>
         )}
         {!debouncedSearch.trim() && history.length>0 && (
@@ -238,6 +324,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               {[
                 { id: 'fav', label: '⭐ Избранное', count: favoriteFoods.length },
                 { id: 'recent', label: '🕒 Часто', count: history.length },
+                { id: 'last', label: '🆕 Последние', count: lastAdded.length },
                 { id: 'presets', label: '📦 Наборы', count: mealPresets.length },
               ].map(tab => (
                 <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: quickTab === tab.id ? 'linear-gradient(135deg, rgba(0,230,138,0.15), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}>
@@ -300,6 +387,27 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '16px', color: 'rgba(255,255,255,0.4)', fontSize: 11, background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.06)' }}>История пуста — начни поиск продуктов</div>
+              )
+            )}
+            {quickTab === 'last' && (
+              lastAdded.length > 0 ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {lastAdded.map((it: any, idx: number) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))', border: '1px solid rgba(0,230,138,0.12)', backdropFilter: 'blur(8px)' }}>
+                      <span style={{ fontSize: 16, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,230,138,0.12)', borderRadius: 8 }}>{CAT_MAP_EMOJI[it.category || 'other'] || '📦'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.name}</div>
+                        <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                          <span style={{ color: '#00e68a', fontWeight: 700 }}>{it.kcal} ккал</span>
+                          <span>{it.qty || '100г'}</span>
+                        </div>
+                      </div>
+                      <button onClick={() => onAddFoodFromDB({ id: it.foodId || it.name, name: it.name, kcal: it.kcal, protein: it.p || 0, fat: it.f || 0, carbs: it.c || 0, category: it.category } as any)} style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,230,138,0.2)' }}>＋</button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px', color: 'rgba(255,255,255,0.4)', fontSize: 11, background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.06)' }}>Нет последних — добавь еду в дневник</div>
               )
             )}
             {quickTab === 'presets' && (
