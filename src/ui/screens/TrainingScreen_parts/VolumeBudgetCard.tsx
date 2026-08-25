@@ -23,11 +23,11 @@ const STATUS_META: Record<BBMuscleVolume['status'], { label: string; color: stri
 };
 
 function recommendation(m: BBMuscleVolume): string {
-  if (m.totalSets < m.mev) return `+${m.mev - m.totalSets} сетов до MEV (минимум)`;
-  if (m.totalSets >= m.mrv) return `−${m.totalSets - m.mrv} сетов (выше MRV — риск невосстановления)`;
-  if (m.totalSets > m.mav) return `в зоне MAV–MRV, держать или −${m.totalSets - m.mav} до MAV`;
-  if (m.totalSets < m.mav) return `+${m.mav - m.totalSets} сетов до MAV (оптимум)`;
-  return 'оптимум';
+  if (m.totalSets < m.mev) return `Недотрен: +${m.mev - m.totalSets} подход(ов) до минимума MEV ${m.mev} — иначе нет стимула для роста`;
+  if (m.totalSets >= m.mrv) return `Перегруз: −${m.totalSets - m.mrv} подход(ов) — выше максимума MRV ${m.mrv}, риск недовосстановления и травмы`;
+  if (m.totalSets > m.mav) return `Выше оптимума: в зоне MAV–MRV (${m.mav}–${m.mrv}), можно держать или −${m.totalSets - m.mav} до оптимума MAV`;
+  if (m.totalSets < m.mav) return `Ниже оптимума: +${m.mav - m.totalSets} подход(ов) до оптимума MAV ${m.mav} для максимального роста`;
+  return 'Оптимум — объём в точке MAV, баланс стимула и восстановления';
 }
 
 function ru(muscle: string): string { return GROUP_RU[muscle] || muscle; }
@@ -75,8 +75,8 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
               <div title={`MRV ${m.mrv}`} style={{ position: 'absolute', left: pct(m.mrv) + '%', top: -2, bottom: -2, width: 2, background: '#ef4444' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#fff', marginBottom: 3 }}>
-              <span>MEV {m.mev} · MAV {m.mav} · MRV {m.mrv}</span>
-              <span>частота {m.frequencyPerRotation}×/рот · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
+              <span>Мин MEV {m.mev} · Опт MAV {m.mav} · Макс MRV {m.mrv}</span>
+              <span>частота {m.frequencyPerRotation}×/нед · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
             </div>
             <div style={{ fontSize: 11, color: st.color, fontWeight: 600 }}>{recommendation(m)}</div>
           </div>

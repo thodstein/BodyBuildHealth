@@ -221,20 +221,31 @@ export function buildBBMethodologySummary(plan: BBPlan): string[] {
   return out;
 }
 
-/** Полный текстовый отчёт ББ-плана (сводка/баланс/фазы/нагрузка). */
+/** Полный текстовый отчёт ББ-плана (сводка/баланс/фазы/нагрузка) — полностью на русском, код остаётся EN. */
 export function buildBBPlanReportText(plan: BBPlan): string {
   const lines: string[] = [];
-  lines.push(`План: ${plan.pattern.name} · ${plan.weeks.length} нед · ${plan.pattern.sessionsPerRotation} сессий/нед`);
+  lines.push(`План: ${plan.pattern.name} · ${plan.weeks.length} недель · ${plan.pattern.sessionsPerRotation} тренировок в неделю`);
+  // Маппинги кодов EN → RU для отображения
+  const LEVEL_RU: Record<string,string> = { beginner:'Новичок', intermediate:'Средний', advanced:'Опытный', enhanced:'Enhanced (фарма)' };
+  const GOAL_RU: Record<string,string> = { mass:'Масса', cut:'Сушка', recomp:'Рекомпозиция', maintenance:'Поддержание', strength_mass:'Сила+Масса' };
+  const FOCUS_RU: Record<string,string> = { strength:'Сила (RIR 1-2)', hypertrophy:'Гипертрофия (RIR 2-3)', endurance:'Выносливость (RIR 3-4)' };
+  const METH_RU: Record<string,string> = { compound_first:'База → изоляция', pre_exhaust:'Пред-истощение (изоляция первой)', post_exhaust:'Пост-истощение (база → изоляция)' };
+  const SUPER_RU: Record<string,string> = { none:'выкл', antagonist:'антагонисты (грудь↔спина, биц↔триц)', same_muscle:'одна группа (пробить мышцу)', giant:'гигант-сет (3 упр.)' };
+  const SCHEME_RU: Record<string,string> = { standard:'Стандарт', gvt:'GVT 10×10', fst7:'FST-7', gironda:'8×8 Жиронда' };
+  const DUP_RU: Record<string,string> = { none:'выкл', heavy_light:'тяж/лёг', strength_hypertrophy:'сила/гипертрофия', full_dup:'полный DUP (3 дня)' };
+  const ROT_RU: Record<string,string> = { forbid:'запрет (одни упражнения)', strict:'строгий (смена раз в 4 нед)', variety:'разнообразие (при 2×/мышцу)' };
+  const INT_RU: Record<string,string> = { light:'лёгкая (+20% отдых)', moderate:'умеренная', high:'высокая (−20% отдых)' };
+  const STRAT_RU: Record<string,string> = { double_progression:'двойная прогрессия', linear:'линейная', wave:'волновая', rpe_based:'RPE-авторегуляция' };
   // Настройки — только реально выбранные параметры, без дублей и внутренних имён.
   const p: any = plan as any;
   const settings: string[] = [];
-  if (p.level) settings.push(`Уровень: ${p.level}`);
-  if (p.goal) settings.push(`Цель: ${p.goal}`);
-  if (p.trainingFocus) settings.push(`Фокус: ${p.trainingFocus}`);
-  if (p.methodology) settings.push(`Методика: ${p.methodology}`);
-  if (p.supersetMode) settings.push(`Суперсеты: ${p.supersetMode}`);
-  if (p.volumeScheme) settings.push(`Схема объёма: ${p.volumeScheme}`);
-  if (p.dupMode) settings.push(`DUP: ${p.dupMode}`);
+  if (p.level) settings.push(`Уровень: ${LEVEL_RU[p.level] || p.level}`);
+  if (p.goal) settings.push(`Цель: ${GOAL_RU[p.goal] || p.goal}`);
+  if (p.trainingFocus) settings.push(`Фокус: ${FOCUS_RU[p.trainingFocus] || p.trainingFocus}`);
+  if (p.methodology) settings.push(`Методика порядка: ${METH_RU[p.methodology] || p.methodology}`);
+  if (p.supersetMode) settings.push(`Суперсеты: ${SUPER_RU[p.supersetMode] || p.supersetMode}`);
+  if (p.volumeScheme) settings.push(`Схема объёма: ${SCHEME_RU[p.volumeScheme] || p.volumeScheme}`);
+  if (p.dupMode) settings.push(`Периодизация: ${DUP_RU[p.dupMode] || p.dupMode}`);
   // Объём — одна запись (не дублировать volumeMode/volumeGoal)
   const volMode = p.trainingVolumeMode === 'high' ? `Объёмный (${p.volumeScheme || 'MRV'}, кап 5 сетов)` : `Обычный (${p.volumeGoal || 'MAV'})`;
   if (p.trainingVolumeMode || p.volumeGoal) settings.push(`Объём: ${volMode}`);
@@ -244,15 +255,15 @@ export function buildBBPlanReportText(plan: BBPlan): string {
   if (peds) settings.push(`Курс: ${peds}`);
   if (p.maxWorkingSets) settings.push(`Капы: ${p.maxWorkingSets} сетов / ${p.maxExercises} упр.`);
   const snap = p.inputSnapshot || {};
-  if (snap.rotationMode) settings.push(`Ротация: ${snap.rotationMode}`);
-  if (snap.intensityLevel) settings.push(`Интенсивность: ${snap.intensityLevel}`);
-  if (snap.avoidAxialLoad) settings.push('Без осевой');
+  if (snap.rotationMode) settings.push(`Ротация упражнений: ${ROT_RU[snap.rotationMode] || snap.rotationMode}`);
+  if (snap.intensityLevel) settings.push(`Интенсивность: ${INT_RU[snap.intensityLevel] || snap.intensityLevel}`);
+  if (snap.avoidAxialLoad) settings.push('Без осевой нагрузки (щадящий режим позвоночника)');
   if (snap.equipment?.length) settings.push(`Оборудование: ${snap.equipment.join(', ')}`);
-  if (snap.injuries?.length) settings.push(`Травм: ${snap.injuries.length}`);
-  if (snap.mobilityRestrictions?.length) settings.push(`Мобильность: ${snap.mobilityRestrictions.join(', ')}`);
-  if (snap.autoDeload != null) settings.push(`Авто-делод: ${snap.autoDeload ? 'да' : 'нет'}`);
-  if (snap.loadStrategy) settings.push(`Прогрессия: ${snap.loadStrategy}`);
-  if (snap.eccentricMult && snap.eccentricMult !== 1) settings.push(`Эксцентрик ×${snap.eccentricMult}`);
+  if (snap.injuries?.length) settings.push(`Учтено травм: ${snap.injuries.length}`);
+  if (snap.mobilityRestrictions?.length) settings.push(`Ограничения мобильности: ${snap.mobilityRestrictions.join(', ')}`);
+  if (snap.autoDeload != null) settings.push(`Авто-разгрузка: ${snap.autoDeload ? 'включена (при ACWR>1.3)' : 'выключена'}`);
+  if (snap.loadStrategy) settings.push(`Прогрессия нагрузки: ${STRAT_RU[snap.loadStrategy] || snap.loadStrategy}`);
+  if (snap.eccentricMult && snap.eccentricMult !== 1) settings.push(`Эксцентрик: ×${snap.eccentricMult} (медленный негатив)`);
   if (settings.length) {
     lines.push(`Настройки: ${settings.join(' · ')}`);
     lines.push('');
