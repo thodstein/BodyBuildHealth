@@ -64,6 +64,7 @@ export interface Recipe {
   pairsWith?: string[];
   batchFriendly?: boolean;
   cookSkill?: 'basic' | 'medium' | 'advanced';
+  sourceUrl?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
