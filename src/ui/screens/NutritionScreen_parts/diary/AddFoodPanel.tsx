@@ -96,6 +96,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   const [editP, setEditP] = useState(0);
   const [editF, setEditF] = useState(0);
   const [editC, setEditC] = useState(0);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickTab, setQuickTab] = useState<'fav'|'recent'|'presets'>('fav');
 
   const startEdit = (idx: number, item: any) => {
     setEditingIdx(idx);
@@ -224,6 +226,102 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop: -2 }}>вставить</span>
           </button>
          </div>
+        {/* Быстрое добавление — отдельной красивой кнопкой */}
+        <button onClick={() => setShowQuickAdd(v => !v)} style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 14, border: `1px solid ${showQuickAdd ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`, background: showQuickAdd ? 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,200,160,0.06))' : 'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))', color: showQuickAdd ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, backdropFilter: 'blur(12px)', transition: 'all 0.2s', boxShadow: showQuickAdd ? '0 4px 16px rgba(0,230,138,0.12)' : 'none' }}>
+          <span style={{ fontSize: 16 }}>⚡</span>
+          <span>Быстрое добавление</span>
+          <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.6, background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 999 }}>{showQuickAdd ? '▲ Свернуть' : '▼ Развернуть'}</span>
+        </button>
+        {showQuickAdd && (
+          <div style={{ marginTop: 10, padding: 12, borderRadius: 16, background: 'linear-gradient(135deg, rgba(18,18,20,0.9), rgba(24,24,27,0.8))', border: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+              {[
+                { id: 'fav', label: '⭐ Избранное', count: favoriteFoods.length },
+                { id: 'recent', label: '🕒 Часто', count: history.length },
+                { id: 'presets', label: '📦 Наборы', count: mealPresets.length },
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, background: quickTab === tab.id ? 'linear-gradient(135deg, rgba(0,230,138,0.15), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.6)', transition: 'all 0.15s' }}>
+                  {tab.label}
+                  {tab.count > 0 && <span style={{ background: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.08)', color: quickTab === tab.id ? '#000' : 'rgba(255,255,255,0.6)', padding: '1px 6px', borderRadius: 999, fontSize: 9, fontWeight: 700 }}>{tab.count}</span>}
+                </button>
+              ))}
+            </div>
+            {quickTab === 'fav' && (
+              favoriteFoods.length > 0 ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {favoriteFoods.slice(0, 8).map(f => (
+                    <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(139,92,246,0.03))', border: '1px solid rgba(139,92,246,0.12)', backdropFilter: 'blur(8px)' }}>
+                      <span style={{ fontSize: 18, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139,92,246,0.12)', borderRadius: 8 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
+                        <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                          <span style={{ color: '#00e68a', fontWeight: 700 }}>{f.kcal} ккал</span>
+                          <span>Б{f.protein}</span><span>Ж{f.fat}</span><span>У{f.carbs}</span>
+                        </div>
+                      </div>
+                      <button onClick={() => onAddFoodFromDB(f)} style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '0 2px 8px rgba(139,92,246,0.3)' }}>＋</button>
+                      {onDirectAdd && <button onClick={() => onDirectAdd(f)} style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>⚡</button>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px', color: 'rgba(255,255,255,0.4)', fontSize: 11, background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.06)' }}>Нет избранного — добавляйте ⭐ из поиска</div>
+              )
+            )}
+            {quickTab === 'recent' && (
+              history.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {history.map(h => {
+                      const food = findFood(h);
+                      return (
+                        <button key={h} onClick={() => onFoodSearchChange(h)} style={{ padding: '7px 12px', borderRadius: 999, fontSize: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>🕒</span> {h}
+                          {food && <span style={{ background: 'rgba(0,230,138,0.12)', color: '#00e68a', padding: '1px 6px', borderRadius: 999, fontSize: 9 }}>＋</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: 600, marginBottom: 4 }}>Нажми на историю чтобы найти, или добавь напрямую:</div>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {history.slice(0, 4).map(h => {
+                      const f = findFood(h);
+                      if (!f) return null;
+                      return (
+                        <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <span style={{ fontSize: 14 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
+                          <span style={{ flex: 1, fontSize: 11, color: '#fff', fontWeight: 500 }}>{f.name}</span>
+                          <button onClick={() => onAddFoodFromDB(f)} style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 10, cursor: 'pointer' }}>＋ В очередь</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px', color: 'rgba(255,255,255,0.4)', fontSize: 11, background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.06)' }}>История пуста — начни поиск продуктов</div>
+              )
+            )}
+            {quickTab === 'presets' && (
+              mealPresets.length > 0 ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {mealPresets.map((p, i) => (
+                    <div key={i} style={{ padding: '10px 12px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(0,230,138,0.06), rgba(0,200,160,0.03))', border: '1px solid rgba(0,230,138,0.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c8a0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>📦</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{p.items?.length || 0} продуктов • {p.items?.reduce((s: any, it: any) => s + (it.kcal || 0), 0) || 0} ккал</div>
+                      </div>
+                      <button onClick={() => onAddPreset(p.items)} style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 11, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,230,138,0.2)' }}>Добавить</button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '16px', color: 'rgba(255,255,255,0.4)', fontSize: 11, background: 'rgba(255,255,255,0.02)', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.06)' }}>Нет сохранённых наборов — собери продукты и сохрани как пресет</div>
+              )
+            )}
+          </div>
+        )}
         {/* Hidden camera input kept for compat — not rendered as button */}
         <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={() => {}} />
 
@@ -402,39 +500,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         </div>
       )}
 
-      {/* Favorites */}
-      {favoriteFoods.length > 0 && (
-        <div style={{ padding: '12px 14px', borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 6 }}>⭐ Избранное</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {favoriteFoods.slice(0, 8).map(f => (
-              <button key={f.id} onClick={() => onAddFoodFromDB(f)} aria-label={`Добавить ${f.name}`}
-                style={{ padding: '6px 12px', borderRadius: 10, fontSize: 10, cursor: 'pointer',
-                  background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.2)',
-                  color: '#8b5cf6', whiteSpace: 'nowrap', minHeight: 32 }}>
-                {CAT_MAP_EMOJI[f.category] || ''} {f.name.length > 14 ? f.name.slice(0, 13) + '…' : f.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Meal presets */}
-      {mealPresets.length > 0 && (
-        <div style={{ padding: '10px 14px', borderRadius: 14, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 600, marginBottom: 6 }}>📦 Быстрые пресеты</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {mealPresets.map((p, i) => (
-              <button key={i} onClick={() => onAddPreset(p.items)}
-                style={{ padding: '6px 12px', borderRadius: 10, fontSize: 10, cursor: 'pointer',
-                  background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)',
-                  color: '#00e68a', fontWeight: 600, minHeight: 32 }}>
-                {p.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Custom food */}
       <button onClick={onToggleCustomFood} aria-label="Своя еда"
