@@ -9,6 +9,7 @@ import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from '../TrainingScreen_parts/planner-bridge';
+import { ModernHero, modernCardBg } from '../NutritionScreen_parts/nutrition-modern-kit';
 
 const ACCENT = '#00e68a';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
@@ -71,6 +72,7 @@ export const MetabolicHub: React.FC = () => {
 
   return (
     <div style={{ padding:'10px 8px 18px', color:'#fff', maxWidth:760, margin:'0 auto' }}>
+      <ModernHero icon="⚖️" title="Метаболика" subtitle="Метаболические расчёты — TDEE, NEAT, адаптация." />
       <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(96,165,250,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(96,165,250,0.18)', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(96,165,250,0.14),transparent 70%)', pointerEvents:'none' }} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>

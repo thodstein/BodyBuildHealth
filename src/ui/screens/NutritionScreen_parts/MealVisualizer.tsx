@@ -1,5 +1,6 @@
 import React from 'react';
 import { FOOD_DB, calcBBQualityScore } from '../../../core/nutrition-database';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 interface VisualizerProps {
   items: { id: string; name: string; weightG: number; color?: string }[];
@@ -20,6 +21,7 @@ export const MealVisualizer: React.FC<VisualizerProps> = ({ items, maxItems = 6 
 
   return (
     <div style={{ marginTop: 8, textAlign: 'center' }}>
+      <ModernHero icon="🍽️" title="Визуализатор" subtitle="Наглядная тарелка — баланс белков, жиров и углеводов." />
       <div style={{ fontSize: 8, fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>🍽 Визуализатор блюда</div>
       <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', background: 'rgba(255,255,255,0.03)' }}>
         {display.map((item, i) => {

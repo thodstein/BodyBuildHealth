@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 const FAQ: { q: string; a: string; icon: string; tag: string }[] = [
   { icon: '📉', tag: 'рейтинг', q: 'Почему у продукта низкий рейтинг?',
@@ -28,6 +29,7 @@ export const NutriAdvisor: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: 80 }}>
+      <ModernHero icon="🧑‍⚕️" title="Нутрициолог" subtitle="Персональные рекомендации на основе профиля и анализов." />
       <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>🧑‍⚕️ Нутрициолог</div>
       <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 6 }}>
         <button key="all" onClick={() => setFilterTag(null)} style={{

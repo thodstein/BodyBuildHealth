@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { getProfile } from '../../../core/profile-manager';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 interface WeightEntry { date: string; weight: number; fatPct?: number; }
 
@@ -38,6 +39,7 @@ export const ProgressTracker: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: 80 }}>
+      <ModernHero icon="📈" title="Прогресс" subtitle="Отслеживание динамики веса, измерений и достижений." />
       <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', marginBottom: 8 }}>📈 Трекер прогресса</div>
 
       {/* Input */}

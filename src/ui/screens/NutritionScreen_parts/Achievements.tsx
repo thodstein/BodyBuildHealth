@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 const ACHIEVEMENTS = [
   { id: 'iron_will', name: 'Железная воля', icon: '💪', desc: 'Заполнять дневник питания 7 дней подряд', target: 7, unit: 'дней' },
@@ -38,6 +39,7 @@ export const Achievements: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: 80 }}>
+      <ModernHero icon="🏆" title="Достижения" subtitle="Награды за регулярность, цели и рекорды." />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6' }}>🏆 Достижения</div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>{unlockedCount}/{ACHIEVEMENTS.length}</div>

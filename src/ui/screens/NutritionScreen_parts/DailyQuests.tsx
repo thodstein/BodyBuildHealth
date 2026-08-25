@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 const QUESTS = [
   { id: 'protein_target', text: '🥩 Достигните 2.5 г белка на кг LBM', icon: '🥩' },
@@ -47,6 +48,7 @@ export const DailyQuests: React.FC = () => {
 
   return (
     <div style={{ paddingBottom: 80 }}>
+      <ModernHero icon="🎯" title="Квесты" subtitle="Ежедневные задания для дисциплины питания." />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>🎯 Ежедневные квесты</div>
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>🏆 {score} баллов</div>

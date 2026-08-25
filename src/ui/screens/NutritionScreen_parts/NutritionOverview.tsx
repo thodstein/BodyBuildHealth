@@ -4,6 +4,7 @@ import { calcNutrition } from '../../../engines/nutrition.engine';
 import { MICRONUTRIENT_TARGETS } from '../../../core/constants';
 import { nutritionMultipliers } from '../../../engines/risk-engine-v7-core';
 import type { UserProfile } from '../../../core/types';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 
 const NUTRITION_FACTOR_LABELS: Record<string, { label: string; desc: string; good: boolean }> = {
   renal_protein: { label: '🫘 Белок → Почки', desc: 'Слишком высокий белок усиливает нагрузку при почечных рисках', good: false },
@@ -63,6 +64,7 @@ export const NutritionOverview: React.FC<{
 
   return (
     <div className="nutrition-overview">
+      <ModernHero icon="📊" title="Обзор" subtitle="Сводка питания — средние КБЖУ, цели и прогресс." />
       {/* Main Macros Card */}
       <div className="card" style={{ marginBottom: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>

@@ -560,26 +560,32 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {/* Week day selector */}
       <WeekDaySelector weekDays={weekDays} selectedDate={selectedDate} onSelectDate={setSelectedDate} diaryData={diaryData} />
 
-      {/* Tab bar — улучшена: бейджи + скруглённый контейнер */}
-      <div style={{ display: 'flex', gap: 4, padding: 4, borderRadius: 14, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.04)' }}>
+      {/* Tab bar — полный редизайн */}
+      <div style={{ display:'flex', gap:6, padding:6, borderRadius:14, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)', backdropFilter:'blur(8px)' }}>
         {([
-          { key: 'add', label: '➕ Добавить', badge: parsedItems.length>0 ? parsedItems.length : null },
-          { key: 'day', label: '📋 День', badge: Object.values(dayMeals).flat().length || null },
-          { key: 'week', label: '📊 Неделя', badge: Object.keys(diaryData).length || null },
+          { key: 'add', label: '➕ Добавить', icon:'➕', badge: parsedItems.length>0 ? parsedItems.length : null, color:'#00e68a' },
+          { key: 'day', label: '📋 День', icon:'📋', badge: Object.values(dayMeals).flat().length || null, color:'#60a5fa' },
+          { key: 'week', label: '📊 Неделя', icon:'📊', badge: Object.keys(diaryData).length || null, color:'#a78bfa' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)} aria-label={t.label} style={{
-            flex: 1, padding: '10px 6px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: tab === t.key ? 800 : 600, position:'relative',
-            border: tab === t.key ? 'none' : '1px solid transparent',
-            background: tab === t.key ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'transparent',
-            color: tab === t.key ? '#000' : 'rgba(255,255,255,0.6)', minHeight: 40, transition: 'all 0.15s', boxShadow: tab === t.key ? '0 2px 8px rgba(0,230,138,0.25)' : 'none',
+            flex: 1, padding:'10px 8px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight: tab === t.key ? 800 : 600, position:'relative', display:'flex', alignItems:'center', justifyContent:'center', gap:4,
+            border: tab === t.key ? `1px solid ${t.color}` : '1px solid rgba(255,255,255,0.06)',
+            background: tab === t.key ? `${t.color}14` : '#202023',
+            color: tab === t.key ? t.color : 'rgba(255,255,255,0.6)', minHeight: 42, transition:'all 0.15s', boxShadow: tab === t.key ? `0 4px 12px ${t.color}20` : 'none',
           }}>
-            {t.label}{t.badge ? <span style={{ marginLeft:4, fontSize:9, background: tab===t.key ? 'rgba(0,0,0,0.15)' : 'rgba(0,230,138,0.15)', color: tab===t.key ? '#000' : '#00e68a', padding:'1px 5px', borderRadius:6, fontWeight:700 }}>{t.badge}</span> : null}
+            <span style={{ fontSize:12 }}>{t.icon}</span> {t.label}{t.badge ? <span style={{ marginLeft:2, fontSize:9, background: tab===t.key ? t.color : 'rgba(255,255,255,0.06)', color: tab===t.key ? '#000' : t.color, padding:'2px 6px', borderRadius:999, fontWeight:700 }}>{t.badge}</span> : null}
           </button>
         ))}
       </div>
 
-      {/* Macro summary — always visible */}
-      <MacroSummary dayTotals={dayTotals} targets={targets} />
+      {/* Macro summary — modern card */}
+      <div style={{ ...modernCardBg, padding:12, border:'1px solid rgba(0,230,138,0.10)' }}>
+        <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ width:22, height:22, borderRadius:8, background:'rgba(0,230,138,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10 }}>📊</span> КБЖУ за день
+          <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 7px', borderRadius:999, background: dayTotals.kcal > (targets?.kcal||2500) ? 'rgba(239,68,68,0.10)' : 'rgba(0,230,138,0.08)', color: dayTotals.kcal > (targets?.kcal||2500) ? '#ef4444' : '#00e68a', border:`1px solid ${dayTotals.kcal > (targets?.kcal||2500) ? 'rgba(239,68,68,0.15)' : 'rgba(0,230,138,0.12)'}` }}>{Math.round(dayTotals.kcal)}/{targets?.kcal||2500} ккал</span>
+        </div>
+        <MacroSummary dayTotals={dayTotals} targets={targets} />
+      </div>
       
       
       
