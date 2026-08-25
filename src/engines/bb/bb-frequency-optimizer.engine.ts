@@ -17,6 +17,7 @@
 import { computePerMuscleACWR } from './bb-progression-feedback.engine';
 import { epley1RM } from '../e1rm';
 import type { BBPlan } from './bb-builder.engine';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
 export interface MuscleFrequencyRecommendation {
   muscle: string;
@@ -108,20 +109,20 @@ export function optimizeMuscleFrequency(
     let acwr: number | undefined;
     let e1rmTrend: number | undefined;
 
-    // ACWR-based adjustment
+    // ACWR-based adjustment (нагрузка vs восстановление)
     const acwrData = perMuscleACWR[muscle];
     if (acwrData) {
       acwr = acwrData.ratio;
       if (acwr > 1.5) {
         recommended = Math.max(1, current - 1);
-        reasons.push(`ACWR ${acwr.toFixed(2)} > 1.5 (danger) → снизить частоту`);
+        reasons.push(`ACWR ${acwr.toFixed(2)} — перегруз (выше 1.5, опасная зона) → снизить частоту, добавить восстановление`);
       } else if (acwr > 1.3) {
         // Caution — не снижать, но не повышать
-        reasons.push(`ACWR ${acwr.toFixed(2)} (caution) → держать частоту`);
+        reasons.push(`ACWR ${acwr.toFixed(2)} — зона осторожности (1.3-1.5) → держать частоту, следить за восстановлением`);
       } else if (acwr < 0.7 && current < 3) {
         // Undertrained — можно повысить
         recommended = current + 1;
-        reasons.push(`ACWR ${acwr.toFixed(2)} < 0.7 (недогруз) → повысить частоту`);
+        reasons.push(`ACWR ${acwr.toFixed(2)} — недогруз (ниже 0.7) → можно повысить частоту, мышца недотренирована`);
       }
     }
 
@@ -168,13 +169,14 @@ export function optimizeMuscleFrequency(
 
   const totalAdjustments = recommendations.length;
   if (totalAdjustments > 0) {
-    rationale.push(`🔧 Per-muscle frequency optimization: ${totalAdjustments} корректировок на основе ACWR/размера мышцы.`);
+    rationale.push(`🔧 Оптимизация частоты по мышцам: ${totalAdjustments} корректировок на основе ACWR и размера мышцы.`);
     for (const rec of recommendations) {
-      const direction = rec.recommendedFrequency > rec.currentFrequency ? '↑' : '↓';
-      rationale.push(`  ${direction} ${rec.muscle}: ${rec.currentFrequency}→${rec.recommendedFrequency}×/нед (${rec.reason})`);
+      const direction = rec.recommendedFrequency > rec.currentFrequency ? '↑ повысить' : '↓ снизить';
+      const ru = MUSCLE_LABEL_RU[rec.muscle] || rec.muscle;
+      rationale.push(`  ${direction} «${ru}»: ${rec.currentFrequency}→${rec.recommendedFrequency}×/нед — ${rec.reason}`);
     }
   } else {
-    rationale.push('✅ Per-muscle frequency: все частоты оптимальны (ACWR в норме, размер учтён).');
+    rationale.push('✅ Частота по мышцам оптимальна — ACWR в норме, размер и восстановление учтены.');
   }
 
   return { recommendations, totalAdjustments, rationale };

@@ -18,21 +18,21 @@ export type ExLike = {
   rir?: number;
 };
 
-/** Метки интенсив-техник (ключи workSets[].technique из bb-autocoach / bb-finalize). */
+/** Метки интенсив-техник (ключи workSets[].technique из bb-autocoach / bb-finalize). Код EN, UI RU. */
 export const TECHNIQUE_LABELS: Record<string, string> = {
   drop_set: 'Дроп-сет',
   dropset: 'Дроп-сет',
   rest_pause: 'Отдых-пауза',
-  myo_reps: 'Myo-reps',
-  myo_rep: 'Myo-reps',
+  myo_reps: 'Myo-повторы',
+  myo_rep: 'Myo-повторы',
   twenty_ones: '21s (7-7-7)',
-  negative: 'Негативы',
-  pause_rep: 'Pause-rep',
+  negative: 'Негативы (3-4с)',
+  pause_rep: 'Пауза-повтор (2-3с)',
   mechanical_drop: 'Механический дроп',
-  bfr: 'BFR (окклюзия)',
-  lengthened_partials: 'Lengthened partials',
-  slow_eccentric: 'Медленный эксцентрик',
-  rest_pause_cluster: 'Кластерный rest-pause',
+  bfr: 'BFR (окклюзия 30-15-15-15)',
+  lengthened_partials: 'Частичные в растянутой',
+  slow_eccentric: 'Медленный негатив 4с',
+  rest_pause_cluster: 'Кластер (2+2+2)',
   superset: 'Суперсет',
   triset: 'Трисет',
   pre_exhaust: 'Пре-истощение',
@@ -114,8 +114,8 @@ export function techniqueChainParts(ex: ExLike, editedWeight?: number): ChainRes
     case 'myo_reps':
     case 'myo_rep':
       return {
-        label: 'Myo-reps',
-        parts: [`${reps}×${round(w)} (активация)`, `4×4×${round(w)} (5с)`],
+        label: 'Myo-повторы',
+        parts: [`${reps}×${round(w)} (активация)`, `4×4×${round(w)} (5с пауза)`],
       };
     case 'twenty_ones':
       return { label: '21s (7-7-7)', parts: ['21 повт: 7 нижних + 7 верхних + 7 полных'] };
@@ -125,7 +125,7 @@ export function techniqueChainParts(ex: ExLike, editedWeight?: number): ChainRes
         parts: [`${reps}×${round(w)}`, 'темп 4-2-1-0, последние 1-2 повтора с контролем'],
       };
     case 'pause_rep':
-      return { label: 'Pause-rep', parts: [`${reps}×${round(w)}`, 'пауза 2-3с в нижней точке'] };
+      return { label: 'Пауза-повтор (2-3с)', parts: [`${reps}×${round(w)}`, 'пауза 2-3с в нижней точке (убирает инерцию)'] };
     case 'mechanical_drop':
       return {
         label: 'Механический дроп',

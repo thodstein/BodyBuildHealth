@@ -34,6 +34,7 @@ import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { PATTERN_RU as SUMMARY_PATTERN_RU } from '../../../engines/bb/bb-summary.engine';
+import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { recommendPEDMethodology } from '../../../engines/bb/bb-ped-methodology.engine';
 import { getAllVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
@@ -275,27 +276,51 @@ function computePhases(totalWeeks: number, goal: string = 'mass'): { week: numbe
 
 function exerciseComment(ex: BBExercise, weakPoints: string[], focusGroup: string, phase: BBPhase): string {
   const parts: string[] = [];
+  const ruMuscle = (MUSCLE_LABEL_RU as any)[ex.muscle] || ex.muscle;
+  // Роль упражнения — подробно
   if (ex.role === 'primary') {
-    parts.push('🎯 Основное движение');
-    if (weakPoints.includes(ex.muscle)) parts.push('🔥 Акцент на отстающую');
-    if (focusGroup === ex.muscle) parts.push('⭐ Группа специализации');
+    parts.push(`🎯 Основное движение для «${ruMuscle}» — тяжёлая база, главный стимул гипертрофии этой группы`);
+    if (weakPoints.includes(ex.muscle)) parts.push(`🔥 Акцент на отстающую «${ruMuscle}» — дополнительный объём и приоритет в начале дня`);
+    if (focusGroup === ex.muscle) parts.push(`⭐ Группа специализации «${ruMuscle}» — повышенный приоритет объёма`);
   } else {
-    parts.push('📌 Добивочное');
+    parts.push(`📌 Добивочное для «${ruMuscle}» — изоляция/добивка после базы, RIR 2-3, контроль техники`);
   }
-  const phaseTech = PHASE_TECHNIQUES[phase];
-  if (phaseTech.length > 0) {
-    const seed = (ex.name || '').split('').reduce((a, c, i) => a + c.charCodeAt(0) * (i + 1), 0);
-    const techHint = phaseTech[seed % phaseTech.length];
-    parts.push('💡 ' + techHint);
-  }
-  if (ex.character === 'тяж') parts.push('💪 Силовая нагрузка');
-  else if (ex.character === 'памп') parts.push('🩸 Нагнетание крови');
-  const catalogEx = EXERCISE_CATALOG.find(e => e.name === ex.name || e.name === ex.muscle);
-  if (catalogEx?.movementPattern) parts.push('🧬 ' + catalogEx.movementPattern);
+  // Характер нагрузки — развёрнуто
+  if (ex.character === 'тяж') parts.push('💪 Характер: тяж — 6-10 повторов, RIR 1-2, максимум механического натяга, отдых 2-3 мин');
+  else if (ex.character === 'памп') parts.push('🩸 Характер: памп — 12-20 повторов, RIR 3, метаболический стресс и жжение, пауза 45-60 сек');
+  else parts.push('🌿 Характер: лёгкий — техника/восстановление, RIR 4');
+  // Фаза — адаптация
+  const phaseDesc: Record<string, string> = {
+    accumulation: 'Фаза «Накопление»: умеренный вес, больший объём, темп 3-1-1-0, акцент на растянутой позиции',
+    intensification: 'Фаза «Интенсификация»: тяжёлый вес, RIR 1-2, темп 2-0-1-0, максимум напряжения',
+    deload: 'Фаза «Разгрузка»: 50% объёма, RIR 3-4, лёгкие веса — восстановление ЦНС и суставов',
+    peaking: 'Фаза «Пик»: минимальный объём, околопредельные веса RIR 0-1 — реализация силы',
+  };
+  if (phaseDesc[phase]) parts.push(`📅 ${phaseDesc[phase]}`);
+  // Паттерн движения — по-русски, из каталога или movementPattern упражнения
+  const catalogEx: any = EXERCISE_CATALOG.find((e: any) => e.name === ex.name || e.id === (ex as any).exerciseName);
+  const rawPat = catalogEx?.movementPattern || (ex as any).movementPattern || '';
+  const patRu = rawPat ? (SUMMARY_PATTERN_RU[rawPat] || rawPat) : '';
+  if (patRu) parts.push(`🧬 Паттерн: ${patRu}`);
+  // Дополнительные мышцы (синергисты) — по-русски
   if (catalogEx?.targetMuscle) {
-    const targets = catalogEx.targetMuscle.split(',').map(t => t.trim()).filter(t => t !== ex.muscle);
-    if (targets.length > 0) parts.push('🎯 Доп. нагрузка: ' + targets.join(', '));
+    const targets = String(catalogEx.targetMuscle).split(',').map((t: string) => t.trim()).filter((t: string) => t && t !== ex.muscle);
+    if (targets.length) parts.push(`🎯 Дополнительно нагружает: ${targets.map((t: string) => (MUSCLE_LABEL_RU as any)[t] || t).join(', ')}`);
   }
+  // Суперсет / техника
+  const ss = (ex as any).supersetWith;
+  if (ss) parts.push(`🔗 Суперсет с «${ss}» — выполняется без отдыха между упражнениями пары`);
+  const lastTech: any = (ex as any).workSets?.[ (ex as any).workSets.length - 1]?.technique;
+  if (lastTech) {
+    const tLabel = techniqueLabel(lastTech);
+    if (tLabel) parts.push(`💥 Интенсив-техника: ${tLabel} на последнем подходе — продлевает сет за отказом`);
+  }
+  // Вес / RIR / отдых — факт плана
+  const w = (ex as any).workSets?.[0]?.weight ?? 0;
+  const r = (ex as any).workSets?.[0]?.reps ?? ex.sets;
+  const rir = (ex as any).rir ?? 2;
+  const rest = (ex as any).restSeconds ?? (ex as any).workSets?.[0]?.restSeconds;
+  if (w) parts.push(`⚙️ Нагрузка плана: ${ex.sets}×${r} @ ${w} кг, RIR ${rir}${rest ? `, отдых ${rest} сек` : ''}`);
   return parts.join(' · ');
 }
 
@@ -3038,19 +3063,23 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* PRO: Per-muscle frequency optimization recommendations */}
+        {/* PRO: Per-muscle frequency optimization — полностью на русском */}
         {freqOptResult && freqOptResult.totalAdjustments > 0 && (
           <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🔧 Frequency Optimization ({freqOptResult.totalAdjustments} корректировок)</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🔧 Оптимизация частоты по мышцам — {freqOptResult.totalAdjustments} корректировок</div>
+            <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.4, padding:'6px 8px', background:'rgba(245,158,11,0.04)', borderRadius:8 }}>На основе восстановления: ACWR (острая/хроническая нагрузка) и тренд силы e1RM. Малая мышца → 2-3×/нед, большая → 1.5-2×/нед. Рекомендации уже учитывают PED и стаж.</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {freqOptResult.recommendations.map((rec: any, i: number) => {
-                const direction = rec.recommendedFrequency > rec.currentFrequency ? '↑' : '↓';
-                const color = rec.recommendedFrequency > rec.currentFrequency ? '#22c55e' : '#ef4444';
+                const up = rec.recommendedFrequency > rec.currentFrequency;
+                const direction = up ? '↑ повысить' : '↓ снизить';
+                const color = up ? '#22c55e' : '#ef4444';
+                const ruMuscle = (MUSCLE_LABEL_RU as any)[rec.muscle] || rec.muscle;
                 return (
-                  <div key={i} style={{ fontSize:11, color:'#fff', display:'flex', gap:8 }}>
-                    <span style={{ color, fontWeight:700 }}>{direction} {rec.muscle}:</span>
-                    <span>{rec.currentFrequency}→{rec.recommendedFrequency}×/нед</span>
-                    <span style={{ color:'#fff' }}>({rec.reason})</span>
+                  <div key={i} style={{ fontSize:11, color:'#fff', display:'flex', gap:6, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)', lineHeight:1.4 }}>
+                    <span style={{ color, fontWeight:800, whiteSpace:'nowrap' }}>{direction}</span>
+                    <span style={{ fontWeight:700 }}>{ruMuscle}:</span>
+                    <span style={{ fontWeight:700, color }}>{rec.currentFrequency}→{rec.recommendedFrequency}×/нед</span>
+                    <span style={{ color:'#fff', flex:1 }}>{rec.reason}</span>
                   </div>
                 );
               })}
@@ -3058,20 +3087,21 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
         )}
 
-        {/* PRO: Auto-regulation status panel — что сделал diary feedback loop */}
+        {/* PRO: Авто-регуляция — полностью на русском */}
         {(() => {
           const summary = summarizeAutoRegulation(builtPlan);
           if (summary.adjustedExercises === 0) return null;
           return (
             <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
               <div style={{ fontSize:12, fontWeight:800, color:'#a855f7', marginBottom:6 }}>
-                ↻ Auto-regulation: {summary.adjustedExercises}/{summary.totalExercises} упражнений скорректировано из дневника
+                ↻ Авто-регуляция по дневнику: {summary.adjustedExercises}/{summary.totalExercises} упражнений скорректировано
               </div>
-              <div style={{ display:'flex', gap:12, fontSize:11, color:'#fff', marginBottom:6 }}>
-                {summary.weightIncreases > 0 && <span style={{ color:'#22c55e' }}>↑ Вес +{summary.weightIncreases}</span>}
-                {summary.weightDecreases > 0 && <span style={{ color:'#ef4444' }}>↓ Вес −{summary.weightDecreases}</span>}
-                {summary.rirAdjustments > 0 && <span style={{ color:'#f59e0b' }}>RIR ±{summary.rirAdjustments}</span>}
-                {summary.plateauDetected > 0 && <span style={{ color:'#ef4444' }}>⚠ Plateau: {summary.plateauDetected}</span>}
+              <div style={{ fontSize:10, color:'#fff', marginBottom:6, lineHeight:1.4 }}>Сравнение плана и факта (RIR, вес × повторы) — веса/повторы следующей недели подстраиваются под вашу реальную силу, а не слепую линейку.</div>
+              <div style={{ display:'flex', gap:12, fontSize:11, color:'#fff', marginBottom:6, flexWrap:'wrap' }}>
+                {summary.weightIncreases > 0 && <span style={{ color:'#22c55e' }}>↑ Вес повышен: {summary.weightIncreases} упр.</span>}
+                {summary.weightDecreases > 0 && <span style={{ color:'#ef4444' }}>↓ Вес снижен: {summary.weightDecreases} упр.</span>}
+                {summary.rirAdjustments > 0 && <span style={{ color:'#f59e0b' }}>RIR скорректирован: {summary.rirAdjustments} упр.</span>}
+                {summary.plateauDetected > 0 && <span style={{ color:'#ef4444' }}>⚠ Плато: {summary.plateauDetected} групп</span>}
               </div>
               <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                 {summary.details.slice(0, 5).map((d, i) => (
@@ -3476,11 +3506,28 @@ export const BbAutoConstructor: React.FC = () => {
         {(() => {
           const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks, currentPhase).slice(0, 6);
           if (targets.length === 0) return null;
+          const STRAT_RU: Record<string,string> = { double_progression:'Двойная прогрессия', linear:'Линейная', wave:'Волновая', rpe_based:'RPE-авторегуляция' };
+          const stratRu = STRAT_RU[loadStrategy] || loadStrategy;
+          const stratDesc: Record<string,string> = {
+            double_progression: 'Сначала добейте верх диапазона повторов с текущим весом, затем повысьте вес на 5% и вернитесь к низу диапазона.',
+            linear: 'Каждую неделю +2.5 кг на базу, +1 кг на изоляцию (если повторы удержаны).',
+            wave: '3-нед волны: неделя 1 — тяж, 2 — сред, 3 — лёгк (разгрузка).',
+            rpe_based: 'Вес по ощущению: цель RIR фазы, факт RIR подсказывает +вес или −вес.',
+          };
           return (
-            <ExpandableCard title={'🎯 Цели прогрессии на эту неделю (' + loadStrategy.replace('_', ' ') + ')'} icon="🎯" short={targets[0].nextTarget + (targets.length > 1 ? (' + ещё ' + (targets.length - 1)) : '')} full={
-              <div>{targets.map((t, i) => <div key={i} style={{ padding:'4px 8px', marginBottom:4, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', fontSize:11, color:'#fff' }}>
-                <b>{t.exerciseName}</b>: {t.nextTarget}
-              </div>)}</div>
+            <ExpandableCard title={`🎯 Цели прогрессии — неделя ${wk.week} (${stratRu})`} icon="🎯" short={`${targets[0].exerciseName}: ${targets[0].nextTarget}${targets.length > 1 ? ` + ещё ${targets.length - 1} целей` : ''}`} full={
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <div style={{ fontSize:10, color:'#fff', padding:'6px 8px', background:'rgba(96,165,250,0.06)', borderRadius:8, lineHeight:1.4 }}>
+                  <b>Стратегия:</b> {stratRu} — {stratDesc[loadStrategy] || ''} Фаза: {PHASE_LABELS[currentPhase as BBPhase] || currentPhase}. Вес считается от рабочего максимума с учётом RIR.
+                </div>
+                {targets.map((t, i) => (
+                  <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
+                    <div style={{ fontWeight:700, color:'#60a5fa', marginBottom:2 }}>{i+1}. {t.exerciseName}</div>
+                    <div>Сейчас: <b>{t.currentWeight} кг × {t.currentReps}</b> ({t.currentSets} подход.ов) → <span style={{ color:'#22c55e', fontWeight:700 }}>{t.nextTarget}</span></div>
+                    <div style={{ fontSize:10, color:'#fff', opacity:0.85, marginTop:2 }}>Подсказка: если выполнили цель на прошлой неделе (все сеты до верха повторов с нужным RIR) — повышайте вес, иначе добивайте повторы.</div>
+                  </div>
+                ))}
+              </div>
             } />
           );
         })()}
@@ -3807,13 +3854,18 @@ export const BbAutoConstructor: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Комментарий и полная тренерская инструкция */}
+                        {/* Комментарий и полная тренерская инструкция — разбивка по пунктам */}
                         <details style={{ marginTop:6 }} open={false}>
                           <summary style={{ fontSize:11, fontWeight:700, color:'rgba(0,230,138,0.8)', cursor:'pointer', padding:'5px 8px', borderRadius:8, background:'rgba(0,230,138,0.04)' }}>
-                            📖 Полная инструкция: паттерн · техника · прогрессия
+                            📖 Полная инструкция — развернуто
                           </summary>
-                          <div style={{ marginTop:4, fontSize:11, color:'#fff', lineHeight:1.5, padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.025)', whiteSpace:'normal' }}>
-                            {comment}
+                          <div style={{ marginTop:4, fontSize:10, color:'#fff', lineHeight:1.55, padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                            {String(comment).split(' · ').map((part: string, idx: number) => (
+                              <div key={idx} style={{ display:'flex', gap:6, marginBottom:3, alignItems:'flex-start' }}>
+                                <span style={{ color:'#00e68a', fontWeight:800, flexShrink:0 }}>{idx+1}.</span>
+                                <span style={{ flex:1 }}>{part}</span>
+                              </div>
+                            ))}
                           </div>
                         </details>
                         {(() => {
@@ -3834,12 +3886,28 @@ export const BbAutoConstructor: React.FC = () => {
                           );
                         })()}
                         {(() => {
+                          const profTech = e.executionProfile || buildExerciseInstructions({ exerciseName: e.name, muscle: e.muscle, role: e.role, trainingFocus: bbTrainingFocus, level: bbLevel, tempo: e.workSets[0]?.tempo, restSeconds: e.workSets[0]?.restSeconds });
                           const tech = technique || (e as any).technique || (e.executionProfile as any)?.technique;
-                          const fallbackTech = !tech ? 'Контролируйте эксцентрик 2-3с, без рывков, полная амплитуда, дыхание — выдох на усилии.' : null;
+                          const cues = profTech?.cues?.length ? profTech.cues : (tech ? [tech] : []);
                           return (
-                          <details style={{ marginTop:4 }}>
-                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(0,230,138,0.75)', cursor:'pointer' }}>💡 Техника выполнения</summary>
-                            <div style={{ fontSize:10, color:'#fff', padding:'4px 8px', lineHeight:1.45, marginTop:2, borderRadius:8, background:'rgba(0,230,138,0.05)' }}>{tech || fallbackTech}</div>
+                          <details style={{ marginTop:4 }} open={false}>
+                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(0,230,138,0.75)', cursor:'pointer' }}>💡 Техника выполнения — пошагово</summary>
+                            <div style={{ fontSize:10, color:'#fff', padding:'6px 8px', lineHeight:1.5, marginTop:2, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.1)' }}>
+                              {cues.length > 0 ? (
+                                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                                  {cues.map((c: string, idx: number) => (
+                                    <div key={idx} style={{ display:'flex', gap:6, alignItems:'flex-start' }}>
+                                      <span style={{ minWidth:18, height:18, borderRadius:'50%', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:9, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{idx+1}</span>
+                                      <span style={{ flex:1 }}>{c}</span>
+                                    </div>
+                                  ))}
+                                  {profTech?.tempo && <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(255,255,255,0.03)', borderRadius:6 }}><b>Темп:</b> {profTech.tempo} — {tempoExplain(profTech.tempo) || 'контролируйте каждую фазу'}</div>}
+                                </div>
+                              ) : (
+                                <div>{tech || 'Контролируйте эксцентрик 2-3с, без рывков, полная амплитуда, дыхание — выдох на усилии.'}</div>
+                              )}
+                              <div style={{ marginTop:6, fontSize:9, color:'#fff', opacity:0.85, lineHeight:1.35 }}>Дыхание: выдох на усилии, вдох на опускании. Кор держите напряжённым весь подход.</div>
+                            </div>
                           </details>
                           );
                         })()}
@@ -3858,13 +3926,25 @@ export const BbAutoConstructor: React.FC = () => {
                           </details>
                         )}
 
-                        {/* Rationale — реальная логика, не "есть описание +5" */}
-                        {e.rationale && (
-                          <details style={{ marginTop:4 }}>
-                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему это упражнение в программе?</summary>
-                            <div style={{ fontSize:10, color:'#fff', padding:'4px 8px', lineHeight:1.5, marginTop:2, whiteSpace:'pre-wrap' }}>{e.rationale}</div>
+                        {/* Rationale — подробно, без мусора */}
+                        {e.rationale && (() => {
+                          const targetNote = exerciseTargetNote(e as any);
+                          const cleanRationale = String(e.rationale || '').replace(/Опытный уровень:\s*/g, '').replace(/Малые группы:\s*/g, '').trim();
+                          return (
+                          <details style={{ marginTop:4 }} open={false}>
+                            <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему именно это упражнение?</summary>
+                            <div style={{ fontSize:10, color:'#fff', padding:'6px 8px', lineHeight:1.55, marginTop:2, background:'rgba(96,165,250,0.05)', borderRadius:8, border:'1px solid rgba(96,165,250,0.1)' }}>
+                              <div style={{ marginBottom:4 }}><b>Логика подбора:</b> {cleanRationale || e.rationale}</div>
+                              {targetNote && <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(59,130,246,0.06)', borderRadius:6, border:'1px solid rgba(59,130,246,0.12)' }}>{targetNote}</div>}
+                              <div style={{ marginTop:6, fontSize:9, color:'#fff', opacity:0.9, lineHeight:1.4 }}>
+                                Роль: {e.role === 'primary' ? 'основное движение дня — даёт 60-70% стимула' : 'добивка/изоляция — добивает объём и формирует детали'} · 
+                                Характер: {e.character === 'тяж' ? 'тяж (6-10 повт, RIR 1-2)' : e.character === 'памп' ? 'памп (12-20, RIR 3)' : 'лёгкий'} · 
+                                Паттерн: {(SUMMARY_PATTERN_RU[(e as any).movementPattern || ''] || (e as any).movementPattern || 'силовой') }
+                              </div>
+                            </div>
                           </details>
-                        )}
+                          );
+                        })()}
                         {/* Темп — внизу карты */}
                         {e.workSets[0]?.tempo && (
                           <details style={{ marginTop:4 }}>

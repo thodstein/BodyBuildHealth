@@ -7,6 +7,7 @@ import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { TAG_MUSCLES } from './bb-day-types';
 import { isCompoundEx } from './bb-session-order.engine';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 
 export interface BBPlanValidationIssue {
   level: 'error' | 'warning';
@@ -257,12 +258,13 @@ export function generateActionableRecommendations(
         const match = issue.message.match(/([\w_]+):.*volume\s+([\d.]+).*MEV\s+(\d+)/);
         if (match) {
           const muscle = match[1];
+          const ru = MUSCLE_LABEL_RU[muscle] || muscle;
           const current = parseFloat(match[2]);
           const mev = parseInt(match[3]);
           const deficit = Math.ceil(mev - current);
           recs.push({
             priority: 'high',
-            action: `Добавьте ${deficit} сет(а) на ${muscle}: включите feeder-сеты или добавьте изоляцию в ближайший день.`,
+            action: `Добавьте ${deficit} подход(ов) на «${ru}»: текущие эффективные ${current} < минимума MEV ${mev}. Включите фидер-сет (2-3 сета изоляции) или добавьте упражнение в ближайшую тренировку этой мышцы.`,
             code: issue.code,
           });
         }
@@ -272,12 +274,13 @@ export function generateActionableRecommendations(
         const match = issue.message.match(/([\w_]+):.*effective\s+([\d.]+).*MRV\s+(\d+)/);
         if (match) {
           const muscle = match[1];
+          const ru = MUSCLE_LABEL_RU[muscle] || muscle;
           const current = parseFloat(match[2]);
           const mrv = parseInt(match[3]);
           const excess = Math.ceil(current - mrv);
           recs.push({
             priority: 'high',
-            action: `Снизьте ${excess} сет(а) на ${muscle}: уберите accessory или уменьшите сеты primary в неделе ${issue.week || ''}.`,
+            action: `Снизьте ${excess} подход(ов) на «${ru}»: эффективные ${current} > максимума MRV ${mrv} (риск невосстановления). Уберите одно изолирующее или уменьшите сеты базы в неделе ${issue.week || ''}.`,
             code: issue.code,
           });
         }
@@ -316,17 +319,19 @@ export function generateActionableRecommendations(
         break;
       }
       case 'session_muscle_leak': {
+        const ru = issue.exercise ? (MUSCLE_LABEL_RU[issue.exercise] || issue.exercise) : 'Упражнение';
         recs.push({
           priority: 'low',
-          action: `${issue.exercise || 'Упражнение'} не соответствует дню — замените на упражнение целевой группы.`,
+          action: `«${ru}» не соответствует дню тренировки — упражнение поставлено в чужой день (утечка). Замените на движение целевой группы дня.`,
           code: issue.code,
         });
         break;
       }
       case 'low_training_frequency': {
+        const ru = issue.exercise ? (MUSCLE_LABEL_RU[issue.exercise] || issue.exercise) : 'Мышца';
         recs.push({
           priority: 'medium',
-          action: `${issue.exercise || 'Мышца'} 1×/нед — добавьте 2-й день: смените сплит на FullBody/Upper-Lower/PPL 4-6× для ≥2× стимула.`,
+          action: `«${ru}» тренируется 1× в неделю — мало для гипертрофии (Schoenfeld: 2× даёт +63% роста). Смените сплит на FullBody / Upper-Lower / PPL 4-6×, чтобы дать ≥2 стимула в неделю.`,
           code: issue.code,
         });
         break;

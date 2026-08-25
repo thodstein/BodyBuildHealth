@@ -199,7 +199,7 @@ function allocateExperiencedBackSession(session: any, week: any, options: BBFina
       muscle: 'back', name: seed.name, exerciseName: seed.name, role: 'primary', character: 'тяж',
       sets: 4, repsRange: [8, 12], rir: 2, exerciseType: seed.type || 'compound', restSeconds: 150,
       workSets: Array.from({ length: 4 }, () => ({ reps: 10, rir: 2, weight: Math.round(wm * 0.65 * 10) / 10, restSeconds: 150 })),
-      warmupSets: [], rationale: 'Experienced enhanced adapt: back budget allocation', comment: 'Адаптация: добавлен полноценный блок спины.',
+      warmupSets: [], rationale: 'Опытный уровень: адаптация — распределение объёма спины (добавлен полноценный блок из 4 сетов)', comment: 'Адаптация: добавлен полноценный блок спины для покрытия объёма (тяж, 4×8-12, RIR 2).',
     };
     session.exercises.push(base);
     current = [base];
@@ -463,7 +463,7 @@ function allocateExperiencedArmSession(session: any, week: any, options: BBFinal
     workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 3, weight: Math.round(baseWeight * 0.35 * 10) / 10, restSeconds: 75 })),
     restSeconds: 75,
     warmupSets: [],
-    rationale: `Experienced enhanced: ${targetMuscle} direct residual volume after indirect overlap`,
+    rationale: `Опытный уровень: ${targetMuscle} — остаточный прямой объём после учёта косвенной нагрузки (добивка для покрытия MEV)`,
   });
 }
 
@@ -509,7 +509,7 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
         muscle, name: candidate.name, exerciseName: candidate.name, role: 'primary', character: 'тяж',
         sets: 5, repsRange: [6, 10], rir: 2, restSeconds: 150, warmupSets: [],
         workSets: Array.from({ length: 5 }, () => ({ reps: 8, rir: 2, weight: Math.round(wm * 0.7 * 10) / 10, restSeconds: 150 })),
-        rationale: `Experienced enhanced: тяжёлый ${muscle} compound (день ${heavyQuads ? 'quads' : 'hamstrings'})`,
+        rationale: `Опытный уровень: тяжёлый ${muscle} compound (день ${heavyQuads ? 'quads' : 'hamstrings'})`,
       };
       session.exercises.push(added); items.push(added);
       compound = added;
@@ -548,7 +548,7 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
     added.repsRange = [8, 12]; added.rir = 2; added.restSeconds = 120;
     const sample = base?.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
     added.workSets = Array.from({ length: added.sets }, () => ({ ...sample, reps: 10, rir: 2, restSeconds: 120 }));
-    added.rationale = `Experienced enhanced: второй паттерн ${muscle} (${second.name})`;
+    added.rationale = `Опытный уровень: второй паттерн ${muscle} (${second.name})`;
     session.exercises.push(added); items.push(added); usedNames.add(second.name); total += added.sets;
   }
 
@@ -564,7 +564,7 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
       added.repsRange = [12, 18]; added.rir = 3; added.restSeconds = 60;
       const sample = base?.workSets?.[0] || { reps: 15, rir: 3, weight: 0 };
       added.workSets = Array.from({ length: added.sets }, () => ({ ...sample, reps: 15, rir: 3, restSeconds: 60 }));
-      added.rationale = `Experienced enhanced: памп-добивка ${muscle} (растянутая позиция)`;
+      added.rationale = `Опытный уровень: памп-добивка ${muscle} (растянутая позиция)`;
       session.exercises.push(added); items.push(added); total += added.sets;
     }
   }
@@ -579,7 +579,7 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
       added.repsRange = [10, 15]; added.rir = 2; added.restSeconds = 90;
       const sample = base?.workSets?.[0] || { reps: 12, rir: 2, weight: 0 };
       added.workSets = Array.from({ length: added.sets }, () => ({ ...sample, reps: 12, rir: 2, restSeconds: 90 }));
-      added.rationale = 'Experienced enhanced 6+: дополнительное leg-упражнение (5-сетовый потолок)';
+      added.rationale = 'Опытный уровень 6+: дополнительное leg-упражнение (5-сетовый потолок)';
       session.exercises.push(added); total += added.sets;
     }
   }
@@ -614,7 +614,7 @@ function ensureLegPumpBlock(session: any, options: BBFinalizeOptions, muscle: st
     muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
     sets, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
     workSets: Array.from({ length: sets }, () => ({ reps: 15, rir: 3, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 60 })),
-    rationale: `Experienced enhanced: памповый ${muscle} (день ${muscle === 'quads' ? 'hamstrings' : 'quads'})`,
+    rationale: `Опытный уровень: памповый ${muscle} (день ${muscle === 'quads' ? 'hamstrings' : 'quads'})`,
   });
 }
 
@@ -648,7 +648,7 @@ function ensureGlutesBlock(session: any, options: BBFinalizeOptions, target: num
     muscle: 'glutes', name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: heavyQuads ? 'тяж' : 'памп',
     sets, repsRange: heavyQuads ? [8, 12] : [12, 18], rir: heavyQuads ? 2 : 3, restSeconds: heavyQuads ? 120 : 60, warmupSets: [],
     workSets: Array.from({ length: sets }, () => ({ reps: heavyQuads ? 10 : 15, rir: heavyQuads ? 2 : 3, weight: Math.round(baseWeight * (heavyQuads ? 0.5 : 0.25) * 10) / 10, restSeconds: heavyQuads ? 120 : 60 })),
-    rationale: `Experienced enhanced: glutes ${heavyQuads ? 'тяж (hip thrust)' : 'памп (отведение)'}`,
+    rationale: `Опытный уровень: glutes ${heavyQuads ? 'тяж (hip thrust)' : 'памп (отведение)'}`,
   });
 }
 
@@ -741,7 +741,7 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
       added.repsRange = [12, 18];
       added.rir = 3;
       added.workSets = Array.from({ length: 3 }, () => ({ ...sample, reps: 15, rir: 3 }));
-      added.rationale = 'Experienced enhanced: chest fly/cable diversity вместо 4-го жима';
+      added.rationale = 'Опытный уровень: chest fly/cable diversity вместо 4-го жима';
       session.exercises.splice(session.exercises.indexOf(target), 1, added);
     }
   }
@@ -761,7 +761,7 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
         muscle: 'chest', name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
         workSets: Array.from({ length: 3 }, () => ({ ...sample, reps: 15, rir: 3, restSeconds: 60 })),
-        rationale: 'Experienced enhanced: pump-day chest fly (растянутая позиция)',
+        rationale: 'Опытный уровень: pump-day chest fly (растянутая позиция)',
       });
     }
   }
@@ -785,7 +785,7 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
         muscle: 'shoulders', name: lateral.name, exerciseName: lateral.name, role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 45, warmupSets: [],
         workSets: Array.from({ length: 3 }, () => ({ reps: 15, rir: 3, weight: Math.round(baseWeight * 0.25 * 10) / 10, restSeconds: 45 })),
-        rationale: 'Experienced enhanced: mid delt с грудью (Push-связка, lateral raise)',
+        rationale: 'Опытный уровень: mid delt с грудью (Push-связка, lateral raise)',
       });
     }
   }
@@ -827,7 +827,7 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
         muscle: 'chest', name: cand.name, exerciseName: cand.name, role: 'accessory', character: heavyDay ? 'тяж' : 'памп',
         sets, repsRange: heavyDay ? [8, 12] : [12, 15], rir: heavyDay ? 2 : 3, restSeconds: 90, warmupSets: [],
         workSets: Array.from({ length: sets }, () => ({ reps: heavyDay ? 10 : 12, rir: heavyDay ? 2 : 3, weight: Math.round(wm * (heavyDay ? 0.7 : 0.5) * 10) / 10, restSeconds: 90 })),
-        rationale: 'Experienced enhanced: chest volume top-up (Upper/Push co-main)',
+        rationale: 'Опытный уровень: chest volume top-up (Upper/Push co-main)',
       });
       usedNames.add(cand.name);
       addedSets += sets;
@@ -937,7 +937,7 @@ function ensureRearDeltInPull(session: any, week: any, options: BBFinalizeOption
     workSets: Array.from({ length: 3 }, () => ({ reps: 15, rir: 3, weight: Math.round(baseWeight * 0.35 * 10) / 10, restSeconds: 60 })),
     restSeconds: 60,
     warmupSets: [],
-    rationale: 'Experienced enhanced: rear delt (Pull-работа)',
+    rationale: 'Опытный уровень: rear delt (Pull-работа)',
   });
 }
 
@@ -1146,11 +1146,14 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
       }
     }
   };
-  // Икры: в Legs-сессиях стоя (растянутая икроножная) + сидя (камбаловидная).
+  // Икры: в каждый день ног — два движения: стоя/жим ногами + сидя.
+  // По ТЗ: «икры делаем одно упражнение стоя либо в жиме ногами второе сидя»
+  // — гарантируем оба в КАЖДОЙ Legs-сессии (а не «до 2 источников в неделю»).
   if (/Legs|Lower|LowerPower|LowerHyp|FullBody/.test(tag) && !muscleExcluded('calves')) {
     const calves = working.filter((e: any) => e.muscle === 'calves');
     const calvesSessions = weekCountOf('calves');
-    const standing = calves.find((e: any) => /носк|calf/i.test(e.name || '') && !/сидя|sitting|seated/i.test(e.name || ''));
+    // Стоя / жим ногами — растянутая икроножная (прямое колено).
+    const standing = calves.find((e: any) => /носк|calf|жим.*ног.*нос/i.test(e.name || '') && !/сидя|sitting|seated/i.test(e.name || ''));
     if (standing) {
       // Доводим стоячие до 5-6 сетов (stretch-позиция, задержка): 6 при единственной
       // calves-сессии в неделю (MEV enhanced 10 = 6 стоя + 4 сидя), 5 при двух.
@@ -1160,13 +1163,13 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
         while (standing.sets < targetSets) { standing.workSets.push({ ...sample }); standing.sets += 1; }
       }
     } else {
-      addEx('calves', /подъём.*носк|подъем.*носк|calf.*raise/i, isEnhanced ? 5 : 4, [12, 20], 'Малые группы: икры стоя (растянутая позиция)');
+      // Стоя или в жиме ногами — оба закрывают растянутую позицию.
+      addEx('calves', /подъём.*носк|подъем.*носк|жим.*ног.*носк|жим.*платформ|calf.*raise|leg.*press.*calf/i, isEnhanced ? 5 : 4, [12, 20], 'Икры: стоя / в жиме ногами — растянутая икроножная (прямое колено, пауза 2 сек внизу)');
     }
-    // Сидячие (камбаловидная): добираются, если нет ни одного сидячего
-    // (вторая сессия не обязательна — MEV enhanced 10 требует 6+4 в одной).
+    // Сидячие (камбаловидная) — обязательно во второй слот КАЖДОГО дня ног.
     const seated = calves.find((e: any) => /сидя|sitting|seated/i.test(e.name || ''));
-    if (!seated && !calves.some((e: any) => /сидя/i.test(e.name || ''))) {
-      addEx('calves', /подъём.*носк.*сидя|подъем.*носк.*сидя|seated.*calf/i, isEnhanced ? 4 : 3, [15, 25], 'Малые группы: икры сидя (камбаловидная, stretch)');
+    if (!seated) {
+      addEx('calves', /подъём.*носк.*сидя|подъем.*носк.*сидя|сидя.*носк|seated.*calf/i, isEnhanced ? 4 : 3, [15, 25], 'Икры: сидя — камбаловидная (колено 90°, пауза 1 сек в растяжке)');
     }
   }
   // Пресс: скручивания/подъёмы ног добираются до MEV (5 сетов) в Upper/FullBody.
@@ -1190,9 +1193,9 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
       addEx('forearms', /запяст|wrist|зоттман/i, isEnhanced ? 4 : 3, [12, 20], 'Малые группы: предплечья с тягами (хват)');
     }
   }
-  // Трапеции: шраги доводятся до MEV (natural 5 / enhanced 6) сетов — stretch
-  // + задержка вверху; если шрагов в сессии нет — добавляем (до 2 источников).
-  if (/Pull|Back|Upper|Torso|FullBody/.test(tag) && !muscleExcluded('traps')) {
+  // Трапеции: шраги в КАЖДЫЙ день спины по логике дня.
+  // По ТЗ: «трапеция добавляется в каждый день спины по логике дня» — без лимита 2/нед.
+  if (/Pull|Back|Upper|Torso|FullBody|ChestBack|ShouldersArms/.test(tag) && !muscleExcluded('traps')) {
     const shrug = working.find((e: any) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
     if (shrug) {
       const targetSets = isEnhanced ? 6 : 5;
@@ -1200,8 +1203,9 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
         const sample = shrug.workSets?.[shrug.workSets.length - 1] || { reps: 12, rir: 3, weight: 0 };
         while (shrug.sets < targetSets) { shrug.workSets.push({ ...sample }); shrug.sets += 1; }
       }
-    } else if (weekCountOf('traps') < 2) {
-      addEx('traps', /шраг|shrug/i, isEnhanced ? 6 : 5, [12, 18], 'Малые группы: шраги (stretch, задержка вверху)');
+    } else {
+      // Гарантируем шраги в каждом тяговом/верхнем дне (включая FullBody/ChestBack).
+      addEx('traps', /шраг|shrug/i, isEnhanced ? 6 : 5, [12, 18], 'Трапеции: шраги в день спины — растянутая трапеция, лопатки к ушам, пауза 1 сек вверху');
     }
   }
   // Ягодицы: hip thrust/отведение в Legs/FullBody — natural-сплиты теряют их
@@ -1296,7 +1300,7 @@ function addWarmupActivator(session: any, options: BBFinalizeOptions): void {
     warmupActivator: true,
     warmupSets: [],
     comment: `🌡 Разминка целевой группы ${lead}: ${candidate.name}, 3×12 @ ${weight} кг RIR 4 — активация перед рабочими подходами (не входит в объём).`,
-    rationale: 'Warmup activator: лёгкая активация целевой мышцы перед основным объёмом',
+    rationale: 'Разминка-активация: лёгкая активация целевой мышцы перед основным объёмом',
   });
 }
 
@@ -1889,7 +1893,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
           muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп', sets,
           repsRange: [12, 20], rir: 3, workSets, tempoSpec: '3-0-1-0', restSeconds: 45,
           comment: `MEV feeder: ${sets}×15-20 для покрытия effective MEV ${landmarks.mev} сетов @${weight} кг; session cap ${maxSetsPerSession}. Target deficit: ${target ? target.targetSets - effectiveSets : 0} sets.`,
-          rationale: 'Adaptive MEV coverage feeder', warmupSets: [],
+          rationale: 'Добивка до минимума MEV (адекватный объём)', warmupSets: [],
         });
         used.add(candidate.name);
         remaining -= sets;
@@ -2317,7 +2321,7 @@ for (const week of next.weeks) {
               muscle: 'chest', name: cand.name, exerciseName: cand.name, role: 'accessory', character: 'памп',
               sets, repsRange: [10, 15], rir: 3, restSeconds: 90, warmupSets: [],
               workSets: Array.from({ length: sets }, () => ({ reps: 12, rir: 3, weight: Math.round(wm * 0.5 * 10) / 10, restSeconds: 90 })),
-              rationale: 'Experienced enhanced: chest co-main invariant (Upper/Push)',
+              rationale: 'Опытный уровень: chest co-main invariant (Upper/Push)',
             });
           }
         }
@@ -2902,12 +2906,13 @@ for (const week of next.weeks) {
     session.exercises = session.exercises.map(ex => ex.muscle === 'back' ? annotateBackExercise(ex) : (['biceps', 'triceps', 'forearms'].includes(ex.muscle) ? annotateArmExercise(ex) : ex));
   }
   // День-гард малых мышц: трапеции/предплечья — только в тяговых/верхних днях
-  // (Pull/Back/Upper/FullBody), икры — в ножных. В Push/Chest/Shoulders-only их НЕТ.
+  // (Pull/Back/Upper/Shoulders/FullBody/Torso), икры — в ножных. В Push/Chest-only их НЕТ.
+  // По ТЗ: трапы — в каждый день спины, икры — в каждый день ног (стоя+сидя).
   // Устраняет «шраги в день груди» (и stale-комментарии от slot-замены малой группы).
   for (const week of next.weeks) {
     for (const session of week.sessions) {
       const tag = session.sessionTag || '';
-      const isUpperPull = /Pull|Back|Upper|FullBody|Torso/.test(tag);
+      const isUpperPull = /Pull|Back|Upper|FullBody|Torso|Shoulders|ChestBack|ShouldersArms/.test(tag);
       const isLegsDay = /Legs|Lower/.test(tag);
       session.exercises = session.exercises.filter(ex => {
         if ((ex as any).warmupActivator) return true;
@@ -2958,10 +2963,17 @@ for (const week of next.weeks) {
   }
   // Разминочное упражнение на целевую группу — в самом конце, после всех
   // проходов (budget/dedupe/taper не могут его удалить). Не входит в объём.
+  // По ТЗ: разминочное — ВСЕГДА первое в дне.
   // Только для реальных генераторных планов (pattern.id задан) и не-faithful.
   if (!options.preserveSource && (next as any).pattern?.id) {
     for (const week of next.weeks) for (const session of week.sessions) {
       addWarmupActivator(session, options);
+    }
+    // Гарантия: warmupActivator — первым в дне (поверх любой сортировки).
+    for (const week of next.weeks) for (const session of week.sessions) {
+      const warmups = session.exercises.filter((e: any) => (e as any).warmupActivator);
+      const rest = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      if (warmups.length) session.exercises = [...warmups, ...rest];
     }
     // Пост-разминочная дедупликация: warmup не должен дублировать изолирующий паттерн
     // (3 разгибания/3 пуловера из-за одновременного наличия regular + warmup). Если

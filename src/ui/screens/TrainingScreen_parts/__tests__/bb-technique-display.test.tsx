@@ -48,11 +48,11 @@ describe('bb-technique-display: lastSetTechnique / techniqueLabel', () => {
   it('маппит ключи в русские метки (обе системы имён)', () => {
     expect(techniqueLabel('drop_set')).toBe('Дроп-сет');
     expect(techniqueLabel('dropset')).toBe('Дроп-сет');
-    expect(techniqueLabel('rest_pause')).toBe('Rest-pause');
-    expect(techniqueLabel('myo_reps')).toBe('Myo-reps');
-    expect(techniqueLabel('myo_rep')).toBe('Myo-reps');
+    expect(techniqueLabel('rest_pause')).toBe('Отдых-пауза');
+    expect(techniqueLabel('myo_reps')).toBe('Myo-повторы');
+    expect(techniqueLabel('myo_rep')).toBe('Myo-повторы');
     expect(techniqueLabel('twenty_ones')).toBe('21s (7-7-7)');
-    expect(techniqueLabel('negative')).toBe('Негативы');
+    expect(techniqueLabel('negative')).toBe('Негативы (3-4с)');
     expect(techniqueLabel(null)).toBeNull();
     expect(techniqueLabel('unknown_tech')).toBe('unknown tech');
   });
@@ -90,14 +90,14 @@ describe('bb-technique-display: techniqueChainParts (render-only)', () => {
   it('rest-pause: мини-сеты через 15с', () => {
     const ex = mkEx({ workSets: [{ reps: 8, rir: 1, weight: 60 }, { reps: 8, rir: 1, weight: 60, technique: 'rest_pause' }] });
     const ch = techniqueChainParts(ex)!;
-    expect(ch.label).toBe('Rest-pause');
+    expect(ch.label).toBe('Отдых-пауза');
     expect(ch.parts).toEqual(['8×60', '15с', '3-4×60', '15с', '3-4×60']);
   });
 
   it('myo-reps: активация + мини-сеты', () => {
     const ex = mkEx({ workSets: [{ reps: 15, rir: 2, weight: 30 }, { reps: 15, rir: 2, weight: 30, technique: 'myo_reps' }] });
     const ch = techniqueChainParts(ex)!;
-    expect(ch.label).toBe('Myo-reps');
+    expect(ch.label).toBe('Myo-повторы');
     expect(ch.parts.join(' ')).toContain('15×30');
     expect(ch.parts.join(' ')).toContain('4×4×30');
   });

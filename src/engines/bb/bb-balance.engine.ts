@@ -1,6 +1,19 @@
 import type { BBPlan } from './bb-builder.engine';
 import { derivePattern } from '../movement-pattern';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
+import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
+
+const PATTERN_RU: Record<string, string> = {
+  horizontal_push: 'горизонтальный жим', vertical_push: 'вертикальный жим',
+  horizontal_pull: 'горизонтальная тяга', vertical_pull: 'вертикальная тяга',
+  squat: 'присед', hinge: 'шарнир', lunge: 'выпады',
+  isolation_chest: 'изоляция груди', isolation_back: 'изоляция спины',
+  isolation_shoulders: 'изоляция плеч', isolation_arms: 'изоляция рук',
+  isolation_legs_quad: 'разгибание ног', isolation_legs_ham: 'сгибание ног',
+  isolation_calves: 'икры', core: 'кор', glute_squat: 'ягодичный мост',
+  unknown: 'прочее', other: 'прочее',
+};
+function ruMuscle(m: string): string { return MUSCLE_LABEL_RU[m] || m; }
 
 export interface BBBalanceReport {
   press: number;
@@ -66,16 +79,20 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
   if (report.upperPull > 0 && report.upperPress < report.upperPull * 0.4) report.issues.push(`Перекос верхней части: жимы ${report.upperPress} против тяг ${report.upperPull} сетов.`);
   if (report.press > 0 && report.pull === 0) report.issues.push('Нет тягового объёма при наличии жимов.');
   if (report.pull > 0 && report.press === 0) report.issues.push('Нет жимового объёма при наличии тяг.');
-  if (report.lengthened === 0 && report.midRange > 0) report.issues.push('Нет упражнений в растянутой позиции.');
-  if (report.shortened === 0 && report.midRange > 0) report.issues.push('Нет упражнений в сокращённой позиции.');
+  if (report.lengthened === 0 && report.midRange > 0) report.issues.push('Нет упражнений в растянутой позиции — добавьте наклонные движения, RDL, разведения с паузой.');
+  if (report.shortened === 0 && report.midRange > 0) report.issues.push('Нет упражнений в сокращённой позиции — добавьте кроссоверы, пиковые сокращения, концентрированные подъёмы.');
   for (const [muscle, coverage] of Object.entries(report.byMuscle)) {
-    if (coverage.lengthened === 0 && coverage.midRange > 0) report.issues.push(`${muscle}: нет растянутой позиции.`);
-    if (coverage.shortened === 0 && coverage.midRange > 0) report.issues.push(`${muscle}: нет сокращённой позиции.`);
-    if (Object.keys(coverage.patterns).length === 1 && Object.values(coverage.patterns)[0] >= 4) report.issues.push(`${muscle}: один movement pattern доминирует в объёме.`);
+    const ru = ruMuscle(muscle);
+    if (coverage.lengthened === 0 && coverage.midRange > 0) report.issues.push(`${ru}: нет растянутой позиции — добавьте упражнение в удлинённом положении (наклон 30°, RDL, тяга с паузой внизу).`);
+    if (coverage.shortened === 0 && coverage.midRange > 0) report.issues.push(`${ru}: нет сокращённой позиции — добавьте пиковое сокращение (кроссовер, концентрированный подъём, сведение).`);
+    if (Object.keys(coverage.patterns).length === 1 && Object.values(coverage.patterns)[0] >= 4) {
+      const pat = Object.keys(coverage.patterns)[0];
+      report.issues.push(`${ru}: доминирует один паттерн «${PATTERN_RU[pat] || pat}» (${Object.values(coverage.patterns)[0]} сетов) — добавьте второй угол/хват для разнообразия стимула.`);
+    }
     const totalMuscleSets = coverage.compound + coverage.isolation;
     const isolationDominantByDesign = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs']).has(muscle);
     if (!isolationDominantByDesign && totalMuscleSets >= 6 && coverage.compound < totalMuscleSets * 0.4) {
-      report.issues.push(`${muscle}: только ${coverage.compound}/${totalMuscleSets} сетов compound (менее 40%) — слишком много изоляции ("мусорный объём").`);
+      report.issues.push(`${ru}: только ${coverage.compound}/${totalMuscleSets} сетов базовых (менее 40%) — слишком много изоляции («мусорный объём»). Добавьте базу: жим/тяга/присед.`);
     }
   }
   return report;

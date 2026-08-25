@@ -112,12 +112,67 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
   let cues = catalogCue
     ? [...labCues.filter(cue => cue !== catalogCue).slice(0, 4), catalogCue]
     : labCues.slice(0, 5);
-  if (cues.length === 0) {
-    // Fallback: generic cue по паттерну, чтобы вкладка не была пустой
-    if (pattern.includes('жим')) cues = ['Контроль траектории, без отбива, лопатки сведены.'];
-    else if (pattern.includes('тяга')) cues = ['Тяните локтями, сводите лопатки, без рывков.'];
-    else if (pattern.includes('присед')) cues = ['Глубина ниже параллели, колени по носкам, грудь вверх.'];
-    else cues = ['Контролируйте технику, без рывков, полная амплитуда.'];
+  // Добивка до 3-4 ключей, чтобы техника не была скудной
+  const needCues = 4 - cues.length;
+  if (needCues > 0) {
+    const fallbackByPattern: Record<string, string[]> = {
+      'жим': [
+        'Лопатки сведены и опущены, грудь «колесом», ягодицы и поясница — естественный прогиб, стопы в пол',
+        'Хват чуть шире плеч, локти 70-75° к корпусу, гриф опускается к нижней груди без отбива, пауза 1с внизу',
+        'Выдох на подъёме, контролируемый эксцентрик 2-3с, не сводите локти полностью вверху — держите напряжение',
+      ],
+      'тяга': [
+        'Тяните локтями, а не кистями, сводите лопатки к позвоночнику в конце, грудь вперёд',
+        'Корпус стабилен, без рывков и читинга, спина — нейтраль, гриф близко к телу',
+        'Пауза 1с в сокращении, медленный негатив 2с — чувствуйте широчайшую, не бицепс',
+      ],
+      'присед': [
+        'Стопы на ширине плеч, носки чуть наружу, колени идут по линии носков, грудь вверх',
+        'Глубина — бёдра ниже параллели, таз не подкручивается («клевок» запрещён), вес на середине стопы',
+        'Колени не заваливаются внутрь, подъём — толчком пяток, выдох на вставании',
+      ],
+      'шарнир': [
+        'Таз назад, штанга скользит по ногам, спина — жёсткая нейтраль, взгляд вперёд',
+        'Чувствуйте растяжение бицепса бедра внизу, без округления поясницы, таз — шарнир',
+        'Сокращение — толчком ягодиц вперёд, пауза 1с вверху, медленно вниз 3с',
+      ],
+      'отведение': [
+        'Мах до уровня плеч, локти чуть согнуты, большой палец чуть вниз, без раскачки корпусом',
+        'Ведите локтями, а не кистями, пауза 1с вверху, медленно вниз 2с — жжение в средней дельте',
+      ],
+      'сгибание': [
+        'Локти прижаты к корпусу, без раскачки, супинация вверху для пика бицепса',
+        'Опускание 2-3с, растяжение внизу 1с, не бросайте вес — контролируйте негатив',
+      ],
+      'разгибание': [
+        'Локти неподвижны, фиксированы у корпуса, разгибание до полного выпрямления с паузой 1с',
+        'Не читингуйте корпусом, негатив 2с, чувствуйте трицепс, не плечи',
+      ],
+      'икры': [
+        'Полная амплитуда: внизу — максимум растяжения 2с, вверху — подъём на носки с паузой 1-2с',
+        'Прямое колено для икроножной (стоя), согнутое 90° для камбаловидной (сидя)',
+      ],
+      'пресс': [
+        'Скручивание — поднимайте лопатки, а не поясницу, подбородок к груди, выдох на усилии',
+        'Пауза 1с вверху, медленно вниз 2с, держите пресс напряжённым всю серию',
+      ],
+    };
+    const pickFallback = (): string[] => {
+      const lowerPat = pattern.toLowerCase();
+      for (const [key, arr] of Object.entries(fallbackByPattern)) {
+        if (lowerPat.includes(key)) return arr;
+      }
+      const lowerName = input.exerciseName.toLowerCase();
+      for (const [key, arr] of Object.entries(fallbackByPattern)) {
+        if (lowerName.includes(key)) return arr;
+      }
+      return ['Контролируйте траекторию, без рывков, полная амплитуда, дыхание — выдох на усилии.'];
+    };
+    const fb = pickFallback();
+    for (let i = 0; i < needCues && i < fb.length; i++) {
+      if (!cues.includes(fb[i])) cues.push(fb[i]);
+    }
+    while (cues.length < 3) cues.push('Держите кор, лопатки стабильны, без читинга — качество важнее веса.');
   }
   const tempo = input.tempo || target?.tempoRecommendation || defaultTempo(input.trainingFocus, input.level);
   const order = orderLabel(input);
@@ -127,21 +182,59 @@ export function buildExerciseInstructions(input: ExerciseInstructionInput): Exer
     : lvl === 'beginner' || lvl === 'новичок'
       ? 'Сначала освойте технику (темп 3-1-2-1), затем добавляйте повторы до верхней границы, потом повышайте вес минимальным шагом.'
       : 'Сначала добавляйте повторы до верхней границы, затем повышайте вес минимальным шагом.';
+  // Фолбеки для растяжки/пика/mmc/mistakes, чтобы вкладки не были пустыми
+  const fallbackStretch = (() => {
+    const p = pattern.toLowerCase();
+    if (p.includes('жим')) return 'Внизу — пауза 1-2с с растяжением груди, лопатки сведены, без отбива. Растянутая — ключ к росту.';
+    if (p.includes('тяга')) return 'В растянутой — полный вынос/опускание с растяжением широчайших 1с, лопатки не округлять.';
+    if (p.includes('присед')) return 'Внизу — глубокая посадка с растяжением ягодиц/квадрицепсов, колени наружу, без «клевка» таза.';
+    if (p.includes('шарнир')) return 'Внизу — максимум растяжения бицепса бедра/ягодиц, таз назад, спина нейтраль.';
+    if (p.includes('отведение') || p.includes('мах')) return 'Внизу — рука опущена с лёгким растяжением дельты, не расслабляйте полностью.';
+    return 'Контролируйте растянутую фазу — пауза 1-2с внизу, без потери натяжения.';
+  })();
+  const fallbackPeak = (() => {
+    const p = pattern.toLowerCase();
+    if (p.includes('жим')) return 'Вверху — сведение/выпрямление с пиковым сокращением 1с, не сводите локти до щелчка.';
+    if (p.includes('тяга')) return 'Вверху — сведение лопаток и пиковое сокращение спины 1с, локти к корпусу.';
+    if (p.includes('сгибание') || p.includes('бицепс')) return 'Вверху — супинация и пиковое сокращение бицепса 1с, без закидывания.';
+    return 'В пиковой точке — задержка 1-2с с максимальным сокращением целевой мышцы.';
+  })();
+  const fallbackMmc = (() => {
+    const m = (input.muscle || '').toLowerCase();
+    if (m === 'back') return 'Представляйте, что тянете локтями к карманам, а не руками — так включится спина, а не бицепс.';
+    if (m === 'chest') return 'Думайте, что обнимаете дерево/толкаете локтями вперёд — так включится грудь, а не трицепс.';
+    if (m === 'quads') return 'Толкайте пятками/серединой стопы, колени наружу — чувствуйте квадрицепс, не поясницу.';
+    if (m === 'hamstrings' || m === 'glutes') return 'Толкайте ягодицами вперёд, таз — шарнир, чувствуйте растяжение сзади бедра.';
+    if (m === 'shoulders') return 'Ведите локтями, а не кистями — так включится дельта, а не трапеция.';
+    return 'Медленно, под контролем — чувствуйте целевую мышцу, не вес.';
+  })();
+  const fallbackMistakes = (() => {
+    const p = pattern.toLowerCase();
+    if (p.includes('жим')) return ['Отбив от груди', 'Сведение локтей слишком широко', 'Отрыв ягодиц от скамьи', 'Неполная амплитуда'];
+    if (p.includes('тяга')) return ['Рывки корпусом', 'Тяга руками вместо спины', 'Округление поясницы', 'Неполное сведение лопаток'];
+    if (p.includes('присед')) return ['Завал коленей внутрь', 'Округление спины («клевок»)', 'Недостаточная глубина', 'Подъём пяток'];
+    return ['Читинг корпусом', 'Неполная амплитуда', 'Слишком быстрый негатив', 'Задержка дыхания'];
+  })();
   // Честный источник: exercise-lab ТОЛЬКО при реальной записи (bio БЕЗ generic-fallback)
   // или target-muscle покрытии. Иначе — каталог (есть техника) или generic.
   const source = hasLabBio || target ? 'exercise-lab'
     : id || EXERCISE_CATALOG.some(e => e.name === input.exerciseName) ? 'catalog' : 'generic';
+  const finalMistakes = [...(target?.commonMistakes || []), ...(catalog?.mistakes || [])];
+  while (finalMistakes.length < 3) {
+    const fb = fallbackMistakes[finalMistakes.length % fallbackMistakes.length];
+    if (!finalMistakes.includes(fb)) finalMistakes.push(fb);
+  }
   return {
     pattern,
     cues,
-    stretch: target?.stretchKey || catalog?.stretch,
-    peak: target?.peakKey || catalog?.peak,
-    mmc: target?.mmc,
+    stretch: target?.stretchKey || catalog?.stretch || fallbackStretch,
+    peak: target?.peakKey || catalog?.peak || fallbackPeak,
+    mmc: target?.mmc || fallbackMmc,
     tempo,
     restSeconds: input.restSeconds,
     order,
     progression,
-    mistakes: [...(target?.commonMistakes || []), ...(catalog?.mistakes || [])].slice(0, 4),
+    mistakes: finalMistakes.slice(0, 4),
     intensityTechnique: input.intensityTechnique,
     source,
   };

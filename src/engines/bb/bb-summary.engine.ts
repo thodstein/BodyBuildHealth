@@ -153,10 +153,61 @@ function getPatternForExercise(ex: any): string {
   return derivePattern({ name: ex.name, group: ex.muscle, type: (ex as any).exerciseType || (ex as any).type, targetMuscle: ex.muscle } as any) || 'other';
 }
 
+/** Русские подписи паттернов движения (derivePattern / movementPattern → RU). */
+export const PATTERN_RU: Record<string, string> = {
+  horizontal_push: 'горизонтальный жим',
+  incline_push: 'наклонный жим',
+  decline_push: 'жим в наклоне вниз',
+  dip_push: 'брусья',
+  vertical_push: 'вертикальный жим',
+  horizontal_pull: 'горизонтальная тяга',
+  vertical_pull: 'вертикальная тяга',
+  squat: 'присед / жим ногами',
+  hinge: 'тазобедренный шарнир (RDL)',
+  glute_squat: 'ягодичный мост / тяга',
+  lunge: 'выпады',
+  isolation_chest: 'изоляция груди',
+  isolation_back: 'изоляция спины',
+  isolation_shoulders: 'изоляция плеч',
+  isolation_arms: 'изоляция рук',
+  isolation_legs_quad: 'разгибание ног',
+  isolation_legs_ham: 'сгибание ног',
+  isolation_calves: 'икры',
+  vertical_pull_lat: 'вертикальная тяга',
+  horizontal_pull_row: 'тяга в наклоне',
+  heavy_row: 'тяжёлая тяга',
+  supported_row: 'тяга с упором',
+  unilateral_row: 'тяга одной рукой',
+  lat_isolation: 'изоляция широчайших',
+  upper_back: 'верх спины',
+  rear_delts: 'задняя дельта',
+  traps: 'шраги',
+  erectors: 'разгибатели',
+  biceps_lengthened: 'бицепс растянутый',
+  biceps_shortened: 'бицепс сокращённый',
+  biceps_hammer: 'молотки',
+  triceps_overhead: 'трицепс над головой',
+  triceps_pushdown: 'трицепс блок',
+  triceps_compound: 'трицепс база',
+  forearm: 'предплечья',
+  core: 'кор',
+  anti_rotation: 'анти-ротация',
+  rotation: 'ротация',
+  carry: 'переноска',
+  unknown: 'прочее',
+  other: 'прочее',
+};
+
+export function patternRu(pattern: string): string {
+  return PATTERN_RU[pattern] || pattern;
+}
+
 export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
   const byMuscle: Record<string, BBMuscleSummary> = {};
   let totalWorkingSets = 0;
+  const weeksCount = Math.max(1, plan.weeks?.length || 1);
 
+  // Агрегируем суммарно по всем неделям, затем усредним на неделю (иначе 8-нед план даёт 8×).
   for (const week of plan.weeks) {
     for (const session of week.sessions) {
       const seenMuscles = new Set<string>();
@@ -198,8 +249,29 @@ export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
     }
   }
 
-  for (const week of plan.weeks) {
-    for (const session of week.sessions) {
+  // Нормализуем на неделю (среднее).
+  for (const m of Object.values(byMuscle)) {
+    m.workingSets = Math.round(m.workingSets / weeksCount * 10) / 10;
+    m.warmupSets = Math.round(m.warmupSets / weeksCount * 10) / 10;
+    m.directSets = Math.round(m.directSets / weeksCount * 10) / 10;
+    m.indirectSets = Math.round(m.indirectSets / weeksCount * 10) / 10;
+    m.sessionsPerWeek = Math.round(m.sessionsPerWeek / weeksCount * 10) / 10;
+    for (const k of Object.keys(m.byPattern)) m.byPattern[k] = Math.round((m.byPattern[k] / weeksCount) * 10) / 10;
+    for (const k of Object.keys(m.byExercise)) m.byExercise[k] = Math.round((m.byExercise[k] / weeksCount) * 10) / 10;
+    if (m.subGroups) {
+      for (const sg of Object.values(m.subGroups as Record<string, any>)) {
+        sg.workingSets = Math.round(sg.workingSets / weeksCount * 10) / 10;
+        for (const k of Object.keys(sg.byPattern)) sg.byPattern[k] = Math.round((sg.byPattern[k] / weeksCount) * 10) / 10;
+        for (const k of Object.keys(sg.byExercise)) sg.byExercise[k] = Math.round((sg.byExercise[k] / weeksCount) * 10) / 10;
+      }
+    }
+  }
+  totalWorkingSets = Math.round(totalWorkingSets / weeksCount * 10) / 10;
+
+  // bySession — только шаблоная неделя (первая), иначе 8 нед × 5 дн = 40 записей «в куче».
+  const templateWeek = plan.weeks[0];
+  if (templateWeek) {
+    for (const session of templateWeek.sessions) {
       const perSession: Record<string, { working: number; warmup: number }> = {};
       for (const ex of session.exercises) {
         const isWarmup = !!(ex as any).warmupActivator;
@@ -225,19 +297,19 @@ export function formatBBExpandedSummary(plan: BBPlan): string {
   for (const [muscle, m] of Object.entries(s.byMuscle)) {
     lines.push(`${muscle} — ${m.sessionsPerWeek} тренировок/нед, ${m.workingSets} рабочих, ${m.warmupSets} разминочных`);
     for (const sess of m.bySession) {
-      lines.push(`  тренировка: ${sess.working} рабочих, ${sess.warmup} разминочных`);
+      lines.push(`  День ${sess.day}: ${sess.working} рабочих подходов, ${sess.warmup} разминочных`);
     }
-    const patterns = Object.entries(m.byPattern).map(([p, v]) => `${p}: ${v}`).join(', ');
-    if (patterns) lines.push(`  паттерн: ${patterns}`);
-    lines.push(`  direct: ${m.directSets}, косвенная: ${Math.round(m.indirectSets)}`);
+    const patterns = Object.entries(m.byPattern).map(([p, v]) => `${patternRu(p)}: ${v}`).join(', ');
+    if (patterns) lines.push(`  Паттерны: ${patterns}`);
+    lines.push(`  Прямая нагрузка: ${m.directSets}, косвенная: ${Math.round(m.indirectSets)}`);
     if (m.subGroups && Object.keys(m.subGroups).length) {
       for (const [subId, sg] of Object.entries(m.subGroups)) {
         const expl = (sg as any).explanation;
         lines.push(`  └ ${expl?.labelRu || subId}: ${sg.workingSets} сетов`);
-        const subPat = Object.entries(sg.byPattern).map(([p, v]) => `${p}: ${v}`).join(', ');
-        if (subPat) lines.push(`     паттерн: ${subPat}`);
-        if (expl?.why) lines.push(`     чем хорошо: ${expl.why}`);
-        if (expl?.how) lines.push(`     как работает: ${expl.how}`);
+        const subPat = Object.entries(sg.byPattern).map(([p, v]) => `${patternRu(p)}: ${v}`).join(', ');
+        if (subPat) lines.push(`     Паттерн: ${subPat}`);
+        if (expl?.why) lines.push(`     Чем хорошо: ${expl.why}`);
+        if (expl?.how) lines.push(`     Как работает: ${expl.how}`);
       }
     }
   }
