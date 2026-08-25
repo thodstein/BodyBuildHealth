@@ -2682,7 +2682,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // 30г = 1 скуп, не 34г = 1.1 скупа. Для цельных продуктов snap ломает сходимость.
         const fd2 = FOOD_DB.find(f => f.id === item.id);
         const isPowder = fd2?.category === 'supplement';
-        const newAmount = isPowder && fd2 ? snapPortionG(fd2, Math.max(suppMin, Math.min(upCap, rawNew))) : Math.max(suppMin, Math.min(upCap, rawNew));
+        const newAmount = fd2 ? snapPortionG(fd2, Math.max(suppMin, Math.min(upCap, rawNew))) : Math.max(suppMin, Math.min(upCap, rawNew));
         const factor = newAmount / (item.amount || 1);
         item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
       });
