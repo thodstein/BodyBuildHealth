@@ -808,22 +808,7 @@ return (
         </div>
       )}
 
-      {/* Пустой-state для про-шагов анализа/обратной связи/инструментов при несобранной программе */}
-      {isPro && (estep === 'analysis' || estep === 'feedback' || estep === 'tools') && (() => {
-        const bbEmpty = !!program.bb && (program.bb.weeks ?? []).every(w => w.sessions.every(s => s.blocks.length === 0));
-        const plEmpty = !!program.pl && !program.pl.schedule.length && !(program.pl.customWeeks ?? []).length;
-        if (!bbEmpty && !plEmpty) return null;
-        return (
-          <div className="constructor-surface" style={{ ...CARD, padding: 12, borderLeft: '3px solid #60a5fa' }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>📊 Сначала соберите программу</div>
-            <div style={{ fontSize: 11, color: DIM_STRONG, lineHeight: 1.45 }}>
-              Авто-сборка (⚡ Создать автоматически) или загрузка из библиотеки на шаге «🎛 Параметры» — затем здесь появятся анализ, обратная связь и инструменты.
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: пошаговые секции (профиль / анализ / обратная связь / инструменты) ═════════ */}
+      {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: профиль ═════════ */}
       {isPro && estep === 'profile' && (
       <>
       <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -842,119 +827,7 @@ return (
       <TrainingProfileCard profile={tprofile} update={updateTProfile} compact />
       </>
       )}
-      {isPro && estep === 'analysis' && (
-      <>
-      {/* P4 — контекстная панель ББ (ПЛ дубль PLEditor удалён — F4.5) */}
-      {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
-      {dir === 'bb' && program.bb && <MesoHeatmap program={program} dir={dir} onToast={showToast} />}
 
-      {/* Лабораторная коррекция плана: MRV× + предупреждения по анализам */}
-      {labAdjust.mrvMultiplier < 1 && (() => {
-        const feeders = suggestFeeders((tprofile.weakPoints ?? []) as string[], (tprofile.equipment ?? []) as string[]);
-        return (
-          <div style={{ ...panelStyle('#f59e0b'), padding: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>
-              🧪 Лабораторная коррекция плана (MRV ×{labAdjust.mrvMultiplier.toFixed(2)})
-            </div>
-            {labAdjust.intensityNote && <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>{labAdjust.intensityNote}</div>}
-            {labAdjust.warnings.length > 0 && (
-              <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>
-                {labAdjust.warnings.map((w, i) => <div key={i}>• {w}</div>)}
-              </div>
-            )}
-            {labAdjust.deloadRecommended && (
-              <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginTop: 4 }}>⚠ Рекомендуется разгрузочная неделя</div>
-            )}
-            {feeders.length > 0 && (
-              <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6 }}>
-                🔥 Фидер-сеты для слабых групп: {feeders.map((f) => `${f.exercise} ${f.sets}×${f.reps}`).join(' · ')}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-<ProPanelsGroup sections={[
-        {
-          id: 'plan-analysis',
-          title: '📊 Анализ плана',
-          hint: 'Score, MRV, объём, периодизация, прогрессия',
-          color: '#22c55e',
-          content: <>
-            <ProgramStrengthScore program={program} dir={dir} />
-            <PlanDiagnosticsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-            <InteractiveVolumePanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-            <ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} />
-            <TonnageEstimatePanel program={program} dir={dir} />
-          </>,
-        },
-      ]} />
-      </>
-      )}
-      {isPro && estep === 'feedback' && (
-      <>
-      <ProPanelsGroup sections={[
-        {
-          id: 'feedback',
-          title: '🔄 Обратная связь (sRPE / RIR / чек-ин)',
-          hint: 'ACWR, RIR-bias, готовность, чек-ин, what-if',
-          color: '#3b82f6',
-          content: <>
-            <LoadGuardPanel program={program} dir={dir} />
-            <RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} />
-            <RealMRVPanel program={program} dir={dir} labMrvMult={labAdjust.mrvMultiplier} />
-            <CheckinGuardPanel program={program} dir={dir} />
-            <StrengthDiaryPanel program={program} dir={dir} />
-            <button onClick={() => setShowFeedbackAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showFeedbackAdv ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.10)', color: showFeedbackAdv ? '#00e68a' : DIM }}>{showFeedbackAdv ? '▲ Скрыть прогноз' : '▼ Дополнительно: прогноз готовности / what-if'}</button>
-            {showFeedbackAdv && <><ReadinessForecastPanel program={program} dir={dir} /><WhatIfGuardPanel program={program} dir={dir} /></>}
-          </>,
-        },
-      ]} />
-      </>
-      )}
-      {isPro && estep === 'tools' && (
-      <>
-      {dir === 'pl' && (
-        <div style={{ ...panelStyle('#a78bfa'), padding: 10 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', marginBottom: 3 }}>
-            🏆 ПЛ PRO: диагностика, мёртвые точки и инструменты
-          </div>
-          <div style={{ fontSize: 10, color:'#fff', marginBottom: 8 }}>
-            Анализ применяется только как рекомендация и добавление ассистентов. Исходные упражнения и процентовки ПЛ-цикла не изменяются.
-          </div>
-          <PlannerToolsPanel mode="pl" />
-          <div style={{ marginTop: 10, borderTop: '1px solid rgba(167,139,250,0.2)', paddingTop: 8 }}>
-            <PlDeadpointsBarPathCard />
-          </div>
-        </div>
-      )}
-      <ProPanelsGroup sections={[
-        {
-          id: 'technique',
-          title: '🦴 Техника и биомеханика',
-          hint: 'Срывы, bar-path, блины, инфо об упражнениях',
-          color: '#06b6d4',
-          content: <>
-            <PlateAutoPanel program={program} dir={dir} />
-            <ExerciseInfoPanel program={program} dir={dir} />
-            <button onClick={() => setShowToolsAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showToolsAdv ? 'rgba(6,182,212,0.35)' : 'rgba(255,255,255,0.10)', color: showToolsAdv ? '#06b6d4' : DIM }}>{showToolsAdv ? '▲ Скрыть биомеханику' : '▼ Биомеханика: срывы / bar-path'}</button>
-            {showToolsAdv && <><StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><BiomechanicsPanel program={program} dir={dir} /></>}
-          </>,
-        },
-        {
-          id: 'tools',
-          title: '🔧 Инструменты тренера',
-          hint: 'Подбор сплита, замены упражнений, история ревизий',
-          color: '#a78bfa',
-          content: <>
-            <SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-            <SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} />
-            <ProgramRevisionsDiff program={program} />
-          </>,
-        },
-      ]} />
-      </>
-      )}
 
       {/* 🗓 Годовой план — MacrocyclePanel (модал, только в про-режиме) */}
       {isPro && editorLibOpen === 'macro' && (
@@ -1887,27 +1760,7 @@ return (
         );
       })()}
 
-      {/* История правок (revisions): дешёвая версия — без полных снапшотов, только timestamp+note (шаг «🔧 Инструменты») */}
-      {isPro && estep === 'tools' && revisions.length > 0 && (
-        <div style={{ ...CARD, padding: 10, marginTop: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📜 История правок</span>
-            <span style={{ fontSize: 10, color: DIM }}>({revisions.length} записей, последние 20)</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
-            {revisions.slice().reverse().map((r, i) => {
-              const realIdx = revisions.length - 1 - i;
-              return (
-                <div key={r.ts} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-                  <span style={{ fontSize: 10, color: DIM_STRONG, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.note}</span>
-                  <span style={{ fontSize: 10, color: DIM }}>{new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                  <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeRev(realIdx)} title="Удалить запись">✕</button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+
     {/* Липкая нижняя навигация шагов — «← Назад» / сохранение / «Далее →» всегда под рукой */}
       <div className="editor-bottomnav" style={{ position: 'sticky', bottom: 0, zIndex: 40, display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(15,17,22,0.97)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 -6px 18px rgba(0,0,0,0.35)' }}>
         {estepIdx > 0 && (
