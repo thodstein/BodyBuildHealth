@@ -215,24 +215,57 @@ export async function searchByName(query: string, pageSize = 20): Promise<OFFPro
   const cached = await searchCacheByName(q);
   if (cached.length > 0) return cached;
 
-  const apis = [OFF_API_RU, OFF_API_WORLD];
-  for (const api of apis) {
+  const tryQueries = [q];
+  const parts = q.split(/\s+/).filter(p => p.length > 2);
+  if (parts.length > 1) {
+    const brand = parts[parts.length - 1];
+    if (brand.toLowerCase() !== q.toLowerCase()) tryQueries.push(brand);
+    const withoutBrand = parts.slice(0, -1).join(' ');
+    if (withoutBrand) tryQueries.push(withoutBrand);
+  }
+
+  for (const qq of tryQueries) {
+    // 1. Новый Search-a-licious (лучше для РФ)
     try {
-      const encoded = encodeURIComponent(q);
-      const res = await fetch(`${api}/cgi/search.pl?search_terms=${encoded}&page_size=${pageSize}&json=1&fields=code,product_name,product_name_ru,brands,categories,nutriments,image_small_url`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (!data.products) continue;
-      const products: OFFProduct[] = [];
-      for (const p of data.products) {
-        const norm = normalizeProduct(p);
-        if (norm) {
-          await saveToCache(norm);
-          products.push(norm);
+      const encoded = encodeURIComponent(qq);
+      const res = await fetch(`https://search.openfoodfacts.org/search?q=${encoded}&page_size=${pageSize}`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
+      if (res.ok) {
+        const data = await res.json();
+        const hits = (data.hits || data.products || []) as any[];
+        if (hits.length > 0) {
+          const products: OFFProduct[] = [];
+          for (const p of hits) {
+            const src = p.product || p;
+            const norm = normalizeProduct(src.code ? src : { ...src, code: src.code || src._id, product_name: src.product_name || src.product_name_ru, nutriments: src.nutriments });
+            if (norm) {
+              await saveToCache(norm);
+              products.push(norm);
+            }
+          }
+          if (products.length > 0) return products;
         }
       }
-      if (products.length > 0) return products;
     } catch {}
+    // 2. Fallback старый API
+    const apis = [OFF_API_RU, OFF_API_WORLD];
+    for (const api of apis) {
+      try {
+        const encoded = encodeURIComponent(qq);
+        const res = await fetch(`${api}/cgi/search.pl?search_terms=${encoded}&page_size=${pageSize}&json=1&fields=code,product_name,product_name_ru,brands,categories,nutriments,image_small_url`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (!data.products) continue;
+        const products: OFFProduct[] = [];
+        for (const p of data.products) {
+          const norm = normalizeProduct(p);
+          if (norm) {
+            await saveToCache(norm);
+            products.push(norm);
+          }
+        }
+        if (products.length > 0) return products;
+      } catch {}
+    }
   }
   return [];
 }

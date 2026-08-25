@@ -71,9 +71,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 }) => {
   const foodSearchResults = useMemo(() => {
     if (!debouncedSearch.trim()) return [];
-    const q = debouncedSearch.toLowerCase();
-    const internal = FOOD_DB.filter((f: any) => (f.name || '').toLowerCase().indexOf(q) >= 0);
-    const usda = usdaFoods.filter((f: any) => (f.name || '').toLowerCase().indexOf(q) >= 0 || (f.description || '').toLowerCase().indexOf(q) >= 0);
+    const q = debouncedSearch.toLowerCase().replace(/ё/g,'е').trim();
+    const tokens = q.split(/\s+/).filter(t => t.length > 1);
+    const match = (text: string) => {
+      const t = (text || '').toLowerCase().replace(/ё/g,'е');
+      return tokens.every(tok => t.includes(tok));
+    };
+    const internal = FOOD_DB.filter((f: any) => match(f.name) || match(f.description || ''));
+    const usda = usdaFoods.filter((f: any) => match(f.name) || match(f.description || ''));
     return [...internal.slice(0, 5), ...usda.slice(0, 10)].slice(0, 15);
   }, [debouncedSearch, usdaFoods]);
 

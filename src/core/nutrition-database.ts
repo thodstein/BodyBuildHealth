@@ -1654,6 +1654,10 @@ export const FOOD_DB: FoodItem[] = [
   // ─── Прочее 3 ───
   {id:"other_seaweed_agar",name:"Агар-агар (порошок)",category:"other",kcal:306,protein:0.7,fat:0,carbs:80,fiber:8,gi:0,servingSize:"10 г",tier:"basic",bestFor:["cutting","recomp"],timing:"any",description:"Растительный желатин (полисахариды агарозы) — гель при 35°C. Клетчатка (8г/10г — 27% ДН). Безкалорийный загуститель для десертов",micros:{Fiber:8,Fe:1.9,Ca:55,Mg:13,K:85}},
   {id:"other_petitgrain_oil",name:"Масло горького апельсина (эфирное)",category:"other",kcal:0,protein:0,fat:0,carbs:0,fiber:0,gi:0,servingSize:"2 капли",tier:"mid",bestFor:["cutting","recomp"],timing:"morning",description:"Ароматерапия — линалоол и линалилацетат (седативный, снижает кортизол). Для диффузора, НЕ внутрь. + к липазу",micros:{Linalool:30}},
+  // ─── Ратимир (РФ) — частый запрос ───
+  {id:"ratimir_govadina_kopcheno_varenaya",name:"Говядина копчено-вареная Ратимир",category:"protein",kcal:250,protein:14,fat:21,carbs:1,fiber:0,gi:0,servingSize:"100 г",tier:"basic",bestFor:["mass","maintenance"],timing:"any",description:"Ратимир — деликатес из говядины, копчено-вареный. 14г белка, 21г жира.",micros:{Fe:2.8,Na:950,Zn:3.2}},
+  {id:"ratimir_sosiski_ratimirovskie",name:"Сосиски Ратимировские",category:"protein",kcal:237,protein:12,fat:21,carbs:0,fiber:0,gi:0,servingSize:"100 г",tier:"basic",bestFor:["mass","maintenance"],timing:"any",description:"Сосиски Ратимир — классические, 12г белка, 21г жира. По данным OpenFoodFacts.",micros:{Na:900,Fe:1.8}},
+  {id:"ratimir_kolbasa_varenaya_doktorskaya",name:"Колбаса вареная Докторская Ратимир",category:"protein",kcal:257,protein:13,fat:22,carbs:1.5,fiber:0,gi:0,servingSize:"100 г",tier:"basic",bestFor:["mass","maintenance"],timing:"any",description:"Докторская Ратимир — вареная колбаса, 13г белка.",micros:{Na:850,Fe:2.1}},
 ];
 
 // ─── Merge supplement (510 products) into FOOD_DB ───
