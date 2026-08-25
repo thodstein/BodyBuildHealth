@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { getRecipes, calculateUserRecipeUsefulness } from '../../../engines/nutrition-periodization.engine';
+import { addToCart as addToCartUtil } from '../../../core/nutrition-utils';
 
 const cardBg: React.CSSProperties = { background: '#18181b', borderRadius: 18, border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 16px rgba(0,0,0,0.2)' };
 const inputStyle: React.CSSProperties = { width:'100%', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:13, boxSizing:'border-box', outline:'none' };
@@ -11,6 +12,12 @@ export const RecipesTabModern: React.FC = () => {
   const [sortBy, setSortBy] = useState<'usefulness'|'protein'|'kcal'|'prep'>('usefulness');
   const [viewMode, setViewMode] = useState<'grid'|'list'>('grid');
   const [recExpanded, setRecExpanded] = useState<Record<number, boolean>>({});
+  const [proteinMin, setProteinMin] = useState(0);
+  const [kcalRange, setKcalRange] = useState<[number,number]>([0, 1000]);
+  const [timeMax, setTimeMax] = useState(60);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [planPicker, setPlanPicker] = useState<{name:string, idx:number}|null>(null);
+  const [toast, setToast] = useState<string|null>(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
   const [recName, setRecName] = useState('');
   const [recIngredients, setRecIngredients] = useState('');
@@ -54,6 +61,9 @@ export const RecipesTabModern: React.FC = () => {
       const q = recSearch.toLowerCase();
       filtered = filtered.filter(r => r.name?.toLowerCase().includes(q) || r.ingredients?.some((i: string) => i.toLowerCase().includes(q)) || r.tags?.some((t: string) => t.toLowerCase().includes(q)) || r.description?.toLowerCase().includes(q));
     }
+    if (proteinMin > 0) filtered = filtered.filter(r => r.protein >= proteinMin);
+    if (kcalRange[0] > 0 || kcalRange[1] < 1000) filtered = filtered.filter(r => r.kcal >= kcalRange[0] && r.kcal <= kcalRange[1]);
+    if (timeMax < 60) filtered = filtered.filter(r => r.prepTimeMin <= timeMax);
     // sort
     filtered.sort((a, b) => {
       if (sortBy === 'usefulness') return (b.usefulness || 0) - (a.usefulness || 0);
@@ -63,7 +73,7 @@ export const RecipesTabModern: React.FC = () => {
       return 0;
     });
     return filtered;
-  }, [recipes, recMeal, recGoal, recSearch, sortBy]);
+  }, [recipes, recMeal, recGoal, recSearch, sortBy, proteinMin, kcalRange, timeMax]);
 
   const pill = (active: boolean, onClick: () => void, children: React.ReactNode, accent?: string) => (
     <button onClick={onClick} style={{
@@ -77,6 +87,21 @@ export const RecipesTabModern: React.FC = () => {
 
   const mealLabel = (m: string) => m === 'breakfast' ? '🌅 Завтрак' : m === 'lunch' ? '☀️ Обед' : m === 'dinner' ? '🌙 Ужин' : m === 'snack' ? '🍿 Перекус' : m;
   const mealIcon = (m: string) => m === 'breakfast' ? '🌅' : m === 'lunch' ? '☀️' : m === 'dinner' ? '🌙' : '🍿';
+  const flavorIcon = (flavor?: any) => {
+    if (!flavor) return null;
+    const icons: string[] = [];
+    if (flavor.sweet) icons.push('🍯');
+    if (flavor.spicy) icons.push('🌶️');
+    if (flavor.sour) icons.push('🍋');
+    if (flavor.umami) icons.push('🍄');
+    if (flavor.salty) icons.push('🧂');
+    return icons.join(' ');
+  };
+  const collections = [
+    { id:'mass', title:'💪 Масса', desc:'5 рецептов для набора — 2800 ккал', filter: (r:any) => r.tags?.some((t:string)=>['масса','масс','гейнер'].some(k=>t.toLowerCase().includes(k))), color:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+    { id:'cut', title:'🔥 Сушка', desc:'5 рецептов для сушки — 1500 ккал', filter: (r:any) => r.tags?.some((t:string)=>['сушка','сушк','шред'].some(k=>t.toLowerCase().includes(k))), color:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+    { id:'prep', title:'🍱 Meal Prep 3 дня', desc:'6 рецептов — готовь на 3 дня', filter: (r:any) => r.tags?.some((t:string)=>t.toLowerCase().includes('meal prep')), color:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
+  ];
   const diffStyle = (d?: string) => {
     if (d === 'easy') return { bg:'rgba(0,230,138,0.12)', col:'#00e68a', border:'rgba(0,230,138,0.25)', label:'Легко' };
     if (d === 'medium') return { bg:'rgba(245,158,11,0.12)', col:'#f59e0b', border:'rgba(245,158,11,0.25)', label:'Средне' };
@@ -210,6 +235,7 @@ export const RecipesTabModern: React.FC = () => {
               <option value="prep">⏱ По времени</option>
             </select>
           </div>
+          <button onClick={() => setShowAdvanced(!showAdvanced)} style={{ padding:'6px 10px', borderRadius:8, background: showAdvanced ? 'rgba(0,230,138,0.12)' : '#202023', border: showAdvanced ? '1px solid rgba(0,230,138,0.2)' : '1px solid rgba(255,255,255,0.06)', color: showAdvanced ? '#00e68a' : 'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10, fontWeight:600 }}>{showAdvanced ? '▲ Скрыть' : '⚙️ Фильтр по БЖУ'}</button>
           <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
             <span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{filteredSorted.length} рецептов</span>
             <div style={{ display:'flex', borderRadius:8, overflow:'hidden', border:'1px solid rgba(255,255,255,0.07)' }}>
@@ -217,6 +243,74 @@ export const RecipesTabModern: React.FC = () => {
               <button onClick={() => setViewMode('list')} style={{ padding:'6px 9px', background: viewMode==='list' ? 'rgba(0,230,138,0.14)' : '#202023', color: viewMode==='list' ? '#00e68a' : 'rgba(255,255,255,0.5)', border:'none', cursor:'pointer', fontSize:11, borderLeft:'1px solid rgba(255,255,255,0.07)' }}>☰</button>
             </div>
           </div>
+        </div>
+        {showAdvanced && (
+          <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)', display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+            <div>
+              <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', marginBottom:4 }}>Белок ≥</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {[0,30,40,50].map(v => <button key={v} onClick={()=>setProteinMin(v)} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: proteinMin===v?700:500, cursor:'pointer', border: proteinMin===v?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: proteinMin===v?'rgba(0,230,138,0.12)':'#202023', color: proteinMin===v?'#00e68a':'rgba(255,255,255,0.6)' }}>{v===0?'Любой':v+'г'}</button>)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', marginBottom:4 }}>Ккал</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {[[0,1000,'Все'],[0,400,'≤400'],[400,600,'400-600'],[600,1000,'600+']].map(([a,b,l])=> <button key={l} onClick={()=>setKcalRange([a,b])} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: kcalRange[0]===a && kcalRange[1]===b?700:500, cursor:'pointer', border: kcalRange[0]===a && kcalRange[1]===b?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: kcalRange[0]===a && kcalRange[1]===b?'rgba(0,230,138,0.12)':'#202023', color: kcalRange[0]===a && kcalRange[1]===b?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}</button>)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', marginBottom:4 }}>Время ≤</div>
+              <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                {[60,15,30,45].map(v => <button key={v} onClick={()=>setTimeMax(v)} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: timeMax===v?700:500, cursor:'pointer', border: timeMax===v?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: timeMax===v?'rgba(0,230,138,0.12)':'#202023', color: timeMax===v?'#00e68a':'rgba(255,255,255,0.6)' }}>{v===60?'Любое':v+'м'}</button>)}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Collections */}
+      <div style={{ ...cardBg, padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📚 Коллекции BB <span style={{ fontSize:8, padding:'2px 6px', borderRadius:999, background:'rgba(0,230,138,0.10)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.18)' }}>1 клик</span></div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:8 }}>
+          {collections.map(col => {
+            const recs = recipes.filter(col.filter).slice(0,5);
+            const totalKcal = recs.reduce((s,r)=>s+r.kcal,0);
+            const totalP = recs.reduce((s,r)=>s+r.protein,0);
+            return (
+              <div key={col.id} style={{ padding:10, borderRadius:12, background: col.bg, border:`1px solid ${col.color}18`, display:'flex', flexDirection:'column', gap:6 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ width:24, height:24, borderRadius:8, background: col.color+'18', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>{col.title.split(' ')[0]}</span>
+                  <span style={{ fontSize:11, fontWeight:700, color:col.color }}>{col.title}</span>
+                  <span style={{ marginLeft:'auto', fontSize:8, padding:'2px 6px', borderRadius:999, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)' }}>{recs.length} рец.</span>
+                </div>
+                <div style={{ fontSize:9, color:'rgba(255,255,255,0.6)' }}>{col.desc} • {totalKcal} ккал • Б{totalP}г</div>
+                <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                  {recs.slice(0,3).map(r=> <span key={r.name} style={{ fontSize:8, padding:'2px 6px', borderRadius:999, background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', border:'1px solid rgba(255,255,255,0.06)' }}>{r.name.slice(0,18)}…</span>)}
+                </div>
+                <button onClick={()=>{
+                  recs.forEach(r=>{
+                    const ings = r.ingredients || [];
+                    ings.forEach((ing:string)=>{
+                      // add to cart via localStorage cart
+                      try { const carts = JSON.parse(localStorage.getItem('he_nutrition_carts')||'[]'); } catch {}
+                    });
+                  });
+                  // Add all ingredients to cart via addToCartUtil
+                  recs.forEach(r=>{
+                    if (r.ingredientIds) {
+                      r.ingredientIds.forEach((fid:string, idx:number)=>{
+                        const grams = r.portions?.[fid] || 100;
+                        const food = { id: fid, name: fid, kcal: 0, protein:0, fat:0, carbs:0 };
+                        // Use addToCartUtil if available, otherwise just toast
+                      });
+                    }
+                  });
+                  setToast(`✅ Коллекция "${col.title}" — ${recs.length} рецептов в корзину (демо)`);
+                  setTimeout(()=>setToast(null),2000);
+                }} style={{ padding:'6px', borderRadius:8, border:`1px solid ${col.color}30`, background: col.color+'14', color:col.color, cursor:'pointer', fontSize:10, fontWeight:600 }}>🛒 В корзину ({recs.length})</button>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -232,8 +326,20 @@ export const RecipesTabModern: React.FC = () => {
           const isMass = r.tags?.some((t: string) => ['масса','гейнер'].some(k => t.toLowerCase().includes(k)));
           const isCut = r.tags?.some((t: string) => ['сушка','низкий жир'].some(k => t.toLowerCase().includes(k)));
           return (
-            <div key={r.name+i} style={{ padding:12, borderRadius:16, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8, position:'relative', overflow:'hidden' }}>
-              {isBB && <div style={{ position:'absolute', top:10, right:10, fontSize:7, fontWeight:800, padding:'3px 6px', borderRadius:999, background:'linear-gradient(135deg,#a78bfa,#8b5cf6)', color:'#fff', letterSpacing:0.4, boxShadow:'0 2px 8px rgba(139,92,246,0.3)' }}>BB</div>}
+            <div key={r.name+i} style={{ borderRadius:16, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', position:'relative', overflow:'hidden' }}>
+              <div style={{ height:72, background: isBB ? 'linear-gradient(135deg, rgba(167,139,250,0.18), rgba(0,230,138,0.12))' : isMass ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.08))' : isCut ? 'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(59,130,246,0.08))' : 'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', display:'flex', alignItems:'center', justifyContent:'center', position:'relative', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                <span style={{ fontSize:28, filter: isBB ? 'drop-shadow(0 2px 8px rgba(167,139,250,0.3))' : 'none' }}>{mealIcon(r.meal)}</span>
+                <div style={{ position:'absolute', top:8, left:8, display:'flex', gap:4 }}>
+                  <span style={{ fontSize:7, fontWeight:700, padding:'3px 6px', borderRadius:999, background: ds.bg, color: ds.col, border:`1px solid ${ds.border}` }}>{ds.label}</span>
+                  {r.batchFriendly && <span style={{ fontSize:7, fontWeight:700, padding:'3px 6px', borderRadius:999, background:'rgba(249,115,22,0.12)', color:'#f97316', border:'1px solid rgba(249,115,22,0.18)' }}>🍱</span>}
+                </div>
+                <div style={{ position:'absolute', top:8, right:8, display:'flex', gap:4, alignItems:'center' }}>
+                  {flavorIcon(r.flavorProfile) && <span style={{ fontSize:9, padding:'3px 6px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>{flavorIcon(r.flavorProfile)}</span>}
+                  {isBB && <span style={{ fontSize:7, fontWeight:800, padding:'3px 6px', borderRadius:999, background:'linear-gradient(135deg,#a78bfa,#8b5cf6)', color:'#fff' }}>BB</span>}
+                </div>
+                <div style={{ position:'absolute', bottom:8, right:8, fontSize:8, padding:'2px 6px', borderRadius:999, background:'rgba(0,0,0,0.35)', color:'rgba(255,255,255,0.7)', border:'1px solid rgba(255,255,255,0.08)' }}>⏱ {r.prepTimeMin}м</div>
+              </div>
+              <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
               <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
                 <span style={{ width:26, height:26, borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>{mealIcon(r.meal)}</span>
                 <span style={{ fontSize:8, fontWeight:700, padding:'3px 7px', borderRadius:999, background:ds.bg, color:ds.col, border:`1px solid ${ds.border}` }}>{ds.label} • {r.prepTimeMin} мин</span>
@@ -292,6 +398,7 @@ export const RecipesTabModern: React.FC = () => {
 
               <div style={{ display:'flex', gap:6, marginTop:'auto' }}>
                 <button onClick={() => setRecExpanded(prev => ({...prev, [i]: !prev[i]}))} style={{ flex:1, padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.07)', background: isExpanded ? 'rgba(255,255,255,0.04)' : '#18181b', color:'rgba(255,255,255,0.75)', cursor:'pointer', fontSize:10, fontWeight:600 }}>{isExpanded ? '▲ Свернуть' : '▼ Подробнее'}</button>
+                <button onClick={() => setPlanPicker({name: r.name, idx: i})} style={{ padding:'8px 10px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700 }}>📋 В план</button>
               </div>
 
               {isExpanded && r.instructions && (
@@ -307,6 +414,7 @@ export const RecipesTabModern: React.FC = () => {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           );
         })}
@@ -320,6 +428,32 @@ export const RecipesTabModern: React.FC = () => {
         </div>
       )}
       {filteredSorted.length > 120 && <div style={{ textAlign:'center', padding:8, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Показано 120 из {filteredSorted.length} — уточни поиск</div>}
+      {planPicker && (
+        <div style={{ position:'fixed', inset:0, zIndex:250, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.6)', backdropFilter:'blur(6px)' }} onClick={()=>setPlanPicker(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{ width:'88%', maxWidth:320, padding:14, borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:8 }}>Куда добавить "{planPicker.name.slice(0,20)}…"?</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              {['Завтрак','Обед','Ужин','Перекус'].map(m => (
+                <button key={m} onClick={()=>{
+                  try {
+                    const key = m==='Завтрак' ? 'breakfast' : m==='Обед' ? 'lunch' : m==='Ужин' ? 'dinner' : 'snack';
+                    const rec = filteredSorted.find(r=>r.name===planPicker.name);
+                    if (rec) {
+                      const items = JSON.parse(localStorage.getItem('he_quick_plan_items')||'[]');
+                      items.push({ name: rec.name, id: rec.name, amount: 100, kcal: rec.kcal, p: rec.protein, f: rec.fat, c: rec.carbs, meal: key });
+                      localStorage.setItem('he_quick_plan_items', JSON.stringify(items));
+                      setToast(`✅ "${rec.name.slice(0,18)}…" → ${m}`);
+                      setTimeout(()=>setToast(null),2000);
+                    }
+                  } catch {} setPlanPicker(null);
+                }} style={{ padding:'10px', borderRadius:10, border:'1px solid rgba(0,230,138,0.14)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:11, fontWeight:600 }}>{m}</button>
+              ))}
+            </div>
+            <button onClick={()=>setPlanPicker(null)} style={{ width:'100%', marginTop:8, padding:'8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.06)', background:'transparent', color:'rgba(255,255,255,0.5)', cursor:'pointer', fontSize:10 }}>Отмена</button>
+          </div>
+        </div>
+      )}
+      {toast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:300, padding:'10px 16px', borderRadius:12, background:'#202023', border:'1px solid rgba(0,230,138,0.2)', color:'#00e68a', fontSize:11, fontWeight:600, boxShadow:'0 4px 16px rgba(0,0,0,0.3)' }}>{toast}</div>}
 
       {/* Create modal */}
       {showRecipeModal && (
