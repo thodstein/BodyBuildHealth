@@ -3074,10 +3074,13 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* Фаза — факт из плана, а не синтетика distributePhases */}
         {(() => {
+          const ratio = typeof ratio !== 'undefined' ? ratio : (typeof acwr !== 'undefined' ? acwr : acwrData);
+
           const Wq = builtPlan.weeks;
           const wkq = Wq[Math.min(bbWeekSel, Wq.length) - 1] || Wq[0];
           const curPhRaw = ((wkq as any).phase || (wkq as any).deload ? 'deload' : 'accumulation') as BBPhase;
           const curPh = (['accumulation','intensification','deload','peaking'].includes(curPhRaw) ? curPhRaw : 'accumulation') as BBPhase;
+          const ratio = typeof ratio !== 'undefined' ? ratio : (typeof acwr !== 'undefined' ? acwr : acwrData);
           const acwrQ = ratio;
           const needsDeloadQ = autoDeload && acwrQ && acwrQ.ratio > 1.3;
           const wkExs = wkq.sessions.flatMap(s => s.exercises);
@@ -3686,8 +3689,9 @@ export const BbAutoConstructor: React.FC = () => {
         {/* Бюджет объёма — единственный источник perMuscle (пиковая неделя) */}
         {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
 
-        {/* === Перенесено из шага 4 — детализация плана === */}
+        {/* === Перенесено из шага 4 === */}
         {(() => {
+          const W = typeof W !== 'undefined' ? W : Wq; const wk = typeof wk !== 'undefined' ? wk : wkq; const ratio = typeof ratio !== 'undefined' ? ratio : acwrData; const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
           const vol = builtPlan.rotationMuscleVolume || {};
           const lm = builtPlan.volumeLandmarks || [];
           const MUSCLE_RU_H: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадр', hamstrings: 'Бицепс б', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предпл', abs: 'Пресс', traps: 'Трапец' };
@@ -3760,6 +3764,10 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* PRO: Авто-регуляция — полностью на русском */}
         {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
           const summary = summarizeAutoRegulation(builtPlan);
           if (summary.adjustedExercises === 0) return null;
           return (
@@ -3788,6 +3796,10 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* Overload targets for this week */}
         {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
            // Per-muscle частота и объём
            const freq = builtPlan.muscleFrequency || {};
            const vol = builtPlan.rotationMuscleVolume || {};
@@ -3849,6 +3861,10 @@ export const BbAutoConstructor: React.FC = () => {
                     return (
                     <div key={m} onClick={() => setExpandedMuscles(prev => { const n = new Set(prev); if (n.has(m)) n.delete(m); else n.add(m); return n; })} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
                       {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
                         const lm = (builtPlan.volumeLandmarks || []).find((l: any) => l.group === m);
                         const freqVal = (builtPlan.muscleFrequency?.[m] ?? v.sessionsPerWeek) as number;
                         const targetSets = (builtPlan as any).volumeTargets?.[m]?.targetSets ?? lm?.mav ?? v.workingSets;
@@ -4053,6 +4069,10 @@ export const BbAutoConstructor: React.FC = () => {
                       </div>
                     )}
                     {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
                       const pp = (linked as any)?.profile?.settings?.personal;
                       if (!pp || (!pp.weight && !pp.bodyFat && !pp.sex)) return null;
                       const leanMass = pp.weight && pp.bodyFat ? (pp.weight * (1 - pp.bodyFat/100)).toFixed(1) : null;
@@ -4064,6 +4084,10 @@ export const BbAutoConstructor: React.FC = () => {
                       );
                     })()}
                     {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
                       const methods = buildBBMethodologySummary(builtPlan);
                       const SUPER_RU: Record<string,string> = { none:'выкл', antagonist:'антагонисты (грудь↔спина, биц↔триц)', same_muscle:'одна группа (пробить)', giant:'гигант-сет (3 упр.)' };
                       const DUP_RU: Record<string,string> = { none:'выкл', heavy_light:'тяж/лёг', strength_hypertrophy:'сила/гипертрофия', full_dup:'полный DUP (3 дня)' };
@@ -4085,6 +4109,10 @@ export const BbAutoConstructor: React.FC = () => {
                       );
                     })()}
                     {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
                       const s = (builtPlan as any).inputSnapshot;
                       if (!s) return null;
                       const parts: string[] = [];
@@ -4101,6 +4129,10 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', color:'#fff', lineHeight:1.45 }}>
                     <b>Фазы:</b> {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
                       const ru: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
                       const seq: Array<{ p: string; from: number; to: number }> = [];
                       for (const wk of (builtPlan as any).weeks || []) {
@@ -4204,6 +4236,10 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ fontSize:11, color:'#fff', marginBottom:6, fontWeight:700 }}>
             Неделя {wk.week} из {W.length} · <span style={{ color:PHASE_COLORS[currentPhase] }}>{PHASE_LABELS[currentPhase]}</span>
             {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
               const cp = (wk as any).contestPhase as PrepPhaseKey | undefined;
               if (!cp) return null;
               const c = PREP_PHASE_COLORS[cp] ?? '#f472b6';
@@ -4256,6 +4292,10 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* Фактическая нагрузка из дневника (sRPE/ACWR) */}
         {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
           const srpeSessions = loadSRPESessions();
           if (srpeSessions.length === 0) return null;
           const acwrData = acuteChronicRatio(toDailyLoads(srpeSessions));
@@ -4291,6 +4331,10 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* Сравнение недель — week 1 vs current week */}
         {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
           const w1 = W[0];
           const wCur = wk;
           if (w1.week === wCur.week) return null;
@@ -4536,6 +4580,10 @@ export const BbAutoConstructor: React.FC = () => {
                           </div>
                         </details>
                         {(() => {
+          const W = typeof W !== 'undefined' ? W : (typeof Wq !== 'undefined' ? Wq : builtPlan.weeks);
+          const wk = typeof wk !== 'undefined' ? wk : (typeof wkq !== 'undefined' ? wkq : W[Math.min(bbWeekSel, W.length)-1] || W[0]);
+          const ratio = typeof ratio !== 'undefined' ? ratio : acwrData;
+          const currentPhase = typeof currentPhase !== 'undefined' ? currentPhase : (typeof curPh !== 'undefined' ? curPh : phaseForWeek(wk.week, bbWeeks));
                           const prof = e.executionProfile || buildExerciseInstructions({ exerciseName: e.name, muscle: e.muscle, role: e.role, trainingFocus: bbTrainingFocus, level: bbLevel, tempo: e.workSets[0]?.tempo, restSeconds: e.workSets[0]?.restSeconds });
                           return (
                           <details style={{ marginTop:4 }}>
