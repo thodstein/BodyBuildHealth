@@ -438,78 +438,103 @@ const RestaurantTab: React.FC = () => {
     if (search.trim()) { const q = search.toLowerCase(); list = list.filter(f => (f.name||'').toLowerCase().includes(q)); }
     return list;
   }, [g, search, restaurantDishes]);
-  const totals = useMemo(() => ({
-    kcal: filtered.reduce((s,f) => s + f.kcal * (portions[f.id] || 1), 0),
-    p: filtered.reduce((s,f) => s + f.protein * (portions[f.id] || 1), 0),
-    f: filtered.reduce((s,f) => s + f.fat * (portions[f.id] || 1), 0),
-    c: filtered.reduce((s,f) => s + f.carbs * (portions[f.id] || 1), 0),
-  }), [filtered, portions]);
-  const cuisineBtn = (v: typeof g, label: string) => (
-    <button onClick={() => setG(v)} style={{ padding:'3px 8px', borderRadius:6, fontSize:8, cursor:'pointer', border: g === v ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)', background: g === v ? 'rgba(0,230,138,0.15)' : '#202023', color: g === v ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: g === v ? 600 : 400 }}>{label}</button>
-  );
-  return (<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+  const selectedIds = useMemo(() => Object.keys(portions), [portions]);
+  const totals = useMemo(() => {
+    const selected = filtered.filter(f => portions[f.id] !== undefined);
+    if (selected.length === 0) return { kcal: 0, p: 0, f: 0, c: 0, count: 0 };
+    return {
+      kcal: selected.reduce((s,f) => s + f.kcal * (portions[f.id] || 1), 0),
+      p: selected.reduce((s,f) => s + f.protein * (portions[f.id] || 1), 0),
+      f: selected.reduce((s,f) => s + f.fat * (portions[f.id] || 1), 0),
+      c: selected.reduce((s,f) => s + f.carbs * (portions[f.id] || 1), 0),
+      count: selected.length,
+    };
+  }, [filtered, portions]);
+  const clearSelection = () => setPortions({});
+  return (<div style={{ display:'flex', flexDirection:'column', gap:10 }}>
       {rtToast && <div style={{ position:'fixed', bottom:20, left:'50%', transform:'translateX(-50%)', zIndex:999, padding:'10px 24px', borderRadius:14, background:'#202023', border:'1px solid rgba(255,255,255,0.06)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)', color:'#fff', fontSize:11, fontWeight:600 }}>{rtToast}</div>}
-      {/* КБЖУ сводка */}
-    {filtered.length > 0 && (
-      <div style={{ padding:14, ...modernCardBg }}>
-        <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>📊 КБЖУ выбранных блюд</div>
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
-          {[{l:'Калории',v:Math.round(totals.kcal),c:'#00e68a',u:'ккал'},{l:'Белки',v:Math.round(totals.p),c:'#3b82f6',u:'г'},{l:'Жиры',v:Math.round(totals.f),c:'#f59e0b',u:'г'},{l:'Углеводы',v:Math.round(totals.c),c:'#f97316',u:'г'}].map((s,i) => (
-            <div key={i} style={{ background:'#202023', borderRadius:8, padding:'5px 8px', textAlign:'center' }}>
-              <div style={{ fontSize:7, color:'rgba(255,255,255,0.85)' }}>{s.l}</div>
-              <div style={{ fontSize:16, fontWeight:800, color:s.c }}>{s.v}<span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.8)' }}> {s.u}</span></div>
-            </div>
-          ))}
+      <ModernHero icon="🍽" title="Рестораны" subtitle="Фастфуд с точным КБЖУ — выбирай кухню, порцию и сразу в корзину или план. Порции не суммируются в фоне — считается только выбранное." count={restaurantDishes.length} stats={[
+        { k:'Позиций', v: restaurantDishes.length, sub:'блюд', col:'#f59e0b', bg:'rgba(245,158,11,0.08)' },
+        { k:'Выбрано', v: totals.count, sub:'блюд', col: totals.count>0?'#00e68a':'rgba(255,255,255,0.3)', bg: totals.count>0?'rgba(0,230,138,0.08)':'rgba(255,255,255,0.03)' },
+        { k:'Ккал', v: totals.count>0 ? Math.round(totals.kcal) : '—', sub: totals.count>0?'выбрано':'—', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+      ]} action={totals.count>0 ? <button onClick={clearSelection} style={{ padding:'7px 12px', borderRadius:10, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:10, fontWeight:600 }}>✕ Сбросить выбор</button> : undefined} />
+      {totals.count > 0 ? (
+        <div style={{ ...modernCardBg, padding:12, border:'1px solid rgba(0,230,138,0.14)' }}>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#00e68a' }}>📊 КБЖУ выбранных блюд</div>
+            <span style={{ fontSize:8, padding:'3px 7px', borderRadius:999, background:'rgba(0,230,138,0.10)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.18)', fontWeight:600 }}>{totals.count} блюд</span>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
+            {[{l:'Калории',v:Math.round(totals.kcal),c:'#00e68a',u:'ккал'},{l:'Белки',v:Math.round(totals.p),c:'#60a5fa',u:'г'},{l:'Жиры',v:Math.round(totals.f),c:'#fbbf24',u:'г'},{l:'Углеводы',v:Math.round(totals.c),c:'#fb923c',u:'г'}].map((s,i) => (
+              <div key={i} style={{ background:'#202023', borderRadius:12, padding:'8px', textAlign:'center', border:`1px solid ${s.c}14` }}>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', fontWeight:600 }}>{s.l}</div>
+                <div style={{ fontSize:16, fontWeight:800, color:s.c }}>{s.v}<span style={{ fontSize:9, fontWeight:400, color:'rgba(255,255,255,0.5)' }}> {s.u}</span></div>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.4)', marginTop:6, textAlign:'center' }}>Считается только то, где ты нажал порцию (0.5/1/1.5/2) — не все отфильтрованные</div>
         </div>
-      </div>
-    )}
-    {/* Фильтры */}
-    <div style={{ padding:14, ...modernCardBg }}>
-      <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginBottom:6 }}>
-        {cuisineBtn('all', 'Все')}
-        {cuisineBtn('russian', '🇷🇺 Русская')}
-        {cuisineBtn('asian', '🥟 Азиатская')}
-        {cuisineBtn('italian', '🍝 Итальянская')}
-        {cuisineBtn('fastfood', '🍔 Фаст-фуд')}
-      </div>
-      <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍 Поиск блюд..." style={{ width:'100%', boxSizing:'border-box', padding:'6px 10px', borderRadius:8, fontSize:9, border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'#fff', outline:'none' }} />
-    </div>
-    {/* Список блюд с КБЖУ */}
-    <div style={{ padding:14, ...modernCardBg }}>
-      <div style={{ fontSize:12, fontWeight:700, color:'#fff', marginBottom:6 }}>🍽 Блюда ресторанов ({filtered.length})</div>
-      {filtered.length === 0 ? (
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.8)', textAlign:'center', padding:20 }}>Нет блюд по выбранному фильтру.</div>
       ) : (
-        <div style={{ maxHeight:400, overflowY:'auto', display:'flex', flexDirection:'column', gap:4 }}>
-          {filtered.map(food => {
-            const portion = portions[food.id] || 1;
-            return (<div key={food.id} style={{ padding:'6px 8px', borderRadius:8, background:'#202023', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, fontWeight:600, color:'#fff' }}>{food.name}</div>
-                  <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)' }}>{food.servingSize || ''} · {detectCuisine(food.name)}</div>
-                </div>
-                <div style={{ display:'flex', gap:2 }}>
-                  {[0.5, 1, 1.5, 2].map(p => <button key={p} onClick={() => setPortions(pp => ({...pp, [food.id]: p}))} style={{ width:18, height:18, borderRadius:4, border:'1px solid rgba(255,255,255,0.06)', background: (portions[food.id]||1) === p ? 'rgba(0,230,138,0.2)' : '#18181b', color:'rgba(255,255,255,0.85)', cursor:'pointer', fontSize:8, display:'flex', alignItems:'center', justifyContent:'center' }}>{p}</button>)}
-                </div>
-                <button onClick={() => addToCart({ name: food.name, amount: Math.round(portion * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * portion), category: 'fast_food' })} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:7, fontWeight:600 }}>🛒</button>
-                <button onClick={() => { try { const planItems = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]'); planItems.push({ name: food.name, id: food.id, amount: Math.round(portion * 100), kcal: Math.round(food.kcal * portion), p: Math.round(food.protein * portion), f: Math.round(food.fat * portion), c: Math.round(food.carbs * portion) }); localStorage.setItem('he_quick_plan_items', JSON.stringify(planItems)); showRtToast('✅ Добавлено в план питания'); } catch {} }} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:7, fontWeight:600 }}>📋</button>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:3, marginTop:4 }}>
-                <div style={{ background:'#18181b', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'rgba(255,255,255,0.85)' }}>🔥 {Math.round(food.kcal * portion)}</div>
-                <div style={{ background:'rgba(59,130,246,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#60a5fa' }}>Б {Math.round(food.protein * portion)}</div>
-                <div style={{ background:'rgba(245,158,11,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fbbf24' }}>Ж {Math.round(food.fat * portion)}</div>
-                <div style={{ background:'rgba(249,115,22,0.08)', borderRadius:4, padding:'2px 4px', textAlign:'center', fontSize:7, color:'#fb923c' }}>У {Math.round(food.carbs * portion)}</div>
-              </div>
-              {portion !== 1 && <div style={{ fontSize:7, color:'rgba(255,255,255,0.8)', marginTop:2 }}>× {portion.toFixed(2)} порции</div>}
-            </div>);
-          })}
+        <div style={{ ...modernCardBg, padding:12, textAlign:'center', border:'1px dashed rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize:12, color:'rgba(255,255,255,0.5)' }}>Выбери порцию у блюда — и здесь появится сводка КБЖУ выбранных</div>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:4 }}>Нажми 0.5 / 1 / 1.5 / 2 на карточке блюда</div>
         </div>
       )}
-    </div>
+      <div style={{ ...modernCardBg, padding:12 }}>
+        <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.6, textTransform:'uppercase', marginBottom:8 }}>Кухня</div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10 }}>
+          <ModernPill active={g==='all'} onClick={() => setG('all')}>Все</ModernPill>
+          <ModernPill active={g==='russian'} onClick={() => setG('russian')}>🇷🇺 Русская</ModernPill>
+          <ModernPill active={g==='asian'} onClick={() => setG('asian')}>🥟 Азиатская</ModernPill>
+          <ModernPill active={g==='italian'} onClick={() => setG('italian')}>🍝 Итальянская</ModernPill>
+          <ModernPill active={g==='fastfood'} onClick={() => setG('fastfood')}>🍔 Фаст-фуд</ModernPill>
+        </div>
+        <ModernSearch value={search} onChange={setSearch} placeholder="Поиск блюд, например: шаурма, бургер, плов…" />
+      </div>
+      <div style={{ ...modernCardBg, padding:12 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+          <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>🍽 Блюда ресторанов</div>
+          <span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.5)', border:'1px solid rgba(255,255,255,0.06)' }}>{filtered.length} блюд</span>
+        </div>
+        {filtered.length === 0 ? (
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', textAlign:'center', padding:24 }}>Нет блюд по выбранному фильтру.</div>
+        ) : (
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:8, maxHeight:520, overflowY:'auto' }}>
+            {filtered.map(food => {
+              const portion = portions[food.id] || 0;
+              const isSelected = portion !== 0 && portions[food.id] !== undefined;
+              return (<div key={food.id} style={{ padding:12, borderRadius:14, background: isSelected ? 'rgba(0,230,138,0.06)' : '#202023', border: isSelected ? '1px solid rgba(0,230,138,0.14)' : '1px solid rgba(255,255,255,0.06)', display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:8 }}>
+                  <span style={{ width:28, height:28, borderRadius:8, background: isSelected ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>{food.category==='fast_food'?'🍔':'🍽'}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{food.name}</div>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', marginTop:2 }}>{food.servingSize || '100г'} • {detectCuisine(food.name)} {isSelected && <span style={{ color:'#00e68a', fontWeight:600 }}>• выбрано ×{portion}</span>}</div>
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                  <span style={{ fontSize:8, color:'rgba(255,255,255,0.4)', fontWeight:600 }}>Порция:</span>
+                  <div style={{ display:'flex', gap:4 }}>
+                    {[0.5, 1, 1.5, 2].map(p => <button key={p} onClick={() => setPortions(pp => ({...pp, [food.id]: p}))} style={{ minWidth:32, padding:'5px 6px', borderRadius:8, border: (portions[food.id]||0) === p ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)', background: (portions[food.id]||0) === p ? 'rgba(0,230,138,0.14)' : '#18181b', color: (portions[food.id]||0) === p ? '#00e68a' : 'rgba(255,255,255,0.6)', cursor:'pointer', fontSize:10, fontWeight:700 }}>{p}</button>)}
+                  </div>
+                  {isSelected && <button onClick={() => setPortions(pp => { const n={...pp}; delete n[food.id]; return n; })} style={{ marginLeft:'auto', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(239,68,68,0.14)', background:'rgba(239,68,68,0.06)', color:'#ef4444', cursor:'pointer', fontSize:9 }}>✕</button>}
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4 }}>
+                  <div style={{ background:isSelected?'rgba(0,230,138,0.08)':'#18181b', borderRadius:8, padding:'6px 2px', textAlign:'center', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:7, color:'rgba(255,255,255,0.4)', letterSpacing:0.3 }}>ККАЛ</div><div style={{ fontSize:11, fontWeight:800, color: isSelected?'#00e68a':'rgba(255,255,255,0.7)' }}>{Math.round(food.kcal * (portion||1))}</div></div>
+                  <div style={{ background:'rgba(96,165,250,0.06)', borderRadius:8, padding:'6px 2px', textAlign:'center', border:'1px solid rgba(96,165,250,0.08)' }}><div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>Б</div><div style={{ fontSize:11, fontWeight:700, color:'#60a5fa' }}>{Math.round(food.protein * (portion||1))}</div></div>
+                  <div style={{ background:'rgba(251,191,36,0.06)', borderRadius:8, padding:'6px 2px', textAlign:'center', border:'1px solid rgba(251,191,36,0.08)' }}><div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>Ж</div><div style={{ fontSize:11, fontWeight:700, color:'#fbbf24' }}>{Math.round(food.fat * (portion||1))}</div></div>
+                  <div style={{ background:'rgba(251,146,60,0.06)', borderRadius:8, padding:'6px 2px', textAlign:'center', border:'1px solid rgba(251,146,60,0.08)' }}><div style={{ fontSize:7, color:'rgba(255,255,255,0.4)' }}>У</div><div style={{ fontSize:11, fontWeight:700, color:'#fb923c' }}>{Math.round(food.carbs * (portion||1))}</div></div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                  <button onClick={() => addToCart({ name: food.name, amount: Math.round((portion||1) * (parseInt(food.servingSize) || 100)), kcal: Math.round(food.kcal * (portion||1)), category: 'fast_food' })} style={{ padding:'8px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:700 }}>🛒 В корзину</button>
+                  <button onClick={() => { try { const planItems = JSON.parse(localStorage.getItem('he_quick_plan_items') || '[]'); planItems.push({ name: food.name, id: food.id, amount: Math.round((portion||1) * 100), kcal: Math.round(food.kcal * (portion||1)), p: Math.round(food.protein * (portion||1)), f: Math.round(food.fat * (portion||1)), c: Math.round(food.carbs * (portion||1)) }); localStorage.setItem('he_quick_plan_items', JSON.stringify(planItems)); showRtToast('✅ В план'); } catch {} }} style={{ padding:'8px', borderRadius:10, border:'1px solid rgba(139,92,246,0.18)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', cursor:'pointer', fontSize:10, fontWeight:700 }}>📋 В план</button>
+                </div>
+              </div>);
+            })}
+          </div>
+        )}
+      </div>
   </div>);
 };
-
 const TravelGuide: React.FC = () => {
   const [travelAdvice] = React.useState<any[]>(() => { try { return JSON.parse(localStorage.getItem('travel_workouts') || '[]'); } catch { return []; } });
   return (<>
