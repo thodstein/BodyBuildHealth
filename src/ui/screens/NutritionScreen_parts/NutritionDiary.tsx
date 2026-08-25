@@ -259,17 +259,22 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   }, [diaryData, selectedDate, saveDiary, showToast]);
 
   const handleOcrFileUpload = useCallback(async (file: File) => { 
-    if (!file) { setOcrError('Файл не выбран. Попробуйте ещё раз.'); return; }
-    setOcrFileLoading(true); setOcrError(''); setOcrHint('⏳ Загружаем и распознаём…');
-    if (file.size > 15 * 1024 * 1024) {
+    if (!file) { setOcrError('Файл не выбран. Попробуйте ещё раз.'); setOcrFileLoading(false); return; }
+    setOcrFileLoading(true); setOcrError(''); setOcrHint(`⏳ Файл выбран: ${((file as any)?.size ? ((file.size/1024/1024).toFixed(2)+' МБ') : '…')} — загружаем…`);
+    if ((file as any)?.size > 15 * 1024 * 1024) {
       setOcrFileLoading(false);
       setOcrError('Фото больше 15 МБ. Сделайте скриншот экрана или уменьшите изображение и повторите.');
       return;
     }
     let backup: number | undefined;
+    let hard: number | undefined;
     const backupPromise = new Promise<never>((_, reject) => {
       backup = window.setTimeout(() => reject(new Error('Превышено время ожидания (50с). Попробуйте скриншот экрана вместо фото камеры.')) as any, 50_000);
     });
+    hard = window.setTimeout(() => {
+      setOcrFileLoading(false);
+      setOcrError(prev => (prev as any) || 'Зависло на телефоне. Попробуйте кнопку «Фото/файл» → выберите скриншот из галереи (не «Камера»).');
+    }, 55_000) as any;
     try {
       const result: any = await Promise.race([
         processUploadedFile(file),
@@ -285,7 +290,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');
       }
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); }
-    finally { if (backup) clearTimeout(backup); setOcrFileLoading(false); }
+    finally { if (backup) clearTimeout(backup); if (hard) clearTimeout(hard); setOcrFileLoading(false); }
    }, [convertOCRItems, usdaFoods]);
 
   const handleOCR = useCallback(() => { 
