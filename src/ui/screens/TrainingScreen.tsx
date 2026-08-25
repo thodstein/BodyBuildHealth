@@ -525,14 +525,14 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
 
   return (
-    <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0, WebkitOverflowScrolling: 'touch' }}>
+    <div className="screen training-screen" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '0 0 calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px) 0', WebkitOverflowScrolling: 'touch' }}>
 
       {/* ─── HERO PAGE ─── */}
       {page === 'hero' && (
         <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
           <img src="/training-hero.jpg" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 50%, rgba(0,0,0,0.85))' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px 80px' }}>
+          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)' }}>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 2px', textShadow: '0 2px 14px rgba(0,0,0,0.9)' }}>Тренировки</h1>
             <p style={{ fontSize: 11, color: '#fff', margin: '0 0 16px', lineHeight: 1.3, textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>
               План, дневник, упражнения, калькуляторы и аналитика
@@ -576,7 +576,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             </div>
             <span style={{ fontSize:10, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'4px 9px', whiteSpace:'nowrap' }}>Шаг 2/3</span>
           </div>
-          <div style={{ padding:'16px 14px 28px', maxWidth:760, width:'100%', margin:'0 auto', display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{ padding:'16px 14px calc(var(--nav-height) + env(safe-area-inset-bottom) + 28px)', maxWidth:760, width:'100%', margin:'0 auto', display:'flex', flexDirection:'column', gap:14 }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
               <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', fontSize:12 }}>✨</span>
               <div style={{ fontSize:11, color:'rgba(255,255,255,0.72)', lineHeight:1.4, flex:1 }}>Тренировки → <b style={{ color:'#00e68a' }}>Планирование</b> → Конструктор · 6 направлений · один клик до сборки</div>
@@ -637,7 +637,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             <span style={{ fontSize:10, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'3px 8px', flexShrink:0 }}>3/3</span>
             <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'4px 7px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕</button>
           </div>
-          <div style={{ flex:1, overflow:'auto', padding:'12px', WebkitOverflowScrolling:'touch' }}>
+          <div style={{ flex:1, overflow:'auto', padding:'12px', paddingBottom:'calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)', WebkitOverflowScrolling:'touch' }}>
             {planningTrack === 'pl' && <PlannerPlAuto />}
             {planningTrack === 'bb' && <PlannerBbAuto />}
             {planningTrack === 'manual' && <ProgramManagerPanel />}
