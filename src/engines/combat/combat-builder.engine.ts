@@ -225,7 +225,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         let weight = weightForCombatExercise(id, input, goal);
         if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
         const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
-        const tempo = tempoForCB(isPrimary, effectiveCharacter as any);
+        const tempo = tempoForCB(id, isPrimary, effectiveCharacter as any);
         const rest = restForCB(isPrimary, effectiveCharacter as any);
         const ex: CombatExercise = {
           id,

@@ -10,9 +10,15 @@ const PCT_BY_PHASE: Record<string, number> = {
   accumulation: 0.75, intensification: 0.85, peaking: 0.92, deload: 0.60, transition: 0.65,
 };
 
+const TEMPO_OVERRIDES: Record<string,string> = {
+  snatch:'X-0-X-0', hang_snatch:'X-0-X-0', power_snatch:'X-0-X-0', muscle_snatch:'X-0-X-0', snatch_pull:'X-0-X-0', clean_pull:'X-0-X-0', hang_clean:'X-0-X-0', power_clean:'X-0-X-0', muscle_clean:'X-0-X-0', push_jerk:'X-0-X-0', split_jerk:'X-0-X-0', push_press:'X-0-X-0',
+  rdl:'3-1-1-0', bulgarian_split:'3-0-1-0', cossack_squat:'3-0-1-0', overhead_squat_v2:'3-0-1-0', snatch_balance:'3-0-1-0',
+  log_press:'2-0-1-0', yoke_walk:'1-0-1-0', farmers_walk_heavy:'1-0-1-0', atlas_stone_load:'2-0-1-0', tire_flip:'1-0-1-0', sled_push_sprint:'1-0-1-0',
+  bench_bar:'2-0-1-0', squat:'2-0-1-0', back_squat:'2-0-1-0', front_squat:'2-0-1-0', deadlift:'2-0-1-0', sumo_dl:'2-0-1-0',
+};
 export function tempoForSS(id: string, character: DayCharacter, phase: string): string {
-  if (id.includes('snatch') || id.includes('clean') || id.includes('jerk')) return 'X-0-X-0';
   if (phase==='deload') return '3-1-1-0';
+  if (id && TEMPO_OVERRIDES[id]) return TEMPO_OVERRIDES[id];
   if (character==='тяж') return '2-0-1-0';
   if (character==='памп') return '2-0-1-1';
   return '2-0-1-0';

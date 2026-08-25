@@ -11,6 +11,7 @@ import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
+import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
 
@@ -147,15 +148,15 @@ export const StrengthSportConstructor: React.FC = () => {
   };
   const exportToUserProgram = () => {
     if (!plan) return;
-    const prog = {
+    const prog: any = {
       id: plan.id,
-      name: `Стронг+ТА ${plan.mode} ${plan.weeks}нед`,
-      weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, deload: w.deload, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, character: s.character, exercises: s.exercises.map(e=> ({ id: e.id, name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir, tempo: e.tempo, rest: e.restSeconds, technique: (e as any).technique, warmup: e.warmupSets, workSets: e.workSets })) })) })),
-      meta: { source: 'strength-sport', mode: plan.mode, level: plan.level, focus: plan.inputSnapshot?.focus, methodology: plan.inputSnapshot?.methodology, dupMode: (plan.inputSnapshot as any)?.dupMode, intensityTech: (plan.inputSnapshot as any)?.intensityTech },
+      meta: { id: plan.id, title: `Стронг+ТА ${plan.mode} ${plan.weeks}нед`, direction: 'strength', createdAt: new Date().toISOString(), source: 'strength-sport', mode: plan.mode, level: plan.level, focus: plan.inputSnapshot?.focus, methodology: plan.inputSnapshot?.methodology, dupMode: (plan.inputSnapshot as any)?.dupMode, intensityTech: (plan.inputSnapshot as any)?.intensityTech },
+      weeks: plan.weeksData.map(w=> ({ week: w.week, phase: w.phase, deload: w.deload, sessions: w.sessions.map(s=> ({ day: s.day, tag: s.sessionTag, character: s.character, exercises: s.exercises.map(e=> ({ id: e.id, name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, rir: e.rir, tempo: e.tempo, restSeconds: e.restSeconds, technique: (e as any).technique, warmupSets: e.warmupSets, workSets: e.workSets })) })) })),
       outside: plan.outsideMetrics,
       validation: plan.validation,
     };
-    try { localStorage.setItem('he_last_strength_program', JSON.stringify(prog)); setMsg('Экспортировано в he_last_strength_program (детально)'); } catch {}
+    try { saveUserProgram(prog); setMsg('Экспортировано в Библиотеку (he_user_programs) + he_last_strength_program'); } catch {}
+    try { localStorage.setItem('he_last_strength_program', JSON.stringify(prog)); } catch {}
     try { navigator.clipboard?.writeText(JSON.stringify(prog, null, 2)); } catch {}
   };
 
