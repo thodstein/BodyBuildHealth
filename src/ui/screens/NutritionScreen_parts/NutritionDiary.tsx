@@ -236,7 +236,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         }
       }
       return result;
-    })).filter(item => item.kcal > 0 || item.p > 0 || item.f > 0 || item.c > 0 || Boolean(item.foodId));
+    })).filter(item => Boolean(item.foodId) && (item.confidence === undefined || item.confidence >= 0.8));
   }, []);
 
   const fillQueuedMicros = useCallback(() => setParsedItems(prev => prev.map(item => ({ ...item, micros: fillMissingMicros(item.name, Number(item.qty) || 100, item.micros) }))), []);
