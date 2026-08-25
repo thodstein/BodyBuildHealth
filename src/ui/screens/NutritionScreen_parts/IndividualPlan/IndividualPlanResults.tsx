@@ -620,7 +620,7 @@ export const IndividualPlanResults: React.FC = () => {
       {generated && dayPlan && (dayPlan as any).hungerNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).hungerNote}</div>
       )}
-      {generated && dayPlan && <DailyDietDashboard />}
+      {plannerMode === 'pro' && generated && dayPlan && <DailyDietDashboard />}
       {plannerMode === 'pro' && generated && dayPlan && (
         <NutritionQualityCard
           meals={(dayPlan as any)?.meals?.map((m: any) => ({

@@ -3140,6 +3140,99 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const uniqueAllergenWarnings = Array.from(
         new Map(allergenWarnings.map(w => [`${w.food}:${w.allergens.join('|')}`, w])).values()
       );
+      // ─── Финальная доводка КБЖУ ≤3% целыми граммами (классический путь) ───
+      {
+        const targetP = (typeof tP !== 'undefined' ? tP : 0) || 1;
+        const targetC = (typeof tCAdj !== 'undefined' ? tCAdj : 0) || (typeof tC !== 'undefined' ? tC : 0) || 1;
+        const targetF = (typeof tF !== 'undefined' ? tF : 0) || 1;
+        const targetK = (typeof tKcalAdj !== 'undefined' ? tKcalAdj : 0) || (typeof tKcal !== 'undefined' ? tKcal : 0) || 1;
+        for (let iter = 0; iter < 30; iter++) {
+          const dP = (totals.p - targetP) / targetP;
+          const dC = (totals.c - targetC) / targetC;
+          const dF = (totals.f - targetF) / targetF;
+          const dK = (totals.kcal - targetK) / targetK;
+          if (Math.abs(dP) <= 0.03 && Math.abs(dC) <= 0.03 && Math.abs(dF) <= 0.03 && Math.abs(dK) <= 0.03) break;
+          let worst: 'p'|'c'|'f'|'k' = 'p';
+          let worstDev = dP;
+          if (Math.abs(dC) > Math.abs(worstDev)) { worst = 'c'; worstDev = dC; }
+          if (Math.abs(dF) > Math.abs(worstDev)) { worst = 'f'; worstDev = dF; }
+          if (Math.abs(dK) > Math.abs(worstDev)) { worst = 'k'; worstDev = dK; }
+          const effectiveWorst = worst === 'k' ? (Math.abs(dP) >= Math.abs(dC) && Math.abs(dP) >= Math.abs(dF) ? 'p' : Math.abs(dC) >= Math.abs(dF) ? 'c' : 'f') : worst;
+          const need = effectiveWorst === 'p' ? targetP - totals.p : effectiveWorst === 'c' ? targetC - totals.c : targetF - totals.f;
+          let best: { m: any; it: any; food: any; per100: number; maxCap: number; minAmt: number } | null = null;
+          let bestScore = -Infinity;
+          for (const m of meals) {
+            for (const it of m.items) {
+              const food: any = FOOD_DB.find((f:any)=>f.id===it.id);
+              if (!food) continue;
+              const per100 = effectiveWorst === 'p' ? (food.protein||0) : effectiveWorst === 'c' ? (food.carbs||0) : (food.fat||0);
+              if (per100 <= 0) continue;
+              const supCap: any = ({ creatine:10, whey_isolate:60, whey_protein:60, casein:60, bcaa:20, supp_eaas:20, glutamine:15, supp_hmb:6, supp_beta_alanine:6 } as any)[food.id];
+              const maxCap = supCap ?? 500;
+              const minAmt = supCap ? 5 : 10;
+              if (need > 0 && it.amount >= maxCap) continue;
+              if (need < 0 && it.amount <= minAmt) continue;
+              const score = need > 0 ? per100 : per100 + it.amount/100;
+              if (score > bestScore) { bestScore = score; best = { m, it, food, per100, maxCap, minAmt }; }
+            }
+          }
+          if (!best) {
+            if (need > 0) {
+              const poolMap: any = { p: ['whey_isolate','chicken_breast','egg_whole'], c: ['rice_white','buckwheat','oats'], f: ['olive_oil','avocado','almonds'] };
+              const ids = poolMap[effectiveWorst] || [];
+              let cand: any = null;
+              for (const id of ids) { const f:any = FOOD_DB.find((x:any)=>x.id===id); if (f && !excludedIds.has(f.id)) { cand=f; break; } }
+              if (cand) {
+                const per100 = effectiveWorst === 'p' ? (cand.protein||0) : effectiveWorst === 'c' ? (cand.carbs||0) : (cand.fat||0);
+                if (per100>0) {
+                  const grams = Math.min(100, Math.max(10, Math.ceil(Math.abs(need)/per100*100)));
+                  const targetMeal = meals.reduce((a:any,b:any)=> (a.totals.kcal||0) < (b.totals.kcal||0) ? a:b);
+                  const r = grams/100;
+                  const newIt = { name: cand.name, id: cand.id, amount: grams, kcal: Math.round((cand.kcal||0)*r), p: Math.round((cand.protein||0)*r), f: Math.round((cand.fat||0)*r), c: Math.round((cand.carbs||0)*r) };
+                  targetMeal.items.push(newIt);
+                  targetMeal.totals = { kcal: targetMeal.items.reduce((s:any,i:any)=>s+i.kcal,0), p: targetMeal.items.reduce((s:any,i:any)=>s+i.p,0), f: targetMeal.items.reduce((s:any,i:any)=>s+i.f,0), c: targetMeal.items.reduce((s:any,i:any)=>s+i.c,0) };
+                  totals = { kcal: meals.reduce((s:any,m:any)=>s+m.totals.kcal,0), p: meals.reduce((s:any,m:any)=>s+m.totals.p,0), f: meals.reduce((s:any,m:any)=>s+m.totals.f,0), c: meals.reduce((s:any,m:any)=>s+m.totals.c,0) };
+                  continue;
+                }
+              }
+            } else if (need < 0) {
+              let toRemove: { m:any; idx:number; c:number } | null = null;
+              for (const m of meals) {
+                if (m.items.length <= 1) continue;
+                for (let i=0;i<m.items.length;i++) {
+                  const it=m.items[i];
+                  const food:any=FOOD_DB.find((f:any)=>f.id===it.id);
+                  if (!food) continue;
+                  const per100 = effectiveWorst==='p' ? (food.protein||0) : effectiveWorst==='c' ? (food.carbs||0) : (food.fat||0);
+                  if (per100<=0) continue;
+                  if (effectiveWorst==='c' && it.id && String(it.id).includes('whey')) continue;
+                  const curC = it.c||0;
+                  if (!toRemove || curC > toRemove.c) toRemove={m, idx:i, c:curC};
+                }
+              }
+              if (toRemove) {
+                toRemove.m.items.splice(toRemove.idx,1);
+                toRemove.m.totals={kcal:toRemove.m.items.reduce((s:any,i:any)=>s+i.kcal,0), p:toRemove.m.items.reduce((s:any,i:any)=>s+i.p,0), f:toRemove.m.items.reduce((s:any,i:any)=>s+i.f,0), c:toRemove.m.items.reduce((s:any,i:any)=>s+i.c,0)};
+                totals={kcal:meals.reduce((s:any,m:any)=>s+m.totals.kcal,0), p:meals.reduce((s:any,m:any)=>s+m.totals.p,0), f:meals.reduce((s:any,m:any)=>s+m.totals.f,0), c:meals.reduce((s:any,m:any)=>s+m.totals.c,0)};
+                continue;
+              }
+            }
+            break;
+          }
+          const deltaGrams = need / best.per100 * 100;
+          let newAmount = best.it.amount + deltaGrams;
+          newAmount = Math.max(best.minAmt, Math.min(best.maxCap, Math.round(newAmount)));
+          if (newAmount === best.it.amount) break;
+          const factor = newAmount / best.it.amount;
+          best.it.amount = newAmount;
+          best.it.kcal = Math.round(best.it.kcal * factor);
+          best.it.p = Math.round(best.it.p * factor);
+          best.it.f = Math.round(best.it.f * factor);
+          best.it.c = Math.round(best.it.c * factor);
+          best.m.totals = { kcal: best.m.items.reduce((s:any,i:any)=>s+i.kcal,0), p: best.m.items.reduce((s:any,i:any)=>s+i.p,0), f: best.m.items.reduce((s:any,i:any)=>s+i.f,0), c: best.m.items.reduce((s:any,i:any)=>s+i.c,0) };
+          totals = { kcal: meals.reduce((s:any,m:any)=>s+m.totals.kcal,0), p: meals.reduce((s:any,m:any)=>s+m.totals.p,0), f: meals.reduce((s:any,m:any)=>s+m.totals.f,0), c: meals.reduce((s:any,m:any)=>s+m.totals.c,0) };
+        }
+      }
       return { meals, totals, isTrainingDay, isWorkDay, allergenWarnings: uniqueAllergenWarnings,
         supplementTimeline: buildSupplementTimeline(mealTimes, isTrainingDay),
         waterTimeline: buildWaterTimeline(weight, mealTimes, isTrainingDay, trainStart),
@@ -3152,24 +3245,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const dayIdx = days === 1 ? selectedDayIndex : 0;
     await maybeYield();
     const snapDayMeals = (day: any) => {
-      if (!day || !Array.isArray(day.meals)) return day;
-      for (const m of day.meals) {
-        if (!Array.isArray(m.items)) continue;
-        for (const it of m.items) {
-          const fd = FOOD_DB.find((f: any) => f.id === it.id);
-          if (!fd) continue;
-          const snapped = snapPortionG(fd, it.amount);
-          if (snapped !== it.amount && it.amount > 0) {
-            const factor = snapped / it.amount;
-            it.amount = snapped; it.kcal = Math.round(it.kcal * factor); it.p = Math.round((it.p||0)*factor*10)/10; it.f = Math.round((it.f||0)*factor*10)/10; it.c = Math.round((it.c||0)*factor*10)/10; it.fiber = Math.round((it.fiber||0)*factor*10)/10;
-          }
-        }
-        if (m.totals) m.totals = m.items.reduce((acc: any, it: any) => ({ kcal: acc.kcal + (it.kcal||0), p: acc.p + (it.p||0), f: acc.f + (it.f||0), c: acc.c + (it.c||0), fiber: acc.fiber + (it.fiber||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
-      }
-      if (day.totals) day.totals = day.meals.reduce((acc: any, m: any) => ({ kcal: acc.kcal + (m.totals?.kcal||0), p: acc.p + (m.totals?.p||0), f: acc.f + (m.totals?.f||0), c: acc.c + (m.totals?.c||0), fiber: acc.fiber + (m.totals?.fiber||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
+      // deactivated: buildDay уже доводит граммы до целых и КБЖУ ≤3%; повторный snap к сетке ломал сходимость
       return day;
     };
-    const d1 = snapDayMeals(buildDay(dayIdx, effIsTrainingDay(dayIdx)));
+    const d1 = buildDay(dayIdx, effIsTrainingDay(dayIdx));
     // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
     // и загрязняя usedFoodIds для 1-дневного плана).
     await maybeYield();
