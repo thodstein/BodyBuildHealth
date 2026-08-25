@@ -39,10 +39,15 @@ async function preprocessForOcr(buffer: Buffer): Promise<Buffer> {
     ctx.drawImage(img as any, 0, 0, w, h);
     const image: any = ctx.getImageData(0, 0, w, h);
     const data: Uint8ClampedArray = image.data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) sum += data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+    const avg = sum / (data.length / 4);
+    const isDark = avg < 110;
     for (let i = 0; i < data.length; i += 4) {
       const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
       const contrast = Math.max(0, Math.min(255, (gray - 128) * 1.5 + 128));
-      const val = gray < 160 ? Math.max(0, contrast - 20) : 255;
+      let val = gray < 160 ? Math.max(0, contrast - 20) : 255;
+      if (isDark) val = 255 - val;
       data[i] = val; data[i + 1] = val; data[i + 2] = val;
     }
     ctx.putImageData(image, 0, 0);
