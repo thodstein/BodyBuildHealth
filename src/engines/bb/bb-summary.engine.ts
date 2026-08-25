@@ -249,24 +249,34 @@ export function buildBBExpandedSummary(plan: BBPlan): BBExpandedSummary {
     }
   }
 
-  // Нормализуем на неделю (среднее).
+  // Нормализуем на неделю (среднее) — только целые подходы, без дробных 16.5.
   for (const m of Object.values(byMuscle)) {
-    m.workingSets = Math.round(m.workingSets / weeksCount * 10) / 10;
-    m.warmupSets = Math.round(m.warmupSets / weeksCount * 10) / 10;
-    m.directSets = Math.round(m.directSets / weeksCount * 10) / 10;
-    m.indirectSets = Math.round(m.indirectSets / weeksCount * 10) / 10;
+    m.workingSets = Math.round(m.workingSets / weeksCount);
+    m.warmupSets = Math.round(m.warmupSets / weeksCount);
+    m.directSets = Math.round(m.directSets / weeksCount);
+    m.indirectSets = Math.round(m.indirectSets / weeksCount);
     m.sessionsPerWeek = Math.round(m.sessionsPerWeek / weeksCount * 10) / 10;
-    for (const k of Object.keys(m.byPattern)) m.byPattern[k] = Math.round((m.byPattern[k] / weeksCount) * 10) / 10;
-    for (const k of Object.keys(m.byExercise)) m.byExercise[k] = Math.round((m.byExercise[k] / weeksCount) * 10) / 10;
+    for (const k of Object.keys(m.byPattern)) m.byPattern[k] = Math.round(m.byPattern[k] / weeksCount);
+    for (const k of Object.keys(m.byExercise)) m.byExercise[k] = Math.round(m.byExercise[k] / weeksCount);
     if (m.subGroups) {
       for (const sg of Object.values(m.subGroups as Record<string, any>)) {
-        sg.workingSets = Math.round(sg.workingSets / weeksCount * 10) / 10;
-        for (const k of Object.keys(sg.byPattern)) sg.byPattern[k] = Math.round((sg.byPattern[k] / weeksCount) * 10) / 10;
-        for (const k of Object.keys(sg.byExercise)) sg.byExercise[k] = Math.round((sg.byExercise[k] / weeksCount) * 10) / 10;
+        sg.workingSets = Math.round(sg.workingSets / weeksCount);
+        for (const k of Object.keys(sg.byPattern)) sg.byPattern[k] = Math.round(sg.byPattern[k] / weeksCount);
+        for (const k of Object.keys(sg.byExercise)) sg.byExercise[k] = Math.round(sg.byExercise[k] / weeksCount);
+      }
+    }
+    // Гарантируем, что все подгруппы/головки мышцы присутствуют в сводке (даже с 0), включая бицепс/трицепс.
+    const defs = SUBGROUP_MAP[m.muscle];
+    if (defs) {
+      if (!m.subGroups) m.subGroups = {};
+      for (const d of defs) {
+        if (!m.subGroups[d.id]) {
+          m.subGroups[d.id] = { workingSets: 0, byPattern: {}, byExercise: {}, explanation: { why: d.why, how: d.how, patternRu: d.patternRu, labelRu: d.labelRu } as any };
+        }
       }
     }
   }
-  totalWorkingSets = Math.round(totalWorkingSets / weeksCount * 10) / 10;
+  totalWorkingSets = Math.round(totalWorkingSets / weeksCount);
 
   // bySession — только шаблоная неделя (первая), иначе 8 нед × 5 дн = 40 записей «в куче».
   const templateWeek = plan.weeks[0];

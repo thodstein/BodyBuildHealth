@@ -33,7 +33,7 @@ import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-v
 import { PlanFeedbackCard } from './PlanFeedbackCard';
 import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
-import { PATTERN_RU as SUMMARY_PATTERN_RU } from '../../../engines/bb/bb-summary.engine';
+import { PATTERN_RU as SUMMARY_PATTERN_RU, SUBGROUP_MAP, SUBGROUP_LABEL_RU as SUMMARY_SUBGROUP_LABEL_RU } from '../../../engines/bb/bb-summary.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import { adaptForPEDs, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
 import { recommendPEDMethodology } from '../../../engines/bb/bb-ped-methodology.engine';
@@ -69,7 +69,7 @@ import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 
 import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
-import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, type PhaseDistribution } from '../../../engines/periodization';
+import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, getPhaseConfig, type PhaseDistribution } from '../../../engines/periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
 import { DayCard, PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
@@ -4269,33 +4269,71 @@ export const BbAutoConstructor: React.FC = () => {
           const curPh = (['accumulation','intensification','deload','peaking'].includes(curPhRaw) ? curPhRaw : 'accumulation') as BBPhase;
           const acwrQ = ratio;
           const needsDeloadQ = autoDeload && acwrQ && acwrQ.ratio > 1.3;
-          // Фактические RIR/повторы/темп из упражнений недели (а не PHASE_CONFIGS хардкод)
           const wkExs = wkq.sessions.flatMap(s => s.exercises);
           const avgRirFact = wkExs.length ? (wkExs.reduce((a,e) => a + (Number.isFinite(e.rir) ? e.rir * e.sets : 0), 0) / wkExs.reduce((a,e) => a + e.sets, 0) || 1) : 0;
           const repsAll = wkExs.flatMap(e => e.workSets?.map((ws:any) => ws.reps) ?? [e.repsRange?.[0] ?? 10]);
-          const repMin = repsAll.length ? Math.min(...repsAll) : PHASE_CONFIGS[curPh].repRange[0];
-          const repMax = repsAll.length ? Math.max(...repsAll) : PHASE_CONFIGS[curPh].repRange[1];
-          const tempoFact = wkExs[0]?.tempoSpec || PHASE_CONFIGS[curPh].tempo;
+          const repMin = repsAll.length ? Math.min(...repsAll) : 0;
+          const repMax = repsAll.length ? Math.max(...repsAll) : 0;
+          const tempoFact = wkExs[0]?.tempoSpec || getPhaseConfig(curPh, bbTrainingFocus as any).tempo;
+          const cfg = getPhaseConfig(curPh, bbTrainingFocus as any);
+          const totalW = builtPlan.weeks.length;
+          const phaseGroups: Record<string, number[]> = {};
+          for (const w of builtPlan.weeks) {
+            const p = ((w as any).phase || 'accumulation') as string;
+            if (!phaseGroups[p]) phaseGroups[p] = [];
+            phaseGroups[p].push(w.week);
+          }
+          const distText = Object.entries(phaseGroups).map(([p, weeks]) => `${PHASE_LABELS[p as BBPhase] || p}: нед ${weeks.join(',')}`).join(' · ');
+          const totalSetsWeek = wkExs.reduce((a,e)=> a+ (e.sets||0),0);
           return <>
-            <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:12, fontWeight:700, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт недели {wkq.week}): {PHASE_LABELS[curPh]}</span>
-                <span style={{ fontSize:11, color:'#fff' }}>RIR ~{avgRirFact.toFixed(1)} · Повт {repMin}-{repMax} · Темп {tempoFact}</span>
+            <div style={{ marginBottom:6, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
+                <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт недели {wkq.week} из {totalW}): {PHASE_LABELS[curPh]}</span>
+                <span style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>RIR факт {avgRirFact.toFixed(1)} · Повт {repMin}-{repMax} · Темп {tempoFact} · Сетов {totalSetsWeek}</span>
               </div>
-              <div style={{ marginTop:4, fontSize:11, color:'#fff' }}>
-                {curPh === 'accumulation' && '🎯 Цель: накопление метаболического стресса. Больше объёма, умеренные веса.'}
-                {curPh === 'intensification' && '🎯 Цель: механическое натяжение. Снижение объёма, рост весов.'}
-                {curPh === 'deload' && '🎯 Цель: активное восстановление. Минимум объёма, лёгкие веса.'}
-                {curPh === 'peaking' && '🎯 Цель: максимальная сила. Низкий объём, высокие веса.'}
+              <div style={{ marginTop:8, display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                {builtPlan.weeks.map(w=>{
+                  const p = ((w as any).phase || 'accumulation') as BBPhase;
+                  const isCur = w.week===wkq.week;
+                  return <div key={w.week} title={`Нед ${w.week}: ${PHASE_LABELS[p] || p}`} style={{ flex:1, background: PHASE_COLORS[p] || '#fff', opacity: isCur?1:0.55, borderLeft: isCur?'1px solid #fff': 'none', borderRight: isCur?'1px solid #fff':'none' }} />
+                })}
               </div>
-              <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.7 }}>Уровень «{bbLevel}» · Цель «{bbGoal}» · Фокус «{bbTrainingFocus}» · Методика «{bbMethodology}» · Сплит «{builtPlan.pattern?.name || ''}»</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.62, marginTop:4, lineHeight:1.35 }}>{distText} · всего {totalW} нед · логика: distributePhases(totalWeeks={totalW}, goal={bbGoal}, trainingFocus={bbTrainingFocus || 'hypertrophy'})</div>
+              <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div style={{ padding:'8px 9px', borderRadius:8, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:PHASE_COLORS[curPh], marginBottom:4 }}>Конфиг фазы ({bbTrainingFocus || 'hypertrophy'})</div>
+                  <div style={{ display:'grid', gap:2, fontSize:10, color:'#fff', lineHeight:1.35, fontFamily:'ui-monospace, monospace' }}>
+                    <div>repRange: {cfg.repRange[0]}–{cfg.repRange[1]} · RIR {String((cfg as any).rir ?? '2-3')} · tempo {cfg.tempo} · отдых {cfg.restBase}с</div>
+                    <div>volume ×{cfg.volumeMultiplier ?? 1} · intensity ×{cfg.intensityMultiplier ?? 1} · {curPh==='deload'?'разгрузка':curPh==='accumulation'?'накопление':curPh==='intensification'?'интенсификация':'пик'}</div>
+                    <div style={{ opacity:0.55 }}>Источник: getPhaseConfig('{curPh}', '{bbTrainingFocus}') · PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} · уровень {bbLevel}</div>
+                  </div>
+                </div>
+                <div style={{ padding:'8px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:4 }}>Факт недели {wkq.week} — расчёт</div>
+                  <div style={{ display:'grid', gap:2, fontSize:10, color:'#fff', lineHeight:1.35, fontFamily:'ui-monospace, monospace' }}>
+                    <div>сетов: {totalSetsWeek} · упражнений: {wkExs.length} · RIR средн. {avgRirFact.toFixed(1)} = Σ(rir×sets)/Σsets</div>
+                    <div>повторы факт: {repMin}-{repMax} (из workSets) vs конфиг {cfg.repRange[0]}–{cfg.repRange[1]} {Math.abs(repMin - cfg.repRange[0])>3 || Math.abs(repMax - cfg.repRange[1])>3 ? '⚠ отклонение' : '✓ соответствует'}</div>
+                    <div>темп факт: {tempoFact} vs конфиг {cfg.tempo} · {avgRirFact.toFixed(1)} vs {(cfg as any).rir ?? '—'}</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ marginTop:6, fontSize:11, color:'#fff', lineHeight:1.4 }}>
+                {curPh === 'accumulation' && '🎯 Накопление: метаболический стресс, больший объём, умеренные веса. Дрифт RIR −1/2н, повторы −1/2н, объём ×1.0.'}
+                {curPh === 'intensification' && '🎯 Интенсификация: механическое натяжение, снижение объёма ×0.85, рост весов, RIR ↓.'}
+                {curPh === 'deload' && '🎯 Разгрузка: активное восстановление, объём ×0.6, RIR+2, темп контроль.'}
+                {curPh === 'peaking' && '🎯 Пик: реализация, низкий объём ×0.7, RIR 0-1, высокая интенсивность.'}
+              </div>
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.7, display:'flex', flexWrap:'wrap', gap:8 }}>
+                <span>Уровень «{bbLevel}»</span><span>Цель «{bbGoal}»</span><span>Фокус «{bbTrainingFocus}»</span><span>Методика «{bbMethodology}»</span><span>Сплит «{builtPlan.pattern?.name || ''}»</span><span>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span><span>ACWR {acwrQ ? acwrQ.ratio.toFixed(2) : '—'}</span><span>Стадий {Object.keys(phaseGroups).length}</span>
+              </div>
+              <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Логика: distributePhases(totalWeeks={totalW}, goal={bbGoal}, trainingFocus={bbTrainingFocus}) → {distText} · curPh из builtPlan.weeks[{wkq.week}].phase</div>
             </div>
             {needsDeloadQ && curPh !== 'deload' && (
-              <div style={{ marginBottom:6, padding:8, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', fontSize:11, fontWeight:600 }}>🚨 ACWR {acwrQ?.ratio.toFixed(2)} &gt; 1.3 — рекомендуется разгрузка.</div>
+              <div style={{ marginBottom:6, padding:8, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', fontSize:11, fontWeight:600 }}>🚨 ACWR {acwrQ?.ratio.toFixed(2)} &gt; 1.3 — рекомендуется разгрузка (факт фаза {PHASE_LABELS[curPh]} не делод).</div>
             )}
             {curPh === 'deload' && (() => {
               const dp = DELOAD_PROTOCOLS[deloadType] || DELOAD_PROTOCOLS.pump;
-              return <div style={{ marginBottom:8, padding:10, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)' }}><div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔋 Разгрузка — активное восстановление</div><div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, fontSize:11 }}><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Объём</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.volumeMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Интенсивность</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.intensityMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>RIR</div><div style={{ fontWeight:700, color:'#22c55e' }}>→{dp.rirTarget}</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Повторения</div><div style={{ fontWeight:700, color:'#22c55e' }}>{dp.repRange[0]}-{dp.repRange[1]}</div></div></div></div>;
+              return <div style={{ marginBottom:8, padding:10, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)' }}><div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔋 Разгрузка — активное восстановление (параметры из DELOAD_PROTOCOLS['{deloadType}'])</div><div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, fontSize:11 }}><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Объём</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.volumeMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Интенсивность</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.intensityMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>RIR</div><div style={{ fontWeight:700, color:'#22c55e' }}>→{dp.rirTarget}</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Повторения</div><div style={{ fontWeight:700, color:'#22c55e' }}>{dp.repRange[0]}-{dp.repRange[1]}</div></div></div></div>;
             })()}
           </>;
         })()}
@@ -4500,8 +4538,11 @@ export const BbAutoConstructor: React.FC = () => {
                 const statusLabel = qm ? (qm.status === 'exceeding_mrv' ? 'перегруз' : qm.status === 'approaching_mrv' ? 'около MRV' : qm.status === 'below_mev' ? 'недотрен' : 'оптимум') : mm.status;
                 const statusColor = over ? '#ef4444' : weak ? '#ec4899' : statusLabel==='перегруз' ? '#ef4444' : statusLabel==='недотрен' ? '#60a5fa' : '#22c55e';
                 const isExpanded = expandedMuscles.has(mm.muscle);
-                const subs = subSetsByMuscle[mm.muscle] || {};
-                const subEntries = Object.entries(subs).sort((a,b)=>b[1]-a[1]);
+                const rawSubs = subSetsByMuscle[mm.muscle] || {};
+                const defs = (SUBGROUP_MAP as any)[mm.muscle] || [];
+                const subs: Record<string, number> = { ...rawSubs };
+                for (const d of defs) if (!(d.id in subs)) subs[d.id] = 0;
+                const subEntries = Object.entries(subs).sort((a,b)=> (b[1] as number)-(a[1] as number));
                 const exs = exByMuscle[mm.muscle] || [];
                 return (
                   <div key={mm.muscle} style={{ padding:'4px 0', borderTop:'1px solid rgba(255,255,255,0.04)', background: weak?'rgba(236,72,153,0.06)':'transparent' }}>
