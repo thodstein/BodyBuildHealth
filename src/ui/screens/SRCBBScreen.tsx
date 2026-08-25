@@ -1178,7 +1178,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     : 'BB';
   const lmsChart: LMSWeekMetric[] = useMemo(() => {
     if (!builtSrc || !Array.isArray(builtSrc.weeks) || !builtSrc.weeks.length) return [];
-    return builtSrc.weeks.map(wk => {
+    const base = builtSrc.weeks.map(wk => {
       const t = wk.days.reduce((s, d) => s + d.metrics.tonnage, 0);
       const k = wk.days.reduce((s, d) => s + d.metrics.kpsh, 0);
       const uoi = k > 0 ? wk.days.reduce((s, d) => s + d.metrics.uoi * d.metrics.kpsh, 0) / k : 0;
@@ -1186,7 +1186,63 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       const intFB = k > 0 ? wk.days.reduce((s, d) => s + d.metrics.intFB * d.metrics.kpsh, 0) / k : 0;
       return { week: wk.week, tonnage: Math.round(t), kpsh: k, relInt: Math.round(relInt * 1000) / 1000, uoi: Math.round(uoi * 100) / 100, intFB: Math.round(intFB) };
     });
-  }, [builtSrc]);
+    if (autoRegMode === 'off') return base;
+    if (autoRegMode === 'auto' && autoRegResult) {
+      const vol = autoRegResult.volumeMultiplier ?? 1;
+      const wMul = autoRegResult.topSetPctMultiplier ?? 1;
+      if (vol === 1 && wMul === 1) return base;
+      return base.map(b => ({
+        week: b.week,
+        tonnage: Math.round(b.tonnage * vol * wMul),
+        kpsh: Math.round(b.kpsh * vol),
+        relInt: Math.round(b.relInt * wMul * 1000) / 1000,
+        uoi: Math.round(b.uoi * wMul * 100) / 100,
+        intFB: Math.round(b.intFB * vol * wMul),
+      }));
+    }
+    if (autoRegMode === 'diary') {
+      try {
+        const allPlans = builtSrc.weeks.flatMap(wk => wk.days.flatMap(d => d.exercises.map(e => {
+          const mainSet = e.workSets.reduce((best, ws) => (ws.weight ?? 0) > (best.weight ?? 0) ? ws : best, e.workSets[0] ?? ({} as typeof e.workSets[number]));
+          return {
+            name: e.name,
+            plannedWeight: mainSet?.weight ?? 0,
+            plannedReps: mainSet?.reps ?? 8,
+            plannedSets: mainSet?.sets ?? 3,
+            plannedRir: mainSet?.rir ?? 2,
+            isMain: e.load === 'Тяжелая',
+          };
+        })));
+        const uniq = new Map<string, typeof allPlans[number]>();
+        for (const p of allPlans) if (!uniq.has(p.name)) uniq.set(p.name, p);
+        const globalPlanned = [...uniq.values()].filter(p => p.plannedWeight > 0);
+        if (globalPlanned.length === 0) return base;
+        const globalDiary = buildDiaryAutoreg({ historyWorkouts, plannedExercises: globalPlanned });
+        let wSum = 0, sSum = 0, cnt = 0;
+        for (const p of globalPlanned) {
+          const adj = globalDiary.perExercise.get(p.name);
+          if (adj && adj.source === 'diary' && p.plannedWeight > 0 && p.plannedSets > 0) {
+            wSum += adj.adjustedWeight / p.plannedWeight;
+            sSum += adj.adjustedSets / p.plannedSets;
+            cnt++;
+          }
+        }
+        if (cnt === 0) return base;
+        const avgW = wSum / cnt;
+        const avgS = sSum / cnt;
+        if (Math.abs(avgW - 1) < 0.01 && Math.abs(avgS - 1) < 0.01) return base;
+        return base.map(b => ({
+          week: b.week,
+          tonnage: Math.round(b.tonnage * avgW * avgS),
+          kpsh: Math.round(b.kpsh * avgS),
+          relInt: Math.round(b.relInt * avgW * 1000) / 1000,
+          uoi: Math.round(b.uoi * avgW * 100) / 100,
+          intFB: Math.round(b.intFB * avgW * avgS),
+        }));
+      } catch { return base; }
+    }
+    return base;
+  }, [builtSrc, autoRegMode, autoRegResult, historyWorkouts]);
   const bbChart: BBMuscleMetric[] = useMemo(() => {
     if (!builtBb || !Array.isArray(builtBb.weeks) || !builtBb.weeks.length) return [];
     const mult = methodHints.volumeMult;
