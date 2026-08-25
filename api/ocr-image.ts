@@ -26,6 +26,30 @@ export const config = {
   api: { bodyParser: { sizeLimit: '16mb' } },
 };
 
+async function preprocessForOcr(buffer: Buffer): Promise<Buffer> {
+  try {
+    const { createCanvas, loadImage } = await import('@napi-rs/canvas');
+    const img: any = await loadImage(buffer as any);
+    const w = (img as any).width as number;
+    const h = (img as any).height as number;
+    if (!w || !h || w * h > 12_000_000) return buffer;
+    const canvas: any = createCanvas(w, h);
+    const ctx: any = canvas.getContext('2d');
+    if (!ctx) return buffer;
+    ctx.drawImage(img as any, 0, 0, w, h);
+    const image: any = ctx.getImageData(0, 0, w, h);
+    const data: Uint8ClampedArray = image.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+      const contrast = Math.max(0, Math.min(255, (gray - 128) * 1.5 + 128));
+      const val = gray < 160 ? Math.max(0, contrast - 20) : 255;
+      data[i] = val; data[i + 1] = val; data[i + 2] = val;
+    }
+    ctx.putImageData(image, 0, 0);
+    return canvas.toBuffer('image/png' as any) as Buffer;
+  } catch { return buffer; }
+}
+
 async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LANG_PATHS): Promise<string> {
   const { createWorker } = await import('tesseract.js');
   const worker = await withTimeout(createWorker(language, 1, {
@@ -42,7 +66,8 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
       preserve_interword_spaces: '1',
       user_defined_dpi: '300',
     }), OCR_TIMEOUT_MS, 'worker configuration');
-    const result = await withTimeout(worker.recognize(buffer), OCR_TIMEOUT_MS, 'recognition');
+    const enhanced = await withTimeout(preprocessForOcr(buffer), 5_000, 'preprocess');
+    const result = await withTimeout(worker.recognize(enhanced as any), OCR_TIMEOUT_MS, 'recognition');
     return typeof result.data.text === 'string' ? result.data.text : '';
   } finally {
     await worker.terminate();
