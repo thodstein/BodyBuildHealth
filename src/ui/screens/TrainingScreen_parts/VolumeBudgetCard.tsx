@@ -40,10 +40,13 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
 
   return (
     <div style={{ ...CARD, padding: 10, marginBottom: 8, background: 'rgba(0,230,138,0.04)', borderLeft: '3px solid #00e68a' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>📊 Бюджет объёма по мышцам · пик</span>
-        {mrvMultiplier > 1 && <span style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: 4 }}>MRV ×{mrvMultiplier.toFixed(2)}</span>}
-        <span style={{ fontSize: 10, color: '#fff' }}>всего {metrics.totalSets} сетов/нед · пик-неделя</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap:'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>📊 Бюджет объёма по мышцам — пиковая неделя (адаптировано)</span>
+        {mrvMultiplier > 1 && <span title="Максимальный восстанавливаемый объём увеличен с учётом фармакологии, стажа и уровня" style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', padding: '2px 6px', borderRadius: 4, border:'1px solid rgba(245,158,11,0.2)' }}>MRV ×{mrvMultiplier.toFixed(2)} — адаптировано</span>}
+        <span style={{ fontSize: 10, color: '#fff', background:'rgba(255,255,255,0.03)', padding:'2px 6px', borderRadius:4 }}>всего {metrics.totalSets} подходов в неделю · пиковая неделя</span>
+      </div>
+      <div style={{ fontSize:9, color:'#fff', marginBottom:8, lineHeight:1.35, padding:'5px 7px', background:'rgba(255,255,255,0.02)', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }}>
+        <b>Как читать:</b> Зелёная зона — минимум для роста (MEV) → оптимум (MAV) → максимум без перетрена (MRV). Столбик — ваш текущий объём. Цвет подписи — статус (недотрен/оптимум/около MRV/перегруз). Значения MEV/MAV/MRV уже адаптированы под ваш уровень, стаж, PED и восстановление.
       </div>
 
       {/* Легенда */}
