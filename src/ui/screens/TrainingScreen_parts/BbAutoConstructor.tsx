@@ -4297,17 +4297,17 @@ export const BbAutoConstructor: React.FC = () => {
           if (!proQ) return null;
           return (
             <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧠 PRO-качество (паттерны/углы/растяжка) — отдельно</div>
-              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Оценка техники/углов/растяжки из интеллектуальных тренировок. Скорректировала базовый score на {proQ.scoreDelta>0?'+':''}{proQ.scoreDelta}.</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧠 PRO-качество (паттерны/углы/растяжка)</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Оценка техники/углов/растяжки из интеллектуальных тренировок. Скорректировала базовую оценку на {proQ.scoreDelta>0?'+':''}{proQ.scoreDelta}.</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
-                <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} OK {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
-                <div><b>Углы:</b> {proQ.angles.filter(a=>a.ok).length}/{proQ.angles.length} OK {proQ.angles.filter(a=>!a.ok).map(a=>a.issue).slice(0,2).join('; ') || '—'}</div>
-                <div><b>Растяжка:</b> {proQ.stretches.filter(s=>s.ok).length}/{proQ.stretches.length} OK</div>
+                <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} в норме {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
+                <div><b>Углы:</b> {proQ.angles.filter(a=>a.ok).length}/{proQ.angles.length} в норме {proQ.angles.filter(a=>!a.ok).map(a=>a.issue).slice(0,2).join('; ') || '—'}</div>
+                <div><b>Растяжка:</b> {proQ.stretches.filter(s=>s.ok).length}/{proQ.stretches.length} в норме</div>
                 <div><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
               </div>
               {proQ.totalIssues.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss,i)=><div key={i}>• {iss}</div>)}</div>}
               {proQ.totalRecommendations.length > 0 && <div style={{ marginTop:4, fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec,i)=><div key={i}>→ {rec}</div>)}</div>}
-              <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Δ Score: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включена в {quality.score}/100)</div>
+              <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Изменение оценки: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включено в итог {quality.score}/100)</div>
             </div>
           );
         })()}
@@ -4433,7 +4433,7 @@ export const BbAutoConstructor: React.FC = () => {
           if (rdata.length < 2) return null;
           return (
             <div style={{ ...CARD, marginTop:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📉 RIR-drift по неделям</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📉 Динамика RIR по неделям</div>
               <RirDriftChart data={rdata} />
             </div>
           );
@@ -4451,11 +4451,11 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           )}
         </div>
-        {/* Дополнительно: прогрессия мезоцикла + What-if — свернуто по умолчанию */}
+        {/* Дополнительно: прогрессия мезоцикла + сценарии — свернуто по умолчанию */}
         <ExpandableCard
-          title="🔧 Дополнительно: прогноз прогрессии и What-if"
+          title="🔧 Дополнительно: прогноз прогрессии и сценарии"
           icon="🔧"
-          short="Прогрессия мезоцикла · What-if сценарии (калории/сон/AAS)"
+          short="Прогрессия мезоцикла · сценарии «что если» (калории/сон/курс)"
           full={
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
