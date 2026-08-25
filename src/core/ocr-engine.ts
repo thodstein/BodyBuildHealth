@@ -460,8 +460,8 @@ export async function processUploadedFile(file: File): Promise<OCRResult> {
   const fileType = typeof file?.type === 'string' ? file.type : '';
   const fileName = typeof file?.name === 'string' ? file.name : '';
   const isPDF = fileType === 'application/pdf' || /\.pdf$/i.test(fileName);
-  const isImage = fileType.startsWith('image/') || /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(fileName);
   const isText = fileType.includes('text') || /\.(txt|csv)$/i.test(fileName);
+  const isImage = fileType.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i.test(fileName) || (!isPDF && !isText && (file as any)?.size > 0);
 
   if (!file) {
     return { text: '', labs: [], meals: [], source: 'text', confidence: 0, warnings: ['Файл изображения не выбран или недоступен.'] };

@@ -259,29 +259,33 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   }, [diaryData, selectedDate, saveDiary, showToast]);
 
   const handleOcrFileUpload = useCallback(async (file: File) => { 
-    setOcrFileLoading(true); setOcrError('');
+    if (!file) { setOcrError('Файл не выбран. Попробуйте ещё раз.'); return; }
+    setOcrFileLoading(true); setOcrError(''); setOcrHint('⏳ Загружаем и распознаём…');
     if (file.size > 15 * 1024 * 1024) {
       setOcrFileLoading(false);
       setOcrError('Фото больше 15 МБ. Сделайте скриншот экрана или уменьшите изображение и повторите.');
       return;
     }
+    let backup: number | undefined;
+    const backupPromise = new Promise<never>((_, reject) => {
+      backup = window.setTimeout(() => reject(new Error('Превышено время ожидания (50с). Попробуйте скриншот экрана вместо фото камеры.')) as any, 50_000);
+    });
     try {
-      const result = await Promise.race([
+      const result: any = await Promise.race([
         processUploadedFile(file),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), 45_000)),
+        backupPromise,
       ]);
       if (result.meals.length > 0) {
         const converted = convertOCRItems(result.meals, usdaFoods);
-        // A new photo is a new recognition attempt, not another append to a
-        // possibly wrong previous attempt. Replace the queue so stale OCR rows
-        // cannot survive retries and look like current recognition output.
         setParsedItems(converted);
         setOcrError('');
         setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь перед сохранением.`);
+      } else if (result.meals.length === 0 && result.labs.length === 0) {
+        setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');
       }
-      if (result.meals.length === 0 && result.labs.length === 0) setOcrError(result.warnings[0] || 'Не удалось распознать данные питания.'); 
     } catch (e) { setOcrError('Ошибка: ' + (e instanceof Error ? e.message : String(e))); } 
-    finally { setOcrFileLoading(false); } 
+    finally { if (backup) clearTimeout(backup); setOcrFileLoading(false); } 
    }, [convertOCRItems, usdaFoods]);
 
   const handleOCR = useCallback(() => { 
