@@ -269,7 +269,7 @@ export const InteractionCheckerTab: React.FC = () => {
   return (
     <div>
       {/* Sub-tab pills */}
-      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+      <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap' }}>
         {subTabs.map((t) => {
           return (
             <button key={t.id} onClick={() => setInteractSub(t.id)} style={{
@@ -465,10 +465,10 @@ export const InteractionCheckerTab: React.FC = () => {
         borderRadius: 12, padding: '14px 16px', marginBottom: 10,
       }}>
         {/* Sub-sub tabs */}
-        <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+        <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap' }}>
           {(['conflicts','instructions'] as const).map(t => (
             <button key={t} onClick={() => setInteractDetail(t)} style={{
-              padding:'5px 12px', borderRadius:14, fontSize:10, fontWeight:600, cursor:'pointer',
+              padding:'5px 12px', borderRadius:14, fontSize:10, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
               background: interactDetail === t ? 'rgba(239,68,68,0.12)' : 'transparent',
               color: interactDetail === t ? '#ef4444' : 'var(--text-dim)',
               border: `1px solid ${interactDetail === t ? 'rgba(239,68,68,0.3)' : 'var(--border)'}`,

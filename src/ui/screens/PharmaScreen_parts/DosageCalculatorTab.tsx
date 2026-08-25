@@ -258,7 +258,7 @@ export const DosageCalculatorTab: React.FC = () => {
       )}
 
       {/* Sub-tab pills */}
-      <div style={{ display:'flex', gap:4, marginBottom:8 }}>
+      <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap' }}>
         {(['dosage','androgen'] as const).map(t => (
           <button key={t} onClick={() => setDosageSub(t)} style={{
             padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap',

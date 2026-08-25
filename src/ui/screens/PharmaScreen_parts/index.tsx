@@ -127,7 +127,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
           />
         </div>
       )}
-      <div style={{ display:'flex', gap:4, overflowX:'auto', marginBottom:8, scrollbarWidth:'none' }}>
+      <div style={{ display:'flex', gap:4, overflowX:'auto', overflowY:'hidden', marginBottom:8, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', paddingBottom:2 }}>
 {page === 'course' && (
   <button style={{
     padding:'6px 14px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'default', flexShrink:0,
