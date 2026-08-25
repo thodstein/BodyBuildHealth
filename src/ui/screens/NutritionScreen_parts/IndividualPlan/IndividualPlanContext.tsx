@@ -1912,9 +1912,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
      if (dayIndex !== undefined) setSelectedDayIndex(dayIndex);
      setWeekEditDay(null); // FIX button-audit: новая генерация сбрасывает редактирование недели
 
-        // ─── V2 Engine path — ТОЛЬКО для Pro режима ───
-       // simple/minimal используют классический путь (простой КБЖУ, без V2-расчётов)
-       if (useProEngine && plannerModeRef.current === 'pro') {
+        // ─── V2 Engine path — для ВСЕХ режимов (pro/simple/minimal) с одинаковой точностью ≤3% ───
+        // simple/minimal используют V2 с quality='basic' и минимумом инфо в UI (без DailyDietDashboard/NutritionQualityCard)
+        if (useProEngine) {
          try {
        const toMin = (t: string) => t?.includes(':') ? parseInt(t.split(':')[0]) * 60 + parseInt(t.split(':')[1]) : 0;
        const bfPct = bodyFatPct > 3 ? bodyFatPct : (sex === 'male' ? 15 : 22);
@@ -3159,7 +3159,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const need = effectiveWorst === 'p' ? targetP - totals.p : effectiveWorst === 'c' ? targetC - totals.c : targetF - totals.f;
           let best: { m: any; it: any; food: any; per100: number; maxCap: number; minAmt: number } | null = null;
           let bestScore = -Infinity;
-          for (const m of meals) {
+           for (const m of meals) {
+            if (m.label === 'Предтрен' || m.label === 'Пост-трен' || String(m.label||'').includes('инсулин')) continue;
             for (const it of m.items) {
               const food: any = FOOD_DB.find((f:any)=>f.id===it.id);
               if (!food) continue;

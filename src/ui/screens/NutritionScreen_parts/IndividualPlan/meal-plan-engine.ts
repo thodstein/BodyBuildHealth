@@ -1478,15 +1478,16 @@ function buildPreWorkout(
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
      const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
    
-   const items: MealItem[] = [];
+    const items: MealItem[] = [];
   if (proteinSource) {
-    const grams = gramsForMacro(proteinSource, PREW_PROTEIN_G, 'protein');
-    items.push(makeItem(proteinSource, grams, 'protein'));
+    const grams = Math.round(PREW_PROTEIN_G / Math.max(1, proteinSource.protein || 1) * 100);
+    const r = grams / 100;
+    items.push({ id: proteinSource.id, name: proteinSource.name, amount: grams, role: 'protein' as const, kcal: Math.round((proteinSource.kcal || 0) * r), p: Math.round((proteinSource.protein || 0) * r), f: Math.round((proteinSource.fat || 0) * r), c: Math.round((proteinSource.carbs || 0) * r), fiber: Math.round((proteinSource.fiber || 0) * r), leucine_mg: Math.round(getLeucine(proteinSource) * r) });
   }
   if (carbSource) {
-    // D-18: cap cooked grains at 280g so a high-carb day doesn't yield a 500g pre-W buckwheat bowl.
-    const grams = gramsForMacro(carbSource, carbG, 'carbs', carbPortionCap(carbSource));
-    items.push(makeItem(carbSource, grams, 'carb_slow'));
+    const grams = Math.min(carbPortionCap(carbSource), Math.round(carbG / Math.max(1, carbSource.carbs || 1) * 100));
+    const r = grams / 100;
+    items.push({ id: carbSource.id, name: carbSource.name, amount: grams, role: 'carb_slow' as const, kcal: Math.round((carbSource.kcal || 0) * r), p: Math.round((carbSource.protein || 0) * r), f: Math.round((carbSource.fat || 0) * r), c: Math.round((carbSource.carbs || 0) * r), fiber: Math.round((carbSource.fiber || 0) * r), leucine_mg: Math.round(getLeucine(carbSource) * r) });
   }
 
 
@@ -1530,23 +1531,25 @@ function buildPostWorkout(
   const items: MealItem[] = [];
 
   if (fastProtein) {
-    const grams = gramsForMacro(fastProtein, POSTW_FAST_PROTEIN_G, 'protein');
-    items.push(makeItem(fastProtein, grams, 'fast_protein'));
+    const grams = Math.round(POSTW_FAST_PROTEIN_G / Math.max(1, fastProtein.protein || 1) * 100);
+    const r = grams / 100;
+    items.push({ id: fastProtein.id, name: fastProtein.name, amount: grams, role: 'fast_protein' as const, kcal: Math.round((fastProtein.kcal || 0) * r), p: Math.round((fastProtein.protein || 0) * r), f: Math.round((fastProtein.fat || 0) * r), c: Math.round((fastProtein.carbs || 0) * r), fiber: Math.round((fastProtein.fiber || 0) * r), leucine_mg: Math.round(getLeucine(fastProtein) * r) });
   }
   if (fastCarb) {
-    // D-18: cap cooked starches at 280g (post-W fast carbs are usually bread/pasta/rice/potato;
-    // a 100g-carb target on a high-carb day could otherwise push pasta to ~400g).
-    const grams = gramsForMacro(fastCarb, carbG, 'carbs', carbPortionCap(fastCarb));
+    const grams = Math.min(carbPortionCap(fastCarb), Math.round(carbG / Math.max(1, fastCarb.carbs || 1) * 100));
+    const r = grams / 100;
     const delivered = (fastCarb.carbs || 0) * grams / 100;
-    items.push(makeItem(fastCarb, grams, 'carb_fast'));
-    // D-18b: if the cap left a large carb gap (high-carb day), add a second fast-carb source.
+    items.push({ id: fastCarb.id, name: fastCarb.name, amount: grams, role: 'carb_fast' as const, kcal: Math.round((fastCarb.kcal || 0) * r), p: Math.round((fastCarb.protein || 0) * r), f: Math.round((fastCarb.fat || 0) * r), c: Math.round((fastCarb.carbs || 0) * r), fiber: Math.round((fastCarb.fiber || 0) * r), leucine_mg: Math.round(getLeucine(fastCarb) * r) });
     if (delivered < carbG - 15 && carbG >= 60) {
       const secondPool = (prefCarb.length > 0 ? prefCarb : _carbBase).filter(f => f.id !== fastCarb.id);
       const fastCarb2 = pickPriority(secondPool.length > 0 ? secondPool : _carbBase.filter(f => f.id !== fastCarb.id), seed + 21, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
       if (fastCarb2) {
         const rem = Math.max(0, carbG - delivered);
-        const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
-        if (grams2 > 0) items.push(makeItem(fastCarb2, grams2, 'carb_fast'));
+        const grams2 = Math.min(carbPortionCap(fastCarb2), Math.round(rem / Math.max(1, fastCarb2.carbs || 1) * 100));
+        if (grams2 > 0) {
+          const r2 = grams2 / 100;
+          items.push({ id: fastCarb2.id, name: fastCarb2.name, amount: grams2, role: 'carb_fast' as const, kcal: Math.round((fastCarb2.kcal || 0) * r2), p: Math.round((fastCarb2.protein || 0) * r2), f: Math.round((fastCarb2.fat || 0) * r2), c: Math.round((fastCarb2.carbs || 0) * r2), fiber: Math.round((fastCarb2.fiber || 0) * r2), leucine_mg: Math.round(getLeucine(fastCarb2) * r2) });
+        }
       }
     }
   }
@@ -3052,6 +3055,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         let best: { m: Meal; it: MealItem; food: FoodItem; per100: number; maxCap: number; minAmt: number } | null = null;
         let bestScore = -Infinity;
         for (const m of meals) {
+          if (['preworkout','postworkout','intra'].includes(m.type as string)) continue;
           for (const it of m.items) {
             const food = FOOD_DB.find(f => f.id === it.id);
             if (!food) continue;
@@ -3092,7 +3096,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               if (per100 > 0) {
                 const grams = Math.min(100, Math.max(10, Math.ceil(Math.abs(need) / per100 * 100)));
                 const targetMeal = meals.reduce((a,b)=> (a.totals.kcal||0) < (b.totals.kcal||0) ? a:b);
-                const newIt = makeItem(cand, grams, worst === 'p' ? 'protein' : worst === 'c' ? 'carb_slow' : 'fat');
+                const r = grams / 100;
+                const newIt: MealItem = { id: cand.id, name: cand.name, amount: grams, role: (worst === 'p' ? 'protein' : worst === 'c' ? 'carb_slow' : 'fat') as MealItem['role'], kcal: Math.round((cand.kcal || 0) * r), p: Math.round((cand.protein || 0) * r), f: Math.round((cand.fat || 0) * r), c: Math.round((cand.carbs || 0) * r), fiber: Math.round((cand.fiber || 0) * r), leucine_mg: Math.round(getLeucine(cand) * r) };
                 targetMeal.items.push(newIt);
                 targetMeal.totals = targetMeal.items.reduce((acc,it)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+(it.fiber||0),leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
                 totals.kcal = meals.reduce((s,m)=>s+m.totals.kcal,0);
@@ -3108,6 +3113,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             // избыток углеводов/жиров/белков, но все items на минимуме — удаляем наименее важный carb-источник
             let toRemove: { m: Meal; idx: number; c: number } | null = null;
             for (const m of meals) {
+              if (['preworkout','postworkout','intra'].includes(m.type as string)) continue;
               if (m.items.length <= 1) continue; // не оставляем приём пустым
               for (let i = 0; i < m.items.length; i++) {
                 const it = m.items[i];
