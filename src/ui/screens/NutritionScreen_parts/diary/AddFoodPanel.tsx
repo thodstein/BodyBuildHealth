@@ -199,18 +199,20 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               color: '#fff', minHeight: 44, fontWeight: 500 }}>
             📱 Штрих-код
           </button>
-          <button onClick={() => ocrFileRef.current?.click()} disabled={ocrFileLoading} aria-label="Сканировать"
-            style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
+           <label style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
-              opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500 }}>
-             {ocrFileLoading ? '⏳ Распознаём' : '📸 Фото/файл'}
-           </button>
-           <button onClick={() => ocrCameraRef.current?.click()} disabled={ocrFileLoading} aria-label="Камера"
-             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
-               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
-               opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500 }}>
-              {ocrFileLoading ? '⏳ Ждём ответ' : '📷 Камера'}
-           </button>
+              opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
+            <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,image/*" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
+              {ocrFileLoading ? '⏳ Распознаём' : '📸 Фото/файл'}
+            </label>
+            <label style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
+              background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
+              opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
+            <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
+               {ocrFileLoading ? '⏳ Ждём ответ' : '📷 Камера'}
+            </label>
           <button onClick={onShowOCR} aria-label="Текст"
             style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
               background: showOCR ? 'rgba(0,230,138,0.12)' : '#202023',
