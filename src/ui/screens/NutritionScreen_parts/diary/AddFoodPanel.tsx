@@ -236,6 +236,12 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               {ocrHint}
             </div>
           )}
+          {ocrText && !ocrError && ocrHint && (
+            <details style={{ padding: '8px 10px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', fontSize: 10 }}>
+              <summary style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.8)' }}>Сырой текст OCR (для отладки)</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: 6, maxHeight: 120, overflowY: 'auto' }}>{ocrText.slice(0, 1500)}</pre>
+            </details>
+          )}
       </div>
 
       {showBarcode && (

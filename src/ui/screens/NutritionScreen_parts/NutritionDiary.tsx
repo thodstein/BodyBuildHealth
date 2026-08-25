@@ -277,12 +277,13 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Мобильный OCR не ответил за 45 секунд. Проверьте интернет и попробуйте скриншот меньшего размера.')), 45_000)),
         backupPromise,
       ]);
+      setOcrText(result.text || '');
       if (result.meals.length > 0) {
         const converted = convertOCRItems(result.meals, usdaFoods);
         if (converted.length > 0) {
           setParsedItems(converted);
           setOcrError('');
-          setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь перед сохранением.`);
+          setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь — тап по названию для правки. Сырой текст ниже.` );
         } else {
           setOcrError('Распознано 0 позиций — попробуйте более чёткий скриншот или вставьте текст вручную через «Текст».');
         }
