@@ -76,10 +76,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     setPlanningTrack(t);
     setPlanningTrackState(t);
     setZone('planner');
-    setPage('tabs');
+    setPage('constructor');
   };
+  // 3-уровневая иерархия: hero → planning → constructor (каждый в новом окне)
+  const openPlanning = useCallback(() => { setZone('planner'); setPage('planning'); }, []);
+  const openConstructor = useCallback((t: PlanningTrack) => { setPlanningTrack(t); setPlanningTrackState(t); setZone('planner'); setPage('constructor'); }, []);
   // Переход в зону «Планировщик» → режим «Ручной сбор» (внешние ссылки setTab('constructor'))
-  const goPlannerManual = useCallback(() => { setZone('planner'); switchPlanningTrack('manual'); }, []);
+  const goPlannerManual = useCallback(() => { openConstructor('manual'); }, [openConstructor]);
   // Внешнее переключение режима планировщика (напр., из CardioLinkCard «Открыть кардио-конструктор»)
   useEffect(() => {
     const h = (e: Event) => {
@@ -271,7 +274,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       setZone('diary'); setPage('tabs'); setTab('analytics');
     } else if (initialSubTab && initialSubTab.startsWith('pl-plan:')) {
       // Deep-link из «Поделиться в ТГ»: открыть ПЛ-авто (маркер цикла читает SRCBBScreen).
-      switchPlanningTrack('pl'); setPage('tabs');
+      switchPlanningTrack('pl');
     } else if (initialSubTab && diaryTabs.has(initialSubTab as TrainingTab)) {
       setZone('diary'); setPage('tabs'); setTab(initialSubTab as TrainingTab);
     }
@@ -359,7 +362,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         const parsed = (allowed as string[]).includes(val || '') ? (val as PlanningTrack) : 'pl';
         setPlanningTrack(parsed);
         setPlanningTrackState(parsed);
-        setZone('planner'); setPage('tabs');
+        setZone('planner'); setPage('constructor');
       }
       if (e.key === 'he_training_tab') {
         const val = localStorage.getItem('he_training_tab') as TrainingTab | null;
@@ -538,7 +541,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
               {ZONE_ORDER.map(z => {
                 const group = ZONES[z];
                 return (
-                <button key={z} onClick={() => { hapticImpact('light'); setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else if (z !== 'planner') setTab(group.tabs[0]); }} style={{
+                <button key={z} onClick={() => { hapticImpact('light'); if (z === 'planner') { setZone('planner'); setPage('planning'); } else { setPage('tabs'); setZone(z); if (z === 'calculators') setTab('runtime'); else setTab(group.tabs[0]); } }} style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
                   background: 'rgba(20,22,30,0.35)', border: '1px solid rgba(255,255,255,0.07)', color: '#fff',
                   transition: 'all 0.2s',
@@ -562,8 +565,68 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         </div>
       )}
 
-      {/* ─── TAB VIEW HEADER (компактный, без обрезки) ─── */}
-      {page !== 'hero' && (
+      {/* ─── PLANNING WINDOW — уровень 2: выбор конструктора (новое окно) ─── */}
+      {page === 'planning' && (
+        <div style={{ position:'fixed', inset:0, zIndex:101, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'auto' }}>
+          <div style={{ position:'relative', flexShrink:0, padding:'12px 14px 10px', background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(59,130,246,0.08))', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10 }}>
+            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'6px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff' }}>← На главную</button>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🏗 Планирование</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}>Выберите конструктор — каждый откроется в новом окне</div>
+            </div>
+            <span style={{ fontSize:11, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'4px 10px' }}>Шаг 2 из 3</span>
+          </div>
+          <div style={{ padding:'14px', display:'flex', flexDirection:'column', gap:10, paddingBottom:80 }}>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>Тренировки → <b style={{ color:'#00e68a' }}>Планирование</b> → Конструктор. Начните с выбора направления.</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {PLANNER_MODES.map(m => {
+                const active = planningTrack === m.id;
+                return (
+                  <button key={m.id} onClick={() => { hapticImpact('medium'); openConstructor(m.id); }} style={{
+                    display:'flex', alignItems:'center', gap:12, padding:'14px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                    background: active ? 'rgba(0,230,138,0.14)' : 'rgba(24,24,27,0.92)', border: active ? '1px solid rgba(0,230,138,0.45)' : '1px solid rgba(255,255,255,0.08)', color:'#fff',
+                    transition:'all 0.2s', boxShadow: active ? '0 0 0 1px rgba(0,230,138,0.25), 0 4px 18px rgba(0,0,0,0.28)' : '0 2px 10px rgba(0,0,0,0.18)',
+                  }}>
+                    <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', fontSize:22 }}>{m.icon}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13, fontWeight:800, color: active ? '#00e68a' : '#fff' }}>{m.label}</div>
+                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.68)', lineHeight:1.35, marginTop:2 }}>{m.hint}</div>
+                    </div>
+                    <span style={{ color: active ? '#00e68a' : 'rgba(255,255,255,0.35)', fontSize:16, fontWeight:700 }}>→</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', textAlign:'center', marginTop:4 }}>Выбранный конструктор запомнится. Назад — «← На главную», вперёд — клик по карточке.</div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CONSTRUCTOR WINDOW — уровень 3: сам конструктор (новое окно, 100% контента) ─── */}
+      {page === 'constructor' && (
+        <div style={{ position:'fixed', inset:0, zIndex:102, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'hidden' }}>
+          <div style={{ flexShrink:0, padding:'8px 10px', background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(16,185,129,0.06))', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:8 }}>
+            <button onClick={() => { hapticImpact('light'); setPage('planning'); }} style={{ padding:'6px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', whiteSpace:'nowrap' }}>← К выбору</button>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.icon ?? '🏗'} {PLANNER_MODES.find(x=>x.id===planningTrack)?.label ?? 'Конструктор'}</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PLANNER_MODES.find(x=>x.id===planningTrack)?.hint ?? ''}</div>
+            </div>
+            <span style={{ fontSize:11, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'4px 10px', flexShrink:0 }}>Шаг 3 из 3</span>
+            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'6px 8px', borderRadius:9, fontSize:11, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕ На главную</button>
+          </div>
+          <div style={{ flex:1, overflow:'auto', padding:'12px', WebkitOverflowScrolling:'touch' }}>
+            {planningTrack === 'pl' && <PlannerPlAuto />}
+            {planningTrack === 'bb' && <PlannerBbAuto />}
+            {planningTrack === 'manual' && <ProgramManagerPanel />}
+            {planningTrack === 'cardio' && <CardioConstructor />}
+            {planningTrack === 'strength' && <StrengthSportConstructor />}
+            {planningTrack === 'combat' && <CombatConstructor />}
+          </div>
+        </div>
+      )}
+
+      {/* ─── TAB VIEW HEADER (компактный, без обрезки) — только для остальных зон (tabs) ─── */}
+      {page === 'tabs' && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,0.08)', minHeight: 36 }}>
           <button onClick={() => { setPage('hero'); setZone(null); }} style={{
             padding: '4px 8px', cursor: 'pointer', fontSize: 13,
@@ -577,7 +640,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         </div>
       )}
 
-      {page !== 'hero' && (
+      {page === 'tabs' && (
       <div style={{ padding: '0 4px' }}>
       {zone && (
         <h2 style={{ margin: '0 0 6px', fontSize: 14, color: ZONES[zone].color, wordBreak:'break-word' }}>{ZONES[zone].title}</h2>
@@ -654,25 +717,16 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
       {/* ═══════════ PLAN TAB ═══════════ */}
       
-      {/* ═══════════ ПЛАНИРОВЩИК (зона) — сегментированный ПЛ/ББ ═══════════ */}
+      {/* ═══════════ ПЛАНИРОВЩИК (зона) — fallback для старых ссылок tabs: ведёт в новые окна ── */}
       {zone === 'planner' && (
         <InfoErrorBoundary label="Планировщик">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display:'flex', gap:4, padding:'6px', borderRadius:12, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
-              {PLANNER_MODES.map(m => (
-                <button key={m.id} onClick={() => { hapticImpact('medium'); switchPlanningTrack(m.id); }} style={{ flex:'0 0 auto', minWidth:104, padding:'8px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border: planningTrack === m.id ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: planningTrack === m.id ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.02)', color: planningTrack === m.id ? '#ffffff' : '#fff', display:'flex', flexDirection:'column', alignItems:'center', gap:2, whiteSpace:'nowrap', boxShadow: planningTrack === m.id ? '0 0 0 1px rgba(0,230,138,0.4), 0 2px 10px rgba(0,0,0,0.25)' : 'none' }}>
-                  <span style={{ fontSize:16 }}>{m.icon}</span>
-                  <span>{m.label}</span>
-                  <span style={{ fontSize:11, fontWeight:400, opacity:0.75, lineHeight:1.2, maxWidth:'100%', overflow:'hidden', textOverflow:'ellipsis' }}>{m.hint}</span>
-                </button>
-              ))}
+          <div style={{ display:'flex', flexDirection:'column', gap:10, padding:'14px', borderRadius:12, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.18)' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#00e68a' }}>🏗 Планировщик теперь в отдельных окнах</div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.75)', lineHeight:1.4 }}>Структура: <b style={{ color:'#fff' }}>Тренировки</b> → <b style={{ color:'#00e68a' }}>Планирование</b> (выбор конструктора) → <b style={{ color:'#fff' }}>Конструктор</b> (контент). Каждый шаг открывается в новом окне, весь контент сохранён без упрощений.</div>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <button onClick={() => { hapticImpact('medium'); setPage('planning'); }} style={{ padding:'10px 14px', borderRadius:10, fontSize:12, fontWeight:800, cursor:'pointer', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#06281c', border:'none' }}>→ К выбору конструктора</button>
+              <button onClick={() => { hapticImpact('medium'); openConstructor(planningTrack); }} style={{ padding:'10px 14px', borderRadius:10, fontSize:12, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.12)' }}>Открыть {PLANNER_MODES.find(m=>m.id===planningTrack)?.label ?? 'конструктор'} →</button>
             </div>
-            {planningTrack === 'pl' && <PlannerPlAuto />}
-            {planningTrack === 'bb' && <PlannerBbAuto />}
-            {planningTrack === 'manual' && <ProgramManagerPanel />}
-            {planningTrack === 'cardio' && <CardioConstructor />}
-            {planningTrack === 'strength' && <StrengthSportConstructor />}
-            {planningTrack === 'combat' && <CombatConstructor />}
           </div>
         </InfoErrorBoundary>
       )}
