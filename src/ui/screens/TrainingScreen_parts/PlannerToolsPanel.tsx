@@ -19,10 +19,8 @@ import { ToolsHub } from './ToolsHub';
 import { RirForecastHub } from './RirForecastHub';
 import { TrainingSafetyHub } from './TrainingSafetyHub';
 
-// ББ-специфичные
-import { SplitGenCard } from './SplitGenCard';
+// ББ-специфичные (SplitGen/VolumeOptimizer удалены — без дублей)
 import { TempoTab } from './TempoTab';
-import { VolumeOptimizerTab } from './VolumeOptimizerTab';
 
 interface ToolDef { id: string; title: string; icon: string; short: string; accent: string; desc: string; render: () => React.ReactNode; }
 
@@ -61,31 +59,16 @@ const TOOLS: Record<'pl' | 'bb', ToolDef[]> = {
     { id: 'metabolic', title: 'Метаболика', icon: '⚖️', accent: '#38bdf8', short: 'Вода · шаги · КБЖУ · жир · кортизол', desc: '5 в 1: EFSA/Mifflin/Navy/HPA — один снапшот с/без ААС, переключатель натурал/ААС', render: () => <MetabolicHub /> },
   ],
 
-  // ═══ ББ-АВТО — все инструменты Интеллекта + ББ-специфичные ═══
+  // ═══ ББ-АВТО — инструменты (без дублей, только уникальный Темп из Интеллекта) ═══
   bb: [
-    { id: 'bb', title: 'ББ-инструменты', icon: '💪', accent: '#ec4899', short: 'Темп/отдых, техники, слабые группы, демография — теперь в лаборатории упражнений.', desc: 'Перейдите в зону «Калькуляторы» → «Лаборатория упражнений»', render: () => (
-      <div style={{ padding: 12, fontSize: 11 }}>
-        <div style={{ color:'#fff', marginBottom: 8, lineHeight: 1.5 }}>
-          ББ-инструменты объединены с Лабораторией упражнений в единый ПРОФ-калькулятор.
-          Перейдите в зону «Калькуляторы» → «Лаборатория упражнений» → вкладка «ББ-инструменты».
-        </div>
-        <button onClick={() => { const ev = new CustomEvent('he_training_nav', { detail: { zone: 'calculators', tab: 'exercise_lab' } }); window.dispatchEvent(ev); }}
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(236,72,153,0.3)', background: 'rgba(236,72,153,0.08)', color: '#ec4899', cursor: 'pointer', fontWeight: 700, fontSize: 11 }}>
-          🧬 Открыть Лабораторию упражнений
-        </button>
-      </div>
-    ) },
-    { id: 'split', title: 'Генератор сплитов', icon: '🧩', accent: '#22c55e', short: '9 типов сплитов под цель/дни/слабые группы.', desc: 'Автоподбор сплита под цель, дни, слабые группы — 9 шаблонов', render: () => <SplitGenCard /> },
-    { id: 'tempo', title: 'Темп повторений', icon: '⏱️', accent: '#f59e0b', short: 'Эксцентрика/пауза/концентрика/пауза по цели — полный контроль TUT (дубль Интеллекта).', desc: 'Темп по цели тренировки: эксцентрика/паузы/концентрика — один источник (Интеллект → Темп)', render: () => <TempoTab /> },
-    { id: 'volopt', title: 'Оптимизатор объёма', icon: '📐', accent: '#38bdf8', short: 'Полный анализ объёма: per-muscle MEV/MAV/MRV, SFR, CNS.', desc: 'MEV/MAV/MRV по мышцам + SFR + CNS — дозировка объёма', render: () => <VolumeOptimizerTab /> },
-    // — Интеллект (без дублей: качество/безопасность/периодизация/RIR уже в dashboard Интеллекта) —
+    { id: 'tempo', title: 'Темп повторений', icon: '⏱️', accent: '#f59e0b', short: 'Эксцентрика/пауза/концентрика/пауза по цели — полный контроль TUT (источник: Интеллект → Темп).', desc: 'Темп по цели тренировки: эксцентрика/паузы/концентрика — один источник (Интеллект → Темп)', render: () => <TempoTab /> },
+    // — Интеллект (дубли убраны: всё в зоне «Интеллект тренировки», здесь только Темп как исключение) —
     { id: 'intel', title: 'Интеллект тренировки', icon: '⚡', accent: '#00e68a', short: 'Единый пульт: нагрузка → восстановление → авторегуляция → прогноз', desc: 'ACWR/Banister/monotony · сон/HRV/готовность · PRI/RPE-вес · Хольт/what-if — один снапшот, без дублей', render: () => <UnifiedIntelligenceHub /> },
     { id: 'strength', title: 'Анализ силы', icon: '🏋️', accent: '#3b82f6', short: '1RM (7 формул), VBT, относительная сила, нормативы, аналитика', desc: 'Один снапшот пол/вес/присед/жим/тяга → 5 секций: 1RM · VBT · отн.сила · нормативы · аналитика', render: () => <StrengthAnalysisHub /> },
     { id: 'diagnostics', title: 'Диагностика движения', icon: '🔬', accent: '#60a5fa', short: '9 лифтов: углы, траектория штанги, скорость, видео', desc: 'Мастер 9 движений + мёртвые точки + лимитеры + VBT + видео — точечные коррекции в план', render: () => <DiagnosticsWrap /> },
     { id: 'joints', title: 'Суставы и ортопедия', icon: '🦴', accent: '#f43f5e', short: 'JSI теплокарта · анатомия · нагрузка · прехаб · видео', desc: '9 блоков в одном скролле: JSI → анатомия → нагрузка → геометрия → прехаб → недельный план → видео', render: () => <JointMasterCard /> },
     { id: 'volume', title: 'Объём-хаб', icon: '📐', accent: '#22c55e', short: 'MEV/MAV/MRV · тоннаж/КПШ · блины', desc: 'Один расчёт объёма: пер-мышца MEV/MAV/MRV · тоннаж/КПШ/УОИ · блины 8 грифов — без дублей', render: () => <VolumeHub /> },
     { id: 'lab', title: 'Лаборатория упражнений', icon: '🧬', accent: '#06b6d4', short: 'Подбор · техника · PRO+замена · сравнение', desc: '4 шага: подбор+нагрузка/блины/тоннаж/1RM/VBT + техника + force-векторы + сравнение — каталог drawer', render: () => <ExerciseLabMerged /> },
-    { id: 'tools', title: 'PRI / схема повторов', icon: '🧠', accent: '#8b5cf6', short: 'PRI готовность → объём/RIR + схема повторов', desc: 'PRI-тест Masuda → целевой объём/RIR + схема повторов — источник Helms/RPE/RIR', render: () => <ToolsHub /> },
     { id: 'mixes', title: 'Миксы', icon: '🧪', accent: '#ec4899', short: 'Тренировочные + пресеты здоровья', desc: 'Тренировочные (памп/сила/фокус пред/интра/пост) + 7 пресетов здоровья — ISSN/Examine', render: () => <MixHub /> },
     { id: 'metabolic', title: 'Метаболика', icon: '⚖️', accent: '#38bdf8', short: 'Вода · шаги · КБЖУ · жир · кортизол', desc: '5 в 1: EFSA/Mifflin/Navy/HPA — один снапшот с/без ААС, переключатель натурал/ААС', render: () => <MetabolicHub /> },
   ],
