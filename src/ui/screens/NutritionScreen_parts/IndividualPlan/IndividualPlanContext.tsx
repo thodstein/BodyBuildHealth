@@ -3153,6 +3153,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     await maybeYield();
     const snapDayMeals = (day: any) => {
       if (!day || !Array.isArray(day.meals)) return day;
+      let _sK=0,_sP=0,_sF=0,_sC=0, _oK=0,_oP=0,_oF=0,_oC=0;
+      for (const mm of day.meals) for (const it of (mm.items||[])) { const fd=FOOD_DB.find((f:any)=>f.id===it.id); const sn=fd?snapPortionG(fd,it.amount):it.amount; const f2=it.amount>0?sn/it.amount:1; _sK+=Math.round((it.kcal||0)*f2); _sP+=Math.round((it.p||0)*f2*10)/10; _sF+=Math.round((it.f||0)*f2*10)/10; _sC+=Math.round((it.c||0)*f2*10)/10; _oK+=it.kcal||0; _oP+=it.p||0; _oF+=it.f||0; _oC+=it.c||0; }
+      const _tK2=(day.totals?.kcal||_oK)||2000,_tP2=(day.totals?.p||_oP)||150,_tF2=(day.totals?.f||_oF)||70,_tC2=(day.totals?.c||_oC)||250;
+      const _devB=Math.max(Math.abs(_oK-_tK2)/_tK2,Math.abs(_oP-_tP2)/_tP2,Math.abs(_oF-_tF2)/_tF2,Math.abs(_oC-_tC2)/_tC2);
+      const _devS=Math.max(Math.abs(_sK-_tK2)/_tK2,Math.abs(_sP-_tP2)/_tP2,Math.abs(_sF-_tF2)/_tF2,Math.abs(_sC-_tC2)/_tC2);
+      if (_devS>0.03 && _devS>_devB+0.01) return day;
       for (const m of day.meals) {
         if (!Array.isArray(m.items)) continue;
         for (const it of m.items) {
