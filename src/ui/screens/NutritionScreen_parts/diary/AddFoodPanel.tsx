@@ -226,9 +226,9 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
            </div>
          )}
 
-          <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt" style={{ display: 'none' }}
+          <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,image/*" style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
-          <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+          <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }}
             onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
       </div>
 
