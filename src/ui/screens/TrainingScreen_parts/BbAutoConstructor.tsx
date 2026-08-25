@@ -1203,9 +1203,13 @@ export const BbAutoConstructor: React.FC = () => {
       sleepHours: lifestyle?.sleepHours,
       stressLevel: lifestyle?.stressLevel,
       injuryCount: injuries.length,
+      injuries,
+      mobilityRestrictions,
       balanceReport: (builtPlan as any).balanceReport || null,
+      weeklySessions: builtPlan.weeks[0]?.sessions.length ?? 4,
+      goal: bbGoal,
     });
-  }, [builtPlan, linked.profile, injuries.length, acwrData]);
+  }, [builtPlan, linked.profile, injuries, mobilityRestrictions, acwrData, bbGoal]);
   // FIX-6: Единый источник качества — validatePlanQuality + pro-quality-analysis (паттерны/углы/растяжка)
   const quality = useMemo(() => {
     if (!builtPlan) return null;
@@ -3999,9 +4003,261 @@ export const BbAutoConstructor: React.FC = () => {
     return (
       <div>
         {safetyScore && (
-          <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, padding: 10, borderRadius: 10, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)' }}>
-            <b>🛡 SafetyScore: {safetyScore.score}/100</b> · {safetyScore.riskLevel === 'safe' ? 'Безопасный план' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный план'}
-            {safetyScore.issues.slice(0, 3).map((issue, index) => <div key={index} style={{ marginTop: 3, fontSize: 11, color: '#f59e0b' }}>⚠ {issue}</div>)}
+          <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, borderRadius: 14, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)', overflow:'hidden' }}>
+            {/* Header gauge + overall */}
+            <div style={{ padding: 12, display:'flex', gap:12, alignItems:'center', background: `linear-gradient(135deg, ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.14)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.14)':'rgba(239,68,68,0.14)'}, transparent)`}}>
+              <div style={{ width:62, height:62, borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center', background: safetyScore.riskLevel==='safe'?'#22c55e': safetyScore.riskLevel==='caution'?'#f59e0b':'#ef4444', color:'#000', fontWeight:900, fontSize:22, boxShadow:'0 4px 12px rgba(0,0,0,0.25)' }}>{safetyScore.score}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
+                <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Формула каждого фактора — ниже</div>
+              </div>
+            </div>
+            {/* Factor breakdown with calculations */}
+            {safetyScore.details?.factorBreakdown && (
+              <div style={{ padding:'8px 12px', display:'grid', gridTemplateColumns:'1fr', gap:6, background:'rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, letterSpacing:0.3, textTransform:'uppercase' }}>Расчёт по факторам — откуда баллы</div>
+                {safetyScore.details.factorBreakdown.map(f=> (
+                  <div key={f.key} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:11, fontWeight:700, color: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444' }}>{f.label}</span>
+                      <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{f.score}/{f.max}</span>
+                    </div>
+                    <div style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', marginTop:4, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${(f.score/f.max)*100}%`, background: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444', transition:'width 0.3s' }} />
+                    </div>
+                    <div style={{ fontSize:10, color:'#fff', opacity:0.68, marginTop:4, lineHeight:1.35, fontFamily:'ui-monospace, SFMono-Regular, monospace' }}>{f.calculation}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Joint stress detailed */}
+            {safetyScore.details?.jointStressDetails && (
+              <div style={{ padding:'8px 12px' }}>
+                <ExpandableCard
+                  title="🦴 Суставная нагрузка — детально (расчёт)"
+                  icon="🦴"
+                  short={`${safetyScore.details.jointStressDetails.overallRisk==='high'?'Высокий': safetyScore.details.jointStressDetails.overallRisk==='moderate'?'Умеренный':'Низкий'} стресс · пик нед ${safetyScore.details.jointStressDetails.peakWeek || '—'} · средний ${Math.round(safetyScore.details.jointStressDetails.avgWeeklyStress)} · самый нагруженный: ${safetyScore.details.jointStressDetails.mostLoadedJoint ? `${safetyScore.details.jointStressDetails.mostLoadedJoint.joint} ${Math.round(safetyScore.details.jointStressDetails.mostLoadedJoint.stress)}` : '—'}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', marginBottom:8, fontSize:10, color:'#fff' }}>
+                        <b>Формула стресса упражнения:</b> base(jointStress low=3 / med=6 / high=10 из EXERCISE_CATALOG) × sets × proximity(1+max(0,2−RIR)×0.15) × intensity(1+min(0.5,(weight−60)/200)) → сумма по упражнениям → <b>byJoint</b>. Пороги сессии: low&lt;15 moderate&lt;25 high≥40; неделя low&lt;45 moderate&lt;75 high≥120 (×3). Пиковая неделя и средний — для оценки перегруза.
+                      </div>
+                      {Object.keys(safetyScore.details.jointStressDetails.byJointPeak).length===0 ? (
+                        <div style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Нет суставной нагрузки — план пустой или только deload.</div>
+                      ) : (
+                        <div style={{ display:'grid', gap:6 }}>
+                          {Object.entries(safetyScore.details.jointStressDetails.byJointPeak).sort((a,b)=> (b[1] as number)-(a[1] as number)).map(([joint, peak])=>{
+                            const avg = (safetyScore.details!.jointStressDetails.byJointAvg as any)[joint] || 0;
+                            const thresh = safetyScore.details!.jointStressDetails.thresholds;
+                            const lvl = (peak as number) > thresh.high ? 'high' : (peak as number) > thresh.moderate ? 'moderate' : (peak as number) > thresh.low ? 'low' : 'none';
+                            const color = lvl==='high'?'#ef4444': lvl==='moderate'?'#f59e0b': lvl==='low'?'#eab308':'#22c55e';
+                            const pct = Math.min(100, ((peak as number)/ (thresh.high*1.5))*100);
+                            return (
+                              <div key={joint} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:`1px solid ${color}22` }}>
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                  <span style={{ fontWeight:700, color:'#fff' }}>{joint}</span>
+                                  <span style={{ fontWeight:800, color }}>{Math.round(peak as number)} пик · {Math.round(avg)} средн.</span>
+                                </div>
+                                <div style={{ height:5, borderRadius:5, background:'rgba(255,255,255,0.08)', marginTop:4, overflow:'hidden' }}>
+                                  <div style={{ width:`${pct}%`, height:'100%', background: color }} />
+                                </div>
+                                <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>пороги: {thresh.low}/{thresh.moderate}/{thresh.high} · {lvl==='high'?'высокий':lvl==='moderate'?'умеренный':lvl==='low'?'низкий':'минимальный'}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {safetyScore.details.jointStressDetails.weeklyReports.length>0 && (
+                        <div style={{ marginTop:8, fontSize:10, color:'#fff', opacity:0.7 }}>
+                          Пиковая неделя: {safetyScore.details.jointStressDetails.peakWeek} · средний недельный стресс: {Math.round(safetyScore.details.jointStressDetails.avgWeeklyStress)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Orthopedic constraints */}
+            {safetyScore.details?.orthopedic && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🦿 Ортопедика: ${safetyScore.details.orthopedic.phase==='acute'?'острая': safetyScore.details.orthopedic.phase==='subacute'?'подострая': safetyScore.details.orthopedic.phase==='chronic'?'хроническая':'поддержание'} фаза`}
+                  icon="🦿"
+                  short={`${safetyScore.details.orthopedic.blockedPatterns.length ? `заблокировано ${safetyScore.details.orthopedic.blockedPatterns.length} паттернов` : 'паттерны без блоков'} · лимиты суставов: ${Object.keys(safetyScore.details.orthopedic.jointStressLimits).length}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                        <div style={{ padding:'7px 9px', borderRadius:8, background: safetyScore.details!.orthopedic.blockedPatterns.length ? 'rgba(239,68,68,0.07)' : 'rgba(34,197,94,0.07)', border:`1px solid ${safetyScore.details!.orthopedic.blockedPatterns.length ? 'rgba(239,68,68,0.14)' : 'rgba(34,197,94,0.14)'}` }}>
+                          <div style={{ fontSize:10, fontWeight:800, color: safetyScore.details!.orthopedic.blockedPatterns.length ? '#ef4444' : '#22c55e' }}>Заблокированные паттерны</div>
+                          <div style={{ fontSize:11, marginTop:3, color:'#fff' }}>{safetyScore.details!.orthopedic.blockedPatterns.length ? safetyScore.details!.orthopedic.blockedPatterns.join(', ') : '— нет блоков'}</div>
+                          <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>Источник: INJURY_PATTERN_BLACKLIST + ROM_LIMITS (orthopedic-load-engines) · травмы/ограничения → чёрный список движений (hinge/squat/lunge/carry/vertical_push и т.д.)</div>
+                        </div>
+                        <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(96,165,250,0.07)', border:'1px solid rgba(96,165,250,0.14)' }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa' }}>Разрешённые паттерны</div>
+                          <div style={{ fontSize:11, marginTop:3, color:'#fff' }}>{safetyScore.details!.orthopedic.allowedPatterns.join(', ') || '—'}</div>
+                        </div>
+                      </div>
+                      {Object.keys(safetyScore.details.orthopedic.romLimits).length>0 && (
+                        <div style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#a855f7', marginBottom:4 }}>ROM лимиты (градусы)</div>
+                          {Object.entries(safetyScore.details.orthopedic.romLimits).map(([j, lim]:any)=> (
+                            <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', marginBottom:3, fontSize:11 }}>
+                              <span style={{ color:'#fff' }}>{j}</span><span style={{ fontWeight:700, color:'#fff' }}>{lim.min}° – {lim.max}°</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {Object.keys(safetyScore.details.orthopedic.jointStressLimits).length>0 && (
+                        <div style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', marginBottom:4 }}>Лимиты стресса по суставам (1–4, ниже = строже)</div>
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                            {Object.entries(safetyScore.details.orthopedic.jointStressLimits).map(([j, lim]:any)=> (
+                              <div key={j} style={{ padding:'5px 7px', borderRadius:8, background: (lim as number)<=1?'rgba(239,68,68,0.1)': (lim as number)<=2?'rgba(245,158,11,0.1)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                                <div style={{ fontSize:9, color:'#fff', opacity:0.7 }}>{j}</div><div style={{ fontSize:12, fontWeight:800, color: (lim as number)<=1?'#ef4444': (lim as number)<=2?'#f59e0b':'#fff' }}>{String(lim)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {safetyScore.details.orthopedic.recommendations.length>0 && (
+                        <div>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#00e68a', marginBottom:4 }}>Рекомендации ортопедии</div>
+                          {safetyScore.details.orthopedic.recommendations.map((r,i)=> <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:6, borderLeft:'2px solid rgba(0,230,138,0.5)' }}>{r}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Load distribution */}
+            {safetyScore.details?.loadDistribution && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`📅 Распределение нагрузки: ${safetyScore.details.loadDistribution.hardDays} тяж. дней · ${safetyScore.details.loadDistribution.totalVolume} объём`}
+                  icon="📅"
+                  short={`7 дней: ${safetyScore.details.loadDistribution.weekPlan.filter(d=>d.difficulty!=='off').map(d=> d.difficulty==='hard'?'тяж': d.difficulty==='medium'?'сред': d.difficulty==='light'?'лёг':'реаб').join(' · ')}${safetyScore.details.loadDistribution.warnings.length?` · ⚠ ${safetyScore.details.loadDistribution.warnings.length}`:''}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:4, marginBottom:8 }}>
+                        {safetyScore.details!.loadDistribution.weekPlan.map((d:any)=> (
+                          <div key={d.day} style={{ padding:'6px 4px', borderRadius:8, textAlign:'center', background: d.difficulty==='hard'?'rgba(239,68,68,0.12)': d.difficulty==='medium'?'rgba(245,158,11,0.10)': d.difficulty==='light'?'rgba(96,165,250,0.10)': d.difficulty==='rehab'?'rgba(168,85,247,0.10)':'rgba(255,255,255,0.04)', border:`1px solid ${d.difficulty==='hard'?'rgba(239,68,68,0.18)': d.difficulty==='medium'?'rgba(245,158,11,0.16)': d.difficulty==='light'?'rgba(96,165,250,0.14)': d.difficulty==='rehab'?'rgba(168,85,247,0.14)':'rgba(255,255,255,0.06)'}` }}>
+                            <div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Дн {d.day}</div>
+                            <div style={{ fontSize:10, fontWeight:800, color:'#fff' }}>{d.difficulty==='off'?'отдых': d.difficulty==='hard'?'тяж': d.difficulty==='medium'?'сред': d.difficulty==='light'?'лёг':'реаб'}</div>
+                            {d.difficulty!=='off' && <><div style={{ fontSize:9, color:'#fff' }}>V{d.volumeTarget}</div><div style={{ fontSize:9, color:'#fff', opacity:0.7 }}>I{d.intensityTarget}</div></>}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
+                        <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Сумм. объём</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{safetyScore.details!.loadDistribution.totalVolume}</div></div>
+                        <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Ср. интенсивность</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{safetyScore.details!.loadDistribution.avgIntensity}</div></div>
+                        <div style={{ padding:'6px 8px', borderRadius:8, background: safetyScore.details!.loadDistribution.hardDays>=4?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Тяж. дней</div><div style={{ fontSize:12, fontWeight:800, color: safetyScore.details!.loadDistribution.hardDays>=4?'#ef4444':'#22c55e' }}>{safetyScore.details!.loadDistribution.hardDays}</div></div>
+                      </div>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginBottom:6 }}>{'Формула: distributeWeeklyLoad({weeklySessions, goal, volumeCapacity, intensityCapacity, priScore, riskLevel}) → слоты hard/medium/light/rehab по goal-паттерну → равномерное распределение по 7 дням (POSITION_MAP) · risk high понижает hard→medium · тяжёлые подряд → warning.'}</div>
+                      {safetyScore.details.loadDistribution.warnings.length>0 && (
+                        <div>
+                          {safetyScore.details.loadDistribution.warnings.map((w,i)=> <div key={i} style={{ fontSize:11, color:'#f59e0b', marginTop:3 }}>⚠ {w}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Joint diagnoses */}
+            {safetyScore.details?.jointDiagnoses && safetyScore.details.jointDiagnoses.length>0 && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🧬 Диагностика суставов — ${safetyScore.details.jointDiagnoses.length} зоны (интеллект)`}
+                  icon="🧬"
+                  short={safetyScore.details.jointDiagnoses.map(j=> `${j.joint.icon} ${j.joint.label} (${j.phase})`).join(' · ')}
+                  full={
+                    <div style={{ display:'grid', gap:8 }}>
+                      {safetyScore.details!.jointDiagnoses.map((jd:any)=> (
+                        <div key={jd.joint.id} style={{ padding:'9px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
+                            <span style={{ fontSize:14 }}>{jd.joint.icon}</span>
+                            <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{jd.joint.label}</span>
+                            <span style={{ fontSize:10, padding:'2px 6px', borderRadius:6, background: jd.phase==='acute'?'rgba(239,68,68,0.14)': jd.phase==='subacute'?'rgba(245,158,11,0.14)': jd.phase==='chronic'?'rgba(96,165,250,0.14)':'rgba(34,197,94,0.10)', color: jd.phase==='acute'?'#ef4444': jd.phase==='subacute'?'#f59e0b': jd.phase==='chronic'?'#60a5fa':'#22c55e', fontWeight:700 }}>{jd.phase}</span>
+                            <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', opacity:0.6 }}>{jd.joint.dangerous.slice(0,2).join(', ')}</span>
+                          </div>
+                          <div style={{ fontSize:10, color:'#fff', opacity:0.75, lineHeight:1.4, marginBottom:6 }}>{jd.joint.description}</div>
+                          {(jd.blockedPatterns?.length || jd.allowedPatterns?.length) && (
+                            <div style={{ fontSize:10, color:'#fff', marginBottom:6 }}>
+                              <span style={{ color:'#ef4444' }}>блок: {jd.blockedPatterns?.join(', ') || '—'}</span> · <span style={{ color:'#22c55e' }}>разрешено: {jd.allowedPatterns?.slice(0,6).join(', ')}</span>
+                            </div>
+                          )}
+                          {jd.options?.length>0 && (
+                            <div style={{ display:'grid', gap:6 }}>
+                              {jd.options.slice(0,2).map((opt:any)=> (
+                                <div key={opt.id} style={{ padding:'7px 8px', borderRadius:8, background: opt.level==='critical'?'rgba(239,68,68,0.08)': opt.level==='high'?'rgba(245,158,11,0.08)': opt.level==='moderate'?'rgba(96,165,250,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${opt.level==='critical'?'rgba(239,68,68,0.14)': opt.level==='high'?'rgba(245,158,11,0.14)': 'rgba(255,255,255,0.06)'}` }}>
+                                  <div style={{ fontSize:11, fontWeight:700, color: opt.level==='critical'?'#ef4444': opt.level==='high'?'#f59e0b':'#fff' }}>{opt.label} · {opt.level}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.8, marginTop:2 }}>{opt.description}</div>
+                                  <div style={{ fontSize:10, color:'#00e68a', marginTop:3 }}><b>Метод:</b> {opt.method}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}><b>Ассисты:</b> {opt.assistance?.join(', ')}</div>
+                                  <div style={{ fontSize:10, color:'#fff', marginTop:2, padding:'3px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', display:'inline-block' }}>Протокол: {opt.protocol.sets}×{opt.protocol.reps} RIR{opt.protocol.rir}{opt.protocol.tempo?` ${opt.protocol.tempo}`:''}{opt.protocol.rest?` · ${opt.protocol.rest}`:''}{opt.protocol.note?` · ${opt.protocol.note}`:''}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>{opt.rationale}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Volume & Frequency details */}
+            {safetyScore.details?.volumeDetails && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`📊 MRV — ${safetyScore.details.volumeDetails.filter(v=>v.violation).length ? `${safetyScore.details.volumeDetails.filter(v=>v.violation).length} нарушений` : 'в норме'}`}
+                  icon="📊"
+                  short={`Допуск ×${safetyScore.details.volumeDetails[0]?.tolerance || 1.15} · ${safetyScore.details.volumeDetails.slice(0,4).map(v=> `${v.muscle} ${v.effectiveSets}/${v.allowed}${v.violation?'⚠':''}`).join(' · ')}`}
+                  full={
+                    <div style={{ display:'grid', gap:4 }}>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:6 }}>Расчёт: effectiveSets (aggregateBBVolume) &gt; cap(mrvByMuscle||landmarks.mrv) × {safetyScore.details!.volumeDetails[0]?.tolerance || 1.15} → violation. Исключаем deload недели. Пиковая effective по мышце.</div>
+                      {safetyScore.details.volumeDetails.sort((a,b)=> (b.over||0)-(a.over||0)).slice(0,10).map(v=> (
+                        <div key={v.muscle} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background: v.violation?'rgba(239,68,68,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${v.violation?'rgba(239,68,68,0.14)':'rgba(255,255,255,0.06)'}` }}>
+                          <span style={{ fontSize:11, fontWeight:700, color: v.violation?'#ef4444':'#fff' }}>{v.muscle}</span>
+                          <span style={{ fontSize:11, color:'#fff' }}>{v.effectiveSets} / {v.allowed} <span style={{ opacity:0.6, fontSize:10 }}>(cap {v.cap})</span>{v.violation && <span style={{ color:'#ef4444', fontWeight:800, marginLeft:6 }}>+{v.over} ⚠</span>}</span>
+                        </div>
+                      ))}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Frequency */}
+            {safetyScore.details?.frequencyDetails && safetyScore.details.frequencyDetails.some(f=>f.violation) && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🔁 Частота — ${safetyScore.details.frequencyDetails.filter(f=>f.violation).length} нарушений`}
+                  icon="🔁"
+                  short={safetyScore.details.frequencyDetails.filter(f=>f.violation).map(f=> `${f.muscle} ${f.days}/${f.required}`).join(' · ') || 'в норме'}
+                  full={
+                    <div style={{ display:'grid', gap:4 }}>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:6 }}>Малые мышцы (biceps/triceps/forearms/calves/abs) требуют ≥2×/нед, остальные ≥1×/нед. Низкая частота → объём концентрирован в одну сессию → выше утомление сустава.</div>
+                      {safetyScore.details.frequencyDetails.filter(f=>f.violation).map(f=> (
+                        <div key={f.muscle} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)', fontSize:11, color:'#fff' }}>{f.muscle}: {f.days} дней / {f.required} требуется ⚠</div>
+                      ))}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* All issues compact */}
+            <div style={{ padding:'8px 12px', background:'rgba(0,0,0,0.12)', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, marginBottom:4 }}>Все сигналы ({safetyScore.issues.length})</div>
+              {safetyScore.issues.slice(0,8).map((issue, index) => <div key={index} style={{ marginTop: 3, fontSize: 11, color: issue.includes('высокий')|| issue.includes('опасн')|| issue.includes('КРИТИЧНО')?'#ef4444':'#f59e0b', lineHeight:1.35 }}>⚠ {issue}</div>)}
+              {safetyScore.issues.length>8 && <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>…и ещё {safetyScore.issues.length-8}</div>}
+            </div>
+            <div style={{ padding:'8px 12px', background:'rgba(34,197,94,0.06)', borderTop:'1px solid rgba(34,197,94,0.12)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', marginBottom:4 }}>Рекомендации ({safetyScore.recommendations.length})</div>
+              {safetyScore.recommendations.slice(0,6).map((r,i)=> <div key={i} style={{ fontSize:11, color:'#fff', marginTop:3, lineHeight:1.35, paddingLeft:6, borderLeft:'2px solid rgba(34,197,94,0.4)' }}>{r}</div>)}
+            </div>
           </div>
         )}
         <div style={H}>📊 Шаг 5: Качество и нагрузка плана</div>
