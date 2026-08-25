@@ -1145,7 +1145,13 @@ export const BbAutoConstructor: React.FC = () => {
     focusGroup: specTargets[0] || undefined,
     donorMuscles: specBlocks.flatMap(b => b.donors),
     specialization: specTargets.length > 0,
-  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex]);
+    peds,
+    pedDoses,
+    equipment: bbEquipment,
+    injuries,
+    mobilityRestrictions,
+    preset: proPreset,
+  }), [bbLevel, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, peds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
   const bestSplit = ranked[0];
   useEffect(() => { if (bestSplit && !selectedSplitId) setSelectedSplitId(bestSplit.pattern.id); }, [bestSplit]);
 
@@ -1225,6 +1231,13 @@ export const BbAutoConstructor: React.FC = () => {
       trainingYears: bbTrainingYears,
       pedMultiplier: pedAdapt.combinedMrvMultiplier,
       injuries: injuries.map(i => ({ muscle: i.muscle, exclude: i.exclude })),
+      goal: bbGoal,
+      trainingFocus: bbTrainingFocus,
+      methodology: bbMethodology,
+      volumeGoal: bbVolGoal,
+      specialization: specializationMode,
+      focusGroup,
+      splitPattern: builtPlan.pattern?.id,
     });
     const result = validatePlanQuality(input);
     // PRO-качество из интеллектуальных — паттерны/углы/растяжка/техники (читает технику из workSets)
@@ -3972,18 +3985,7 @@ export const BbAutoConstructor: React.FC = () => {
             );
           })}
         </div>
-        {/* Feeder sets for weak points */}
-        {weakPoints.length > 0 && (() => {
-          const feeders = suggestFeeders(weakPoints, []);
-          if (feeders.length === 0) return null;
-          return (
-            <ExpandableCard title={'🔥 Feeder-сеты для слабых групп (ежедневно)'} icon="🔥" short={feeders.map(f => f.muscle).join(', ')} full={
-              <div>{feeders.map((f, i) => <div key={i} style={{ padding:'6px 8px', marginBottom:4, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', fontSize:11, color:'#fff' }}>
-                <b>{f.exercise}</b> — {f.sets}×{f.reps}, {f.notes}
-              </div>)}</div>
-            } />
-          );
-        })()}
+        {/* Feeder sets — перенесено наверх, см. блок в начале плана */}
 
         {/* Summary */}
         <div style={{ display:'flex', gap:12, marginTop:10 }}>
@@ -4337,6 +4339,31 @@ export const BbAutoConstructor: React.FC = () => {
             })()}
           </>;
         })()}
+        {/* 🧩 Оценка сплита — соответствие выбранным параметрам (скор) */}
+        {(() => {
+          const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
+          const sc = sel?.score ?? bestSplit?.score ?? 0;
+          const maxSc = Math.max(...ranked.map(r=>r.score), 1);
+          const pct = Math.round((sc/maxSc)*100);
+          const color = pct>=80?'#22c55e': pct>=60?'#f59e0b':'#ef4444';
+          return (
+            <div style={{ ...CARD, background:`linear-gradient(135deg, ${color}14, transparent)`, border:`1px solid ${color}22`, marginTop:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, flexWrap:'wrap', gap:6 }}>
+                <span style={{ fontSize:12, fontWeight:800, color }}>🧩 Сплит: {builtPlan.pattern?.name || '—'} · скор {sc} ({pct}%)</span>
+                <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>{bbDays}×/нед · {bbLevel} · {bbGoal} · {weakPoints.length?`слабые ${weakPoints.slice(0,2).join(',')}`:'баланс'}</span>
+              </div>
+              <div style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', overflow:'hidden', marginBottom:8 }}>
+                <div style={{ width:`${pct}%`, height:'100%', background:color, transition:'width 0.3s' }} />
+              </div>
+              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                <b>Соответствие:</b> {sel ? sel.rationale.slice(0,3).join(' · ') : '—'}<br/>
+                <b>Выбрано:</b> дней {bbDays}, цель {bbGoal}, слабые {weakPoints.join(', ')||'—'}, фокус {focusGroup||'—'}, оборудование {bbEquipment.slice(0,2).join(', ')||'все'}, травмы {injuries.length||'нет'} · <b>План:</b> {builtPlan.pattern?.schedule?.length||'?'} дн/ротацию
+              </div>
+              {sel?.warnings?.length ? <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>{sel.warnings.slice(0,2).map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null}
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>Формула: rankBBSplits(level, goal, days, weakPoints, focusGroup, donorMuscles, specialization, equipment, injuries, mobility, peds) → {sc} / max {maxSc}. Топ-3: {ranked.slice(0,3).map(r=>`${r.pattern.id} ${r.score}`).join(' · ')}</div>
+            </div>
+          );
+        })()}
         {/* Cycle info if in cycle mode */}
         {planMode === 'bb_cycle' && selectedCycleId && (() => {
           const c = getCycleById(selectedCycleId);
@@ -4376,13 +4403,48 @@ export const BbAutoConstructor: React.FC = () => {
         {(() => {
           const rationale = builtPlan.rationale || [];
           if (rationale.length === 0) return null;
-          // Чистим EN-коды и технический мусор для отображения
-          const STRAT_RU_L: Record<string,string> = { double_progression:'двойная прогрессия', linear:'линейная', wave:'волновая', rpe_based:'RPE-авторегуляция' };
+          // Чистим EN-коды и технический мусор — полностью на русский, с привязкой к выбранным параметрам
+          const STRAT_RU_L: Record<string,string> = { double_progression:'двойная прогрессия', linear:'линейная', wave:'волновая', rpe_based:'RPE-авторегуляция', undulating:'волновая', block:'блочная' };
           const clean = (r: string): string => {
             let s = String(r || '');
-            s = s.replace(/double_progression|linear|wave|rpe_based/g, m => STRAT_RU_L[m] || m);
+            s = s.replace(/double_progression|linear|wave|rpe_based|undulating|block/g, m => STRAT_RU_L[m] || m);
+            // Полная карта EN → RU для остатков rationale из движков
+            const MAP: Array<[RegExp,string]> = [
+              [/MEV coverage|Adaptive MEV/g, 'покрытие MEV'],
+              [/Experienced enhanced/g, 'опытный на курсе'],
+              [/Warmup activator/g, 'разминочная активация'],
+              [/back budget allocation/g, 'бюджет спины'],
+              [/direct residual volume after indirect overlap/g, 'остаточный прямой объём после косвенной нагрузки'],
+              [/Fatigue budget:/g, 'Бюджет утомления:'],
+              [/Adaptive safety replacement/g, 'Замена по безопасности'],
+              [/Controlled rotation:/g, 'Контролируемая ротация:'],
+              [/S-MRV/g, 'С-MRV'],
+              [/Cross-mesocycle:/g, 'Межмезоцикл:'],
+              [/Per-muscle ACWR/g, 'Помышечный ACWR'],
+              [/Doнорское перераспределение/g, 'Донорское перераспределение'],
+              [/Due to|due to/g, 'из-за'],
+              [/volume/g, 'объём'],
+              [/sets/g, 'подходов'],
+              [/reps/g, 'повт'],
+              [/RIR/g, 'RIR'],
+              [/week/g, 'нед'],
+              [/day/g, 'день'],
+              [/exercise/g, 'упражнение'],
+              [/muscle/g, 'мышца'],
+              [/level/g, 'уровень'],
+              [/goal/g, 'цель'],
+              [/focus/g, 'фокус'],
+              [/methodology/g, 'методика'],
+              [/frequency/g, 'частота'],
+              [/intensity/g, 'интенсивность'],
+              [/recovery/g, 'восстановление'],
+            ];
+            for (const [re, ru] of MAP) s = s.replace(re, ru);
+            // Удаляем технический мусор, не несущий смысла для пользователя (оставляем факт)
             s = s.replace(/MEV coverage|Adaptive MEV|Experienced enhanced|Warmup activator|back budget allocation|direct residual volume after indirect overlap/g, '');
             s = s.replace(/\.\s*\./g, '.').replace(/\s{2,}/g, ' ').trim();
+            // Убираем остатки EN в скобках
+            s = s.replace(/\b[A-Z]{2,}\b/g, m => m.length<=3 ? m : m); // оставляем короткие аббр.
             return s;
           };
           const shown = rationale.map(clean).filter(Boolean);
@@ -4668,34 +4730,63 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Мусорный объём — честная проверка с каноникой слабых */}
+        {/* Мусорный объём — полностью на русском, проверка с учётом всех выбранных параметров и плана */}
         {(() => {
-          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears });
+          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears, focusGroup, specialization: specializationMode, specializationTargets: specTargets });
           const ruMuscleG = (m: string) => (MUSCLE_LABEL_RU as any)[m] || m;
           const ruReason = (r: string) => r
-            .replace(/Дублирование паттерна (\S+) для (\S+)/, 'Дубль паттерна «$1» для «$2»')
-            .replace(/Мышца (\S+) не входит в тег сессии (\S+)/, 'Мышца «$1» не входит в день «$2»');
+            .replace(/Дублирование паттерна (\S+) для (\S+)/, 'Дубль изоляции «$1» для «$2» — в одной сессии достаточно одной')
+            .replace(/Мышца (\S+) не входит в тег сессии (\S+)/, 'Мышца «$1» не входит в день «$2» — проверьте совместимость сплита с выбранными группами');
+          const paramChips: string[] = [];
+          paramChips.push(`уровень ${bbLevel}`);
+          if (bbTrainingYears!==undefined) paramChips.push(`стаж ${bbTrainingYears}л`);
+          paramChips.push(`цель ${bbGoal}`);
+          paramChips.push(`фокус ${bbTrainingFocus}`);
+          paramChips.push(`методика ${bbMethodology}`);
+          paramChips.push(`сплит ${builtPlan.pattern?.name || builtPlan.pattern?.id || '—'}`);
+          paramChips.push(`объём ${bbVolGoal}${trainingVolumeMode==='high'?' (объёмный)':''}`);
+          if (weakPoints.length) paramChips.push(`слабые: ${weakPoints.join(', ')}`);
+          if (focusGroup) paramChips.push(`фокус-группа ${focusGroup}`);
+          if (specializationMode) paramChips.push(`специализация ${specTargets.join('+')}`);
+          if (bbEquipment.length) paramChips.push(`оборудование ${bbEquipment.slice(0,3).join(', ')}${bbEquipment.length>3?'…':''}`);
+          if (injuries.length) paramChips.push(`травмы ${injuries.length}`);
           if (garbage.length === 0) {
             return (
-              <div style={{ ...CARD, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-                <div style={{ fontSize:11, fontWeight:700, color:'#22c55e' }}>🗑 Мусорный объём: чисто ✅</div>
-                <div style={{ fontSize:10, color:'#fff', marginTop:4, lineHeight:1.4 }}>Дублей изоляций не найдено. Для слабых групп допустим доп. стимул, проверено с учётом ваших параметров: уровень {bbLevel}{bbTrainingYears!==undefined?`, стаж ${bbTrainingYears} лет`:''}{weakPoints.length?`, слабые ${weakPoints.join(', ')}`:''}.</div>
+              <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(16,185,129,0.04))', border:'1px solid rgba(34,197,94,0.18)', position:'relative', overflow:'hidden' }}>
+                <div style={{ position:'absolute', top:-12, right:-12, width:80, height:80, borderRadius:80, background:'radial-gradient(circle, rgba(34,197,94,0.12), transparent 70%)' }} />
+                <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', display:'flex', alignItems:'center', gap:6 }}>🗑 Мусорный объём: чисто ✅ <span style={{ fontSize:10, fontWeight:600, color:'#22c55e', background:'rgba(34,197,94,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(34,197,94,0.22)' }}>соответствует параметрам</span></div>
+                <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>Дублей изоляций не найдено. Для слабых/фокусных групп повтор паттерна допустим — учтена каноника <span style={{ fontFamily:'ui-monospace, monospace', background:'rgba(255,255,255,0.06)', padding:'1px 4px', borderRadius:4 }}>chest_upper→chest, delt_mid→shoulders</span>. Икры «стоя+сидя» — по дизайну 2 разных упражнения, не дубль. Проверка: compound-паттерны (жим/тяга/присед) — не считаются мусором (разные углы — норма).</div>
+                <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
+                  {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
+                </div>
+                <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>Логика: detectGarbageVolume(weeks, weakPoints, {level, trainingYears, focusGroup, specialization}) → warmup исключён, back по classifyBackExercise, compound исключён, seenPatterns per session, слабые/фокус — скип.</div>
               </div>
             );
           }
-          const ctxParts: string[] = [`уровень ${bbLevel}`];
-          if (bbTrainingYears !== undefined) ctxParts.push(`стаж ${bbTrainingYears} лет`);
-          if (weakPoints.length > 0) ctxParts.push(`слабые: ${weakPoints.join(', ')}`);
           return (
-            <div style={{ ...CARD, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#ef4444', marginBottom:6 }}>🗑 Мусорный объём ({garbage.length})</div>
-              <div style={{ fontSize:10, color:'#fff', marginBottom:6, lineHeight:1.4 }}>
-                Дублирование изоляций по вашим параметрам: {ctxParts.join(' · ')}. Для слабых групп дубль допустим (учтена каноника chest_upper→chest, delt_mid→shoulders).
+            <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.04))', border:'1px solid rgba(239,68,68,0.18)', position:'relative', overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:-10, right:-10, width:90, height:90, borderRadius:90, background:'radial-gradient(circle, rgba(239,68,68,0.12), transparent 70%)' }} />
+              <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', display:'flex', alignItems:'center', gap:8 }}>🗑 Мусорный объём: найдено {garbage.length} <span style={{ fontSize:10, fontWeight:600, color:'#ef4444', background:'rgba(239,68,68,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(239,68,68,0.22)' }}>несоответствие параметрам</span></div>
+              <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>
+                Дублирование изоляций: план содержит повторы одного паттерна для одной мышцы в одной сессии — при выбранных параметрах это избыточно. Для слабых/фокусных групп дубль <b>допустим</b> (учтена каноника), для остальных — мусор. Проверено по: {paramChips.slice(0,6).join(' · ')}{paramChips.length>6?' …':''}.
               </div>
-              {garbage.slice(0, 5).map((g, i) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, padding:'3px 6px', borderRadius:4, background:'rgba(239,68,68,0.04)' }}>
-                • {g.exerciseName} ({ruMuscleG(g.muscle)}): {ruReason(g.reason)}
-              </div>)}
-              {garbage.length > 5 && <div style={{ fontSize:11, color:'#fff' }}>...и ещё {garbage.length - 5}</div>}
+              <div style={{ marginTop:8, display:'grid', gap:6 }}>
+                {garbage.slice(0, 6).map((g, i) => (
+                  <div key={i} style={{ display:'flex', gap:8, alignItems:'flex-start', padding:'7px 9px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)' }}>
+                    <span style={{ flexShrink:0, width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', color:'#ef4444', fontWeight:800, fontSize:11 }}>{i+1}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{g.exerciseName} <span style={{ fontWeight:400, opacity:0.7 }}>· {ruMuscleG(g.muscle)} · {g.sessionTag || 'день'}</span></div>
+                      <div style={{ fontSize:10, color:'#fbbf24', marginTop:2 }}>{ruReason(g.reason)}</div>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>Исправление: заменить на другой угол/хват или убрать (для слабых — оставить, если цель — специализация).</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {garbage.length > 6 && <div style={{ marginTop:6, fontSize:11, color:'#fff', textAlign:'center', opacity:0.7 }}>…и ещё {garbage.length - 6} — откройте план, проверьте сессии</div>}
+              <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
+                {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
+              </div>
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Формула: per session seenPatterns[day-muscle-pattern] → если дубль && !isWeak && !calvesByDesign → мусор. isWeak учитывает weakPoints+focusGroup+specializationTargets.</div>
             </div>
           );
         })()}

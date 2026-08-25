@@ -479,17 +479,18 @@ export interface GarbageVolume {
  * Определить «мусорный» объём: упражнения, где целевая мышца не совпадает
  * с тегом сессии, или упражнения, дублирующие механический паттерн.
  */
-export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?: { level?: string; trainingYears?: number }): GarbageVolume[] {
+export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?: { level?: string; trainingYears?: number; focusGroup?: string; specialization?: boolean; specializationTargets?: string[] }): GarbageVolume[] {
   const garbage: GarbageVolume[] = [];
-  // Канонизация слабых групп: delt_mid → shoulders, chest_upper → chest и т.д.
-  const weakCanonical = new Set((weakPoints || []).map(w => {
+  // Канонизация слабых групп + фокус/специализация: delt_mid → shoulders, chest_upper → chest и т.д.
+  const allWeak = [...(weakPoints || []), ...(opts?.specializationTargets || []), ...(opts?.focusGroup ? [opts.focusGroup] : [])];
+  const weakCanonical = new Set(allWeak.map(w => {
     const v = String(w).toLowerCase();
     if (v === 'delt_front' || v === 'delt_mid' || v === 'delt_rear') return 'shoulders';
     if (v === 'chest_upper' || v === 'chest_lower') return 'chest';
     if (v === 'back_width' || v === 'back_thickness') return 'back';
     return v;
   }));
-  const isWeak = (muscle: string) => weakCanonical.has(String(muscle).toLowerCase()) || weakPoints.includes(muscle);
+  const isWeak = (muscle: string) => weakCanonical.has(String(muscle).toLowerCase()) || weakPoints.includes(muscle) || (opts?.focusGroup && String(muscle).toLowerCase()===String(opts.focusGroup).toLowerCase()) || (opts?.specializationTargets || []).includes(muscle);
   for (const w of weeks) {
     const seenPatterns: Set<string> = new Set();
     for (const s of w.sessions) {

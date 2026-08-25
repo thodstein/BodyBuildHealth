@@ -30,6 +30,12 @@ export interface BBSelectorInput {
   pedDoses?: Record<string, number>;
   /** Выбранный пресет методики (DC/Fortitude/Meadows) — мягкая подсказка. */
   preset?: string;
+  /** Оборудование — влияет на пригодность сплита (ограниченный инвентарь → FullBody/UpperLower предпочтительнее) */
+  equipment?: string[];
+  /** Травмы — сплиты с высокой частотой травмированной группы получают штраф */
+  injuries?: Array<{ muscle: string; exclude?: boolean }>;
+  /** Ограничения мобильности — аналогично травмам */
+  mobilityRestrictions?: string[];
 }
 
 export interface BBRankedPattern {
@@ -186,6 +192,41 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     if (input.preset === 'dc' && (p.id === 'upper_lower_4' || p.id === 'ppl_6')) { score += 4; rationale.push('DC пресет: Upper/Lower/PPL подходит'); }
     if (input.preset === 'fortitude' && (p.id === 'upper_lower_5' || p.id === 'fullbody_4')) { score += 4; rationale.push('Fortitude: частый сплит'); }
     if (input.preset === 'meadows' && (p.id === 'ppl_6' || p.id === 'arnold_6')) { score += 4; rationale.push('Meadows: PPL/Arnold для pre-exhaust'); }
+
+    // Оборудование — ограниченный инвентарь (только bodyweight/гантели) → FullBody/UpperLower предпочтительнее, изолированные сплиты штрафуются
+    if (input.equipment && input.equipment.length>0) {
+      const hasBarbell = input.equipment.includes('barbell');
+      const hasMachine = input.equipment.includes('machine');
+      const hasCable = input.equipment.includes('cable');
+      const limited = !hasBarbell && !hasMachine;
+      if (limited) {
+        if (['fullbody_2','fullbody_3','fullbody_4','upper_lower_3','upper_lower_4'].includes(p.id)) { score += 4; rationale.push('оборудование ограничено → FullBody/UpperLower предпочтителен'); }
+        if (['bro_5','arnold_6','ppl_6'].includes(p.id) && !hasCable) { score -= 3; warnings.push('оборудование ограничено — PPL/Bro требует больше инвентаря'); }
+      }
+    }
+    // Травмы и мобильность — сплиты с высокой частотой травмированной группы штрафуются
+    const injuredMuscles = new Set<string>();
+    for (const inj of (input.injuries || [])) {
+      const m = String(inj.muscle || '').toLowerCase();
+      const canon = (WEAK_TO_MUSCLE as any)[m] || m;
+      injuredMuscles.add(canon);
+      injuredMuscles.add(m);
+    }
+    for (const mr of (input.mobilityRestrictions || [])) {
+      const m = String(mr || '').toLowerCase();
+      const canon = (WEAK_TO_MUSCLE as any)[m] || m;
+      injuredMuscles.add(canon);
+    }
+    if (injuredMuscles.size>0) {
+      let injFreq = 0;
+      for (const im of injuredMuscles) injFreq += freq[im] || 0;
+      if (injFreq >= 2) {
+        const penalty = Math.min(12, Math.round(injFreq*4));
+        score -= penalty;
+        warnings.push(`травмы/ограничения ${Array.from(injuredMuscles).slice(0,2).join(',')} — частота ${injFreq.toFixed(1)}×/нед → штраф −${penalty}`);
+        rationale.push(`учтены травмы/ограничения: снижена частота травмированных групп`);
+      }
+    }
 
     out.push({ pattern: p, score, rationale, warnings });
   }

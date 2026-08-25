@@ -131,6 +131,14 @@ export interface PlanQualityInput {
   trainingYears?: number;
   /** PED-множитель порогов (combinedMrvMultiplier) — для контекста в отчёте. */
   pedMultiplier?: number;
+  /** Выбранные параметры — для проверки соответствия плана */
+  goal?: string;
+  trainingFocus?: string;
+  methodology?: string;
+  volumeGoal?: string;
+  specialization?: boolean;
+  focusGroup?: string;
+  splitPattern?: string;
 }
 
 // ─── Основная функция ───
@@ -142,13 +150,21 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     planType = 'manual', totalWeeks = 8, exerciseNames = [],
     injuries = [], onCourse = false,
     mrvByMuscle, trainingYears, pedMultiplier,
-  } = input;
+    goal, trainingFocus, methodology, volumeGoal, specialization, focusGroup, splitPattern,
+  } = input as any;
 
   // Контекстный суффикс для отчёта: на основе каких параметров пользователя
-  // сформирован допустимый объём (стаж, курс, фокус).
+  // сформирован допустимый объём (стаж, курс, фокус, цель, методика).
   const contextParts: string[] = [];
   if (trainingYears !== undefined) contextParts.push(`стаж ${trainingYears} лет`);
   if (onCourse || (pedMultiplier ?? 0) > 1) contextParts.push(`курс PED ×${(pedMultiplier ?? 1).toFixed(2)}`);
+  if (goal) contextParts.push(`цель ${goal}`);
+  if (trainingFocus) contextParts.push(`фокус ${trainingFocus}`);
+  if (methodology) contextParts.push(`методика ${methodology}`);
+  if (volumeGoal) contextParts.push(`объём ${volumeGoal}`);
+  if (focusGroup) contextParts.push(`фокус-группа ${focusGroup}`);
+  if (specialization) contextParts.push(`специализация`);
+  if (splitPattern) contextParts.push(`сплит ${splitPattern}`);
   if (contextParts.length === 0) contextParts.push('базовый уровень');
   const USER_CONTEXT = `выбрано по: ${contextParts.join(', ')}`;
 
@@ -310,8 +326,88 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     if (inj.exclude && allGroups.has(inj.muscle)) {
       issues.push({
         id: `injury_active_${inj.muscle}`, severity: 'critical', category: 'injury', muscle: inj.muscle,
-        message: `Травмированная группа «${inj.muscle}» включена в план (должна быть исключена)`,
-        fix: `Исключить ${inj.muscle} из плана`,
+        message: `Травмированная группа «${inj.muscle}» включена в план (должна быть исключена) — выбрано исключение, план нарушает`,
+        detail: `Выбрано: исключить ${inj.muscle} · План: содержит ${weeklySets[inj.muscle]||0} сетов`,
+        fix: `Исключить ${inj.muscle} из плана или сменить травму на щадящую`,
+      });
+    }
+  }
+
+  // 8. Соответствие выбранных параметров и плана — валидация и предупреждения
+  // Цель vs объём
+  if ((input as any).goal) {
+    const avgSets = Object.values(weeklySets).reduce((a,b)=>a+b,0) / Math.max(1, Object.keys(weeklySets).length);
+    if ((input as any).goal === 'cut' && avgSets > 18) {
+      issues.push({
+        id: 'goal_cut_volume_high', severity: 'warning', category: 'volume',
+        message: `Цель «сушка» выбрана, но средний объём ${avgSets.toFixed(1)} сетов/группа > MAV — на дефиците риск перетрена`,
+        detail: `Выбрано: цель cut · План: ${avgSets.toFixed(1)} сетов/группа (MAV≈18)`,
+        fix: `Снизить объём до MAV или сменить цель на mass/recomp`,
+      });
+    }
+    if ((input as any).goal === 'strength_mass' && avgSets < 10) {
+      issues.push({
+        id: 'goal_strength_low', severity: 'info', category: 'volume',
+        message: `Цель «сила+масса» выбрана, но объём низкий (${avgSets.toFixed(1)}) — для силы нужен базовый объём`,
+        detail: `Выбрано: strength_mass · План: ${avgSets.toFixed(1)}`,
+        fix: `Увеличить объём до MEV/MAV`,
+      });
+    }
+  }
+  // Объёмная цель vs факт
+  if ((input as any).volumeGoal) {
+    const vg = (input as any).volumeGoal;
+    const overMrv = Object.entries(weeklySets).some(([g, s]) => s > (getThresholds(g, level, mrvByMuscle).mrv));
+    const underMev = Object.entries(weeklySets).some(([g, s]) => s < (getThresholds(g, level, mrvByMuscle).mev));
+    if (vg === 'mrv' && !overMrv && Object.values(weeklySets).every(s=> s < 20)) {
+      issues.push({
+        id: 'vol_goal_mrv_not_reached', severity: 'info', category: 'volume',
+        message: `Цель объёма «максимальный (MRV)» выбрана, но ни одна группа не на MRV — план ниже выбранного уровня`,
+        detail: `Выбрано: ${vg} · План: макс ${Math.max(...Object.values(weeklySets)).toFixed(1)} сетов`,
+        fix: `Увеличить объём или сменить цель на MAV`,
+      });
+    }
+    if (vg === 'mev' && overMrv) {
+      issues.push({
+        id: 'vol_goal_mev_exceeded', severity: 'warning', category: 'volume',
+        message: `Цель «минимальный (MEV)» выбрана, но есть превышения MRV — план выше выбранного уровня`,
+        detail: `Выбрано: ${vg} · План: есть группы > MRV`,
+        fix: `Снизить объём до MEV/MAV`,
+      });
+    }
+  }
+  // Фокус-группа vs объём
+  if ((input as any).focusGroup) {
+    const fg = (input as any).focusGroup;
+    const fgSets = weeklySets[fg] ?? weeklySets[fg.toLowerCase()] ?? 0;
+    const fgThresh = getThresholds(fg, level, mrvByMuscle);
+    if (fgSets < fgThresh.mav) {
+      issues.push({
+        id: `focus_low_${fg}`, severity: 'warning', category: 'weak_point', muscle: fg,
+        message: `Фокус-группа «${fg}» выбрана, но объём ${fgSets} < MAV ${fgThresh.mav} — фокус не реализован`,
+        detail: `Выбрано: фокус ${fg} · План: ${fgSets} сетов (MAV ${fgThresh.mav})`,
+        fix: `Увеличить объём фокуса до MAV или убрать фокус`,
+      });
+    }
+  }
+  // Специализация без слабых
+  if ((input as any).specialization && (!weakPoints || weakPoints.length===0)) {
+    issues.push({
+      id: 'spec_no_weak', severity: 'info', category: 'weak_point',
+      message: `Включена специализация, но слабые группы не указаны — план строится как без акцента`,
+      detail: `Выбрано: specialization=true · План: weakPoints пусто`,
+      fix: `Указать слабые группы или выключить специализацию`,
+    });
+  }
+  // Методика vs разнообразие (упрощённо)
+  if ((input as any).methodology && (input as any).methodology !== 'compound_first') {
+    const uniq = new Set(exerciseNames.flat()).size;
+    if (uniq < 6) {
+      issues.push({
+        id: 'methodology_low_diversity', severity: 'info', category: 'exercise',
+        message: `Методика «${(input as any).methodology}» выбрана, но разнообразие низкое (${uniq} упр.) — эффект методики снижен`,
+        detail: `Выбрано: методика ${(input as any).methodology} · План: ${uniq} уникальных упражнений`,
+        fix: `Добавить вариаций для методики`,
       });
     }
   }
@@ -376,10 +472,13 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
 export function bbPlanToQualityInput(bbPlan: {
   weeks: { sessions: { exercises: { muscle: string; sets: number; name: string }[] }[]; phase?: string; deload?: boolean }[];
   mrvByMuscle?: Record<string, number>;
+  pattern?: { id?: string; name?: string };
+  inputSnapshot?: any;
 }, opts: {
   level: string; weakPoints?: string[]; hasDeload?: boolean; deloadWeeks?: number[];
   onCourse?: boolean; trainingYears?: number; pedMultiplier?: number;
   injuries?: { muscle: string; exclude?: boolean }[];
+  goal?: string; trainingFocus?: string; methodology?: string; volumeGoal?: string; specialization?: boolean; focusGroup?: string; splitPattern?: string;
 }): PlanQualityInput {
   const weeklySets: Record<string, number> = {};
   const exerciseNames: string[][] = [];
@@ -443,6 +542,13 @@ export function bbPlanToQualityInput(bbPlan: {
     trainingYears: opts.trainingYears,
     pedMultiplier: opts.pedMultiplier,
     injuries: opts.injuries,
+    goal: (opts as any).goal ?? (bbPlan as any).inputSnapshot?.goal ?? (bbPlan as any).goal,
+    trainingFocus: (opts as any).trainingFocus ?? (bbPlan as any).inputSnapshot?.trainingFocus ?? (bbPlan as any).trainingFocus,
+    methodology: (opts as any).methodology ?? (bbPlan as any).inputSnapshot?.methodology ?? (bbPlan as any).methodology,
+    volumeGoal: (opts as any).volumeGoal ?? (bbPlan as any).inputSnapshot?.volumeGoal ?? (bbPlan as any).volumeGoal,
+    specialization: (opts as any).specialization ?? (bbPlan as any).inputSnapshot?.specialization ?? !!((bbPlan as any).specializationSchedule?.active),
+    focusGroup: (opts as any).focusGroup ?? (bbPlan as any).inputSnapshot?.focusGroup ?? (bbPlan as any).priorityMuscles?.[0],
+    splitPattern: (opts as any).splitPattern ?? (bbPlan as any).pattern?.id ?? (bbPlan as any).inputSnapshot?.splitPattern,
   };
 }
 
