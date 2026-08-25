@@ -187,6 +187,8 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   // мышцы вклинивается между группами (ноги-спина-ноги), ломая сессию.
   const muscleGroup = MUSCLE_ORDER[exMuscle] ?? 12;
 
+  // Характер нагрузки: тяж (0) всегда перед памп (1) и лёг (2) даже внутри одного tier (GVT vs тяжёлые махи)
+  const charRank = ex.character === 'тяж' ? 0 : ex.character === 'памп' ? 1 : 2;
   let subOrder: number;
   if (tier === 2) subOrder = stretchRank(ex.name || '');
   else if (compound) subOrder = isPress(ex.name || '') ? pressPositionRank(ex.name || '', primaryMuscle) : 0;
@@ -194,7 +196,7 @@ function rankKey(ex: BBExercise, primaryMuscle: string, tagMuscleSet: Set<string
   if (plSpec) subOrder += 50;
 
   const load = loadRank(ex);
-  return [isPrimaryFlag, muscleGroup, priorityFlag, tier, subOrder, load];
+  return [isPrimaryFlag, muscleGroup, priorityFlag, tier, charRank, subOrder, load];
 }
 
 function collapseMuscle(m: string): string {

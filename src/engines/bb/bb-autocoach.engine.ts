@@ -530,7 +530,10 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
         if (pattern && pattern !== 'other' && !isCompoundPattern) {
           // Ключ включает мышцу: forearms-изоляция не конфликтует с biceps-изоляцией.
           const key = `${s.day}-${e.muscle}-${pattern}`;
-          if (seenPatterns.has(key) && !isWeak(e.muscle)) {
+          // Икры — исключение: стоя (икроножная) + сидя (камбаловидная) — это ДВА разных
+          // упражнения по ТЗ, оба обязательны в день ног. Не считаем дублем.
+          const calvesByDesign = e.muscle === 'calves' && /носк|calf/i.test(e.name || '');
+          if (seenPatterns.has(key) && !isWeak(e.muscle) && !calvesByDesign) {
             garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Дублирование паттерна ${pattern} для ${e.muscle} — одна изоляция на сессию` });
           }
           seenPatterns.add(key);

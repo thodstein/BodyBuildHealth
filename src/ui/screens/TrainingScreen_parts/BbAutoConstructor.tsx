@@ -53,7 +53,7 @@ import { MesocycleProgressionCard } from './MesocycleProgressionCard';
 import { PopupNumber, PopupSelect, PopupSelectSmart, PopupExerciseList, ExpandableCard, SaveButton } from '../SRCBBScreen_parts/TrainingPopups';
 import { InjurySelectCard } from './InjurySelectCard';
 import type { InjurySelectEntry } from './InjurySelectCard';
-import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, computeOverloadTargets, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
+import { prescribeLoad, DELOAD_PROTOCOLS, applyDeloadToWeek, rirDrift, suggestFeeders, detectGarbageVolume, type LoadStrategy, type DeloadType, INTENSITY_TECHNIQUES, DEFAULT_TECHNIQUE_BY_PHASE, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
 import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
@@ -99,7 +99,6 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
-import { generateActionableRecommendations } from '../../../engines/bb/bb-validator.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -3273,19 +3272,6 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {builtPlan && (() => {
-          const methods = buildBBMethodologySummary(builtPlan);
-          if (methods.length === 0) return null;
-          return (
-            <ExpandableCard title="🧩 Применённые методики" icon="🧩"
-              short={`${methods.length} методик · ${methods[0]}`}
-              full={<div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 11 }}>
-                {methods.map((m, i) => <div key={i} style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', color: '#fff' }}>✓ {m}</div>)}
-              </div>}
-            />
-          );
-        })()}
-
         {builtPlan.rotationReport && (() => {
           const report = builtPlan.rotationReport;
           const primaryCount = Object.keys(report.primaryByMuscle).length;
@@ -3418,9 +3404,27 @@ export const BbAutoConstructor: React.FC = () => {
                         </div>
                       );
                     })()}
-                    {((builtPlan as any).supersetMode || (builtPlan as any).dupMode || (builtPlan as any).priorityMuscles?.length) && (
-                      <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(168,85,247,0.06)', borderRadius:8, border:'1px solid rgba(168,85,247,0.12)' }}><b>Методики:</b> Суперсеты — {((builtPlan as any).supersetMode || 'нет') === 'none' ? 'выкл' : (builtPlan as any).supersetMode} · Волновая (DUP) — {((builtPlan as any).dupMode || 'нет') === 'none' ? 'выкл' : (builtPlan as any).dupMode}{(builtPlan as any).priorityMuscles?.length ? ` · Акцент: ${(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}` : ''}</div>
-                    )}
+                    {(() => {
+                      const methods = buildBBMethodologySummary(builtPlan);
+                      const SUPER_RU: Record<string,string> = { none:'выкл', antagonist:'антагонисты (грудь↔спина, биц↔триц)', same_muscle:'одна группа (пробить)', giant:'гигант-сет (3 упр.)' };
+                      const DUP_RU: Record<string,string> = { none:'выкл', heavy_light:'тяж/лёг', strength_hypertrophy:'сила/гипертрофия', full_dup:'полный DUP (3 дня)' };
+                      const SCHEME_RU: Record<string,string> = { standard:'Стандарт', gvt:'GVT 10×10', fst7:'FST-7', gironda:'8×8 Жиронда' };
+                      const superset = (builtPlan as any).supersetMode;
+                      const dup = (builtPlan as any).dupMode;
+                      const scheme = (builtPlan as any).volumeScheme;
+                      const hasMeth = methods.length > 0 || superset || dup || scheme || (builtPlan as any).priorityMuscles?.length;
+                      if (!hasMeth) return null;
+                      return (
+                        <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(168,85,247,0.06)', borderRadius:8, border:'1px solid rgba(168,85,247,0.12)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                          <div style={{ fontWeight:800, color:'#a855f7', marginBottom:4 }}>🧩 Применённые методики</div>
+                          {methods.length > 0 && <div style={{ marginBottom:4 }}>{methods.map((m, i) => <div key={i}>✓ {m}</div>)}</div>}
+                          {superset && superset !== 'none' && <div>✓ Суперсеты: {SUPER_RU[superset] || superset}</div>}
+                          {dup && dup !== 'none' && <div>✓ Волновая периодизация (DUP): {DUP_RU[dup] || dup}</div>}
+                          {scheme && scheme !== 'standard' && <div>✓ Схема объёма памп-дней: {SCHEME_RU[scheme] || scheme}</div>}
+                          {(builtPlan as any).priorityMuscles?.length ? <div>✓ Акцент (специализация): {(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}</div> : null}
+                        </div>
+                      );
+                    })()}
                     {(() => {
                       const s = (builtPlan as any).inputSnapshot;
                       if (!s) return null;
@@ -3533,81 +3537,6 @@ export const BbAutoConstructor: React.FC = () => {
               {warnings.slice(0, 8).map((issue: { message: string }, i: number) => <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>)}
               <div style={{ marginTop:5, fontSize:10, color:'#fff' }}>Это предупреждения, а не блокировка. Ограничения оборудования, времени и восстановления могут объяснять недобор.</div>
             </div>
-          );
-        })()}
-
-        {/* PRO: Рекомендации — полностью на русском, понятно что делать */}
-        {builtPlan.validation && (() => {
-          const recs = generateActionableRecommendations(builtPlan, builtPlan.validation.issues);
-          if (recs.length === 0 || (recs.length === 1 && recs[0].code === 'all_clear')) {
-            return (
-              <div style={{ marginTop:8, padding:10, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)', textAlign:'center' }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#22c55e' }}>✅ Рекомендаций нет — план сбалансирован</div>
-                <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Объём в пределах MEV–MRV, частота, делод и ротация в норме. Продолжайте по плану.</div>
-              </div>
-            );
-          }
-          const colorFor = (p: string) => p === 'high' ? '#ef4444' : p === 'medium' ? '#f59e0b' : '#22c55e';
-          const grouped = {
-            high: recs.filter(r => r.priority === 'high'),
-            medium: recs.filter(r => r.priority === 'medium'),
-            low: recs.filter(r => r.priority === 'low'),
-          };
-          return (
-            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, flexWrap:'wrap', gap:6 }}>
-                <span style={{ fontSize:12, fontWeight:800, color:'#22c55e' }}>💡 Что улучшить — {recs.length} шагов</span>
-                <span style={{ fontSize:9, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 6px', borderRadius:4 }}>🔴 важно · 🟡 желательно · 🟢 инфо</span>
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {(["high","medium","low"] as const).map(prio => {
-                  const list = grouped[prio];
-                  if (list.length === 0) return null;
-                  return (
-                    <div key={prio} style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                      <div style={{ fontSize:10, fontWeight:700, color: colorFor(prio), textTransform:'uppercase', letterSpacing:0.3 }}>
-                        {prio === 'high' ? '🔴 Важно' : prio === 'medium' ? '🟡 Желательно' : '🟢 Инфо'}
-                      </div>
-                      {list.slice(0,4).map((rec, idx) => (
-                        <div key={idx} style={{ fontSize:11, color:'#fff', lineHeight:1.4, display:'flex', gap:6, padding:'5px 7px', background:'rgba(255,255,255,0.02)', borderRadius:6 }}>
-                          <span style={{ color: colorFor(rec.priority), fontWeight:700, flexShrink:0 }}>{rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}</span>
-                          <span style={{ flex:1 }}>{rec.action}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-        {(() => {
-          const targets = computeOverloadTargets(wk, loadStrategy, bbWorkMax, bbWeeks, currentPhase).slice(0, 6);
-          if (targets.length === 0) return null;
-          const STRAT_RU: Record<string,string> = { double_progression:'Двойная прогрессия', linear:'Линейная', wave:'Волновая', rpe_based:'RPE-авторегуляция' };
-          const stratRu = STRAT_RU[loadStrategy] || loadStrategy;
-          const stratDesc: Record<string,string> = {
-            double_progression: 'Сначала добейте верх диапазона повторов с текущим весом, затем повысьте вес на 5% и вернитесь к низу диапазона.',
-            linear: 'Каждую неделю +2.5 кг на базу, +1 кг на изоляцию (если повторы удержаны).',
-            wave: '3-нед волны: неделя 1 — тяж, 2 — сред, 3 — лёгк (разгрузка).',
-            rpe_based: 'Вес по ощущению: цель RIR фазы, факт RIR подсказывает +вес или −вес.',
-          };
-          return (
-            <ExpandableCard title={`🎯 Цели прогрессии — неделя ${wk.week} (${stratRu})`} icon="🎯" short={`${targets[0].exerciseName}: ${targets[0].nextTarget}${targets.length > 1 ? ` + ещё ${targets.length - 1} целей` : ''}`} full={
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                <div style={{ fontSize:10, color:'#fff', padding:'6px 8px', background:'rgba(96,165,250,0.06)', borderRadius:8, lineHeight:1.4 }}>
-                  <b>Стратегия:</b> {stratRu} — {stratDesc[loadStrategy] || ''} Фаза: {PHASE_LABELS[currentPhase as BBPhase] || currentPhase}. Вес считается от рабочего максимума с учётом RIR.
-                </div>
-                {targets.map((t, i) => (
-                  <div key={i} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)', fontSize:11, color:'#fff', lineHeight:1.45 }}>
-                    <div style={{ fontWeight:700, color:'#60a5fa', marginBottom:2 }}>{i+1}. {t.exerciseName}</div>
-                    <div>Сейчас: <b>{t.currentWeight} кг × {t.currentReps}</b> ({t.currentSets} подход.ов) → <span style={{ color:'#22c55e', fontWeight:700 }}>{t.nextTarget}</span></div>
-                    <div style={{ fontSize:10, color:'#fff', opacity:0.85, marginTop:2 }}>Подсказка: если выполнили цель на прошлой неделе (все сеты до верха повторов с нужным RIR) — повышайте вес, иначе добивайте повторы.</div>
-                  </div>
-                ))}
-              </div>
-            } />
           );
         })()}
 
@@ -4149,25 +4078,26 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         {/* Бюджет объёма — единственный источник perMuscle (пиковая неделя) */}
         {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
-        {/* Логика построения — факт из builtPlan + inputSnapshot, без обрезки важных warnings */}
+        {/* Логика построения — ВСЕ пункты, без обрезки и EN-мусора */}
         {(() => {
-          const snap = (builtPlan as any).inputSnapshot || { level: bbLevel, goal: bbGoal, trainingFocus: bbTrainingFocus, methodology: bbMethodology, volumeGoal: bbVolGoal, supersetMode, volumeScheme, weakPoints };
           const rationale = builtPlan.rationale || [];
-          // Показываем все пункты кроме самых технических, но обязательно держим PED/lab/deload в начале
-          const head = rationale.slice(0, 8);
-          const tail = rationale.length > 8 ? rationale.slice(-4) : [];
-          const shown = rationale.length > 12 ? [...head, '…', ...tail] : rationale;
-          const goalLabel = snap.goal || bbGoal;
-          const levelLabel = snap.level || bbLevel;
-          const focusLabel = snap.trainingFocus || bbTrainingFocus;
-          const methodLabel = snap.methodology || bbMethodology;
+          if (rationale.length === 0) return null;
+          // Чистим EN-коды и технический мусор для отображения
+          const STRAT_RU_L: Record<string,string> = { double_progression:'двойная прогрессия', linear:'линейная', wave:'волновая', rpe_based:'RPE-авторегуляция' };
+          const clean = (r: string): string => {
+            let s = String(r || '');
+            s = s.replace(/double_progression|linear|wave|rpe_based/g, m => STRAT_RU_L[m] || m);
+            s = s.replace(/MEV coverage|Adaptive MEV|Experienced enhanced|Warmup activator|back budget allocation|direct residual volume after indirect overlap/g, '');
+            s = s.replace(/\.\s*\./g, '.').replace(/\s{2,}/g, ' ').trim();
+            return s;
+          };
+          const shown = rationale.map(clean).filter(Boolean);
           return (
             <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой</div>
+              <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой (все пункты)</div>
               <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                {shown.map((r,i) => r === '…' ? <div key={i} style={{ margin: '4px 0', color:'#fff', opacity:0.5 }}>… {rationale.length - head.length - tail.length} пунктов скрыто …</div> : <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
+                {shown.map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
               </div>
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', fontStyle:'italic' }}>Факт: цель «{goalLabel}» · уровень «{levelLabel}» · фокус «{focusLabel}» · методика «{methodLabel}» · суперсет «{snap.supersetMode || supersetMode}» · схема «{snap.volumeScheme || volumeScheme}» · специализация {(snap.weakPoints || weakPoints).join(', ') || 'нет'} · сплит «{builtPlan.pattern?.name || ''}» ({W.length} нед).</div>
             </div>
           );
         })()}
@@ -4303,7 +4233,7 @@ export const BbAutoConstructor: React.FC = () => {
           return (
             <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.18)' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#a855f7', marginBottom:4 }}>🏋️ Объём по мышцам с подгруппами (клик — детали)</div>
-              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Пиковая неделя. Подгруппы — из факта плана (`subgroup`/`chestSubgroup`/`backSubgroup` или фолбэк по имени). Частота/RIR — средние по мезо в `quality`.</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Пиковая неделя. Подгруппы — из факта плана (subgroup/chestSubgroup/backSubgroup или фолбэк по имени). Частота/RIR — средние по мезо.</div>
               <div style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, fontWeight:700, color:'#fff', padding:'4px 0', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
                 <span>Мышца / подгруппа</span><span>Сетов</span><span>Тяж</span><span>Памп</span><span>MRV</span>
               </div>
@@ -4325,7 +4255,7 @@ export const BbAutoConstructor: React.FC = () => {
                       onKeyDown={e => { if(e.key==='Enter'||e.key===' ') { e.preventDefault(); setExpandedMuscles(prev => { const ns=new Set(prev); if(ns.has(mm.muscle)) ns.delete(mm.muscle); else ns.add(mm.muscle); return ns; }); }}}
                       style={{ display:'grid', gridTemplateColumns:'1.4fr 0.5fr 0.5fr 0.5fr 0.5fr', gap:2, fontSize:11, color:'#fff', alignItems:'center', cursor:'pointer' }}
                     >
-                      <span style={{ fontWeight:700, color: weak?'#ec4899': '#fff' }}>{isExpanded?'▼':'▶'} {weak?'🔥 ':''}{mm.muscle} <span style={{ fontSize:10, color: statusColor }}>· {statusLabel}{over?' ⚠':''}</span></span>
+                      <span style={{ fontWeight:700, color: weak?'#ec4899': '#fff' }}>{isExpanded?'▼':'▶'} {weak?'🔥 ':''}{(MUSCLE_LABEL_RU as any)[mm.muscle] || mm.muscle} <span style={{ fontSize:10, color: statusColor }}>· {statusLabel}{over?' ⚠':''}</span></span>
                       <span style={{ color:over?'#ef4444':(weak?'#ec4899':ACCENT), fontWeight:800 }}>{mm.totalSets}</span>
                       <span style={{ color:'#ef4444' }}>{mm.тяжSets}</span>
                       <span style={{ color:'#60a5fa' }}>{mm.пампSets}</span>
@@ -4444,6 +4374,10 @@ export const BbAutoConstructor: React.FC = () => {
         {/* Мусорный объём — честная проверка с каноникой слабых */}
         {(() => {
           const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears });
+          const ruMuscleG = (m: string) => (MUSCLE_LABEL_RU as any)[m] || m;
+          const ruReason = (r: string) => r
+            .replace(/Дублирование паттерна (\S+) для (\S+)/, 'Дубль паттерна «$1» для «$2»')
+            .replace(/Мышца (\S+) не входит в тег сессии (\S+)/, 'Мышца «$1» не входит в день «$2»');
           if (garbage.length === 0) {
             return (
               <div style={{ ...CARD, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
@@ -4462,96 +4396,16 @@ export const BbAutoConstructor: React.FC = () => {
                 Дублирование изоляций по вашим параметрам: {ctxParts.join(' · ')}. Для слабых групп дубль допустим (учтена каноника chest_upper→chest, delt_mid→shoulders).
               </div>
               {garbage.slice(0, 5).map((g, i) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, padding:'3px 6px', borderRadius:4, background:'rgba(239,68,68,0.04)' }}>
-                • {g.exerciseName} ({g.muscle}): {g.reason}
+                • {g.exerciseName} ({ruMuscleG(g.muscle)}): {ruReason(g.reason)}
               </div>)}
               {garbage.length > 5 && <div style={{ fontSize:11, color:'#fff' }}>...и ещё {garbage.length - 5}</div>}
             </div>
           );
         })()}
-        {/* Аудит параметров — выбрано → факт в плане (методика-специфично) */}
-        {(() => {
-          const snap = (builtPlan as any).inputSnapshot || {};
-          const fact = {
-            goal: (builtPlan as any).goal || bbGoal,
-            level: (builtPlan as any).level || bbLevel,
-            focus: (builtPlan as any).trainingFocus || bbTrainingFocus,
-            methodology: (builtPlan as any).methodology || bbMethodology,
-            superset: (builtPlan as any).supersetMode || supersetMode,
-            volumeScheme: (builtPlan as any).volumeScheme || volumeScheme,
-            dup: (builtPlan as any).dupMode || dupMode,
-            peds: (builtPlan as any).pedAdapt ? 'PED' : (peds.length>0 ? peds.join('+') : 'натурал'),
-            weak: weakPoints.length ? weakPoints.join(', ') : 'нет',
-          };
-          // Проверка методики по факту порядка
-          const methOk = (() => {
-            const firstRoles = W.slice(0,2).flatMap(w=>w.sessions.map(s=> s.exercises[0]?.role||''));
-            if (fact.methodology==='compound_first') return firstRoles.every(r=>r==='primary') ? '✅ порядок соблюдён' : '⚠️ есть изоляция первой';
-            if (fact.methodology==='pre_exhaust') return firstRoles.some(r=>r==='accessory') ? '✅ есть пред-истощение' : '⚠️ нет пред-истощения';
-            if (fact.methodology==='post_exhaust') return '✅';
-            return '—';
-          })();
-          const supersetCnt = W.flatMap(w=>w.sessions.flatMap(s=>s.exercises)).filter(e=> (e as any).supersetWith).length;
-          const dupOk = fact.dup==='none' ? '—' : `✅ ${fact.dup}`;
-          const rows: Array<[string,string,string]> = [
-            ['Цель', snap.goal||bbGoal, fact.goal],
-            ['Уровень', snap.level||bbLevel, fact.level],
-            ['Фокус RIR', snap.trainingFocus||bbTrainingFocus, `${fact.focus} (ср. RIR ${metrics.avgRir.toFixed(1)})`],
-            ['Методика', snap.methodology||bbMethodology, `${fact.methodology} ${methOk}`],
-            ['Суперсеты', snap.supersetMode||supersetMode, fact.superset==='none' ? 'выкл' : `${fact.superset} · пар ${Math.round(supersetCnt/2)}`],
-            ['Схема объёма', snap.volumeScheme||volumeScheme, fact.volumeScheme],
-            ['DUP', snap.dupMode||dupMode, dupOk],
-            ['PED', peds.length? peds.join('+'):'натурал', fact.peds],
-            ['Специализация', snap.weakPoints ? (snap.weakPoints as string[]).join(', ')||'нет' : fact.weak, fact.weak],
-          ];
-          return (
-            <div style={{ ...CARD, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#3b82f6', marginBottom:6 }}>🧭 Аудит параметров — выбрано → факт в плане</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1.1fr 0.9fr 1.1fr', gap:4, fontSize:10, fontWeight:700, color:'#fff', padding:'2px 0', borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-                <span>Параметр</span><span>Выбрано</span><span>Факт</span>
-              </div>
-              {rows.map(([k,a,b])=> (
-                <div key={k} style={{ display:'grid', gridTemplateColumns:'1.1fr 0.9fr 1.1fr', gap:4, fontSize:10, color:'#fff', padding:'3px 0', borderTop:'1px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontWeight:600 }}>{k}</span><span style={{ opacity:0.85 }}>{a}</span><span style={{ fontWeight:700, color: a===b || b.includes('✅') ? '#22c55e' : '#f59e0b' }}>{b}</span>
-                </div>
-              ))}
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.6 }}>Факт читается из `builtPlan` (методика — порядок первой, суперсеты — `supersetWith`, специализация — `weakPoints` vs `perMuscle`).</div>
-            </div>
-          );
-        })()}
-        {/* Адаптации — PED / восстановление / травмы / лаборатория → MRV */}
-        {(() => {
-          const snap = (builtPlan as any).inputSnapshot || {};
-          const mrvByMuscle = (builtPlan as any).mrvByMuscle || {};
-          const hasPed = peds.length>0;
-          const pedMult = pedAdapt.combinedMrvMultiplier;
-          const regime = computeRegimeMrvMult({ onCourse: hasPed, courseIntensity });
-          const recParts: string[] = [];
-          if (Number.isFinite(snap.bodyFat) && snap.bodyFat>25) recParts.push(`жир ${snap.bodyFat}% → MRV×0.9`);
-          if (Number.isFinite(snap.sleepHours) && snap.sleepHours<6) recParts.push(`сон ${snap.sleepHours}ч → MRV×0.85`);
-          if (Number.isFinite(snap.hrvMs) && snap.hrvMs<50) recParts.push(`HRV ${snap.hrvMs}мс → MRV×0.85`);
-          if (Number.isFinite(snap.stressLevel) && snap.stressLevel>6) recParts.push(`стресс ${snap.stressLevel}/10 → MRV×0.85`);
-          if (injuries.length) recParts.push(`травм ${injuries.length} → исключения`);
-          if (snap.labMrvMultiplier && snap.labMrvMultiplier!==1) recParts.push(`лаб ×${Number(snap.labMrvMultiplier).toFixed(2)}`);
-          const mrvSample = Object.entries(mrvByMuscle).slice(0,3).map(([m,v])=> `${m} ${v}`).join(' · ') || '—';
-          return (
-            <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🛡️ Адаптации — PED / восстановление / травмы / анализы → MRV</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10, color:'#fff' }}>
-                <div>Режим: <b>{hasPed? `PED ×${pedMult.toFixed(2)} (режим ×${regime.toFixed(2)})` : 'натурал ×1.0'}</b></div>
-                <div>MRV факт (3 группы): <b>{mrvSample}</b></div>
-                <div style={{ gridColumn:'1 / span 2', marginTop:2, lineHeight:1.4 }}>
-                  {recParts.length ? recParts.join(' · ') : 'Коррекций восстановления/травм нет — базовые MRV'}
-                </div>
-                {snap.labMrvMultiplier && snap.labMrvMultiplier!==1 && <div style={{ gridColumn:'1 / span 2', fontSize:10, color:'#f59e0b' }}>Лабораторная коррекция: ×{Number(snap.labMrvMultiplier).toFixed(2)}</div>}
-              </div>
-            </div>
-          );
-        })()}
-        {/* Per-muscle chip table removed — consolidated into Plan step's Detailed Muscle Groups */}
         {/* Рекомендации — единственные, детали уже в них (quality.details убраны как дубль) */}
         {quality.recommendations && quality.recommendations.length > 0 && (
           <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации (из quality + PRO)</div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации по качеству плана</div>
             {quality.recommendations.map((r, i) => (
               <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:4, borderLeft:'2px solid #f59e0b' }}>{r}</div>
             ))}
