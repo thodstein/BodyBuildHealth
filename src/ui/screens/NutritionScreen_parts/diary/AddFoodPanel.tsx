@@ -194,37 +194,38 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             style={{ padding: '7px 10px', borderRadius: 9, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, minHeight: 36 }}>＋</button>
         </div>
 
-        {/* Quick actions */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+        {/* Quick actions — modern */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
           <button type="button" onClick={onShowBarcode} aria-label="Штрих-код"
-            style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
-              background: showBarcode ? 'rgba(0,230,138,0.12)' : '#202023',
-              border: `1px solid ${showBarcode ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`,
-              color: '#fff', minHeight: 44, fontWeight: 500 }}>
-            📱 Штрих-код
+            style={{ padding: '14px 8px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              background: showBarcode ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${showBarcode ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
+              color: showBarcode ? '#00e68a' : 'rgba(255,255,255,0.85)', minHeight: 72, fontWeight: 600, backdropFilter: 'blur(8px)', transition: 'all 0.2s', boxShadow: showBarcode ? '0 4px 16px rgba(0,230,138,0.15)' : 'none' }}>
+            <span style={{ fontSize: 20, filter: showBarcode ? 'none' : 'grayscale(0.3)' }}>📱</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.3 }}>Штрих-код</span>
           </button>
-            <label style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
-              background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
-              opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
+          <label style={{ padding: '14px 8px', borderRadius: 14, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              background: ocrFileLoading ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(139,92,246,0.02))',
+              border: `1px solid ${ocrFileLoading ? 'rgba(0,230,138,0.3)' : 'rgba(139,92,246,0.12)'}`,
+              color: ocrFileLoading ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 72, fontWeight: 600, backdropFilter: 'blur(8px)', transition: 'all 0.2s', boxShadow: ocrFileLoading ? '0 4px 16px rgba(0,230,138,0.15)' : '0 2px 8px rgba(0,0,0,0.1)', opacity: ocrFileLoading ? 0.9 : 1, justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
             <input ref={ocrFileRef} type="file" accept="image/*" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
               onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
-              {ocrFileLoading ? '⏳ Распознаём' : '📸 Фото/файл'}
-            </label>
-            <label style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
-              background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
-              opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
-            <input ref={ocrCameraRef} type="file" accept="image/*" capture="environment" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
-              onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
-               {ocrFileLoading ? '⏳ Ждём ответ' : '📷 Камера'}
-            </label>
+            <span style={{ fontSize: 20 }}>{ocrFileLoading ? '⏳' : '📸'}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.3 }}>{ocrFileLoading ? 'Сканируем…' : 'Фото'}</span>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop: -2 }}>скрин / камера</span>
+          </label>
           <button onClick={onShowOCR} aria-label="Текст"
-            style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: 'pointer',
-              background: showOCR ? 'rgba(0,230,138,0.12)' : '#202023',
-              border: `1px solid ${showOCR ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`,
-              color: '#fff', minHeight: 44, fontWeight: 500 }}>
-            📋 Текст
+            style={{ padding: '14px 8px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              background: showOCR ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(59,130,246,0.08))' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${showOCR ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
+              color: showOCR ? '#60a5fa' : 'rgba(255,255,255,0.85)', minHeight: 72, fontWeight: 600, backdropFilter: 'blur(8px)', transition: 'all 0.2s', boxShadow: showOCR ? '0 4px 16px rgba(59,130,246,0.15)' : 'none' }}>
+            <span style={{ fontSize: 20 }}>📋</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.3 }}>Текст</span>
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop: -2 }}>вставить</span>
           </button>
          </div>
+        {/* Hidden camera input kept for compat — not rendered as button */}
+        <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={() => {}} />
 
           {ocrError && (
             <div role="alert" style={{ padding: '9px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35 }}>
