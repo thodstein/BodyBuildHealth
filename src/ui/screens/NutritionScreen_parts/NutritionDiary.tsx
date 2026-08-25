@@ -603,7 +603,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           onOcrFile={handleOcrFileUpload} ocrFileLoading={ocrFileLoading}
           onShowOCR={() => setShowOCR(!showOCR)} showOCR={showOCR}
           ocrText={ocrText} onOcrTextChange={setOcrText} onOcrSubmit={handleOCR}
-          ocrError={ocrError} onOcrClose={() => { setShowOCR(false); setOcrText(''); }}
+          ocrError={ocrError} ocrHint={ocrHint} onOcrClose={() => { setShowOCR(false); setOcrText(''); }}
           parsedItems={parsedItems} onRemoveParsedItem={(i) => setParsedItems(prev => prev.filter((_, j) => j !== i))}
           onUpdateParsedItemQty={updateParsedItemQty} onFillMicros={fillQueuedMicros}
           onSaveItems={() => saveItemsToDiary(parsedItems)}
