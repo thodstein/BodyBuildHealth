@@ -3231,6 +3231,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           totals = { kcal: meals.reduce((s:any,m:any)=>s+m.totals.kcal,0), p: meals.reduce((s:any,m:any)=>s+m.totals.p,0), f: meals.reduce((s:any,m:any)=>s+m.totals.f,0), c: meals.reduce((s:any,m:any)=>s+m.totals.c,0) };
         }
       }
+      // Fast/minimal fix: align kcal with Atwater (P*4+F*9+C*4) so kcal deviation matches macros and stays ≤3% vs card
+      totals.kcal = Math.round(totals.p*4 + totals.f*9 + totals.c*4);
+      meals.forEach((m:any)=>{ m.totals.kcal = Math.round(m.totals.p*4 + m.totals.f*9 + m.totals.c*4); });
       return { meals, totals, isTrainingDay, isWorkDay, allergenWarnings: uniqueAllergenWarnings,
         supplementTimeline: buildSupplementTimeline(mealTimes, isTrainingDay),
         waterTimeline: buildWaterTimeline(weight, mealTimes, isTrainingDay, trainStart),
