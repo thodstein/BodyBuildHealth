@@ -3151,34 +3151,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const dayIdx = days === 1 ? selectedDayIndex : 0;
     await maybeYield();
-    // FINAL SNAP: порции к человеческой сетке в классическом пути (simple/minimal)
-    const snapDayMeals = (day: any) => {
-      if (!day || !Array.isArray(day.meals)) return day;
-      for (const m of day.meals) {
-        if (!Array.isArray(m.items)) continue;
-        for (const it of m.items) {
-          const fd = FOOD_DB.find((f: any) => f.id === it.id);
-          if (!fd) continue;
-           const snapped = snapPortionG(fd, it.amount);
-          if (snapped !== it.amount && it.amount > 0) {
-            const factor = snapped / it.amount;
-            it.amount = snapped;
-            it.kcal = Math.round(it.kcal * factor);
-            it.p = Math.round((it.p || 0) * factor * 10) / 10;
-            it.f = Math.round((it.f || 0) * factor * 10) / 10;
-            it.c = Math.round((it.c || 0) * factor * 10) / 10;
-            it.fiber = Math.round((it.fiber || 0) * factor * 10) / 10;
-          }
-        }
-        if (m.totals) {
-          m.totals = m.items.reduce((acc: any, it: any) => ({ kcal: acc.kcal + (it.kcal||0), p: acc.p + (it.p||0), f: acc.f + (it.f||0), c: acc.c + (it.c||0), fiber: acc.fiber + (it.fiber||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
-        }
-      }
-      if (day.totals) {
-        day.totals = day.meals.reduce((acc: any, m: any) => ({ kcal: acc.kcal + (m.totals?.kcal||0), p: acc.p + (m.totals?.p||0), f: acc.f + (m.totals?.f||0), c: acc.c + (m.totals?.c||0), fiber: acc.fiber + (m.totals?.fiber||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
-      }
-      return day;
-    };
+    const snapDayMeals = (day: any) => day;
     const d1 = snapDayMeals(buildDay(dayIdx, effIsTrainingDay(dayIdx)));
     // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
     // и загрязняя usedFoodIds для 1-дневного плана).
