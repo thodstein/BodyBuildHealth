@@ -2110,22 +2110,17 @@ export const BbAutoConstructor: React.FC = () => {
     const groups: Record<string, string[]> = planMode === 'bb_cycle'
       ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
       : { 'ПАРАМЕТРЫ': ['params','ped','split'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] };
+    const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
     return (
-      <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '10px', marginBottom: 10 }}>
-        {Object.entries(groups).map(([gLabel, keys]) => {
-          const items = stepList.filter(s => (keys as string[]).includes(s));
-          if (items.length === 0) return null;
+      <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '6px 8px', marginBottom: 10, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
+        {stepList.map(s => {
+          const active = step === s;
+          const disabled = (s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan;
           return (
-            <div key={gLabel} style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.35)', letterSpacing: 0.6, marginBottom: 4 }}>{gLabel}</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
-                {items.map(s => {
-                  const active = step === s;
-                  const disabled = (s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan;
-                  return <button key={s} disabled={disabled} onClick={() => { if (disabled) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={{ ...STEP_PILL(active), opacity: disabled ? 0.45 : 1, padding: '8px 14px', fontSize: 12 }}>{stepLabels[s]}</button>;
-                })}
-              </div>
-            </div>
+            <>
+              <button key={s} disabled={disabled} onClick={() => { if (disabled) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1, padding: '7px 12px', fontSize: 11 }}>{stepLabels[s]}</button>
+              {groupEndKeys.has(s) && s !== stepList[stepList.length - 1] && <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
+            </>
           );
         })}
       </div>
