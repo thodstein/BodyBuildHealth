@@ -2991,14 +2991,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
   }
 
-  // FINAL SNAP: граммовки круглые только если deviation <=3%
+  // FINAL SNAP: граммовки 100% круглые — все продукты к сетке (41→50, 97→100, 203→200)
   {
-      const _tK = input.goalKcal || 2000, _tP = input.goalProteinG || 150, _tF = input.goalFatG || 70, _tC = input.goalCarbsG || 250;
-      let _snapK=0,_snapP=0,_snapF=0,_snapC=0;
-      for (const mm of meals) for (const it of mm.items) { const fd2 = FOOD_DB.find(f => f.id === it.id); const sn = fd2 ? snapPortionG(fd2, it.amount) : it.amount; const f2 = it.amount>0?sn/it.amount:1; _snapK+=Math.round(it.kcal*f2); _snapP+=Math.round(it.p*f2*10)/10; _snapF+=Math.round(it.f*f2*10)/10; _snapC+=Math.round(it.c*f2*10)/10; }
-      const _devBefore = Math.max(Math.abs(totals.kcal-_tK)/_tK, Math.abs(totals.p-_tP)/_tP, Math.abs(totals.f-_tF)/_tF, Math.abs(totals.c-_tC)/_tC);
-      const _devSnap = Math.max(Math.abs(_snapK-_tK)/_tK, Math.abs(_snapP-_tP)/_tP, Math.abs(_snapF-_tF)/_tF, Math.abs(_snapC-_tC)/_tC);
-      if (_devSnap > 0.03 && _devSnap > _devBefore + 0.01) { /* skip snap */ } else {
       for (const m of meals) {
         for (const it of m.items) {
           const fd = FOOD_DB.find(f => f.id === it.id);
@@ -3023,7 +3017,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
       totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
       totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
-    }
   }
 
   return {
