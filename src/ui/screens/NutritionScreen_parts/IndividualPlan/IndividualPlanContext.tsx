@@ -2990,13 +2990,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const fb = FOOD_DB.find(f => f.id === fallbackId);
         if (!pickFood(fb)) return;
       };
-      for (let iter = 0; iter < 6; iter++) {
+      for (let iter = 0; iter < 8; iter++) {
         const devK = Math.abs(totals.kcal - tK) / tK; const devP = Math.abs(totals.p - tP_) / tP_;
         const devF = Math.abs(totals.f - tF_) / tF_; const devC = Math.abs(totals.c - tC_) / tC_;
         if (devK <= TOL && devP <= TOL && devF <= TOL && devC <= TOL) break;
         if (iter === 0) {
           const scales = [tK / Math.max(1, totals.kcal), tP_ / Math.max(1, totals.p), tF_ / Math.max(1, totals.f), tC_ / Math.max(1, totals.c)];
-          const effScale = Math.min(1.8, Math.max(0.5, scales.reduce((s, v) => s + v, 0) / scales.length));
+          const effScale = Math.min(2.0, Math.max(0.4, scales.reduce((s, v) => s + v, 0) / scales.length));
           meals.forEach((m: any) => {
             m.items.forEach((it: any) => {
               const fd = FOOD_DB.find((f: any) => f.id === it.id);
