@@ -2997,7 +2997,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const fd = FOOD_DB.find(f => f.id === it.id);
       if (!fd) continue;
       const snapped = snapPortionG(fd, it.amount);
-      if (snapped !== it.amount && it.amount > 0 && Math.abs(snapped - it.amount) >= 10) {
+      if (snapped !== it.amount && it.amount > 0) {
         const factor = snapped / it.amount;
         it.amount = snapped;
         it.kcal = Math.round(it.kcal * factor);
