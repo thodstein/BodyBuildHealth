@@ -655,10 +655,15 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
           showToast(`⚡ ${food.name} → ${mealType}`);
         }} />
         {recentFoods.length > 0 && (
-          <div style={{ padding:'10px 14px', borderRadius:14, background:'#18181b', border:'1px solid rgba(255,255,255,0.06)', marginTop:6 }}>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)', fontWeight:600, marginBottom:6 }}>🕒 Недавние (1-клик)</div>
-            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-              {recentFoods.slice(0,8).map(f => (
+          <div style={{ padding: 12, borderRadius: 16, background: 'linear-gradient(135deg, rgba(59,130,246,0.06), rgba(59,130,246,0.02))', border: '1px solid rgba(59,130,246,0.12)', backdropFilter: 'blur(12px)', marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ width: 24, height: 24, borderRadius: 8, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🕒</span>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>Недавние</div>
+              <span style={{ fontSize: 9, background: 'rgba(59,130,246,0.12)', color: '#60a5fa', padding: '2px 7px', borderRadius: 999, border: '1px solid rgba(59,130,246,0.18)', fontWeight: 700 }}>1-клик</span>
+              <span style={{ marginLeft: 'auto', fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>{recentFoods.length} блюд</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {recentFoods.slice(0, 8).map(f => (
                 <button key={f.name} onClick={() => {
                   const data = { ...diaryData };
                   if (!data[selectedDate]) data[selectedDate] = { meals: {} };
@@ -667,8 +672,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
                   data[selectedDate].meals[mt].push({ ...f });
                   saveDiary(data);
                   showToast(`🕒 ${f.name} → ${mt}`);
-                }} style={{ padding:'6px 10px', borderRadius:10, fontSize:10, cursor:'pointer', background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.2)', color:'#60a5fa', whiteSpace:'nowrap' }}>
-                  {f.name.length>14 ? f.name.slice(0,13)+'…' : f.name} · {Math.round(f.kcal)}ккал
+                }} style={{ padding: '7px 12px', borderRadius: 999, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.14)', color: '#60a5fa', whiteSpace: 'nowrap', fontWeight: 600, transition: 'all 0.15s', backdropFilter: 'blur(8px)' }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.14)'} onMouseLeave={e => e.currentTarget.style.background = 'rgba(59,130,246,0.08)'}>
+                  {f.name.length>14 ? f.name.slice(0,13)+'…' : f.name} <span style={{ opacity: 0.7, fontWeight: 400 }}>· {Math.round(f.kcal)}ккал</span>
                 </button>
               ))}
             </div>
