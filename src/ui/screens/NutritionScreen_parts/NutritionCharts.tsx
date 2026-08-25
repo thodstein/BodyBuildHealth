@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { formatDate } from '../../../core/utils/date-utils';
 import { readDiaryV2 } from './diary-storage-v2';
 import { Line } from 'react-chartjs-2';
+import { ModernHero, modernCardBg } from './nutrition-modern-kit';
 import {
   Chart as ChartJS,
   CategoryScale, LinearScale, PointElement,
@@ -118,20 +119,25 @@ export const NutritionCharts: React.FC<{
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <ModernHero icon="📈" title="Графики" subtitle="Динамика КБЖУ и веса — за 7/14/30 дней. Тренды, средние и календарь достижений." stats={[
+        { k:'Дней', v: range, sub:'период', col:'#00e68a', bg:'rgba(0,230,138,0.08)' },
+        { k:'Ккал', v: avgKcal, sub:'среднее', col:'#22c55e', bg:'rgba(34,197,94,0.08)' },
+        { k:'Белок', v: avgProtein+'г', sub:'среднее', col:'#60a5fa', bg:'rgba(96,165,250,0.08)' },
+      ]} />
       {!hasRealData && (
-        <div style={{ ...cardBg, background: 'rgba(255,165,2,0.06)', border: '1px solid rgba(255,165,2,0.15)' }}>
+        <div style={{ ...modernCardBg, background: 'rgba(255,165,2,0.06)', border: '1px solid rgba(255,165,2,0.15)' }}>
           <div style={{ fontSize: 10, color: '#ffa502' }}>📊 Нет данных дневника. Показаны оценочные значения.</div>
         </div>
       )}
       {hasRealData && daysWithData < range && (
-        <div style={{ ...cardBg, background: 'rgba(30,144,255,0.06)', border: '1px solid rgba(30,144,255,0.15)' }}>
+        <div style={{ ...modernCardBg, background: 'rgba(30,144,255,0.06)', border: '1px solid rgba(30,144,255,0.15)' }}>
           <div style={{ fontSize: 10, color: '#1e90ff' }}>📊 Данные за {daysWithData} из {range} дней.</div>
         </div>
       )}
 
       {/* Range + mode selector */}
-      <div style={{ ...cardBg }}>
+      <div style={{ ...modernCardBg }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: -0.3 }}>📈 Графики</div>
           <div style={{ display: 'flex', gap: 4 }}>
@@ -169,7 +175,7 @@ export const NutritionCharts: React.FC<{
       </div>
 
       {/* Macro distribution */}
-      <div style={{ ...cardBg }}>
+      <div style={{ ...modernCardBg }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8, letterSpacing: -0.3 }}>🍽 Распределение макронутриентов</div>
         <div style={{ height: 20, borderRadius: 10, overflow: 'hidden', display: 'flex', marginBottom: 6 }}>
           <div style={{ flex: kcalPct, background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: '#fff', minWidth: 30 }}>Б {kcalPct}%</div>
@@ -184,7 +190,7 @@ export const NutritionCharts: React.FC<{
       </div>
 
       {/* Summary stats */}
-      <div style={{ ...cardBg }}>
+      <div style={{ ...modernCardBg }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8, letterSpacing: -0.3 }}>📊 Средние за {range} дней</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {[
@@ -203,7 +209,7 @@ export const NutritionCharts: React.FC<{
       </div>
 
       {/* Goal completion */}
-      <div style={{ ...cardBg }}>
+      <div style={{ ...modernCardBg }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8, letterSpacing: -0.3 }}>🎯 Выполнение целей за {range} дней</div>
         {(() => {
           const daysWithAnyData = realDailyData.filter(d => d.kcal > 0).length;
@@ -238,7 +244,7 @@ export const NutritionCharts: React.FC<{
       </div>
 
       {/* Mini calendar - achievement heatmap */}
-      <div style={{ ...cardBg }}>
+      <div style={{ ...modernCardBg }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8, letterSpacing: -0.3 }}>📅 Календарь достижений</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
           {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(d => <div key={d} style={{ fontSize: 7, color: 'rgba(255,255,255,0.75)', textAlign: 'center', padding: '2px 0' }}>{d}</div>)}
