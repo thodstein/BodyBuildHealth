@@ -236,11 +236,7 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         }
       }
       return result;
-    })).filter(item => {
-      // OCR-only queue must not expose raw garbage as a food. Known local/USDA
-      // products are safe; unknown low-confidence rows require manual entry.
-      return Boolean(item.foodId) && (item.confidence === undefined || item.confidence >= 0.8);
-    });
+    })).filter(item => item.kcal > 0 || item.p > 0 || item.f > 0 || item.c > 0 || Boolean(item.foodId));
   }, []);
 
   const fillQueuedMicros = useCallback(() => setParsedItems(prev => prev.map(item => ({ ...item, micros: fillMissingMicros(item.name, Number(item.qty) || 100, item.micros) }))), []);
@@ -283,9 +279,13 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       ]);
       if (result.meals.length > 0) {
         const converted = convertOCRItems(result.meals, usdaFoods);
-        setParsedItems(converted);
-        setOcrError('');
-        setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь перед сохранением.`);
+        if (converted.length > 0) {
+          setParsedItems(converted);
+          setOcrError('');
+          setOcrHint(`Распознано позиций: ${converted.length}. Проверьте очередь перед сохранением.`);
+        } else {
+          setOcrError('Распознано 0 позиций — попробуйте более чёткий скриншот или вставьте текст вручную через «Текст».');
+        }
       } else if (result.meals.length === 0 && result.labs.length === 0) {
         setOcrError(result.warnings?.[0] || 'Не удалось распознать данные питания. Попробуйте более чёткий скриншот.');
       }
