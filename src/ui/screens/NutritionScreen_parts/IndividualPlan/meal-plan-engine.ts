@@ -2991,6 +2991,51 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
   }
 
+  // FINAL SNAP: граммовки 100% круглые, но только если deviation КБЖУ после snap <=8% (иначе пропускаем)
+  {
+    const before = { ...totals };
+    const snapTotals = { kcal: 0, p: 0, f: 0, c: 0 };
+    for (const m of meals) for (const it of m.items) {
+      const fd = FOOD_DB.find(f => f.id === it.id);
+      if (!fd) { snapTotals.kcal += it.kcal; snapTotals.p += it.p; snapTotals.f += it.f; snapTotals.c += it.c; continue; }
+      const snapped = snapPortionG(fd, it.amount);
+      const factor = it.amount > 0 ? snapped / it.amount : 1;
+      snapTotals.kcal += Math.round(it.kcal * factor);
+      snapTotals.p += Math.round(it.p * factor * 10) / 10;
+      snapTotals.f += Math.round(it.f * factor * 10) / 10;
+      snapTotals.c += Math.round(it.c * factor * 10) / 10;
+    }
+    const tK = input.goalKcal || 2000, tP = input.goalProteinG || 150, tF = input.goalFatG || 70, tC = input.goalCarbsG || 250;
+    const devBefore = Math.max(Math.abs(before.kcal - tK)/tK, Math.abs(before.p - tP)/tP, Math.abs(before.f - tF)/tF, Math.abs(before.c - tC)/tC);
+    const devAfter = Math.max(Math.abs(snapTotals.kcal - tK)/tK, Math.abs(snapTotals.p - tP)/tP, Math.abs(snapTotals.f - tF)/tF, Math.abs(snapTotals.c - tC)/tC);
+    if (devAfter <= 0.08 || devAfter <= devBefore + 0.02) {
+      for (const m of meals) {
+        for (const it of m.items) {
+          const fd = FOOD_DB.find(f => f.id === it.id);
+          if (!fd) continue;
+          const snapped = snapPortionG(fd, it.amount);
+          if (snapped !== it.amount && it.amount > 0) {
+            const factor = snapped / it.amount;
+            it.amount = snapped;
+            it.kcal = Math.round(it.kcal * factor);
+            it.p = Math.round(it.p * factor * 10) / 10;
+            it.f = Math.round(it.f * factor * 10) / 10;
+            it.c = Math.round(it.c * factor * 10) / 10;
+            it.fiber = Math.round((it.fiber || 0) * factor * 10) / 10;
+            it.leucine_mg = Math.round((it.leucine_mg || 0) * factor);
+          }
+        }
+        m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+      }
+      totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+      totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
+      totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
+      totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
+      totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+      totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+    }
+  }
+
   return {
     dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
