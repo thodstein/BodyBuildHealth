@@ -2691,7 +2691,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const effectiveLunch = isWorkDay && workScheduleEnabled ? workStartMin + Math.round((workEndMin - workStartMin + (isNightShift ? 1440 : 0)) / 2) % 1440 : lunchMin;
       const effectiveDinner = isWorkDay && workScheduleEnabled ? (isNightShift ? workEndMin + 60 : Math.min(workEndMin + 30, 1380)) : dinnerMin;
 
-      let effectiveMealsCount = lazyDayMode ? Math.min(3, mealsCount) : cookTimeMin < 30 ? Math.min(3, mealsCount) : cookTimeMin < 60 ? Math.min(4, mealsCount) : mealsCount;
+      let effectiveMealsCount = mealsCount;
       const mealDefs: { label: string; anchor?: number }[] = [];
       mealDefs.push({ label: 'Завтрак', anchor: effectiveWake + 30 });
       if (effectiveMealsCount >= 5) mealDefs.push({ label: 'Второй завтрак' });
