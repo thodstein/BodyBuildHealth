@@ -89,7 +89,7 @@ const cardBg = CARD;
 const ACCENT = 'var(--accent)';
 const BTN: React.CSSProperties = { background: ACCENT, color: '#0a0a0a', border: 'none', borderRadius: 8, padding: '10px 14px', fontWeight: 600, fontSize: 12, minHeight: 40, cursor: 'pointer' };
 const BTN_GHOST: React.CSSProperties = { ...BTN, background: 'transparent', color: ACCENT, border: '1px solid var(--accent-dim)' };
-const PILL = (active: boolean) => ({ padding:'7px 12px', borderRadius:20, fontSize:11, fontWeight: active ? 700 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.06)', background: active ? 'linear-gradient(135deg,var(--accent),#00c8a0)' : '#18181b', color: active ? '#000' : '#fff', flexShrink:0 } as React.CSSProperties);
+const PILL = (active: boolean) => ({ padding:'8px 14px', borderRadius:20, fontSize:11, fontWeight: active ? 800 : 500, cursor:'pointer', border: active ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: active ? 'linear-gradient(135deg,var(--accent) 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: active ? '#000' : '#fff', flexShrink:0, boxShadow: active ? '0 2px 10px rgba(0,230,138,0.25), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none', backdropFilter: 'blur(8px)', transition: 'all 0.2s ease', transform: active ? 'translateY(-1px)' : 'none' } as React.CSSProperties);
 const SEL: React.CSSProperties = { background: '#18181b', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 40, width: '100%', outline: 'none', boxSizing: 'border-box' };
 const IN: React.CSSProperties = { ...SEL, padding: '10px' };
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '6px 0 3px' };
@@ -1384,12 +1384,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
           : { 'ПЛАН': ['plan','macro','tools'], 'РАБОТА': ['bridge','peak_bb'], 'АНАЛИЗ': ['methods','analytics','prometrics','charts'] };
         const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
         return (
-          <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '6px 8px', marginBottom: 10, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
+          <div style={{ background: 'linear-gradient(135deg, rgba(24,24,27,0.65), rgba(18,18,22,0.85))', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: '8px', marginBottom: 12, display: 'flex', gap: 6, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
             {list.map(({ key, label }) => (
-              <>
-                <button key={key} style={{ ...PILL(subView === key), flexShrink: 0 as const, padding: '7px 12px', fontSize: 11 }} onClick={() => setSubView(key)}>{label}</button>
-                {groupEndKeys.has(key) && key !== list[list.length - 1].key && <span style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.08)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
-              </>
+              <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
+                <button style={{ ...PILL(subView === key), flexShrink: 0 as const }} onClick={() => setSubView(key)}>{label}</button>
+                {groupEndKeys.has(key) && key !== list[list.length - 1].key && <span style={{ width: 1, height: 18, background: 'linear-gradient(to bottom, transparent, rgba(255,255,255,0.08), transparent)', flexShrink: 0 as const, margin: '0 2px', alignSelf: 'center' }} />}
+              </span>
             ))}
           </div>
         );

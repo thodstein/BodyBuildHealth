@@ -67,14 +67,15 @@ export const BTN_GHOST: React.CSSProperties = {
   ...BTN, background: 'transparent', color: 'var(--accent, #00e68a)', border: '1px solid var(--accent-line, rgba(0,230,138,0.45))', boxShadow: 'none',
 };
 
-/** Шаговая пилюля (активная / неактивная). */
+/** Шаговая пилюля (активная / неактивная) — современно, с подъёмом. */
 export const STEP_PILL = (active: boolean): React.CSSProperties => ({
-  padding: '7px 14px', borderRadius: R.pill, fontSize: 12,
+  padding: '8px 14px', borderRadius: R.pill, fontSize: 11,
   fontWeight: active ? 800 : 500, cursor: 'pointer',
   border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
-  background: active ? `linear-gradient(135deg,${ACCENT},#00c8a0)` : 'rgba(24,24,27,0.6)',
+  background: active ? `linear-gradient(135deg,${ACCENT} 0%, #00c8a0 100%)` : 'rgba(255,255,255,0.04)',
   color: active ? '#06281c' : '#fff', flexShrink: 0,
-  boxShadow: active ? '0 4px 14px rgba(0,230,138,0.3)' : 'none',
+  boxShadow: active ? '0 2px 10px rgba(0,230,138,0.25), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none',
+  backdropFilter: 'blur(8px)', transition: 'all 0.2s ease', transform: active ? 'translateY(-1px)' : 'none',
 });
 
 /** Поле ввода. */
