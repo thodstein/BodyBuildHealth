@@ -135,7 +135,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         {foodSearchResults.length > 0 && (
           <div style={{ maxHeight: 240, overflowY: 'auto', marginTop: 8, borderRadius: 10, background: '#202023', border:'1px solid rgba(255,255,255,0.04)' }}>
             {foodSearchResults.map(f => (
-              <div key={f.id} style={{ padding: '8px 10px', fontSize: 11, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 44, transition:'background 0.12s' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.03)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+              <div key={f.id} style={{ padding: '10px 12px', fontSize: 11, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 48, transition:'background 0.12s', borderRadius:8, margin:'2px 4px', background:'rgba(255,255,255,0.01)' }} onMouseEnter={e=>e.currentTarget.style.background='rgba(0,230,138,0.06)'} onMouseLeave={e=>e.currentTarget.style.background='rgba(255,255,255,0.01)'}>
                 <div onClick={() => onAddFoodFromDB(f)} role="button" aria-label={`Добавить ${f.name}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex:1, cursor:'pointer' }}>
                   <span style={{ fontSize: 16, width:20, textAlign:'center' }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
                   <span style={{ fontWeight: 600, flex:1, lineHeight:1.2 }}>{f.name}</span>
@@ -167,19 +167,22 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           </div>
         )}
 
-        {/* Meal type selector */}
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginTop: 10, maxWidth: '100%', overflowX: 'auto' }}>
-          {allMealTypes.map(mt => (
-            <button key={mt} onClick={() => onMealTypeChange(mealType === mt ? '' : mt)} 
+        {/* Meal type selector — premium */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+          {allMealTypes.map(mt => {
+            const isActive = mealType === mt;
+            const icon = mt.toLowerCase().includes('завтрак') ? '🌅' : mt.toLowerCase().includes('обед') ? '☀️' : mt.toLowerCase().includes('ужин') ? '🌙' : mt.toLowerCase().includes('перекус') ? '🍿' : mt.toLowerCase().includes('трениров') ? '💪' : '🍽';
+            return (
+            <button key={mt} onClick={() => onMealTypeChange(isActive ? '' : mt)} 
               aria-label={`Приём: ${mt}`}
-              style={{ padding: '6px 12px', borderRadius: 20, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap',
-                background: mealType === mt ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-                border: mealType === mt ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                color: mealType === mt ? '#000' : 'rgba(255,255,255,0.7)', fontWeight: mealType === mt ? 700 : 500,
-                minHeight: 32, transition: 'all 0.15s' }}>
-              {mt}
+              style={{ padding: '7px 12px', borderRadius: 999, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display:'flex', alignItems:'center', gap:6,
+                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+                color: isActive ? '#000' : 'rgba(255,255,255,0.7)', fontWeight: isActive ? 700 : 500,
+                minHeight: 34, transition: 'all 0.15s', boxShadow: isActive ? '0 2px 8px rgba(0,230,138,0.2)' : 'none' }}>
+              <span style={{ fontSize:11 }}>{icon}</span> {mt}
             </button>
-          ))}
+          )})}
         </div>
         <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
           <input value={customMealInput} onChange={e => onCustomMealInputChange(e.target.value)}
