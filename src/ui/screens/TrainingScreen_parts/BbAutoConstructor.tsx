@@ -3271,21 +3271,61 @@ export const BbAutoConstructor: React.FC = () => {
           const report = builtPlan.rotationReport;
           const primaryCount = Object.keys(report.primaryByMuscle).length;
           const warningCount = report.issues.length;
+          const totalPrimary = Object.values(report.primaryByMuscle).flat().length;
+          const uniqPrimaries = new Set(Object.values(report.primaryByMuscle).flat()).size;
           return (
-            <ExpandableCard title="🔁 Ротация упражнений" icon="🔁"
-              short={`${primaryCount} базовых мышц · ${warningCount} предупреждений`}
+            <ExpandableCard title="🔁 Ротация упражнений — стабильность базы, вариативность изоляции" icon="🔁"
+              short={`${primaryCount} групп с базой · ${uniqPrimaries} уникальных базовых · ${warningCount} предупреждений`}
               full={
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, padding:'6px 8px', background:'rgba(59,130,246,0.06)', borderRadius:8, border:'1px solid rgba(59,130,246,0.12)' }}>
-                    <b>Логика ротации:</b> базовые (primary) движения — якорь, не меняются внутри фазы (стабильная прогрессия по весам). Изолирующие (accessory) — ротируются по паттернам и углам каждую неделю, чтобы разнообразить стимул и избежать привыкания.
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, padding:'7px 9px', background:'rgba(59,130,246,0.06)', borderRadius:8, border:'1px solid rgba(59,130,246,0.12)' }}>
+                    <b>Принцип:</b> базовые (primary) — стабильны внутри фазы для прогрессии весов; изолирующие (accessory) — ротируются по углам/хватам каждую неделю. Всего базовых движений в плане: {totalPrimary} (уникальных {uniqPrimaries}).
                   </div>
-                  {report.issues.length === 0
-                    ? <div style={{ fontSize:11, color:'#22c55e' }}>✅ Конфликтов ротации не обнаружено.</div>
-                    : report.issues.slice(0, 8).map((issue: { code?: string; phase?: string; message: string }, i: number) => (
-                      <div key={i} style={{ fontSize:11, color: issue.code === 'primary_changed' ? '#f59e0b' : '#fff' }}>
-                         {issue.phase ? `[${PHASE_LABELS[issue.phase as BBPhase] || issue.phase}] ` : ''}{issue.message}
+                  {Object.keys(report.primaryByMuscle).length > 0 && (
+                    <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.12)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>🎯 Базовые движения по мышцам (якоря, не меняются внутри фазы):</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {Object.entries(report.primaryByMuscle).map(([muscle, names]) => {
+                          const uniq = Array.from(new Set(names as string[]));
+                          const ruMuscle = (MUSCLE_LABEL_RU as any)[muscle] || muscle;
+                          return (
+                            <div key={muscle} style={{ display:'flex', justifyContent:'space-between', gap:8, padding:'4px 7px', background:'rgba(255,255,255,0.03)', borderRadius:6, fontSize:10, color:'#fff' }}>
+                              <span style={{ fontWeight:700, color:'#22c55e' }}>{ruMuscle}</span>
+                              <span style={{ flex:1, textAlign:'right', opacity:0.9 }}>{uniq.join(' · ') || '—'}</span>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
+                    </div>
+                  )}
+                  {Object.keys(report.accessoryPatternsByMuscle).length > 0 && (
+                    <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🔄 Паттерны изоляции по мышцам (ротируются):</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {Object.entries(report.accessoryPatternsByMuscle).map(([muscle, pats]) => {
+                          const uniqPats = Array.from(new Set(pats as string[]));
+                          const ruMuscle = (MUSCLE_LABEL_RU as any)[muscle] || muscle;
+                          const ruPats = uniqPats.map(p => (SUMMARY_PATTERN_RU as any)[p] || p).join(' · ');
+                          return (
+                            <div key={muscle} style={{ display:'flex', justifyContent:'space-between', gap:8, padding:'4px 7px', background:'rgba(255,255,255,0.03)', borderRadius:6, fontSize:10, color:'#fff' }}>
+                              <span style={{ fontWeight:700, color:'#a855f7' }}>{ruMuscle}</span>
+                              <span style={{ flex:1, textAlign:'right', opacity:0.9 }}>{ruPats || '—'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ padding:'6px 9px', borderRadius:8, background: report.issues.length === 0 ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.07)', border:`1px solid ${report.issues.length === 0 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.15)'}` }}>
+                    <div style={{ fontSize:11, fontWeight:700, color: report.issues.length === 0 ? '#22c55e' : '#f59e0b', marginBottom:4 }}>{report.issues.length === 0 ? '✅ Ротация в норме' : `⚠️ Найдено ${report.issues.length} замечаний:`}</div>
+                    {report.issues.length === 0
+                      ? <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>Базовые стабильны, изоляция варьируется — прогрессия и разнообразие сбалансированы.</div>
+                      : report.issues.slice(0, 8).map((issue: { code?: string; phase?: string; message: string }, i: number) => (
+                        <div key={i} style={{ fontSize:10, color: issue.code === 'primary_changed' ? '#f59e0b' : '#fff', padding:'3px 6px', background: issue.code === 'primary_changed' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:3 }}>
+                           {issue.phase ? <span style={{ fontWeight:700, color:'#60a5fa' }}>[{PHASE_LABELS[issue.phase as BBPhase] || issue.phase}]</span> : null} {issue.message}
+                        </div>
+                      ))}
+                  </div>
                 </div>
               }
             />
@@ -3477,21 +3517,47 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* PRO: Actionable recommendations — конкретные шаги по улучшению плана */}
+        {/* PRO: Рекомендации — полностью на русском, понятно что делать */}
         {builtPlan.validation && (() => {
           const recs = generateActionableRecommendations(builtPlan, builtPlan.validation.issues);
-          if (recs.length === 0 || (recs.length === 1 && recs[0].code === 'all_clear')) return null;
+          if (recs.length === 0 || (recs.length === 1 && recs[0].code === 'all_clear')) {
+            return (
+              <div style={{ marginTop:8, padding:10, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)', textAlign:'center' }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#22c55e' }}>✅ Рекомендаций нет — план сбалансирован</div>
+                <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>Объём в пределах MEV–MRV, частота, делод и ротация в норме. Продолжайте по плану.</div>
+              </div>
+            );
+          }
           const colorFor = (p: string) => p === 'high' ? '#ef4444' : p === 'medium' ? '#f59e0b' : '#22c55e';
+          const grouped = {
+            high: recs.filter(r => r.priority === 'high'),
+            medium: recs.filter(r => r.priority === 'medium'),
+            low: recs.filter(r => r.priority === 'low'),
+          };
           return (
             <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>💡 Рекомендации по улучшению</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                {recs.slice(0, 8).map((rec, i) => (
-                  <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4, display:'flex', gap:6 }}>
-                    <span style={{ color: colorFor(rec.priority), fontWeight:700 }}>{rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}</span>
-                    <span>{rec.action}</span>
-                  </div>
-                ))}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, flexWrap:'wrap', gap:6 }}>
+                <span style={{ fontSize:12, fontWeight:800, color:'#22c55e' }}>💡 Что улучшить — {recs.length} шагов</span>
+                <span style={{ fontSize:9, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 6px', borderRadius:4 }}>🔴 важно · 🟡 желательно · 🟢 инфо</span>
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                {(["high","medium","low"] as const).map(prio => {
+                  const list = grouped[prio];
+                  if (list.length === 0) return null;
+                  return (
+                    <div key={prio} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                      <div style={{ fontSize:10, fontWeight:700, color: colorFor(prio), textTransform:'uppercase', letterSpacing:0.3 }}>
+                        {prio === 'high' ? '🔴 Важно' : prio === 'medium' ? '🟡 Желательно' : '🟢 Инфо'}
+                      </div>
+                      {list.slice(0,4).map((rec, idx) => (
+                        <div key={idx} style={{ fontSize:11, color:'#fff', lineHeight:1.4, display:'flex', gap:6, padding:'5px 7px', background:'rgba(255,255,255,0.02)', borderRadius:6 }}>
+                          <span style={{ color: colorFor(rec.priority), fontWeight:700, flexShrink:0 }}>{rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢'}</span>
+                          <span style={{ flex:1 }}>{rec.action}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
