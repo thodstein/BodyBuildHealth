@@ -255,7 +255,7 @@ export const RecipesTabModern: React.FC = () => {
             <div>
               <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.5)', letterSpacing:0.4, textTransform:'uppercase', marginBottom:4 }}>Ккал</div>
               <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                {[[0,1000,'Все'],[0,400,'≤400'],[400,600,'400-600'],[600,1000,'600+']].map(([a,b,l])=> <button key={l} onClick={()=>setKcalRange([a,b])} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: kcalRange[0]===a && kcalRange[1]===b?700:500, cursor:'pointer', border: kcalRange[0]===a && kcalRange[1]===b?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: kcalRange[0]===a && kcalRange[1]===b?'rgba(0,230,138,0.12)':'#202023', color: kcalRange[0]===a && kcalRange[1]===b?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}</button>)}
+                {([[0,1000,'Все'],[0,400,'≤400'],[400,600,'400-600'],[600,1000,'600+']] as [number, number, string][]).map(([a,b,l])=> <button key={l} onClick={()=>setKcalRange([a,b])} style={{ padding:'5px 8px', borderRadius:8, fontSize:10, fontWeight: kcalRange[0]===a && kcalRange[1]===b?700:500, cursor:'pointer', border: kcalRange[0]===a && kcalRange[1]===b?'1px solid #00e68a':'1px solid rgba(255,255,255,0.06)', background: kcalRange[0]===a && kcalRange[1]===b?'rgba(0,230,138,0.12)':'#202023', color: kcalRange[0]===a && kcalRange[1]===b?'#00e68a':'rgba(255,255,255,0.6)' }}>{l}</button>)}
               </div>
             </div>
             <div>
