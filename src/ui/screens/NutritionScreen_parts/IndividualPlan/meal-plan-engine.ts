@@ -1478,16 +1478,15 @@ function buildPreWorkout(
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
      const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
    
-    const items: MealItem[] = [];
+   const items: MealItem[] = [];
   if (proteinSource) {
-    const grams = Math.round(PREW_PROTEIN_G / Math.max(1, proteinSource.protein || 1) * 100);
-    const r = grams / 100;
-    items.push({ id: proteinSource.id, name: proteinSource.name, amount: grams, role: 'protein' as const, kcal: Math.round((proteinSource.kcal || 0) * r), p: Math.round((proteinSource.protein || 0) * r), f: Math.round((proteinSource.fat || 0) * r), c: Math.round((proteinSource.carbs || 0) * r), fiber: Math.round((proteinSource.fiber || 0) * r), leucine_mg: Math.round(getLeucine(proteinSource) * r) });
+    const grams = gramsForMacro(proteinSource, PREW_PROTEIN_G, 'protein');
+    items.push(makeItem(proteinSource, grams, 'protein'));
   }
   if (carbSource) {
-    const grams = Math.min(carbPortionCap(carbSource), Math.round(carbG / Math.max(1, carbSource.carbs || 1) * 100));
-    const r = grams / 100;
-    items.push({ id: carbSource.id, name: carbSource.name, amount: grams, role: 'carb_slow' as const, kcal: Math.round((carbSource.kcal || 0) * r), p: Math.round((carbSource.protein || 0) * r), f: Math.round((carbSource.fat || 0) * r), c: Math.round((carbSource.carbs || 0) * r), fiber: Math.round((carbSource.fiber || 0) * r), leucine_mg: Math.round(getLeucine(carbSource) * r) });
+    // D-18: cap cooked grains at 280g so a high-carb day doesn't yield a 500g pre-W buckwheat bowl.
+    const grams = gramsForMacro(carbSource, carbG, 'carbs', carbPortionCap(carbSource));
+    items.push(makeItem(carbSource, grams, 'carb_slow'));
   }
 
 
@@ -1531,25 +1530,23 @@ function buildPostWorkout(
   const items: MealItem[] = [];
 
   if (fastProtein) {
-    const grams = Math.round(POSTW_FAST_PROTEIN_G / Math.max(1, fastProtein.protein || 1) * 100);
-    const r = grams / 100;
-    items.push({ id: fastProtein.id, name: fastProtein.name, amount: grams, role: 'fast_protein' as const, kcal: Math.round((fastProtein.kcal || 0) * r), p: Math.round((fastProtein.protein || 0) * r), f: Math.round((fastProtein.fat || 0) * r), c: Math.round((fastProtein.carbs || 0) * r), fiber: Math.round((fastProtein.fiber || 0) * r), leucine_mg: Math.round(getLeucine(fastProtein) * r) });
+    const grams = gramsForMacro(fastProtein, POSTW_FAST_PROTEIN_G, 'protein');
+    items.push(makeItem(fastProtein, grams, 'fast_protein'));
   }
   if (fastCarb) {
-    const grams = Math.min(carbPortionCap(fastCarb), Math.round(carbG / Math.max(1, fastCarb.carbs || 1) * 100));
-    const r = grams / 100;
+    // D-18: cap cooked starches at 280g (post-W fast carbs are usually bread/pasta/rice/potato;
+    // a 100g-carb target on a high-carb day could otherwise push pasta to ~400g).
+    const grams = gramsForMacro(fastCarb, carbG, 'carbs', carbPortionCap(fastCarb));
     const delivered = (fastCarb.carbs || 0) * grams / 100;
-    items.push({ id: fastCarb.id, name: fastCarb.name, amount: grams, role: 'carb_fast' as const, kcal: Math.round((fastCarb.kcal || 0) * r), p: Math.round((fastCarb.protein || 0) * r), f: Math.round((fastCarb.fat || 0) * r), c: Math.round((fastCarb.carbs || 0) * r), fiber: Math.round((fastCarb.fiber || 0) * r), leucine_mg: Math.round(getLeucine(fastCarb) * r) });
+    items.push(makeItem(fastCarb, grams, 'carb_fast'));
+    // D-18b: if the cap left a large carb gap (high-carb day), add a second fast-carb source.
     if (delivered < carbG - 15 && carbG >= 60) {
       const secondPool = (prefCarb.length > 0 ? prefCarb : _carbBase).filter(f => f.id !== fastCarb.id);
       const fastCarb2 = pickPriority(secondPool.length > 0 ? secondPool : _carbBase.filter(f => f.id !== fastCarb.id), seed + 21, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
       if (fastCarb2) {
         const rem = Math.max(0, carbG - delivered);
-        const grams2 = Math.min(carbPortionCap(fastCarb2), Math.round(rem / Math.max(1, fastCarb2.carbs || 1) * 100));
-        if (grams2 > 0) {
-          const r2 = grams2 / 100;
-          items.push({ id: fastCarb2.id, name: fastCarb2.name, amount: grams2, role: 'carb_fast' as const, kcal: Math.round((fastCarb2.kcal || 0) * r2), p: Math.round((fastCarb2.protein || 0) * r2), f: Math.round((fastCarb2.fat || 0) * r2), c: Math.round((fastCarb2.carbs || 0) * r2), fiber: Math.round((fastCarb2.fiber || 0) * r2), leucine_mg: Math.round(getLeucine(fastCarb2) * r2) });
-        }
+        const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
+        if (grams2 > 0) items.push(makeItem(fastCarb2, grams2, 'carb_fast'));
       }
     }
   }
@@ -1580,9 +1577,7 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
   // а не фикс. 40 г/ч — иначе карб-веса резервировались, но не доставлялись.
   const _intraCarbG = Math.max(20, Math.round(carbG ?? INTRA_CARB_G_PER_H));
   if (pool.dextrin) {
-    const _d = pool.dextrin as FoodItem;
-    const _r = _intraCarbG / 100;
-    items.push({ id: _d.id, name: _d.name, amount: _intraCarbG, role: 'liquid' as const, kcal: Math.round((_d.kcal || 0) * _r), p: Math.round((_d.protein || 0) * _r), f: Math.round((_d.fat || 0) * _r), c: Math.round((_d.carbs || 0) * _r), fiber: Math.round((_d.fiber || 0) * _r), leucine_mg: Math.round(getLeucine(_d) * _r) });
+    items.push(makeItem(pool.dextrin, _intraCarbG, 'liquid'));
   } else {
     items.push({ id: 'cyclic_dextrin', name: 'Циклический декстрин', amount: _intraCarbG, kcal: _intraCarbG * 4, p: 0, f: 0, c: _intraCarbG, fiber: 0, role: 'liquid' });
   }
@@ -2426,6 +2421,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
   }
 
+  // Fix: полдник/перекус 0 У — гарантируем минимум 10г углеводов если цель >5г
+  for (const m of meals) {
+    if ((m.type === 'snack' || m.type === 'snack2' || m.type === 'snack3' || m.type === 'snack4') && m.target && (m.target.c || 0) > 5 && (m.totals.c || 0) < 5) {
+      const fb = FOOD_DB.find(f => f.id === 'oats' || f.id === 'oats_dry') || pool.carbSlow[0] || pool.carbFast[0];
+      if (fb && !m.items.some((it:any)=> it.id===fb.id)) {
+        const grams = Math.min(carbPortionCap(fb), 30);
+        const r = grams/100;
+        const it: MealItem = { id: fb.id, name: fb.name, amount: grams, role: 'carb_slow' as const, kcal: Math.round((fb.kcal||0)*r), p: Math.round((fb.protein||0)*r), f: Math.round((fb.fat||0)*r), c: Math.round((fb.carbs||0)*r), fiber: Math.round((fb.fiber||0)*r), leucine_mg: Math.round(getLeucine(fb)*r) };
+        m.items.push(it);
+        m.totals = m.items.reduce((acc:any, it:any)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+(it.fiber||0),leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+      }
+    }
+  }
+
   // ─── Дневные итоговые ────────────────────────────────────────────────
   const totals = meals.reduce((acc, m) => ({
     kcal: acc.kcal + m.totals.kcal,
@@ -3022,160 +3031,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
       totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
       totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
-  }
-
-  // ─── Финальная доводка КБЖУ ≤3% во всех режимах, граммы целые ────────
-  // После всех добавок (микро, изотоник, омега) и финального снапа к сетке
-  // точная подгонка могла уйти. Доводим целыми граммами до ≤3% от цели.
-  {
-    const targetP = (typeof adjustedProteinG === 'number' ? adjustedProteinG : 0) || input.goalProteinG;
-    const targetC = (typeof carbsTotal === 'number' ? carbsTotal : 0) || input.goalCarbsG;
-    const targetF = (typeof fatTotal === 'number' ? fatTotal : 0) || input.goalFatG;
-    const targetK = targetP*4 + targetF*9 + targetC*4;
-    // Если цели некорректны — пропускаем
-    if (targetP > 0 && targetC > 0 && targetF > 0) {
-      for (let iter = 0; iter < 30; iter++) {
-        const dP = (totals.p - targetP) / targetP;
-        const dC = (totals.c - targetC) / targetC;
-        const dF = (totals.f - targetF) / targetF;
-        const dK = (totals.kcal - targetK) / targetK;
-        if (Math.abs(dP) <= 0.03 && Math.abs(dC) <= 0.03 && Math.abs(dF) <= 0.03 && Math.abs(dK) <= 0.03) break;
-        // выбираем худший макрос по абсолютному отклонению
-        let worst: 'p'|'c'|'f'|'k' = 'p';
-        let worstDev = dP;
-        if (Math.abs(dC) > Math.abs(worstDev)) { worst = 'c'; worstDev = dC; }
-        if (Math.abs(dF) > Math.abs(worstDev)) { worst = 'f'; worstDev = dF; }
-        if (Math.abs(dK) > Math.abs(worstDev)) { worst = 'k'; worstDev = dK; }
-        if (worst === 'k') {
-          // для калорий корректируем тот макрос, который дальше всего от цели
-          worst = Math.abs(dP) >= Math.abs(dC) && Math.abs(dP) >= Math.abs(dF) ? 'p' : Math.abs(dC) >= Math.abs(dF) ? 'c' : 'f';
-        }
-        const need = worst === 'p' ? targetP - totals.p : worst === 'c' ? targetC - totals.c : targetF - totals.f;
-        const roles = worst === 'p' ? ['protein','fast_protein','slow_protein'] : worst === 'c' ? ['carb_slow','carb_fast','fruit','liquid','veg'] : ['fat'];
-        let best: { m: Meal; it: MealItem; food: FoodItem; per100: number; maxCap: number; minAmt: number } | null = null;
-        let bestScore = -Infinity;
-        for (const m of meals) {
-          if (['preworkout','postworkout','intra'].includes(m.type as string)) continue;
-          for (const it of m.items) {
-            const food = FOOD_DB.find(f => f.id === it.id);
-            if (!food) continue;
-            const per100 = worst === 'p' ? (food.protein || 0) : worst === 'c' ? (food.carbs || 0) : (food.fat || 0);
-            if (per100 <= 0) continue;
-            // для углеводов учитываем ЛЮБОЙ продукт с углеводами (в т.ч. liquid/жиры с инцидентными carbs), иначе intra и орехи не корректируются
-            if (worst !== 'c' && !roles.includes(it.role)) continue;
-            if (worst === 'c' && per100 < 1) continue; // игнор микродоз
-            if (worst === 'p' && need > 0 && m.type === 'presleep') continue;
-            const supCap = (SUPPLEMENT_MAX_G as any)[food.id];
-            let maxCap = supCap ?? maxGramPerItem(_currentBudget);
-            if (!supCap) {
-              if (it.role === 'carb_slow' || it.role === 'carb_fast') maxCap = Math.min(maxCap, carbPortionCap(food));
-              else if (it.role === 'fruit') maxCap = Math.min(maxCap, FRUIT_PORTION_CAP_G);
-              else if (it.role === 'protein') maxCap = Math.min(maxCap, 300);
-              else if (it.role === 'liquid') maxCap = Math.min(maxCap, 90);
-              else if (it.role === 'fat') maxCap = Math.min(maxCap, 40);
-              else if (it.role === 'veg') maxCap = Math.min(maxCap, 200);
-            }
-            let minAmt: number;
-            if (it.role === 'fast_protein' || it.role === 'slow_protein') minAmt = 20;
-            else if (worst === 'c') minAmt = 5;
-            else minAmt = supCap ? 5 : 10;
-            if (need > 0 && it.amount >= maxCap) continue;
-            if (need < 0 && it.amount <= minAmt) continue;
-            const score = need > 0 ? per100 : per100 + it.amount / 100;
-            if (score > bestScore) { bestScore = score; best = { m, it, food, per100, maxCap, minAmt }; }
-          }
-        }
-        if (!best) {
-          if (need > 0) {
-            let cand: FoodItem | undefined;
-            if (worst === 'p') cand = (pool.proteinSolid[0] || pool.proteinLean[0] || pool.fastProtein[0]) as any;
-            else if (worst === 'c') cand = (pool.carbSlow[0] || pool.carbFast[0]) as any;
-            else cand = (pool.fats[0] as any);
-            if (cand) {
-              const per100 = worst === 'p' ? (cand.protein || 0) : worst === 'c' ? (cand.carbs || 0) : (cand.fat || 0);
-              if (per100 > 0) {
-                const grams = Math.min(100, Math.max(10, Math.ceil(Math.abs(need) / per100 * 100)));
-                const targetMeal = meals.reduce((a,b)=> (a.totals.kcal||0) < (b.totals.kcal||0) ? a:b);
-                const r = grams / 100;
-                const newIt: MealItem = { id: cand.id, name: cand.name, amount: grams, role: (worst === 'p' ? 'protein' : worst === 'c' ? 'carb_slow' : 'fat') as MealItem['role'], kcal: Math.round((cand.kcal || 0) * r), p: Math.round((cand.protein || 0) * r), f: Math.round((cand.fat || 0) * r), c: Math.round((cand.carbs || 0) * r), fiber: Math.round((cand.fiber || 0) * r), leucine_mg: Math.round(getLeucine(cand) * r) };
-                targetMeal.items.push(newIt);
-                targetMeal.totals = targetMeal.items.reduce((acc,it)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+(it.fiber||0),leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
-                totals.kcal = meals.reduce((s,m)=>s+m.totals.kcal,0);
-                totals.p = Math.round(meals.reduce((s,m)=>s+m.totals.p,0)*10)/10;
-                totals.f = Math.round(meals.reduce((s,m)=>s+m.totals.f,0)*10)/10;
-                totals.c = Math.round(meals.reduce((s,m)=>s+m.totals.c,0)*10)/10;
-                totals.fiber = Math.round(meals.reduce((s,m)=>s+(m.totals.fiber||0),0)*10)/10;
-                totals.leucine_mg = meals.reduce((s,m)=>s+(m.totals.leucine_mg||0),0);
-                continue;
-              }
-            }
-          } else if (need < 0) {
-            // избыток углеводов/жиров/белков, но все items на минимуме — удаляем наименее важный carb-источник
-            let toRemove: { m: Meal; idx: number; c: number } | null = null;
-            for (const m of meals) {
-              if (['preworkout','postworkout','intra'].includes(m.type as string)) continue;
-              if (m.items.length <= 1) continue; // не оставляем приём пустым
-              for (let i = 0; i < m.items.length; i++) {
-                const it = m.items[i];
-                const food: any = FOOD_DB.find((f:any)=>f.id===it.id);
-                if (!food) continue;
-                const per100 = worst === 'p' ? (food.protein||0) : worst === 'c' ? (food.carbs||0) : (food.fat||0);
-                if (per100 <= 0) continue;
-                // не трогаем единственный белок приёма (MPS)
-                if (worst === 'c' && it.role === 'protein' && m.items.filter((x:any)=>x.role==='protein').length <=1) continue;
-                if (worst === 'c' && it.role === 'liquid' && m.type === 'intra') continue; // intra оставляем
-                const curC = it.c || 0;
-                if (!toRemove || curC > toRemove.c) toRemove = { m, idx: i, c: curC };
-              }
-            }
-            if (toRemove) {
-              toRemove.m.items.splice(toRemove.idx, 1);
-              toRemove.m.totals = toRemove.m.items.reduce((acc:any,it:any)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+(it.fiber||0),leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
-              totals.kcal = meals.reduce((s:any,m:any)=>s+m.totals.kcal,0);
-              totals.p = Math.round(meals.reduce((s:any,m:any)=>s+m.totals.p,0)*10)/10;
-              totals.f = Math.round(meals.reduce((s:any,m:any)=>s+m.totals.f,0)*10)/10;
-              totals.c = Math.round(meals.reduce((s:any,m:any)=>s+m.totals.c,0)*10)/10;
-              totals.fiber = Math.round(meals.reduce((s:any,m:any)=>s+(m.totals.fiber||0),0)*10)/10;
-              totals.leucine_mg = meals.reduce((s:any,m:any)=>s+(m.totals.leucine_mg||0),0);
-              continue;
-            }
-          }
-          break;
-        }
-        const deltaGrams = need / best.per100 * 100;
-        let newAmount = best.it.amount + deltaGrams;
-        newAmount = Math.max(best.minAmt, Math.min(best.maxCap, Math.round(newAmount)));
-        if (newAmount === best.it.amount) break;
-        const factor = newAmount / best.it.amount;
-        best.it.amount = newAmount;
-        best.it.kcal = Math.round(best.it.kcal * factor);
-        best.it.p = Math.round(best.it.p * factor * 10) / 10;
-        best.it.f = Math.round(best.it.f * factor * 10) / 10;
-        best.it.c = Math.round(best.it.c * factor * 10) / 10;
-        best.it.fiber = Math.round((best.it.fiber || 0) * factor * 10) / 10;
-        best.it.leucine_mg = Math.round((best.it.leucine_mg || 0) * factor);
-        best.m.totals = best.m.items.reduce((acc,it)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+(it.fiber||0),leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
-        totals.kcal = meals.reduce((s,m)=>s+m.totals.kcal,0);
-        totals.p = Math.round(meals.reduce((s,m)=>s+m.totals.p,0)*10)/10;
-        totals.f = Math.round(meals.reduce((s,m)=>s+m.totals.f,0)*10)/10;
-        totals.c = Math.round(meals.reduce((s,m)=>s+m.totals.c,0)*10)/10;
-        totals.fiber = Math.round(meals.reduce((s,m)=>s+(m.totals.fiber||0),0)*10)/10;
-        totals.leucine_mg = meals.reduce((s,m)=>s+(m.totals.leucine_mg||0),0);
-      }
-      totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
-      meals.forEach(m=>{ m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
-      {
-        const dP2 = Math.abs(totals.p - targetP) / targetP;
-        const dC2 = Math.abs(totals.c - targetC) / targetC;
-        const dF2 = Math.abs(totals.f - targetF) / targetF;
-        const maxDev = Math.max(dP2,dC2,dF2);
-        const idx = notes.findIndex(n=> n.includes('Точность рациона'));
-        const msg = maxDev <= 0.03 ? `🎯 Точность рациона: Б ${totals.p}/${targetP}г, Ж ${totals.f}/${targetF}г, У ${totals.c}/${targetC}г (отклонение ≤3%)`
-          : maxDev <= 0.05 ? `✓ Точность рациона: отклонение ≤5% (Б ${Math.round(dP2*100)}%, Ж ${Math.round(dF2*100)}%, У ${Math.round(dC2*100)}%)`
-          : `⚠ Точность рациона: отклонение >5% (Б ${Math.round(dP2*100)}%, Ж ${Math.round(dF2*100)}%, У ${Math.round(dC2*100)}%) — проверьте пулы продуктов`;
-        if (idx >=0) notes[idx]=msg; else notes.push(msg);
-      }
-    }
   }
 
   return {
