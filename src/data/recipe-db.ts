@@ -18,6 +18,12 @@ import { RECIPE_DB_P16 } from './recipe-db-p16';
 import { RECIPE_DB_P17 } from './recipe-db-p17';
 import { RECIPE_DB_P18 } from './recipe-db-p18';
 import { RECIPE_DB_P19 } from './recipe-db-p19';
+import { RECIPE_DB_P20 } from './recipe-db-p20';
+import { RECIPE_DB_P21 } from './recipe-db-p21';
+import { RECIPE_DB_P22 } from './recipe-db-p22';
+import { RECIPE_DB_P23 } from './recipe-db-p23';
+import { RECIPE_DB_P24 } from './recipe-db-p24';
+import { RECIPE_DB_P25 } from './recipe-db-p25';
 import { enrichRecipes } from './recipe-enrichment';
 
 export const RECIPE_DB: Recipe[] = enrichRecipes([
@@ -40,4 +46,10 @@ export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P17,
   ...RECIPE_DB_P18,
   ...RECIPE_DB_P19,
+  ...RECIPE_DB_P20,
+  ...RECIPE_DB_P21,
+  ...RECIPE_DB_P22,
+  ...RECIPE_DB_P23,
+  ...RECIPE_DB_P24,
+  ...RECIPE_DB_P25,
 ]);
