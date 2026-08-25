@@ -6,8 +6,9 @@ import { ProgramManagerPanelWithProvider } from '../ProgramManagerPanel';
 /**
  * manual-constructor-steps.test.tsx — последовательные шаги ручного конструктора
  * (как в BB-авто): «1 Выбор» → «2 Редактор» → «3 Итог».
- * Внутри «2 Редактор» — внутренние шаги редактора:
- *   standard: Параметры → Недели; pro: Профиль → Параметры → Недели → Анализ → Обратная связь → Инструменты.
+ * Внутри «2 Редактор» — единый конструктор с режимами без перегрузки:
+ *   standard: Параметры → Недели (2 шага); pro: Профиль → Параметры → Недели (3 шага).
+ *   Анализ / Обратная связь / Инструменты — аккордеоны внутри «Недели», не отдельные шаги.
  */
 describe('Ручной конструктор — последовательные шаги', () => {
   beforeEach(() => {
@@ -17,17 +18,17 @@ describe('Ручной конструктор — последовательны
 
   it('шаг 1 «Выбор»: навигационные пилюли видны', () => {
     render(<ProgramManagerPanelWithProvider />);
-    expect(screen.getByText('1 Выбор')).toBeTruthy();
-    expect(screen.getByText('2 Редактор')).toBeTruthy();
-    expect(screen.getByText('3 Итог')).toBeTruthy();
-    expect(screen.getByText('🆕 Создать новую')).toBeTruthy();
+    expect(screen.getAllByText(/1 Выбор/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/2 Редактор/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/3 Итог/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Создать новую/)).toBeTruthy();
   });
 
   it('онбординг: баннер «Как работает конструктор» при первом запуске, скрывается навсегда по кнопке', () => {
     render(<ProgramManagerPanelWithProvider />);
-    expect(screen.getByText('👋 Как работает ручной конструктор')).toBeTruthy();
+    expect(screen.getByText(/Как работает ручной конструктор/)).toBeTruthy();
     fireEvent.click(screen.getByText('Понятно, поехали →'));
-    expect(screen.queryByText('👋 Как работает ручной конструктор')).toBeNull();
+    expect(screen.queryByText(/Как работает ручной конструктор/)).toBeNull();
     expect(localStorage.getItem('he_manual_onboarding_done')).toBe('1');
   });
 
@@ -36,22 +37,22 @@ describe('Ручной конструктор — последовательны
     fireEvent.click(screen.getAllByText('ББ')[0]);
     await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
     // Пилюля «2 Редактор» активна, внутренние пилюли standard видны, счётчик шага
-    expect(screen.getByText('2 Редактор')).toBeTruthy();
-    expect(screen.getByText('🎛 Параметры')).toBeTruthy();
-    expect(screen.getByText('🗓 Недели')).toBeTruthy();
+    expect(screen.getAllByText(/2 Редактор/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/🎛 Параметры/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/🗓 Недели/).length).toBeGreaterThan(0);
     expect(screen.getByText('шаг 1 из 2')).toBeTruthy();
     // Заголовок активного шага с описанием
     expect(screen.getByText('Параметры программы')).toBeTruthy();
     expect(screen.getByText('Название, цель, уровень, дни и недели + заметки тренера')).toBeTruthy();
     // На первом шаге кнопки «← Назад» нет, галочек на пройденных шагах нет
     expect(screen.queryByText('← Назад: Параметры')).toBeNull();
-    expect(screen.queryByText('✓ 🎛 Параметры')).toBeNull();
+    expect(screen.queryByText(/✓.*Параметры/)).toBeNull();
     fireEvent.click(screen.getByText('Далее: Недели →'));
     expect(screen.getByText('Далее: Итог →')).toBeTruthy();
     expect(screen.getByText('шаг 2 из 2')).toBeTruthy();
     expect(screen.getByText('Недели и упражнения')).toBeTruthy();
     // Пройденный шаг «Параметры» получает галочку
-    expect(screen.getByText('✓ 🎛 Параметры')).toBeTruthy();
+    expect(screen.getByText(/✓.*Параметры/)).toBeTruthy();
     // На втором шаге «← Назад: Параметры» — в нижней панели навигации, возвращает на первый шаг
     expect(screen.getByText('← Назад: Параметры')).toBeTruthy();
     fireEvent.click(screen.getByText('← Назад: Параметры'));
@@ -79,40 +80,39 @@ describe('Ручной конструктор — последовательны
     expect(screen.getAllByText(/упр\./).length).toBeGreaterThan(0);
   });
 
-  it('pro: внутренние шаги редактора (Профиль → Параметры → Недели → Анализ → Обратная связь → Инструменты → Итог) с «← Назад»', async () => {
+  it('pro: внутренние шаги редактора (Профиль → Параметры → Недели → Итог) с «← Назад» — единый конструктор', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getByText('Профессиональный'));
     fireEvent.click(screen.getAllByText('ББ')[0]);
     await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 15000 });
-    // Все 6 внутренних пилюль видны + счётчик
-    expect(screen.getByText('👤 Профиль')).toBeTruthy();
-    expect(screen.getByText('🎛 Параметры')).toBeTruthy();
-    expect(screen.getByText('🗓 Недели')).toBeTruthy();
-    expect(screen.getByText('📊 Анализ')).toBeTruthy();
-    expect(screen.getByText('🔄 Обратная связь')).toBeTruthy();
-    expect(screen.getByText('🔧 Инструменты')).toBeTruthy();
-    expect(screen.getByText('шаг 1 из 6')).toBeTruthy();
+    // 3 пилюли Pro (было 6, стало 3 — Анализ/Обратная связь/Инструменты теперь аккордеоны внутри Недели)
+    expect(screen.getAllByText(/👤 Профиль/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/🎛 Параметры/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/🗓 Недели/).length).toBeGreaterThan(0);
+    // Старые отдельные пилюли больше не рендерятся как шаги
+    expect(screen.queryByText('📊 Анализ')).toBeNull();
+    expect(screen.queryByText('🔄 Обратная связь')).toBeNull();
+    expect(screen.queryByText('🔧 Инструменты')).toBeNull();
+    expect(screen.getByText('шаг 1 из 3')).toBeTruthy();
     // Заголовок активного шага (профиль)
     expect(screen.getByText('Данные атлета')).toBeTruthy();
-    // «Далее» ведёт по шагам pro
+    // «Далее» ведёт по шагам pro (3 шага вместо 6)
     fireEvent.click(screen.getByText('Далее: Параметры →'));
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
-    expect(screen.getByText('шаг 2 из 6')).toBeTruthy();
+    expect(screen.getByText('шаг 2 из 3')).toBeTruthy();
     // «← Назад: Профиль» — в нижней панели навигации, возвращает на первый шаг
     expect(screen.getByText('← Назад: Профиль')).toBeTruthy();
     fireEvent.click(screen.getByText('← Назад: Профиль'));
     expect(screen.getByText('Далее: Параметры →')).toBeTruthy();
-    // Проходим до конца
+    // Проходим до конца (Недели → Итог, без промежуточных Анализ/Обратная связь/Инструменты)
     fireEvent.click(screen.getByText('Далее: Параметры →'));
     fireEvent.click(screen.getByText('Далее: Недели →'));
-    expect(screen.getByText('Далее: Анализ →')).toBeTruthy();
-    fireEvent.click(screen.getByText('Далее: Анализ →'));
-    expect(screen.getByText('Далее: Обратная связь →')).toBeTruthy();
-    fireEvent.click(screen.getByText('Далее: Обратная связь →'));
-    expect(screen.getByText('Далее: Инструменты →')).toBeTruthy();
-    fireEvent.click(screen.getByText('Далее: Инструменты →'));
     expect(screen.getByText('Далее: Итог →')).toBeTruthy();
-    expect(screen.getByText('шаг 6 из 6')).toBeTruthy();
+    expect(screen.getByText('шаг 3 из 3')).toBeTruthy();
+    // Внутри Недели — аккордеоны Pro (прогрессивное раскрытие)
+    expect(screen.getByText(/📊 Анализ/)).toBeTruthy();
+    expect(screen.getByText(/🔄 Обратная связь/)).toBeTruthy();
+    expect(screen.getByText(/🔧 Инструменты/)).toBeTruthy();
   });
 
   it('пилюли «Редактор»/«Итог» не переводят без выбранной программы', () => {

@@ -30,14 +30,15 @@ function renderWizard(embedded = false): string {
 describe('ManualProgramWizard smoke render', () => {
   it('renders the modal wizard', () => {
     const html = renderWizard();
-    expect(html).toContain('Визард — шаг 4 из 4');
+    // Единый конструктор: визард сжат 5→3, шаг 4 мапится на 3 (Превью)
+    expect(html).toContain('Визард — шаг 3 из 3');
     expect(html).toContain('Создать и заполнить');
-    expect(html).toContain('Бодибилдинг');
+    expect(html).toContain('Превью');
   });
 
   it('renders the embedded wizard variant', () => {
     const html = renderWizard(true);
-    expect(html).toContain('Визард создания программы — шаг 4 из 4');
+    expect(html).toContain('Визард — шаг 3 из 3');
     expect(html).toContain('Пустой каркас');
   });
 

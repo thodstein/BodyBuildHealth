@@ -8,6 +8,8 @@ import { computePlanQualityFor } from '../../../engines/manual-constructor';
 import { ProgressBar, InfoBanner } from './ManualUI';
 
 export type WizardDirection = 'bb' | 'pl' | 'hybrid';
+/** Единый конструктор: визард сжат с 5 до 3 шагов без потери контроля
+ *  (Тип+Цель → Формат → Превью). Старые значения 4|5 мапятся на 3 для совместимости. */
 export type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 const DIRECTIONS: Array<[WizardDirection, string, string]> = [
@@ -48,10 +50,12 @@ export const ManualProgramWizard: React.FC<Props> = ({
   onClose, onStep, onDirection, onGoal, onLevel, onDays, onWeeks, onCreate,
 }) => {
   if (!open) return null;
-  const STEP_TITLES = ['Тип', 'Цель', 'Формат', 'Каркас', 'Превью'] as const;
+  // Сжатие 5→3: старые 4|5 мапятся на 3 (Превью) для совместимости с сохранённым wizardStep
+  const effStep: WizardStep = (step >= 3 ? 3 : step) as WizardStep;
+  const STEP_TITLES = ['Тип', 'Параметры', 'Превью'] as const;
 
   const preview = useMemo(() => {
-    if (step !== 5) return null;
+    if (effStep !== 3) return null;
     try {
       const prof = loadTrainingProfile();
       if (direction === 'bb') {
@@ -78,30 +82,30 @@ export const ManualProgramWizard: React.FC<Props> = ({
 
   const content = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* Stepper */}
+      {/* Stepper — 3 шага вместо 5 (Тип → Параметры → Превью), без потери контроля */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2, overflowX: 'auto' }}>
-        {([1,2,3,4,5] as WizardStep[]).map(s => {
-          const active = s === step;
-          const done = s < step;
+        {([1,2,3] as WizardStep[]).map(s => {
+          const active = s === effStep;
+          const done = s < effStep;
           return (
             <div key={s} style={{ flex: 1, minWidth: 44, display: 'flex', alignItems: 'center', gap: 4 }}>
               <div style={{ width: 22, height: 22, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: active ? '#a78bfa' : done ? '#22c55e' : 'rgba(255,255,255,0.08)', color: '#fff', border: active ? '2px solid #a78bfa' : '1px solid rgba(255,255,255,0.08)' }}>{done ? '✓' : s}</div>
               <div style={{ fontSize: 10, color: active ? '#a78bfa' : done ? '#22c55e' : '#fff', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' }}>{STEP_TITLES[s-1]}</div>
-              {s < 5 && <div style={{ flex: 1, height: 2, background: s < step ? '#22c55e' : 'rgba(255,255,255,0.08)', borderRadius: 1, marginLeft: 4 }} />}
+              {s < 3 && <div style={{ flex: 1, height: 2, background: s < effStep ? '#22c55e' : 'rgba(255,255,255,0.08)', borderRadius: 1, marginLeft: 4 }} />}
             </div>
           );
         })}
       </div>
-      {step === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 1 из 5: что вы тренируете?</div>
+      {effStep === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 1 из 3: что вы тренируете?</div>
         <div style={{ fontSize: 10, color: DIM }}>Выберите основной тип программы. Его можно будет редактировать после создания.</div>
         <div style={{ display: 'flex', gap: 6 }}>
           {DIRECTIONS.map(([id, label, defaultGoal]) => <button key={id} onClick={() => onDirection(id, defaultGoal)} style={{ ...BTN, flex: 1, minHeight: 44, background: direction === id ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#7c3aed20', color: direction === id ? '#fff' : '#a78bfa' }}>{label}</button>)}
         </div>
       </div>}
-      {step === 2 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 2 из 5: какая цель?</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>{direction === 'pl' ? 'Для ПЛ цель фиксирована: развитие соревновательных движений.' : 'Цель влияет на фазы, объём и рекомендации программы.'}</div>
+      {effStep === 2 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 2 из 3: параметры</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 2 }}>Цель, уровень и формат — всё в одном шаге (было 3 шага). {direction === 'pl' ? 'Для ПЛ цель фиксирована.' : ''}</div>
         <EditorPopupSelect
           value={goal}
           options={[
@@ -114,10 +118,6 @@ export const ManualProgramWizard: React.FC<Props> = ({
           ariaLabel="Цель программы"
           title="Цель программы"
         />
-      </div>}
-      {step === 3 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 3 из 5: сколько и как часто?</div>
-        <div style={{ fontSize: 10, color: DIM }}>Дни/нед = количество тренировок в каждой неделе. Упражнения и названия дней добавляются позже в редакторе.</div>
         <EditorPopupSelect
           value={level}
           options={LEVELS.map(([id, label]) => ({ id, label }))}
@@ -129,14 +129,14 @@ export const ManualProgramWizard: React.FC<Props> = ({
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Дней/нед<input type="number" style={IN} min={2} max={6} value={days} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onDays(Math.max(2, Math.min(6, Math.round(v)))); }} aria-label="Дней в неделю" inputMode="numeric" /></label>
           <label style={{ ...SMALL, flex: 1, display: 'flex', flexDirection: 'column' }}>Недель<input type="number" style={IN} min={4} max={24} value={weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onWeeks(Math.max(4, Math.min(24, Math.round(v)))); }} aria-label="Недель в программе" inputMode="numeric" /></label>
         </div>
+        <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 8, background: 'rgba(167,139,250,0.06)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ fontSize: 11, color: '#fff' }}>📋 <b>{direction === 'bb' ? 'Бодибилдинг' : direction === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b> · {goal} · {level} · {days}д × {weeks} нед</div>
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.45 }}>{pro ? 'Далее — превью качественной программы (неделя-1 + балл качества).' : '💡 Рекомендуем «⚡ Создать и заполнить» — качественная программа в 1 клик.'}</div>
+        </div>
       </div>}
-      {step === 4 && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 4 из 5: проверьте каркас</div>
-        <div className="constructor-surface constructor-surface--tinted" style={{ ...CARD, padding: 10, background: 'rgba(167,139,250,0.06)' }}><div style={{ fontSize: 12, color: '#fff' }}>📋 <b>{direction === 'bb' ? 'Бодибилдинг' : direction === 'pl' ? 'Пауэрлифтинг' : 'Powerbuilder'}</b></div><div style={{ fontSize: 11, color: DIM }}>Цель: {goal} · уровень: {level}</div><div style={{ fontSize: 11, color: DIM }}>{days} тренировок в неделю × {weeks} нед.</div><div style={{ fontSize: 10, color: DIM, marginTop: 5, lineHeight: 1.45 }}>{pro ? 'На шаге 5 — живое превью качественной программы (неделя-1 + балл качества).' : '💡 Рекомендуем «⚡ Создать и заполнить» — качественная программа в 1 клик по вашему профилю.'}</div></div>
-      </div>}
-      {step === 5 && (
+      {effStep === 3 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 5 из 5: превью — как будет выглядеть программа</div>
+          <div style={{ fontSize: 12, color: '#fff', fontWeight: 800 }}>Шаг 3 из 3: превью — как будет выглядеть программа</div>
           {!preview || (preview as any).kind === 'error' ? (
             <InfoBanner tone="warn">⚠ Не удалось собрать превью — проверьте профиль (оборудование/уровень) и попробуйте снова. Можно создать пустой каркас.</InfoBanner>
           ) : (preview as any).kind === 'bb' ? (
@@ -184,13 +184,12 @@ export const ManualProgramWizard: React.FC<Props> = ({
         </div>
       )}
       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-        {step > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => onStep(Math.max(1, step - 1) as WizardStep)}>← Назад</button>}
-        {step < 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => onStep((step + 1) as WizardStep)}>Далее →</button>}
-        {step === 4 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => onStep(5)}>Превью →</button>}
-        {step === 5 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44, minWidth: 140 }} onClick={() => onCreate(false)} title="Создать пустую структуру">📄 Пустой каркас</button>}
-        {step === 5 && <button style={{ ...BTN, flex: 1, minHeight: 44, minWidth: 160, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800 }} onClick={() => onCreate(true)}>⚡ Создать и заполнить</button>}
+        {effStep > 1 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44 }} onClick={() => onStep(Math.max(1, effStep - 1) as WizardStep)}>← Назад</button>}
+        {effStep < 3 && <button style={{ ...BTN, flex: 1, minHeight: 44 }} onClick={() => onStep((effStep + 1) as WizardStep)}>Далее →</button>}
+        {effStep === 3 && <button style={{ ...BTN_GHOST, flex: 1, minHeight: 44, minWidth: 140 }} onClick={() => onCreate(false)} title="Создать пустую структуру">📄 Пустой каркас</button>}
+        {effStep === 3 && <button style={{ ...BTN, flex: 1, minHeight: 44, minWidth: 160, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800 }} onClick={() => onCreate(true)}>⚡ Создать и заполнить</button>}
       </div>
     </div>
   );
-  return embedded ? <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🪄 Визард — шаг {step} из 5</span><button style={{ ...BTN_GHOST, minHeight: 44 }} onClick={onClose}>Отмена</button></div>{content}</div> : <TrainingModal title={`🪄 Визард — шаг ${step} из 5`} onClose={onClose}>{content}</TrainingModal>;
+  return embedded ? <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>🪄 Визард — шаг {effStep} из 3</span><button style={{ ...BTN_GHOST, minHeight: 44 }} onClick={onClose}>Отмена</button></div>{content}</div> : <TrainingModal title={`🪄 Визард — шаг ${effStep} из 3`} onClose={onClose}>{content}</TrainingModal>;
 };

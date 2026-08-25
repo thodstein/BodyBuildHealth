@@ -80,11 +80,14 @@ const SOURCE_LABEL: Record<string, string> = {
   custom: 'своя', cloned_library: 'из библиотеки', cloned_cycle: 'клон цикла', from_build: 'из сборки',
 };
 
-/** Внутренние шаги редактора (внутри шага «2 Редактор» родителя).
- *  Standard: Параметры → Недели. Pro: Профиль → Параметры → Недели → Анализ → Обратная связь → Инструменты. */
+/** Внутренние шаги редактора — единый конструктор с режимами без перегрузки.
+ *  Standard: Параметры → Недели (2 шага). Pro: Профиль → Параметры → Недели (3 шага).
+ *  Анализ / Обратная связь / Инструменты — не отдельные шаги, а аккордеоны внутри «Недели»
+ *  (прогрессивное раскрытие, рендерятся лениво по isPro). Это сохраняет ручной контроль
+ *  (недели→упражнения — ядро) и убирает прыжки 6→3 клика до Итога. */
 type EditorStep = 'profile' | 'params' | 'weeks' | 'analysis' | 'feedback' | 'tools';
 const STANDARD_EDITOR_STEPS: EditorStep[] = ['params', 'weeks'];
-const PRO_EDITOR_STEPS: EditorStep[] = ['profile', 'params', 'weeks', 'analysis', 'feedback', 'tools'];
+const PRO_EDITOR_STEPS: EditorStep[] = ['profile', 'params', 'weeks'];
 const EDITOR_STEP_LABELS: Record<EditorStep, string> = {
   profile: '👤 Профиль',
   params: '🎛 Параметры',
@@ -147,6 +150,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [showFeedbackAdv, setShowFeedbackAdv] = useState(false);
   const [showToolsAdv, setShowToolsAdv] = useState(false);
+  // Единый конструктор: Pro-аккордеоны внутри «Недели» (вместо отдельных шагов analysis/feedback/tools)
+  const [proAccAnalysis, setProAccAnalysis] = useState(false);
+  const [proAccFeedback, setProAccFeedback] = useState(false);
+  const [proAccTools, setProAccTools] = useState(false);
 
   // V6: Toast with variants — replaces plain editorToast div
   const { showToast: showToastRaw, ToastNode } = useEditorToast();
@@ -256,17 +263,19 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  // Внутренний шаг редактора: standard = [Параметры, Недели], pro = [Профиль, Параметры, Недели, Анализ, Обратная связь, Инструменты]
+  // Единый конструктор: standard [Параметры, Недели], pro [Профиль, Параметры, Недели]
+  // Анализ/Обратная связь/Инструменты теперь аккордеоны внутри Недели — не отдельные шаги.
   const editorSteps = isPro ? PRO_EDITOR_STEPS : STANDARD_EDITOR_STEPS;
-  // Шаг восстанавливается из sessionStorage (he_editor_step) — возврат из «Итога» не сбрасывает позицию
+  // Шаг восстанавливается из sessionStorage (he_editor_step). Legacy analysis/feedback/tools → weeks + аккордеон.
   const [estep, setEstep] = useState<EditorStep>(() => {
     try {
       const raw = sessionStorage.getItem('he_editor_step');
       if (raw) {
         const stored = JSON.parse(raw) as { id?: string; step?: EditorStep };
-        // Валидируем шаг по ТЕКУЩЕМУ режиму (pro/standard) — иначе пилюля не подсветится и контент не отрисуется
-        if (stored.id === program.meta.id && stored.step && editorSteps.includes(stored.step)) {
-          return stored.step;
+        if (stored.id === program.meta.id && stored.step) {
+          if (editorSteps.includes(stored.step)) return stored.step;
+          // Миграция старых шагов (до унификации 6→3): analysis/feedback/tools теперь внутри weeks
+          if ((['analysis','feedback','tools'] as EditorStep[]).includes(stored.step)) return 'weeks';
         }
       }
     } catch { /* ignore */ }
@@ -1460,6 +1469,106 @@ return (
         </div>
         <BulkApplyCard program={program} onChange={onChange} showToast={showToast} />
         </>
+      )}
+
+      {/* Единый конструктор: Pro-аккордеоны внутри «Недели» — прогрессивное раскрытие без перегрузки.
+          Раньше это были отдельные шаги analysis/feedback/tools (6 пилюль), теперь — 3 коллапса внутри weeks.
+          Сохраняет ручной контроль (ядро — недели→упражнения), анализ/обратная связь/инструменты — по запросу. */}
+      {estep === 'weeks' && isPro && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
+          {/* Анализ */}
+          <div className="constructor-surface" style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${proAccAnalysis ? '#22c55e' : 'rgba(255,255,255,0.06)'}` }}>
+            <button onClick={() => setProAccAnalysis(v => !v)} aria-expanded={proAccAnalysis} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccAnalysis ? 'rgba(34,197,94,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13 }}>{proAccAnalysis ? '▼' : '▶'}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: proAccAnalysis ? '#22c55e' : '#fff' }}>📊 Анализ</span>
+                <span style={{ fontSize: 10, color: DIM, fontWeight: 400 }}>Score, MRV, объём, периодизация, прогрессия</span>
+              </span>
+              <span style={{ fontSize: 10, color: proAccAnalysis ? '#22c55e' : DIM, border: `1px solid ${proAccAnalysis ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 20, padding: '2px 8px' }}>{proAccAnalysis ? 'Скрыть' : 'Развернуть'}</span>
+            </button>
+            {proAccAnalysis && (
+              <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                {dir === 'bb' && program.bb && <BbContextPanel program={program} level={program.meta.level} />}
+                {dir === 'bb' && program.bb && <MesoHeatmap program={program} dir={dir} onToast={showToast} />}
+                {labAdjust.mrvMultiplier < 1 && (() => {
+                  const feeders = suggestFeeders((tprofile.weakPoints ?? []) as string[], (tprofile.equipment ?? []) as string[]);
+                  return (
+                    <div style={{ ...panelStyle('#f59e0b'), padding: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>🧪 Лабораторная коррекция плана (MRV ×{labAdjust.mrvMultiplier.toFixed(2)})</div>
+                      {labAdjust.intensityNote && <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>{labAdjust.intensityNote}</div>}
+                      {labAdjust.warnings.length > 0 && <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{labAdjust.warnings.map((w, i) => <div key={i}>• {w}</div>)}</div>}
+                      {labAdjust.deloadRecommended && <div style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', marginTop: 4 }}>⚠ Рекомендуется разгрузочная неделя</div>}
+                      {feeders.length > 0 && <div style={{ fontSize: 10, color: '#a78bfa', marginTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6 }}>🔥 Фидер-сеты для слабых групп: {feeders.map((f) => `${f.exercise} ${f.sets}×${f.reps}`).join(' · ')}</div>}
+                    </div>
+                  );
+                })()}
+                <ProPanelsGroup sections={[{ id: 'plan-analysis', title: '📊 Анализ плана', hint: 'Score, MRV, объём, периодизация, прогрессия', color: '#22c55e', content: <><ProgramStrengthScore program={program} dir={dir} /><PlanDiagnosticsPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><InteractiveVolumePanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><ProgressionCoach program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} onCourse={tprofile.onCourse ?? false} courseIntensity={tprofile.courseIntensity ?? 'moderate'} /><TonnageEstimatePanel program={program} dir={dir} /></> }]} />
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 8 }}>
+                  <RirWaveChart program={program} />
+                  {dir === 'bb' && program.bb && program.bb.weeks.length > 0 && <ProgramTimeline program={program} selectedWeek={execWeek - 1} onSelectWeek={(wi) => setExecWeek(wi + 1)} />}
+                  <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Обратная связь */}
+          <div className="constructor-surface" style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${proAccFeedback ? '#3b82f6' : 'rgba(255,255,255,0.06)'}` }}>
+            <button onClick={() => setProAccFeedback(v => !v)} aria-expanded={proAccFeedback} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccFeedback ? 'rgba(59,130,246,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13 }}>{proAccFeedback ? '▼' : '▶'}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: proAccFeedback ? '#3b82f6' : '#fff' }}>🔄 Обратная связь</span>
+                <span style={{ fontSize: 10, color: DIM, fontWeight: 400 }}>ACWR, RIR-bias, готовность, чек-ин, what-if</span>
+              </span>
+              <span style={{ fontSize: 10, color: proAccFeedback ? '#3b82f6' : DIM, border: `1px solid ${proAccFeedback ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 20, padding: '2px 8px' }}>{proAccFeedback ? 'Скрыть' : 'Развернуть'}</span>
+            </button>
+            {proAccFeedback && (
+              <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <ProPanelsGroup sections={[{ id: 'feedback', title: '🔄 Обратная связь (sRPE / RIR / чек-ин)', hint: 'ACWR, RIR-bias, готовность, чек-ин, what-if', color: '#3b82f6', content: <><LoadGuardPanel program={program} dir={dir} /><RIRCalibrationPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><RealMRVPanel program={program} dir={dir} labMrvMult={labAdjust.mrvMultiplier} /><CheckinGuardPanel program={program} dir={dir} /><StrengthDiaryPanel program={program} dir={dir} /><button onClick={() => setShowFeedbackAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showFeedbackAdv ? 'rgba(0,230,138,0.35)' : 'rgba(255,255,255,0.10)', color: showFeedbackAdv ? '#00e68a' : DIM }}>{showFeedbackAdv ? '▲ Скрыть прогноз' : '▼ Дополнительно: прогноз готовности / what-if'}</button>{showFeedbackAdv && <><ReadinessForecastPanel program={program} dir={dir} /><WhatIfGuardPanel program={program} dir={dir} /></>}</> }]} />
+              </div>
+            )}
+          </div>
+          {/* Инструменты */}
+          <div className="constructor-surface" style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${proAccTools ? '#a78bfa' : 'rgba(255,255,255,0.06)'}` }}>
+            <button onClick={() => setProAccTools(v => !v)} aria-expanded={proAccTools} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: proAccTools ? 'rgba(167,139,250,0.08)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13 }}>{proAccTools ? '▼' : '▶'}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: proAccTools ? '#a78bfa' : '#fff' }}>🔧 Инструменты</span>
+                <span style={{ fontSize: 10, color: DIM, fontWeight: 400 }}>Сплит, замены, ПЛ-диагностика, ревизии</span>
+              </span>
+              <span style={{ fontSize: 10, color: proAccTools ? '#a78bfa' : DIM, border: `1px solid ${proAccTools ? 'rgba(167,139,250,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 20, padding: '2px 8px' }}>{proAccTools ? 'Скрыть' : 'Развернуть'}</span>
+            </button>
+            {proAccTools && (
+              <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                {dir === 'pl' && (
+                  <div style={{ ...panelStyle('#a78bfa'), padding: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#c4b5fd', marginBottom: 3 }}>🏆 ПЛ PRO: диагностика, мёртвые точки и инструменты</div>
+                    <div style={{ fontSize: 10, color:'#fff', marginBottom: 8 }}>Анализ применяется только как рекомендация и добавление ассистентов. Исходные упражнения и процентовки ПЛ-цикла не изменяются.</div>
+                    <PlannerToolsPanel mode="pl" />
+                    <div style={{ marginTop: 10, borderTop: '1px solid rgba(167,139,250,0.2)', paddingTop: 8 }}><PlDeadpointsBarPathCard /></div>
+                  </div>
+                )}
+                <ProPanelsGroup sections={[{ id: 'technique', title: '🦴 Техника и биомеханика', hint: 'Срывы, bar-path, блины, инфо об упражнениях', color: '#06b6d4', content: <><PlateAutoPanel program={program} dir={dir} /><ExerciseInfoPanel program={program} dir={dir} /><button onClick={() => setShowToolsAdv(v => !v)} style={{ ...BTN_GHOST, width: '100%', minHeight: 36, fontSize: 11, borderColor: showToolsAdv ? 'rgba(6,182,212,0.35)' : 'rgba(255,255,255,0.10)', color: showToolsAdv ? '#06b6d4' : DIM }}>{showToolsAdv ? '▲ Скрыть биомеханику' : '▼ Биомеханика: срывы / bar-path'}</button>{showToolsAdv && <><StickingPointPanel program={program} dir={dir} onChange={onChange} showToast={showToast} /><BiomechanicsPanel program={program} dir={dir} /></>}</> }, { id: 'tools', title: '🔧 Инструменты тренера', hint: 'Подбор сплита, замены упражнений, история ревизий', color: '#a78bfa', content: <><SplitConsultant program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><SubstitutionPanel program={program} dir={dir} onChange={onChange} showToast={showToast} labMrvMult={labAdjust.mrvMultiplier} /><ProgramRevisionsDiff program={program} /></> }]} />
+                {revisions.length > 0 && (
+                  <div style={{ ...CARD, padding: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>📜 История правок</span><span style={{ fontSize: 10, color: DIM }}>({revisions.length} записей)</span></div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 160, overflowY: 'auto' }}>
+                      {revisions.slice().reverse().map((r, i) => {
+                        const realIdx = revisions.length - 1 - i;
+                        return (
+                          <div key={r.ts} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
+                            <span style={{ fontSize: 10, color: DIM_STRONG, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.note}</span>
+                            <span style={{ fontSize: 10, color: DIM }}>{new Date(r.ts).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                            <button style={{ ...BTN_GHOST, padding: '2px 6px', fontSize: 11, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeRev(realIdx)} title="Удалить запись">✕</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
 

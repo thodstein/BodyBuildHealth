@@ -162,35 +162,39 @@ export const ManualStepper: React.FC<{
   active: string;
   onChange: (id: string) => void;
   disabledIds?: Set<string>;
-}> = ({ steps, active, onChange, disabledIds }) => (
-  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-    {steps.map(s => {
-      const isActive = s.id === active;
-      const disabled = disabledIds?.has(s.id);
-      return (
-        <button
-          key={s.id}
-          disabled={!!disabled}
-          onClick={() => !disabled && onChange(s.id)}
-          aria-pressed={isActive}
-          aria-disabled={!!disabled}
-          style={{
-            ...CHIP,
-            flex: '1 0 auto',
-            minWidth: 92,
-            justifyContent: 'center',
-            display: 'inline-flex',
-            alignItems: 'center',
-            ...(isActive ? { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#06281c', border: '1px solid #00e68a', boxShadow: '0 4px 14px rgba(0,230,138,0.3)', fontWeight: 800 } : {}),
-            ...(disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}),
-          }}
-        >
-          {isActive ? '● ' : ''}{s.label}
-        </button>
-      );
-    })}
-  </div>
-);
+}> = ({ steps, active, onChange, disabledIds }) => {
+  const activeIdx = steps.findIndex(s => s.id === active);
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {steps.map((s, idx) => {
+        const isActive = s.id === active;
+        const disabled = disabledIds?.has(s.id);
+        const isDone = activeIdx >= 0 && idx < activeIdx && !disabled;
+        return (
+          <button
+            key={s.id}
+            disabled={!!disabled}
+            onClick={() => !disabled && onChange(s.id)}
+            aria-pressed={isActive}
+            aria-disabled={!!disabled}
+            style={{
+              ...CHIP,
+              flex: '1 0 auto',
+              minWidth: 92,
+              justifyContent: 'center',
+              display: 'inline-flex',
+              alignItems: 'center',
+              ...(isActive ? { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#06281c', border: '1px solid #00e68a', boxShadow: '0 4px 14px rgba(0,230,138,0.3)', fontWeight: 800 } : {}),
+              ...(disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}),
+            }}
+          >
+            {isDone ? '✓ ' : isActive ? '● ' : ''}{s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 /** Мини полоска объёма MEV/MAV/MRV — для сессии/недели. */
 export const VolumeMiniBar: React.FC<{ cur: number; mrv: number; mev: number; label?: string; compact?: boolean }> = ({ cur, mrv, mev, label, compact }) => {

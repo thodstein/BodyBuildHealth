@@ -932,15 +932,9 @@ export const ProgramManagerPanel: React.FC = () => {
         {/* P2.1: Визард создания программы (модал для пустого состояния) */}
         <ManualProgramWizard open={wizardOpen} step={wizardStep} direction={wizardDir} goal={wizardGoal} level={wizardLevel} days={wizardDays} weeks={wizardWeeks} pro={manualMode === 'pro'} onClose={() => setWizardOpen(false)} onStep={setWizardStep} onDirection={setWizardDirection} onGoal={setWizardGoal} onLevel={setWizardLevel} onDays={setWizardDays} onWeeks={setWizardWeeks} onCreate={finishWizard} />
 
-        {/* Пикеры: Библиотека ББ / LMS-цикл — единая галерея */}
-        {pickerOpen === 'bb' && (
-          <TrainingModal title="📚 Библиотека + 🟣 ПЛ-циклы — галерея" onClose={() => setPickerOpen(null)}>
-            <ManualLibraryGallery bbPrograms={allLibraryPrograms} plCycles={plCycles as any} onSelectBB={(p) => { startCloneLibrary(p); setPickerOpen(null); }} onSelectPL={(id) => { startCloneCycle(id); setPickerOpen(null); }} />
-          </TrainingModal>
-        )}
-
-        {pickerOpen === 'pl' && (
-          <TrainingModal title="📚 Библиотека + 🟣 ПЛ-циклы — галерея" onClose={() => setPickerOpen(null)}>
+        {/* Пикеры: Библиотека ББ / LMS-цикл — единая галерея (один модал вместо дубля bb/pl) */}
+        {pickerOpen && (
+          <TrainingModal title={pickerOpen === 'pl' ? '🟣 ПЛ-циклы + 📚 Библиотека — галерея' : '📚 Библиотека + 🟣 ПЛ-циклы — галерея'} onClose={() => setPickerOpen(null)}>
             <ManualLibraryGallery bbPrograms={allLibraryPrograms} plCycles={plCycles as any} onSelectBB={(p) => { startCloneLibrary(p); setPickerOpen(null); }} onSelectPL={(id) => { startCloneCycle(id); setPickerOpen(null); }} />
           </TrainingModal>
         )}
