@@ -565,39 +565,62 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         </div>
       )}
 
-      {/* ─── PLANNING WINDOW — уровень 2: выбор конструктора (новое окно) ─── */}
+      {/* ─── PLANNING WINDOW — уровень 2: выбор конструктора — современно, стеклянные карточки ─── */}
       {page === 'planning' && (
-        <div style={{ position:'fixed', inset:0, zIndex:101, display:'flex', flexDirection:'column', background:'#0a0a0a', overflow:'auto' }}>
-          <div style={{ position:'relative', flexShrink:0, padding:'12px 14px 10px', background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(59,130,246,0.08))', borderBottom:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', gap:10 }}>
-            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'6px 10px', borderRadius:9, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff' }}>← На главную</button>
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>🏗 Планирование</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}>Выберите конструктор — каждый откроется в новом окне</div>
+        <div style={{ position:'fixed', inset:0, zIndex:101, display:'flex', flexDirection:'column', background:'radial-gradient(1100px 520px at 15% -10%, rgba(0,230,138,0.14), transparent 60%), radial-gradient(900px 460px at 92% 4%, rgba(99,102,241,0.12), transparent 60%), radial-gradient(700px 380px at 60% 100%, rgba(236,72,153,0.08), transparent 60%), #0a0a0a', overflow:'auto' }}>
+          <div style={{ position:'sticky', top:0, zIndex:2, flexShrink:0, padding:'12px 14px 12px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderBottom:'1px solid rgba(255,255,255,0.07)', display:'flex', alignItems:'center', gap:10 }}>
+            <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'7px 12px', borderRadius:10, fontSize:12, fontWeight:800, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', backdropFilter:'blur(8px)' }}>← На главную</button>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:15, fontWeight:900, color:'#fff', letterSpacing:-0.2, lineHeight:1 }}>🏗 Планирование</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:1, lineHeight:1.3 }}>Выберите конструктор — каждый откроется в новом окне · без потерь</div>
             </div>
-            <span style={{ fontSize:11, fontWeight:700, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:20, padding:'4px 10px' }}>Шаг 2 из 3</span>
+            <span style={{ fontSize:11, fontWeight:800, color:'#00e68a', background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,230,138,0.08))', border:'1px solid rgba(0,230,138,0.26)', borderRadius:20, padding:'6px 11px', boxShadow:'0 2px 10px rgba(0,230,138,0.14)', whiteSpace:'nowrap' }}>Шаг 2 из 3</span>
           </div>
-          <div style={{ padding:'14px', display:'flex', flexDirection:'column', gap:10, paddingBottom:80 }}>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', lineHeight:1.4 }}>Тренировки → <b style={{ color:'#00e68a' }}>Планирование</b> → Конструктор. Начните с выбора направления.</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ padding:'16px 14px 28px', maxWidth:760, width:'100%', margin:'0 auto', display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
+              <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', fontSize:12 }}>✨</span>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.72)', lineHeight:1.4, flex:1 }}>Тренировки → <b style={{ color:'#00e68a' }}>Планирование</b> → Конструктор · 6 направлений · один клик до сборки</div>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)', whiteSpace:'nowrap' }}>{PLANNER_MODES.length} конструкторов</span>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:10 }}>
               {PLANNER_MODES.map(m => {
+                const ACC: Record<string,string> = { pl:'#a78bfa', bb:'#00e68a', manual:'#3b82f6', cardio:'#ef4444', strength:'#f59e0b', combat:'#ec4899' };
+                const accent = ACC[m.id] ?? '#00e68a';
                 const active = planningTrack === m.id;
                 return (
                   <button key={m.id} onClick={() => { hapticImpact('medium'); openConstructor(m.id); }} style={{
-                    display:'flex', alignItems:'center', gap:12, padding:'14px 14px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                    background: active ? 'rgba(0,230,138,0.14)' : 'rgba(24,24,27,0.92)', border: active ? '1px solid rgba(0,230,138,0.45)' : '1px solid rgba(255,255,255,0.08)', color:'#fff',
-                    transition:'all 0.2s', boxShadow: active ? '0 0 0 1px rgba(0,230,138,0.25), 0 4px 18px rgba(0,0,0,0.28)' : '0 2px 10px rgba(0,0,0,0.18)',
+                    position:'relative', display:'flex', flexDirection:'column', gap:10, padding:'16px 14px 14px', borderRadius:16, cursor:'pointer', textAlign:'left', overflow:'hidden',
+                    background: active ? `linear-gradient(135deg, ${accent}14, rgba(24,24,27,0.82))` : 'rgba(24,24,27,0.64)',
+                    backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
+                    border: active ? `1px solid ${accent}55` : '1px solid rgba(255,255,255,0.07)',
+                    borderLeft: `3px solid ${accent}`,
+                    boxShadow: active ? `0 10px 28px ${accent}1E, inset 0 1px 0 rgba(255,255,255,0.06)` : '0 4px 18px rgba(0,0,0,0.22)',
+                    transition:'all 0.22s ease', transform: active ? 'translateY(-1px)' : 'none',
                   }}>
-                    <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: active ? 'linear-gradient(135deg,#00e68a,#00c853)' : 'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', fontSize:22 }}>{m.icon}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:800, color: active ? '#00e68a' : '#fff' }}>{m.label}</div>
-                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.68)', lineHeight:1.35, marginTop:2 }}>{m.hint}</div>
+                    <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg, ${accent}, transparent)`, opacity: active ? 1 : 0.85 }} />
+                    <div style={{ position:'absolute', top:-18, right:-18, width:86, height:86, borderRadius:86, background:`radial-gradient(circle, ${accent}18, transparent 70%)`, pointerEvents:'none' }} />
+                    <div style={{ display:'flex', alignItems:'center', gap:10, position:'relative' }}>
+                      <div style={{ width:48, height:48, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${accent}, ${accent}CC)`, color: active ? '#000' : '#fff', fontSize:22, fontWeight:800, boxShadow:`0 4px 16px ${accent}45`, border:`1px solid ${accent}66` }}>{m.icon}</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:900, color: active ? accent : '#fff', lineHeight:1.1, letterSpacing:-0.15 }}>{m.label}</div>
+                        <div style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.52)', marginTop:2, letterSpacing:0.2, textTransform:'uppercase' }}>{m.id === 'pl' ? 'LMS • ПМ • пик' : m.id === 'bb' ? 'Сплиты • MEV/MRV • PED' : m.id === 'manual' ? 'Ручной • с нуля • 29 шаблонов' : m.id === 'cardio' ? 'Zone2 • HIIT • фазы' : m.id === 'strength' ? 'ТА • стронг • лог' : 'ММА • бокс • хват'}</div>
+                      </div>
+                      {active && <span style={{ fontSize:9, fontWeight:900, color:accent, background:`${accent}14`, border:`1px solid ${accent}33`, borderRadius:20, padding:'4px 8px', letterSpacing:0.3 }}>выбран</span>}
                     </div>
-                    <span style={{ color: active ? '#00e68a' : 'rgba(255,255,255,0.35)', fontSize:16, fontWeight:700 }}>→</span>
+                    <div style={{ fontSize:11, color:'rgba(255,255,255,0.70)', lineHeight:1.45, minHeight:34, position:'relative' }}>{m.hint}</div>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:2, position:'relative' }}>
+                      <span style={{ fontSize:11, fontWeight:800, color: accent, display:'flex', alignItems:'center', gap:6 }}>Открыть <span style={{ fontSize:12 }}>→</span></span>
+                      <span style={{ width:30, height:30, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: active ? accent : 'rgba(255,255,255,0.06)', color: active ? '#000' : 'rgba(255,255,255,0.55)', border:`1px solid ${active ? accent : 'rgba(255,255,255,0.08)'}`, fontSize:13, fontWeight:800, transition:'all 0.2s' }}>→</span>
+                    </div>
                   </button>
                 );
               })}
             </div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', textAlign:'center', marginTop:4 }}>Выбранный конструктор запомнится. Назад — «← На главную», вперёд — клик по карточке.</div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, justifyContent:'center', fontSize:10, color:'rgba(255,255,255,0.38)', textAlign:'center', padding:'6px 0' }}>
+              <span style={{ width:6, height:6, borderRadius:6, background:'rgba(0,230,138,0.55)', boxShadow:'0 0 8px rgba(0,230,138,0.45)' }} />
+              Выбранный конструктор запомнится · Назад — «← На главную», вперёд — клик по карточке
+              <span style={{ width:6, height:6, borderRadius:6, background:'rgba(99,102,241,0.45)' }} />
+            </div>
           </div>
         </div>
       )}
