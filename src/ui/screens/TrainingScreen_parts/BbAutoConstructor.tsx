@@ -3374,8 +3374,8 @@ export const BbAutoConstructor: React.FC = () => {
           const ROT_RU: Record<string,string> = { forbid:'запрет', strict:'строгий', variety:'разнообразие' };
           const INT_RU: Record<string,string> = { light:'лёгкая', moderate:'умеренная', high:'высокая' };
           return (
-            <ExpandableCard title="📋 Итоговый отчёт программы" icon="📋"
-              short={`${report.weeks} недель · ${report.totalDirectSets} прямых подходов · пик неделя ${report.peakWeek}`}
+            <ExpandableCard title="📋 Итоговый отчёт программы — сводка и проверка" icon="📋"
+              short={`${report.weeks} недель · ${report.totalDirectSets} прямых подходов всего (~${Math.round(report.totalDirectSets / Math.max(1, report.weeks))} в неделю) · пик неделя ${report.peakWeek} · ${report.sessionsPerWeek} тренировок в неделю`}
               full={
                 <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
                   <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'#fff', lineHeight:1.55 }}>
