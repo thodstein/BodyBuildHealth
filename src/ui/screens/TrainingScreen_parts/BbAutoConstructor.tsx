@@ -58,10 +58,10 @@ import type { SessionMethodology } from '../../../engines/bb/bb-session-order.en
 import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';
 import { PCT_FOR_RIR } from '../../../engines/rir-table';
 import { labTrainingAdjust } from './lab-training-adjust';
-import { getCyclesByDirection, getCycleById, normalizeCycleDirection } from '../../../data/lms-cycles/lms-cycle-index';
-import { convertCycleToBBPlan, programToCycleTemplate, cycleTemplateToFullProgram, programToBBPlan } from '../../../engines/bb/cycle-to-plan';
+import { getCycleById, normalizeCycleDirection, getCyclesByDirection } from '../../../data/lms-cycles/lms-cycle-index';
+import { programToBBPlan, cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import type { SRCycleTemplate } from '../../../data/lms-cycles/lms-types';
-import { getAllPrograms, FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
+import { FULL_PROGRAM_LIBRARY } from '../../../engines/complete-program-library.engine';
 import type { FullProgram } from '../../../engines/complete-program-library.engine';
 import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
@@ -113,7 +113,7 @@ import { getWeightLog } from '../../../engines/profile-store';
 
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
-type PlanMode = 'generic_split' | 'bb_cycle';
+type PlanMode = 'generic_split' | 'bb_cycle' | 'programs';
 
 const WEAK_GROUPS = [
   ['chest','Грудь'],['chest_upper','Верх груди'],['chest_lower','Низ груди'],
@@ -502,7 +502,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbTrainingFocus, setBbTrainingFocus] = useState<'strength' | 'hypertrophy' | 'endurance'>(
     ((prof as any).trainingFocus || 'hypertrophy') as 'strength' | 'hypertrophy' | 'endurance',
   );
-  const [planMode, setPlanMode] = useState<PlanMode>(prof.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split');
+  const [planMode, setPlanMode] = useState<PlanMode>((prof.planMode === 'programs' || prof.planMode === 'bb_cycle') ? 'programs' : 'generic_split');
   const [selectedCycleId, setSelectedCycleId] = useState<string>(prof.bbCycleId || '');
   const [loadStrategy, setLoadStrategy] = useState<LoadStrategy>((prof.loadStrategy as LoadStrategy) || 'double_progression');
   const [autoDeload, setAutoDeload] = useState<boolean>(true);
@@ -564,12 +564,12 @@ export const BbAutoConstructor: React.FC = () => {
   const [exSwapSearch, setExSwapSearch] = useState('');
   // Фаза 7: Фильтр оборудования
   const [bbEquipment, setBbEquipment] = useState<string[]>(() => prof.equipment || []);
-  // Кастомный цикл из библиотеки программ (через planner-bridge kind='program' или прямой пикер)
+  // Программы: только FullProgram (библиотека) → programToBBPlan (faithful/adapt)
   const [customCycle, setCustomCycle] = useState<SRCycleTemplate | null>(null);
   const [customProgram, setCustomProgram] = useState<FullProgram | null>(null);
-  const [bbProgramPath, setBbProgramPath] = useState<'library' | 'cycle'>('cycle');
+  const [bbProgramPath, setBbProgramPath] = useState<'library' | 'cycle'>('library');
   const [bbAdaptMode, setBbAdaptMode] = useState<'faithful' | 'adapt'>('faithful');
-  const [bbSource, setBbSource] = useState<'cycle' | 'program'>(customCycle ? 'program' : 'cycle');
+  const [bbSource, setBbSource] = useState<'cycle' | 'program'>('program');
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(customCycle ? customCycle.meta.id.replace('prog_', '') : null);
   const [bridgeMsg, setBridgeMsg] = useState('');
   // C4: flash helper — заменяет alert() для некритичных уведомлений.
@@ -1022,8 +1022,11 @@ export const BbAutoConstructor: React.FC = () => {
       }
       if (payload.kind === 'program' && payload.data) {
         const cycle = payload.data as SRCycleTemplate;
+        // Legacy SRCycleTemplate из bridge теперь трактуем как программу (только FullProgram путь)
+        // Для совместимости маппим на программу-заглушку через library path (faithful)
+        setCustomProgram(null);
         setCustomCycle(cycle);
-        setPlanMode('bb_cycle');
+        setPlanMode('programs');
         setBbSource('program');
         setSelectedProgramId(cycle.meta.id.replace('prog_', ''));
         setSelectedCycleId(cycle.meta.id);
@@ -1061,46 +1064,26 @@ export const BbAutoConstructor: React.FC = () => {
     return () => { unsub(); };
   }, []);
 
-  // Применение готовой программы из библиотеки (прямой пикер или bridge).
-  // Определяет путь: программы ББ-цикла (cycle-bb-*) идут через convertCycleToBBPlan,
-  // остальные (FULL_PROGRAM_LIBRARY + WOMENS + CUSTOM_PROGRAMS) идут через programToBBPlan (faithful).
+  // Применение готовой программы из библиотеки (единственный путь: FullProgram → programToBBPlan faithful/adapt).
+  // Все программы (FULL_PROGRAM_LIBRARY + WOMENS + CUSTOM_PROGRAMS + cycle-bb-*) идут через один путь.
   const applyProgramToBb = useCallback((program: FullProgram) => {
-    const id = program.id || '';
-    const isBbCycleProgram = id.startsWith('cycle-bb') || id.startsWith('bb_cycle_') || (program.author === 'LMS/PROF' && id.startsWith('prog_cycle-bb'));
-    if (isBbCycleProgram) {
-      // BB-cycle путь: конвертация через SRCycleTemplate (старый путь)
-      const cycle = programToCycleTemplate(program);
-      setCustomCycle(cycle);
-      setCustomProgram(null);
-      setBbProgramPath('cycle');
-      setPlanMode('bb_cycle');
-      setBbSource('program');
-      setSelectedProgramId(program.id);
-      setSelectedCycleId(cycle.meta.id);
-      setBbDays(cycle.meta.sessionsPerWeek);
-      setBbWeeks(cycle.meta.weeks);
-      setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
-      setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
-    } else {
-      // Library путь: прямой FullProgram → programToBBPlan. По умолчанию faithful — программа без изменений.
-      setBbAdaptMode('faithful');
-      setCustomProgram(program);
-      setCustomCycle(null);
-      setBbProgramPath('library');
-      setPlanMode('bb_cycle');
-      setBbSource('program');
-      setSelectedProgramId(program.id);
-      setSelectedCycleId('prog_' + program.id);
-      setBbDays(program.daysPerWeek);
-      setBbWeeks(program.durationWeeks);
-      setBbLevel(program.level === 'beginner' ? 'beginner' : program.level === 'advanced' ? 'advanced' : 'intermediate');
-      const goalMap: Record<string, string> = {
-        hypertrophy: 'mass', strength: 'strength_mass', bodybuilding: 'mass',
-        peaking: 'cut', powerlifting: 'strength_mass', athletic: 'mass', rehab: 'mass',
-      };
-      setBbGoal(goalMap[program.goal] || 'mass');
-    }
-    setBridgeMsg(`🔗 Программа загружена: ${program.name} (режим: ${isBbCycleProgram ? 'PROF-цикл' : 'библиотека, faithful + адаптация'})`);
+    setBbAdaptMode('faithful');
+    setCustomProgram(program);
+    setCustomCycle(null);
+    setBbProgramPath('library');
+    setPlanMode('programs');
+    setBbSource('program');
+    setSelectedProgramId(program.id);
+    setSelectedCycleId('prog_' + program.id);
+    setBbDays(program.daysPerWeek);
+    setBbWeeks(program.durationWeeks);
+    setBbLevel(program.level === 'beginner' ? 'beginner' : program.level === 'advanced' ? 'advanced' : 'intermediate');
+    const goalMap: Record<string, string> = {
+      hypertrophy: 'mass', strength: 'strength_mass', bodybuilding: 'mass',
+      peaking: 'cut', powerlifting: 'strength_mass', athletic: 'mass', rehab: 'mass',
+    };
+    setBbGoal(goalMap[program.goal] || 'mass');
+    setBridgeMsg(`🔗 Программа загружена: ${program.name} (режим: библиотека, faithful + адаптация)`);
     setTimeout(() => setBridgeMsg(''), 5000);
     setStep('params');
   }, []);
@@ -1236,7 +1219,7 @@ export const BbAutoConstructor: React.FC = () => {
       methodology: bbMethodology,
       volumeGoal: bbVolGoal,
       specialization: specializationMode,
-      focusGroup,
+      focusGroup: '',
       splitPattern: builtPlan.pattern?.id,
     });
     const result = validatePlanQuality(input);
@@ -1473,9 +1456,9 @@ export const BbAutoConstructor: React.FC = () => {
 
     try {
 
-    if (planMode === 'bb_cycle') {
-      // Library путь (FullProgram напрямую → programToBBPlan, faithful режим)
-      if (bbProgramPath === 'library' && customProgram) {
+    if (planMode === 'programs') {
+      // Единственный путь: FullProgram → programToBBPlan (faithful / adapt)
+      if (customProgram) {
         plan = programToBBPlan(customProgram, {
           workMax: bbWorkMax,
           weakPoints,
@@ -1523,6 +1506,10 @@ export const BbAutoConstructor: React.FC = () => {
             planStartWeek: new Date().toISOString().slice(0, 10),
             supersetMode,
             volumeScheme: effectiveVolumeScheme,
+            bfrMode,
+            blastCruiseEnabled,
+            blastWeeks,
+            cruiseWeeks,
             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
            });
           if (bbDays !== customProgram.daysPerWeek) setBbDays(customProgram.daysPerWeek);
@@ -1530,69 +1517,10 @@ export const BbAutoConstructor: React.FC = () => {
            const clamped = Math.max(4, Math.min(24, Math.round(Number(customProgram.durationWeeks) || 8)));
            if (Number.isFinite(clamped)) setBbWeeks(clamped);
          }
-      } else if (selectedCycleId || customCycle) {
-        // BB-цикл путь (SRCycleTemplate → convertCycleToBBPlan)
-        const cycle = customCycle || (getCycleById(selectedCycleId) as SRCycleTemplate | undefined);
-        if (!cycle) { flash('Цикл не найден'); return; }
-        plan = convertCycleToBBPlan({
-          cycle,
-          workMax: bbWorkMax,
-          weakPoints,
-          peds,
-          pedDoses,
-          courseIntensity,
-          loadStrategy,
-          injuries,
-          intensityTechnique: intensityTech,
-          autoDeload,
-          deloadType,
-          autoRegResult: autoRegPayload,
-          favoriteExercises: bbFavEx,
-          excludedExercises: bbExclEx,
-          avoidAxialLoad: avoidAxialLoadUi || prof.avoidAxialLoad || false,
-          fewerCompound,
-          allowStrengthLifts: allowStrengthLifts && bbGoal === 'strength_mass',
-           rotationMode,
-           intensityLevel,
-            volumeGoal: effectiveVolGoal,
-            trainingVolumeMode: trainingVolumeMode as any,
-             specialization: specializationMode,
-            specializationSchedule: buildSpecBlocks,
-            focusGroup: '',
-            level: bbLevel,
-            trainingYears: bbTrainingYears,
-            bodyweightCapability: prof.bodyweightCapability,
-            equipment: bbEquipment,
-           mode: bbAdaptMode,
-           methodology: bbMethodology,
-            trainingFocus: bbTrainingFocus,
-             goal: bbGoal,
-              sex: linked.profile?.settings?.personal?.sex,
-              bodyFat: linked.profile.settings.personal.bodyFat,
-              leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
-              hrvMs: linked.profile.settings.lifestyle.morningHRV,
-              sleepHours: linked.profile.settings.lifestyle.sleepHours,
-              stressLevel: linked.profile.settings.lifestyle.stressLevel,
-             proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
-             calorieSurplus,
-             eccentricMult,
-             mobilityRestrictions,
-             labMrvMultiplier: labAdjust.mrvMultiplier,
-             labWarnings: labAdjust.warnings,
-             labIntensityNote: labAdjust.intensityNote,
-             planStartWeek: new Date().toISOString().slice(0, 10),
-             supersetMode,
-             volumeScheme: effectiveVolumeScheme,
-             previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
-        });
-          const cycleWeeks = cycle.meta.sessionsPerWeek;
-         if (bbDays !== cycleWeeks) setBbDays(cycleWeeks);
-         if (bbWeeks !== cycle.meta.weeks) {
-           const clamped = Math.max(4, Math.min(24, Math.round(Number(cycle.meta.weeks) || 8)));
-           if (Number.isFinite(clamped)) setBbWeeks(clamped);
-         }
       } else {
-        return; // нет ни программы, ни цикла — нельзя строить (защита)
+        flash('Выберите программу из библиотеки');
+        setIsBuilding(false);
+        return;
       }
     } else {
       const pattern = SPLIT_PATTERNS.find(p => p.id === selectedSplitId);
@@ -1662,7 +1590,7 @@ export const BbAutoConstructor: React.FC = () => {
 
     const modeLabel = bbAnnualMacrocycle
       ? `Годовой BB-макроцикл (${bbAnnualMacrocycle.totalWeeks} нед)`
-      : planMode === 'bb_cycle' ? `BB-цикл: ${customCycle?.meta.title || getCycleById(selectedCycleId)?.meta.title || selectedCycleId}` : 'Generic-сплит';
+      : planMode === 'programs' ? `Программа: ${customProgram?.name || customCycle?.meta.title || selectedProgramId || selectedCycleId}` : 'Generic-сплит';
     const srpe = loadSRPESessions();
     const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
     const deloadNote = autoDeload && acwr && acwr.ratio > 1.5
@@ -1864,7 +1792,7 @@ export const BbAutoConstructor: React.FC = () => {
            source: bbSource,
            programPath: bbProgramPath,
             programId: selectedProgramId || undefined,
-            cycleId: planMode === 'bb_cycle' ? selectedCycleId : undefined,
+            cycleId: planMode === 'programs' ? selectedCycleId : undefined,
          };
         const planMetrics: SavedBBPlan['metrics'] = {
            totalSets: exportMetrics.totalSets,
@@ -1968,7 +1896,10 @@ export const BbAutoConstructor: React.FC = () => {
     if (v.params.pedDoses) setPedDoses({ ...v.params.pedDoses });
     if (v.params.courseIntensity) setCourseIntensity(v.params.courseIntensity as 'mild' | 'moderate' | 'heavy');
     if (v.params.autoDeload != null) setAutoDeload(Boolean(v.params.autoDeload));
-    if (v.params.planMode === 'bb_cycle' || v.params.planMode === 'generic_split') setPlanMode(v.params.planMode as PlanMode);
+    if (v.params.planMode === 'programs' || (v.params as any).planMode === 'bb_cycle' || v.params.planMode === 'generic_split') {
+      const migrated = (v.params as any).planMode === 'bb_cycle' ? 'programs' : v.params.planMode;
+      setPlanMode(migrated as PlanMode);
+    }
     if (v.params.patternId) setSelectedSplitId(v.params.patternId);
     if (v.params.source) setBbSource(v.params.source);
     if (v.params.programPath) setBbProgramPath(v.params.programPath);
@@ -2120,10 +2051,10 @@ export const BbAutoConstructor: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const stepList: Step[] = planMode === 'bb_cycle' ? ['params','ped','plan','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','quality','adjust','contest','annual','tools'];
-  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'bb_cycle' ? '3 План' : '4 План', quality: planMode === 'bb_cycle' ? '4 Качество' : '5 Качество', adjust: planMode === 'bb_cycle' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
+  const stepList: Step[] = planMode === 'programs' ? ['params','ped','plan','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','quality','adjust','contest','annual','tools'];
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'programs' ? '3 План' : '4 План', quality: planMode === 'programs' ? '4 Качество' : '5 Качество', adjust: planMode === 'programs' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
   const renderStepNav = () => {
-    const groups: Record<string, string[]> = planMode === 'bb_cycle'
+    const groups: Record<string, string[]> = planMode === 'programs'
       ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
       : { 'ПАРАМЕТРЫ': ['params','ped','split'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] };
     const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
@@ -2285,7 +2216,7 @@ export const BbAutoConstructor: React.FC = () => {
     <div>
       <div style={H}>📋 Шаг 1: Базовые параметры</div>
 
-      {/* Plan mode: cycle vs generic split */}
+      {/* Plan mode: generic vs programs */}
       <div style={{ marginBottom:10, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
         <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📌 Источник программы</div>
         <div style={{ display:'flex', gap:6 }}>
@@ -2294,19 +2225,19 @@ export const BbAutoConstructor: React.FC = () => {
             border: planMode === 'generic_split' ? '2px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
             background: planMode === 'generic_split' ? 'rgba(168,85,247,0.15)' : 'rgba(255,255,255,0.02)',
             color: planMode === 'generic_split' ? '#a855f7' : '#fff',
-          }}>🧩 Generic-сплит (авто-генерация)</button>
-          <button onClick={() => setPlanMode('bb_cycle')} style={{
+          }}>🧩 Генерик-сплит (авто-генерация)</button>
+          <button onClick={() => setPlanMode('programs')} style={{
             flex:1, padding:'8px 10px', borderRadius:10, cursor:'pointer', fontWeight:700, fontSize:11,
-            border: planMode === 'bb_cycle' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
-            background: planMode === 'bb_cycle' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
-            color: planMode === 'bb_cycle' ? '#00e68a' : '#fff',
-          }}>📋 ПРОФ-цикл (12 готовых программ)</button>
+            border: planMode === 'programs' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+            background: planMode === 'programs' ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.02)',
+            color: planMode === 'programs' ? '#00e68a' : '#fff',
+          }}>📚 Программы (точно / адаптация)</button>
         </div>
        </div>
 
       {renderSpecializationSelection()}
 
-      {planMode === 'bb_cycle' && (
+      {planMode === 'programs' && (
         <div style={{ marginBottom:10, padding:'10px 12px', borderRadius:10, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
           {/* Под-источник: ПРОФ-цикл / Библиотека программ */}
           <div style={{ display:'flex', gap:6, marginBottom:8 }}>
@@ -2402,8 +2333,8 @@ export const BbAutoConstructor: React.FC = () => {
                     Если не менять — берутся разумные дефолты.
                   </div>
 
-                  {/* Режим адаптации (faithful vs adapt) — только для library path */}
-                  {(planMode === 'bb_cycle') && (
+                  {/* Режим адаптации (faithful vs adapt) */}
+                  {(planMode === 'programs') && (
                     <div style={{ marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)' }}>
                       <div style={{ fontSize: 10, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>🔒 Режим конвертации программы</div>
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -2427,56 +2358,70 @@ export const BbAutoConstructor: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  {/* 🔧 Полная настройка как в генерик-сплите — видна только в adapt режиме */}
+                  {bbAdaptMode === 'adapt' && (
+                  <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    <PopupSelect label="🎯 Фокус тренировки" value={bbTrainingFocus} onChange={v => setBbTrainingFocus(v as 'strength' | 'hypertrophy' | 'endurance')} options={[
+                      { id:'strength', label:'Сила: RIR 1-2', desc:'Тяжёлые веса, RIR 1-2 — максимальный натяг.' },
+                      { id:'hypertrophy', label:'Гипертрофия: RIR 2-3', desc:'Умеренные веса 8-12 повт, темп 3-1-1-0.' },
+                      { id:'endurance', label:'Выносливость: RIR 3-4', desc:'Лёгкие веса 15-20 повт, короткая пауза.' },
+                    ]} />
+                    <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint="Порядок упражнений в дне — в коде: compound_first / pre_exhaust / post_exhaust" options={[
+                      { id:'compound_first', label:'Базовые → изоляция', desc:'Сначала тяжёлые многосуставные.' },
+                      { id:'pre_exhaust', label:'Pre-exhaust', desc:'Изоляция первой, затем база.' },
+                      { id:'post_exhaust', label:'Post-exhaust', desc:'База в полную силу, затем изоляция.' },
+                    ]} />
                     <PopupSelect
                       label='🔥 Интенсив-техника'
                       value={intensityTech}
                       onChange={v => setIntensityTech(v as IntensityTechnique)}
+                      hint='В коде: none / rest_pause / drop_set / myo_reps / pause_rep / mechanical_drop / negative'
                       options={[
-                        { id: 'none', label: 'Авто по фазе', desc:'Accumulation → пауза-репс, intensification → rest-pause/dropset по мышце.' },
-                        { id: 'rest_pause', label: 'Рест-пауза', desc:'Финал 8 + 15с → 3-4 + 15с → 3-4. Продлевает подход.' },
-                        { id: 'drop_set', label: 'Дроп-сет', desc:'−20% веса → 6 повт, ещё −20% → 4 повт. Жжение.' },
-                        { id: 'myo_reps', label: 'Myo-reps', desc:'12-15 + 4×4 с 5с паузой. Для изоляций.' },
-                        { id: 'pause_rep', label: 'Пауза-репс', desc:'Пауза 2-3с внизу каждого повтора.' },
+                        { id: 'none', label: 'Авто по фазе', desc:'Accumulation → пауза-репс, intensification → rest-pause/dropset.' },
+                        { id: 'rest_pause', label: 'Рест-пауза', desc:'Финал 8 + 15с → 3-4 + 15с → 3-4.' },
+                        { id: 'drop_set', label: 'Дроп-сет', desc:'−20% веса → 6 повт, ещё −20% → 4 повт.' },
+                        { id: 'myo_reps', label: 'Myo-reps', desc:'12-15 + 4×4 с 5с паузой.' },
+                        { id: 'pause_rep', label: 'Пауза-репс', desc:'Пауза 2-3с внизу.' },
                         { id: 'mechanical_drop', label: 'Мех. дроп-сет', desc:'Смена угла/хвата без отдыха.' },
-                      { id: 'negative', label: 'Негативы (3-4с)', desc:'Медленный негатив 3-4с, подъём 1с.' },
-                      { id: 'twenty_ones', label: '21s (7-7-7)', desc:'7 снизу +7 сверху +7 полных — бицепс.' },
-                    ]}
+                        { id: 'negative', label: 'Негативы (3-4с)', desc:'Медленный негатив 3-4с.' },
+                        { id: 'twenty_ones', label: '21s (7-7-7)', desc:'7 снизу +7 сверху +7 полных — бицепс.' },
+                      ]}
                     />
                     <PopupSelect
                       label='🌊 Волновая периодизация (DUP)'
                       value={dupMode}
                       onChange={v => setDupMode(v as DUPMode)}
-                      hint='Чередование стимулов внутри недели — в коде: none / heavy_light / strength_hypertrophy / full_dup'
+                      hint='В коде: none / heavy_light / strength_hypertrophy / full_dup'
                       options={[
                         { id: 'none', label: 'Выкл (стандарт)', desc:'Блочная: накопление → интенс. → разгрузка.' },
-                        { id: 'heavy_light', label: 'Тяж/лёг (2 дня)', desc:'Тяж сила + лёгк объём/техника.' },
-                        { id: 'strength_hypertrophy', label: 'Сила/гипертрофия (2 дня)', desc:'4-6 RIR1 + 10-15 RIR3 — оптимум.' },
-                        { id: 'full_dup', label: 'Полный DUP (3 дня)', desc:'Сила/гипер/выносл. — нужен опыт.' },
+                        { id: 'heavy_light', label: 'Тяж/лёг (2 дня)', desc:'Тяж сила + лёгк объём.' },
+                        { id: 'strength_hypertrophy', label: 'Сила/гипертрофия (2 дня)', desc:'4-6 RIR1 + 10-15 RIR3.' },
+                        { id: 'full_dup', label: 'Полный DUP (3 дня)', desc:'Сила/гипер/выносл.' },
                       ]}
                     />
                     <PopupSelect
                       label='🔗 Суперсеты'
                       value={supersetMode}
                       onChange={v => setSupersetMode(v as 'none' | 'antagonist' | 'same_muscle' | 'giant')}
-                      hint='Суперсеты — в коде: none / antagonist / same_muscle / giant (без отдыха)'
+                      hint='В коде: none / antagonist / same_muscle / giant'
                       options={[
                         { id: 'none', label: 'Выкл', desc:'По очереди с отдыхом.' },
-                        { id: 'antagonist', label: 'Антагонисты', desc:'Грудь↔спина, биц↔триц. −30% времени.' },
-                        { id: 'same_muscle', label: 'Одна группа', desc:'База+изоляция без отдыха — пробить.' },
-                        { id: 'giant', label: 'Гигант-сет', desc:'Три упр. одной группы — для продвинутых.' },
+                        { id: 'antagonist', label: 'Антагонисты', desc:'Грудь↔спина, биц↔триц.' },
+                        { id: 'same_muscle', label: 'Одна группа', desc:'База+изоляция без отдыха.' },
+                        { id: 'giant', label: 'Гигант-сет', desc:'Три упр. одной группы.' },
                       ]}
                     />
                     <PopupSelect
                       label='📦 Схема объёма памп-дней'
                       value={volumeScheme}
                       onChange={v => setVolumeScheme(v as any)}
-                      hint='Методики для памп-изоляций (кап 5/упр) — в коде: standard / gvt / fst7 / gironda'
+                      hint='В коде: standard / gvt / fst7 / gironda'
                       options={[
                         { id: 'standard', label: 'Стандартная', desc:'Авто: тяж база, памп изоляция.' },
-                        { id: 'gvt', label: 'GVT 10×10', desc:'10×10, 60%, 60-90с — экстремальный объём.' },
-                        { id: 'fst7', label: 'FST-7', desc:'7×8-12, 30-45с в конце мышцы.' },
-                        { id: 'gironda', label: '8×8 Gironda', desc:'8×8, 45-60с, умеренный вес.' },
+                        { id: 'gvt', label: 'GVT 10×10', desc:'10×10, 60%, 60-90с.' },
+                        { id: 'fst7', label: 'FST-7', desc:'7×8-12, 30-45с.' },
+                        { id: 'gironda', label: '8×8 Gironda', desc:'8×8, 45-60с.' },
                       ]}
                     />
                     <PopupSelect
@@ -2484,24 +2429,105 @@ export const BbAutoConstructor: React.FC = () => {
                       value={loadStrategy}
                       onChange={v => setLoadStrategy(v as LoadStrategy)}
                       options={[
-                        { id: 'double_progression', label: 'Двойная прогрессия', desc:'Сначала добить повторы до верха, затем +вес 5%.' },
+                        { id: 'double_progression', label: 'Двойная прогрессия', desc:'Сначала добить повторы, затем +вес.' },
                         { id: 'linear', label: 'Линейная', desc:'+2.5 кг/нед компаунд, +1 кг изоляция.' },
                         { id: 'wave', label: 'Волновая', desc:'3-нед волны тяж/сред/лёг.' },
-                        { id: 'rpe_based', label: 'RPE-based', desc:'Вес по ощущению RPE — для опытных.' },
+                        { id: 'rpe_based', label: 'RPE-based', desc:'Вес по ощущению RPE.' },
                       ]}
                     />
                     <PopupSelect
                       label='📉 Тип разгрузки'
                       value={deloadType}
                       onChange={v => setDeloadType(v as DeloadType)}
-                      hint='Разгрузка при ACWR>1.3 — в коде: pump / neural / full_rest'
+                      hint='В коде: pump / neural / full_rest'
                       options={[
-                        { id: 'pump', label: 'Памп-делод 50%', desc:'Лёгкие веса 15-20 повт, 50% объёма.' },
-                        { id: 'neural', label: 'Нейр-делод тяж/мало', desc:'Мало сетов, тяж вес, 3 мин пауза.' },
-                        { id: 'full_rest', label: 'Полный отдых', desc:'20% объёма, 40% веса — при перетрене.' },
+                        { id: 'pump', label: 'Памп-делод 50%', desc:'Лёгкие веса 15-20 повт.' },
+                        { id: 'neural', label: 'Нейр-делод', desc:'Мало сетов, тяж вес.' },
+                        { id: 'full_rest', label: 'Полный отдых', desc:'20% объёма, 40% веса.' },
                       ]}
                     />
+                    <PopupSelect label="⬇️ Эксцентрик" value={String(eccentricMult)} onChange={v => setEccentricMult(parseFloat(v))} hint="В коде eccentricMult: 1.0 / 1.1 / 1.2 (Schoenfeld 2021)." options={[
+                      { id:'1.0', label:'1.0 — Норма', desc:'Стандартный темп.' },
+                      { id:'1.1', label:'1.1 — +10%', desc:'Медленнее опускание.' },
+                      { id:'1.2', label:'1.2 — +20%', desc:'Выраженный негатив.' },
+                    ]} />
+                    <PopupNumber label="🍽️ Профицит (ккал/день)" value={calorieSurplus} onChange={v => setCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} />
+                    <PopupSelect label="🔄 Вариативность" value={rotationMode} onChange={v => setRotationMode(v as any)} hint="В коде rotationMode: forbid / strict / variety" options={[
+                      { id:'forbid', label:'🚫 Запрет — одни и те же', desc:'Строго одни упражнения.' },
+                      { id:'strict', label:'📅 Строгий — раз в 4 недели', desc:'Смена на границе фаз.' },
+                      { id:'variety', label:'🎨 Разнообразие — при 2×/мышцу', desc:'Чередование углов.' },
+                    ]} />
+                    <PopupSelect label="🔥 Интенсивность" value={intensityLevel} onChange={v => setIntensityLevel(v as any)} hint="В коде intensityLevel: light / moderate / high" options={[
+                      { id:'light', label:'🌿 Лёгкая — отдых +20%', desc:'Тяж 3 мин, памп 75с.' },
+                      { id:'moderate', label:'⚖️ Умеренная — стандарт', desc:'Тяж 2-3 мин, памп 60с.' },
+                      { id:'high', label:'🔥 Высокая — отдых −20%', desc:'Тяж 1.5 мин, памп 45с.' },
+                    ]} />
+                    <PopupSelect label="📦 Цель объёма" value={bbVolGoal} onChange={v => setBbVolGoal(v)} options={[['mev','Минимум (MEV)'],['mav','Оптимум (MAV)'],['mrv','Максимум (MRV)']].map(([id,label]) => ({ id, label }))} />
+                    <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 10px', borderRadius:10, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)' }}>
+                      <span style={{ fontSize:10, fontWeight:700, color:'#3b82f6' }}>📦 Объёмный</span>
+                      <button onClick={() => setTrainingVolumeMode('standard')} style={{ flex:1, padding:'6px 8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', border: trainingVolumeMode==='standard' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='standard' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='standard' ? '#3b82f6' : '#fff' }}>Обычный</button>
+                      <button onClick={() => setTrainingVolumeMode('high')} style={{ flex:1, padding:'6px 8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', border: trainingVolumeMode==='high' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode==='high' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode==='high' ? '#f59e0b' : '#fff' }}>Объёмный</button>
+                    </div>
                   </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>Подбор упражнений</div>
+                    {[
+                      { icon: '🚫', title: 'Исключить осевую нагрузку', desc: 'Убрать приседы, тяги со штангой', on: avoidAxialLoadUi, set: setAvoidAxialLoadUi, accent: '#ef4444', enabled: true },
+                      { icon: '🏗️', title: 'Меньше многосуставных', desc: 'Больше тренажёров и изоляций', on: fewerCompound, set: setFewerCompound, accent: '#f59e0b', enabled: true },
+                      { icon: '🏋️', title: 'Становая / жим стоя', desc: bbGoal === 'strength_mass' ? 'Включить становую и жим стоя' : 'Доступно в «Сила + Масса»', on: allowStrengthLifts, set: setAllowStrengthLifts, accent: '#3b82f6', enabled: bbGoal === 'strength_mass' },
+                    ].map(t => {
+                      const active = t.enabled && t.on;
+                      return (
+                        <button key={t.title} type="button" onClick={() => t.enabled && t.set(!t.on)} aria-pressed={!!active} aria-disabled={!t.enabled} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, padding: '10px 12px', borderRadius: 12, cursor: t.enabled ? 'pointer' : 'not-allowed', textAlign: 'left', boxSizing: 'border-box', fontFamily: 'inherit', background: active ? `linear-gradient(135deg, ${t.accent}1e, rgba(24,24,27,0.35))` : 'rgba(255,255,255,0.03)', border: active ? `1px solid ${t.accent}66` : '1px solid rgba(255,255,255,0.08)', opacity: t.enabled ? 1 : 0.45, transition: 'all .15s' }}>
+                          <span style={{ fontSize: 16, flexShrink: 0 }}>{t.icon}</span>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: active ? t.accent : '#fff', lineHeight: 1.2 }}>{t.title}</span>
+                            <span style={{ display: 'block', fontSize: 10, color: '#fff', lineHeight: 1.3, marginTop: 2 }}>{t.desc}</span>
+                          </span>
+                          <span style={{ marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0, position: 'relative', background: active ? t.accent : 'rgba(255,255,255,0.15)', transition: 'background .2s' }}>
+                            <span style={{ position: 'absolute', top: 2, left: active ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                    <PopupExerciseList label="⭐ Любимые" ids={bbFavEx} onChange={ids => { setBbFavEx(ids); syncProf({ favoriteExercises: ids }); }} accent="#00e68a" />
+                    <PopupExerciseList label="✕ Не любимые" ids={bbExclEx} onChange={ids => { setBbExclEx(ids); syncProf({ excludedExercises: ids }); }} accent="#ef4444" />
+                  </div>
+                  <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🏋️ Оборудование</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+                      {([['barbell','Штанга'],['dumbbell','Гантели'],['cable','Блок'],['machine','Тренажёр'],['kettlebell','Гири'],['bodyweight','Свой вес'],['bands','Резинки']] as const).map(([id,label]) => {
+                        const on = bbEquipment.includes(id);
+                        return <button key={id} onClick={() => setBbEquipment(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])} style={{ padding:'5px 10px', borderRadius:14, fontSize:10, fontWeight:700, cursor:'pointer', minHeight:38, border:on?'1px solid #60a5fa':'1px solid rgba(255,255,255,0.08)', background:on?'rgba(96,165,250,0.15)':'rgba(255,255,255,0.02)', color:on?'#60a5fa':'#fff' }}>{label}{on?' ✓':''}</button>;
+                      })}
+                    </div>
+                  </div>
+                  <div style={{ marginTop:8 }}>
+                    <InjurySelectCard injuries={injuries} onChange={setInjuries} />
+                  </div>
+                  <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.18)' }}>
+                    <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🦴 Ограничения мобильности</div>
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                      {([
+                        { id: 'shoulder', icon: '🤸', label: 'Плечи' },
+                        { id: 'hip', icon: '🦵', label: 'Таз' },
+                        { id: 'ankle', icon: '🦶', label: 'Голеностоп' },
+                        { id: 'lower_back', icon: '🔙', label: 'Поясница' },
+                        { id: 'wrist', icon: '✋', label: 'Запястья' },
+                      ] as const).map(r => {
+                        const active = mobilityRestrictions.includes(r.id);
+                        return (
+                          <button key={r.id} onClick={() => setMobilityRestrictions(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])} style={{ padding:'7px 10px', borderRadius:10, fontSize:11, cursor:'pointer', border: active ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#f59e0b' : '#fff' }}>
+                            {r.icon} {r.label} {active ? '✕' : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  </>
+                  )}
                   <button
                     onClick={() => setAutoDeload(a => !a)}
                     style={{
@@ -2954,10 +2980,10 @@ export const BbAutoConstructor: React.FC = () => {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
         {BB_WM_KEYS.map(k => <PopupNumber key={k} label={BB_WM_RU[k]} value={bbWorkMax[k] || 80} min={10} max={500} suffix=' кг' onChange={v => setBbWorkMax(p => ({ ...p, [k]: v }))} />)}
       </div>
-      <button style={{ ...BTN, width:'100%' }} onClick={() => planMode === 'bb_cycle' ? buildBb() : setStep('split')}>
-        {planMode === 'bb_cycle' ? '⚡ Собрать план по циклу →' : 'Далее: выбрать сплит →'}
+      <button style={{ ...BTN, width:'100%' }} onClick={() => planMode === 'programs' ? buildBb() : setStep('split')}>
+        {planMode === 'programs' ? '⚡ Собрать план по программе →' : 'Далее: выбрать сплит →'}
       </button>
-      {planMode === 'bb_cycle' && (
+      {planMode === 'programs' && (
         <button style={{ ...BTN_GHOST, width:'100%', marginTop:6 }} onClick={() => setStep('params')}>
           ← Назад к параметрам
         </button>
@@ -4357,15 +4383,15 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
               <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
                 <b>Соответствие:</b> {sel ? sel.rationale.slice(0,3).join(' · ') : '—'}<br/>
-                <b>Выбрано:</b> дней {bbDays}, цель {bbGoal}, слабые {weakPoints.join(', ')||'—'}, фокус {focusGroup||'—'}, оборудование {bbEquipment.slice(0,2).join(', ')||'все'}, травмы {injuries.length||'нет'} · <b>План:</b> {builtPlan.pattern?.schedule?.length||'?'} дн/ротацию
+                <b>Выбрано:</b> дней {bbDays}, цель {bbGoal}, слабые {weakPoints.join(', ')||'—'}, фокус —, оборудование {bbEquipment.slice(0,2).join(', ')||'все'}, травмы {injuries.length||'нет'} · <b>План:</b> {builtPlan.pattern?.schedule?.length||'?'} дн/ротацию
               </div>
               {sel?.warnings?.length ? <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>{sel.warnings.slice(0,2).map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null}
               <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>Формула: rankBBSplits(level, goal, days, weakPoints, focusGroup, donorMuscles, specialization, equipment, injuries, mobility, peds) → {sc} / max {maxSc}. Топ-3: {ranked.slice(0,3).map(r=>`${r.pattern.id} ${r.score}`).join(' · ')}</div>
             </div>
           );
         })()}
-        {/* Cycle info if in cycle mode */}
-        {planMode === 'bb_cycle' && selectedCycleId && (() => {
+        {/* Legacy cycle info — для старых сохранённых bb_cycle планов */}
+        {(planMode === 'programs' || planMode === 'bb_cycle') && selectedCycleId && getCycleById(selectedCycleId) && (() => {
           const c = getCycleById(selectedCycleId);
           if (!c) return null;
           return (
@@ -4732,7 +4758,7 @@ export const BbAutoConstructor: React.FC = () => {
         })()}
         {/* Мусорный объём — полностью на русском, проверка с учётом всех выбранных параметров и плана */}
         {(() => {
-          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears, focusGroup, specialization: specializationMode, specializationTargets: specTargets });
+          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears, focusGroup: '', specialization: specializationMode, specializationTargets: specTargets });
           const ruMuscleG = (m: string) => (MUSCLE_LABEL_RU as any)[m] || m;
           const ruReason = (r: string) => r
             .replace(/Дублирование паттерна (\S+) для (\S+)/, 'Дубль изоляции «$1» для «$2» — в одной сессии достаточно одной')
@@ -4746,7 +4772,6 @@ export const BbAutoConstructor: React.FC = () => {
           paramChips.push(`сплит ${builtPlan.pattern?.name || builtPlan.pattern?.id || '—'}`);
           paramChips.push(`объём ${bbVolGoal}${trainingVolumeMode==='high'?' (объёмный)':''}`);
           if (weakPoints.length) paramChips.push(`слабые: ${weakPoints.join(', ')}`);
-          if (focusGroup) paramChips.push(`фокус-группа ${focusGroup}`);
           if (specializationMode) paramChips.push(`специализация ${specTargets.join('+')}`);
           if (bbEquipment.length) paramChips.push(`оборудование ${bbEquipment.slice(0,3).join(', ')}${bbEquipment.length>3?'…':''}`);
           if (injuries.length) paramChips.push(`травмы ${injuries.length}`);
@@ -4759,7 +4784,7 @@ export const BbAutoConstructor: React.FC = () => {
                 <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
                   {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
                 </div>
-                <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>Логика: detectGarbageVolume(weeks, weakPoints, {level, trainingYears, focusGroup, specialization}) → warmup исключён, back по classifyBackExercise, compound исключён, seenPatterns per session, слабые/фокус — скип.</div>
+                <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>{`Логика: detectGarbageVolume(weeks, weakPoints, {level, trainingYears, focusGroup: '', specialization}) → warmup исключён, back по classifyBackExercise, compound исключён, seenPatterns per session, слабые/фокус — скип.`}</div>
               </div>
             );
           }

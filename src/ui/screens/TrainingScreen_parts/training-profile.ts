@@ -29,7 +29,7 @@ export interface TrainingProfile {
   pmDead: number;
   workMax: Record<string, number>;
   loadStrategy: string;
-  planMode: 'generic_split' | 'bb_cycle';
+  planMode: 'generic_split' | 'programs' | 'bb_cycle';
   bbCycleId: string;
   onCourse: boolean;
   courseIntensity: 'mild' | 'moderate' | 'heavy';

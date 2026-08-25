@@ -150,8 +150,14 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     planType = 'manual', totalWeeks = 8, exerciseNames = [],
     injuries = [], onCourse = false,
     mrvByMuscle, trainingYears, pedMultiplier,
-    goal, trainingFocus, methodology, volumeGoal, specialization, focusGroup, splitPattern,
-  } = input as any;
+  } = input;
+  const goal = (input as any).goal as string | undefined;
+  const trainingFocus = (input as any).trainingFocus as string | undefined;
+  const methodology = (input as any).methodology as string | undefined;
+  const volumeGoal = (input as any).volumeGoal as string | undefined;
+  const specialization = (input as any).specialization as boolean | undefined;
+  const focusGroup = (input as any).focusGroup as string | undefined;
+  const splitPattern = (input as any).splitPattern as string | undefined;
 
   // Контекстный суффикс для отчёта: на основе каких параметров пользователя
   // сформирован допустимый объём (стаж, курс, фокус, цель, методика).
@@ -335,9 +341,9 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
 
   // 8. Соответствие выбранных параметров и плана — валидация и предупреждения
   // Цель vs объём
-  if ((input as any).goal) {
-    const avgSets = Object.values(weeklySets).reduce((a,b)=>a+b,0) / Math.max(1, Object.keys(weeklySets).length);
-    if ((input as any).goal === 'cut' && avgSets > 18) {
+  if (goal) {
+    const avgSets = Object.values(weeklySets as Record<string, number>).reduce((a,b)=>a+b,0) / Math.max(1, Object.keys(weeklySets).length);
+    if (goal === 'cut' && avgSets > 18) {
       issues.push({
         id: 'goal_cut_volume_high', severity: 'warning', category: 'volume',
         message: `Цель «сушка» выбрана, но средний объём ${avgSets.toFixed(1)} сетов/группа > MAV — на дефиците риск перетрена`,
@@ -345,7 +351,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
         fix: `Снизить объём до MAV или сменить цель на mass/recomp`,
       });
     }
-    if ((input as any).goal === 'strength_mass' && avgSets < 10) {
+    if (goal === 'strength_mass' && avgSets < 10) {
       issues.push({
         id: 'goal_strength_low', severity: 'info', category: 'volume',
         message: `Цель «сила+масса» выбрана, но объём низкий (${avgSets.toFixed(1)}) — для силы нужен базовый объём`,
@@ -355,15 +361,14 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     }
   }
   // Объёмная цель vs факт
-  if ((input as any).volumeGoal) {
-    const vg = (input as any).volumeGoal;
-    const overMrv = Object.entries(weeklySets).some(([g, s]) => s > (getThresholds(g, level, mrvByMuscle).mrv));
-    const underMev = Object.entries(weeklySets).some(([g, s]) => s < (getThresholds(g, level, mrvByMuscle).mev));
-    if (vg === 'mrv' && !overMrv && Object.values(weeklySets).every(s=> s < 20)) {
+  if (volumeGoal) {
+    const vg = volumeGoal;
+    const overMrv = Object.entries(weeklySets as Record<string, number>).some(([g, s]) => s > (getThresholds(g, level, mrvByMuscle).mrv));
+    if (vg === 'mrv' && !overMrv && Object.values(weeklySets as Record<string, number>).every(s=> s < 20)) {
       issues.push({
         id: 'vol_goal_mrv_not_reached', severity: 'info', category: 'volume',
         message: `Цель объёма «максимальный (MRV)» выбрана, но ни одна группа не на MRV — план ниже выбранного уровня`,
-        detail: `Выбрано: ${vg} · План: макс ${Math.max(...Object.values(weeklySets)).toFixed(1)} сетов`,
+        detail: `Выбрано: ${vg} · План: макс ${Math.max(...Object.values(weeklySets as Record<string, number>)).toFixed(1)} сетов`,
         fix: `Увеличить объём или сменить цель на MAV`,
       });
     }
@@ -377,9 +382,9 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     }
   }
   // Фокус-группа vs объём
-  if ((input as any).focusGroup) {
-    const fg = (input as any).focusGroup;
-    const fgSets = weeklySets[fg] ?? weeklySets[fg.toLowerCase()] ?? 0;
+  if (focusGroup) {
+    const fg = focusGroup;
+    const fgSets = (weeklySets as Record<string, number>)[fg] ?? (weeklySets as Record<string, number>)[fg.toLowerCase()] ?? 0;
     const fgThresh = getThresholds(fg, level, mrvByMuscle);
     if (fgSets < fgThresh.mav) {
       issues.push({
@@ -391,7 +396,7 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     }
   }
   // Специализация без слабых
-  if ((input as any).specialization && (!weakPoints || weakPoints.length===0)) {
+  if (specialization && (!weakPoints || weakPoints.length===0)) {
     issues.push({
       id: 'spec_no_weak', severity: 'info', category: 'weak_point',
       message: `Включена специализация, но слабые группы не указаны — план строится как без акцента`,
@@ -400,13 +405,13 @@ export function validatePlanQuality(input: PlanQualityInput): PlanQualityResult 
     });
   }
   // Методика vs разнообразие (упрощённо)
-  if ((input as any).methodology && (input as any).methodology !== 'compound_first') {
+  if (methodology && methodology !== 'compound_first') {
     const uniq = new Set(exerciseNames.flat()).size;
     if (uniq < 6) {
       issues.push({
         id: 'methodology_low_diversity', severity: 'info', category: 'exercise',
-        message: `Методика «${(input as any).methodology}» выбрана, но разнообразие низкое (${uniq} упр.) — эффект методики снижен`,
-        detail: `Выбрано: методика ${(input as any).methodology} · План: ${uniq} уникальных упражнений`,
+        message: `Методика «${methodology}» выбрана, но разнообразие низкое (${uniq} упр.) — эффект методики снижен`,
+        detail: `Выбрано: методика ${methodology} · План: ${uniq} уникальных упражнений`,
         fix: `Добавить вариаций для методики`,
       });
     }

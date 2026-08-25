@@ -1441,6 +1441,12 @@ export interface ProgramToBBPlanOpts {
   supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
   volumeScheme?: 'standard' | 'gvt' | 'fst7' | 'gironda';
+  /** BFR-режим: окклюзия 20-30% 1RM, 30-15-15-15, 30с. Только для памп-изоляций. */
+  bfrMode?: boolean;
+  /** Blast/Cruise: 8н blast (×1.15) / 4н cruise (×0.85), повторяется. */
+  blastCruiseEnabled?: boolean;
+  blastWeeks?: number;
+  cruiseWeeks?: number;
   /** P1-7 (audit 2026-08): предыдущий мезоцикл — для cross-mesocycle continuity. */
   previousPlan?: BBPlan;
 }

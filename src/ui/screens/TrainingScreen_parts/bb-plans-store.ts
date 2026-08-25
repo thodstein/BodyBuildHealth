@@ -117,7 +117,7 @@ function migrateSavedPlan(value: any): SavedBBPlan {
       daysPerWeek: Number.isInteger(rawParams.daysPerWeek) && rawParams.daysPerWeek > 0 ? rawParams.daysPerWeek : undefined,
       source: validSource, programPath: validProgramPath,
       programId: typeof rawParams.programId === 'string' ? rawParams.programId : undefined,
-      planMode: rawParams.planMode === 'bb_cycle' ? 'bb_cycle' : 'generic_split',
+      planMode: rawParams.planMode === 'programs' || rawParams.planMode === 'bb_cycle' ? 'programs' : 'generic_split',
       cycleId: typeof rawParams.cycleId === 'string' ? rawParams.cycleId : undefined,
     },
     metrics: {
