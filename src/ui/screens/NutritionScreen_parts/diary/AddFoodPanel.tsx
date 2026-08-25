@@ -202,17 +202,17 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               color: '#fff', minHeight: 44, fontWeight: 500 }}>
             📱 Штрих-код
           </button>
-           <label style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
+            <label style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
               opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
-            <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,image/*" style={{ display: 'none' }}
+            <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,image/*" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
               onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
               {ocrFileLoading ? '⏳ Распознаём' : '📸 Фото/файл'}
             </label>
             <label style={{ flex: 1, padding: '10px', borderRadius: 12, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
               background: '#202023', border: '1px solid rgba(255,255,255,0.06)', color: '#fff',
               opacity: ocrFileLoading ? 0.5 : 1, minHeight: 44, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
-            <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }}
+            <input ref={ocrCameraRef} type="file" accept="image/*" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}
               onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
                {ocrFileLoading ? '⏳ Ждём ответ' : '📷 Камера'}
             </label>
@@ -225,16 +225,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
           </button>
          </div>
 
-         {ocrError && !showOCR && (
-           <div role="alert" style={{ padding: '9px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35 }}>
-             {ocrError}
-           </div>
-         )}
-
-          <input ref={ocrFileRef} type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,image/*" style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
-          <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
+          {ocrError && !showOCR && (
+            <div role="alert" style={{ padding: '9px 10px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35 }}>
+              {ocrError}
+            </div>
+          )}
       </div>
 
       {showBarcode && (
