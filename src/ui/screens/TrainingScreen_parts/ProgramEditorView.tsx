@@ -1351,9 +1351,21 @@ return (
             if (!titleOk) step = { icon: '✏️', title: 'Добавьте название', desc: 'Без названия Итог не будет качественным — 3+ символов.', color: '#ef4444', btn: 'К параметрам →', action: ()=>{ setEstep('params'); scrollEditorTop(); } };
             else if (!hasWeeks) step = { icon: '🗓', title: 'Создайте недели', desc: 'Добавьте недели и дни — каркас программы.', color: '#3b82f6', btn: 'К параметрам →', action: ()=>{ setEstep('params'); scrollEditorTop(); } };
             else if (hasEmptySession) step = { icon: '⚡', title: 'Заполните пустые тренировки', desc: 'Есть дни без упражнений — 1 клик по «Заполнить пустые» добавит базу под ваш зал.', color: '#f59e0b', btn: 'К упражнениям ↓', action: ()=> window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'}) };
-            else if (daysMismatch) step = { icon: '⚖️', title: 'Выровняйте дни', desc: `meta ${program.meta.daysPerWeek}д ↔ в неделе ${program.bb?.weeks[0]?.sessions.length}д — нажмите Выровнять.`, color: '#f59e0b', btn: 'Выровнять', action: ()=>{} };
-            else if (lows.length>0) step = { icon: '⬇️', title: `Недобор: ${lows.slice(0,2).map((l:any)=> GROUP_RU[l.muscle] ?? l.muscle).join(', ')}`, desc: `MEV не достигнут — добавьте 1 сет в день. Score ${q?.score??'—'}/100.`, color: '#3b82f6', btn: '+ Добавить сет', action: ()=>{} };
-            else if (overs.length>0) step = { icon: '⚠️', title: `Перегруз: ${overs.slice(0,2).map((o:any)=> GROUP_RU[o.muscle] ?? o.muscle).join(', ')}`, desc: `> MRV — снимите 1 сет, иначе перетрен.`, color: '#ef4444', btn: 'Исправить', action: ()=>{} };
+            else if (daysMismatch) step = { icon: '⚖️', title: 'Выровняйте дни', desc: `meta ${program.meta.daysPerWeek}д ↔ в неделе ${program.bb?.weeks[0]?.sessions.length}д — нажмите Выровнять.`, color: '#f59e0b', btn: 'Выровнять', action: ()=>{ try{ const ndays=program.meta.daysPerWeek; update({ bb: { ...program.bb!, weeks: program.bb!.weeks.map(w=> ({...w, sessions: w.sessions.slice(0, ndays)})) }}); showToast('⚖️ Дни выровнены'); }catch{} } };
+            else if (lows.length>0) step = { icon: '⬇️', title: `Недобор: ${lows.slice(0,2).map((l:any)=> GROUP_RU[l.muscle] ?? l.muscle).join(', ')}`, desc: `MEV не достигнут — добавим 1 сет для ${GROUP_RU[lows[0].muscle] ?? lows[0].muscle}. Score ${q?.score??'—'}/100.`, color: '#3b82f6', btn: '+ Добавить сет', action: ()=>{ try{
+                  const mus = lows[0].muscle;
+                  const prof = (()=>{ try{return loadTrainingProfile();}catch{return {} as any;}})();
+                  const exs = suggestExercisesForGroup(mus, program.meta.level, 1, prof.equipment??[], prof.weakPoints??[], [], false, prof.favoriteExercises??[], prof.excludedExercises??[]);
+                  const ex = exs[0];
+                  const widx = 0; const sidx = 0;
+                  const weeks = program.bb!.weeks.map((w,wi)=> wi!==widx? w : {...w, sessions: w.sessions.map((s,si)=> si!==sidx? s : {...s, blocks: [...s.blocks, { id: newId('blk'), exerciseName: ex?.name ?? mus, muscle: mus, type: (ex?.type==='compound'?'compound':'accessory') as any, role: (ex?.type==='compound'?'primary':'accessory') as any, sets: [{reps: 10, rir: 2, weight: 40}] }]})});
+                  update({ bb: {...program.bb!, weeks}}); showToast('⬇️ + сет для '+(GROUP_RU[mus]??mus));
+                }catch{} } };
+            else if (overs.length>0) step = { icon: '⚠️', title: `Перегруз: ${overs.slice(0,2).map((o:any)=> GROUP_RU[o.muscle] ?? o.muscle).join(', ')}`, desc: `> MRV — снимем 1 сет у ${GROUP_RU[overs[0].muscle] ?? overs[0].muscle}.`, color: '#ef4444', btn: 'Снять сет', action: ()=>{ try{
+                  const mus = overs[0].muscle;
+                  const weeks = program.bb!.weeks.map(w=> ({...w, sessions: w.sessions.map(s=> ({...s, blocks: s.blocks.map(b=> b.muscle===mus ? {...b, sets: b.sets.slice(0, Math.max(1,b.sets.length-1))}: b ).filter(b=> b.sets.length>0)}))}));
+                  update({ bb: {...program.bb!, weeks}}); showToast('⚠️ − сет для '+(GROUP_RU[mus]??mus));
+                }catch{} } };
             else if (needDeload) step = { icon: '🔄', title: 'Добавьте делод', desc: `${program.meta.weeks} нед без делода — каждая 4-я нед −30% объёма.`, color: '#f59e0b', btn: 'К неделям', action: ()=>{} };
             else step = { icon: '✅', title: 'Готово к Итогу', desc: `Score ${q?.score ?? '—'}/100 ${q?.grade ?? ''} · можно сохранять.`, color: '#22c55e', btn: 'Далее: Итог →', action: ()=> onNext?.() };
             return (
@@ -1381,21 +1393,37 @@ return (
         <BulkApplyCard program={program} onChange={onChange} showToast={showToast} />
         </>
       )}
-      {/* 📚 Похожие из библиотеки — 3 рекомендации под вашу цель/уровень (1 клик) */}
+      {/* 📚 Похожие из библиотеки — умный скор: цель×3 + уровень×2 + дни×1 + оборудование×1 + слабые×1 */}
       {estep === 'weeks' && dir === 'bb' && (() => {
         try {
           const all = getAllPrograms();
-          const recs = all.filter(p => p.goal === program.meta.goal || p.level === program.meta.level).slice(0, 3);
-          if (recs.length === 0) return null;
+          const prof = (() => { try { return loadTrainingProfile(); } catch { return {} as any; } })();
+          const scored = all.map(p => {
+            let score = 0;
+            const tags: string[] = [];
+            if (p.goal === program.meta.goal) { score += 3; tags.push('цель ✓'); } else tags.push('цель · ' + p.goal);
+            if (p.level === program.meta.level) { score += 2; tags.push('уровень ✓'); }
+            if (p.daysPerWeek === program.meta.daysPerWeek) { score += 2; tags.push(p.daysPerWeek + 'д ✓'); } else tags.push(p.daysPerWeek + 'д');
+            // оборудование: если программа требует оборудование которого нет — штраф
+            const equipNeed = (p as any).equipmentNeeded ?? [];
+            const hasEquip = equipNeed.length === 0 || (prof.equipment ?? []).some((e: string) => equipNeed.includes(e));
+            if (hasEquip && equipNeed.length > 0) { score += 1; tags.push('зал ✓'); }
+            // слабые: программа бьёт по слабой группе?
+            const weakHit = (prof.weakPoints ?? []).some((w: string) => (p as any).name?.toLowerCase().includes(w) || (p as any).focus?.toLowerCase().includes(w));
+            if (weakHit) { score += 1; tags.push('слабая ✓'); }
+            return { p, score, tags };
+          }).sort((a,b) => b.score - a.score).slice(0, 3);
+          if (scored.length === 0) return null;
           return (
-            <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>📚 Похожие из библиотеки</span><span style={{ fontSize: 10, color: DIM }}>под вашу цель·уровень — 1 клик клонировать</span></div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
-                {recs.map(pr => (
-                  <button key={String(pr.id ?? pr.name)} onClick={() => { const cloned = cloneFromLibrary(pr as any); onChange(cloned); showToast('📥 ' + pr.name + ' — клонировано'); }} style={{ ...CARD_BTN, minHeight: 64, borderColor: 'rgba(167,139,250,0.18)', background: 'rgba(167,139,250,0.06)' }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>{pr.name}</span>
+            <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>📚 Похожие из библиотеки</span><span style={{ fontSize: 10, color: DIM }}>умный подбор под цель·уровень·дни·зал — 1 клик</span></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 6 }}>
+                {scored.map(({p: pr, score, tags}) => (
+                  <button key={String(pr.id ?? pr.name)} onClick={() => { const cloned = cloneFromLibrary(pr as any); onChange(cloned); showToast('📥 ' + pr.name + ' — клонировано'); }} style={{ ...CARD_BTN, minHeight: 72, borderColor: score>=5 ? 'rgba(167,139,250,0.30)' : 'rgba(167,139,250,0.16)', background: score>=5 ? 'rgba(167,139,250,0.10)' : 'rgba(167,139,250,0.05)', position: 'relative' }}>
+                    <span style={{ position: 'absolute', top: 6, right: 6, fontSize: 9, fontWeight: 800, color: score>=5 ? '#fff' : '#a78bfa', background: score>=5 ? '#a78bfa' : 'rgba(167,139,250,0.14)', borderRadius: 6, padding: '1px 5px' }}>{score>=5 ? '★' : ''} {score}/7</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa', paddingRight: 36 }}>{pr.name}</span>
                     <span style={{ fontSize: 10, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д</span>
-                    <span style={{ fontSize: 9, color: 'rgba(167,139,250,0.70)' }}>→ Взять за основу</span>
+                    <span style={{ fontSize: 9, color: 'rgba(167,139,250,0.70)', display: 'flex', gap: 4, flexWrap: 'wrap' }}>{tags.map(t => <span key={t} style={{ background: t.includes('✓') ? 'rgba(167,139,250,0.14)' : 'rgba(255,255,255,0.04)', border: `1px solid ${t.includes('✓') ? 'rgba(167,139,250,0.22)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 6, padding: '1px 4px', color: t.includes('✓') ? '#a78bfa' : DIM }}>{t}</span>)}</span>
                   </button>
                 ))}
               </div>

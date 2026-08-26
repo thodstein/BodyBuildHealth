@@ -993,8 +993,8 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
       `}</style>
       {blocks.length === 0 && (
         <div className="editor-empty-exercises" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
-          <div className="editor-empty-exercises__title" style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Добавим первое упражнение — 1 клик</div>
-          <div className="editor-empty-exercises__text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)', lineHeight: 1.5 }}>Выберите группу — покажем 6 упражнений под ваш зал, уровень и травмы. <span style={{ color: '#a78bfa', fontWeight: 700 }}>Фиолетовые — слабые группы, приоритет +10% объёма.</span> Или используйте «⚡ Заполнить пустые» выше для авто-наполнения всего дня.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 24, height: 24, borderRadius: 12, background: '#00e68a', color: '#06281c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>1</span><span className="editor-empty-exercises__title" style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Шаг 1 — выберите группу мышц</span><span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.45)', background: 'rgba(255,255,255,0.05)', borderRadius: 6, padding: '2px 6px' }}>1 клик</span></div>
+          <div className="editor-empty-exercises__text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)', lineHeight: 1.5, marginTop: 6 }}>Выберите карточку — покажем 6 упражнений под ваш зал, уровень и травмы. <span style={{ color: '#a78bfa', fontWeight: 700 }}>Фиолетовые — слабые (+10%).</span> Далее: <span style={{ color: '#fff', fontWeight: 700 }}>Шаг 2</span> — выберите упражнение, <span style={{ color: '#fff', fontWeight: 700 }}>Шаг 3</span> — настройте подходы. Или «⚡ Заполнить пустые» — весь день за 1 клик.</div>
           <div className="editor-card-grid">
             {(() => {
               let weak: string[] = [];
