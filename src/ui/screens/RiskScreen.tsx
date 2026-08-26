@@ -866,44 +866,39 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
       {/* ─── HERO PAGE — на весь экран, fixed overlay ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column' }}>
-          <img src="/risk-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)' }} />
-          <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px calc(64px + env(safe-area-inset-bottom, 0px))', gap: 10, overflowY: 'auto' }}>
-            <div>
-              <h1 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: '8px 0 4px', textShadow: '0 2px 12px rgba(0,0,0,0.9)', letterSpacing: '-0.6px', lineHeight: 1 }}>Оценка рисков</h1>
-              <p style={{ fontSize: 11, color: '#fff', margin: 0, lineHeight: 1.4, textShadow: '0 1px 6px rgba(0,0,0,0.8)', maxWidth: 480 }}>
-                Механизм-ориентированная модель ТЗ, вероятностные методы, клиника и справочник — всё в одном хабе
-              </p>
+        <div style={{ position:'fixed', inset:0, zIndex:80, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
+          <img src="/risk-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(0,0,0,0.10) 88%, rgba(0,0,0,0.18) 100%)' }} />
+          <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(20px + var(--nav-height,68px) + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
+            <div style={{ marginBottom:14 }}>
+            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 20px rgba(0,0,0,0.9)' }}>Оценка рисков</h1>
+            <p style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, maxWidth:360, textShadow:'0 1px 12px rgba(0,0,0,0.85)' }}>
+              Механизм-ориентированная модель ТЗ, вероятностные методы, клиника и справочник — всё в одном хабе
+            </p>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+<div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'tz_spec', icon: '🧬', title: 'Механизм-ориентированная', desc: '6 систем · 28 механизмов · верификация анализами', color: '#8b5cf6', bg: 'rgba(139,92,246,0.14)' },
-                { id: 'calculations', icon: '🧮', title: 'Другие методы расчёта', desc: 'Вероятностная, Монте-Карло V7, MDSS, клиника', color: '#22c55e', bg: 'rgba(34,197,94,0.14)' },
-                { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов', color: '#a78bfa', bg: 'rgba(168,85,247,0.14)' },
+                { id: 'tz_spec', icon: '🧬', title: 'Механизм-ориентированная', desc: '6 систем · 28 механизмов · полуколичественная шкала · верификация анализами.', color: '#8b5cf6' },
+                { id: 'calculations', icon: '🧮', title: 'Другие методы расчёта', desc: 'Вероятностная, Монте-Карло V7, MDSS, клиника — все модели в одном месте.', color: '#22c55e' },
+                { id: 'info', icon: 'ℹ️', title: 'Общая информация', desc: 'Формулы, механизмы, пороги препаратов и справочные данные.', color: '#a855f7' },
               ].map(card => (
-                <div
-                  key={card.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : 'overview' as any); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as any).click(); } }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; (e.currentTarget as HTMLDivElement).style.borderColor = `${card.color}40`; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 6px 18px rgba(0,0,0,0.32), 0 0 0 1px ${card.color}18 inset`; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.12)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 3px 12px rgba(0,0,0,0.30)'; }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 3px 12px rgba(0,0,0,0.30)', transition: 'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease', background: 'rgba(18,18,20,0.62)' }}
-                >
-                  <div style={{ width: 38, height: 38, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background: card.bg, fontSize: 18, boxShadow: `0 3px 10px ${card.color}20`, border: `1px solid ${card.color}18` }}>{card.icon}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 2, color: card.color, letterSpacing: '-0.2px', lineHeight: 1.2 }}>{card.title}</div>
-                    <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.3 }}>{card.desc}</div>
+                <button key={card.id} onClick={() => { setMainTab(card.id as any); setSubTab(card.id === 'info' ? 'info' : card.id === 'tz_spec' ? 'overview' : 'overview'); }} style={{
+                  display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                  background:'transparent', border:'1px solid rgba(255,255,255,0.14)', backdropFilter:'none', WebkitBackdropFilter:'none', boxShadow:'none', color:'#fff', transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
+                }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.22)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.06)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.background='transparent'; }}>
+                  <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${card.color}18`, border:`1px solid ${card.color}22`, fontSize:18 }}>{card.icon}</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6, textShadow:'0 1px 10px rgba(0,0,0,0.7)' }}>
+                      {card.title}
+                      <span style={{ width:5, height:5, borderRadius:'50%', background:card.color }} />
+                    </div>
+                    <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>{card.desc}</div>
                   </div>
-                  <span style={{ width: 26, height: 26, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${card.color}12`, border: `1px solid ${card.color}18`, color: card.color, fontSize: 13, flexShrink: 0, fontWeight: 700 }}>→</span>
-                </div>
+                  <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.10)', border:'1px solid rgba(255,255,255,0.14)', color:'#fff', fontSize:12, flexShrink:0 }}>→</span>
+                </button>
               ))}
             </div>
-            <div style={{ fontSize: 9, color: '#fff', textAlign: 'center', lineHeight: 1.3 }}>
-              Ознакомительно. Назначение — только врачом.
-            </div>
+            <div style={{ marginTop:10, textAlign:'center', fontSize:10, color:'#fff', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>Нажми на раздел — откроются инструменты и данные</div>
           </div>
         </div>
       )}

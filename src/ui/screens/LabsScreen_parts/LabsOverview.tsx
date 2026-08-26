@@ -66,7 +66,7 @@ export const LabsOverview: React.FC<{
           <span style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(234,179,8,0.14)', border:'1px solid rgba(234,179,8,0.18)', fontSize:14 }}>💡</span>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:11, fontWeight:800, color:'#fde68a' }}>Нет данных анализов</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', marginTop:1, lineHeight:1.35 }}>Добавьте маркеры во вкладке «Текущие» или импортируйте PDF/фото — тогда появятся статистика, риски и графики.</div>
+            <div style={{ fontSize:10, color:'#fff', marginTop:1, lineHeight:1.35 }}>Добавьте маркеры во вкладке «Текущие» или импортируйте PDF/фото — тогда появятся статистика, риски и графики.</div>
           </div>
           <LabsBadge color="#eab308">старт</LabsBadge>
         </div>
@@ -77,7 +77,7 @@ export const LabsOverview: React.FC<{
           <span style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.18)', fontSize:14 }}>🚫</span>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:11, fontWeight:800, color:'#fecaca' }}>Применён штраф за отсутствие анализов</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', marginTop:1 }}>Риски рассчитываются с повышающим коэффициентом. Снимите штраф после ввода данных.</div>
+            <div style={{ fontSize:9, color:'#fff', marginTop:1 }}>Риски рассчитываются с повышающим коэффициентом. Снимите штраф после ввода данных.</div>
           </div>
           <button onClick={()=>setForceNoLabs(false)} style={{ padding:'6px 10px', borderRadius:999, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>Снять</button>
         </div>
@@ -123,7 +123,7 @@ export const LabsOverview: React.FC<{
                   <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 11px', background: color+'10', borderBottom:`1px solid ${color}14` }}>
                     <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: color+'18', border:`1px solid ${color}22`, fontSize:13 }}>{icon}</span>
                     <span style={{ fontSize:12, fontWeight:800, color:'#fff', flex:1 }}>{label}</span>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{systemLabs.length} маркеров</span>
+                    <span style={{ fontSize:9, color:'#fff' }}>{systemLabs.length} маркеров</span>
                     {sysAbn>0 ? <LabsBadge color="#ef4444" small>{sysAbn} вне</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>в норме</LabsBadge>}
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, padding:8 }}>
@@ -144,10 +144,10 @@ export const LabsOverview: React.FC<{
                         }}>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontSize:11, fontWeight:700, color: isAbn? '#fff':'rgba(255,255,255,0.9)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
-                            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.code} • {refInfo || '—'}</div>
+                            <div style={{ fontSize:9, color:'#fff', marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.code} • {refInfo || '—'}</div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0 }}>
-                            <div style={{ fontSize:13, fontWeight:800, color: statusColor, lineHeight:1 }}>{lab.value}<span style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginLeft:2, fontWeight:600 }}>{lab.unit||''}</span></div>
+                            <div style={{ fontSize:13, fontWeight:800, color: statusColor, lineHeight:1 }}>{lab.value}<span style={{ fontSize:9, color:'#fff', marginLeft:2, fontWeight:600 }}>{lab.unit||''}</span></div>
                             <div style={{ marginTop:2, display:'inline-flex', alignItems:'center', gap:3, fontSize:9, fontWeight:800, padding:'1px 6px', borderRadius:999, background: statusColor+'18', border:`1px solid ${statusColor}22`, color: statusColor }}>{statusIcon} {status==='high'?'выше': status==='low'?'ниже': status==='unknown'?'—':'норма'}</div>
                           </div>
                         </div>

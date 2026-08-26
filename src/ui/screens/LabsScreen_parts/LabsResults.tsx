@@ -54,11 +54,11 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
     <div>
       {/* Filters — premium pills */}
       <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10, alignItems:'center' }}>
-        <button onClick={()=>setFilterSystem('all')} style={filterSystem==='all' ? { ...sysPillStyle(true, LABS_ACCENT), padding:'6px 12px' } : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.68)', fontSize:10, fontWeight:700, cursor:'pointer' }}>
+        <button onClick={()=>setFilterSystem('all')} style={filterSystem==='all' ? { ...sysPillStyle(true, LABS_ACCENT), padding:'6px 12px' } : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>
           Все системы
         </button>
         {systems.map(sys=>(
-          <button key={sys} onClick={()=>setFilterSystem(sys)} style={filterSystem===sys? sysPillStyle(true, sysColors[sys]||'#6b7280') : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.62)', fontSize:10, fontWeight:700, cursor:'pointer' }}>
+          <button key={sys} onClick={()=>setFilterSystem(sys)} style={filterSystem===sys? sysPillStyle(true, sysColors[sys]||'#6b7280') : { padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.05)', color:'#fff', fontSize:10, fontWeight:700, cursor:'pointer' }}>
             {sysIcons[sys]||''} {sysLabels[sys]||sys}
           </button>
         ))}
@@ -86,7 +86,7 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                   <span style={{ fontSize:12, fontWeight:800, color: isOpen? LABS_ACCENT : '#fff' }}>{dateStr}</span>
                   <span style={{ fontSize:10, color:'rgba(255,255,255,0.38)', marginLeft:6, display:'none' }}>{date}</span>
                   <span style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
-                    <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.72)' }}>{dateLabs.length}</span>
+                    <span style={{ fontSize:10, fontWeight:700, padding:'3px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{dateLabs.length}</span>
                     {dateAbn>0 ? <LabsBadge color="#ef4444" small>⚠ {dateAbn}</LabsBadge> : <LabsBadge color={LABS_ACCENT} small>✓</LabsBadge>}
                   </span>
                 </button>
@@ -109,13 +109,13 @@ export const LabsResults: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
                           <div style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: sysColor+'16', color: sysColor, fontWeight:800, fontSize:10, border:`1px solid ${sysColor}22` }}>{lab.code.slice(0,2).toUpperCase()}</div>
                           <div style={{ flex:1, minWidth:0 }}>
                             <div style={{ fontWeight:700, fontSize:11, color: isAbn?'#fff':'rgba(255,255,255,0.92)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{lab.name || lab.code}</div>
-                            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:1, display:'flex', gap:6, alignItems:'center' }}>
+                            <div style={{ fontSize:9, color:'#fff', marginTop:1, display:'flex', gap:6, alignItems:'center' }}>
                               <span>{sysIcons[sys]||''} {sysLabels[sys]||sys}</span>
                               {info && <span style={{ padding:'1px 5px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)' }}>{info.lln}–{info.uln} {info.prefUnit||''}</span>}
                             </div>
                           </div>
                           <div style={{ textAlign:'right', flexShrink:0, minWidth:86 }}>
-                            <div style={{ fontWeight:800, fontSize:14, color: statusColor, lineHeight:1 }}>{lab.value}<span style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginLeft:3, fontWeight:600 }}>{lab.unit||''}</span></div>
+                            <div style={{ fontWeight:800, fontSize:14, color: statusColor, lineHeight:1 }}>{lab.value}<span style={{ fontSize:9, color:'#fff', marginLeft:3, fontWeight:600 }}>{lab.unit||''}</span></div>
                             <div style={{ marginTop:3, fontSize:9, fontWeight:800, padding:'1px 6px', borderRadius:999, background: statusColor+'18', border:`1px solid ${statusColor}22`, color: statusColor, display:'inline-flex', gap:3 }}>{isAbn? (status==='high'?'↗':'↘') : '✓'} {statusText}</div>
                           </div>
                         </div>
