@@ -3,8 +3,16 @@ import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, no
 
 describe('BB volume model', () => {
   it('normalizes granular shoulder keys to the canonical group', () => {
-    expect(normalizeBBMuscle('delt_rear')).toBe('shoulders');
     expect(normalizeBBMuscle(' Shoulders ')).toBe('shoulders');
+    expect(normalizeBBMuscle('delts')).toBe('shoulders');
+  });
+
+  it('PPL per-head: delt_rear остаётся гранулярным ключом (не коллапсирует)', () => {
+    // PPL fix (fabdc8245): объём плеч считается по головкам (delt_front/mid/rear),
+    // а не суммой в shoulders — иначе 4×/нед плеч в PPL дают ложный overflow.
+    expect(normalizeBBMuscle('delt_rear')).toBe('delt_rear');
+    expect(normalizeBBMuscle('delt_mid')).toBe('delt_mid');
+    expect(normalizeBBMuscle('delt_front')).toBe('delt_front');
   });
 
   it('keeps direct sets and adds conservative indirect contribution', () => {

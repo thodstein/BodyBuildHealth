@@ -59,7 +59,7 @@ describe('optimizeMuscleFrequency', () => {
     const result = optimizeMuscleFrequency(plan);
     expect(result.rationale.length).toBeGreaterThan(0);
     // Должен содержать либо "корректировок" либо "оптимальны"
-    expect(result.rationale.some(r => r.includes('frequency') || r.includes('частот'))).toBe(true);
+    expect(result.rationale.some(r => r.includes('корректировок') || r.includes('оптимальна'))).toBe(true);
   });
 
   it('recommendedFrequency в диапазоне 1-4', () => {

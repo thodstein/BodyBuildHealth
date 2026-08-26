@@ -1112,7 +1112,7 @@ function buildExComment(
   });
   const progInstrParts: string[] = [];
   if (instr.cues.length) progInstrParts.push(`Техника: ${instr.cues.slice(0,2).join('; ')}`);
-  progInstrParts.push(`Темп ${instr.tempo}${tempoExplain(instr.tempo) ? ` (${tempoExplain(instr.tempo)})` : ''}, отдых ${instr.restSeconds || restSec}с — именно для этого сета в программе`);
+  progInstrParts.push(`Темп: ${instr.tempo}${tempoExplain(instr.tempo) ? ` (${tempoExplain(instr.tempo)})` : ''}, отдых ${instr.restSeconds || restSec}с — именно для этого сета в программе`);
   if (instr.stretch) progInstrParts.push(`Растяжение: ${instr.stretch}`);
   if (instr.peak) progInstrParts.push(`Пик: ${instr.peak}`);
   if (instr.mistakes.length) progInstrParts.push(`Ошибки в этой программе: ${instr.mistakes.slice(0,2).join('; ')}`);
@@ -3341,6 +3341,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       skipPhaseRedistribution: true,
       intensityTechnique: input.intensityTechnique && input.intensityTechnique !== 'none' ? input.intensityTechnique : undefined,
       weakPoints: weakPoints.length > 0 ? weakPoints : undefined,
+      level,
     });
   }
   const pedMrvMult = (pedAdapt?.combinedMrvMultiplier ?? 1);
@@ -3784,6 +3785,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     avoidAxialLoad: avAxial,
     excludedMuscles: [...excludedMuscles],
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
+    gradedInjuries: gradedInjuries.map(inj => ({ muscle: inj.muscle, exclude: inj.exclude, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap })),
     mobilityRestrictions: input.mobilityRestrictions,
     ensureMinimumVolume: true,
     workMax,
@@ -3884,12 +3886,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     for (const week of finalized.weeks) {
       if (week.phase === 'deload') continue;
       for (const sess of week.sessions) {
-        if (sess.exercises.some((e: any) => (e as any).optional)) continue;
         const sessMuscles = new Set(sess.exercises.map(e => collapseKey(e.muscle)));
         const usedNames = new Set(sess.exercises.map(e => e.exerciseName || e.name || ''));
         for (const wp of weakPoints) {
           const cw = collapseKey(wp);
           if (!sessMuscles.has(cw)) continue;
+          // BUG-FIX (audit 2026-08): optional-упражнение ДРУГОЙ мышцы (PPL-финишеры
+          // дельт) не должно блокировать weak-optional этой мышцы. Проверяем
+          // только optional той же мышцы.
+          if (sess.exercises.some((e: any) => (e as any).optional && collapseKey(e.muscle) === cw)) continue;
           // Слабая группа и специализация — разные вещи: если мышца УЖЕ является
           // специализацией (focus), не добавляем ей ещё и weak-optional (+1) — иначе двойной акцент.
           if (focusGroup && collapseKey(focusGroup) === cw) continue;
@@ -3909,13 +3914,21 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           if (!iso) break;
           const wm = workMax[cw] || defaultWorkMax(cw);
           const weight = Math.round((wm || 40) * 0.6 * 10) / 10;
+          const workSets = Array.from({ length: 3 }, () => ({ reps: 12, rir: 3, weight, tempo: '3-1-1-0', restSeconds: 60 }));
+          // BUG-FIX (audit 2026-08): 21s при специализации бицепса — weak-optional
+          // добавляется ПОСЛЕ post-phase, техника на него не навешивается. Ставим
+          // вручную (методика бицепса: 7 нижних + 7 верхних + 7 полных).
+          if (input.intensityTechnique === 'twenty_ones' && cw === 'biceps') {
+            workSets[workSets.length - 1].reps = 21;
+            (workSets[workSets.length - 1] as any).technique = 'twenty_ones';
+          }
           sess.exercises.push({
             muscle: cw, name: iso.name, role: 'accessory', character: 'памп',
             sets: 3, repsRange: [12, 15], rir: 3,
-            workSets: Array.from({ length: 3 }, () => ({ reps: 12, rir: 3, weight, tempo: '3-1-1-0', restSeconds: 60 })),
+            workSets,
             exerciseName: iso.name, tempoSpec: '3-1-1-0', restSeconds: 60,
             optional: true,
-            comment: `⚡ Слабая группа: +1 ${iso.name} (3×12) без учёта капа — акцент на отстающую часть.`,
+            comment: `⚡ Слабая группа: +1 ${iso.name} (3×12) без учёта капа — акцент на отстающую часть.${input.intensityTechnique === 'twenty_ones' && cw === 'biceps' ? ' · 🎯 21s: 7 нижних + 7 верхних + 7 полных повторов' : ''}`,
             warmupSets: [], rationale: 'Optional: слабая группа +20% (без расходования капа других мышц)',
           });
           break;

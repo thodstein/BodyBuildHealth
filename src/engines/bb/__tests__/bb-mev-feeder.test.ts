@@ -14,7 +14,7 @@ describe('BB adaptive MEV coverage', () => {
       rotationMuscleVolume: {}, rationale: [],
     };
     const result = finalizeBBPlan(plan, { reorder: true, ensureMinimumVolume: true, level: 'intermediate', workMax: { chest: 100 } });
-    expect(result.weeks[0].sessions[0].exercises.some(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'))).toBe(true);
+    expect(result.weeks[0].sessions[0].exercises.some(ex => ex.rationale?.includes('Авто-добивка до MEV'))).toBe(true);
   });
 
   it('does not add feeders in faithful mode when disabled', () => {
@@ -32,14 +32,14 @@ describe('BB adaptive MEV coverage', () => {
     });
     const plan: any = { pattern: {}, weeks: [source(1, 'accumulation'), source(2, 'accumulation'), source(3, 'deload')], rotationMuscleVolume: {}, rationale: [] };
     const result = finalizeBBPlan(plan, { reorder: true, ensureMinimumVolume: true, level: 'intermediate', workMax: { chest: 100 } });
-    expect(result.weeks[0].sessions[0].exercises.some(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'))).toBe(true);
-    expect(result.weeks[1].sessions[0].exercises.some(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'))).toBe(true);
-    expect(result.weeks[1].sessions[0].exercises.find(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'))?.workSets[0].weight).toBe(30);
-    const feeder = result.weeks[1].sessions[0].exercises.find(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'))!;
+    expect(result.weeks[0].sessions[0].exercises.some(ex => ex.rationale?.includes('Авто-добивка до MEV'))).toBe(true);
+    expect(result.weeks[1].sessions[0].exercises.some(ex => ex.rationale?.includes('Авто-добивка до MEV'))).toBe(true);
+    expect(result.weeks[1].sessions[0].exercises.find(ex => ex.rationale?.includes('Авто-добивка до MEV'))?.workSets[0].weight).toBe(30);
+    const feeder = result.weeks[1].sessions[0].exercises.find(ex => ex.rationale?.includes('Авто-добивка до MEV'))!;
     expect(feeder.sets).toBe(feeder.workSets.length);
     expect(result.weeks[1].sessions[0].exercises.length).toBeLessThanOrEqual(10);
     expect(result.fatigueReport?.[1].sessions[0].timeSeconds).toBeGreaterThan(0);
-    expect(result.weeks[2].sessions[0].exercises.some(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'))).toBe(false);
+    expect(result.weeks[2].sessions[0].exercises.some(ex => ex.rationale?.includes('Авто-добивка до MEV'))).toBe(false);
   });
 
   it('does not add a feeder when indirect compound volume already reaches MEV', () => {
@@ -52,7 +52,7 @@ describe('BB adaptive MEV coverage', () => {
       }] }], rotationMuscleVolume: {}, rationale: [],
     };
     const result = finalizeBBPlan(plan, { reorder: true, ensureMinimumVolume: true, level: 'intermediate', workMax: { chest: 100 } });
-    expect(result.weeks[0].sessions[0].exercises.some(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'))).toBe(false);
+    expect(result.weeks[0].sessions[0].exercises.some(ex => ex.rationale?.includes('Авто-добивка до MEV'))).toBe(false);
   });
 
   it('uses multiple safe feeders when a large deficit remains below MEV', () => {
@@ -62,7 +62,7 @@ describe('BB adaptive MEV coverage', () => {
       }] }], rotationMuscleVolume: {}, rationale: [],
     };
     const result = finalizeBBPlan(plan, { reorder: true, ensureMinimumVolume: true, level: 'intermediate', workMax: { chest: 100 } });
-    const feeders = result.weeks[0].sessions[0].exercises.filter(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'));
+    const feeders = result.weeks[0].sessions[0].exercises.filter(ex => ex.rationale?.includes('Авто-добивка до MEV'));
     expect(feeders.length).toBeGreaterThan(0);
     expect(feeders.reduce((sum, feeder) => sum + feeder.sets, 0)).toBeGreaterThanOrEqual(2);
     expect(result.weeks[0].sessions[0].exercises.length).toBeLessThanOrEqual(10);
@@ -77,7 +77,7 @@ describe('BB adaptive MEV coverage', () => {
       rotationMuscleVolume: {}, rationale: [],
     };
     const result = finalizeBBPlan(plan, { reorder: true, ensureMinimumVolume: true, level: 'intermediate', workMax: { chest: 100 } });
-    const feeders = result.weeks[0].sessions[0].exercises.filter(ex => ex.rationale?.includes('Adaptive MEV coverage feeder'));
+    const feeders = result.weeks[0].sessions[0].exercises.filter(ex => ex.rationale?.includes('Авто-добивка до MEV'));
     expect(feeders).toHaveLength(0);
   });
 });

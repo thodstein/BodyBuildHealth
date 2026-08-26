@@ -600,6 +600,8 @@ export interface PostPhaseInput {
   intensityTechnique?: IntensityTechnique;
   /** P8: слабые группы для auto-feeder (ежедневные добивки). */
   weakPoints?: string[];
+  /** Уровень атлета — для гейта проф-методик (новичку интенсив-техники не нужны). */
+  level?: string;
 }
 
 /**
@@ -744,7 +746,9 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     // drop_set/myo_reps/twenty_ones → последняя изоляция группы (accessory), не compound.
     // rest_pause → primary compound. pause_rep/negative/mechanical_drop → primary.
     // Техника может быть в середине сессии, если методика требует (pre_exhaust), но отображается корректно.
-    const techniqueChoice = (input as any).intensityTechnique;
+    // BUG-FIX (audit 2026-08): интенсив-техники — проф-методика, новичку не нужны
+    // (отказные протоколы повышают RPE без роста процентов и истощают восстановление).
+    const techniqueChoice = (input.level === 'beginner' || (plan as any).level === 'beginner') ? 'none' : (input as any).intensityTechnique;
     const technique = techniqueChoice || DEFAULT_TECHNIQUE_BY_PHASE[ph] || 'none';
     if (technique !== 'none') {
       const meta = INTENSITY_TECHNIQUES[technique as IntensityTechnique];
@@ -764,6 +768,10 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
               const isolations = list.filter((e:any) => e.role === 'accessory' && !e.warmupActivator && /isolation|accessory/i.test(e.role) || /curl|fly|raise|extension|pushdown|crunch|шраг/i.test(e.name || ''));
               // Fallback: последняя accessory
               target = isolations.length ? isolations[isolations.length - 1] : list.filter((e:any)=>e.role==='accessory').pop();
+              // BUG-FIX (audit 2026-08): 21s — методика бицепса; если в группе
+              // нет accessory-изоляции (все primary), берём последнее упражнение
+              // группы — applyIntensityTechniqueToExercise сам гейтит по muscle.
+              if (!target && technique === 'twenty_ones') target = list.filter((e:any)=>!e.warmupActivator).pop();
             } else if (technique === 'rest_pause') {
               target = list.find((e:any)=> e.role==='primary' && !e.warmupActivator);
             } else {

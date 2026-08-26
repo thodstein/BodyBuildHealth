@@ -77,6 +77,12 @@ export function derivePattern(ex: any): string {
   if (/отрицат|decline|опускан/.test(nm)) return 'decline_push';
   if (/отрицат|decline|опускан/.test(nm)) return 'decline_push';
   if (/жим|пресс.*груд| bench/i.test(nm)) return 'horizontal_push';
+  // BUG-FIX (audit 2026-08): махи/разведения плеч (наклон/rear/лицо ИЛИ мышца
+  // shoulders/delt_*) — плечи, НЕ грудь. Раньше «Махи в наклоне на заднюю
+  // дельту» и «Махи гантелями в стороны» классифицировались как isolation_chest
+  // → session_muscle_leak в Pull-днях и ложные дубли изоляций в Push.
+  const m = (ex.muscle || ex.group || '').toLowerCase();
+  if (/мах|развод|raise|fly|отведен/i.test(nm) && (/наклон|задн|rear|обратн|лиц.*тяга|face.?pull/i.test(nm) || /^delt_/.test(m) || m === 'shoulders' || m === 'delts') && m !== 'chest' && !/груд|chest/i.test(nm)) return 'isolation_shoulders';
   if (/мах|разводк|fly|пек-дек|сведен/.test(nm)) return 'isolation_chest';
   if (/поворот|рубк|rotation/i.test(nm)) return 'rotation';
 

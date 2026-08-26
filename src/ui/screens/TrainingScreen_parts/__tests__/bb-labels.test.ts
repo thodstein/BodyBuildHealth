@@ -47,8 +47,9 @@ describe('bb-labels (локализация + targetLabel)', () => {
     expect(note).toContain('длинная головка');
   });
 
-  it('targetLabelFor: неизвестное упражнение → пусто', () => {
-    expect(targetLabelFor({ muscle: 'abs', name: 'Скручивания' })).toBe('');
+  it('targetLabelFor: пресс — пояснение есть (не пусто)', () => {
+    const note = targetLabelFor({ muscle: 'abs', name: 'Скручивания' });
+    expect(note).toContain('Пресс');
   });
 
   it('exerciseTargetNote добавляет 🎯 префикс', () => {

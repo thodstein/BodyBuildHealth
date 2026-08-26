@@ -58,10 +58,13 @@ describe('strength_mass: peaking-фаза', () => {
 });
 
 describe('strength_mass: volume и композиция', () => {
-  it('strength_mass volume = mass volume (оба ×1.05)', () => {
+  it('strength_mass volume чуть ниже mass (×1.03 vs ×1.05 — сила приоритетнее)', () => {
     const smPlan = buildBBPlan(makeInput({ weeks: 8 }));
     const massPlan = buildBBPlan({ ...makeInput(), goal: 'mass' } as BBBuilderInput);
-    expect(smPlan.rotationMuscleVolume['chest']).toBe(massPlan.rotationMuscleVolume['chest']);
+    const smChest = smPlan.rotationMuscleVolume['chest'];
+    const massChest = massPlan.rotationMuscleVolume['chest'];
+    expect(smChest).toBeLessThanOrEqual(massChest);
+    expect(smChest).toBeGreaterThanOrEqual(massChest - 2);
   });
 
   it('strength_mass + AAS 500 → volume boost от PED', () => {

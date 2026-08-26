@@ -31,7 +31,7 @@ function expectValid(plan: ReturnType<typeof convertCycleToBBPlan>) {
   for (const week of plan.weeks) for (const session of week.sessions) for (const exercise of session.exercises) {
     expect(exercise.workSets).toHaveLength(exercise.sets);
     // Разминочное упражнение не проходит enrich (добавляется последним) — skip.
-    if (!(exercise as any).warmupActivator) expect(exercise.rationale).toContain('final position:');
+    if (!(exercise as any).warmupActivator) expect(exercise.rationale).toContain('позиция в сессии:');
   }
 }
 

@@ -18,6 +18,7 @@ import { matchesAnyZonePattern } from './bb-specialization-registry';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { trueMuscleOf } from '../movement-pattern';
+import { TAG_MUSCLES } from './bb-day-types';
 
 export interface TradeoffApplyOptions {
   level: string;
@@ -119,12 +120,25 @@ function addToRecipient(
 
   for (const session of week.sessions) {
     if (transferred >= budget) break;
+    // BUG-FIX (audit 2026-08): перенос ресурса только в дни, где целевая
+    // мышца уместна по тегу (TAG_MUSCLES) — иначе back попадает в Legs/Push
+    // (session_muscle_leak), а chest — в Pull.
+    const tag = session.sessionTag || '';
+    const allowedMuscles = TAG_MUSCLES[tag];
+    const tagAllows = (m: string): boolean => {
+      if (!allowedMuscles) return true;
+      if (allowedMuscles.includes(m)) return true;
+      if (m === 'shoulders' && allowedMuscles.some(x => /^delt_/.test(x))) return true;
+      if (/^delt_/.test(m) && allowedMuscles.includes('shoulders')) return true;
+      return false;
+    };
     // Сначала поднимаем существующие паттерн-совпадающие упражнения.
     for (const ex of session.exercises as BBExercise[]) {
       if (transferred >= budget) break;
       if ((ex as any).warmupActivator) continue;
       const m = canonicalMuscle(ex.muscle);
       if (!targetCanonical.has(m)) continue;
+      if (!tagAllows(m)) continue;
       if (!matchesAnyZonePattern(ex.exerciseName || ex.name || '', targets)) continue;
       const cap = opts.mrvByMuscle[m] ?? getVolumeLandmarks(opts.level, m)?.mrv ?? 16;
       while (transferred < budget && (ex.sets ?? 0) < 5) {
@@ -144,6 +158,7 @@ function addToRecipient(
     if (transferred < budget && session.exercises.filter(e => !(e as any).warmupActivator).length < opts.maxExercisesPerSession) {
       for (const m of targetCanonical) {
         if (transferred >= budget) break;
+        if (!tagAllows(m)) continue;
         const cap = opts.mrvByMuscle[m] ?? getVolumeLandmarks(opts.level, m)?.mrv ?? 16;
         const eff = volume()[m]?.effectiveSets ?? 0;
         if (eff + 3 > cap) continue;

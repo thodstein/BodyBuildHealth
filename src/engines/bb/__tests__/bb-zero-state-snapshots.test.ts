@@ -26,21 +26,21 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
   it('Generic enhanced 6+ (upper_lower_4, mass, AAS 500) — per-muscle объём', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, ...PED });
     expect(directVolume(plan)).toEqual({
-      abs: 15, back: 52, biceps: 4, calves: 10, chest: 28, forearms: 4, glutes: 10, hamstrings: 27, quads: 15, shoulders: 10, traps: 6, triceps: 4,
+      abs: 11, back: 46, biceps: 6, calves: 10, chest: 30, delt_mid: 8, delt_rear: 7, forearms: 6, glutes: 18, hamstrings: 23, quads: 18, shoulders: 0, traps: 6, triceps: 7,
     });
   });
 
   it('Generic natural (ppl_6, intermediate 3 года) — per-muscle объём', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 1, workMax: WM });
     expect(directVolume(plan)).toEqual({
-      abs: 7, back: 19, biceps: 6, calves: 10, chest: 16, forearms: 6, glutes: 7, hamstrings: 11, quads: 14, shoulders: 9, traps: 10, triceps: 6,
+      abs: 7, back: 19, biceps: 6, calves: 8, chest: 16, delt_front: 5, delt_mid: 8, delt_rear: 10, forearms: 6, glutes: 5, hamstrings: 14, quads: 13, shoulders: 2, traps: 4, triceps: 6,
     });
   });
 
   it('ПРОФ-cycle adapt (CYCLE_01 + AAS 500) — per-muscle объём', () => {
     const plan = convertCycleToBBPlan({ cycle: CYCLE_01, workMax: WM, level: 'enhanced', trainingYears: 6, ...PED, mode: 'adapt' } as any);
     expect(directVolume(plan)).toEqual({
-      abs: 6, back: 6, biceps: 6, calves: 6, chest: 6, forearms: 6, glutes: 6, hamstrings: 6, quads: 12, shoulders: 10, traps: 6, triceps: 6,
+      abs: 6, back: 6, biceps: 6, calves: 6, chest: 6, delt_front: 2, delt_mid: 2, delt_rear: 6, forearms: 6, glutes: 6, hamstrings: 6, quads: 12, shoulders: 0, traps: 6, triceps: 6,
     });
   });
 
@@ -49,7 +49,7 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     expect(src).toBeDefined();
     const plan = programToBBPlan(src!, { workMax: WM, level: 'enhanced', trainingYears: 6, ...PED, mode: 'adapt' } as any);
     expect(directVolume(plan)).toEqual({
-      abs: 6, back: 6, biceps: 6, calves: 6, chest: 8, forearms: 6, glutes: 6, hamstrings: 12, quads: 9, shoulders: 11, traps: 6, triceps: 6,
+      abs: 6, back: 6, biceps: 6, calves: 6, chest: 8, delt_front: 3, delt_mid: 2, delt_rear: 6, forearms: 6, glutes: 6, hamstrings: 12, quads: 9, shoulders: 0, traps: 6, triceps: 6,
     });
   });
 

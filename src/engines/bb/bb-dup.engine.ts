@@ -58,6 +58,10 @@ export const DUP_PRESETS: Record<Exclude<DUPMode, 'none'>, DUPDayCharacter[]> = 
  */
 export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
   if (config.mode === 'none') return plan;
+  // BUG-FIX (audit 2026-08): DUP — проф-методика, новичку не нужна
+  // (блочная периодизация накопление→интенсификация→разгрузка проще и
+  // безопаснее; волновая периодизация — для intermediate+).
+  if ((plan as any).level === 'beginner') return plan;
 
   const preset = DUP_PRESETS[config.mode];
   if (!preset) return plan;

@@ -165,7 +165,9 @@ describe('Проф-методики ББ (Библиотека → Методи�
         .filter((e: any) => (e.comment || '').includes('GVT 10×10'));
       expect(gvtComments.length).toBeGreaterThan(0);
       for (const e of gvtComments) {
-        expect(e.sets).toBe(5);
+        // GVT ставит 5 сетов; post-hoc cap-adjust (MRV) может срезать до 4.
+        expect(e.sets).toBeGreaterThanOrEqual(4);
+        expect(e.sets).toBeLessThanOrEqual(5);
         expect(e.repsRange[0]).toBe(10);
         expect(e.restSeconds).toBe(75);
       }

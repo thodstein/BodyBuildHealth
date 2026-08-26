@@ -128,7 +128,7 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
         const syntheticMuscleName = new Set(['chest', 'back', 'shoulders', 'quads', 'hamstrings', 'glutes', 'calves', 'biceps', 'triceps', 'forearms', 'abs', 'traps', 'arms', 'legs', 'core', 'lower_back']).has(exercise.name.toLowerCase());
         if (!catalog && !syntheticMuscleName) {
           issues.push({ level: 'error', code: 'equipment_unknown_exercise', message: `${exercise.name}: упражнение отсутствует в каталоге, оборудование невозможно подтвердить.`, week, session: sessionIndex, exercise: exercise.name });
-        } else if (equipment.length > 0 && !equipment.some(item => options.equipment!.includes(item))) {
+        } else if (equipment.length > 0 && !equipment.includes('bodyweight') && !equipment.some(item => options.equipment!.includes(item))) {
           issues.push({ level: 'error', code: 'equipment_restriction_violation', message: `${exercise.name}: оборудование не входит в доступный список.`, week, session: sessionIndex, exercise: exercise.name });
         }
       }

@@ -40,13 +40,14 @@ describe('buildExercisePool — вынесенный слой пула (3.1)', (
     }
   });
 
-  it('учитывает оборудование: только cable-упражнения', () => {
+  it('учитывает оборудование: только cable-упражнения (bodyweight разрешён)', () => {
     const pool = buildExercisePool('chest', 'primary', poolOpts({ equipmentList: ['cable'] }));
     expect(pool.length).toBeGreaterThan(0);
     for (const ex of pool) {
       const rawEq = ex.equipment;
       const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-      expect(exEq.length === 0 || exEq.some(eq => ['cable'].includes(eq))).toBe(true);
+      // bodyweight всегда разрешён (не требует оборудования) — 6988a4ffb.
+      expect(exEq.length === 0 || exEq.includes('bodyweight') || exEq.some(eq => ['cable'].includes(eq))).toBe(true);
     }
   });
 

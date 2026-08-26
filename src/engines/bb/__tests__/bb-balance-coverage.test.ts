@@ -7,6 +7,7 @@ describe('BB per-muscle pattern and stretch coverage', () => {
     const report = analyzeBBBalance({ pattern: {} as any, weeks: [{ week: 1, sessions: [{ day: 1, exercises: [exercise] }] }], rationale: [], rotationMuscleVolume: {} } as any);
     expect(report.byMuscle.hamstrings.lengthened).toBeGreaterThanOrEqual(0);
     expect(report.byMuscle.hamstrings.midRange + report.byMuscle.hamstrings.shortened).toBeGreaterThanOrEqual(0);
-    expect(report.issues.some(issue => issue.includes('hamstrings'))).toBe(true);
+    // Issue пишется RU-лейблом мышцы («Бицепс бедра»), не EN-ключом.
+    expect(report.issues.some(issue => issue.includes('Бицепс бедра') || issue.includes('hamstrings'))).toBe(true);
   });
 });

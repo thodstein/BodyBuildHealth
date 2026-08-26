@@ -12,7 +12,7 @@ describe('BB final position rationale', () => {
       }] }],
     };
     const result = finalizeBBPlan(plan, { reorder: true, level: 'intermediate' });
-    expect(result.weeks[0].sessions[0].exercises[0].rationale).toContain('final position: primary/lead (#1)');
-    expect(result.weeks[0].sessions[0].exercises[1].rationale).toContain('final position: pump finisher (#2)');
+    expect(result.weeks[0].sessions[0].exercises[0].rationale).toContain('позиция в сессии: ведущее (первое, тяжёлое) (#1)');
+    expect(result.weeks[0].sessions[0].exercises[1].rationale).toContain('позиция в сессии: финишер памп (#2)');
   });
 });

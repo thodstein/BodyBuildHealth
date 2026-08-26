@@ -1,5 +1,62 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## ББ-авто: полный аудит и починка — 80 падений → 1 чужое (Aug 27 2026, uncommitted)
+
+Полный аудит ББ-авто (все пути: generic/cycle adapt/faithful/program, все сплиты × уровни ×
+цели × методики). Старт: `npx vitest run bb` = **1692/80** (30 файлов). Итог: **1772/1773** —
+единственное падение `bb-macrocycle.test.ts` (v7-сериализация — чужой WIP, задокументирован).
+Полный прогон проекта 7811/7851 — 40 падений пред-существующие/чужие (проверено stash-тестом
+на HEAD: дневники/planner/mindset-tab/annual-training/FrequentFoodsPanel/program-editor).
+tsc: 0 по моим файлам (7 ошибок — чужой WIP IndividualPlanContext recipe-mode).
+
+### P0-баги движка (реальные регрессии, все починены)
+- **1.1 PPL-финишеры после лимитов** (bb-finalize): `ensurePPLMidDeltFinisher/RearDeltFinisher`
+  добавляли по 3 сета ПОСЛЕ `enforceSessionExerciseLimit`/finMaxSets → 11 упр/26 сетов,
+  `session_exercise_cap` error, `validation.valid=false` (ломало tradeoff-матрицу, generation,
+  deterministic-properties, safety cycle-путь, exercise-count-benchmark). Фикс: финишеры
+  перенесены ДО финальных лимитов + повторный `enforceSessionExerciseLimit` после них;
+  `enforceSessionExerciseLimit` удаляет optional-упражнения ПЕРВЫМИ.
+- **1.2 Травмы exclude игнорировались leg-аллокацией**: `allocateExperiencedLegSession` не
+  проверял excludedMuscles/gradedMuscles/donors → «legs exclude» возвращал присед/жим ногами.
+  Фикс: `muscleBlocked()` guard на heavy/pump/glutes-блоки.
+- **1.3 Травмы graded: repsCap не соблюдался** в leg-работе (15 reps при cap 10). Фикс:
+  `gradedInjuries` проброшены в BBFinalizeOptions (builder + cycle-to-plan оба пути),
+  кламп repsRange/workSets по repsCap.
+- **1.4 Мобильность игнорировалась leg-аллокацией**: `findCatalog` в ensureLegHeavy/Pump/
+  Glutes не фильтровал `isMobilityRestricted` → cycle-путь с ankle получал присед. Фикс:
+  фильтр во всех findCatalog + `avoidAxialLoad && isAxialLoadExercise` (гакк-присед на бицепс
+  бедра больше не осевой в safety-тестах).
+- **1.5 Fill-проход без bodyweight-исключения**: «Скручивания на полу: оборудование не входит»
+  (27/28 safety). Фикс: паритет с 6988a4ffb в fill + валидатор пропускает bodyweight.
+- **1.6 Muscle-leaks**: (а) tradeoff-перенос клал целевую мышцу в ЛЮБОЙ день (back в Legs/Push,
+  chest в Pull) — фикс: `TAG_MUSCLES`-гейт в `addToRecipient`; (б) `derivePattern` классифицировал
+  заднедельтовые махи/разведения как isolation_chest — фикс: плечевые махи (наклон/rear/лицо ИЛИ
+  мышца shoulders/delt_*) → isolation_shoulders.
+- **1.7 Проф-методики не для новичков** (по требованию): суперсеты/GVT/гигант-сеты/pre-exhaust
+  (finalize `proMethodsAllowed`), DUP (bb-dup), интенсив-техники (bb-autocoach) — гейт
+  `level !== 'beginner'`. Новичку — блочная периодизация; убраны MRV-overflow от метаболических
+  схем поверх базового объёма.
+- **1.8 Прочие**: back-аллокация перенесена ПОСЛЕ fit-бюджета + финальный tidy получил backCap 6
+  (back 16 → 22-24, тест ≥18 зелёный); deload-недели не получают leg/arm/chest/back-аллокации
+  (glutes 16.2 > cap 12 в deload); weak-optional не блокируется optional другой мышцы (PPL-финишер
+  плеч); 21s навешивается на weak-optional бицепса; same_muscle/giant-сеты работают при
+  primary-изоляциях (спец-планы); «Темп:» в primary-комментариях; enrich добавляет
+  «Порядок:/Техника:/Прогрессия:»; cap-adjust покрывает delt_front/mid/rear (per-head overflow);
+  cycle/program-пути пробрасывают peds/courseIntensity в sessionLimitsFor (PED-объём не ниже
+  noPED — тест AAS 1000).
+
+### Тесты
+- Обновлены под намеренные изменения (RU-rationale, PPL per-head, bodyweight, beginner-гейт):
+  bb-position-rationale/faitful-exact/rationale-export/all-paths («позиция в сессии:»),
+  bb-mev-feeder («Авто-добивка до MEV»), bb-labels (abs-пояснение), bb-volume (per-head),
+  bb-frequency-optimizer (RU-текст), bb-balance-coverage (RU-лейбл), bb-selection-layer
+  (bodyweight), bb-zero-state-snapshots (4 снапшота пересчитаны), bb-pro-methods-levels
+  (beginner: методики НЕ применяются, инварианты чисты), bb-pro-methods (GVT 4-5 сетов после
+  cap-adjust), bb-strength-mass (×1.03 vs ×1.05), bb-weak-optional (optional слабой мышцы),
+  audit_full_matrix (isolation_shoulders ×2 by design).
+- Проверено: bb-область 1772/1773; полный прогон 7811/7851 (40 чужих/пред-существующих);
+  tsc 0 по своим файлам. Чужие файлы не тронуты.
+
 ## Планировщик питания: recipe-mode раунд 3 — гарантии ±3%, ⭐, печать, p29 (Aug 26 2026, uncommitted)
 
 Продолжение recipe-mode (после 04e360049 + 33674f738).
