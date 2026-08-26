@@ -781,13 +781,23 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       )}
 
       {/* ═══ MODE: HISTORY ═══ */}
-      {mode === 'history' && <DiaryHistoryView hub={hub} />}
+      {mode === 'history' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
+          <DiaryHistoryView hub={hub} />
+        </div>
+      )}
 
       {/* ═══ MODE: COMPETITION ═══ — сохранённые соревновательные циклы */}
       {mode === 'competition' && <CompetitionPlansView onBack={() => setMode('record')} />}
 
       {/* ═══ MODE: RECOMMENDATIONS ═══ — профессиональные рекомендации (ББ) */}
-      {mode === 'recommendations' && <BBRecommendationsTab hub={hub} />}
+      {mode === 'recommendations' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
+          <BBRecommendationsTab hub={hub} />
+        </div>
+      )}
 
       {/* ═══ MODE: FEEDBACK ═══ — план vs факт (ББ фидбек из дневника) */}
       {mode === 'feedback' && (
@@ -806,6 +816,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {mode === 'mytraining' && (
         <InfoErrorBoundary label="Мои тренировки">
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
             <MyTrainingTab customExercises={myTrainingExs} setCustomExercises={setMyTrainingExs} goal={goal} level={level} daysPerWeek={daysPerWeek} mesoLength={mesoLength} />
           </div>
         </InfoErrorBoundary>
@@ -813,19 +824,21 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
 
       {/* ═══ MODE: ANALYTICS (lite) ═══ — обезжирен: линки в хабы */}
       {(mode === 'analytics' || mode === 'analytics_lite') && (
-        <>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
           <DiaryAnalyticsView hub={hub} />
           <MixEffectivenessCard workouts={historyWorkouts} />
-          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:11, lineHeight:1.5, color:'#fff' }}>
+          <div style={{ padding:'10px 12px', borderRadius:10, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:11, lineHeight:1.5, color:'#fff' }}>
             <div style={{ fontWeight:800, color:'#3b82f6', marginBottom:4 }}>🔗 Глубже — в Интеллекте</div>
             <div>ACWR/монотонность/напряжение → <b>⚡ Интеллект → Нагрузка</b> · MEV/MAV/MRV → <b>📐 Объём-хаб</b> · 1RM/VBT/DOTS → <b>🏋️ Анализ силы</b> · прогноз → <b>🔮 Прогноз</b></div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ═══ MODE: PROGRESS (lite + календарь) ═══ */}
       {mode === 'progress' && (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
           <div style={{ display:'flex', gap:6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
             {([['progress','📏 Прогресс'],['calendar','📅 Календарь']] as const).map(([k,l]) => (
               <button key={k} onClick={()=> setProgressSub(k)} style={{
@@ -842,6 +855,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {/* ═══ MODE: RITUALS ═══ — практики 6 в 1 (психика/мобильность/разминка/заминка/чек-ин/MMC) */}
       {mode === 'rituals' && (
         <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
           <div style={{ display:'flex', gap:6, flexWrap:'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
             {([
               ['mindset','🧠 Психология'],['mobility','🧘 Мобильность'],['warmup','🔥 Разминка'],['cooldown','❄️ Заминка'],['checkin','📋 Чек-ин'],['mmc','🔄 MMC'],
@@ -864,7 +878,12 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {/* legacy direct modes → теперь через rituals/progress seg (оставлено для backward deep-link, без дубля) */}
 
       {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
-      {mode === 'tools' && <DiaryToolsView hub={hub} />}
+      {mode === 'tools' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={() => setMode('record')} style={{ alignSelf:'flex-start', padding:'6px 10px', borderRadius:999, fontSize:11, fontWeight:700, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>← К записи</button>
+          <DiaryToolsView hub={hub} />
+        </div>
+      )}
 
       {/* Редактор сохранённой тренировки */}
       {editingWorkout && (

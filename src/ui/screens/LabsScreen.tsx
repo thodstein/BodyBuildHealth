@@ -583,15 +583,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   return (
     <div className="screen labs" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
 
-      {/* ─── HERO PAGE — glass + KPI, фикс перекрытия ─── */}
+      {/* ─── HERO PAGE — на весь экран, без fixed (фикс: hero не показывался из-за fixed+zIndex) ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', overflowY:'auto', WebkitOverflowScrolling:'touch', background:'#070a12' }}>
-          <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none' }}>
+        <div style={{ position:'relative', minHeight:'100vh', display:'flex', flexDirection:'column', background:'#070a12', overflow:'hidden' }}>
+          <div style={{ position:'absolute', inset:0, zIndex:0, pointerEvents:'none' }}>
             <img src="/lab-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:0.92 }} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(7,10,18,0.22) 0%, rgba(7,10,18,0.58) 42%, rgba(7,10,18,0.94) 78%, #070a12 100%)' }} />
             <div style={{ position:'absolute', inset:0, background:'radial-gradient(560px 380px at 18% 14%, rgba(0,230,138,0.16), transparent 68%), radial-gradient(600px 420px at 92% 88%, rgba(59,130,246,0.11), transparent 65%)' }} />
           </div>
-          <div style={{ position:'relative', zIndex:1, flex:'0 0 auto', display:'flex', flexDirection:'column', justifyContent:'flex-start', padding:'26px 16px calc(18px + 72px + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box', minHeight:'100dvh' }}>
+          <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'28px 16px calc(28px + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
               <span style={{ padding:'4px 9px', borderRadius:999, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.24)', color:LABS_ACCENT, fontSize:9, fontWeight:800, letterSpacing:0.6 }}>LABS • HEALTH OS</span>
               <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{hasLabs ? `${currentLabs.length} маркеров • ${PHASE_LABELS[selectedPhase]}` : 'Нет данных — начните с ввода'}</span>
