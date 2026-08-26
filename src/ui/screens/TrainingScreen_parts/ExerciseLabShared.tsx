@@ -29,7 +29,7 @@ export const JOINT_RU: Record<string, string> = { knee: 'Колено', hip: 'Т
 export const RIR_TO_RPE: Record<number, number> = { 0: 10, 1: 9, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2 };
 export const RPE_LABEL: Record<number, string> = { 10: 'Максимально', 9: 'Тяжело', 8: 'Умеренно тяжело', 7: 'Средне', 6: 'Легко', 5: 'Очень легко', 4: 'Разминка' };
 
-export type LabMode = 'prescription' | 'technique' | 'compare' | 'pro' | 'substitute' | 'catalog';
+export type LabMode = 'prescription' | 'technique' | 'compare' | 'pro' | 'catalog';
 
 // ════════════════ SUB-REGION DEFINITIONS ════════════════
 export const SUBREGION_DEFS: Record<string, { id: string; name: string; keywords: string[]; description: string }[]> = {

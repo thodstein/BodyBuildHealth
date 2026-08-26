@@ -485,14 +485,14 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
       {/* ═══ MODE: RECORD ═══ — quick entry + full form */}
       {mode === 'record' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Подвкладки дневника — красиво, без бега */}
+          {/* Подвкладки дневника — 2 канона + 4 перенесено */}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)' as any, borderRadius:12, padding:'8px', marginBottom:4 }}>
             <button onClick={() => setMode('record')} style={{ flex: 1, minWidth: 100, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--accent)', background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 800, fontSize: 11, cursor: 'pointer', boxShadow:'0 2px 8px rgba(0,230,138,0.25)' }}>📓 Запись</button>
             <button onClick={() => setMode('history')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📜 История</button>
-            <button onClick={() => setMode('feedback')} style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>📊 Фидбек</button>
-            <button onClick={() => setMode('mytraining')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>⭐ Мои тренировки</button>
-            <button onClick={() => setMode('competition')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>🏁 Соревнования</button>
-            <button onClick={() => setMode('recommendations')} style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>💡 Рекомендации</button>
+            <button disabled title="Перемещено в Интеллект → Качество (BBFeedbackCard)" style={{ flex: 1, minWidth: 90, padding: '8px 12px', borderRadius: 10, border: '1px dashed rgba(168,85,247,0.22)', background: 'rgba(168,85,247,0.06)', color: 'rgba(168,85,247,0.65)', fontWeight: 700, fontSize: 10 }}>📊 Фидбек → ⭐ Качество</button>
+            <button disabled title="Перемещено в Библиотеку → Мои тренировки" style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px dashed rgba(245,158,11,0.22)', background: 'rgba(245,158,11,0.06)', color: 'rgba(245,158,11,0.65)', fontWeight: 700, fontSize: 10 }}>⭐ Мои → 📖 Библиотека</button>
+            <button disabled title="Перемещено в Интеллект → Периодизация → История" style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px dashed rgba(234,179,8,0.22)', background: 'rgba(234,179,8,0.06)', color: 'rgba(234,179,8,0.65)', fontWeight: 700, fontSize: 10 }}>🏁 Соревн. → 🔄 Периодиз.</button>
+            <button disabled title="Перемещено в Интеллект → Рекомендации" style={{ flex: 1, minWidth: 110, padding: '8px 12px', borderRadius: 10, border: '1px dashed rgba(139,92,246,0.22)', background: 'rgba(139,92,246,0.06)', color: 'rgba(139,92,246,0.65)', fontWeight: 700, fontSize: 10 }}>💡 Рекоменд. → ⚡ Интеллект</button>
           </div>
           {/* 🏁 Активный contest prep — сводная карточка (видна всегда в дневнике); клик → BB-планировщик */}
           <BBContestPrepActiveCard onOpen={() => {

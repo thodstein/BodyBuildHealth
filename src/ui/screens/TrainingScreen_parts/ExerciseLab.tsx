@@ -4,7 +4,6 @@ import PrescriptionTab from './ExerciseLabPrescription';
 import TechniqueTab from './ExerciseLabTechnique';
 import CompareTab from './ExerciseLabCompare';
 import ProAnalysisTab from './ExerciseLabPro';
-import ExerciseLabSubstitute from './ExerciseLabSubstitute';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
 
 const MODE_DEFS: Array<{ m: LabMode; label: string; icon: string }> = [
@@ -12,7 +11,6 @@ const MODE_DEFS: Array<{ m: LabMode; label: string; icon: string }> = [
   { m: 'technique', label: 'Техника', icon: '🔬' },
   { m: 'compare', label: 'Сравнение', icon: '⚖️' },
   { m: 'pro', label: 'ПРО-анализ', icon: '🔮' },
-  { m: 'substitute', label: 'Замена', icon: '🔄' },
   { m: 'catalog', label: 'Каталог', icon: '📋' },
 ];
 
@@ -60,7 +58,6 @@ const ExerciseLab: React.FC = () => {
       {mode === 'technique' && <TechniqueTab onSelectForCompare={handleSelectForCompare} />}
       {mode === 'compare' && <CompareTab initialId1={compareIds[0] || ''} initialId2={compareIds[1] || ''} />}
       {mode === 'pro' && <ProAnalysisTab />}
-      {mode === 'substitute' && <ExerciseLabSubstitute />}
       {mode === 'catalog' && <ExerciseLabCatalog />}
     </div>
   );

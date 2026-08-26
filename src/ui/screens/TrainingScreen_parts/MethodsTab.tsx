@@ -40,6 +40,30 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
     specialization: 'Специализация', recovery: 'Восстановление', mobility: 'Мобильность',
     mindset: 'Психология',
   };
+  const CAT: { id: string; label: string; icon: string; hint: string }[] = [
+    { id: 'periodization', label: 'Периодизация', icon: '🗓️', hint: 'как менять объём/интенсивность по неделям' },
+    { id: 'progression', label: 'Прогрессия', icon: '📈', hint: 'как расти без плато' },
+    { id: 'intensity', label: 'Интенсивность', icon: '🔥', hint: 'дроп-сеты, кластеры' },
+    { id: 'technique', label: 'Техника', icon: '🎯', hint: 'темп, паузы' },
+    { id: 'volume', label: 'Объём', icon: '📦', hint: 'MEV/MAV/MRV' },
+    { id: 'frequency', label: 'Частота', icon: '🔁', hint: 'сколько раз в неделю' },
+    { id: 'specialization', label: 'Специализация', icon: '🎯', hint: 'отстающую' },
+    { id: 'recovery', label: 'Восстановление', icon: '🔄', hint: 'делод, сон' },
+    { id: 'mobility', label: 'Мобильность', icon: '🤸', hint: 'разминка' },
+    { id: 'mindset', label: 'Психология', icon: '🧠', hint: 'фокус' },
+  ];
+  const HUMAN_TIP: Record<string, string> = {
+    periodization: '💡 Без калькулятора: выберите 1 схему волн (напр. DUP) и держите 4 недели.',
+    progression: '💡 Двойная прогрессия: растите повторами до верха, затем +2.5 кг.',
+    intensity: '💡 Суперсеты — для памп-дня, дроп — только последний подход изоляции.',
+    technique: '💡 Темп 3-1-1-0 гипертрофия, 2-1-1-0 сила. Пауза внизу убирает читинг.',
+    volume: '💡 MEV — минимум (6-8), MRV — потолок (15-22). Держитесь середины.',
+    frequency: '💡 Натуральным — 2×/нед на группу лучше 1×.',
+    specialization: '💡 Отстающую — 1.3× объёма за счёт других.',
+    recovery: '💡 Делод — −30% объёма с тем же весом.',
+    mobility: '💡 5 мин: бар×15 → 50%×10 → 70%×5 → рабочий.',
+    mindset: '💡 Mind-muscle: 2с пауза в пике ×3 повтора в начале.',
+  };
   const cats = [...new Set(methods.map(m => m.category))];
   const methodCatOptions = [
     { id: 'all', label: 'Все категории' },
@@ -390,11 +414,27 @@ export const MethodsTab: React.FC<{ linked: ReturnType<typeof useDataLink>; trai
       </>
     )}
 
-    {/* ── Method Reference Library (always visible) ── */}
+    {/* ── Method Reference Library (always visible) — карточная сетка как в Encyclopedia ── */}
     <h4 style={{ margin: '12px 0 8px', fontSize: 12, color: 'var(--accent)' }}>📚 Библиотека методик</h4>
-    <div style={{ marginBottom: 8 }}>
-      <PopupSelect label="Категория методики" value={methodCat} options={methodCatOptions} onChange={setMethodCat} />
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(132px, 1fr))', gap:8, marginBottom:10 }}>
+      {[{id:'all',label:'Все',icon:'📚',hint:'все методики',cnt:methods.length}, ...CAT.map(c=> ({...c, cnt: methods.filter(m=>m.category===c.id).length}))].map(c=>{
+        const on = methodCat===c.id;
+        return (
+          <button key={c.id} onClick={()=> setMethodCat(c.id)} style={{
+            display:'flex', flexDirection:'column', alignItems:'flex-start', gap:2, padding:'10px 11px', borderRadius:12, cursor:'pointer', textAlign:'left',
+            border: on ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+            background: on ? 'rgba(0,230,138,0.12)' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))',
+            boxShadow: on ? '0 4px 14px rgba(0,230,138,0.18)' : '0 2px 8px rgba(0,0,0,0.16)',
+          }}>
+            <span style={{ fontSize:13 }}>{c.icon} <b style={{ color: on ? '#00e68a' : '#fff', fontSize:11 }}>{c.label}</b> <span style={{ fontSize:10, color: on ? 'rgba(0,230,138,0.85)' : 'rgba(255,255,255,0.45)' }}>{(c as any).cnt}</span></span>
+            <span style={{ fontSize:10, color: on ? 'rgba(0,230,138,0.75)' : 'rgba(255,255,255,0.50)', lineHeight:1.25 }}>{c.hint}</span>
+          </button>
+        );
+      })}
     </div>
+    {methodCat!=='all' && HUMAN_TIP[methodCat] && (
+      <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.18)', fontSize:11, color:'rgba(255,255,255,0.85)', lineHeight:1.45, marginBottom:8 }}>{HUMAN_TIP[methodCat]}</div>
+    )}
     {filtered.map((m,i) => <div key={i} className="card" style={{ marginBottom:6, padding:10, border: (appliedMethods[m.category] === m.name) ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{ fontWeight:600, fontSize:12 }}>{(appliedMethods[m.category] === m.name) ? '✓ ' : ''}{m.name} <span style={{ fontSize:10, color:'#fff' }}>[{({ periodization:'Периодизация', progression:'Прогрессия', technique:'Техника', intensity:'Интенсивность', volume:'Объём', frequency:'Частота', specialization:'Специализация', recovery:'Восстановление', mobility:'Мобильность', mindset:'Психология' } as Record<string,string>)[m.category] || m.category}]</span></div>
       <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{m.description}</div>
