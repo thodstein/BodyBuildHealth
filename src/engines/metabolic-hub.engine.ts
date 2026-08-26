@@ -1,155 +1,274 @@
 /**
  * metabolic-hub.engine.ts — единый движок 5 калькуляторов с/без ААС
  * Вода / Шаги / КБЖУ / Жир / Кортизол — один снапшот, без дублей.
- * Формулы: EFSA/Mifflin-Katch, Helms, US Navy, Schoenfeld, Issurin.
+ * Формулы: EFSA/Mifflin-St Jeor + Katch-McArdle, ISSN/Helms, US Navy, Gabbett ACWR.
+ * Pro-уровень: инвалидация дубль-PAL, cm→in, дозозависимый ААС, HPA-индекс.
  */
 export interface MetabolicInput {
   weight: number; height: number; age: number; sex: 'male'|'female';
   bodyFat?: number; neck?: number; waist?: number; hip?: number;
   steps?: number; cardioMin?: number; trainingDays?: number; trainingHours?: number;
-  activityLevel?: 'low'|'medium'|'high'; // бытовая
+  activityLevel?: 'low'|'medium'|'high'; // бытовая NEAT
   goal?: 'cut'|'maintain'|'bulk';
-  onAAS?: boolean; aasDose?: number; // мг/нед тест-экв
+  onAAS?: boolean; aasDose?: number; // мг/нед тест-экв (опционально, для дозозависимости)
   stress?: number; sleepHours?: number; sleepQuality?: number; // 1-5
   acwr?: number; // для кортизола
+  // pro-расширения (опциональные, backward compat)
+  climate?: 'temperate'|'hot'|'cold';
+  sweatRate?: number; // мл/ч 400-800, если известен
+}
+
+const clamp = (v:number, lo:number, hi:number)=> Math.max(lo, Math.min(hi, v));
+const toIn = (cm:number)=> cm * 0.393701;
+const log10 = (x:number)=> Math.log(x)/Math.log(10);
+
+// ——— общий BMR ———
+function bmrKatchMcArdle(lean:number){ return 370 + 21.6 * lean; }
+function bmrMifflin(w:number,h:number,a:number,sex:'male'|'female'){
+  return sex==='male' ? 10*w + 6.25*h - 5*a + 5 : 10*w + 6.25*h - 5*a - 161;
+}
+function computeBMR(input: MetabolicInput){
+  const bf = input.bodyFat;
+  const hasBF = typeof bf==='number' && bf>3 && bf<70;
+  if(hasBF){
+    const lean = input.weight * (1 - bf!/100);
+    const bmr = Math.max(800, bmrKatchMcArdle(lean));
+    return { bmr, lean, method:'katch_mcardle' as const };
+  }
+  const bmr = Math.max(800, bmrMifflin(input.weight, input.height, input.age, input.sex));
+  const leanDef = input.weight * (1 - (input.sex==='male'?0.15:0.22));
+  return { bmr, lean: leanDef, method:'mifflin' as const };
+}
+function aasMult(input: MetabolicInput, maxBoost:number){
+  if(!input.onAAS) return 1;
+  const dose = clamp(input.aasDose ?? 500, 0, 3000);
+  // 500мг → ~50% от максимума, 1500мг → ~90% — насыщение
+  const frac = dose<=0 ? 0.6 : Math.min(1, 0.4 + 0.6 * (dose/800));
+  // линейно до maxBoost
+  return 1 + maxBoost * frac;
 }
 
 // ——— Вода ———
 export function calcWater(input: MetabolicInput) {
-  const base = input.weight * 35; // мл
-  const training = (input.trainingHours ?? 0) * 500 + (input.cardioMin ?? 0) * 8;
-  const climate = 0; // запас для жары
-  const nat = Math.round(base + training + climate);
-  // ААС: задержка Na, эритроцитоз, АД → +12% + 300мг Na контроль
-  const aas = Math.round(nat * 1.12 + (input.onAAS ? 300 : 0));
-  const perHour = Math.round((input.onAAS ? aas : nat) / 16);
+  const { lean } = computeBMR(input);
+  const fatMass = Math.max(0, input.weight - lean);
+  // База: 35мл/кг общей, но жир — 20мл/кг (меньше воды), lean — 40мл/кг
+  // Для bf<18 — приближается к 35мл/кг; для ожирения — экономит ~15%
+  const hasBF = typeof input.bodyFat==='number' && input.bodyFat>3;
+  const base = hasBF ? Math.round(lean*40 + fatMass*20) : Math.round(input.weight * 35);
+  const hours = input.trainingHours ?? (input.trainingDays ?? 3) * 1.1;
+  const sweat = input.sweatRate ?? 600; // мл/ч средний
+  const training = Math.round(hours * sweat * 0.85 + (input.cardioMin ?? 0) * 7); // 7мл/мин кардио ~420мл/ч
+  const climateAdd = input.climate==='hot' ? 600 : input.climate==='cold' ? -150 : 0;
+  const nat = Math.round(base + training + climateAdd);
+  const boost = aasMult(input, 0.12) - 1; // 0..0.12 дозозависимо
+  const aas = Math.round(nat * (1 + boost));
+  const perHour = Math.round(nat / 16);
+  const perHourAAS = Math.round(aas / 16);
   return {
     nat, aas,
     delta: aas - nat,
-    perHour, perHourAAS: Math.round(aas/16),
-    note: input.onAAS ? 'ААС: +12% + Na-контроль, HCT>50 — +500мл, АД>140 — +300мл' : 'Натурал: EFSA 35мл/кг + тренировка',
-    breakdown: { base: Math.round(base), training: Math.round(training) }
+    perHour, perHourAAS,
+    note: input.onAAS
+      ? `ААС: +${Math.round(boost*100)}% (задержка Na/H2O, эритроцитоз). HCT>50 → +500мл, АД>140 → +300мл. Контроль Na 4-5г/сут, K 3.5-4.5г`
+      : 'Натурал: EFSA 35мл/кг (lean 40/жир 20) + пот ~600мл/ч. Жара +600мл',
+    breakdown: { base: Math.round(base), training: Math.round(training), climate: climateAdd, lean: Math.round(lean), fatMass: Math.round(fatMass) }
   };
 }
 
 // ——— Шаги ———
 export function calcSteps(input: MetabolicInput) {
-  // BMR Katch-McArdle
-  const lean = input.weight * (1 - (input.bodyFat ?? 15)/100);
-  const bmr = 370 + 21.6 * lean;
-  const palMap = { low: 1.375, medium: 1.55, high: 1.725 } as const;
-  const pal = palMap[input.activityLevel ?? 'medium'];
-  const tdeeNat = bmr * pal + (input.cardioMin ?? 0) * 8 + (input.trainingDays ?? 3) * 150;
-  const tdeeAAS = tdeeNat * (input.onAAS ? 1.08 : 1);
-  const goalDelta = input.goal === 'cut' ? -500 : input.goal === 'bulk' ? 300 : 0;
+  const { bmr } = computeBMR(input);
+  const palBaseMap = { low: 1.40, medium: 1.55, high: 1.75 } as const;
+  const palBase = palBaseMap[input.activityLevel ?? 'medium'];
+  // тренировочная надбавка к PAL раздельно (EAT), не дубль BMR*PAL+training
+  const trainAdd = clamp((input.trainingDays ?? 3) * 0.022, 0, 0.14);
+  const cardioAdd = clamp((input.cardioMin ?? 0) / 60 * 0.025, 0, 0.10);
+  const palEff = clamp(palBase + trainAdd + cardioAdd, 1.25, 2.25);
+  const tdeeNat = Math.round(bmr * palEff);
+  const mult = aasMult(input, 0.08);
+  const tdeeAAS = Math.round(tdeeNat * mult);
+  // цель — % от TDEE (профессионально) c полом -500/+300
+  const cutDelta = Math.round(-Math.min(750, Math.max(400, tdeeNat * 0.18)));
+  const bulkDelta = Math.round(Math.min(450, Math.max(250, tdeeNat * 0.10)));
+  const goalDelta = input.goal === 'cut' ? cutDelta : input.goal === 'bulk' ? bulkDelta : 0;
   const targetNat = tdeeNat + goalDelta;
   const targetAAS = tdeeAAS + goalDelta;
-  // 1 шаг ≈ 0.04 ккал (70кг), корректируется весом
-  const kcalPerStep = 0.04 * (input.weight / 70);
-  const stepsNat = Math.round(Math.max(3000, (targetNat - (bmr*1.2)) / kcalPerStep));
-  const stepsAAS = Math.round(stepsNat * (input.onAAS ? 0.92 : 1));
+  // 1 шаг: ~0.04ккал на 70кг, масса-зависимо + рост-зависимый шаг
+  const kcalPerStep = 0.04 * (input.weight / 70) * (input.height ? (input.height/175) : 1);
+  const kcalPerStepClamped = clamp(kcalPerStep, 0.025, 0.07);
+  const sedentKcal = Math.round(bmr * 1.20);
+  const stepsNat = Math.round(clamp((targetNat - sedentKcal) / kcalPerStepClamped, 3000, 22000));
+  const stepsAAS = Math.round(clamp(stepsNat * (input.onAAS ? 0.92 : 1), 3000, 22000));
   return {
-    tdeeNat: Math.round(tdeeNat), tdeeAAS: Math.round(tdeeAAS),
-    targetNat: Math.round(targetNat), targetAAS: Math.round(targetAAS),
-    stepsNat: Math.min(20000, stepsNat), stepsAAS: Math.min(20000, stepsAAS),
+    tdeeNat, tdeeAAS,
+    targetNat, targetAAS,
+    stepsNat: Math.min(22000, stepsNat), stepsAAS: Math.min(22000, stepsAAS),
     delta: stepsAAS - stepsNat,
-    note: input.onAAS ? 'ААС: TDEE +8% → шагов −8% для того же дефицита' : 'Натурал: PAL по бытовой + кардио + силовые'
+    pal: Math.round(palEff*100)/100,
+    kcalPerStep: Math.round(kcalPerStepClamped*1000)/1000,
+    sedentKcal,
+    note: input.onAAS ? `ААС: TDEE +${Math.round((mult-1)*100)}% (NEAT↑) → шагов −8% для того же дефицита` : `Натурал: PAL ${palEff.toFixed(2)} (бытовая ${palBase}+train ${trainAdd.toFixed(2)}+cardio ${cardioAdd.toFixed(2)})`
   };
 }
 
 // ——— КБЖУ ———
 export function calcKBJU(input: MetabolicInput) {
-  const lean = input.weight * (1 - (input.bodyFat ?? 15)/100);
-  const bmr = 370 + 21.6 * lean;
-  const palMap = { low: 1.375, medium: 1.55, high: 1.725 } as const;
-  const pal = palMap[input.activityLevel ?? 'medium'];
-  let tdeeNat = bmr * pal + (input.cardioMin ?? 0) * 8 + (input.trainingDays ?? 3) * 150;
-  let tdeeAAS = tdeeNat * (input.onAAS ? 1.10 : 1);
-  const goalDelta = input.goal === 'cut' ? -500 : input.goal === 'bulk' ? 300 : 0;
+  const { bmr, lean, method } = computeBMR(input);
+  const palBaseMap = { low: 1.40, medium: 1.55, high: 1.75 } as const;
+  const palBase = palBaseMap[input.activityLevel ?? 'medium'];
+  const trainAdd = clamp((input.trainingDays ?? 3) * 0.022, 0, 0.14);
+  const cardioAdd = clamp((input.cardioMin ?? 0) / 60 * 0.025, 0, 0.10);
+  const palEff = clamp(palBase + trainAdd + cardioAdd, 1.25, 2.25);
+  let tdeeNat = Math.round(bmr * palEff);
+  const mult = aasMult(input, 0.10);
+  let tdeeAAS = Math.round(tdeeNat * mult);
+  const cutDelta = Math.round(-Math.min(750, Math.max(400, tdeeNat * 0.18)));
+  const bulkDelta = Math.round(Math.min(450, Math.max(250, tdeeNat * 0.10)));
+  const goalDelta = input.goal === 'cut' ? cutDelta : input.goal === 'bulk' ? bulkDelta : 0;
   tdeeNat += goalDelta; tdeeAAS += goalDelta;
-  // Белок
-  const protNat = input.goal === 'cut' ? 2.2 : 1.8;
-  const protAAS = 2.8;
+  // Белок ISSN/Helms: натурал 1.8-2.2 maintain/bulk, 2.3-3.1 cut по сухости
+  const bf = input.bodyFat ?? (input.sex==='male'?15:22);
+  let protNat: number;
+  if(input.goal==='cut'){
+    protNat = bf < 12 ? 2.6 : bf < 18 ? 2.4 : 2.2;
+  } else if(input.goal==='bulk'){
+    protNat = 1.9;
+  } else {
+    protNat = 2.0;
+  }
+  // ААС: +0.4-0.8 г/кг дозозависимо, 2.8 — средняя для 500мг
+  const aasProtAdd = input.onAAS ? 0.4 + clamp((input.aasDose ?? 500)/1000, 0, 0.8) : 0;
+  const protAAS = +(protNat + aasProtAdd).toFixed(1);
   const pNat = Math.round(input.weight * protNat);
   const pAAS = Math.round(input.weight * protAAS);
-  // Жиры
-  const fNat = Math.round(Math.max(50, input.weight * 0.8));
-  const fAAS = Math.round(Math.max(60, input.weight * 1.0));
-  // Углеводы — остаток
+  // Жиры: минимум гормональный
+  const fMinNat = input.goal==='cut' ? 0.8 : 0.9;
+  const fNat = Math.round(Math.max(50, input.weight * fMinNat));
+  const fAAS = Math.round(Math.max(55, input.weight * 1.0));
+  // Углеводы — остаток с полом и потолком 5-8 г/кг (planner-targets)
   const kcalProtNat = pNat * 4, kcalFatNat = fNat * 9;
-  const cNat = Math.max(80, Math.round((tdeeNat - kcalProtNat - kcalFatNat)/4));
+  let cNat = Math.max(80, Math.round((tdeeNat - kcalProtNat - kcalFatNat)/4));
   const kcalProtAAS = pAAS * 4, kcalFatAAS = fAAS * 9;
-  const cAAS = Math.max(100, Math.round((tdeeAAS - kcalProtAAS - kcalFatAAS)/4));
+  let cAAS = Math.max(100, Math.round((tdeeAAS - kcalProtAAS - kcalFatAAS)/4));
+  // диетологический потолок 5г/кг (до 8 при инсулине — здесь нет инсулина, 5)
+  const carbCeil = Math.round(input.weight * 5);
+  const carbFloor = 90;
+  cNat = clamp(cNat, carbFloor, carbCeil);
+  cAAS = clamp(cAAS, 110, Math.round(input.weight * 6));
+  // пересчёт ккал после клампа углеводов
+  const kcalNatFinal = pNat*4 + fNat*9 + cNat*4;
+  const kcalAASFinal = pAAS*4 + fAAS*9 + cAAS*4;
   return {
-    nat: { kcal: Math.round(tdeeNat), p: pNat, f: fNat, c: cNat, protPerKg: protNat },
-    aas: { kcal: Math.round(tdeeAAS), p: pAAS, f: fAAS, c: cAAS, protPerKg: protAAS },
-    delta: { kcal: Math.round(tdeeAAS - tdeeNat), p: pAAS - pNat, c: cAAS - cNat },
-    carbTiming: '50% вокруг тренировки, 30% утро, 20% вечер',
-    note: input.onAAS ? 'ААС: белок 2.8, +10% ккал, жиры 1.0г/кг' : 'Натурал: белок 1.8-2.2, жиры 0.8'
+    nat: { kcal: kcalNatFinal, p: pNat, f: fNat, c: cNat, protPerKg: protNat, tdee: tdeeNat, bmr, lean: Math.round(lean), method, pal: Math.round(palEff*100)/100 },
+    aas: { kcal: kcalAASFinal, p: pAAS, f: fAAS, c: cAAS, protPerKg: protAAS, tdee: tdeeAAS, bmr, lean: Math.round(lean), method, pal: Math.round(palEff*100)/100 },
+    delta: { kcal: Math.round(kcalAASFinal - kcalNatFinal), p: pAAS - pNat, c: cAAS - cNat },
+    carbTiming: input.trainingDays && input.trainingDays>=4 ? 'Тренировочный: 55% вокруг тренировки, 25% утро, 20% вечер · Отдых: 35/35/30' : '50% вокруг тренировки, 30% утро, 20% вечер',
+    fiber: { nat: input.sex==='male'? 32: 25, aas: input.sex==='male'? 34: 26 },
+    note: input.onAAS ? `ААС: белок ${protAAS}г/кг (+${aasProtAdd.toFixed(1)}), TDEE +${Math.round((mult-1)*100)}%, жиры 1.0г/кг` : `Натурал: белок ${protNat}г/кг (Helms/ISSN), жиры ${fMinNat}г/кг, PAL ${palEff.toFixed(2)}`
   };
 }
 
 // ——— Жир ———
 export function calcBodyFat(input: MetabolicInput) {
-  // US Navy
-  const log10 = (x:number)=> Math.log(x)/Math.log(10);
+  // US Navy — вход в дюймах, исправлено cm→in
   let navy: number | null = null;
-  if (input.waist && input.neck && input.height) {
-    if (input.sex === 'male' && input.waist > input.neck) {
-      navy = 86.01*log10(input.waist - input.neck) - 70.041*log10(input.height) + 36.76;
-    } else if (input.sex === 'female' && input.hip && input.waist && input.neck) {
-      navy = 163.205*log10(input.waist + (input.hip||0) - input.neck) - 97.684*log10(input.height) - 78.387;
+  const hIn = input.height ? toIn(input.height) : null;
+  const waistIn = input.waist ? toIn(input.waist) : null;
+  const neckIn = input.neck ? toIn(input.neck) : null;
+  const hipIn = input.hip ? toIn(input.hip) : null;
+  if (hIn && waistIn && neckIn) {
+    if (input.sex === 'male' && waistIn > neckIn) {
+      navy = 86.01*log10(waistIn - neckIn) - 70.041*log10(hIn) + 36.76;
+    } else if (input.sex === 'female' && hipIn && waistIn && neckIn) {
+      const sum = waistIn + hipIn - neckIn;
+      if(sum>0) navy = 163.205*log10(sum) - 97.684*log10(hIn) - 78.387;
     }
+    if(navy!=null && !isFinite(navy)) navy=null;
+    if(navy!=null) navy = clamp(navy, 3, 65);
   }
-  // ББ/ПЛ коррекция талии от осевой нагрузки
-  const squatVol = (input.trainingDays ?? 3) * 8; // условные сеты приседа/тяги в неделю
-  const waistCorr = input.bodyFat != null ? 0 : 0; // placeholder
-  const axialAdd = squatVol > 20 ? 1.5 : squatVol > 12 ? 0.7 : 0;
-  const waistAdj = (input.waist ?? 0) + axialAdd;
+  // ББ/ПЛ коррекция талии от осевой нагрузки — умеренная, прозрачная
+  const squatVol = (input.trainingDays ?? 3) * 7;
+  const axialAddCm = squatVol > 22 ? 1.4 : squatVol > 14 ? 0.7 : 0;
+  const waistAdjCm = (input.waist ?? 0) + axialAddCm;
   let navyAdj: number | null = null;
-  if (navy != null && axialAdd>0 && input.waist && input.neck) {
-    if (input.sex === 'male') navyAdj = 86.01*log10(waistAdj - input.neck) - 70.041*log10(input.height) + 36.76;
-    else if (input.hip) navyAdj = 163.205*log10(waistAdj + input.hip - input.neck) - 97.684*log10(input.height) - 78.387;
+  if (navy != null && axialAddCm>0 && waistIn && neckIn && hIn) {
+    const waistAdjIn = toIn(waistAdjCm);
+    if (input.sex === 'male' && waistAdjIn > neckIn) navyAdj = 86.01*log10(waistAdjIn - neckIn) - 70.041*log10(hIn) + 36.76;
+    else if (input.sex === 'female' && hipIn) {
+      const sum = waistAdjIn + hipIn - neckIn;
+      if(sum>0) navyAdj = 163.205*log10(sum) - 97.684*log10(hIn) - 78.387;
+    }
+    if(navyAdj!=null) navyAdj = clamp(navyAdj, 3, 65);
   }
-  const curr = input.bodyFat ?? navy ?? 15;
+  const currRaw = input.bodyFat ?? navy ?? (input.sex==='female'?22:15);
+  const curr = clamp(Math.round(currRaw*10)/10, 3, 65);
   const ffm = input.weight * (1 - curr/100);
-  const ffmi = ffm / Math.pow((input.height||180)/100,2);
-  const ffmiAdj = ffmi + (input.onAAS ? 1.2 : 0);
+  const hM = (input.height||180)/100;
+  const ffmi = ffm / (hM*hM);
+  // FFMI нормализованный к росту 1.80 (Kouri 1995)
+  const ffmiNorm = ffmi + 6.1 * (1.80 - hM);
+  const aasAdd = input.onAAS ? clamp(0.8 + (input.aasDose ?? 500)/1200, 0.8, 2.2) : 0;
+  const ffmiAdj = ffmi + aasAdd;
+  const ffmiNormAdj = ffmiNorm + aasAdd;
+  const natLimit = 25;
   return {
     navy: navy != null ? Math.round(navy*10)/10 : null,
     navyAdj: navyAdj != null ? Math.round(navyAdj*10)/10 : null,
-    waistAdj: axialAdd>0 ? Math.round(waistAdj*10)/10 : null,
-    axialAdd,
-    current: Math.round(curr*10)/10,
+    waistAdj: axialAddCm>0 ? Math.round(waistAdjCm*10)/10 : null,
+    axialAdd: axialAddCm,
+    current: curr,
     ffm: Math.round(ffm*10)/10,
     ffmi: Math.round(ffmi*10)/10,
+    ffmiNorm: Math.round(ffmiNorm*10)/10,
     ffmiAdj: Math.round(ffmiAdj*10)/10,
-    note: axialAdd>0 ? `Осевая коррекция +${axialAdd}см к талии (присед/тяга ${squatVol} сет/нед)` : 'Без осевой коррекции',
-    aasNote: input.onAAS ? 'ААС: FFMI +1.2 (реально выше из-за задержки воды/гликогена)' : 'Натурал: FFMI без поправки'
+    ffmiNormAdj: Math.round(ffmiNormAdj*10)/10,
+    natLimit,
+    isOverNatLimit: ffmiNorm > natLimit,
+    isOverNatLimitAAS: ffmiNormAdj > natLimit,
+    note: axialAddCm>0 ? `Осевая +${axialAddCm}см к талии (присед/тяга ~${squatVol} сет/нед)` : 'Без осевой коррекции',
+    aasNote: input.onAAS ? `ААС: FFMI +${aasAdd.toFixed(1)} (вода/гликоген). Натуральный лимит FFMI_norm ~25` : `Натурал: лимит FFMI_norm ~25, у вас ${ffmiNorm.toFixed(1)}`,
+    accuracy: 'Navy ±3.5% (гидратация/осанка/еда). Для трека — мерьте в одних условиях'
   };
 }
 
-// ——— Кортизол ———
+// ——— Кортизол — HPA индекс риска (не фейк нмоль/л) ———
 export function calcCortisol(input: MetabolicInput) {
-  const stress = input.stress ?? 5; // 1-10
-  const sleep = input.sleepHours ?? 7;
-  const sleepQ = input.sleepQuality ?? 3; // 1-5
-  const acwr = input.acwr ?? 1;
-  const base = 8 + stress*0.8 + (7 - sleep)*0.9 + (5 - sleepQ)*0.6 + Math.max(0, acwr-1)*4;
-  const nat = Math.min(25, Math.max(3, base));
-  const aas = Math.max(3, nat * (input.onAAS ? 0.85 : 1));
-  const zone = (v:number)=> v<7 ? 'low' : v<=15 ? 'norm' : 'high';
-  const diurnal = input.onAAS
-    ? 'Утро 300-350 нм/л → вечер 60-80 (сглажена, HPA приглушена)'
-    : 'Утро 350-450 → вечер 40-60 (физиологично)';
+  const stress = clamp(input.stress ?? 5, 1, 10);
+  const sleep = clamp(input.sleepHours ?? 7, 3, 11);
+  const sleepQ = clamp(input.sleepQuality ?? 3, 1, 5);
+  const acwr = clamp(input.acwr ?? 1, 0, 3);
+  // индекс 0-100: 50 = норма, >70 = высокий
+  let score = 50;
+  score += (stress - 5) * 4.5; // 1→-18, 10→+22.5
+  score += (7 - sleep) * 5.5; // 4ч → +16.5
+  score += (3 - sleepQ) * 4; // 1 → +8
+  score += Math.max(0, acwr - 1.15) * 28; // ACWR 1.5→+9.8, 2.0→+23.8
+  if(acwr < 0.75) score += (0.75 - acwr)*10; // детрен
+  score = clamp(Math.round(score), 8, 96);
+  // супрессия ААС дозозависимо: −10..−18%
+  const aasScore = clamp(Math.round(score * (input.onAAS ? 0.86 : 1)), 5, 96);
+  const zone = (v:number)=> v<38 ? 'low' : v<=62 ? 'norm' : v<=78 ? 'high' : 'very_high';
+  const zoneNat = zone(score);
+  const zoneAAS = zone(aasScore);
+  const zoneLabel: Record<string,string> = { low:'Низкий (риск детрена/гипо)', norm:'Норма', high:'Повышен', very_high:'Высокий — делод/сон' };
+  // what-if: возврат индекса
+  const whatIf = (dSleep:number, dStress:number, dAcwr:number)=>{
+    let v = score + dStress*4.5 + dSleep*(-5.5) + dAcwr*28;
+    return clamp(Math.round(v), 5, 96);
+  };
+  // совместимость: старые поля nat/aas как индекс
   return {
-    nat: Math.round(nat*10)/10, aas: Math.round(aas*10)/10, delta: Math.round((aas-nat)*10)/10,
-    zoneNat: zone(nat), zoneAAS: zone(aas),
-    diurnal,
-    whatIf: (dSleep:number, dStress:number, dVol:number)=> {
-      const v = nat + dStress*0.8 + dSleep*(-0.9) + dVol*0.3;
-      return Math.round(Math.max(3, Math.min(25, v))*10)/10;
-    },
-    note: input.onAAS ? 'ААС: кортизол −15% (супрессия HPA), но риск отката при отмене' : 'Натурал: кортизол по стрессу/сну/ACWR'
+    nat: score, aas: aasScore, delta: aasScore - score,
+    natIdx: score, aasIdx: aasScore,
+    zoneNat, zoneAAS,
+    zoneLabelNat: zoneLabel[zoneNat], zoneLabelAAS: zoneLabel[zoneAAS],
+    diurnal: input.onAAS
+      ? 'ААС: супрессия HPA, утренний пик сглажен. Риск отката 2-4 нед после курса'
+      : 'Физиология: пик 06:00-08:00, минимум 22:00-02:00. Свет/кофеин сдвигают',
+    whatIf,
+    acwrZone: acwr<0.8?'undertrained': acwr<=1.3?'optimal': acwr<=1.5?'caution':'dangerous',
+    note: input.onAAS ? 'ААС: HPA −14% (дозозависимо). После отмены — мониторинг усталости/сна 2-4нед' : 'Индекс из стресс/сон/качество/ACWR. Не лаба — скрининг перегруза',
+    scaleNote: 'Шкала 0-100: <38 низкий, 38-62 норма, 63-78 повышен, >78 высокий'
   };
 }
