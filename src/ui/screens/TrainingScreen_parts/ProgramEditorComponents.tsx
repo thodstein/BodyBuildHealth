@@ -2013,12 +2013,22 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
 const WEAK_OPTS = ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'calves', 'traps', 'forearms', 'core', 'arms'];
 const WeakPointChips: React.FC<{ value: string[]; onChange: (v: string[]) => void }> = ({ value, onChange }) => {
   const toggle = (m: string) => onChange(value.includes(m) ? value.filter(x => x !== m) : [...value, m]);
+  const iconFor = (m: string) => ({ chest: '💪', back: '🦍', quads: '🦵', hamstrings: '🦵', glutes: '🍑', shoulders: '🏋️', biceps: '💥', triceps: '💥', calves: '🦶', traps: '🏔️', forearms: '🤝', core: '🧱', arms: '💪' } as Record<string, string>)[m] ?? '🎯';
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-      {WEAK_OPTS.map(m => {
-        const on = value.includes(m);
-        return <button key={m} className="editor-chip" onClick={() => toggle(m)} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, cursor: 'pointer', border: on ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.02)', color: on ? '#fff' : DIM, minHeight: 44 }}>{GROUP_RU[m] ?? m}</button>;
-      })}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(124px, 1fr))', gap: 6 }}>
+        {WEAK_OPTS.map(m => {
+          const on = value.includes(m);
+          return (
+            <button key={m} onClick={() => toggle(m)} aria-pressed={on} className="editor-action-card" style={on ? { ...CARD_BTN_ACTIVE, minHeight: 54, padding: '8px 10px' } : { ...CARD_BTN, minHeight: 54, padding: '8px 10px' }}>
+              <span style={{ fontSize: 13 }}>{iconFor(m)}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: on ? '#00e68a' : '#fff', lineHeight: 1.1 }}>{GROUP_RU[m] ?? m}</span>
+              <span style={{ fontSize: 9, color: on ? 'rgba(0,230,138,0.70)' : 'rgba(255,255,255,0.45)' }}>{on ? '✓ в приоритете' : 'нажмите → приоритет'}</span>
+            </button>
+          );
+        })}
+      </div>
+      <MethodHint icon="🎯" title="Как работает специализация без калькулятора" text="Выберите 1-2 отстающие → им +30% сетов 6 недель за счёт других, не сверху. Через 6 недель — баланс. Так же делает BB-авто." color="#ec4899" />
     </div>
   );
 };
@@ -2064,15 +2074,23 @@ const BBConstraintsPanel: React.FC<{
   };
   return (
     <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>⚙️ Параметры ББ-программы</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>⚙️ Параметры ББ-программы — карточки</div>
       <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Оборудование (доступное)</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {EQUIPMENT_OPTS.map(o => <Chip key={o.id} active={(constraints.equipment ?? []).includes(o.id)} onClick={() => toggleEq(o.id)}>{o.label}</Chip>)}
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Оборудование (доступное) — карточка = есть в зале</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 6 }}>
+          {EQUIPMENT_OPTS.map(o => {
+            const on = (constraints.equipment ?? []).includes(o.id);
+            return (
+              <button key={o.id} onClick={() => toggleEq(o.id)} aria-pressed={on} className="editor-action-card" style={on ? { ...CARD_BTN_ACTIVE, minHeight: 48, padding: '8px 10px', flexDirection: 'row', gap: 8 } : { ...CARD_BTN, minHeight: 48, padding: '8px 10px', flexDirection: 'row', gap: 8 }}>
+                <span style={{ fontSize: 12 }}>{on ? '✓' : '○'}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: on ? '#00e68a' : '#fff' }}>{o.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
       <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Прогрессия весов</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Прогрессия весов — без калькулятора</div>
         <EditorPopupSelect
           value={progression.loadStrategy || 'double_progression'}
           options={LOAD_STRATEGY_OPTS.map(o => ({ id: o.id, label: o.label }))}
@@ -2080,9 +2098,10 @@ const BBConstraintsPanel: React.FC<{
           ariaLabel="Прогрессия весов"
           title="Стратегия прогрессии"
         />
+        <div style={{ marginTop: 4 }}><MethodHint icon="📈" title="Двойная прогрессия" text="Сначала расти повторами (8→12), затем +2.5 кг и снова 8. Без расчётов — просто следи за диапазоном." color="#22c55e" /></div>
       </div>
       <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Протокол делода</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Протокол делода — без калькулятора</div>
         <EditorPopupSelect
           value={progression.deloadProtocol || 'pump'}
           options={DELOAD_PROTOCOL_OPTS.map(o => ({ id: o.id, label: o.label }))}
@@ -2090,12 +2109,23 @@ const BBConstraintsPanel: React.FC<{
           ariaLabel="Протокол делода"
           title="Протокол разгрузки"
         />
+        <div style={{ marginTop: 4 }}><MethodHint icon="🔄" title="Делод" text="Каждая 4-я неделя — −30% объёма, вес тот же, RIR +2. Лёгкая неделя спасает суставы лучше полного отдыха." color="#f59e0b" /></div>
       </div>
       <div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Интенсив-техники</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {INTENSITY_TECHNIQUE_OPTS.map(o => <Chip key={o.id} active={(progression.intensityTechniques ?? ['none']).includes(o.id as IntensityTechnique)} onClick={() => toggleIntensity(o.id as IntensityTechnique)}>{o.label}</Chip>)}
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Интенсив-техники — карточка = приём на памп-дне</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 6 }}>
+          {INTENSITY_TECHNIQUE_OPTS.map(o => {
+            const on = (progression.intensityTechniques ?? ['none']).includes(o.id as IntensityTechnique);
+            const hint: Record<string, string> = { none: 'без добивок', rest_pause: '15-20с пауза', drop_set: '−20% вес', myo_reps: 'мини-сеты', pause_rep: 'пауза 1с', mechanical_drop: 'смена угла' };
+            return (
+              <button key={o.id} onClick={() => toggleIntensity(o.id as IntensityTechnique)} aria-pressed={on} className="editor-action-card" style={on ? { ...CARD_BTN_ACTIVE, minHeight: 48, padding: '8px 10px' } : { ...CARD_BTN, minHeight: 48, padding: '8px 10px' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: on ? '#00e68a' : '#fff' }}>{o.label}</span>
+                <span style={{ fontSize: 9, color: on ? 'rgba(0,230,138,0.70)' : 'rgba(255,255,255,0.45)' }}>{hint[o.id] ?? ''}</span>
+              </button>
+            );
+          })}
         </div>
+        <div style={{ marginTop: 4 }}><MethodHint icon="🔥" title="Когда применять" text="Дроп/мио — только на последнем подходе изоляции, не на базе. 1-2 приёма на неделю достаточно." color="#ef4444" /></div>
       </div>
       <label style={{ ...SMALL, display: 'flex', alignItems: 'center', gap: 6 }}>
         <input type="checkbox" checked={constraints.avoidAxialLoad ?? false} onChange={e => onChangeConstraints({ ...constraints, avoidAxialLoad: e.target.checked })} />
