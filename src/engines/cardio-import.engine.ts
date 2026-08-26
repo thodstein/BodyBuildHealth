@@ -10,6 +10,7 @@ import type { CardioLogEntry } from './lms/cardio-diary.engine';
 import { estimateCardioEntryKcal } from './lms/cardio-diary.engine';
 import type { CardioType } from './lms/cardio.engine';
 import { unzipSync, strFromU8 } from 'fflate';
+import FitParser from 'fit-file-parser';
 
 function genId(): string {
   return 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6) + '-' + Math.random().toString(36).slice(2, 6);
@@ -625,21 +626,9 @@ export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
   const warnings: string[] = [];
   // пробуем реальный парсинг, fallback — инструкция
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    let FitParser: any = null;
-    try {
-      // @ts-ignore
-      FitParser = require('fit-file-parser');
-      if (FitParser && FitParser.default) FitParser = FitParser.default;
-    } catch {}
-    if (!FitParser) {
-      // динамический импорт как fallback (ESM)
-      // @ts-ignore
-      // eslint-disable-next-line
-      // FitParser will be null in browser without bundling — fallback to stub
-    }
-    if (FitParser) {
-      const parser = new FitParser({ force: true, speedUnit: 'km/h', lengthUnit: 'km', temperatureUnit: 'celsius' });
+    const Parser: any = (FitParser as any)?.default ? (FitParser as any).default : FitParser;
+    if (Parser) {
+      const parser = new Parser({ force: true, speedUnit: 'km/h', lengthUnit: 'km', temperatureUnit: 'celsius' });
       let out: any = null;
       let err: any = null;
       // fit-file-parser — синхронный колбэк

@@ -195,7 +195,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const streak = useMemo(() => computeStreak(log.filter(e => e.completed).map(e => ({ date: e.date }))), [log]);
 
   const add = () => {
-    const w = validateCardioLogFields({ rpe, hr, km, minutes, notes });
+    const w = validateCardioLogFields({ rpe, hr, km, minutes });
     if (Object.keys(w).length) {
       const msg = Object.values(w).join(' · ');
       flashMsg(`⚠ ${msg}`);
