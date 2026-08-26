@@ -272,6 +272,8 @@ const SleepForm: React.FC<{
   const set = (key: keyof RichSleepEntry, val: string | number | boolean) =>
     setDraft((prev) => ({ ...prev, [key]: val }));
 
+  const timeRe = /^\d{2}:\d{2}$/;
+  const isValidTime = (t: unknown) => typeof t === 'string' && timeRe.test(t) && (() => { const [hh, mm] = t.split(':').map(Number); return hh >= 0 && hh < 24 && mm >= 0 && mm < 60; })();
   const submit = () => {
     const h = Number(draft.hours);
     if (!draft.date) return setError('Укажите дату');
@@ -281,6 +283,15 @@ const SleepForm: React.FC<{
     const lat = Number(draft.latency);
     if (draft.latency !== undefined && draft.latency !== null && (!Number.isFinite(lat) || lat < 0 || lat > 300))
       return setError('Засыпание: число минут от 0 до 300');
+    const aw = Number(draft.awakenings);
+    if (draft.awakenings !== undefined && draft.awakenings !== null && (!Number.isFinite(aw) || aw < 0 || aw > 20))
+      return setError('Пробуждений: 0–20');
+    const st = Number(draft.screenTime);
+    if (draft.screenTime !== undefined && draft.screenTime !== null && (!Number.isFinite(st) || st < 0 || st > 600))
+      return setError('Экран: 0–600 мин');
+    if (draft.caffeineCutoff && !isValidTime(draft.caffeineCutoff)) return setError('Кофеин до: формат ЧЧ:ММ');
+    if (draft.bedtime && !isValidTime(draft.bedtime)) return setError('Легли: формат ЧЧ:ММ');
+    if (draft.wakeTime && !isValidTime(draft.wakeTime)) return setError('Подъём: формат ЧЧ:ММ');
     setError(null);
     onSave({
       ...draft,
@@ -588,27 +599,27 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
   };
 
   const entries = useMemo(() => rows.map(fieldsOf), [rows]);
+  const rangeEntries = useMemo(() => filterByRange(entries, range), [entries, range]);
   const active = useMemo(() => {
-    let result = filterByRange(entries, range);
+    let result = rangeEntries;
     const q = query.trim().toLowerCase();
     if (q) result = result.filter((e) => e.date.includes(q) || e.fields.some((f) => f.value.toLowerCase().includes(q)));
     return sortEntries(result, sort);
-  }, [entries, range, query, sort]);
+  }, [rangeEntries, query, sort]);
   const pageData = paginate(active, page, 8);
 
-  const points = rows
-    .filter((r) => active.some((e) => e.date === r.date))
-    .map((r) => ({ date: r.date, value: r.hours }));
+  const rangeDateSet = useMemo(() => new Set(rangeEntries.map((e) => e.date)), [rangeEntries]);
+  const points = rows.filter((r) => rangeDateSet.has(r.date)).map((r) => ({ date: r.date, value: r.hours }));
   const dist = computeDistribution(points.map((p) => p.value));
-  const extremes = computeExtremes('sleep', active);
-  const streak = computeStreak(entries);
-  const anomalies = detectAnomalies('sleep', active);
+  const extremes = computeExtremes('sleep', rangeEntries);
+  const streak = computeStreak(rangeEntries);
+  const anomalies = detectAnomalies('sleep', rangeEntries);
   const weeks = buildWeeklyHistogram(points);
   const comparison = compareWithLastWeek(points);
   const normal = getNormalRange('sleep');
-  const score = useMemo(() => computeSleepScore(active, goals), [active, goals]);
-  const trends = useMemo(() => computeSleepTrends(active), [active]);
-  const weekdayAvg = useMemo(() => computeWeekdayAverages(active), [active]);
+  const score = useMemo(() => computeSleepScore(rangeEntries, goals), [rangeEntries, goals]);
+  const trends = useMemo(() => computeSleepTrends(rangeEntries), [rangeEntries]);
+  const weekdayAvg = useMemo(() => computeWeekdayAverages(rangeEntries), [rangeEntries]);
   const calendar = useMemo(() => buildSleepCalendar(entries, 60), [entries]);
 
   const diaryCorrelations = useMemo(() => {
