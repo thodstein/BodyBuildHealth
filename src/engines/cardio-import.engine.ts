@@ -1,14 +1,15 @@
 /**
  * cardio-import.engine.ts — импорт кардио-сессий из популярных часов/приложений.
- * Поддерживает: Apple Watch (Health export.xml / CSV / TCX / GPX), Huawei Health (CSV/TCX/GPX),
- * Samsung Health (CSV/TCX), Garmin/Polar/Suunto/Fitbit/Xiaomi (TCX/GPX/CSV/FIT-stub), JSON.
+ * Поддерживает: Apple Watch (Health export.xml / export.zip / CSV / TCX / GPX), Huawei Health (CSV/TCX/GPX),
+ * Samsung Health (CSV/TCX), Garmin/Polar/Suunto/Fitbit/Xiaomi (TCX/GPX/CSV/FIT), JSON.
  * CSV — авто-детект разделителя, заголовков (ru/en), форматов даты/длительности.
  * TCX/GPX/Apple XML — DOMParser.
- * FIT — заглушка с инструкцией (бинарный, требует конвертации в TCX).
+ * FIT — парсинг через fit-file-parser, ZIP — через fflate.
  */
 import type { CardioLogEntry } from './lms/cardio-diary.engine';
 import { estimateCardioEntryKcal } from './lms/cardio-diary.engine';
 import type { CardioType } from './lms/cardio.engine';
+import { unzipSync, strFromU8 } from 'fflate';
 
 function genId(): string {
   return 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6) + '-' + Math.random().toString(36).slice(2, 6);
@@ -578,22 +579,143 @@ export function parseCardioJson(text: string): CardioImportResult {
   return { entries, warnings, format: 'json' };
 }
 
-// ── FIT stub ──────────────────────────────────────────────────────────────
-export function parseCardioFit(_buffer: ArrayBuffer): CardioImportResult {
-  return {
-    entries: [],
-    warnings: [
-      'FIT — бинарный формат Garmin. Экспортируйте тренировку как TCX/GPX из Garmin Connect, Huawei Health, Samsung Health, Apple Health (экспорт.xml) или скачайте CSV из приложения часов, затем импортируйте его.',
-      'Подсказка: Huawei Health → Здоровье → Я → Конфиденциальность → Запросить данные → CSV; Samsung Health → Настройки → Скачать данные → CSV; Apple Watch → iPhone Здоровье → Профиль → Экспорт → export.xml; Garmin Connect → Активность → Экспорт → TCX.',
-    ],
-    format: 'fit',
-  };
+// ── ZIP (Apple export.zip → export.xml + routes) ──────────────────────────
+export function parseCardioZip(buffer: ArrayBuffer): CardioImportResult {
+  const warnings: string[] = [];
+  const entries: CardioLogEntry[] = [];
+  try {
+    const unzipped = unzipSync(new Uint8Array(buffer));
+    let found = false;
+    for (const [name, data] of Object.entries(unzipped)) {
+      const lower = name.toLowerCase();
+      const isXml = lower.endsWith('.xml') || lower.endsWith('export.xml');
+      const isTcx = lower.endsWith('.tcx');
+      const isGpx = lower.endsWith('.gpx');
+      const isCsv = lower.endsWith('.csv');
+      const isJson = lower.endsWith('.json');
+      if (!isXml && !isTcx && !isGpx && !isCsv && !isJson) continue;
+      found = true;
+      try {
+        const text = strFromU8(data as Uint8Array);
+        let res: CardioImportResult | null = null;
+        if (isXml && text.toLowerCase().includes('<healthdata')) res = parseAppleHealthXml(text);
+        else if (isTcx) res = parseCardioTcx(text);
+        else if (isGpx) res = parseCardioGpx(text);
+        else if (isCsv) res = parseCardioCsv(text, name);
+        else if (isJson) res = parseCardioJson(text);
+        else if (isXml) res = parseAppleHealthXml(text);
+        if (res) {
+          entries.push(...res.entries);
+          warnings.push(...res.warnings.map(w => `${name}: ${w}`));
+        }
+      } catch (e) {
+        warnings.push(`${name}: ошибка — ${(e as Error).message}`);
+      }
+    }
+    if (!found) warnings.push('ZIP: внутри не найдено export.xml / TCX / GPX / CSV / JSON');
+    if (entries.length === 0 && warnings.length === 0) warnings.push('ZIP: не найдено тренировок');
+  } catch (e) {
+    return { entries: [], warnings: ['ZIP: ошибка распаковки — ' + (e as Error).message + ' — распакуйте вручную и загрузите export.xml'], format: 'zip' };
+  }
+  return { entries, warnings, format: 'zip' };
+}
+
+// ── FIT (Garmin) — попытка парсинга через fit-file-parser ─────────────────
+export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
+  const warnings: string[] = [];
+  // пробуем реальный парсинг, fallback — инструкция
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    let FitParser: any = null;
+    try {
+      // @ts-ignore
+      FitParser = require('fit-file-parser');
+      if (FitParser && FitParser.default) FitParser = FitParser.default;
+    } catch {}
+    if (!FitParser) {
+      // динамический импорт как fallback (ESM)
+      // @ts-ignore
+      // eslint-disable-next-line
+      // FitParser will be null in browser without bundling — fallback to stub
+    }
+    if (FitParser) {
+      const parser = new FitParser({ force: true, speedUnit: 'km/h', lengthUnit: 'km', temperatureUnit: 'celsius' });
+      let out: any = null;
+      let err: any = null;
+      // fit-file-parser — синхронный колбэк
+      parser.parse(new Uint8Array(buffer), (e: any, data: any) => { err = e; out = data; });
+      if (err) throw err;
+      if (out) {
+        const sessions: any[] = out.sessions || out.activity?.sessions || out.activities?.[0]?.sessions || [];
+        const laps: any[] = out.laps || [];
+        const sources = sessions.length ? sessions : laps.length ? laps : [];
+        // если структура другая — пробуем поля activity
+        const candidates: any[] = sources.length ? sources : (Array.isArray(out) ? out : []);
+        const parsed: CardioLogEntry[] = [];
+        for (const s of candidates) {
+          try {
+            const start = s.start_time || s.startTime || s.timestamp || s.start_position || '';
+            const isoDate = parseDateFlexible(String(start || '')) || toIsoDate(new Date());
+            // длительность
+            let dur: number | null = null;
+            if (s.total_elapsed_time !== undefined) dur = Math.round(Number(s.total_elapsed_time) / 60);
+            else if (s.total_timer_time !== undefined) dur = Math.round(Number(s.total_timer_time) / 60);
+            else if (s.total_time !== undefined) dur = Math.round(Number(s.total_time) / 60);
+            else if (s.duration !== undefined) dur = parseDurationFlexible(String(s.duration));
+            if (!dur || dur < 1 || dur > 600) continue;
+            let dist: number | undefined;
+            const dRaw = s.total_distance ?? s.distance ?? s.totalDistance;
+            if (dRaw !== undefined) {
+              const v = Number(dRaw);
+              if (Number.isFinite(v) && v > 0) dist = Math.round((v / 1000) * 10) / 10; // метры → км, если уже км — <200
+              if (dist !== undefined && dist > 1000) dist = Math.round((dist / 1000) * 10) / 10;
+              if (dist !== undefined && dist > 200) dist = 200;
+            }
+            let hr: number | undefined;
+            const hrRaw = s.avg_heart_rate ?? s.average_heart_rate ?? s.avgHeartRate ?? s.heart_rate;
+            if (hrRaw !== undefined) {
+              const v = Number(hrRaw);
+              if (Number.isFinite(v) && v >= 20 && v <= 260) hr = Math.round(v);
+            }
+            let cal: number | undefined;
+            const calRaw = s.total_calories ?? s.calories ?? s.totalCalories;
+            if (calRaw !== undefined) {
+              const v = Number(calRaw);
+              if (Number.isFinite(v) && v > 0) cal = Math.round(v);
+            }
+            const typeRaw = String(s.sport ?? s.activity ?? s.sport_type ?? s.sub_sport ?? '');
+            const type = mapActivityToCardioType(typeRaw);
+            parsed.push({
+              id: genId(),
+              date: isoDate,
+              type,
+              durationMin: clamp(dur, 1, 600),
+              distanceKm: dist,
+              avgHr: hr,
+              calories: cal ?? estimateCardioEntryKcal(type, clamp(dur, 1, 600)),
+              completed: true,
+            });
+          } catch {}
+        }
+        if (parsed.length > 0) return { entries: parsed, warnings, format: 'fit' };
+        warnings.push('FIT: структура файла не распознана — попробуйте экспорт TCX из Garmin Connect');
+      }
+    }
+  } catch (e) {
+    warnings.push('FIT: ошибка парсинга — ' + (e as Error).message);
+  }
+  warnings.unshift(
+    'FIT — бинарный формат Garmin. Если автоматический парсинг не сработал, экспортируйте тренировку как TCX/GPX из Garmin Connect, Huawei Health, Samsung Health, Apple Health (экспорт.xml) или скачайте CSV, затем импортируйте его.',
+    'Подсказка: Huawei Health → Здоровье → Я → Конфиденциальность → Запросить данные → CSV; Samsung Health → Настройки → Скачать данные → CSV; Apple Watch → iPhone Здоровье → Профиль → Экспорт → export.zip → export.xml; Garmin Connect → Активность → Экспорт → TCX.',
+  );
+  return { entries: [], warnings, format: 'fit' };
 }
 
 // ── Auto-detect + unified parse ──────────────────────────────────────────
-export function detectCardioFormat(fileName: string, content: string): 'csv' | 'tcx' | 'gpx' | 'apple_health' | 'json' | 'fit' | 'unknown' {
+export function detectCardioFormat(fileName: string, content: string): 'csv' | 'tcx' | 'gpx' | 'apple_health' | 'json' | 'fit' | 'zip' | 'unknown' {
   const name = String(fileName || '').toLowerCase();
   const head = String(content || '').slice(0, 4000).toLowerCase();
+  if (name.endsWith('.zip')) return 'zip';
   if (name.endsWith('.fit') || head.startsWith('') && content.length > 14 && content.slice(0, 12).includes('.FIT')) return 'fit';
   if (name.endsWith('.tcx') || head.includes('<trainingcenterdatabase') || head.includes('<activity') && head.includes('<lap')) return 'tcx';
   if (name.endsWith('.gpx') || head.includes('<gpx') || head.includes('<trk>')) return 'gpx';
@@ -608,7 +730,11 @@ export function detectCardioFormat(fileName: string, content: string): 'csv' | '
 
 export function parseCardioImport(fileName: string, content: string | ArrayBuffer): CardioImportResult {
   const name = String(fileName || '').toLowerCase();
-  // FIT — ArrayBuffer
+  // ZIP / FIT — ArrayBuffer
+  if (name.endsWith('.zip')) {
+    const buf = content instanceof ArrayBuffer ? content : new TextEncoder().encode(String(content)).buffer;
+    return parseCardioZip(buf);
+  }
   if (name.endsWith('.fit') || content instanceof ArrayBuffer) {
     const buf = content instanceof ArrayBuffer ? content : new TextEncoder().encode(String(content)).buffer;
     return parseCardioFit(buf);
@@ -633,9 +759,9 @@ export function parseCardioImport(fileName: string, content: string | ArrayBuffe
 export const CARDIO_IMPORT_INSTRUCTIONS: { brand: string; steps: string[]; formats: string[] }[] = [
   {
     brand: 'Apple Watch',
-    formats: ['export.xml', 'TCX', 'GPX', 'CSV'],
+    formats: ['export.zip', 'export.xml', 'TCX', 'GPX', 'CSV'],
     steps: [
-      'iPhone → Здоровье → Профиль (аватар) → Экспорт всех данных → export.zip → внутри export.xml — импортируйте его (содержит все Workout).',
+      'iPhone → Здоровье → Профиль (аватар) → Экспорт всех данных → export.zip — загрузите ZIP прямо сюда (внутри export.xml автоматически распознается).',
       'Или: Fitness → Тренировка → Поделиться → Экспорт GPX/TCX (через WorkOutDoors/Strava).',
       'Или: Скачайте CSV из QS Access / Health Auto Export.',
     ],

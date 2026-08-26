@@ -68,16 +68,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
 
   const handleImportFile = async (file: File) => {
     const lowName = file.name.toLowerCase();
-    if (lowName.endsWith('.zip')) {
-      flashMsg('⚠️ Распакуйте ZIP (Apple export.zip) и загрузите export.xml / CSV / TCX внутри');
-      setImportPreview({ entries: [], warnings: ['ZIP-архив: распакуйте и выберите export.xml (Apple) или CSV/TCX/GPX'], format: 'zip', fileName: file.name });
-      return;
-    }
+    const isBinary = lowName.endsWith('.zip') || lowName.endsWith('.fit');
     setImportBusy(true);
     try {
-      const isFit = lowName.endsWith('.fit');
       let parsed: ReturnType<typeof parseCardioImport>;
-      if (isFit) {
+      if (isBinary) {
         const buf = await file.arrayBuffer();
         parsed = parseCardioImport(file.name, buf);
       } else {
