@@ -73,8 +73,9 @@ export function syncBBPlanSetShape(plan: BBPlan): BBPlan {
 
 function validateSession(session: BBSession, week: number, sessionIndex: number, options: BBPlanValidationOptions = {}): BBPlanValidationIssue[] {
   const issues: BBPlanValidationIssue[] = [];
-  // Разминочное упражнение не входит в лимит рабочих упражнений.
-  const workingCount = session.exercises.filter(exercise => !(exercise as any).warmupActivator).length;
+  // Разминочное упражнение не входит в лимит рабочих упражнений; optional-добивки
+  // («при наличии сил») тоже вне капа сессии.
+  const workingCount = session.exercises.filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional).length;
   const { maxExercises } = sessionLimitsFor(options);
   if (workingCount > maxExercises) {
     issues.push({ level: 'error', code: 'session_exercise_cap', message: `Сессия содержит ${workingCount} рабочих упражнений (максимум ${maxExercises}).`, week, session: sessionIndex });
@@ -148,7 +149,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
       if (!allowed) issues.push({ level: 'warning', code: 'session_muscle_leak', message: `${exercise.name}: мышца ${canonical} не соответствует тегу дня ${session.sessionTag}.`, week: week.week || wi + 1, session: si + 1, exercise: exercise.name });
     }
     const sessionSets = session.exercises
-      .filter(exercise => !(exercise as any).warmupActivator)
+      .filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional)
       .reduce((sum, exercise) => sum + exercise.sets, 0);
     const { maxWorkingSets } = sessionLimitsFor(options);
     if (sessionSets > maxWorkingSets) {

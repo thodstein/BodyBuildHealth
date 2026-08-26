@@ -37,8 +37,9 @@ describe('BB deterministic and property invariants', () => {
   it.each(SPLIT_PATTERNS)('keeps structural invariants for %s', pattern => {
     const plan = buildBBPlan({ patternId: pattern.id, level: 'intermediate', goal: 'mass', weeks: 4, workMax });
     for (const week of plan.weeks) for (const session of week.sessions) {
-      // Разминочное упражнение (warmupActivator) не входит в лимит рабочих.
-      const working = session.exercises.filter((ex: any) => !ex.warmupActivator);
+      // Разминочное упражнение (warmupActivator) и optional-добивки
+      // («при наличии сил» ⚡) не входят в лимит рабочих упражнений.
+      const working = session.exercises.filter((ex: any) => !ex.warmupActivator && !ex.optional);
       expect(working.length).toBeLessThanOrEqual(10);
       for (const exercise of session.exercises) {
         expect(exercise.sets).toBeGreaterThanOrEqual(1);

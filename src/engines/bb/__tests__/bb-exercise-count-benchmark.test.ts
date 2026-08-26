@@ -4,8 +4,9 @@ import { SPLIT_PATTERNS } from '../bb-split-patterns';
 
 const workMax = { chest: 100, back: 120, shoulders: 60, arms: 50, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
-// Рабочие упражнения без разминочных (warmupActivator не входит в бюджеты).
-const working = (session: any) => session.exercises.filter((e: any) => !e.warmupActivator);
+// Рабочие упражнения без разминочных (warmupActivator) и optional-добивок
+// («при наличии сил» ⚡) — обе категории вне капов сессии.
+const working = (session: any) => session.exercises.filter((e: any) => !e.warmupActivator && !e.optional);
 
 describe('BB exercise-count benchmark', () => {
   it('keeps natural plans within session caps across every split', () => {

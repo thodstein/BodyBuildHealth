@@ -1175,10 +1175,22 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
   const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
   const isEnhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
-  const addEx = (muscle: string, pattern: RegExp, sets: number, reps: [number, number], note: string): void => {
+  const addEx = (muscle: string, pattern: RegExp, sets: number, reps: [number, number], note: string, opts?: { optional?: boolean }): void => {
     const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pattern.test(c.name || '') && !/tibialis|tibia/i.test(c.name || '') && !working.some((e: any) => e.name === c.name) && !isMobilityRestricted(c, options.mobilityRestrictions));
     if (!candidate) return;
     const baseWeight = options.workMax?.[muscle] || 40;
+    if (opts?.optional) {
+      // «При наличии сил»: вне капа сессии (не занимает слот 10/14/18,
+      // не считается в 24/40/60) — добровольная добивка.
+      session.exercises.push({
+        muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
+        sets, repsRange: reps, rir: 3, restSeconds: 45, warmupSets: [], optional: true,
+        comment: 'Опционально — при наличии сил и времени.',
+        workSets: Array.from({ length: sets }, () => ({ reps: reps[1], rir: 3, weight: Math.round(baseWeight * 0.3 * 10) / 10, restSeconds: 45 })),
+        rationale: note,
+      });
+      return;
+    }
     if (working.length < maxEx) {
       session.exercises.push({
         muscle, name: candidate.name, exerciseName: candidate.name, role: 'accessory', character: 'памп',
@@ -1251,7 +1263,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
         while (absEx.sets < targetSets) { absEx.workSets.push({ ...sample }); absEx.sets += 1; }
       }
     } else if (weekCountOf('abs') < 2) {
-      addEx('abs', /скручиван|crunch|подъём.*ног|подъем.*ног|велосипед/i, isEnhanced ? 5 : 4, [15, 25], 'Малые группы: пресс (скручивания)');
+      addEx('abs', /скручиван|crunch|подъём.*ног|подъем.*ног|велосипед/i, isEnhanced ? 5 : 4, [15, 25], 'Малые группы: пресс (скручивания) — при наличии сил', { optional: true });
     }
   }
   // Предплечья — с тягами (Pull/Back/Upper/FullBody): хватовая работа.
@@ -1259,7 +1271,7 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   if (/Pull|Back|Upper|Torso|FullBody/.test(tag) && !muscleExcluded('forearms')) {
     const hasForearms = working.some((e: any) => e.muscle === 'forearms');
     if (!hasForearms && weekCountOf('forearms') < 2) {
-      addEx('forearms', /запяст|wrist|зоттман/i, isEnhanced ? 4 : 3, [12, 20], 'Малые группы: предплечья с тягами (хват)');
+      addEx('forearms', /запяст|wrist|зоттман/i, isEnhanced ? 4 : 3, [12, 20], 'Малые группы: предплечья с тягами (хват) — при наличии сил', { optional: true });
     }
   }
   // Трапеции: шраги в КАЖДЫЙ день спины по логике дня.
@@ -1657,21 +1669,15 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
 /** Лимит упражнений сессии (10/14/18) применяется пост-фактум: слабые
  *  группы могут привести к перебору в buildSession (спец-слоты), а проходы
  *  только не дают ДОБАВЛЯТЬ сверх лимита. Удаляем лишние: изоляции-дубли
- *  сначала, затем accessory, сохраняя минимум 1 упражнение мышцы. */
+ *  сначала, затем accessory, сохраняя минимум 1 упражнение мышцы.
+ *  Optional-добивки («при наличии сил», ⚡) вне капа — не считаются
+ *  и никогда не удаляются (не вытесняют обязательную работу). */
 function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): void {
   const iso = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
   const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
   for (const week of plan.weeks) {
     for (const session of week.sessions) {
-      const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator);
-      if (working().length <= maxEx) continue;
-      // Optional-упражнения («при наличии сил») удаляются ПЕРВЫМИ — они вне
-      // бюджета и не должны вытеснять обязательную работу.
-      const optionals = working().filter((e: any) => (e as any).optional);
-      for (const ex of optionals) {
-        if (working().length <= maxEx) break;
-        session.exercises = session.exercises.filter((x: any) => x !== ex);
-      }
+      const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
       if (working().length <= maxEx) continue;
       // Изоляции по имени (в спец-планах они primary — но дубли паттернов
       // всё равно лишние), затем accessory-не-изоляции; compound не трогаем.
@@ -2718,7 +2724,9 @@ for (const week of next.weeks) {
         // Строгий сетовой лимит сессии: если добавление не влезает — не добавляем
         // (иначе 24/60 нарушается; MEV покрывается guardMap в budget-фите).
         const addSets = fillSets(muscle);
-        if (sessionSets() + addSets > maxSessionSets) continue;
+        // Пресс/предплечья — «при наличии сил» (optional, вне капа сессии).
+        const isOptionalSmall = muscle === 'abs' || muscle === 'forearms';
+        if (!isOptionalSmall && sessionSets() + addSets > maxSessionSets) continue;
         const candidate = EXERCISE_CATALOG.find((x: any) => {
           if (trueMuscleOf(x) !== muscle) return false;
           if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
@@ -2738,6 +2746,10 @@ for (const week of next.weeks) {
         added.sets = addSets;
         const sample = template.workSets?.[0] || { reps: 10, rir: 2, weight: 0 };
         added.workSets = Array.from({ length: added.sets }, () => ({ ...sample }));
+        if (isOptionalSmall) {
+          added.optional = true;
+          added.comment = 'Опционально — при наличии сил и времени.';
+        }
         session.exercises.push(added);
         present.add(muscle);
       }
@@ -2828,10 +2840,11 @@ for (const week of next.weeks) {
   }
   // Финальная страховка лимита сессии (после всех проходов): ни одна сессия
   // не превышает maxWorkingSets (вторичные accessory сеты срезаются, мин. 2).
+  // Optional-добивки («при наличии сил») в кап не входят.
   const finMaxSets = options.maxWorkingSets ?? 24;
   for (const week of next.weeks) {
     for (const session of week.sessions) {
-      const workingEx = session.exercises.filter((e: any) => !(e as any).warmupActivator);
+      const workingEx = session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
       let total = workingEx.reduce((a: number, e: any) => a + (e.sets || 0), 0);
       if (total <= finMaxSets) continue;
       for (const e of workingEx.filter((x: any) => x.role === 'accessory' && x.sets > 2)) {

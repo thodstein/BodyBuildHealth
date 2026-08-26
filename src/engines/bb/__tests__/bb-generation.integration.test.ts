@@ -27,8 +27,9 @@ describe('BB generic generation integration', () => {
       expect(plan.weeks).toHaveLength(4);
       for (const week of plan.weeks) {
         for (const session of week.sessions) {
-          // Разминочные упражнения (warmupActivator) не входят в лимит рабочих.
-          const working = session.exercises.filter((ex: any) => !ex.warmupActivator);
+          // Разминочные упражнения (warmupActivator) и optional-добивки
+          // («при наличии сил» ⚡) не входят в лимит рабочих упражнений.
+          const working = session.exercises.filter((ex: any) => !ex.warmupActivator && !ex.optional);
           expect(working.length).toBeLessThanOrEqual(10);
           for (const exercise of session.exercises) {
             expect(exercise.sets).toBeGreaterThanOrEqual(1);
