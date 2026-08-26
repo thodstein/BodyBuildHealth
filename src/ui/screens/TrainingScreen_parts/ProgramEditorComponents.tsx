@@ -759,9 +759,11 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
   const [quickGroup, setQuickGroup] = useState<string | null>(null);
   const [quickSearch, setQuickSearch] = useState('');
   const quickExercises = useMemo(() => {
-    if (!quickGroup) return [] as Array<{ id: string; name: string; group?: string; type?: string; equipment?: string }>;
+    if (!quickGroup) return [] as Array<{ id: string; name: string; group?: string; type?: string; equipment?: string; isFavorite?: boolean; isWeak?: boolean }>;
     try {
       const prof = loadTrainingProfile();
+      const favSet = new Set(prof.favoriteExercises ?? []);
+      const weakSet = new Set(prof.weakPoints ?? []);
       const list = suggestExercisesForGroup(
         quickGroup,
         prof.level || 'intermediate',
@@ -774,11 +776,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
         prof.excludedExercises ?? [],
       ).map(ex => {
         const cat = (EXERCISE_CATALOG as unknown as Array<{ id: string; name: string; equipment?: string; type?: string; group?: string }>).find(c => c.id === ex.id || c.name === ex.name);
-        return { id: ex.id, name: ex.name, group: ex.group || cat?.group, type: ex.type || cat?.type, equipment: (cat as any)?.equipment || '—' };
+        return { id: ex.id, name: ex.name, group: ex.group || cat?.group, type: ex.type || cat?.type, equipment: (cat as any)?.equipment || '—', isFavorite: favSet.has(ex.id), isWeak: weakSet.has(ex.group || cat?.group || quickGroup) };
       });
-      if (!quickSearch.trim()) return list.slice(0, 6);
+      // Сортировка: избранное → слабые → остальные, уже отсортировано движком, но усиливаем
+      const sorted = [...list].sort((a,b) => (Number(b.isFavorite) - Number(a.isFavorite)) || (Number(b.isWeak) - Number(a.isWeak)));
+      if (!quickSearch.trim()) return sorted.slice(0, 6);
       const q = quickSearch.toLowerCase().trim();
-      return list.filter(e => e.name.toLowerCase().includes(q)).slice(0, 6);
+      return sorted.filter(e => e.name.toLowerCase().includes(q)).slice(0, 6);
     } catch {
       return [];
     }
@@ -1025,6 +1029,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', alignItems: 'stretch' }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>{GROUP_RU[quickGroup] ?? quickGroup}</span>
+                {(() => { try { const p=loadTrainingProfile(); return <span style={{ fontSize: 10, color: DIM }}>{(p.equipment?.length ?? 0)>0 ? `· зал: ${(p.equipment as string[]).slice(0,3).join(', ')}` : '· зал: весь'} · {(p.weakPoints?.length ?? 0)>0 ? `слабые: ${(p.weakPoints as string[]).slice(0,2).map((w:string)=>GROUP_RU[w]??w).join(', ')}` : 'слабых нет'}</span>; } catch { return null; }})()}
                 <input value={quickSearch} onChange={e => setQuickSearch(e.target.value)} placeholder="🔍 Фильтр по названию…" style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 8px', color: '#fff', fontSize: 11, minHeight: 32 }} />
                 <button onClick={() => { setQuickGroup(null); setQuickSearch(''); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, border: 'none', background: 'rgba(255,255,255,0.06)', color: DIM, cursor: 'pointer' }}>✕</button>
               </div>
@@ -1034,9 +1039,9 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
                   <button
                     key={ex.id}
                     onClick={() => addQuickBlock(ex)}
-                    title={`Добавить «${ex.name}» · ${ex.type ?? ''} · ${ex.equipment ?? ''}`}
-                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', minHeight: 56, textAlign: 'left', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)', color: '#fff' }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>+ {ex.name}</span>
+                    title={`Добавить «${ex.name}» · ${ex.type ?? ''} · ${ex.equipment ?? ''}${ex.isFavorite ? ' · ★ избранное' : ''}${ex.isWeak ? ' · слабая группа' : ''}`}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', minHeight: 56, textAlign: 'left', background: ex.isFavorite ? 'rgba(245,158,11,0.10)' : ex.isWeak ? 'rgba(167,139,250,0.08)' : 'rgba(59,130,246,0.08)', border: ex.isFavorite ? '1px solid rgba(245,158,11,0.28)' : ex.isWeak ? '1px solid rgba(167,139,250,0.22)' : '1px solid rgba(59,130,246,0.25)', color: '#fff' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: ex.isFavorite ? '#f59e0b' : ex.isWeak ? '#a78bfa' : '#60a5fa', display: 'flex', alignItems: 'center', gap: 4 }}>+ {ex.name} {ex.isFavorite && <span style={{ fontSize: 9, background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: 6, padding: '1px 4px' }}>★</span>}{ex.isWeak && <span style={{ fontSize: 9, background: 'rgba(167,139,250,0.14)', border: '1px solid rgba(167,139,250,0.20)', borderRadius: 6, padding: '1px 4px', color: '#a78bfa' }}>слабая</span>}</span>
                     <span style={{ fontSize: 10, color: DIM }}>{ex.type === 'compound' ? '🏋️ База' : ex.type === 'isolation' ? '🎯 Изоляция' : '🔧 Доп.'} · {typeof ex.equipment === 'string' ? ex.equipment : Array.isArray(ex.equipment) ? (ex.equipment as string[]).join('/') : '—'}</span>
                   </button>
                 ))}

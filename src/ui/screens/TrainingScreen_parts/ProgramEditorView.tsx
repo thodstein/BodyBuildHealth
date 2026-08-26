@@ -39,7 +39,7 @@ import { loadDesigns } from '../../../engines/periodization-designer.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL, UI_METRICS } from './training-ui';
-import { ManualHeader, ManualStepper, SectionCard as ManualSectionCard, Badge, ProgressBar, InfoBanner, VolumeMiniBar, ScoreBadge, MethodHint, CARD_BTN, CARD_BTN_ACTIVE } from './ManualUI';
+import { ManualHeader, ManualStepper, SectionCard as ManualSectionCard, Badge, ProgressBar, InfoBanner, VolumeMiniBar, ScoreBadge, MethodHint, CARD_BTN, CARD_BTN_ACTIVE, MANUAL_STYLE_TAG } from './ManualUI';
 import { buildProgramIcs, downloadIcs } from './ManualExport';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
@@ -697,6 +697,7 @@ for (const w of program.hybrid.bbWeeks ?? []) {
 
 return (
       <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <style>{MANUAL_STYLE_TAG}</style>
         {/* Панель действий — иерархия: акцент слева по направлению, стекло, 2 ряда */}
          <div className="editor-topbar-shell" style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'linear-gradient(180deg, rgba(26,28,38,0.82), rgba(18,20,30,0.68))', borderRadius: 14, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${DIR_COLOR[dir]}`, boxShadow: '0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter: 'blur(14px)' }}>
          <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

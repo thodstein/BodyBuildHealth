@@ -617,34 +617,44 @@ export const ProgramManagerPanel: React.FC = () => {
           })()}
         </div>
 
-        {/* Валидация */}
+        {/* Валидация — кликабельные исправления */}
         {(() => {
           if (issues.length === 0) {
             return (
-              <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #22c55e', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>✅</span>
+              <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #22c55e', display: 'flex', alignItems: 'center', gap: 10, background: 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(255,255,255,0.02))' }}>
+                <span style={{ width: 32, height: 32, borderRadius: 16, background: '#22c55e', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900 }}>✓</span>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e' }}>Программа валидна</div>
-                  <div style={{ fontSize: 10, color: DIM }}>Ошибок и предупреждений нет — можно сохранять.</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#22c55e' }}>Программа валидна</div>
+                  <div style={{ fontSize: 10, color: DIM }}>Ошибок и предупреждений нет — можно сохранять и отправлять к выполнению.</div>
                 </div>
               </div>
             );
           }
           const color = errCount > 0 ? '#ef4444' : '#f59e0b';
           const icon = errCount > 0 ? '🚫' : '⚠️';
+          const fixFor = (code: string) => {
+            if (code === 'NO_TITLE' || code === 'BAD_DAYS' || code === 'BAD_WEEKS' || code === 'DAYS_MISMATCH' || code === 'NO_DELOAD') return { label: 'К параметрам →', action: () => setMstep('editor') };
+            if (code === 'NO_WEEKS' || code === 'NO_EXERCISES' || code === 'MRV_EXCEED') return { label: 'К неделям →', action: () => setMstep('editor') };
+            if (code.startsWith('HYBRID') || code === 'NO_CYCLE') return { label: 'Настроить →', action: () => setMstep('editor') };
+            return null;
+          };
           return (
             <div role="alert" style={{ ...CARD, padding: 10, borderLeft: `3px solid ${color}` }}>
               <div style={{ fontSize: 11, fontWeight: 800, color, marginBottom: 6 }}>
-                {icon} {errCount > 0 ? `${errCount} ошибк${errCount === 1 ? 'а' : 'и'}` : `${warnCount} предупреждени${warnCount === 1 ? 'е' : 'я'}`} валидации
+                {icon} {errCount > 0 ? `${errCount} ошибк${errCount === 1 ? 'а' : 'и'}` : `${warnCount} предупреждени${warnCount === 1 ? 'е' : 'я'}`} валидации — нажмите чтобы исправить
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {issues.slice(0, 8).map((iss, i) => (
-                  <div key={i} style={{ fontSize: 10, color: iss.level === 'error' ? '#fca5a5' : '#fbbf24', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 800 }}>{iss.level === 'error' ? '✕' : '!'}</span>
-                    <span style={{ flex: 1 }}>{iss.message}</span>
-                    <span style={{ color: DIM }}>{iss.code}</span>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {issues.slice(0, 8).map((iss, i) => {
+                  const fix = fixFor(iss.code);
+                  return (
+                    <div key={i} style={{ fontSize: 10, color: iss.level === 'error' ? '#fca5a5' : '#fbbf24', display: 'flex', alignItems: 'center', gap: 6, padding: '5px 7px', borderRadius: 8, background: iss.level === 'error' ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${iss.level === 'error' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)'}` }}>
+                      <span style={{ fontWeight: 800, width: 14, textAlign: 'center' }}>{iss.level === 'error' ? '✕' : '!'}</span>
+                      <span style={{ flex: 1 }}>{iss.message}</span>
+                      <span style={{ color: DIM, fontSize: 9 }}>{iss.code}</span>
+                      {fix && <button onClick={fix.action} style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, border: `1px solid ${color}55`, background: color + '18', color, cursor: 'pointer', whiteSpace: 'nowrap' }}>{fix.label}</button>}
+                    </div>
+                  );
+                })}
               </div>
               {issues.length > 8 && <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>…и ещё {issues.length - 8}</div>}
             </div>
@@ -662,11 +672,11 @@ export const ProgramManagerPanel: React.FC = () => {
             const daysOk = !p.bb || (p.bb.weeks[0]?.sessions.length ?? 0) === p.meta.daysPerWeek;
             const volumeOk = q ? q.perMuscle.every(m=> m.status==='ok' || m.status==='high') : true;
             const checks = [
-              { ok: hasTitle, label: 'Название', hint: hasTitle ? '✓' : 'Укажите название' },
-              { ok: hasWeeks && !hasEmpty, warn: hasEmpty, label: 'Наполнение', hint: !hasWeeks ? 'Нет недель' : hasEmpty ? 'Есть пустые тренировки' : 'Все тренировки заполнены' },
-              { ok: volumeOk, label: 'Объём', hint: q ? `${q.score}/100 ${q.grade}` : 'Нет данных' },
-              { ok: hasDeload, label: 'Делод', hint: hasDeload ? 'Есть' : 'Рекомендуется для '+p.meta.weeks+' нед' },
-              { ok: daysOk, label: 'Дни', hint: daysOk ? '✓ ' + p.meta.daysPerWeek + 'д/нед' : '⚠ ' + p.meta.daysPerWeek + 'д/нед ↔ ' + (p.bb?.weeks[0]?.sessions.length ?? 0) },
+              { ok: hasTitle, label: 'Название', hint: hasTitle ? '✓' : 'Укажите название', go: () => setMstep('editor') },
+              { ok: hasWeeks && !hasEmpty, warn: hasEmpty, label: 'Наполнение', hint: !hasWeeks ? 'Нет недель' : hasEmpty ? 'Есть пустые тренировки' : 'Все тренировки заполнены', go: () => setMstep('editor') },
+              { ok: volumeOk, label: 'Объём', hint: q ? `${q.score}/100 ${q.grade}` : 'Нет данных', go: () => setMstep('editor') },
+              { ok: hasDeload, label: 'Делод', hint: hasDeload ? 'Есть' : 'Рекомендуется для '+p.meta.weeks+' нед', go: () => setMstep('editor') },
+              { ok: daysOk, label: 'Дни', hint: daysOk ? '✓ ' + p.meta.daysPerWeek + 'д/нед' : '⚠ ' + p.meta.daysPerWeek + 'д/нед ↔ ' + (p.bb?.weeks[0]?.sessions.length ?? 0), go: () => setMstep('editor') },
             ];
             const okCnt = checks.filter(c=> (c as any).ok).length;
             const pct = Math.round(okCnt/checks.length*100);
@@ -674,7 +684,7 @@ export const ProgramManagerPanel: React.FC = () => {
             return (
               <div style={{ ...CARD, padding: 10, borderLeft: `3px solid ${col}`, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: col }}>✅ Чек-лист качества — {okCnt}/{checks.length} · {pct}%</span><span style={{ fontSize: 10, color: DIM }}>{pct>=80 ? 'готово' : 'вернитесь в Редактор чтобы исправить'}</span></div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{checks.map(c=> (<div key={(c as any).label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: (c as any).ok ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${(c as any).ok ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`}}><span style={{ width: 16, height: 16, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: (c as any).ok ? '#22c55e' : '#ef4444', color: '#fff' }}>{(c as any).ok ? '✓' : '✕'}</span><span style={{ fontSize: 11, fontWeight: 700, color: (c as any).ok ? '#22c55e' : '#ef4444', minWidth: 70 }}>{(c as any).label}</span><span style={{ fontSize: 11, color: DIM_STRONG, flex: 1 }}>{(c as any).hint}</span></div>))}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>{checks.map(c=> (<div key={(c as any).label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 6, background: (c as any).ok ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)', border: `1px solid ${(c as any).ok ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'}`}}><span style={{ width: 16, height: 16, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, background: (c as any).ok ? '#22c55e' : '#ef4444', color: '#fff' }}>{(c as any).ok ? '✓' : '✕'}</span><span style={{ fontSize: 11, fontWeight: 700, color: (c as any).ok ? '#22c55e' : '#ef4444', minWidth: 70 }}>{(c as any).label}</span><span style={{ fontSize: 11, color: DIM_STRONG, flex: 1 }}>{(c as any).hint}</span>{!(c as any).ok && <button onClick={(c as any).go} style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.22)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', whiteSpace: 'nowrap' }}>Исправить →</button>}</div>))}</div>
               </div>
             );
           } catch { return null; }

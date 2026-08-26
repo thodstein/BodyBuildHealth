@@ -278,8 +278,19 @@ export const ICON_CARD_BTN: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: 10, cursor: 'pointer',
   background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff',
-  fontSize: 13, transition: 'all 0.15s ease',
+  fontSize: 13, transition: 'all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)',
 } as const;
+
+// Глобальные hover/transition для конструктора — не ломают функциональность, только ощущение качества
+export const MANUAL_STYLE_TAG = `
+.manual-constructor button { transition: transform 0.18s cubic-bezier(0.25,0.46,0.45,0.94), box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease; }
+.manual-constructor button:hover:not(:disabled) { transform: translateY(-1px); }
+.manual-constructor button:active:not(:disabled) { transform: translateY(0px) scale(0.99); }
+@media (hover: none) { .manual-constructor button:hover { transform: none; } }
+@media (max-width: 480px) {
+  .manual-constructor { gap: 8px !important; }
+  .manual-constructor .editor-card-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}`;
 
 export const MethodHint: React.FC<{ icon?: string; title: string; text: string; color?: string }> = ({ icon = '💡', title, text, color = '#60a5fa' }) => (
   <div style={{ display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 10, background: `${color}10`, border: `1px solid ${color}22`, lineHeight: 1.45 }}>
