@@ -1555,20 +1555,23 @@ return (
         <span style={{ color: program.meta.weeks <3 || program.meta.weeks>12 ? '#f59e0b' : DIM }}>{program.meta.weeks <4 ? '💡 4 нед — минимум' : program.meta.weeks >12 ? '⚠ ' + program.meta.weeks + ' нед — длинный' : '✓ ' + program.meta.weeks + ' нед — ок'}</span>
         {program.meta.weeks >=6 && !program.bb?.weeks.some(w=> w.deload) && <span style={{ color: '#f59e0b' }}>· добавьте делод</span>}
       </div>
-      <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #60a5fa', display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#60a5fa' }}>💡 Цель и уровень — как влияет на цикл</div>
-         <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.5 }}>
-           {program.meta.goal === 'hypertrophy' && 'Масса: объём 65–85% MEV→MAV, RIR 2–3 → 1, делод каждую 4 нед.'}
-           {program.meta.goal === 'powerlifting' && 'Сила: интенсивность 75–90% 1RM, RIR 3→1, пик + делод перед тестом.'}
-           {program.meta.goal === 'cut' && 'Сушка: объём −15%, RIR 3, упор на сохранение силы, делод чаще.'}
-           {program.meta.goal === 'recomp' && 'Рекомпозиция: умеренный объём, RIR 2–3, баланс.'}
-           {program.meta.goal === 'peaking' && 'Пик: объём ↓, интенсивность ↑, RIR 1→0, тейпер.'}
-           {!['hypertrophy','powerlifting','cut','recomp','peaking'].includes(program.meta.goal) && 'Цель влияет на фазы, RIR и объём — выберите ближе к вашей задаче.'}
-         </div>
-         <div style={{ fontSize: 10, color: DIM }}>
-           Уровень <b style={{ color: DIM_STRONG }}>{program.meta.level}</b> · {program.meta.level === 'beginner' ? 'MEV ниже, RIR выше, техника в приоритете' : program.meta.level === 'intermediate' ? 'Стандарт MEV/MAV, RIR 2' : program.meta.level === 'advanced' ? 'MAV выше, RIR 1–2, можно специализацию' : 'Enhanced: MRV +15–30%, RIR 1, объём выше'} · {program.meta.daysPerWeek}д/нед × {program.meta.weeks} нед
-         </div>
-       </div>
+      <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #60a5fa', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 850, color: '#60a5fa' }}>💡 Как цель и уровень влияют на цикл</span><span style={{ fontSize: 10, color: DIM, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.14)', borderRadius: 20, padding: '2px 7px' }}>подсказка тренера</span></div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
+          <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.16)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a' }}>🎯 Цель: {GOAL_OPTS.find(g=>g.id===program.meta.goal)?.label ?? program.meta.goal}</span>
+            <span style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{program.meta.goal === 'hypertrophy' ? 'Объём 65–85% MEV→MAV, RIR 2→1, делод 4н' : program.meta.goal === 'powerlifting' ? 'Интенсив 75–90% 1RM, RIR 3→1, пик+делод' : program.meta.goal === 'cut' ? 'Объём −15%, RIR 3, делод чаще' : program.meta.goal === 'recomp' ? 'Умеренный объём, RIR 2–3' : program.meta.goal === 'peaking' ? 'Объём ↓ интенс ↑ RIR 1→0' : 'Выберите ближе к задаче'}</span>
+          </div>
+          <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.16)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>📶 Уровень: {LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level}</span>
+            <span style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{program.meta.level === 'beginner' ? 'MEV ниже, RIR выше, техника приоритет' : program.meta.level === 'intermediate' ? 'Стандарт MEV/MAV, RIR 2' : program.meta.level === 'advanced' ? 'MAV выше, RIR 1–2, специализация' : 'MRV +15–30%, RIR 1, объём выше'}</span>
+          </div>
+          <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.16)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa' }}>🗓 Формат: {program.meta.daysPerWeek}д × {program.meta.weeks}н</span>
+            <span style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{program.meta.daysPerWeek <3 ? '3д — минимум для прогрессии' : program.meta.daysPerWeek >5 ? '6д — для продвинутых' : 'Оптимально'} · {program.meta.weeks <4 ? '4н — минимум' : program.meta.weeks >12 ? 'Длинный цикл — делод обязателен' : 'Сбалансировано'}{program.meta.weeks >=6 && !program.bb?.weeks.some(w=> w.deload) ? ' · добавьте делод' : ''}</span>
+          </div>
+        </div>
+      </div>
 
        {/* F2.5: тренерские заметки (отображаются в PDF) */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>

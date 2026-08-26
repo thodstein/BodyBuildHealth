@@ -988,9 +988,9 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
       @media (hover: hover) { .editor-action-card:hover { transform: translateY(-2px); border-color: rgba(0,230,138,0.35) !important; box-shadow: 0 4px 14px rgba(0,0,0,0.22); } }
       `}</style>
       {blocks.length === 0 && (
-        <div className="editor-empty-exercises">
-          <div className="editor-empty-exercises__title">Шаг 3: добавьте первое упражнение</div>
-          <div className="editor-empty-exercises__text">Выберите группу мышц карточкой ниже — подберём упражнения под ваш зал, уровень и травмы. Карточка подсвечивается при выборе.</div>
+        <div className="editor-empty-exercises" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: 12, padding: 12 }}>
+          <div className="editor-empty-exercises__title" style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Добавим первое упражнение — 1 клик</div>
+          <div className="editor-empty-exercises__text" style={{ fontSize: 10, color: 'rgba(255,255,255,0.60)', lineHeight: 1.5 }}>Выберите группу — покажем 6 упражнений под ваш зал, уровень и травмы. <span style={{ color: '#a78bfa', fontWeight: 700 }}>Фиолетовые — слабые группы, приоритет +10% объёма.</span> Или используйте «⚡ Заполнить пустые» выше для авто-наполнения всего дня.</div>
           <div className="editor-card-grid">
             {(() => {
               let weak: string[] = [];

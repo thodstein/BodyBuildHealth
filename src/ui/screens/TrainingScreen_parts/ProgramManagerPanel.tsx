@@ -237,6 +237,7 @@ export const ProgramManagerPanel: React.FC = () => {
     } catch { return false; }
   });
   useEffect(() => { try { localStorage.setItem('he_manual_quick_collapsed', quickTplCollapsed ? '1' : '0'); } catch {} }, [quickTplCollapsed]);
+  const [emptyQuickExpanded, setEmptyQuickExpanded] = useState(false);
 
   // Последовательные шаги конструктора. Создание/открытие программы
   // автоматически переводит на шаг «Редактор», сохранение на «Итог» — обратно в выбор.
@@ -878,24 +879,26 @@ export const ProgramManagerPanel: React.FC = () => {
         </div>
 
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🆕 Создать новую</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2 }} onClick={() => startCreate('bb')}>
-              <span style={{ fontSize: 16 }}>💪</span>
-              <span>ББ</span>
+        <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>🆕 Создать новую</span><span style={{ fontSize: 10, color: DIM }}>с нуля — выберите направление</span></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            <button style={{ ...BTN, minHeight: 64, flexDirection: 'column', gap: 3, padding: '10px 6px' }} onClick={() => startCreate('bb')}>
+              <span style={{ fontSize: 18 }}>💪</span>
+              <span style={{ fontSize: 12, fontWeight: 800 }}>ББ</span>
+              <span style={{ fontSize: 9, color: 'rgba(6,40,28,0.65)', fontWeight: 600 }}>масса · сушка</span>
             </button>
-            <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => startCreate('pl')}>
-              <span style={{ fontSize: 16 }}>🏆</span>
-              <span>ПЛ</span>
+            <button style={{ ...BTN, minHeight: 64, flexDirection: 'column', gap: 3, padding: '10px 6px', color: '#a78bfa', borderColor: 'rgba(167,139,250,0.35)', background: 'linear-gradient(180deg, rgba(167,139,250,0.14), rgba(167,139,250,0.06))' }} onClick={() => startCreate('pl')}>
+              <span style={{ fontSize: 18 }}>🏆</span>
+              <span style={{ fontSize: 12, fontWeight: 800 }}>ПЛ</span>
+              <span style={{ fontSize: 9, color: 'rgba(90,40,160,0.75)', fontWeight: 600 }}>сила · пик</span>
             </button>
-            <button style={{ ...BTN, flex: 1, minHeight: 56, flexDirection: 'column', gap: 2, color: '#3b82f6', borderColor: 'rgba(59,130,246,0.3)' }} onClick={() => startCreate('hybrid')}>
-              <span style={{ fontSize: 16 }}>⚡</span>
-              <span>БВ</span>
+            <button style={{ ...BTN, minHeight: 64, flexDirection: 'column', gap: 3, padding: '10px 6px', color: '#3b82f6', borderColor: 'rgba(59,130,246,0.35)', background: 'linear-gradient(180deg, rgba(59,130,246,0.14), rgba(59,130,246,0.06))' }} onClick={() => startCreate('hybrid')}>
+              <span style={{ fontSize: 18 }}>⚡</span>
+              <span style={{ fontSize: 12, fontWeight: 800 }}>Гибрид</span>
+              <span style={{ fontSize: 9, color: 'rgba(30,60,140,0.75)', fontWeight: 600 }}>сила+масса</span>
             </button>
           </div>
-          {/* P2-3: Wizard как альтернатива прямому созданию — карточка */}
-          <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(167,139,250,0.12), rgba(167,139,250,0.04))', border: '1px solid rgba(167,139,250,0.28)', color: '#a78bfa', fontWeight: 800, fontSize: 11, minHeight: 44, boxShadow: '0 2px 10px rgba(167,139,250,0.12)' }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}><span style={{ fontSize: 14 }}>🪄</span> Визард (пошагово) <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.75)', fontWeight: 400, marginLeft: 4 }}>— проведёт за 30 сек</span></button>
+          <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(167,139,250,0.28)', color: '#a78bfa', fontWeight: 700, fontSize: 11, minHeight: 38 }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}><span style={{ fontSize: 13 }}>🪄</span> Визард — пошагово за 30 сек <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.60)', fontWeight: 400 }}>· проведёт по цели/уровню/дням</span></button>
         </div>
 
         {/* P15: Шаблоны быстрого старта — в обоих режимах + подсветка по профилю */}
@@ -904,9 +907,12 @@ export const ProgramManagerPanel: React.FC = () => {
           const isRecommended = (tpl: typeof QUICK_TEMPLATES[0]) => tpl.days === prof.daysPerWeek && tpl.level === prof.level;
           return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>🚀 Быстрый старт (шаблоны) <span style={{ fontSize: 10, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— 1 клик до качественной программы</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700, flex: 1 }}>🚀 Быстрый старт (шаблоны) <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— 1 клик, подобрано под ваш профиль</span></span>
+              <button onClick={() => setEmptyQuickExpanded(v => !v)} style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: emptyQuickExpanded ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', color: emptyQuickExpanded ? '#00e68a' : DIM, cursor: 'pointer' }}>{emptyQuickExpanded ? 'Скрыть ↑' : `Показать ещё ${QUICK_TEMPLATES.length - 3} ↓`}</button>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
-              {QUICK_TEMPLATES.map(tpl => {
+              {(emptyQuickExpanded ? QUICK_TEMPLATES : QUICK_TEMPLATES.slice(0, 3)).map(tpl => {
                 const rec = isRecommended(tpl);
                 return (
                 <button key={tpl.id} className="editor-chip" onClick={() => applyQuickTemplate(tpl)} style={{ padding: '10px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', background: rec ? tpl.color + '18' : tpl.color + '08', border: rec ? '2px solid ' + tpl.color : '1px solid ' + tpl.color + '25', color: DIM_STRONG, display: 'flex', flexDirection: 'column', gap: 3, minHeight: 70, boxShadow: rec ? '0 0 0 1px ' + tpl.color + '30' : 'none', position: 'relative' }}>
