@@ -80,21 +80,22 @@ export const cardStyles = {
 
 /* ── Иконки-бейджи ───────────────────────────────────────────────────────── */
 
-// ⚖️ визуально уже остальных эмодзи (узкий глиф) — компенсируем размером
+// ⚖️ узкий глиф — компенсируем крупнее и масштабом, чтобы в центре выглядел как остальные
 export const isWeightDiaryKey = (k: string) => k === 'weight' || k === 'measurements';
 
 export const iconBadge = (color: string, diaryKey?: string) => ({
-  width: 38,
-  height: 38,
-  borderRadius: 10,
+  width: 40,
+  height: 40,
+  borderRadius: 11,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  background: `${color}28`,
-  border: `1px solid ${color}55`,
-  fontSize: isWeightDiaryKey(diaryKey || '') ? 24 : 20,
+  background: `${color}22`,
+  border: `1px solid ${color}44`,
+  fontSize: isWeightDiaryKey(diaryKey || '') ? 26 : 20,
   lineHeight: 1,
   flexShrink: 0,
+  boxShadow: `0 2px 10px ${color}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
 } as React.CSSProperties);
 
 /* ── Статус-чипы (заполнено/сегодня/устарело) ────────────────────────────── */
@@ -324,23 +325,24 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
           e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)';
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '26px 16px 20px', gap: 12 }}>
           <div
             aria-hidden="true"
             style={{
-              width: 64,
-              height: 64,
+              width: 72,
+              height: 72,
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: `${meta.color}18`,
-              border: `1px solid ${meta.color}33`,
-              fontSize: isWeightDiaryKey(diaryKey) ? 36 : 32,
+              background: `radial-gradient(120% 120% at 30% 20%, ${meta.color}22, ${meta.color}10 55%, transparent 75%)`,
+              border: `1px solid ${meta.color}2a`,
+              boxShadow: `0 8px 24px ${meta.color}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
+              fontSize: isWeightDiaryKey(diaryKey) ? 40 : 32,
               lineHeight: 1,
             }}
           >
-            <span style={isWeightDiaryKey(diaryKey) ? { transform: 'scale(1.08)', display: 'inline-block' } : undefined}>{meta.icon}</span>
+            <span style={isWeightDiaryKey(diaryKey) ? { transform: 'scale(1.18)', display: 'inline-block', transformOrigin: 'center' } : undefined}>{meta.icon}</span>
           </div>
           <div style={{ textAlign: 'center', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{meta.title}</div>

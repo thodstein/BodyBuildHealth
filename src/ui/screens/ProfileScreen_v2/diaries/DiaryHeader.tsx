@@ -84,11 +84,29 @@ export const DiaryHeader: React.FC<{
       />
       <button
         className="diary-header-btn"
-        style={{ ...btnGhost(accent), minHeight: 40, padding: '8px 12px', fontWeight: 600, background: 'rgba(255,255,255,0.04)' }}
+        style={{
+          minHeight: 40,
+          padding: '8px 14px',
+          borderRadius: 12,
+          border: '1px solid rgba(255,255,255,0.14)',
+          background: 'rgba(255,255,255,0.07)',
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          color: '#fff',
+          fontSize: 13,
+          fontWeight: 700,
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          boxShadow: '0 2px 10px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)',
+          whiteSpace: 'nowrap',
+        }}
         onClick={onClose}
         aria-label="Назад к дневникам"
       >
-        ← Дневники
+        ← Назад
       </button>
 
       <b style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: 8, color: '#fff', lineHeight: 1, flexWrap: 'wrap' }}>
