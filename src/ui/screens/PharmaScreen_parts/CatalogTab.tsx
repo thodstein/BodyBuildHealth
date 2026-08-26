@@ -543,21 +543,19 @@ export const CatalogTab: React.FC = () => {
           <span style={{ fontSize:10, fontWeight:800, color:'#fff', letterSpacing:0.4, textTransform:'uppercase' as const }}>Фильтр по классу</span>
           <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{filteredList.length} поз.</span>
         </div>
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
           <button onClick={() => setFilterClass('all')} style={{
-            padding:'6px 12px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:800,
-            background: filterClass === 'all' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.05)',
-            color: filterClass === 'all' ? '#fff' : 'rgba(255,255,255,0.62)',
-            border:`1px solid ${filterClass === 'all' ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.07)'}`,
-            boxShadow: filterClass==='all' ? '0 4px 12px rgba(34,197,94,0.18)' : 'none',
+            padding:'4px 8px', borderRadius:8, fontSize:10, cursor:'pointer', fontWeight:700,
+            background: filterClass === 'all' ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)',
+            color: filterClass === 'all' ? '#fff' : 'rgba(255,255,255,0.68)',
+            border:`1px solid ${filterClass === 'all' ? 'rgba(34,197,94,0.28)' : 'rgba(255,255,255,0.07)'}`,
           }}>Все</button>
           {PHARMA_CLASSES.map(cls => (
             <button key={cls} onClick={() => setFilterClass(cls)} style={{
-              padding:'6px 11px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:700,
-              background: filterClass === cls ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.05)',
-              color: filterClass === cls ? '#fff' : 'rgba(255,255,255,0.62)',
-              border:`1px solid ${filterClass === cls ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.07)'}`,
-              boxShadow: filterClass===cls ? '0 4px 12px rgba(34,197,94,0.14)' : 'none',
+              padding:'4px 8px', borderRadius:8, fontSize:10, cursor:'pointer', fontWeight:600,
+              background: filterClass === cls ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.04)',
+              color: filterClass === cls ? '#fff' : 'rgba(255,255,255,0.68)',
+              border:`1px solid ${filterClass === cls ? 'rgba(34,197,94,0.28)' : 'rgba(255,255,255,0.07)'}`,
             }}>{CLASS_LABELS[cls] || cls}</button>
           ))}
         </div>

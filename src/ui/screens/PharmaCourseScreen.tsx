@@ -313,15 +313,13 @@ export const PharmaCourseScreen: React.FC = () => {
         <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{course.length>0 ? 'Прогресс бара = окно приёма' : 'Выбери дату — подсветим активные препараты'}</span>
       </div>
 
-      {/* View tabs */}
-      <div style={{ display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
-        {([['current', '📋 Текущий'], ['schedule', '📅 Расписание'], ['graph', '📊 График'], ['history', '📚 История']] as const).map(([key, label]) => (
+      {/* View tabs — компактные без пилюль */}
+      <div style={{ display:'flex', gap:2, overflowX:'auto', scrollbarWidth:'none', borderBottom:'1px solid rgba(255,255,255,0.06)', paddingBottom:0 }}>
+        {([['current', 'Текущий'], ['schedule', 'Расписание'], ['graph', 'График'], ['history', 'История']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setViewTab(key)} style={{
-            padding:'7px 13px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:700, whiteSpace:'nowrap',
-            border:`1px solid ${viewTab === key ? 'rgba(139,92,246,0.38)' : 'rgba(255,255,255,0.07)'}`,
-            background: viewTab === key ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(124,58,237,0.18))' : 'rgba(255,255,255,0.05)',
-            color: viewTab === key ? '#fff' : 'rgba(255,255,255,0.62)',
-            boxShadow: viewTab===key ? '0 4px 14px rgba(139,92,246,0.18)' : 'none',
+            padding:'5px 8px 6px', cursor:'pointer', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
+            background:'transparent', border:'none', borderBottom: viewTab===key ? '2px solid #8b5cf6' : '2px solid transparent', borderRadius:0, marginBottom:-1,
+            color: viewTab === key ? '#fff' : '#fff', opacity: viewTab===key ? 1 : 0.62,
           }}>{label}</button>
         ))}
       </div>

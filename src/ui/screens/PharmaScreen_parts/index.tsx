@@ -58,45 +58,32 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     return (
       <div style={{ position:'fixed', inset:0, zIndex:5, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
         <img src="/pharma-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.10) 45%, rgba(5,5,8,0.22) 72%, rgba(5,5,8,0.38) 100%)' }} />
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 700px 360px at 50% 18%, rgba(139,92,246,0.08), transparent 62%), radial-gradient(ellipse 520px 320px at 92% 42%, rgba(0,230,138,0.05), transparent 62%)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.04) 55%, rgba(0,0,0,0.12) 85%, rgba(0,0,0,0.18) 100%)' }} />
 
-        {/* header badge + stats */}
+        {/* header — без стекла, hero открыт */}
         <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(20px + var(--nav-height,68px) + env(safe-area-inset-bottom))', maxWidth:560, width:'100%', margin:'0 auto' }}>
           <div style={{ marginBottom:14 }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:20, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', marginBottom:10 }}>
-              <span style={{ width:6, height:6, borderRadius:'50%', background:'#00e68a', boxShadow:'0 0 8px rgba(0,230,138,0.7)' }} />
-              <span style={{ fontSize:9, fontWeight:800, letterSpacing:0.7, color:'#fff', textTransform:'uppercase' as const }}>Pharma · BioStack</span>
-              <span style={{ fontSize:9, color:'#fff' }}>• {pharmaSubstances.length} веществ</span>
-            </div>
-            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 18px rgba(0,0,0,0.85), 0 0 24px rgba(139,92,246,0.18)' }}>
+            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 20px rgba(0,0,0,0.9)' }}>
               Фармакология
             </h1>
-            <p style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, textShadow:'0 1px 10px rgba(0,0,0,0.75)', maxWidth:360 }}>
+            <p style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, textShadow:'0 1px 12px rgba(0,0,0,0.85)', maxWidth:360 }}>
               Курс, PK/PD симуляция, каталог веществ и проверка взаимодействий — всё в одном хабе
             </p>
-            {/* quick stats */}
-            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:12, background:'rgba(0,0,0,0.42)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
-                <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', fontSize:11 }}>💊</span>
-                <div>
-                  <div style={{ fontSize:9, color:'#fff', lineHeight:1 }}>В курсе</div>
-                  <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>{courseLen}</div>
-                </div>
+            {/* quick stats — без пилюль, без стекла */}
+            <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:11, opacity:0.9 }}>💊</span>
+                <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>В курсе <b>{courseLen}</b></span>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:12, background:'rgba(0,0,0,0.42)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
-                <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background: (risk ?? 0) >=60 ? 'rgba(239,68,68,0.18)' : (risk ?? 0) >=30 ? 'rgba(245,158,11,0.18)' : 'rgba(0,230,138,0.18)', fontSize:11 }}>{(risk ?? 0) >=60 ? '🔴' : (risk ?? 0) >=30 ? '🟡' : '🟢'}</span>
-                <div>
-                  <div style={{ fontSize:9, color:'#fff', lineHeight:1 }}>Риск</div>
-                  <div style={{ fontSize:13, fontWeight:800, color: (risk ?? 0) >=60 ? '#ef4444' : (risk ?? 0) >=30 ? '#f59e0b' : '#00e68a', lineHeight:1 }}>{risk != null ? `${Math.round(risk)}%` : '—'}</div>
-                </div>
+              <div style={{ width:1, height:14, background:'rgba(255,255,255,0.15)', alignSelf:'center' }} />
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:11 }}>{(risk ?? 0) >=60 ? '🔴' : (risk ?? 0) >=30 ? '🟡' : '🟢'}</span>
+                <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Риск <b style={{ color: (risk ?? 0) >=60 ? '#ef4444' : (risk ?? 0) >=30 ? '#f59e0b' : '#00e68a' }}>{risk != null ? `${Math.round(risk)}%` : '—'}</b></span>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:12, background:'rgba(0,0,0,0.42)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
-                <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.18)', fontSize:11 }}>🧬</span>
-                <div>
-                  <div style={{ fontSize:9, color:'#fff', lineHeight:1 }}>Каталог</div>
-                  <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>{pharmaSubstances.length}</div>
-                </div>
+              <div style={{ width:1, height:14, background:'rgba(255,255,255,0.15)', alignSelf:'center' }} />
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ fontSize:11, opacity:0.9 }}>🧬</span>
+                <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Каталог <b>{pharmaSubstances.length}</b></span>
               </div>
             </div>
           </div>
@@ -106,24 +93,24 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
               <button key={c.key} onClick={() => setPage(c.key)} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14,
                 cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(16,16,20,0.38)', border:'1px solid rgba(255,255,255,0.08)',
-                backdropFilter:'blur(10px) saturate(120%)', WebkitBackdropFilter:'blur(10px) saturate(120%)',
-                boxShadow:'0 4px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
+                background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.10)',
+                backdropFilter:'none', WebkitBackdropFilter:'none',
+                boxShadow:'none',
                 transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor=c.border; (e.currentTarget as HTMLButtonElement).style.background='rgba(20,20,26,0.48)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(16,16,20,0.38)'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.18)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(0,0,0,0.32)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.10)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(0,0,0,0.22)'; }}
               >
                 <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center',
-                  flexShrink:0, background:`linear-gradient(135deg, ${c.color}22, ${c.color}0e)`, border:`1px solid ${c.color}20`, fontSize:18, boxShadow:`0 2px 10px ${c.color}12` }}>{c.icon}</div>
+                  flexShrink:0, background:`${c.color}18`, border:`1px solid ${c.color}22`, fontSize:18 }}>{c.icon}</div>
                 <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6 }}>
                     {c.title}
-                    <span style={{ width:5, height:5, borderRadius:'50%', background:c.color, boxShadow:`0 0 6px ${c.color}` }} />
+                    <span style={{ width:5, height:5, borderRadius:'50%', background:c.color }} />
                   </div>
                   <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.desc}</div>
                 </div>
-                <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:c.color, fontSize:12, flexShrink:0 }}>→</span>
+                <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontSize:12, flexShrink:0 }}>→</span>
               </button>
             ))}
           </div>
