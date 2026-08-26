@@ -74,6 +74,7 @@ import type { DiaryWindowProps } from '../../DiaryWindow';
 
 const ACCENT = '#ec4899';
 const EDIT_DRAFT_KEY = 'he_draft_health_edit';
+const PAIN_MAX = PAIN_ZONES.length * 10;
 
 const button: React.CSSProperties = { ...btnBase(ACCENT) };
 const card: React.CSSProperties = { ...glassSection };
@@ -112,8 +113,9 @@ function entryFields(entry: UnifiedHealthEntry): DiaryEntryLike {
   const neuro = entry.neuro?.totalScore || 0;
   const acne = entry.acne?.totalScore || 0;
   const hemato = entry.hemato?.totalScore || 0;
+  const painMax = PAIN_ZONES.length * 10;
   const fields = [
-    { label: 'Боль', value: String(pain), unit: '/70' },
+    { label: 'Боль', value: String(pain), unit: `/${painMax}` },
     { label: 'Нейро', value: String(neuro), unit: '/10' },
     { label: 'Акне', value: String(acne), unit: '/12' },
     { label: 'Гемат', value: String(hemato), unit: '/8' },
@@ -460,7 +462,7 @@ const EntryEditor: React.FC<{
                 );
               })}
             </div>
-            <div style={{ marginTop: 8, fontSize: 11 }}>Σ {score(painZones)}/70</div>
+            <div style={{ marginTop: 8, fontSize: 11 }}>Σ {score(painZones)}/{PAIN_MAX}</div>
           </FieldGroup>
           <div style={{ ...card, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ fontSize: 10, color: colors.textMuted, marginBottom: 4 }}>Нажмите на часть тела — VAS 0–10</div>
@@ -910,7 +912,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     const rowsHtml = rows.map((e) => {
       const zones = PAIN_ZONES.map((z) => `<td>${e.pain?.zones[z.id] || 0}</td>`).join('');
       const symptoms = e.symptoms.map((s) => `${escapeHtml(s.name)} ${s.severity}/5`).join('<br>');
-      return `<tr><td>${escapeHtml(e.date)}</td><td>${e.pain?.totalScore || 0}/70</td>${zones}<td>${symptoms}</td><td>${e.neuro?.totalScore || 0}/10</td><td>${e.acne?.totalScore || 0}/12</td><td>${e.hemato?.totalScore || 0}/8</td><td>${escapeHtml(e.notes || '')}</td></tr>`;
+      return `<tr><td>${escapeHtml(e.date)}</td><td>${e.pain?.totalScore || 0}/${PAIN_MAX}</td>${zones}<td>${symptoms}</td><td>${e.neuro?.totalScore || 0}/10</td><td>${e.acne?.totalScore || 0}/12</td><td>${e.hemato?.totalScore || 0}/8</td><td>${escapeHtml(e.notes || '')}</td></tr>`;
     }).join('');
     const w = window.open('', '_blank');
     if (!w) return;
@@ -1097,7 +1099,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         >
           {[
             ['Записей', rows.length, '#60a5fa'],
-            ['Боль', stats.pain ? `${stats.pain.avg}/70` : '—', '#22c55e'],
+            ['Боль', stats.pain ? `${stats.pain.avg}/${PAIN_MAX}` : '—', '#22c55e'],
             ['Нейро', stats.neuro ? `${stats.neuro.avg}/10` : '—', '#ef4444'],
             ['Акне', stats.acne ? `${stats.acne.avg}/12` : '—', '#f97316'],
             ['Гемат', stats.hemato ? `${stats.hemato.avg}/8` : '—', '#3b82f6'],
@@ -1133,7 +1135,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         <section style={{ ...card, marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <b>📈 Боль по датам</b>
-            <span style={{ color: colors.textMuted, fontSize: 11 }}>Норма ≤ {normal?.high}/70</span>
+            <span style={{ color: colors.textMuted, fontSize: 11 }}>Норма ≤ {normal?.high}/${PAIN_MAX}</span>
           </div>
           <svg
             ref={svgRef}
@@ -1178,14 +1180,14 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 fill="#22c55e"
               >
                 <title>
-                  {p.date}: {p.value}/70
+                  {p.date}: {p.value}/${PAIN_MAX}
                 </title>
               </circle>
             ))}
           </svg>
           {painForecast && (
             <div style={{ marginTop: 4, fontSize: 11, color: painForecast.rising ? colors.warning : colors.green }}>
-              🔮 Прогноз боли через 7 дней: {painForecast.value}/70 ({painForecast.rising ? '↑ рост' : 'стабильно/↓ снижение'}, r²={painForecast.r2.toFixed(2)})
+              🔮 Прогноз боли через 7 дней: {painForecast.value}/${PAIN_MAX} ({painForecast.rising ? '↑ рост' : 'стабильно/↓ снижение'}, r²={painForecast.r2.toFixed(2)})
             </div>
           )}
         </section>
@@ -1274,7 +1276,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                   <>
                     <br />
                     <span style={{ color: colors.textMuted, fontSize: 11 }}>
-                      Мин {extremes.min.date}: {extremes.min.value}/70 · Макс {extremes.max.date}: {extremes.max.value}/70
+                      Мин {extremes.min.date}: {extremes.min.value}/${PAIN_MAX} · Макс {extremes.max.date}: {extremes.max.value}/${PAIN_MAX}
                     </span>
                   </>
                 )}
@@ -1399,7 +1401,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 return (
                   <tr key={row.id}>
                     <td style={tableTd}>{row.date}</td>
-                    <td style={tableTd}>{row.pain?.totalScore || 0}/70</td>
+                    <td style={tableTd}>{row.pain?.totalScore || 0}/${PAIN_MAX}</td>
                     <td style={tableTd}>{row.neuro?.totalScore || 0}/10</td>
                     <td style={tableTd}>{row.acne?.totalScore || 0}/12</td>
                     <td style={tableTd}>{row.hemato?.totalScore || 0}/8</td>
@@ -1458,7 +1460,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             <b>🕘 Последние записи</b>
             {rows.slice(0, 3).map((row) => (
               <div key={`latest-${row.id}`} style={{ marginTop: 7, fontSize: 12, color: colors.textMuted }}>
-                {row.date}: боль {row.pain?.totalScore || 0}/70 · симптомов {row.symptoms.length} · нейро{' '}
+                {row.date}: боль {row.pain?.totalScore || 0}/${PAIN_MAX} · симптомов {row.symptoms.length} · нейро{' '}
                 {row.neuro?.totalScore || 0}/10
               </div>
             ))}
@@ -1472,7 +1474,7 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
               <b>🗺 Карта зон боли · 3D</b>
               <span style={{ color: colors.textMuted, fontSize: 11 }}>
-                Клик по части тела — анализ зоны · Вращайте модель · Σ {score(mapZones)}/70
+                Клик по части тела — анализ зоны · Вращайте модель · Σ {score(mapZones)}/${PAIN_MAX}
               </span>
             </div>
             <PainZone3D zones={mapZones} onChange={setMapZones} height={460} analysisFor={(base) => zoneAnalysis[base] || null} />

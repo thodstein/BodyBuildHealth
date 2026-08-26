@@ -311,9 +311,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function sanitizeUnifiedHealthEntry(entry: Omit<UnifiedHealthEntry, 'id' | 'createdAt' | 'updatedAt'>): Omit<UnifiedHealthEntry, 'id' | 'createdAt' | 'updatedAt'> {
   const date = typeof entry.date === 'string' && DATE_RE.test(entry.date) ? entry.date : todayIso();
+  const maxPain = PAIN_ZONE_LIST.length * 10;
   const pain = entry.pain ? {
     ...entry.pain,
-    totalScore: Math.max(0, Math.min(70, Number(entry.pain.totalScore) || 0)),
+    totalScore: Math.max(0, Math.min(maxPain, Number(entry.pain.totalScore) || 0)),
     zones: Object.fromEntries(
       Object.entries(entry.pain.zones || {}).map(([k, v]) => [k, Math.max(0, Math.min(10, Number(v) || 0))])
     ),

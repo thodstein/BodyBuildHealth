@@ -242,9 +242,11 @@ export function useDiaryDraft<T extends object>(
 /* ── Шкалы, пресеты, метаданные (сохранены как есть) ── */
 
 export const PAIN_ZONES = [
+  { id: 'neck', label: 'Шея' },
   { id: 'shoulders', label: 'Плечи' },
   { id: 'elbows', label: 'Локти' },
   { id: 'wrists', label: 'Запястья' },
+  { id: 'upper_back', label: 'Грудной отдел' },
   { id: 'lower_back', label: 'Поясница' },
   { id: 'hips', label: 'ТБС' },
   { id: 'knees', label: 'Колени' },
