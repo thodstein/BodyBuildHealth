@@ -323,12 +323,12 @@ const EntryEditor: React.FC<{
   const [symptomName, setSymptomName] = useState('');
   const [symptomSeverity, setSymptomSeverity] = useState<1 | 2 | 3 | 4 | 5>(2);
   const [symptomDuration, setSymptomDuration] = useState('');
-  // Черновик редактирования (переживает случайное закрытие) — ключ привязан к дате записи,
-  // чтобы черновик одной даты не перетекал в другую.
+  // Черновик редактирования (переживает перезагрузку) — localStorage, ключ привязан к дате записи,
+  // чтобы черновик одной даты не перетекал в другую. Автоочистка при успешном сохранении.
   const editDraftKey = `${EDIT_DRAFT_KEY}:${entry?.date ?? 'new'}`;
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(editDraftKey);
+      const raw = localStorage.getItem(editDraftKey);
       if (!raw) return;
       const d = JSON.parse(raw) as EntryDraft;
       if (!d || typeof d.date !== 'string') return;
@@ -338,10 +338,10 @@ const EntryEditor: React.FC<{
     } catch {}
   }, [editDraftKey]);
   useEffect(() => {
-    try { sessionStorage.setItem(editDraftKey, JSON.stringify(draft)); } catch {}
+    try { localStorage.setItem(editDraftKey, JSON.stringify(draft)); } catch {}
   }, [draft, editDraftKey]);
   const clearEditDraft = () => {
-    try { sessionStorage.removeItem(editDraftKey); } catch {}
+    try { localStorage.removeItem(editDraftKey); } catch {}
   };
   const painZones = draft.pain?.zones || {};
   const neuroValues = draft.neuro?.symptoms || {};
@@ -794,25 +794,42 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
       }
     }
     const out: Record<string, { last?: number; avg30?: number; count?: number; trend?: 'up' | 'down' | 'stable' | null }> = {};
-    const cutoff = Date.now() - 30 * 86400000;
+    const now = Date.now();
+    const cutoff30 = now - 30 * 86400000;
+    const cutoff14 = now - 14 * 86400000;
     for (const [base, vals] of Object.entries(byBase)) {
       const sorted = [...vals].sort((a, b) => a.date.localeCompare(b.date));
-      const recent = sorted.filter((x) => {
+      const recent30 = sorted.filter((x) => {
         const t = Date.parse(x.date);
-        return Number.isFinite(t) && t >= cutoff;
+        return Number.isFinite(t) && t >= cutoff30;
       });
-      const half = Math.max(1, Math.floor(sorted.length / 2));
-      const older = sorted.slice(0, half);
-      const newer = sorted.slice(half);
+      // Тайм-взвешенный тренд: последние 14д vs предыдущие 14д (30-14). Fallback — половина массива если окон недостаточно.
       let trend: 'up' | 'down' | 'stable' | null = null;
-      if (older.length && newer.length) {
-        const avgO = older.reduce((s, x) => s + x.v, 0) / older.length;
-        const avgN = newer.reduce((s, x) => s + x.v, 0) / newer.length;
-        trend = avgN - avgO > 1 ? 'up' : avgO - avgN > 1 ? 'down' : 'stable';
+      const recent14 = sorted.filter((x) => {
+        const t = Date.parse(x.date);
+        return Number.isFinite(t) && t >= cutoff14;
+      });
+      const prior14 = sorted.filter((x) => {
+        const t = Date.parse(x.date);
+        return Number.isFinite(t) && t >= cutoff30 && t < cutoff14;
+      });
+      if (recent14.length && prior14.length) {
+        const avgR = recent14.reduce((s, x) => s + x.v, 0) / recent14.length;
+        const avgP = prior14.reduce((s, x) => s + x.v, 0) / prior14.length;
+        trend = avgR - avgP > 1 ? 'up' : avgP - avgR > 1 ? 'down' : 'stable';
+      } else if (sorted.length >= 4) {
+        const half = Math.max(1, Math.floor(sorted.length / 2));
+        const older = sorted.slice(0, half);
+        const newer = sorted.slice(half);
+        if (older.length && newer.length) {
+          const avgO = older.reduce((s, x) => s + x.v, 0) / older.length;
+          const avgN = newer.reduce((s, x) => s + x.v, 0) / newer.length;
+          trend = avgN - avgO > 1 ? 'up' : avgO - avgN > 1 ? 'down' : 'stable';
+        }
       }
       out[base] = {
         last: sorted[sorted.length - 1].v,
-        avg30: recent.length ? Math.round((recent.reduce((s, x) => s + x.v, 0) / recent.length) * 10) / 10 : undefined,
+        avg30: recent30.length ? Math.round((recent30.reduce((s, x) => s + x.v, 0) / recent30.length) * 10) / 10 : undefined,
         count: sorted.length,
         trend,
       };
@@ -864,6 +881,11 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const exportCsv = () => {
     const zoneLabels = PAIN_ZONES.map((z) => z.label);
     const header = ['Дата', 'Боль', ...zoneLabels, 'Симптомы', 'Нейро', 'Акне', 'Гемат', 'Заметка'];
+    const csvCell = (v: unknown) => {
+      const s = String(v ?? '');
+      const guarded = /^[=+\-@]/.test(s) ? `'${s}` : s;
+      return `"${guarded.replace(/"/g, '""')}"`;
+    };
     const body = rows.map((e) => {
       const zones = PAIN_ZONES.map((z) => e.pain?.zones[z.id] || 0);
       const symptoms = e.symptoms.map((s) => `${s.name} ${s.severity}/5${s.duration ? ` (${s.duration})` : ''}`).join('; ');
@@ -877,10 +899,10 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         e.hemato?.totalScore || 0,
         e.notes || '',
       ]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .map(csvCell)
         .join(',');
     });
-    downloadText(`health-${todayIso()}.csv`, `\ufeff${header.join(',')}\n${body.join('\n')}`, 'text/csv;charset=utf-8');
+    downloadText(`health-${todayIso()}.csv`, `\ufeff${header.map(csvCell).join(',')}\n${body.join('\n')}`, 'text/csv;charset=utf-8');
     (window as any).showToast?.('📥 CSV экспортирован');
   };
   const printPdf = () => {
