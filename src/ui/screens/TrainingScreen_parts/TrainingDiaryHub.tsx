@@ -138,6 +138,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
     if (m === 'diary') return 'record';
     if (m === 'reports' || m === 'import_data') return 'tools';
     if (m === 'analytics') return 'analytics_lite';
+    if (m === 'calendar') return 'progress';
     if (m === 'mindset' || m === 'mobility' || m === 'warmup' || m === 'cooldown' || m === 'mmc' || m === 'checkin') return 'rituals';
     return (m as HubMode) || 'record';
   };
@@ -860,14 +861,7 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
           {ritualsSub==='mmc' && <MMCTrackingCard />}
         </div>
       )}
-      {/* legacy direct modes → редирект в rituals */}
-      {mode === 'calendar' && <TrainingCalendarTab />}
-      {mode === 'checkin' && <CheckinMetricsCard />}
-      {mode === 'mmc' && <MMCTrackingCard />}
-      {mode === 'mindset' && <InfoErrorBoundary label="Психология"><MindsetTab hub={hub} /></InfoErrorBoundary>}
-      {mode === 'mobility' && <InfoErrorBoundary label="Мобильность"><MobilityTab hub={hub} /></InfoErrorBoundary>}
-      {mode === 'warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView historyWorkouts={historyWorkouts} planDay={planDayToday} /></InfoErrorBoundary>}
-      {mode === 'cooldown' && <InfoErrorBoundary label="Заминка"><CooldownDiaryView planDay={planDayToday} /></InfoErrorBoundary>}
+      {/* legacy direct modes → теперь через rituals/progress seg (оставлено для backward deep-link, без дубля) */}
 
       {/* ═══ MODE: TOOLS ═══ — import + export + reports */}
       {mode === 'tools' && <DiaryToolsView hub={hub} />}
