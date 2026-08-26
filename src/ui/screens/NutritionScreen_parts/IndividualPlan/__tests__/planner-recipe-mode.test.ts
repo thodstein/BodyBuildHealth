@@ -15,6 +15,8 @@ import {
   buildShoppingFromPlans,
   buildRecipeCookingPlan,
   collectAppliedRecipes,
+  RECIPE_PRESETS,
+  recipeMatchesPreset,
 } from '../planner-recipe-mode';
 import { snapPortionG } from '../meal-plan-engine';
 
@@ -254,5 +256,36 @@ describe('утилиты режима', () => {
     ] as any);
     expect(t.kcal).toBe(1000);
     expect(t.p).toBe(80);
+  });
+});
+
+describe('RECIPE_PRESETS (чипы-пресеты: масса = большое У)', () => {
+  it('пресет «Масса» матчит высокий carbs и теги массы/загрузки', () => {
+    const mass = RECIPE_PRESETS.find(p => p.id === 'mass')!;
+    expect(mass.match({ tags: ['обед', 'масса'], carbs: 20 })).toBe(true);
+    expect(mass.match({ tags: ['углеводная загрузка'], carbs: 10 })).toBe(true);
+    expect(mass.match({ tags: [], carbs: 55 })).toBe(true);
+    expect(mass.match({ tags: ['сушка'], carbs: 15 })).toBe(false);
+  });
+
+  it('пресеты «Сушка»/«Белок»/«Быстро»/«Low-carb»/«ПП» — пороги корректны', () => {
+    const cut = RECIPE_PRESETS.find(p => p.id === 'cut')!;
+    expect(cut.match({ tags: [], fat: 8, protein: 40 })).toBe(true);
+    expect(cut.match({ tags: ['сушка'], fat: 30, protein: 10 })).toBe(true);
+    const prot = RECIPE_PRESETS.find(p => p.id === 'protein')!;
+    expect(prot.match({ protein: 42, tags: [] })).toBe(true);
+    const fast = RECIPE_PRESETS.find(p => p.id === 'fast')!;
+    expect(fast.match({ prepTimeMin: 10, tags: [] })).toBe(true);
+    expect(fast.match({ prepTimeMin: 45, tags: [] })).toBe(false);
+    const lc = RECIPE_PRESETS.find(p => p.id === 'lowcarb')!;
+    expect(lc.match({ carbs: 12, tags: [] })).toBe(true);
+    const pp = RECIPE_PRESETS.find(p => p.id === 'pp')!;
+    expect(pp.match({ tags: ['пп'] })).toBe(true);
+  });
+
+  it('recipeMatchesPreset: null-пресет пропускает всё, неизвестный id — тоже', () => {
+    expect(recipeMatchesPreset({ carbs: 5 }, null)).toBe(true);
+    expect(recipeMatchesPreset(null, 'mass')).toBe(false);
+    expect(recipeMatchesPreset({ carbs: 5 }, 'unknown')).toBe(true);
   });
 });

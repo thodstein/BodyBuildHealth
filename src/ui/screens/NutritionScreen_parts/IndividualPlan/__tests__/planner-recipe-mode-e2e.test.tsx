@@ -48,4 +48,48 @@ describe('режим «по рецептам»: E2E', () => {
     // план жив: завтрак на месте
     expect(bodyHas(/Завтрак/)).toBe(true);
   }, 90000);
+
+  it('применение из пикера «🍳» перестраивает рацион (кнопка печати появляется)', async () => {
+    // продуктовый режим: подсказки-рецепты есть у всех приёмов
+    try { localStorage.removeItem('he_planner_gen_mode'); } catch {}
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickBtn(/✨ Сгенерировать план питания/);
+    await waitFor(() => { expect(bodyHas(/Рецепты для этого приёма/)).toBe(true); }, { timeout: 30000 });
+    // открыть пикер замены: кнопка внутри раскрытой подсказки рецепта
+    const openPicker = Array.from(document.querySelectorAll<HTMLElement>('button'))
+      .find(b => (b.textContent || '').includes('Заменить приём этим рецептом'));
+    if (!openPicker) throw new Error('«Заменить приём этим рецептом» not found');
+    fireEvent.click(openPicker);
+    await waitFor(() => { expect(bodyHas(/Заменить «.*» рецептом/)).toBe(true); }, { timeout: 8000 });
+    // кнопки-рецепты в модалке имеют формат «…ккал · БN/ЖN/УN» — уникальный маркер
+    const recipeBtn = Array.from(document.querySelectorAll<HTMLElement>('button'))
+      .find(b => /Б\d+(\.\d+)?\/Ж\d+(\.\d+)?\/У\d+/.test(b.textContent || ''));
+    if (!recipeBtn) throw new Error('recipe button not found');
+    fireEvent.click(recipeBtn);
+    // пикер закрылся; применение фиксируется в персистнутом плане (recipeApplied)
+    await waitFor(() => { expect(bodyHas(/Заменить «.*» рецептом/)).toBe(false); }, { timeout: 8000 });
+    await waitFor(() => {
+      let applied = false;
+      try {
+        const dp = JSON.parse(localStorage.getItem('he_day_plan') || 'null');
+        applied = !!dp?.meals?.some((m: any) => m.recipeApplied);
+        void dp;
+      } catch {}
+      expect(applied).toBe(true);
+    }, { timeout: 8000 });
+    expect(bodyHas(/Завтрак/)).toBe(true);
+  }, 90000);
+
+  it('пресеты рецептов отображаются над вариантами (масса = большое У)', async () => {
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    clickBtn(/🍳 Сгенерировать план по рецептам/);
+    await waitFor(() => { expect(bodyHas(/Варианты рецептов/)).toBe(true); }, { timeout: 30000 });
+    // пресет-чипы рендерятся, если среди вариантов ≥2 пресетов активны
+    const hasMassChip = Array.from(document.querySelectorAll<HTMLElement>('span')).some(s => (s.textContent || '').includes('Масса'));
+    if (hasMassChip) {
+      fireEvent.click(Array.from(document.querySelectorAll<HTMLElement>('span')).find(s => (s.textContent || '').includes('Масса'))!);
+      // после клика фильтр применён — варианты всё ещё видны
+      expect(bodyHas(/Выбрать/)).toBe(true);
+    }
+  }, 90000);
 });

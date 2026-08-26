@@ -1796,31 +1796,80 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       });
     };
     if (dayIdx === 0) {
-      const matchedItems = buildRecipeItems();
-      setDayPlan((prev: any) => {
-        if (!prev || !Array.isArray(prev.meals)) return prev;
-        // P0-fix: bounds check на mealIdx — предотвращает молчаливую порчу данных
-        if (mealIdx < 0 || mealIdx >= prev.meals.length) return prev;
-        const meals = [...prev.meals];
-        const totals = calcItemTotals(matchedItems);
-        meals[mealIdx] = { ...meals[mealIdx], items: matchedItems, totals };
-        return { ...prev, meals, totals: calcMealTotals(meals) };
-      });
-      // FIX button-audit: синхронизация правок обратно в недельный план
+      // Полное применение: приём = рецепт (авторские порции), затем ребаланс дня до ±3%
+      // (рецепт помечается recipeApplied → защищён от резки), синк закупок и готовки.
+      const flatOpt = flattenRecipeOption(recipe);
+      const applyRebalanced = (mealsSrc: any[] | undefined): any[] | null => {
+        if (!Array.isArray(mealsSrc) || mealIdx < 0 || mealIdx >= mealsSrc.length) return null;
+        const items = buildRecipeItems();
+        const patched = mealsSrc.map((x, i) => i === mealIdx
+          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOpt }
+          : x);
+        const pre = sumDayTotals(patched as any);
+        const rb = rebalanceDayAfterRecipes(patched as any, {
+          kcal: effectiveKcal > 0 ? effectiveKcal : pre.kcal,
+          p: effectiveP > 0 ? effectiveP : pre.p,
+          f: effectiveF > 0 ? effectiveF : pre.f,
+          c: effectiveC > 0 ? effectiveC : pre.c,
+        });
+        return rb.meals as any[];
+      };
+      const resMeals = applyRebalanced(dayPlan?.meals);
+      if (!resMeals) return;
+      const newDay = { ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      // FIX button-audit: синхронизация правки обратно в недельный план
+      let weekDaysUpdated: any[] | null = null;
       if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
-        updateMultiDayPlan(weekPlan, weekEditDay, mealIdx, () => matchedItems);
+        const wres = applyRebalanced(weekPlan.days[weekEditDay].meals);
+        const days = [...weekPlan.days];
+        days[weekEditDay] = wres ? { ...days[weekEditDay], meals: wres } : newDay;
+        setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+        weekDaysUpdated = days;
       }
+      setDayPlan(newDay);
+      // F: закупки из ВСЕХ видимых дней плана (отредактированный день подставлен)
+      const visiblePlans: any[] =
+        planDays >= 7 && weekPlan?.days?.length
+          ? (weekDaysUpdated ?? weekPlan.days)
+          : planDays >= 3 && threeDayPlan?.days?.length
+            ? threeDayPlan.days.map((d: any, i: number) => (i === selectedDayIndex ? newDay : d))
+            : [newDay];
+      setShoppingList(buildShoppingFromPlans(visiblePlans));
+      refreshRecipeCookingCardIfActive(newDay, threeDayPlan, weekDaysUpdated ? { days: weekDaysUpdated } : weekPlan);
     } else {
       // FIX button-audit: недельные дни (dayIdx >= 7) идут в weekPlan, 1..3 — в threeDayPlan
       const resolved = _resolvePlanDay(dayIdx);
-      if (!resolved) { setRecipePickerMeal(null); return; }
-      if (resolved.plan === 'three') {
-        updateMultiDayPlan(threeDayPlan, resolved.day, mealIdx, () => buildRecipeItems());
-      } else if (resolved.plan === 'week') {
-        updateMultiDayPlan(weekPlan, resolved.day, mealIdx, () => buildRecipeItems());
-      }
+      if (!resolved || resolved.plan === 'day') { setRecipePickerMeal(null); return; }
+      const srcPlan: any = resolved.plan === 'three' ? threeDayPlan : weekPlan;
+      if (!srcPlan?.days?.[resolved.day]) return;
+      const flatOpt = flattenRecipeOption(recipe);
+      const applyRebalanced2 = (mealsSrc: any[]): any[] | null => {
+        if (!Array.isArray(mealsSrc) || mealIdx < 0 || mealIdx >= mealsSrc.length) return null;
+        const items = buildRecipeItems();
+        const patched = mealsSrc.map((x, i) => i === mealIdx
+          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOpt }
+          : x);
+        const pre = sumDayTotals(patched as any);
+        const rb = rebalanceDayAfterRecipes(patched as any, {
+          kcal: effectiveKcal > 0 ? effectiveKcal : pre.kcal,
+          p: effectiveP > 0 ? effectiveP : pre.p,
+          f: effectiveF > 0 ? effectiveF : pre.f,
+          c: effectiveC > 0 ? effectiveC : pre.c,
+        });
+        return rb.meals as any[];
+      };
+      const resMeals = applyRebalanced2(srcPlan.days[resolved.day].meals);
+      if (!resMeals) return;
+      const days = [...srcPlan.days];
+      days[resolved.day] = { ...srcPlan.days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      const updated = { ...srcPlan, days, totals: sumMultiTotals(days) };
+      if (resolved.plan === 'three') setThreeDayPlan(updated); else setWeekPlan(updated);
+      if (resolved.plan === 'week') setDayPlan(days[resolved.day]);
+      else if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
+      setShoppingList(buildShoppingFromPlans(days));
+      refreshRecipeCookingCardIfActive(resolved.plan === 'week' ? days[resolved.day] : dayPlan, resolved.plan === 'three' ? updated : threeDayPlan, resolved.plan === 'week' ? updated : weekPlan);
     }
-    // F: закупки обновляются вслед за планом — список отражает фактические ингредиенты рецепта
+    if (typeof (window as any).showToast === 'function') (window as any).showToast('🍳 Рецепт применён — рацион перестроен', 'success');
     setTimeout(() => syncShoppingListFromPlans(), 0);
     setRecipePickerMeal(null);
   };

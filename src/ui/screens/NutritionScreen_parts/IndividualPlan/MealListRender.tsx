@@ -13,7 +13,7 @@ import type { PlanCtx } from "./IndividualPlanContext";
 import { NUTRITION_LEVELS } from "./types";
 import { OrganLoadBadgeGroup } from "./OrganLoadBadges";
 import { readDiaryV2, writeDiaryV2 } from "../diary-storage-v2";
-import { kbjuFormulaDeviationPct } from "./planner-recipe-mode";
+import { kbjuFormulaDeviationPct, RECIPE_PRESETS, recipeMatchesPreset } from "./planner-recipe-mode";
 
 // FIX week-perf: кэш тяжёлых метрик приёма (DIAAS/GL/II) по объекту приёма.
 // Объекты приёмов иммутабельны (заменяются при правках), поэтому WeakMap-кэш всегда валиден
@@ -71,8 +71,8 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
   const setDayPlan = _setDayPlan as any;
   const setEditAmount = _setEditAmount as any;
   const timeEdit = useMealTimeEdit(dayPlan, saveUndo, setDayPlan);
-  // UX чипов: фильтр по тегам рецептов-подсказок (быстро / высокий белок / сушка…)
-  const [recipeTagFilter, setRecipeTagFilter] = useState<string | null>(null);
+  // UX чипов: пресеты рецептов (масса = большое У, сушка, белок…)
+  const [recipePreset, setRecipePreset] = useState<string | null>(null);
   return (dayData: any, editable = false, dayIdx = 0) => {
     if (!dayData) return null;
     const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0); const totalFiber = Math.round(d.totals?.fiber || 0);
@@ -190,7 +190,20 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                 {Array.isArray(m.recipeOptions) && m.recipeOptions.length > 0 && (
                   <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:3}}>
                     <div style={{fontSize:8,fontWeight:700,color:'#f97316',padding:'2px 0'}}>🍳 Варианты рецептов — выберите один, рацион перестроится:{m.recipeApplied ? <span style={{color:'#22c55e',fontWeight:600}}> выбрано «{m.recipeApplied}»</span> : null}</div>
-                    {(m.recipeOptions as any[]).map((r: any, ri: number) => {
+                    {/* Пресеты подбора (масса = большое У, сушка, белок…) */}
+                    {(() => {
+                      const optsAll = m.recipeOptions as any[];
+                      const activePresets = RECIPE_PRESETS.filter(p => optsAll.some(o => p.match(o)));
+                      if (activePresets.length < 2) return null;
+                      return (
+                        <div style={{display:'flex',gap:3,flexWrap:'wrap',marginBottom:2}}>
+                          {activePresets.map(p => (
+                            <span key={p.id} title={p.hint} onClick={()=>setRecipePreset(recipePreset===p.id?null:p.id)} style={{cursor:'pointer',padding:'1px 6px',borderRadius:6,fontSize:7,fontWeight:700,border:`1px solid ${recipePreset===p.id?'rgba(249,115,22,0.55)':'rgba(249,115,22,0.18)'}`,background:recipePreset===p.id?'rgba(249,115,22,0.15)':'transparent',color:recipePreset===p.id?'#fb923c':'rgba(255,255,255,0.6)'}}>{p.label}</span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                    {(m.recipeOptions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).map((r: any, ri: number) => {
                       const selected = m.recipeApplied === r.name;
                       return (
                         <details key={ri} style={{borderRadius:8,background:selected?'rgba(34,197,94,0.08)':'rgba(249,115,22,0.06)',border:`1px solid ${selected?'rgba(34,197,94,0.35)':'rgba(249,115,22,0.12)'}`,overflow:'hidden'}}>
@@ -232,16 +245,19 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                       <span onClick={()=>refreshRecipeSuggestions(dayIdx)} title="Подобрать другие рецепты" style={{cursor:'pointer',fontSize:9,padding:'1px 6px',borderRadius:5,border:'1px solid rgba(249,115,22,0.25)',color:'#f97316',fontWeight:700}}>🔄</span>
                     </div>
                     {(() => {
-                      const _tagPool = ['быстро','высокий белок','low-carb','масса','сушка','пп'];
-                      const _tags = Array.from(new Set((m.recipeSuggestions as any[]).flatMap((r:any)=>(r.tags||[]) as string[]))).filter((t:string)=>_tagPool.includes(t)).slice(0,6);
-                      if (_tags.length === 0) return null;
+                      // Пресеты подбора (масса = большое У, сушка, белок…) — фиксированный набор
+                      const sugAll = m.recipeSuggestions as any[];
+                      const activePresets = RECIPE_PRESETS.filter(p => sugAll.some(o => p.match(o)));
+                      if (activePresets.length < 2) return null;
                       return (
                         <div style={{display:'flex',gap:3,flexWrap:'wrap',marginBottom:2}}>
-                          {_tags.map((t:string)=><span key={t} onClick={()=>setRecipeTagFilter(recipeTagFilter===t?null:t)} style={{cursor:'pointer',padding:'1px 6px',borderRadius:6,fontSize:7,fontWeight:700,border:`1px solid ${recipeTagFilter===t?'rgba(249,115,22,0.55)':'rgba(249,115,22,0.18)'}`,background:recipeTagFilter===t?'rgba(249,115,22,0.15)':'transparent',color:recipeTagFilter===t?'#fb923c':'rgba(255,255,255,0.6)'}}>{t}</span>)}
+                          {activePresets.map(p => (
+                            <span key={p.id} title={p.hint} onClick={()=>setRecipePreset(recipePreset===p.id?null:p.id)} style={{cursor:'pointer',padding:'1px 6px',borderRadius:6,fontSize:7,fontWeight:700,border:`1px solid ${recipePreset===p.id?'rgba(249,115,22,0.55)':'rgba(249,115,22,0.18)'}`,background:recipePreset===p.id?'rgba(249,115,22,0.15)':'transparent',color:recipePreset===p.id?'#fb923c':'rgba(255,255,255,0.6)'}}>{p.label}</span>
+                          ))}
                         </div>
                       );
                     })()}
-                      {(m.recipeSuggestions as any[]).filter((r:any)=>!recipeTagFilter||((r.tags||[])as string[]).includes(recipeTagFilter)).slice(0, 3).map((r: any, ri: number) => (
+                    {(m.recipeSuggestions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).slice(0, 3).map((r: any, ri: number) => (
                       <details key={ri} style={{borderRadius:8,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.12)',overflow:'hidden'}}>
                         <summary style={{cursor:'pointer',padding:'3px 6px',fontSize:8,color:'#f97316',fontWeight:600,listStyle:'none'}}>
                           <span onClick={(e)=>{e.preventDefault();e.stopPropagation();toggleFavoriteRecipe(r.name);}} title="В избранное (⭐ — приоритет в подборе)" style={{cursor:'pointer',fontSize:10,color:isFavoriteRecipe(r.name)?'#f59e0b':'rgba(255,255,255,0.3)',marginRight:4}}>{isFavoriteRecipe(r.name)?'⭐':'☆'}</span>

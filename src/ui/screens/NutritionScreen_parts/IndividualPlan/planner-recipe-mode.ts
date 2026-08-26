@@ -581,6 +581,61 @@ export function collectAppliedRecipes(plan: any): { label: string; recipe: FlatR
   return out;
 }
 
+// ─── Пресеты рецептов (чипы над вариантами/подсказками) ────────────────
+
+export interface RecipePresetTarget {
+  tags?: string[]; carbs?: number; protein?: number; fat?: number; prepTimeMin?: number;
+}
+
+export interface RecipePreset {
+  id: string;
+  label: string;
+  hint: string;
+  match: (r: RecipePresetTarget) => boolean;
+}
+
+const hasTag = (r: RecipePresetTarget, t: string): boolean =>
+  (r.tags || []).some(x => (x || '').toLowerCase().includes(t));
+
+/**
+ * Фиксированные пресеты подбора рецептов. «Масса» — акцент на углеводы
+ * (большое У): тег массы/загрузки ИЛИ carbs ≥ 45 г на порцию.
+ */
+export const RECIPE_PRESETS: RecipePreset[] = [
+  {
+    id: 'mass', label: '🏋️ Масса', hint: 'Набор: рецепты с большим У (углеводная загрузка)',
+    match: r => hasTag(r, 'масса') || hasTag(r, 'загрузка') || (r.carbs ?? 0) >= 45,
+  },
+  {
+    id: 'cut', label: '🔥 Сушка', hint: 'Дефицит: мало жиров, много белка',
+    match: r => hasTag(r, 'сушк') || hasTag(r, 'рельеф') || ((r.fat ?? 99) <= 12 && (r.protein ?? 0) >= 35),
+  },
+  {
+    id: 'protein', label: '🥩 Белок 40+', hint: 'Максимум белка на порцию',
+    match: r => (r.protein ?? 0) >= 38 || hasTag(r, 'высокий белок'),
+  },
+  {
+    id: 'fast', label: '⚡ Быстро', hint: 'До 15 минут',
+    match: r => (r.prepTimeMin ?? 99) <= 15 || hasTag(r, 'быстро') || hasTag(r, 'без готовки'),
+  },
+  {
+    id: 'lowcarb', label: '🌾 Low-carb', hint: 'Мало углеводов / кето',
+    match: r => hasTag(r, 'low-carb') || hasTag(r, 'кето') || ((r.carbs ?? 99) <= 20),
+  },
+  {
+    id: 'pp', label: '🥦 ПП', hint: 'Сбалансированное правильное питание',
+    match: r => hasTag(r, 'пп') || hasTag(r, 'здоровое') || hasTag(r, 'сбалансир'),
+  },
+];
+
+/** Матчинг рецепта по пресету (для фильтра чипов в UI). */
+export function recipeMatchesPreset(r: RecipePresetTarget | null | undefined, presetId: string | null): boolean {
+  if (!presetId) return true;
+  if (!r) return false;
+  const p = RECIPE_PRESETS.find(x => x.id === presetId);
+  return p ? p.match(r) : true;
+}
+
 // ─── Сборка рецептурного дня (чистая функция, экстракция из generatePlan) ──
 
 export interface AssembleRecipeDayArgs {
