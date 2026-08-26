@@ -352,17 +352,17 @@ export default function LabsCatalogTab({
         return (
           <div>
             {grouped.map(g => (
-              <div key={g.type} style={{ marginBottom: 8, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <div key={g.type} style={{ marginBottom:8, borderRadius:14, overflow:'hidden', border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)' }}>
                 <button onClick={() => setInvExpandedTypes(prev => ({ ...prev, [g.type]: !prev[g.type] }))} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 12px',
-                  cursor: 'pointer', background: 'var(--bg-secondary)', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700, textAlign: 'left',
-                  borderBottom: invExpandedTypes[g.type] ? '1px solid var(--border)' : 'none',
+                  display:'flex', justifyContent:'space-between', alignItems:'center', width:'100%', padding:'10px 12px',
+                  cursor:'pointer', background: invExpandedTypes[g.type]? 'rgba(255,255,255,0.04)' : 'transparent', border:'none', color:'#fff', fontSize:12, fontWeight:800, textAlign:'left',
+                  borderBottom: invExpandedTypes[g.type] ? '1px solid rgba(255,255,255,0.06)' : 'none',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{ width:26, height:26, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(168,85,247,0.14)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10 }}>{g.items.length}</span>
                     <span>{INVEST_TYPE_CONFIG[g.type].label}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{g.items.length}</span>
                   </div>
-                  <span style={{ fontSize: 10, transition: 'transform 0.2s', transform: invExpandedTypes[g.type] ? 'rotate(180deg)' : 'none' }}>▼</span>
+                  <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, transition:'transform 0.2s', transform: invExpandedTypes[g.type] ? 'rotate(180deg)' : 'none' }}>▾</span>
                 </button>
                 {invExpandedTypes[g.type] && (
                   <div style={{ padding: '6px 10px 10px' }}>
