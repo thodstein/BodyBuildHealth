@@ -162,13 +162,47 @@ export const PL_GOAL_PHASE_OVERRIDES: Record<string, Partial<Record<BBPhase, Par
   },
 };
 
+/** Гибрид/повербилдер — третий ручной конструктор (PL+BB). Смесь PL-логики и BB-логики: объём как ББ (Israetel) + интенсивность как ПЛ (Bompa), PHUL/PHAT стиль. */
+export const HYBRID_GOAL_PHASE_OVERRIDES: Record<string, Partial<Record<BBPhase, Partial<PhaseConfig>>>> = {
+  pb_endurance: {
+    accumulation:    { repRange: [10, 18], intensityMultiplier: 0.68, volumeMultiplier: 1.00, rirRange: [4, 3] as [number, number], restBase: 75, description: 'ПБ выносливость: функц. 10-18, 65-70%, многосет, RIR3-4' },
+    intensification: { repRange: [8, 12],  intensityMultiplier: 0.73, volumeMultiplier: 0.90, rirRange: [3, 2] as [number, number], restBase: 90 },
+    peaking:         { repRange: [6, 10],  intensityMultiplier: 0.78, volumeMultiplier: 0.75, rirRange: [2, 1] as [number, number], restBase: 120 },
+    deload:          { repRange: [12, 18], intensityMultiplier: 0.55, volumeMultiplier: 0.50, restBase: 70 },
+  },
+  pb_strength: {
+    accumulation:    { repRange: [6, 10], intensityMultiplier: 0.78, volumeMultiplier: 0.95, rirRange: [3, 1] as [number, number], restBase: 150, tempo: '2-1-1-0', description: 'ПБ сила: тяж 3-6 + памп 8-12, PHUL' },
+    intensification: { repRange: [4, 8],  intensityMultiplier: 0.86, volumeMultiplier: 0.85, rirRange: [2, 0] as [number, number], restBase: 160 },
+    peaking:         { repRange: [2, 5],  intensityMultiplier: 0.92, volumeMultiplier: 0.60, rirRange: [1, 0] as [number, number], restBase: 200 },
+    deload:          { repRange: [8, 12], intensityMultiplier: 0.62, volumeMultiplier: 0.45, restBase: 90 },
+  },
+  pb_mass: {
+    accumulation:    { repRange: [8, 15], intensityMultiplier: 0.75, volumeMultiplier: 1.00, rirRange: [3, 1] as [number, number], restBase: 90,  description: 'ПБ масса: 8-15, 70-80%, RIR1-3, объём как ББ но с базой 5×5' },
+    intensification: { repRange: [6, 12], intensityMultiplier: 0.80, volumeMultiplier: 0.88, rirRange: [2, 1] as [number, number], restBase: 120 },
+    peaking:         { repRange: [4, 8],  intensityMultiplier: 0.85, volumeMultiplier: 0.70, rirRange: [2, 0] as [number, number], restBase: 150 },
+    deload:          { repRange: [12, 20], intensityMultiplier: 0.55, volumeMultiplier: 0.50, restBase: 70 },
+  },
+  pb_peaking: {
+    accumulation:    { repRange: [6, 10], intensityMultiplier: 0.76, volumeMultiplier: 0.92, rirRange: [3, 1] as [number, number], restBase: 120 },
+    intensification: { repRange: [3, 6],  intensityMultiplier: 0.88, volumeMultiplier: 0.75, rirRange: [2, 0] as [number, number], restBase: 180 },
+    peaking:         { repRange: [1, 3],  intensityMultiplier: 0.96, volumeMultiplier: 0.50, rirRange: [1, 0] as [number, number], restBase: 220, description: 'ПБ пик: taper сила + сушка ББ, ×0.50/0.96' },
+    deload:          { repRange: [5, 8],  intensityMultiplier: 0.60, volumeMultiplier: 0.40, restBase: 90 },
+  },
+};
+
 /** ББ-цели (отличаются источником: Schoenfeld/Helms/Israetel, не Sir/Verk). Для документации — используются в BB-builder, тут только сводка. */
 export const BB_MANUAL_GOALS = ['hypertrophy', 'mass', 'cut', 'recomp', 'maintenance', 'strength_mass', 'rehab'] as const;
 export const PL_MANUAL_GOALS = ['pl_endurance', 'pl_strength', 'pl_speed', 'pl_peaking', 'rehab'] as const;
+/** Гибрид/повербилдер — третий ручной конструктор (PL+BB). Источники: Helms + Israetel + Zatsiorsky powerbuilding blend (PHUL/PHAT). */
+export const HYBRID_MANUAL_GOALS = ['pb_endurance', 'pb_strength', 'pb_mass', 'pb_peaking', 'rehab'] as const;
 
 /** Нормализовать legacy/alias goal → канонический id (ПЛ 4 + ББ). */
 export function normalizeManualGoal(goal: string): string {
   const g = (goal || '').toLowerCase().trim();
+  if (['pb_endurance','pb_выносливость','гибрид_вынос'].includes(g)) return 'pb_endurance';
+  if (['pb_strength','pb_сила','гибрид_сила','powerbuilder_strength'].includes(g)) return 'pb_strength';
+  if (['pb_mass','pb_масса','гибрид_масса','powerbuilder_mass','гипертрофия_пб'].includes(g)) return 'pb_mass';
+  if (['pb_peaking','pb_пик','гибрид_пик','powerbuilder_peak'].includes(g)) return 'pb_peaking';
   if (['pl_endurance','endurance','выносливость','gpp','офп'].includes(g)) return 'pl_endurance';
   if (['pl_strength','strength','max_strength','powerlifting','сила','силовая'].includes(g)) return 'pl_strength';
   if (['pl_speed','speed','speed_coordination','скорость','координация','скорость/координация'].includes(g)) return 'pl_speed';
@@ -188,6 +222,9 @@ export function isPLManualGoal(goal: string): boolean {
 export function isBBManualGoal(goal: string): boolean {
   return ['hypertrophy','mass','cut','recomp','maintenance','strength_mass'].includes(normalizeManualGoal(goal));
 }
+export function isHybridManualGoal(goal: string): boolean {
+  return ['pb_endurance','pb_strength','pb_mass','pb_peaking'].includes(normalizeManualGoal(goal));
+}
 
 /**
  * Распределить N недель мезоцикла по фазам.
@@ -206,6 +243,8 @@ export function getPhaseConfigForGoal(phase: BBPhase, goal: string, focus?: BBTr
   const norm = normalizeManualGoal(goal);
   const plOverride = (PL_GOAL_PHASE_OVERRIDES as Record<string, Record<string, Partial<PhaseConfig>>>)[norm]?.[phase];
   if (plOverride) return { ...base, ...plOverride } as PhaseConfig;
+  const hybOverride = (HYBRID_GOAL_PHASE_OVERRIDES as Record<string, Record<string, Partial<PhaseConfig>>>)[norm]?.[phase];
+  if (hybOverride) return { ...base, ...hybOverride } as PhaseConfig;
   return base;
 }
 
@@ -214,10 +253,10 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
   const normGoal = normalizeManualGoal(goal);
   // maintenance: редкий deload (6 нед), не 4 — MV-поддержка не требует частой разгрузки
   if (normGoal === 'maintenance' && deloadFreq === 4) deloadFreq = 6;
-  // ПЛ-выносливость: частый делод каждые 3 нед (GPP высокий объём, восстановление)
-  if (normGoal === 'pl_endurance' && deloadFreq === 4) deloadFreq = 3;
-  // ПЛ-пик: делод каждые 3 нед (интенсивный стресс)
-  if (normGoal === 'pl_peaking' && deloadFreq === 4) deloadFreq = 3;
+  // ПЛ/ПБ-выносливость: частый делод каждые 3 нед (GPP высокий объём, восстановление)
+  if ((normGoal === 'pl_endurance' || normGoal === 'pb_endurance') && deloadFreq === 4) deloadFreq = 3;
+  // ПЛ/ПБ-пик: делод каждые 3 нед (интенсивный стресс)
+  if ((normGoal === 'pl_peaking' || normGoal === 'pb_peaking') && deloadFreq === 4) deloadFreq = 3;
   const deloadWeeks = new Set<number>();
   
   if (deloadFreq > 0) {
@@ -226,12 +265,12 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
     }
   }
 
-  // Пик только для силы/пика (ПЛ и ББ). Выносливость и скорость — без пика (подготовительный блок, Verkhoshansky)
-  const hasPeak = normGoal === 'pl_strength' || normGoal === 'pl_peaking' || goal === 'strength' || goal === 'powerlifting' || goal === 'strength_mass' || normGoal === 'strength_mass';
-  // ПЛ-пик: 3 недели пика при цикле >=8 нед (Bosquet 2007 extended taper), остальные 1-2
+  // Пик только для силы/пика (ПЛ, ПБ и ББ). Выносливость и скорость — без пика (подготовительный блок, Verkhoshansky)
+  const hasPeak = ['pl_strength','pl_peaking','pb_strength','pb_peaking','pb_mass','strength_mass'].includes(normGoal) || goal === 'strength' || goal === 'powerlifting' || normGoal === 'strength_mass';
+  // ПЛ/ПБ-пик: 3 недели пика при цикле >=8 нед (Bosquet 2007 extended taper), остальные 1-2; ПБ-масса/сила — 1-2н пика
   let peakWeeks = 0;
   if (hasPeak) {
-    if (normGoal === 'pl_peaking') peakWeeks = mesoLength >= 8 ? 3 : Math.min(2, Math.floor(mesoLength * 0.20));
+    if (normGoal === 'pl_peaking' || normGoal === 'pb_peaking') peakWeeks = mesoLength >= 8 ? 3 : Math.min(2, Math.floor(mesoLength * 0.20));
     else peakWeeks = Math.min(2, Math.floor(mesoLength * 0.15));
   }
 
@@ -242,13 +281,14 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
   }
   const totalActive = activeWeeks.length;
 
-  // recomp 60/40 (accum/intens), выносливость 65/35 (больше GPP), скорость 55/45, остальные 50/50
+  // recomp 60/40 (accum/intens), выносливость 65/35 (больше GPP), скорость 55/45, остальные 50/50; ПБ — blend
   let accumRatio = 0.5;
   if (normGoal === 'recomp') accumRatio = 0.6;
-  else if (normGoal === 'pl_endurance') accumRatio = 0.65;
+  else if (normGoal === 'pl_endurance' || normGoal === 'pb_endurance') accumRatio = 0.65;
   else if (normGoal === 'pl_speed') accumRatio = 0.55;
-  else if (normGoal === 'pl_strength') accumRatio = 0.5;
-  else if (normGoal === 'pl_peaking') accumRatio = 0.45; // пик: короче accumulation, дольше intens
+  else if (normGoal === 'pl_strength' || normGoal === 'pb_strength') accumRatio = 0.50;
+  else if (normGoal === 'pl_peaking' || normGoal === 'pb_peaking') accumRatio = 0.45; // пик: короче accumulation, дольше intens
+  else if (normGoal === 'pb_mass') accumRatio = 0.55; // ПБ масса: чуть больше accum чем сила
   const accumEnd = totalActive > 1 ? Math.ceil(totalActive * accumRatio) : 1;
 
   for (let w = 1; w <= mesoLength; w++) {
@@ -412,6 +452,19 @@ export function getDeloadOverride(goal: string): DeloadOverride {
   }
   if (norm === 'pl_peaking') {
     return { volumeMultiplier: 0.25, intensityMultiplier: 0.65, repRange: [1, 2], label: 'тапер (пик, Bosquet ×0.25)' };
+  }
+  // ПБ гибрид — гибридные делоды (Helms+Israetel+Zatsiorsky)
+  if (norm === 'pb_endurance') {
+    return { volumeMultiplier: 0.48, intensityMultiplier: 0.55, repRange: [12, 18], label: 'восстановительный (ПБ выносл.)' };
+  }
+  if (norm === 'pb_strength') {
+    return { volumeMultiplier: 0.38, intensityMultiplier: 0.75, repRange: [3, 6], label: 'силовой (ПБ сила, PHUL)' };
+  }
+  if (norm === 'pb_mass') {
+    return { volumeMultiplier: 0.45, intensityMultiplier: 0.55, repRange: [12, 20], label: 'объёмный (ПБ масса)' };
+  }
+  if (norm === 'pb_peaking') {
+    return { volumeMultiplier: 0.35, intensityMultiplier: 0.70, repRange: [2, 4], label: 'тапер (ПБ пик, сила+сушка)' };
   }
   if (norm === 'strength' || goal === 'powerlifting') {
     return { volumeMultiplier: 0.30, intensityMultiplier: 0.85, repRange: [1, 3], label: 'интенсивный (сила)' };

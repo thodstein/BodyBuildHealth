@@ -85,16 +85,24 @@ export const GOAL_OPTS_PL: Array<{ id: string; label: string }> = [
   { id: 'pl_peaking', label: 'Выход на пик' },
   { id: 'rehab', label: 'Реабилитация' },
 ];
+export const GOAL_OPTS_HYBRID: Array<{ id: string; label: string }> = [
+  { id: 'pb_endurance', label: 'Выносливость (функц.)' },
+  { id: 'pb_strength', label: 'Сила (ПЛ+ББ)' },
+  { id: 'pb_mass', label: 'Масса (гипертрофия+база)' },
+  { id: 'pb_peaking', label: 'Пик (сила+сушка)' },
+  { id: 'rehab', label: 'Реабилитация' },
+];
 const GOAL_OPTS: Array<{ id: string; label: string }> = [
   ...GOAL_OPTS_BB,
   ...GOAL_OPTS_PL.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id)),
+  ...GOAL_OPTS_HYBRID.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id) && !GOAL_OPTS_PL.some(b => b.id === o.id)),
   { id: 'powerlifting', label: 'Сила (ПЛ, legacy)' },
   { id: 'peaking', label: 'Пик/сушка (legacy)' },
   { id: 'mass', label: 'Масса (legacy)' },
   { id: 'bulk', label: 'Масса (legacy bulk)' },
 ];
 function goalLabelOf(id: string): string {
-  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? id;
+  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? GOAL_OPTS_HYBRID.find(g => g.id === id)?.label ?? id;
 }
 const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
@@ -1603,7 +1611,7 @@ return (
            {program.meta.title && program.meta.title.trim().length >= 3 && program.meta.title.trim().length < 12 && <span style={{ fontSize: 10, color: '#f59e0b' }}>💡 Более описательное название поможет в списке (напр. «Масса 4д × 8 нед»)</span>}
          </div>
          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8 }}>
-            <EditorPopupSelect value={program.meta.goal} options={(program.meta.direction === 'pl' ? GOAL_OPTS_PL : program.meta.direction === 'bb' ? GOAL_OPTS_BB : GOAL_OPTS).map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ goal: v })} ariaLabel="Цель программы" title="Цель программы" buttonStyle={{ width: '100%' }} />
+            <EditorPopupSelect value={program.meta.goal} options={(program.meta.direction === 'pl' ? GOAL_OPTS_PL : program.meta.direction === 'bb' ? GOAL_OPTS_BB : program.meta.direction === 'hybrid' ? GOAL_OPTS_HYBRID : GOAL_OPTS).map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ goal: v })} ariaLabel="Цель программы" title="Цель программы" buttonStyle={{ width: '100%' }} />
             <EditorPopupSelect value={program.meta.level} options={LEVEL_OPTS.map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ level: v })} ariaLabel="Уровень подготовки" title="Уровень подготовки" buttonStyle={{ width: '100%' }} />
            <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Дней / нед</span>
@@ -1679,7 +1687,7 @@ return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
           <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.16)', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a' }}>🎯 Цель: {goalLabelOf(program.meta.goal)}</span>
-            <span style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{(() => { const g = program.meta.goal; if (g === 'pl_endurance' || g === 'endurance') return 'Выносливость: 60-70% ×10-20, RIR 3-4, объём ×1.0, GPP/ОФП'; if (g === 'pl_strength' || g === 'powerlifting' || g === 'strength') return 'Сила: 75-90% ×1-6, RIR 0-2, Прилепин'; if (g === 'pl_speed') return 'Скорость: 50-75% ×2-5, RIR 4-5, взрыв, цепи/паузы'; if (g === 'pl_peaking' || g === 'peaking' || g === 'peak') return 'Пик: 90-105% ×1-3, taper ×0.45, RIR 0-1'; if (g === 'hypertrophy' || g === 'mass') return 'Масса: 65-85% 8-15, RIR 2→1, делод 4н'; if (g === 'cut') return 'Сушка: объём ×0.60-0.75 на дефиците, RIR 3-4'; if (g === 'recomp') return 'Рекомп: умеренный объём, RIR 2-3'; if (g === 'maintenance') return 'Поддержание: MEV, RIR 4, делод 6н'; if (g === 'strength_mass') return 'Сила+Масса: гибрид объём+интенс'; return 'Выберите ближе к задаче'; })()}</span>
+            <span style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{(() => { const g = program.meta.goal; if (g === 'pl_endurance' || g === 'endurance') return 'Выносливость: 60-70% ×10-20, RIR 3-4, объём ×1.0, GPP/ОФП'; if (g === 'pl_strength' || g === 'powerlifting' || g === 'strength') return 'Сила: 75-90% ×1-6, RIR 0-2, Прилепин'; if (g === 'pl_speed') return 'Скорость: 50-75% ×2-5, RIR 4-5, взрыв, цепи/паузы'; if (g === 'pl_peaking' || g === 'peaking' || g === 'peak') return 'Пик: 90-105% ×1-3, taper ×0.45, RIR 0-1'; if (g === 'pb_endurance') return 'ПБ выносл.: 10-18×0.68 vol1.0 функц.'; if (g === 'pb_strength') return 'ПБ сила: 6-10→4-8×0.78-0.92 PHUL тяж+памп'; if (g === 'pb_mass') return 'ПБ масса: 8-15×0.75 гибрид ББ+ПЛ'; if (g === 'pb_peaking') return 'ПБ пик: 1-3×0.96 taper сила+сушка'; if (g === 'hypertrophy' || g === 'mass') return 'Масса: 65-85% 8-15, RIR 2→1, делод 4н'; if (g === 'cut') return 'Сушка: объём ×0.60-0.75 на дефиците, RIR 3-4'; if (g === 'recomp') return 'Рекомп: умеренный объём, RIR 2-3'; if (g === 'maintenance') return 'Поддержание: MEV, RIR 4, делод 6н'; if (g === 'strength_mass') return 'Сила+Масса: гибрид объём+интенс'; return 'Выберите ближе к задаче'; })()}</span>
           </div>
           <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.16)', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>📶 Уровень: {LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level}</span>

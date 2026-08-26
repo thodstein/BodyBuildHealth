@@ -116,17 +116,29 @@ export const GOAL_OPTS_PL: Array<{ id: string; label: string }> = [
   { id: 'pl_peaking', label: 'Выход на пик' },
   { id: 'rehab', label: 'Реабилитация' },
 ];
+/**
+ * Гибрид/повербилдер — третий ручной конструктор (PL+BB blend, PHUL/PHAT, Helms+Israetel+Zatsiorsky):
+ *  endurance — функционал ОФП, strength — тяж+памп, mass — гипертрофия с базой 5×5, peaking — taper.
+ */
+export const GOAL_OPTS_HYBRID: Array<{ id: string; label: string }> = [
+  { id: 'pb_endurance', label: 'Выносливость (функц.)' },
+  { id: 'pb_strength', label: 'Сила (ПЛ+ББ)' },
+  { id: 'pb_mass', label: 'Масса (гипертрофия+база)' },
+  { id: 'pb_peaking', label: 'Пик (сила+сушка)' },
+  { id: 'rehab', label: 'Реабилитация' },
+];
 // Legacy combined для отображения старых программ (powerlifting→pl_strength, peaking→pl_peaking / cut)
 const GOAL_OPTS: Array<{ id: string; label: string }> = [
   ...GOAL_OPTS_BB,
   ...GOAL_OPTS_PL.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id)),
+  ...GOAL_OPTS_HYBRID.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id) && !GOAL_OPTS_PL.some(b => b.id === o.id)),
   { id: 'powerlifting', label: 'Сила (ПЛ, legacy)' },
   { id: 'peaking', label: 'Пик/сушка (legacy)' },
   { id: 'mass', label: 'Масса (legacy)' },
   { id: 'bulk', label: 'Масса (legacy bulk)' },
 ];
 function goalLabelOf(id: string): string {
-  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? id;
+  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? GOAL_OPTS_HYBRID.find(g => g.id === id)?.label ?? id;
 }
 const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },

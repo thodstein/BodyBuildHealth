@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { distributePhases, getDeloadOverride, normalizeManualGoal, isPLManualGoal, PL_GOAL_PHASE_OVERRIDES } from '../../ui/screens/TrainingScreen_parts/phase-periodization';
+import { distributePhases, getDeloadOverride, normalizeManualGoal, isPLManualGoal, isHybridManualGoal, PL_GOAL_PHASE_OVERRIDES, HYBRID_GOAL_PHASE_OVERRIDES } from '../../ui/screens/TrainingScreen_parts/phase-periodization';
 
 describe('PL manual 4 goals vs BB goals', () => {
   it('normalize legacy aliases', () => {
@@ -82,5 +82,19 @@ describe('PL manual 4 goals vs BB goals', () => {
       const weeks = d.map(x=>x.startWeek);
       expect(new Set(weeks).size).toBe(8);
     }
+  });
+
+  it('hybrid (повербилдер) 4 цели — отдельные фазы и делоды (PHUL/PHAT blend)', () => {
+    expect(isHybridManualGoal('pb_strength')).toBe(true);
+    expect(isHybridManualGoal('pb_mass')).toBe(true);
+    expect(normalizeManualGoal('pb_mass')).toBe('pb_mass');
+    expect(HYBRID_GOAL_PHASE_OVERRIDES['pb_strength'].accumulation?.repRange).toEqual([6,10]);
+    expect(HYBRID_GOAL_PHASE_OVERRIDES['pb_mass'].accumulation?.repRange).toEqual([8,15]);
+    const deloadPB = getDeloadOverride('pb_peaking');
+    expect(deloadPB.label).toContain('ПБ пик');
+    const dist = distributePhases(12, 4, 'pb_peaking');
+    expect(dist.filter(d=>d.phase==='peaking').length).toBe(3);
+    const distEnd = distributePhases(8, 4, 'pb_endurance');
+    expect(distEnd.filter(d=>d.phase==='deload').map(d=>d.startWeek)).toContain(3);
   });
 });

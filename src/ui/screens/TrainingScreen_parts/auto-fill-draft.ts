@@ -195,10 +195,13 @@ export function autoFillHybridDraft(ctx: AutoFillCtx): boolean {
   let foundCycle = LMS_CYCLES.find(c => c.meta.level === program.meta.level && Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
   if (!foundCycle) foundCycle = LMS_CYCLES.find(c => Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1);
   const bbDays = Math.max(1, days - sessCount);
+  // Маппинг ПБ-цели гибрида → ББ-цель для bb-части (powerbuilding blend: Helms/Israetel)
+  const hybGoal = (program.meta.goal || '').toLowerCase();
+  const bbGoalForHybrid = hybGoal === 'pb_strength' ? 'strength_mass' : hybGoal === 'pb_mass' ? 'hypertrophy' : hybGoal === 'pb_peaking' ? 'strength_mass' : 'hypertrophy';
   let bbWeeks: UserWeek[] = [];
   try {
     const bbUserProg = buildBBUserProgramFromProfile({
-      title: 'hybrid-bb', goal: 'hypertrophy', level: program.meta.level,
+      title: 'hybrid-bb', goal: bbGoalForHybrid, level: program.meta.level,
       days: bbDays, weeks: Math.max(1, program.meta.weeks || 4), prof,
       trainingFocus: program.meta.trainingFocus,
       bodyFat, leanMass, hrvMs, sleepHours, stressLevel, labMrvMultiplier,
