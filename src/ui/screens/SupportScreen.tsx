@@ -2237,7 +2237,7 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
           }} style={{
             flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
             padding:'4px 2px', background: active ? `${item.accent}12` : 'transparent', border: active ? `1px solid ${item.accent}28` : '1px solid transparent', cursor:'pointer',
-            color: active ? item.accent : 'rgba(255,255,255,0.55)',
+            color: active ? item.accent : '#fff',
             fontSize:9, fontWeight: active ? 800 : 500,
             borderRadius:10, transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', minHeight:40,
           }}>

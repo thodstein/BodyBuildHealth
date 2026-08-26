@@ -53,6 +53,23 @@
 .support-screen h3 { font-size: 14px !important; }
 .support-screen h4 { font-size: 13px !important; }
 
+/* ВЕСЬ СЕРЫЙ ТЕКСТ В БЛОКЕ → БЕЛЫЙ (по требованию) — переопределяем inline rgba серый) */
+.support-screen [style*="color: rgba(255,255,255,0.38)"],
+.support-screen [style*="color: rgba(255,255,255,0.4)"],
+.support-screen [style*="color: rgba(255,255,255,0.45)"],
+.support-screen [style*="color: rgba(255,255,255,0.5)"],
+.support-screen [style*="color: rgba(255,255,255,0.55)"],
+.support-screen [style*="color: rgba(255,255,255,0.6)"],
+.support-screen [style*="color: rgba(255,255,255,0.65)"],
+.support-screen [style*="color: rgba(255,255,255,0.7)"],
+.support-screen [style*="color: rgba(255,255,255,0.72)"],
+.support-screen [style*="color: rgba(255,255,255,0.78)"],
+.support-screen [style*="color: rgba(255,255,255,0.8)"],
+.support-screen [style*="color: rgba(255,255,255,0.85)"],
+.support-screen [style*="color: var(--text-dim)"] {
+  color: #fff !important;
+}
+
 /* Бейджи механизмов — крупнее */
 .support-screen span[style*="font-size: 7"],
 .support-screen span[style*="font-size: 8"] {
