@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { getSortedArticles, type ArticleManifestEntry, ARTICLES_MANIFEST } from '../../data/articles-manifest';
 
+const FONT = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif";
+
 const CATEGORIES = [
   { value: 'all', label: 'Все', color: '#8b5cf6' },
   { value: 'pharma', label: 'Фарма', color: '#f97316' },
@@ -8,11 +10,11 @@ const CATEGORIES = [
   { value: 'training', label: 'Тренировки', color: '#00e68a' },
   { value: 'nutrition', label: 'Питание', color: '#eab308' },
   { value: 'support', label: 'Поддержка', color: '#a855f7' },
-];
+] as const;
 
 const ARTICLE_SECTIONS = [
-  { id: 'new', icon: '🆕', title: 'Новые статьи', desc: 'Последние добавленные', color: 'var(--accent)' },
-  { id: 'recommended', icon: '⭐', title: 'Рекомендуемое', desc: 'Популярные и рекомендованные', color: '#3b82f6' },
+  { id: 'new', icon: '🆕', title: 'Новые статьи', desc: 'Последние добавленные', color: '#00e68a' },
+  { id: 'recommended', icon: '⭐', title: 'Рекомендуемое', desc: 'Популярные и избранные', color: '#3b82f6' },
   { id: 'all', icon: '📚', title: 'Все статьи', desc: 'Полная библиотека', color: '#8b5cf6' },
 ] as const;
 
@@ -41,11 +43,11 @@ function estimateReadTime(md: string): number {
 function renderMarkdown(md: string): string {
   let html = md
     .replace(/^### (.+)$/gm, (_, h) =>
-      `<h4 style="font-size:13px;font-weight:700;color:var(--accent);margin:18px 0 8px;letter-spacing:-0.01em;border-left:3px solid var(--accent);padding-left:10px">${h}</h4>`)
+      `<h4 style="font-size:13px;font-weight:800;color:#a78bfa;margin:22px 0 8px;letter-spacing:-0.01em;border-left:3px solid #00e68a;padding-left:10px">${h}</h4>`)
     .replace(/^## (.+)$/gm, (_, h) =>
-      `<h3 style="font-size:16px;font-weight:700;color:#fff;margin:24px 0 10px;letter-spacing:-0.02em">${h}</h3>`)
+      `<h3 style="font-size:16px;font-weight:800;color:#fff;margin:26px 0 10px;letter-spacing:-0.02em">${h}</h3>`)
     .replace(/^# (.+)$/gm, (_, h) =>
-      `<h2 style="font-size:19px;font-weight:800;color:#fff;margin:28px 0 12px;letter-spacing:-0.03em;background:linear-gradient(135deg,var(--accent),#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${h}</h2>`)
+      `<h2 style="font-size:20px;font-weight:900;color:#fff;margin:28px 0 12px;letter-spacing:-0.03em;background:linear-gradient(135deg,#00e68a,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent">${h}</h2>`)
     .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#fff;font-weight:700">$1</strong>')
     .replace(/\*(.+?)\*/g, '<em style="color:rgba(255,255,255,0.85);font-style:italic">$1</em>');
 
@@ -59,12 +61,12 @@ function renderMarkdown(md: string): string {
         inTable = true;
         const headerCells = line.split('|').filter(c => c.trim());
         const headerRow = '<tr>' + headerCells.map(c =>
-          `<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.04em;background:rgba(0,230,138,0.08);border-bottom:1px solid rgba(0,230,138,0.15)">${c.trim()}</th>`
+          `<th style="padding:8px 11px;text-align:left;font-size:10px;font-weight:800;color:#00e68a;text-transform:uppercase;letter-spacing:0.06em;background:rgba(0,230,138,0.09);border-bottom:1px solid rgba(0,230,138,0.16)">${c.trim()}</th>`
         ).join('') + '</tr>';
-        return `<table style="width:100%;border-collapse:collapse;margin:12px 0;border-radius:10px;overflow:hidden;font-size:11px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)"><thead>${headerRow}</thead><tbody>`;
+        return `<table style="width:100%;border-collapse:collapse;margin:14px 0;border-radius:12px;overflow:hidden;font-size:11px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)"><thead>${headerRow}</thead><tbody>`;
       }
       return '<tr>' + cells.map((c, i) =>
-        `<td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;${i === 0 ? 'font-weight:600;color:#fff' : 'color:rgba(255,255,255,0.8)'}">${c.trim()}</td>`
+        `<td style="padding:7px 11px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;${i === 0 ? 'font-weight:700;color:#fff' : 'color:rgba(255,255,255,0.82)'}">${c.trim()}</td>`
       ).join('') + '</tr>';
     } else {
       if (inTable) {
@@ -78,20 +80,20 @@ function renderMarkdown(md: string): string {
 
   html = html
     .replace(/^- (.+)$/gm, (_, item) =>
-      `<li style="margin:4px 0;font-size:12px;line-height:1.5;color:rgba(255,255,255,0.85);position:relative;padding-left:4px">— ${item}</li>`)
-    .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:8px 0;padding:0;list-style:none">${m}</ul>`)
-    .replace(/^---$/gm, '<hr style="border:none;height:1px;background:linear-gradient(90deg,transparent,rgba(0,230,138,0.2),transparent);margin:20px 0"/>')
+      `<li style="margin:5px 0;font-size:12px;line-height:1.55;color:rgba(255,255,255,0.86);position:relative;padding-left:4px">— ${item}</li>`)
+    .replace(/(<li.*<\/li>\n?)+/g, m => `<ul style="margin:10px 0;padding:0;list-style:none">${m}</ul>`)
+    .replace(/^---$/gm, '<hr style="border:none;height:1px;background:linear-gradient(90deg,transparent,rgba(0,230,138,0.22),transparent);margin:22px 0"/>')
     .replace(/\n\n/g, '<div style="height:8px"></div>')
     .replace(/- \[ \] (.+)/g, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:6px;margin:3px 0;font-size:11px;color:rgba(255,255,255,0.7)"><span style="width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(255,255,255,0.2);display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0"></span>${t}</span><br/>`)
+      `<span style="display:inline-flex;align-items:center;gap:7px;margin:4px 0;font-size:11px;color:rgba(255,255,255,0.7)"><span style="width:14px;height:14px;border-radius:4px;border:1.5px solid rgba(255,255,255,0.22);display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0"></span>${t}</span><br/>`)
     .replace(/- \[x\] (.+)/g, (_, t) =>
-      `<span style="display:inline-flex;align-items:center;gap:6px;margin:3px 0;font-size:11px;color:var(--accent)"><span style="width:14px;height:14px;border-radius:3px;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0">✓</span>${t}</span><br/>`);
+      `<span style="display:inline-flex;align-items:center;gap:7px;margin:4px 0;font-size:11px;color:#00e68a"><span style="width:14px;height:14px;border-radius:4px;background:#00e68a;display:inline-flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;color:#000;font-weight:900">✓</span>${t}</span><br/>`);
 
   html = html
     .replace(/^> (.+)$/gm, (_, q) =>
-      `<blockquote style="margin:14px 0;padding:10px 14px;background:rgba(0,230,138,0.06);border-left:3px solid var(--accent);border-radius:6px;font-size:12px;color:rgba(255,255,255,0.85);line-height:1.5">${q}</blockquote>`);
+      `<blockquote style="margin:16px 0;padding:12px 14px;background:rgba(0,230,138,0.07);border-left:3px solid #00e68a;border-radius:8px;font-size:12px;color:rgba(255,255,255,0.88);line-height:1.55;backdrop-filter:blur(8px)">${q}</blockquote>`);
 
-  return `<div style="line-height:1.7;font-size:13px;color:rgba(255,255,255,0.82)">${html}</div>`;
+  return `<div style="line-height:1.75;font-size:13px;color:rgba(255,255,255,0.84)">${html}</div>`;
 }
 
 export const ArticlesScreen: React.FC = () => {
@@ -133,37 +135,49 @@ export const ArticlesScreen: React.FC = () => {
 
   if (page === 'hero') {
     return (
-      <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column' }}>
-        <img src="/articles-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.4) 30%, rgba(0,0,0,0.92) 70%, #0a0a0f 100%)' }} />
-        <div style={{ position:'absolute', inset:0, background:'rgba(10,10,15,0.4)' }} />
-        <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'20px 16px 70px' }}>
-          <div style={{ marginBottom:6 }}>
-            <span style={{ display:'inline-block', padding:'3px 10px', borderRadius:12, background:'rgba(0,230,138,0.15)', color:'var(--accent)', fontSize:9, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em' }}>База знаний</span>
+      <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', fontFamily: FONT, background:'#050508', overflow:'hidden' }}>
+        <img src="/articles-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', filter:'saturate(1.08) contrast(1.04)' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.32) 28%, rgba(5,5,10,0.78) 62%, #050508 92%)' }} />
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(900px 500px at 20% -10%, rgba(0,230,138,0.18), transparent 60%), radial-gradient(700px 400px at 100% 8%, rgba(59,130,246,0.14), transparent 55%)', opacity:0.9 }} />
+        {/* soft grain */}
+        <div style={{ position:'absolute', inset:0, opacity:0.04, backgroundImage:'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize:'18px 18px' }} />
+        <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'22px 16px 24px', maxWidth: 520, width:'100%', margin:'0 auto' }}>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6, marginBottom:10 }}>
+            <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 12px', borderRadius:999, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.24)', color:'#00e68a', fontSize:10, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)', boxShadow:'0 2px 14px rgba(0,230,138,0.18)' }}>
+              <span style={{ width:6, height:6, borderRadius:'50%', background:'#00e68a', boxShadow:'0 0 10px rgba(0,230,138,0.9)', display:'inline-block' }} /> База знаний
+            </span>
+            <span style={{ padding:'4px 9px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.72)', fontSize:10, fontWeight:700, backdropFilter:'blur(8px)' }}>HE • {ARTICLES_MANIFEST.length} материалов</span>
           </div>
-          <h1 style={{ fontSize:28, fontWeight:900, color:'#fff', margin:'0 0 4px', textShadow:'0 4px 20px rgba(0,0,0,0.9)', letterSpacing:'-0.03em', lineHeight:1.1 }}>Статьи</h1>
-          <p style={{ fontSize:12, color:'rgba(255,255,255,0.75)', margin:'0 0 20px', lineHeight:1.4, textShadow:'0 1px 8px rgba(0,0,0,0.8)', maxWidth:'80%' }}>
-            Фармакология, анализы, тренировки, питание и поддержка
+          <h1 style={{ fontSize:34, fontWeight:900, color:'#fff', margin:'0 0 6px', textShadow:'0 8px 28px rgba(0,0,0,0.65), 0 2px 10px rgba(0,0,0,0.5)', letterSpacing:'-0.04em', lineHeight:0.95 }}>Статьи</h1>
+          <p style={{ fontSize:13, color:'rgba(255,255,255,0.78)', margin:'0 0 18px', lineHeight:1.45, textShadow:'0 2px 12px rgba(0,0,0,0.6)', maxWidth:'86%' }}>
+            Фармакология · Анализы · Тренировки · Питание · Поддержка — концентрат практики и науки
           </p>
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:10 }}>
             {ARTICLE_SECTIONS.map(s => (
               <button key={s.id} onClick={() => goToList(s.id)} style={{
-                display:'flex', alignItems:'center', gap:12, padding:'13px 15px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(20,22,30,0.5)', border:'1px solid rgba(255,255,255,0.06)', color:'var(--text)',
-                backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
-                transition:'all 0.25s', boxShadow:'0 4px 20px rgba(0,0,0,0.2)',
+                display:'flex', alignItems:'center', gap:13, padding:'14px 15px', borderRadius:16, cursor:'pointer', textAlign:'left', width:'100%',
+                background:'rgba(16,18,28,0.46)', border:'1px solid rgba(255,255,255,0.07)', color:'var(--text)',
+                backdropFilter:'blur(16px) saturate(140%)', WebkitBackdropFilter:'blur(16px) saturate(140%)',
+                transition:'all 0.22s cubic-bezier(0.2,0.9,0.4,1)', boxShadow:'0 10px 32px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.06)',
+                position:'relative', overflow:'hidden',
               }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(20,22,30,0.5)'; e.currentTarget.style.transform = 'translateY(0)'; }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 14px 36px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor = s.color+'38'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,18,28,0.46)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 10px 32px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}
               >
-                <div style={{ width:42, height:42, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:s.color+'20', fontSize:18 }}>{s.icon}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14, fontWeight:700, marginBottom:2, color:s.color, letterSpacing:'-0.01em' }}>{s.title}</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.65)', lineHeight:1.3 }}>{s.desc}</div>
+                <div aria-hidden="true" style={{ position:'absolute', inset:0, background:`radial-gradient(500px 120px at 12% 0%, ${s.color}14, transparent 62%)`, pointerEvents:'none' }} />
+                <div style={{ width:46, height:46, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`linear-gradient(135deg, ${s.color}22, ${s.color}10)`, border:`1px solid ${s.color}28`, fontSize:19, boxShadow:`0 4px 16px ${s.color}26`, position:'relative' }}>{s.icon}</div>
+                <div style={{ flex:1, position:'relative' }}>
+                  <div style={{ fontSize:14.5, fontWeight:800, marginBottom:2, color:'#fff', letterSpacing:'-0.015em' }}>{s.title}</div>
+                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', lineHeight:1.35 }}>{s.desc}</div>
                 </div>
-                <div style={{ color:s.color, fontSize:14, opacity:0.5, transition:'all 0.2s' }}>→</div>
+                <div style={{ width:28, height:28, borderRadius:999, background:`${s.color}16`, border:`1px solid ${s.color}22`, display:'flex', alignItems:'center', justifyContent:'center', color:s.color, fontSize:13, flexShrink:0 }}>→</div>
               </button>
             ))}
+          </div>
+          <div style={{ display:'flex', gap:8, alignItems:'center', justifyContent:'center', marginTop:6, padding:'8px 10px', borderRadius:999, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)', width:'fit-content', alignSelf:'center' }}>
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.42)', fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase' }}>Контент обновляется</span>
+            <span style={{ width:4, height:4, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
+            <span style={{ fontSize:10, color:'rgba(255,255,255,0.62)', fontWeight:600 }}>Еженедельно</span>
           </div>
         </div>
       </div>
@@ -171,149 +185,166 @@ export const ArticlesScreen: React.FC = () => {
   }
 
   return (
-    <div className="screen">
-      {/* Header toolbar */}
-      <div style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 0px 8px', flexShrink:0 }}>
+    <div className="screen" style={{ fontFamily: FONT, paddingBottom: 0, background:'transparent' }}>
+      {/* premium toolbar */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0 10px', flexShrink:0, position:'sticky', top:0, zIndex:2, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,10,15,0.62)', margin:'-6px -6px 0', paddingLeft:6, paddingRight:6, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
         <button onClick={() => setPage('hero')} style={{
-          padding:'6px 8px', cursor:'pointer', fontSize:13,
-          color:'var(--text-dim)', border:'none', background:'transparent',
-          display:'flex', alignItems:'center', gap:4, fontWeight:600,
-          transition:'color 0.2s',
-        }}>← Категории</button>
+          padding:'8px 12px', cursor:'pointer', fontSize:12, fontWeight:700,
+          color:'rgba(255,255,255,0.82)', border:'1px solid rgba(255,255,255,0.09)', background:'rgba(255,255,255,0.05)',
+          borderRadius:999, display:'flex', alignItems:'center', gap:6,
+          backdropFilter:'blur(10px)', transition:'all 0.18s',
+        }}
+        onMouseEnter={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.14)'; }}
+        onMouseLeave={e=>{ e.currentTarget.style.background='rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.09)'; }}
+        >← Категории</button>
         <div style={{ flex:1 }} />
-        <span style={{ fontSize:10, color:'rgba(255,255,255,0.3)' }}>{articles.length} ст.</span>
+        <span style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.42)', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', padding:'5px 10px', borderRadius:999 }}>{articles.length} ст.</span>
       </div>
 
-      {/* Search bar */}
-      <div style={{ position:'relative', marginBottom:10 }}>
-        <svg style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', width:14, height:14, color:'rgba(255,255,255,0.25)', fill:'none', stroke:'currentColor', strokeWidth:2, strokeLinecap:'round' }} viewBox="0 0 24 24">
+      {/* Search bar — glass */}
+      <div style={{ position:'relative', marginBottom:10, marginTop:10 }}>
+        <svg style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', width:15, height:15, color:'rgba(255,255,255,0.32)', fill:'none', stroke:'currentColor', strokeWidth:2, strokeLinecap:'round' }} viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск статей..." style={{
-            width:'100%', padding:'9px 10px 9px 30px', borderRadius:10,
-            background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.06)',
-            color:'var(--text)', fontSize:12, outline:'none',
-            transition:'border-color 0.2s',
+          placeholder="Поиск статей — заголовок, тег, категория..." style={{
+            width:'100%', padding:'11px 36px 11px 36px', borderRadius:12,
+            background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.09)',
+            color:'#fff', fontSize:13, outline:'none', fontFamily: FONT,
+            backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
+            boxShadow:'0 6px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
+            transition:'border-color 0.2s, box-shadow 0.2s',
             boxSizing:'border-box',
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,230,138,0.3)'; }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; }}
+          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(0,230,138,0.38)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(0,0,0,0.22), 0 0 0 3px rgba(0,230,138,0.12), inset 0 1px 0 rgba(255,255,255,0.06)'; }}
+          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = '0 6px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)'; }}
         />
+        {search && (
+          <button onClick={()=>setSearch('')} aria-label="Очистить" style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', width:26, height:26, borderRadius:999, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.72)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>✕</button>
+        )}
       </div>
 
-      {/* Category chips */}
-      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginBottom:12 }}>
+      {/* Category chips — glass pills */}
+      <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:12 }}>
         {CATEGORIES.map(c => {
           const isActive = category === c.value;
           return (
             <button key={c.value} onClick={() => setCategory(c.value)} style={{
-              padding:'5px 11px', borderRadius:14, fontSize:10, cursor:'pointer',
-              background: isActive ? c.color + '1a' : 'rgba(255,255,255,0.04)',
-              color: isActive ? c.color : 'rgba(255,255,255,0.5)',
-              border: `1px solid ${isActive ? c.color + '44' : 'rgba(255,255,255,0.06)'}`,
-              fontWeight: isActive ? 600 : 400,
-              transition:'all 0.2s',
-              display:'flex', alignItems:'center', gap:4,
+              padding:'7px 13px', borderRadius:999, fontSize:11, cursor:'pointer', fontFamily: FONT,
+              background: isActive ? `linear-gradient(135deg, ${c.color}1f, ${c.color}12)` : 'rgba(255,255,255,0.05)',
+              color: isActive ? c.color : 'rgba(255,255,255,0.62)',
+              border: `1px solid ${isActive ? c.color+'44' : 'rgba(255,255,255,0.08)'}`,
+              fontWeight: isActive ? 800 : 600,
+              backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+              boxShadow: isActive ? `0 4px 16px ${c.color}22, inset 0 1px 0 rgba(255,255,255,0.08)` : 'inset 0 1px 0 rgba(255,255,255,0.04)',
+              transition:'all 0.18s', letterSpacing:'-0.01em',
+              display:'flex', alignItems:'center', gap:6,
             }}>
-              {CAT_ICON[c.value] && <span style={{ fontSize:10 }}>{CAT_ICON[c.value]}</span>}
+              {CAT_ICON[c.value] && <span style={{ fontSize:11 }}>{CAT_ICON[c.value]}</span>}
               {c.label}
             </button>
           );
         })}
       </div>
 
-      {/* PDF Viewer Modal */}
+      {/* PDF Viewer Modal — premium */}
       {pdfViewer && (
-        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(0,0,0,0.92)', display:'flex', flexDirection:'column', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontWeight:700, fontSize:13, display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ color:'#ef4444' }}>📄</span> PDF
+        <div style={{ position:'fixed', inset:0, zIndex:300, background:'rgba(6,6,10,0.88)', display:'flex', flexDirection:'column', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px', borderBottom:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)' }}>
+            <span style={{ fontWeight:800, fontSize:13, display:'flex', alignItems:'center', gap:7, letterSpacing:'-0.02em' }}>
+              <span style={{ width:26, height:26, borderRadius:8, background:'rgba(239,68,68,0.14)', border:'1px solid rgba(239,68,68,0.22)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>📄</span> PDF
             </span>
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={() => openPDF(pdfViewer)} style={{ padding:'6px 16px', borderRadius:8, background:'var(--accent)', color:'#000', border:'none', fontWeight:700, fontSize:11, cursor:'pointer' }}>Открыть</button>
-              <button onClick={() => setPdfViewer(null)} style={{ padding:'6px 12px', borderRadius:8, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.6)', border:'1px solid rgba(255,255,255,0.08)', fontSize:11, cursor:'pointer' }}>✕</button>
+              <button onClick={() => openPDF(pdfViewer)} style={{ padding:'7px 16px', borderRadius:999, background:'#00e68a', color:'#000', border:'none', fontWeight:800, fontSize:11, cursor:'pointer', boxShadow:'0 4px 14px rgba(0,230,138,0.28)' }}>Открыть</button>
+              <button onClick={() => setPdfViewer(null)} style={{ padding:'7px 12px', borderRadius:999, background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.72)', border:'1px solid rgba(255,255,255,0.08)', fontSize:11, cursor:'pointer' }}>✕</button>
             </div>
           </div>
           <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, padding:24 }}>
-            <div style={{ width:64, height:64, borderRadius:16, background:'rgba(239,68,68,0.1)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28 }}>📄</div>
-            <div style={{ fontSize:15, color:'var(--text)', fontWeight:600, textAlign:'center' }}>PDF-документ</div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', textAlign:'center' }}>Для просмотра откройте в браузере</div>
+            <div style={{ width:72, height:72, borderRadius:18, background:'radial-gradient(120% 120% at 30% 20%, rgba(239,68,68,0.18), rgba(239,68,68,0.06) 55%, transparent 75%)', border:'1px solid rgba(239,68,68,0.18)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:32, boxShadow:'0 12px 32px rgba(239,68,68,0.18)' }}>📄</div>
+            <div style={{ fontSize:16, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>PDF-документ</div>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.48)', textAlign:'center', maxWidth:320, lineHeight:1.5 }}>Для просмотра откроется новая вкладка — браузер покажет файл в встроенном просмотрщике.</div>
+            <button onClick={()=>openPDF(pdfViewer)} style={{ marginTop:8, padding:'10px 18px', borderRadius:999, background:'#fff', color:'#000', border:'none', fontWeight:800, fontSize:12, cursor:'pointer' }}>Открыть в браузере →</button>
           </div>
         </div>
       )}
 
-      {/* Full-screen article reader */}
+      {/* Full-screen article reader — premium */}
       {readingArticle && (
-        <div style={{ position:'fixed', inset:0, zIndex:200, background:'#0a0a0f', display:'flex', flexDirection:'column' }}>
-          {/* Header */}
-          <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', flexShrink:0 }}>
+        <div style={{ position:'fixed', inset:0, zIndex:200, background:'#07070a', display:'flex', flexDirection:'column', fontFamily: FONT }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', flexShrink:0, background:'rgba(255,255,255,0.02)', backdropFilter:'blur(14px)' }}>
             <button onClick={() => setReadingArticle(null)} style={{
-              width:32, height:32, borderRadius:10, cursor:'pointer',
-              background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)',
-              color:'rgba(255,255,255,0.6)', fontSize:14, fontWeight:600,
-              display:'flex', alignItems:'center', justifyContent:'center',
-              transition:'all 0.2s', flexShrink:0,
+              width:34, height:34, borderRadius:999, cursor:'pointer',
+              background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)',
+              color:'rgba(255,255,255,0.82)', fontSize:14, fontWeight:700,
+              display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
             }}>←</button>
             <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{readingArticle.title}</div>
-              <div style={{ fontSize:9.5, color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:6, marginTop:1 }}>
+              <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', letterSpacing:'-0.02em' }}>{readingArticle.title}</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.42)', display:'flex', alignItems:'center', gap:6, marginTop:2, fontWeight:600 }}>
                 <span style={{ color: CATEGORIES.find(c => c.value === readingArticle.category)?.color || '#6b7280' }}>
                   {CAT_ICON[readingArticle.category] || '📄'} {CATEGORIES.find(c => c.value === readingArticle.category)?.label || readingArticle.category}
                 </span>
-                <span>·</span>
-                <span>{estimateReadTime(readingArticle.content || '')} мин чтения</span>
-                <span>·</span>
+                <span style={{ opacity:0.35 }}>·</span>
+                <span>{estimateReadTime(readingArticle.content || '')} мин</span>
+                <span style={{ opacity:0.35 }}>·</span>
                 <span>{readingArticle.date}</span>
               </div>
             </div>
+            <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.56)' }}>{estimateReadTime(readingArticle.content||'')}′</span>
           </div>
 
-          {/* Scrollable content */}
-          <div style={{ flex:1, overflow:'auto', padding:'16px 14px 40px' }}>
-            {/* Title at top of content */}
-            <h1 style={{ fontSize:22, fontWeight:900, color:'#fff', margin:'0 0 8px', lineHeight:1.2, letterSpacing:'-0.03em' }}>
+          <div style={{ flex:1, overflow:'auto', padding:'18px 16px 40px', maxWidth: 720, width:'100%', margin:'0 auto' }}>
+            <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:999, background:`${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}14`, border:`1px solid ${CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280'}22`, color: CATEGORIES.find(c=>c.value===readingArticle.category)?.color || '#6b7280', fontSize:11, fontWeight:800, marginBottom:10 }}>
+              {CAT_ICON[readingArticle.category] || '📄'} {CATEGORIES.find(c=>c.value===readingArticle.category)?.label || readingArticle.category}
+            </div>
+            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 8px', lineHeight:1.12, letterSpacing:'-0.04em' }}>
               {readingArticle.title}
             </h1>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginBottom:20, paddingBottom:16, borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8 }}>
-              <span>{readingArticle.authorName}</span>
-              <span>·</span>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.42)', marginBottom:18, paddingBottom:16, borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontWeight:700, color:'rgba(255,255,255,0.72)' }}>{readingArticle.authorName}</span>
+              <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
               <span>{readingArticle.date}</span>
+              <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
+              <span style={{ padding:'3px 8px', borderRadius:999, background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.18)', color:'#00e68a', fontWeight:700, fontSize:10 }}>{estimateReadTime(readingArticle.content||'')} мин чтения</span>
             </div>
 
             <div dangerouslySetInnerHTML={{ __html: renderMarkdown(readingArticle.content || '') }} />
 
-            {/* Tags */}
             {readingArticle.tags.length > 0 && (
-              <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:24, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:26, paddingTop:16, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
                 {readingArticle.tags.map(t => (
                   <span key={t} style={{
-                    padding:'3px 10px', borderRadius:12, fontSize:9,
-                    background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.4)',
+                    padding:'5px 11px', borderRadius:999, fontSize:11, fontWeight:600,
+                    background:'rgba(255,255,255,0.05)', color:'rgba(255,255,255,0.62)', border:'1px solid rgba(255,255,255,0.06)',
+                    backdropFilter:'blur(8px)',
                   }}>#{t}</span>
                 ))}
               </div>
             )}
 
-            {/* Footer */}
-            <div style={{ marginTop:24, paddingTop:14, borderTop:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9.5, color:'rgba(255,255,255,0.15)' }}>
+            <div style={{ marginTop:22, padding:'12px 14px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ width:28, height:28, borderRadius:999, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:13 }}>✓</span>
+              <span style={{ fontSize:11, color:'rgba(255,255,255,0.62)', lineHeight:1.4 }}>Материал подготовлен командой Health Engine. Не является медицинской рекомендацией — проконсультируйтесь с врачом.</span>
+            </div>
+            <div style={{ marginTop:18, textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.18)' }}>
               Health Engine · {readingArticle.date}
             </div>
           </div>
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Empty state — premium */}
       {articles.length === 0 && (
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 20px', gap:10 }}>
-          <div style={{ width:56, height:56, borderRadius:'50%', background:'rgba(255,255,255,0.04)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24 }}>📭</div>
-          <div style={{ fontSize:13, color:'rgba(255,255,255,0.4)', fontWeight:500 }}>Статьи не найдены</div>
-          <button onClick={() => { setSearch(''); setCategory('all'); }} style={{ padding:'5px 14px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'transparent', color:'rgba(255,255,255,0.5)', fontSize:10, cursor:'pointer' }}>Сбросить фильтры</button>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'44px 20px', gap:12, marginTop:10, borderRadius:16, background:'rgba(255,255,255,0.02)', border:'1px dashed rgba(255,255,255,0.08)' }}>
+          <div style={{ width:64, height:64, borderRadius:18, background:'radial-gradient(120% 120% at 30% 20%, rgba(139,92,246,0.18), transparent 65%)', border:'1px solid rgba(139,92,246,0.18)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, boxShadow:'0 10px 28px rgba(139,92,246,0.14)' }}>📭</div>
+          <div style={{ fontSize:14, color:'#fff', fontWeight:800, letterSpacing:'-0.02em' }}>Статьи не найдены</div>
+          <div style={{ fontSize:12, color:'rgba(255,255,255,0.48)', textAlign:'center', maxWidth:300 }}>Попробуйте изменить запрос или сбросить фильтры — покажем всё снова.</div>
+          <button onClick={() => { setSearch(''); setCategory('all'); }} style={{ marginTop:6, padding:'8px 16px', borderRadius:999, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.06)', color:'#fff', fontSize:12, fontWeight:700, cursor:'pointer', backdropFilter:'blur(10px)' }}>Сбросить фильтры</button>
         </div>
       )}
 
-      {/* Article cards — magazine grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+      {/* Article cards — premium magazine grid */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(160px, 1fr))', gap:10, marginBottom:8 }}>
         {articles.map(article => {
           const catColor = CATEGORIES.find(c => c.value === article.category)?.color || '#6b7280';
           const catIcon = CAT_ICON[article.category] || '📄';
@@ -325,49 +356,48 @@ export const ArticlesScreen: React.FC = () => {
                 if (isPDF) { setPdfViewer(article.file_url || ''); }
                 else { setReadingArticle(article); }
               }} style={{
-              borderRadius:12, overflow:'hidden',
-              background:'rgba(255,255,255,0.03)',
-              border:'1px solid rgba(255,255,255,0.06)',
-              transition:'all 0.25s',
+              borderRadius:16, overflow:'hidden',
+              background:'rgba(255,255,255,0.04)',
+              border:'1px solid rgba(255,255,255,0.07)',
+              backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
+              boxShadow:'0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)',
+              transition:'all 0.22s cubic-bezier(0.2,0.9,0.4,1)',
               position:'relative', cursor:'pointer',
-            }}>
-              {/* Color bar top */}
-              <div style={{ height:3, background:catColor, width:'100%' }} />
-
-              <div style={{ padding:'10px 10px 8px' }}>
-                {/* Category badge + type */}
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-                  <span style={{ fontSize:9, color:catColor, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em', display:'flex', alignItems:'center', gap:3 }}>
-                    {catIcon} {CATEGORIES.find(c => c.value === article.category)?.label || article.category}
+            }}
+            onMouseEnter={e=>{ e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 14px 36px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)'; e.currentTarget.style.borderColor = catColor+'2a'; }}
+            onMouseLeave={e=>{ e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'; }}
+            >
+              <div style={{ height:3, background: isPDF ? 'linear-gradient(90deg, #ef4444, #f97316)' : catColor, width:'100%', opacity:0.95 }} />
+              <div style={{ padding:'11px 11px 10px', position:'relative' }}>
+                <div aria-hidden="true" style={{ position:'absolute', inset:0, background:`radial-gradient(520px 100px at 14% 0%, ${catColor}10, transparent 62%)`, pointerEvents:'none' }} />
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:7, position:'relative' }}>
+                  <span style={{ fontSize:10, color:catColor, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.06em', display:'flex', alignItems:'center', gap:5, background:`${catColor}12`, border:`1px solid ${catColor}22`, padding:'3px 8px', borderRadius:999 }}>
+                    <span style={{ fontSize:11 }}>{catIcon}</span> {CATEGORIES.find(c => c.value === article.category)?.label || article.category}
                   </span>
                   {isPDF ? (
-                    <span style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:'rgba(239,68,68,0.12)', color:'#ef4444', fontWeight:600 }}>PDF</span>
+                    <span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background:'rgba(239,68,68,0.12)', color:'#f87171', fontWeight:800, border:'1px solid rgba(239,68,68,0.18)' }}>PDF</span>
                   ) : (
-                    <span style={{ fontSize:8, padding:'1px 6px', borderRadius:4, background:'rgba(0,230,138,0.08)', color:'var(--accent)', fontWeight:600 }}>{readTime} мин</span>
+                    <span style={{ fontSize:9, padding:'3px 7px', borderRadius:999, background:'rgba(0,230,138,0.10)', color:'#00e68a', fontWeight:800, border:'1px solid rgba(0,230,138,0.16)' }}>{readTime}′</span>
                   )}
                 </div>
 
-                {/* Title */}
-                <div style={{ fontWeight:700, fontSize:11.5, color:'#fff', marginBottom:3, lineHeight:1.3, letterSpacing:'-0.01em' }}>
+                <div style={{ fontWeight:800, fontSize:12, color:'#fff', marginBottom:4, lineHeight:1.32, letterSpacing:'-0.015em', display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 38, position:'relative' }}>
                   {article.title}
                 </div>
 
-                {/* Description */}
-                <div style={{ fontSize:9.5, color:'rgba(255,255,255,0.45)', lineHeight:1.3, marginBottom:4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', lineHeight:1.42, marginBottom:8, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden', minHeight: 31, position:'relative' }}>
                   {article.description}
                 </div>
 
-                {/* Date + author */}
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:2 }}>
-                  <span style={{ fontSize:8.5, color:'rgba(255,255,255,0.25)' }}>{article.date}</span>
-                  <span style={{ fontSize:8.5, color:'rgba(255,255,255,0.2)' }}>{article.authorName.replace('Health Engine Team', 'HE Team')}</span>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', position:'relative' }}>
+                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.32)', fontWeight:600, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:999 }}>{article.date}</span>
+                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.42)', fontWeight:600 }}>{article.authorName.replace('Health Engine Team', 'HE Team')}</span>
                 </div>
               </div>
 
-              {/* PDF click hint */}
               {isPDF && (
-                <div style={{ padding:'2px 10px 8px', display:'flex', alignItems:'center', gap:4 }}>
-                  <span style={{ fontSize:8.5, color:'rgba(239,68,68,0.5)' }}>📂 Нажмите, чтобы открыть</span>
+                <div style={{ padding:'0 11px 10px', display:'flex', alignItems:'center', gap:6, position:'relative' }}>
+                  <span style={{ fontSize:10, color:'rgba(239,68,68,0.72)', fontWeight:700, display:'flex', alignItems:'center', gap:4 }}>📂 Открыть PDF <span style={{ opacity:0.6 }}>→</span></span>
                 </div>
               )}
             </div>
@@ -375,11 +405,15 @@ export const ArticlesScreen: React.FC = () => {
         })}
       </div>
 
-      {/* Footer stats */}
-      <div style={{ marginTop:4, marginBottom:10, padding:'8px 0', textAlign:'center', fontSize:9.5, color:'rgba(255,255,255,0.2)', display:'flex', justifyContent:'center', gap:12 }}>
-        <span>📚 {ARTICLES_MANIFEST.length} статей</span>
-        <span>📄 {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF</span>
-        <span>📝 {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length} статей</span>
+      {/* Footer stats — pill */}
+      <div style={{ marginTop:8, marginBottom:14, display:'flex', justifyContent:'center' }}>
+        <div style={{ display:'inline-flex', alignItems:'center', gap:10, padding:'7px 12px', borderRadius:999, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)', fontSize:10, color:'rgba(255,255,255,0.42)', fontWeight:700 }}>
+          <span>📚 {ARTICLES_MANIFEST.length}</span>
+          <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.18)' }} />
+          <span style={{ color:'#f87171' }}>📄 {ARTICLES_MANIFEST.filter(a => a.content_type === 'pdf').length} PDF</span>
+          <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.18)' }} />
+          <span style={{ color:'#00e68a' }}>📝 {ARTICLES_MANIFEST.filter(a => a.content_type === 'markdown').length}</span>
+        </div>
       </div>
     </div>
   );
