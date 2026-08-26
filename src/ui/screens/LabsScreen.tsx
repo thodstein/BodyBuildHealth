@@ -2073,7 +2073,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       </div>
        )}
       {/* ─── BOTTOM TABS — зеро, внизу ─── */}
-      {mainTab === 'lab' && mainTab !== 'hero' && (
+      {mainTab === 'lab' && (
         <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:6, overflowX:'auto', padding:'8px 10px calc(8px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.84)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.06)', scrollbarWidth:'none' }}>
           {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
             <button key={t.id} onClick={() => setSubTab(t.id)} style={{
