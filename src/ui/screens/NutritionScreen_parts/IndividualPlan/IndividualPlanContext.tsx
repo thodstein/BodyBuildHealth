@@ -1613,7 +1613,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
    *  в гибкие слоты (ребаланс ±3%), рецепт-дни защищены. Работает во всех режимах. */
   const removeMealRebalanced = (dayIdx: number, mealIdx: number) => {
     saveUndo();
-    const rebuildWithoutMeal = (mealsSrc: any[] | undefined): { ok: boolean; meals?: any[]; removedLabel?: string; removedKcal?: number } => {
+    const rebuildWithoutMeal = (mealsSrc: any[] | undefined): { ok: boolean; meals?: any[]; removedLabel?: string; removedKcal?: number; notes?: string[] } => {
       if (!Array.isArray(mealsSrc) || mealIdx < 0 || mealIdx >= mealsSrc.length) return { ok: false };
       const removed = mealsSrc[mealIdx];
       const remaining = mealsSrc.filter((_, i) => i !== mealIdx);
@@ -1626,7 +1626,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         c: effectiveC > 0 ? effectiveC : pre.c,
       });
       const notes = [`♻️ Приём «${removed.label || 'Приём'}» (${Math.round(removed.totals?.kcal || 0)} ккал) пропущен — день пересобран`, ...rb.notes];
-      return { ok: true, meals: rb.meals as any[], removedLabel: removed.label, removedKcal: removed.totals?.kcal || 0 };
+      return { ok: true, meals: rb.meals as any[], removedLabel: removed.label, removedKcal: removed.totals?.kcal || 0, notes };
     };
     const attachNotes = (day: any, notes: string[]) => ({ ...day, proNotes: [...(day.proNotes || []), ...notes] });
 
@@ -1638,20 +1638,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const wres = rebuildWithoutMeal(weekPlan.days[weekEditDay].meals);
         const days = [...weekPlan.days];
         days[weekEditDay] = wres.ok && wres.meals
-          ? attachNotes({ ...days[weekEditDay], meals: wres.meals, totals: sumDayTotals(wres.meals as any) }, res.notes)
-          : attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes);
+          ? attachNotes({ ...days[weekEditDay], meals: wres.meals, totals: sumDayTotals(wres.meals as any) }, res.notes ?? [])
+          : attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes ?? []);
         setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
         weekDaysUpdated = days;
       }
-      setDayPlan(attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes));
+      setDayPlan(attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes ?? []));
       const visiblePlans: any[] =
         planDays >= 7 && weekPlan?.days?.length
           ? (weekDaysUpdated ?? weekPlan.days)
           : planDays >= 3 && threeDayPlan?.days?.length
-            ? threeDayPlan.days.map((d: any, i: number) => (i === selectedDayIndex ? attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes) : d))
-            : [attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes)];
+            ? threeDayPlan.days.map((d: any, i: number) => (i === selectedDayIndex ? attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes ?? []) : d))
+            : [attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes ?? [])];
       setShoppingList(buildShoppingFromPlans(visiblePlans));
-      refreshRecipeCookingCardIfActive(attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes), threeDayPlan, weekDaysUpdated ? { days: weekDaysUpdated } : weekPlan);
+      refreshRecipeCookingCardIfActive(attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes ?? []), threeDayPlan, weekDaysUpdated ? { days: weekDaysUpdated } : weekPlan);
     } else {
       const resolved = _resolvePlanDay(dayIdx);
       if (!resolved || resolved.plan === 'day') return;
@@ -1660,7 +1660,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const days = [...srcPlan.days];
       const res = rebuildWithoutMeal(days[resolved.day].meals);
       if (!res.ok || !res.meals) return;
-      days[resolved.day] = attachNotes({ ...days[resolved.day], meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes);
+      days[resolved.day] = attachNotes({ ...days[resolved.day], meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes ?? []);
       const updated = { ...srcPlan, days, totals: sumMultiTotals(days) };
       if (resolved.plan === 'three') setThreeDayPlan(updated); else setWeekPlan(updated);
       if (resolved.plan === 'week') setDayPlan(days[resolved.day]);
