@@ -466,20 +466,6 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
         </div>
         <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{mode}</span>
       </div>
-      {/* Постоянная навигация хаба — все вкладки всегда видны, горизонтальный скролл */}
-      <div style={{ display:'flex', gap:6, overflowX:'auto', padding:'6px 2px 2px', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any }}>
-        {([
-          ['record','📓','Запись'], ['history','📜','История'], ['analytics_lite','📊','Аналитика'], ['progress','📏','Прогресс'], ['rituals','🧘','Ритуалы'], ['tools','🧰','Инструменты'], ['mytraining','⭐','Мои'], ['feedback','💬','Фидбек'], ['competition','🏁','Соревн.'], ['recommendations','💡','Советы'],
-        ] as const).map(([k, ic, lb]) => {
-          const active = mode===k;
-          return (
-            <button key={k} onClick={()=>setMode(k as HubMode)} style={{
-              flex:'0 0 auto', padding:'7px 11px', borderRadius:999, fontSize:11, fontWeight: active?800:600, whiteSpace:'nowrap', cursor:'pointer',
-              background: active?'var(--accent)':'rgba(255,255,255,0.06)', color: active?'#000':'rgba(255,255,255,0.72)', border: active?'1px solid var(--accent)':'1px solid rgba(255,255,255,0.08)', boxShadow: active?'0 2px 8px rgba(0,230,138,0.22)':'none',
-            }}>{ic} {lb}</button>
-          );
-        })}
-      </div>
       {/* Program context header */}
       {macrocycle && curPhase && (
         <div style={{ ...style.card, border: '1px solid rgba(0,230,138,0.12)' }}>
