@@ -85,25 +85,28 @@ type BPForm = {
 
 const ACCENT = '#ef4444';
 
-const btn: React.CSSProperties = { ...btnBase(ACCENT) };
+const btn: React.CSSProperties = { ...btnBase(ACCENT), minHeight: 40, boxShadow: '0 2px 10px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.06)' };
 const input: React.CSSProperties = {
-  width: '100%', boxSizing: 'border-box', padding: '8px 10px', borderRadius: 10,
-  border: `1px solid ${colors.border}`, background: 'rgba(255,255,255,0.06)',
-  color: colors.text, fontSize: 14, outline: 'none', minHeight: 38,
-  fontFamily: 'inherit',
+  width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 12,
+  border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+  color: colors.text, fontSize: 14, outline: 'none', minHeight: 40,
+  fontFamily: 'inherit', transition: 'border-color 0.15s, background 0.15s',
 };
 const tintCard = (bg: string, border: string): React.CSSProperties => ({
-  padding: 14,
+  padding: 15,
   borderRadius: 16,
-  background: `linear-gradient(180deg, ${bg}, transparent 85%)`,
+  background: `linear-gradient(135deg, ${bg}, transparent 72%), rgba(28,28,32,0.68)`,
+  backdropFilter: 'blur(16px) saturate(150%)',
+  WebkitBackdropFilter: 'blur(16px) saturate(150%)',
   border: `1px solid ${border}`,
-  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+  boxShadow: '0 8px 24px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.05)',
   marginBottom: 12,
 });
-const card: React.CSSProperties = { ...glassSection };
-const infoCard: React.CSSProperties = tintCard('rgba(59,130,246,.12)', 'rgba(59,130,246,.25)');
-const goodCard: React.CSSProperties = tintCard('rgba(34,197,94,.12)', 'rgba(34,197,94,.25)');
-const warnCard: React.CSSProperties = tintCard('rgba(245,158,11,.12)', 'rgba(245,158,11,.25)');
+const card: React.CSSProperties = { ...glassSection, backdropFilter: 'blur(18px) saturate(150%)', WebkitBackdropFilter: 'blur(18px) saturate(150%)' };
+const infoCard: React.CSSProperties = tintCard('rgba(59,130,246,.14)', 'rgba(59,130,246,.28)');
+const goodCard: React.CSSProperties = tintCard('rgba(34,197,94,.13)', 'rgba(34,197,94,.28)');
+const warnCard: React.CSSProperties = tintCard('rgba(245,158,11,.14)', 'rgba(245,158,11,.28)');
 const esc = escapeHtml;
 
 const defaultDraft = (): BPForm => ({
@@ -403,21 +406,23 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
 
   return (
     <div
-      className="bp-window"
+      className="bp-window diary-scrollbar"
       style={{
         position: 'fixed', inset: 0, zIndex: 2000,
         background:
-          'radial-gradient(900px 480px at 15% -10%, rgba(239,68,68,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(56,189,248,0.06), transparent 55%), #0a0a0d',
+          'radial-gradient(1000px 560px at 14% -12%, rgba(239,68,68,0.14), transparent 64%), radial-gradient(760px 460px at 100% -6%, rgba(248,113,113,0.08), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(255,255,255,0.04), transparent 62%), #08080a',
         color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
       }}
     >
       <style>{`
         .bp-window button { font-family: inherit; }
-        .bp-window::-webkit-scrollbar { width: 10px; }
+        .bp-window::-webkit-scrollbar { width: 10px; height: 10px; }
         .bp-window::-webkit-scrollbar-track { background: transparent; }
-        .bp-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 5px; }
-        .bp-window::-webkit-scrollbar-thumb:hover { background: rgba(239,68,68,0.4); }
-        .bp-window h3 { font-size: 11px; font-weight: 700; color: ${ACCENT}; text-transform: uppercase; letter-spacing: 0.6px; margin: 0 0 10px; }
+        .bp-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+        .bp-window::-webkit-scrollbar-thumb:hover { background: rgba(239,68,68,0.38); background-clip: content-box; }
+        .bp-window h3 { font-size: 11px; font-weight: 800; color: ${ACCENT}; text-transform: uppercase; letter-spacing: 0.7px; margin: 0 0 10px; }
+        .diary-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+        .diary-card:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06); }
         @media (hover: none) and (pointer: coarse) {
           .bp-window button { min-height: 44px; }
           .bp-window input, .bp-window textarea, .bp-window select { font-size: 16px; }
@@ -495,8 +500,8 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
           ))}
         </div>
 
-        {/* Summary cards */}
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(130px,1fr))', gap: 8, margin: '12px 0' }}>
+        {/* Summary cards — премиум сетка */}
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(134px,1fr))', gap: 10, margin: '14px 0' }}>
           {[
             ['Среднее АД', avgS && avgD ? { s: avgS, d: avgD } : null, bpColor],
             ['Пульс', avgP || null, undefined],
@@ -516,10 +521,23 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
             } else if (typeof v === 'number') {
               content = <AnimatedCounter value={v} decimals={0} duration={500} style={{ fontSize: 20, fontWeight: 800 }} />;
             }
+            const accentFor = (typeof color === 'string' ? color : ACCENT);
             return (
-              <div key={String(l)} style={{ ...statCard, border: `1px solid ${color ? `${color}44` : colors.border}` }}>
-                <small style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{String(l)}</small>
-                <strong style={{ display: 'block', fontSize: 20, fontWeight: 800, color: typeof color === 'string' ? color : undefined }}>{content}</strong>
+              <div
+                key={String(l)}
+                className="diary-card"
+                style={{
+                  ...statCard,
+                  border: `1px solid ${typeof color === 'string' ? `${color}30` : 'rgba(255,255,255,0.08)'}`,
+                  background: `linear-gradient(135deg, ${typeof color === 'string' ? `${color}14` : 'rgba(255,255,255,0.03)'} 0%, transparent 72%), rgba(28,28,32,0.74)`,
+                  borderLeft: typeof color === 'string' ? `2px solid ${color}88` : undefined,
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(380px 90px at 14% 0%, ${typeof color === 'string' ? `${color}14` : 'transparent'}, transparent 62%)`, pointerEvents: 'none' }} />
+                <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', position: 'relative' }}>{String(l)}</small>
+                <strong style={{ display: 'block', fontSize: 20, fontWeight: 800, letterSpacing: '-0.3px', color: typeof color === 'string' ? color : '#fff', position: 'relative', marginTop: 2 }}>{content}</strong>
               </div>
             );
           })}

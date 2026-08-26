@@ -114,9 +114,10 @@ const Metric: React.FC<{ label: string; value: React.ReactNode; tone?: string }>
   value,
   tone = colors.primary,
 }) => (
-  <div style={{ ...card, minWidth: 135, flex: '1 1 135px' }}>
-    <div style={{ ...labelStyle, marginBottom: 7 }}>{label}</div>
-    <strong style={{ fontSize: 20, color: tone }}>{value}</strong>
+  <div className="diary-card" style={{ ...card, minWidth: 138, flex: '1 1 138px', background: `linear-gradient(135deg, ${tone}14, transparent 70%), rgba(28,28,32,0.72)`, borderLeft: `2px solid ${tone}88`, position: 'relative', overflow: 'hidden' }}>
+    <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(360px 80px at 14% 0%, ${tone}12, transparent 62%)`, pointerEvents: 'none' }} />
+    <div style={{ ...labelStyle, marginBottom: 6, position: 'relative', color: 'rgba(255,255,255,0.44)', fontWeight: 700, letterSpacing: '0.5px' }}>{label}</div>
+    <strong style={{ fontSize: 21, color: tone, position: 'relative', letterSpacing: '-0.3px' }}>{value}</strong>
   </div>
 );
 
@@ -785,20 +786,22 @@ export const InjectionDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDa
   const chartMax = 10;
   return (
     <div
-      className="injection-window"
+      className="injection-window diary-scrollbar"
       style={{
         position: 'fixed', inset: 0, zIndex: 2000,
         background:
-          'radial-gradient(900px 480px at 15% -10%, rgba(245,158,11,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(139,92,246,0.06), transparent 55%), #0a0a0d',
+          'radial-gradient(1000px 560px at 14% -12%, rgba(245,158,11,0.13), transparent 64%), radial-gradient(780px 460px at 100% -6%, rgba(245,158,11,0.07), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(255,255,255,0.04), transparent 62%), #08080a',
         color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
       }}
     >
       <style>{`
         .injection-window button { font-family: inherit; }
-        .injection-window::-webkit-scrollbar { width: 10px; }
+        .injection-window::-webkit-scrollbar { width: 10px; height: 10px; }
         .injection-window::-webkit-scrollbar-track { background: transparent; }
-        .injection-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 5px; }
-        .injection-window::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,0.4); }
+        .injection-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+        .injection-window::-webkit-scrollbar-thumb:hover { background: rgba(245,158,11,0.38); background-clip: content-box; }
+        .diary-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+        .diary-card:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06); }
         @media (hover: none) and (pointer: coarse) {
           .injection-window button { min-height: 44px; }
           .injection-window input, .injection-window textarea, .injection-window select { font-size: 16px; }

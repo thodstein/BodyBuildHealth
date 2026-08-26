@@ -7,7 +7,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui';
-import { btnBase, btnPrimary, chip, chipActive, main as pageMain, sectionTitle, statCard } from '../diary-page-styles';
+import { btnBase, btnPrimary, chip, chipActive, diaryShell, header as diaryHeaderStyle, glassSection, heroCard, main as pageMain, sectionTitle, statCard, tableTh, tableTd } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
 import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry,
@@ -41,7 +41,7 @@ function newId(): string {
   return 'c-' + Date.now() + '-' + Math.floor(Math.random() * 1e6);
 }
 
-export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange }) => {
+export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataChange }) => {
   const [log, setLog] = useState<CardioLogEntry[]>(() => loadCardioLog());
   const [date, setDate] = useState(todayIso());
   const [type, setType] = useState<CardioType>('zone2');
@@ -247,8 +247,19 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
   const totalMinutes = log.reduce((s, e) => s + e.durationMin, 0);
   const doneSessions = log.filter(e => e.completed).length;
 
+  if (open === false) return null;
+
   return (
-    <div style={pageMain}>
+    <div className="cardio-window diary-scrollbar" style={{ ...diaryShell(ACCENT), background: `radial-gradient(1000px 560px at 14% -12%, rgba(74,222,128,0.14), transparent 64%), radial-gradient(760px 460px at 100% -6%, rgba(74,222,128,0.08), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(255,255,255,0.04), transparent 62%), #08080a` }}>
+      <style>{`
+        .cardio-window button { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; }
+        .cardio-window::-webkit-scrollbar { width: 10px; height: 10px; }
+        .cardio-window::-webkit-scrollbar-track { background: transparent; }
+        .cardio-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+        .cardio-window::-webkit-scrollbar-thumb:hover { background: rgba(74,222,128,0.38); background-clip: content-box; }
+        .diary-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+        .diary-card:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06); }
+      `}</style>
       <DiaryHeader
         accent={ACCENT}
         title="❤️ Кардио-дневник"
@@ -265,31 +276,35 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           { label: '🗑 Очистить дневник', onClick: () => { if (log.length && window.confirm('Очистить весь кардио-дневник?')) { log.forEach(e => removeCardioLogEntry(e.id)); reload(); } }, danger: true },
         ]}
         badge={adherence ? (
-          <span style={{ fontSize: 12, color: ACCENT, background: `${ACCENT}1f`, border: `1px solid ${ACCENT}55`, borderRadius: 12, padding: '3px 10px' }}>
-            {adherence.cycle.name}: {adherence.doneSessions}/{adherence.plannedSessions} сессий нед {adherence.week}
+          <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}14`, border: `1px solid ${ACCENT}30`, borderRadius: 999, padding: '3px 10px', letterSpacing: '0.2px' }}>
+            {adherence.cycle.name}: {adherence.doneSessions}/{adherence.plannedSessions} · нед {adherence.week}
           </span>
         ) : undefined}
         undoActive={!!undo}
         onUndo={restoreUndo}
         undoLabel="↩ Отменить запись"
       />
+      <div style={{ ...pageMain, paddingBottom: 72 }}>
 
-      {flash && <div style={{ color: ACCENT, fontSize: 13, fontWeight: 600, padding: '4px 2px' }} role="status">{flash}</div>}
+      {flash && <div style={{ color: ACCENT, fontSize: 13, fontWeight: 700, padding: '8px 10px', marginTop: 6, background: `${ACCENT}10`, border: `1px solid ${ACCENT}22`, borderRadius: 10 }} role="status">{flash}</div>}
 
       {weekHint && (
-        <div style={{ fontSize: 12, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '8px 10px', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: HINT_COLOR[weekHint.kind] ?? 'rgba(255,255,255,0.78)', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 12, padding: '10px 12px', marginTop: 12, marginBottom: 12, boxShadow: '0 4px 18px rgba(0,0,0,0.18)' }}>
           {HINT_ICON[weekHint.kind] ?? '💡'} Нед {weekHint.week}: {weekHint.text}
         </div>
       )}
 
       {adherence && (
-        <div style={{ ...glassCard, padding: 12, marginBottom: 12 }}>
-          <div style={{ ...labelStyle, marginBottom: 6 }}>📈 Активный цикл — план vs факт (нед {adherence.week})</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
-            {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин ({adherence.pctMinutes}%)
+        <div className="diary-card" style={{ ...heroCard(ACCENT), padding: 14, marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: ACCENT, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: 6 }}>📈 Активный цикл — план vs факт · нед {adherence.week}</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.4px' }}>
+            {adherence.doneSessions}/{adherence.plannedSessions} сессий · {adherence.doneMinutes}/{adherence.plannedMinutes} мин <span style={{ fontWeight: 600, color: ACCENT, fontSize: 14 }}>· {adherence.pctMinutes}%</span>
           </div>
-          <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>
-            Фаза недели: {adherence.weekPhase ? CARDIO_PHASE_LABELS[adherence.weekPhase] : '—'} · прогресс цикла: {Math.round((adherence.week / adherence.cycle.totalWeeks) * 100)}%
+          <div style={{ height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden', marginTop: 8 }}>
+            <div style={{ height: '100%', width: `${Math.max(6, Math.min(100, adherence.pctMinutes))}%`, background: ACCENT, borderRadius: 999, boxShadow: `0 0 10px ${ACCENT}66`, transition: 'width 0.4s ease' }} />
+          </div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 6 }}>
+            Фаза: {adherence.weekPhase ? CARDIO_PHASE_LABELS[adherence.weekPhase] : '—'} · прогресс цикла {Math.round((adherence.week / adherence.cycle.totalWeeks) * 100)}%
           </div>
         </div>
       )}
@@ -301,24 +316,20 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         </div>
       )}
 
-      {/* Статистика */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-        <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
-          <div style={labelStyle}>7 дней</div>
-          <strong style={{ fontSize: 20, color: ACCENT }}>{stats7.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats7.minutes} мин{stats7.km > 0 ? ` · ${stats7.km} км` : ''}{stats7.avgPace ? ` · ${stats7.avgPace}` : ''}{stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}{stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}</div>
-          {stats7.avgHr != null && <div style={{ fontSize: 12, color: colors.textMuted }}>ЧСС ср. {stats7.avgHr}</div>}
-        </div>
-        <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
-          <div style={labelStyle}>28 дней</div>
-          <strong style={{ fontSize: 20, color: ACCENT }}>{stats28.sessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{stats28.minutes} мин{stats28.km > 0 ? ` · ${stats28.km} км` : ''}{stats28.avgPace ? ` · ${stats28.avgPace}` : ''}{stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}</div>
-        </div>
-        <div style={{ ...statCard, minWidth: 130, flex: '1 1 130px' }}>
-          <div style={labelStyle}>Всего</div>
-          <strong style={{ fontSize: 20, color: ACCENT }}>{doneSessions} сесс.</strong>
-          <div style={{ fontSize: 12, color: colors.textMuted }}>{totalMinutes} мин</div>
-        </div>
+      {/* Статистика — премиум */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 14 }}>
+        {[
+          { label: '7 дней', val: `${stats7.sessions} сесс.`, sub: `${stats7.minutes} мин${stats7.km > 0 ? ` · ${stats7.km} км` : ''}${stats7.avgPace ? ` · ${stats7.avgPace}` : ''}${stats7.kcal > 0 ? ` · ${stats7.kcal} ккал` : ''}${stats7.avgRpe != null ? ` · RPE ${stats7.avgRpe}` : ''}${stats7.avgHr != null ? ` · ЧСС ${stats7.avgHr}` : ''}` },
+          { label: '28 дней', val: `${stats28.sessions} сесс.`, sub: `${stats28.minutes} мин${stats28.km > 0 ? ` · ${stats28.km} км` : ''}${stats28.avgPace ? ` · ${stats28.avgPace}` : ''}${stats28.kcal > 0 ? ` · ${stats28.kcal} ккал` : ''}` },
+          { label: 'Всего', val: `${doneSessions} сесс.`, sub: `${totalMinutes} мин` },
+        ].map((c) => (
+          <div key={c.label} className="diary-card" style={{ ...statCard, background: `linear-gradient(135deg, ${ACCENT}12, transparent 68%), rgba(28,28,32,0.74)`, borderLeft: `2px solid ${ACCENT}88`, position: 'relative', overflow: 'hidden' }}>
+            <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(420px 90px at 14% 0%, ${ACCENT}12, transparent 62%)`, pointerEvents: 'none' }} />
+            <div style={{ ...labelStyle, position: 'relative', color: 'rgba(255,255,255,0.44)', fontWeight: 700 }}>{c.label}</div>
+            <strong style={{ fontSize: 20, color: ACCENT, position: 'relative', letterSpacing: '-0.3px' }}>{c.val}</strong>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', position: 'relative', marginTop: 2, lineHeight: 1.35 }}>{c.sub}</div>
+          </div>
+        ))}
       </div>
 
       {weeklyHistogram.length > 0 && (() => {
@@ -363,9 +374,9 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
         </div>
       )}
 
-      {/* Форма записи */}
-      <div style={{ ...glassCard, padding: 14, marginBottom: 14 }}>
-        <div style={sectionTitle}>✍️ Записать сессию</div>
+      {/* Форма записи — премиум */}
+      <div className="diary-card" style={{ ...glassCard, padding: 15, marginBottom: 14, border: `1px solid ${ACCENT}22`, background: `linear-gradient(135deg, ${ACCENT}0f, transparent 68%), rgba(28,28,32,0.74)` }}>
+        <div style={{ ...sectionTitle, color: ACCENT, marginBottom: 10 }}>✍️ Записать сессию</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-end' }}>
           <label style={{ display: 'block' }}>
             <span style={labelStyle}>Дата</span>
@@ -426,8 +437,8 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
           )}
         </div>
       </div>
-      <div style={{ ...glassCard, padding: 14 }}>
-        <div style={sectionTitle}>📓 Журнал ({filteredLog.length}/{log.length})</div>
+      <div className="diary-card" style={{ ...glassCard, padding: 15 }}>
+        <div style={{ ...sectionTitle, marginBottom: 10 }}>📓 Журнал <span style={{ color: ACCENT, fontWeight: 800 }}>{filteredLog.length}</span><span style={{ color: 'rgba(255,255,255,0.38)', fontWeight: 500 }}>/{log.length}</span></div>
         {filteredLog.length === 0 && <div style={{ fontSize: 13, color: colors.textMuted }}>{log.length === 0 ? 'Пока пусто — запишите первую кардио-сессию.' : 'Нет записей по фильтру.'}</div>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {pageItems.map(e => {
@@ -473,6 +484,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ onClose, onDataChange 
             <button style={btnBase(ACCENT)} disabled={safePage >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>→</button>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

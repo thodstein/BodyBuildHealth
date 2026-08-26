@@ -81,60 +81,71 @@ const defaultGoals: SleepGoals = {
   alcoholDaysPerWeek: 2,
 };
 
-/* ── Общие стили ───────────────────────────────────────────────────────── */
+/* ── Общие стили — премиум апгрейд (стекло + глубина) ─────────────── */
 
 const btnBase: React.CSSProperties = {
-  minHeight: 38,
-  padding: '8px 13px',
-  borderRadius: 10,
-  border: `1px solid ${colors.border}`,
-  background: 'rgba(255,255,255,0.05)',
+  minHeight: 40,
+  padding: '9px 14px',
+  borderRadius: 12,
+  border: `1px solid rgba(255,255,255,0.10)`,
+  background: 'rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(12px) saturate(140%)',
+  WebkitBackdropFilter: 'blur(12px) saturate(140%)',
   color: colors.text,
   cursor: 'pointer',
   fontSize: 13,
   fontWeight: 600,
   fontFamily: 'inherit',
-  transition: 'all 0.15s',
+  transition: 'all 0.18s cubic-bezier(0.25,0.46,0.45,0.94)',
   whiteSpace: 'nowrap',
   display: 'inline-flex',
   alignItems: 'center',
   gap: 6,
+  boxShadow: '0 2px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
 };
 const btnPrimary: React.CSSProperties = {
   ...btnBase,
   background: ACCENT,
   border: `1px solid ${ACCENT}`,
-  color: '#18181b',
+  color: '#0a0a0f',
+  fontWeight: 700,
+  boxShadow: '0 4px 18px rgba(167,139,250,0.32), inset 0 1px 0 rgba(255,255,255,0.18)',
 };
-const btnGhost: React.CSSProperties = { ...btnBase, background: 'transparent' };
+const btnGhost: React.CSSProperties = { ...btnBase, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' };
 const menuItem: React.CSSProperties = {
   ...btnGhost,
   justifyContent: 'flex-start',
   width: '100%',
-  minHeight: 36,
-  padding: '6px 10px',
+  minHeight: 38,
+  padding: '8px 12px',
   border: 'none',
-  borderRadius: 8,
+  borderRadius: 10,
   fontSize: 13,
+  fontWeight: 500,
+  background: 'transparent',
+  boxShadow: 'none',
 };
 const chip: React.CSSProperties = {
-  minHeight: 30,
-  padding: '4px 11px',
-  borderRadius: 16,
+  minHeight: 32,
+  padding: '6px 13px',
+  borderRadius: 999,
   fontSize: 12,
   fontWeight: 600,
   cursor: 'pointer',
-  border: `1px solid ${colors.border}`,
-  background: 'rgba(255,255,255,0.03)',
+  border: `1px solid rgba(255,255,255,0.10)`,
+  background: 'rgba(255,255,255,0.05)',
+  backdropFilter: 'blur(10px)',
   color: colors.textMuted,
   fontFamily: 'inherit',
-  transition: 'all 0.15s',
+  transition: 'all 0.18s ease',
 };
 const chipActive: React.CSSProperties = {
   ...chip,
-  borderColor: ACCENT,
-  background: ACCENT_DIM,
+  borderColor: 'rgba(167,139,250,0.55)',
+  background: 'linear-gradient(135deg, rgba(167,139,250,0.18), rgba(167,139,250,0.08))',
   color: ACCENT,
+  boxShadow: '0 2px 12px rgba(167,139,250,0.18), inset 0 1px 0 rgba(167,139,250,0.18)',
+  fontWeight: 700,
 };
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -450,13 +461,38 @@ const StatCard: React.FC<{ icon: string; label: string; value: string; color: st
   color,
   hint,
 }) => (
-  <div style={{ ...glassCard, padding: 12, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, boxShadow: `0 2px 10px ${color}14, 0 1px 4px rgba(0,0,0,0.2)`, borderLeft: `2px solid ${color}55` }}>
-    <div style={{ fontSize: 16 }}>{icon}</div>
-    <small style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+  <div
+    className="diary-card"
+    style={{
+      ...glassCard,
+      padding: 13,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 3,
+      minWidth: 0,
+      background: `linear-gradient(135deg, ${color}10, transparent 68%), ${String((glassCard.background as string) || 'rgba(28,28,32,0.72)')}`,
+      boxShadow: `0 8px 22px rgba(0,0,0,0.24), 0 2px 10px ${color}14, inset 0 1px 0 rgba(255,255,255,0.06)`,
+      borderLeft: `2px solid ${color}88`,
+      borderTop: `1px solid rgba(255,255,255,0.07)`,
+      position: 'relative',
+      overflow: 'hidden',
+    }}
+  >
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        background: `radial-gradient(420px 120px at 18% 0%, ${color}14, transparent 62%)`,
+        pointerEvents: 'none',
+      }}
+    />
+    <div style={{ fontSize: 16, position: 'relative' }}>{icon}</div>
+    <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', position: 'relative' }}>
       {label}
     </small>
-    <strong style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1.2 }}>{value}</strong>
-    {hint && <small style={{ fontSize: 10, color: colors.textSubtle }}>{hint}</small>}
+    <strong style={{ fontSize: 21, fontWeight: 800, color, lineHeight: 1.1, letterSpacing: '-0.3px', position: 'relative' }}>{value}</strong>
+    {hint && <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', position: 'relative' }}>{hint}</small>}
   </div>
 );
 
@@ -717,13 +753,13 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
 
   return (
     <div
-      className="sleep-window"
+      className="sleep-window diary-scrollbar"
       style={{
         position: 'fixed',
         inset: 0,
         zIndex: 2000,
         background:
-          'radial-gradient(900px 480px at 15% -10%, rgba(167,139,250,0.13), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(56,189,248,0.08), transparent 55%), #0a0a0d',
+          'radial-gradient(1000px 560px at 14% -12%, rgba(167,139,250,0.16), transparent 64%), radial-gradient(820px 480px at 100% -6%, rgba(56,189,248,0.09), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(139,92,246,0.06), transparent 62%), #08080a',
         color: colors.text,
         overflowY: 'auto',
         overflowX: 'hidden',

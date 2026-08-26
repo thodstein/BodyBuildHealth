@@ -918,20 +918,22 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   if (!open) return null;
   return (
     <div
-      className="health-window"
+      className="health-window diary-scrollbar"
       style={{
         position: 'fixed', inset: 0, zIndex: 2000,
         background:
-          'radial-gradient(900px 480px at 15% -10%, rgba(236,72,153,0.10), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(59,130,246,0.06), transparent 55%), #0a0a0d',
+          'radial-gradient(1000px 560px at 14% -12%, rgba(236,72,153,0.14), transparent 64%), radial-gradient(760px 460px at 100% -6%, rgba(236,72,153,0.08), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(255,255,255,0.04), transparent 62%), #08080a',
         color: colors.text, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
       }}
     >
       <style>{`
         .health-window button { font-family: inherit; }
-        .health-window::-webkit-scrollbar { width: 10px; }
+        .health-window::-webkit-scrollbar { width: 10px; height: 10px; }
         .health-window::-webkit-scrollbar-track { background: transparent; }
-        .health-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 5px; }
-        .health-window::-webkit-scrollbar-thumb:hover { background: rgba(236,72,153,0.4); }
+        .health-window::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+        .health-window::-webkit-scrollbar-thumb:hover { background: rgba(236,72,153,0.38); background-clip: content-box; }
+        .diary-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+        .diary-card:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06); }
         @media (hover: none) and (pointer: coarse) {
           .health-window button { min-height: 44px; }
           .health-window input, .health-window textarea, .health-window select { font-size: 16px; }
@@ -1080,9 +1082,10 @@ export const HealthDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             ['Симптомы', symptomStats?.total || 0, '#ec4899'],
             ['Серия', streak.current, '#f59e0b'],
           ].map(([label, value, color]) => (
-            <div key={String(label)} style={{ ...statCard, border: `1px solid ${String(color)}44` }}>
-              <small style={{ fontSize: 10, color: colors.textSubtle, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px' }}>{label}</small>
-              <strong style={{ display: 'block', color: String(color), fontSize: 20, fontWeight: 800 }}>{value}</strong>
+            <div key={String(label)} className="diary-card" style={{ ...statCard, border: `1px solid ${String(color)}30`, background: `linear-gradient(135deg, ${String(color)}14, transparent 70%), rgba(28,28,32,0.74)`, borderLeft: `2px solid ${String(color)}88`, position: 'relative', overflow: 'hidden' }}>
+              <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: `radial-gradient(360px 80px at 14% 0%, ${String(color)}12, transparent 62%)`, pointerEvents: 'none' }} />
+              <small style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', position: 'relative' }}>{label}</small>
+              <strong style={{ display: 'block', color: String(color), fontSize: 20, fontWeight: 800, position: 'relative', letterSpacing: '-0.3px', marginTop: 2 }}>{value}</strong>
             </div>
           ))}
         </section>

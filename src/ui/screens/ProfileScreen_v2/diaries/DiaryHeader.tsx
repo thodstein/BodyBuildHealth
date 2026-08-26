@@ -1,8 +1,6 @@
 /**
- * DiaryHeader.tsx — общая шапка ПОЛНЫХ страниц дневников (открываются по «Открыть»).
- * Дословно повторяет шапку дневника сна: ← Дневники | Заголовок + счётчик | flex-разделитель |
- * [+ Записать] [⚡ Сегодня] [↩ Отменить] [••• Ещё → экспорт/очистка].
- * Каждый дневник передаёт свой акцентный цвет и набор действий экспорта.
+ * DiaryHeader.tsx — премиальная шапка ПОЛНЫХ страниц дневников.
+ * Стекло + акцентная полоска, единая типографика, меню экспорта — стекло.
  */
 import React, { useState } from 'react';
 import { colors } from '../ui';
@@ -54,80 +52,144 @@ export const DiaryHeader: React.FC<{
   const [open, setOpen] = useState(false);
   return (
     <header
+      className="diary-header"
       style={{
         position: 'sticky',
         top: 0,
-        zIndex: 2,
-        padding: '10px 14px',
+        zIndex: 10,
+        padding: '11px 14px 10px',
         display: 'flex',
         gap: 8,
         flexWrap: 'wrap',
         alignItems: 'center',
-        background: 'rgba(24,24,27,0.92)',
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
-        borderBottom: `1px solid ${colors.border}`,
+        background: 'rgba(16,16,20,0.78)',
+        backdropFilter: 'blur(22px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(22px) saturate(160%)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        boxShadow: '0 8px 28px rgba(0,0,0,0.32)',
       }}
     >
-      <button style={btnGhost(accent)} onClick={onClose} aria-label="Назад к дневникам">
+      {/* акцентная тонкая линия сверху */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 2,
+          background: `linear-gradient(90deg, ${accent}, ${accent}66 45%, transparent 92%)`,
+          opacity: 0.95,
+        }}
+      />
+      <button
+        className="diary-header-btn"
+        style={{ ...btnGhost(accent), minHeight: 40, padding: '8px 12px', fontWeight: 600, background: 'rgba(255,255,255,0.04)' }}
+        onClick={onClose}
+        aria-label="Назад к дневникам"
+      >
         ← Дневники
       </button>
-      <b style={{ fontSize: 18, display: 'flex', alignItems: 'center', gap: 6 }}>
-        {title}
-        <span style={{ fontSize: 12, fontWeight: 500, color: colors.textMuted }}>
+
+      <b style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: 8, color: '#fff', lineHeight: 1, flexWrap: 'wrap' }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{title}</span>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: accent,
+            background: `${accent}14`,
+            border: `1px solid ${accent}30`,
+            borderRadius: 999,
+            padding: '2px 9px',
+            letterSpacing: '0.2px',
+          }}
+        >
           {count} {countLabel}
         </span>
       </b>
-      {badge}
-      <div style={{ flex: 1 }} />
+
+      {badge && <span style={{ display: 'inline-flex', alignItems: 'center' }}>{badge}</span>}
+
+      <div style={{ flex: 1, minWidth: 12 }} />
       {extra}
-      <button style={btnPrimary(accent)} onClick={onAdd}>
+
+      <button className="diary-header-btn" style={{ ...btnPrimary(accent), minHeight: 40, boxShadow: `0 4px 18px ${accent}32, inset 0 1px 0 rgba(255,255,255,0.15)` }} onClick={onAdd}>
         {addLabel}
       </button>
+
       {onToday && (
-        <button style={btnBase(accent)} onClick={onToday}>
+        <button className="diary-header-btn" style={{ ...btnBase(accent), minHeight: 40 }} onClick={onToday}>
           {todayLabel}
         </button>
       )}
+
       {undoActive && onUndo && (
-        <button style={{ ...btnBase(accent), borderColor: `${accent}55`, color: accent }} onClick={onUndo}>
+        <button
+          className="diary-header-btn"
+          style={{ ...btnBase(accent), minHeight: 40, borderColor: `${accent}55`, color: accent, background: `${accent}10`, fontWeight: 700 }}
+          onClick={onUndo}
+        >
           {undoLabel}
         </button>
       )}
-      <div style={{ position: 'relative', marginLeft: 'auto' }}>
-        <button style={btnBase(accent)} onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu">
+
+      <div style={{ position: 'relative', marginLeft: 2 }}>
+        <button
+          className="diary-header-btn"
+          style={{ ...btnBase(accent), minHeight: 40, padding: '8px 12px' }}
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label={exportLabel}
+        >
           {exportLabel}
         </button>
         {open && (
           <>
-            <div style={{ position: 'fixed', inset: 0, zIndex: 4 }} onClick={() => setOpen(false)} />
+            <div style={{ position: 'fixed', inset: 0, zIndex: 4 }} onClick={() => setOpen(false)} aria-hidden="true" />
             <div
               role="menu"
               style={{
                 position: 'absolute',
                 right: 0,
-                top: 'calc(100% + 8px)',
+                top: 'calc(100% + 10px)',
                 zIndex: 5,
-                minWidth: 200,
+                minWidth: 220,
                 maxWidth: 'calc(100vw - 20px)',
-                maxHeight: 'min(60vh, 420px)',
+                maxHeight: 'min(64vh, 440px)',
                 overflowY: 'auto',
                 padding: 6,
-                borderRadius: 12,
-                background: 'rgba(28,28,34,0.98)',
-                border: `1px solid ${accent}55`,
-                boxShadow: '0 16px 40px rgba(0,0,0,0.5)',
+                borderRadius: 16,
+                background: 'rgba(22,22,26,0.92)',
+                backdropFilter: 'blur(20px) saturate(160%)',
+                WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+                border: `1px solid ${accent}33`,
+                boxShadow: '0 18px 46px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.06)',
                 display: 'grid',
                 gap: 2,
               }}
             >
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textSubtle, textTransform: 'uppercase', letterSpacing: '0.5px', padding: '6px 10px 2px' }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: 'rgba(255,255,255,0.38)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.7px',
+                  padding: '7px 10px 4px',
+                }}
+              >
                 {exportTitle}
               </div>
               {exportActions.map((a) => (
                 <button
                   key={a.label}
-                  style={a.danger ? { ...menuItem(accent), color: '#f87171' } : menuItem(accent)}
+                  style={
+                    a.danger
+                      ? { ...menuItem(accent), color: '#fca5a5', background: 'rgba(239,68,68,0.06)' }
+                      : { ...menuItem(accent), color: 'rgba(255,255,255,0.88)' }
+                  }
                   role="menuitem"
                   onClick={() => {
                     setOpen(false);

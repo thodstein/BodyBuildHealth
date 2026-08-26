@@ -886,11 +886,11 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
   const bmiColor = body?.bmi == null ? undefined : body.bmi >= 30 ? c.red : body.bmi >= 25 ? c.orange : body.bmi < 18.5 ? c.orange : c.green;
 
   return (
-    <div className="wd-diary"
+    <div className="wd-diary diary-scrollbar"
       style={{
         position: 'fixed', inset: 0, zIndex: 2000,
         background:
-          'radial-gradient(900px 480px at 15% -10%, rgba(34,197,94,0.08), transparent 60%), radial-gradient(700px 420px at 100% 0%, rgba(56,189,248,0.05), transparent 55%), #0a0a0a',
+          'radial-gradient(1000px 560px at 14% -12%, rgba(52,199,89,0.14), transparent 64%), radial-gradient(820px 480px at 100% -6%, rgba(52,199,89,0.07), transparent 58%), radial-gradient(900px 520px at 50% 118%, rgba(255,255,255,0.04), transparent 62%), #08080a',
         color: c.text,
         overflowY: 'auto', overflowX: 'hidden',
         WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain',
@@ -1022,10 +1022,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           </label>
         </section>
 
-        {/* ── Быстрый ввод ── */}
-        <section style={card}>
+        {/* ── Быстрый ввод — премиум ── */}
+        <section style={{ ...card, background: 'linear-gradient(135deg, rgba(52,199,89,0.10), transparent 68%), rgba(28,28,32,0.72)', border: '1px solid rgba(52,199,89,0.18)', boxShadow: '0 8px 28px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.06)' } as React.CSSProperties & {}}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ ...metricLabel, marginBottom: 0 }}>Быстрый ввод</span>
+            <span style={{ ...metricLabel, marginBottom: 0, color: '#34c759', fontWeight: 800 }}>⚡ Быстрый ввод</span>
             <input
               style={{ ...input, width: 96 }}
               type="number" step="0.1" min={isLbs ? 44 : 20} max={isLbs ? 880 : 400}
