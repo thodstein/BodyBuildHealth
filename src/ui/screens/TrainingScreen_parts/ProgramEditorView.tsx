@@ -1380,6 +1380,28 @@ return (
         <BulkApplyCard program={program} onChange={onChange} showToast={showToast} />
         </>
       )}
+      {/* 📚 Похожие из библиотеки — 3 рекомендации под вашу цель/уровень (1 клик) */}
+      {estep === 'weeks' && dir === 'bb' && (() => {
+        try {
+          const all = getAllPrograms();
+          const recs = all.filter(p => p.goal === program.meta.goal || p.level === program.meta.level).slice(0, 3);
+          if (recs.length === 0) return null;
+          return (
+            <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>📚 Похожие из библиотеки</span><span style={{ fontSize: 10, color: DIM }}>под вашу цель·уровень — 1 клик клонировать</span></div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+                {recs.map(pr => (
+                  <button key={String(pr.id ?? pr.name)} onClick={() => { const cloned = cloneFromLibrary(pr as any); onChange(cloned); showToast('📥 ' + pr.name + ' — клонировано'); }} style={{ ...CARD_BTN, minHeight: 64, borderColor: 'rgba(167,139,250,0.18)', background: 'rgba(167,139,250,0.06)' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>{pr.name}</span>
+                    <span style={{ fontSize: 10, color: DIM }}>{pr.author} · {pr.goal} · {pr.daysPerWeek}д</span>
+                    <span style={{ fontSize: 9, color: 'rgba(167,139,250,0.70)' }}>→ Взять за основу</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        } catch { return null; }
+      })()}
 
       {/* 💡 Интеллектуальные подсказки — свернуты по умолчанию, не перегружают, но 1 клик — 6 правил */}
       {estep === 'weeks' && (

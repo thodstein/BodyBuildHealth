@@ -72,7 +72,7 @@ import { deserializeMacro } from '../../../engines/lms/macrocycle.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL } from './training-ui';
-import { ManualHeader, ManualStepper, InfoBanner, SectionCard, Badge, ProgressBar, ScoreBadge } from './ManualUI';
+import { ManualHeader, ManualStepper, InfoBanner, SectionCard, Badge, ProgressBar, ScoreBadge, CARD_BTN } from './ManualUI';
 import { ManualLibraryGallery } from './ManualLibraryGallery';
 import { buildProgramIcs, downloadIcs } from './ManualExport';
 import { EditorPopupSelect } from './EditorPopup';
@@ -680,26 +680,23 @@ export const ProgramManagerPanel: React.FC = () => {
           } catch { return null; }
         })()}
 
-        {/* Действия */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <button style={{ ...BTN, width: '100%', minHeight: 48 }} onClick={() => { if (commit('Сборка завершена')) closeEditor(); }}>
+        {/* Действия — иерархия: primary save + secondary nav + export card */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button style={{ ...BTN, width: '100%', minHeight: 52, fontSize: 13, fontWeight: 800, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', boxShadow: '0 6px 18px rgba(0,230,138,0.25)' }} onClick={() => { if (commit('Сборка завершена')) closeEditor(); }}>
             💾 Сохранить и завершить
           </button>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button style={ghostBtn} onClick={() => setMstep('editor')}>← Назад к редактору</button>
-            <button style={ghostBtn} onClick={() => copyProgramToClipboard(p)}>📋 В буфер</button>
+          <div style={{ fontSize: 10, color: DIM, textAlign: 'center', lineHeight: 1.4 }}>Сохранит в локальное хранилище · появится в списке · можно отправить к выполнению</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <button style={{ ...BTN_GHOST, minHeight: 40, fontSize: 11 }} onClick={() => setMstep('editor')}>← Назад к редактору</button>
+            <button style={{ ...BTN_GHOST, minHeight: 40, fontSize: 11, borderColor: 'rgba(239,68,68,0.22)', color: '#ef4444' }} onClick={() => setEditing(null)}>✕ К списку без сохр.</button>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button style={ghostBtn} onClick={() => {
-              const json = JSON.stringify(p, null, 2);
-              const blob = new Blob([json], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a'); a.href = url; a.download = (p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.json';
-              a.click(); URL.revokeObjectURL(url);
-              flash('📤 Экспортировано');
-            }}>📤 JSON</button>
-            <button style={ghostBtn} onClick={() => { try { const ics = buildProgramIcs(p); downloadIcs((p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); flash('📅 ICS скачан'); } catch { flash('⚠ Не удалось собрать ICS'); } }}>📅 ICS</button>
-            <button style={ghostBtn} onClick={() => setEditing(null)}>✕ К списку</button>
+          <div style={{ ...CARD, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>📤 Экспорт и шаринг</span><span style={{ fontSize: 10, color: DIM }}>JSON · ICS · буфер</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              <button aria-label="📋 В буфер" style={{ ...CARD_BTN, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 }} onClick={() => copyProgramToClipboard(p)}><span aria-hidden style={{ fontSize: 16 }}>📋</span><span aria-hidden style={{ fontSize: 11, fontWeight: 700 }}>В буфер</span><span aria-hidden style={{ fontSize: 9, color: DIM }}>текст</span><span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>📋 В буфер</span></button>
+              <button style={{ ...CARD_BTN, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 }} onClick={() => { const json = JSON.stringify(p, null, 2); const blob = new Blob([json], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = (p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.json'; a.click(); URL.revokeObjectURL(url); flash('📤 Экспортировано'); }}><span style={{ fontSize: 16 }}>📄</span><span style={{ fontSize: 11, fontWeight: 700 }}>JSON</span><span style={{ fontSize: 9, color: DIM }}>файл</span></button>
+              <button style={{ ...CARD_BTN, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 4 }} onClick={() => { try { const ics = buildProgramIcs(p); downloadIcs((p.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); flash('📅 ICS скачан'); } catch { flash('⚠ Не удалось собрать ICS'); } }}><span style={{ fontSize: 16 }}>📅</span><span style={{ fontSize: 11, fontWeight: 700 }}>ICS</span><span style={{ fontSize: 9, color: DIM }}>календарь</span></button>
+            </div>
           </div>
         </div>
       </div>
