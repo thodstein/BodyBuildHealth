@@ -794,7 +794,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
 
             {/* ═══════════ DIARY AND ANALYTICS TAB (объединённый дневник+аналитика+прогресс+визуализация+отчёты) ═══════════ */}
       {/* ═══════════ Дневник и аналитика (зона) ═══════════ */}
-      {zone === 'diary' && (tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'mindset' || tab === 'mobility' || tab === 'warmup' || tab === 'cooldown' || tab === 'reports' || tab === 'mytraining') && (
+      {zone === 'diary' && (tab === 'diary' || tab === 'history' || tab === 'analytics' || tab === 'analytics_lite' || tab === 'progress' || tab === 'calendar' || tab === 'checkin' || tab === 'mmc_tracking' || tab === 'mindset' || tab === 'mobility' || tab === 'warmup' || tab === 'cooldown' || tab === 'reports' || tab === 'mytraining' || tab === 'rituals' || tab === 'tools') && (
         <DiaryAnalyticsZone
           tab={tab}
           initialDiaryMode={initialSubTab === 'diary' ? 'diary' : undefined}

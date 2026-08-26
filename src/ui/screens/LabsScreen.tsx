@@ -585,62 +585,52 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       {/* ─── HERO PAGE — на весь экран, fixed overlay, glass не перекрывает ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position:'fixed', inset:0, zIndex:80, display:'flex', flexDirection:'column', overflowY:'auto', WebkitOverflowScrolling:'touch', background:'#070a12' }}>
-          <div style={{ position:'absolute', inset:0, zIndex:0, pointerEvents:'none' }}>
-            <img src="/lab-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:0.92 }} />
-            <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(7,10,18,0.22) 0%, rgba(7,10,18,0.58) 42%, rgba(7,10,18,0.94) 78%, #070a12 100%)' }} />
-            <div style={{ position:'absolute', inset:0, background:'radial-gradient(560px 380px at 18% 14%, rgba(0,230,138,0.16), transparent 68%), radial-gradient(600px 420px at 92% 88%, rgba(59,130,246,0.11), transparent 65%)' }} />
-          </div>
-          <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'28px 16px calc(84px + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-              <span style={{ padding:'4px 9px', borderRadius:999, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.24)', color:LABS_ACCENT, fontSize:9, fontWeight:800, letterSpacing:0.6 }}>LABS • HEALTH OS</span>
-              <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{hasLabs ? `${currentLabs.length} маркеров • ${PHASE_LABELS[selectedPhase]}` : 'Нет данных — начните с ввода'}</span>
-            </div>
-            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.6, lineHeight:1, textShadow:'0 6px 24px rgba(0,0,0,0.45)' }}>Лаборатория</h1>
-            <p style={{ fontSize:12, color:'rgba(255,255,255,0.78)', margin:'0 0 12px', lineHeight:1.45, maxWidth:440 }}>
-              Механизм-ориентированная модель ТЗ, тренды и обследования — без потери логики, с премиальной визуализацией.
+        <div style={{ position:'fixed', inset:0, zIndex:80, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
+          <img src="/lab-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(0,0,0,0.10) 88%, rgba(0,0,0,0.18) 100%)' }} />
+          <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(20px + var(--nav-height,68px) + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
+            <div style={{ marginBottom:14 }}>
+            <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 20px rgba(0,0,0,0.9)' }}>Лаборатория</h1>
+            <p style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, maxWidth:360, textShadow:'0 1px 12px rgba(0,0,0,0.85)' }}>
+              Механизм-ориентированная модель ТЗ, тренды и обследования — всё в одном хабе
             </p>
+            </div>
             {hasLabs && (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom:12 }}>
-                <div style={{ ...LABS_CARD, padding:'10px 8px', textAlign:'center', background:'rgba(20,22,30,0.52)', backdropFilter:'blur(10px)' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700 }}>Покрытие фазы</div>
-                  <div style={{ fontSize:20, fontWeight:900, color: completionPct===100?LABS_ACCENT: completionPct>50?'#eab308':'#ef4444', lineHeight:1, marginTop:4 }}>{completionPct}%</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:2 }}>{submittedCount}/{requiredLabs.length} сдано</div>
-                  <div style={{ height:4, background:'rgba(255,255,255,0.08)', borderRadius:999, overflow:'hidden', marginTop:8 }}><div style={{ width:`${completionPct}%`, height:'100%', background: completionPct===100?LABS_ACCENT:'#eab308', transition:'width 0.5s' }} /></div>
+              <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:12 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:11 }}>📊</span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Покрытие <b style={{ color: completionPct===100?'#00e68a': completionPct>50?'#eab308':'#ef4444' }}>{completionPct}%</b> <span style={{ color:'#fff', fontWeight:400, fontSize:10 }}>{submittedCount}/{requiredLabs.length}</span></span>
                 </div>
-                <div style={{ ...LABS_CARD, padding:'10px 8px', textAlign:'center', background:'rgba(20,22,30,0.52)', backdropFilter:'blur(10px)' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700 }}>Отклонений</div>
-                  <div style={{ fontSize:20, fontWeight:900, color: deviationCount? '#ef4444':'#22c55e', lineHeight:1, marginTop:4 }}>{deviationCount}</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:2 }}>{deviationCount? 'требуют внимания' : 'все в норме'}</div>
-                  <div style={{ fontSize:8, marginTop:8, padding:'3px 6px', borderRadius:999, background: deviationCount?'rgba(239,68,68,0.12)':'rgba(34,197,94,0.12)', color: deviationCount?'#ef4444':'#22c55e', border:`1px solid ${deviationCount?'rgba(239,68,68,0.18)':'rgba(34,197,94,0.18)'}`, display:'inline-block' }}>{deviationCount? '⚠ проверить':'✓ стабильно'}</div>
+                <div style={{ width:1, height:14, background:'rgba(255,255,255,0.15)', alignSelf:'center' }} />
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:11 }}>{deviationCount? '⚠️' : '✅'}</span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Отклонений <b style={{ color: deviationCount?'#ef4444':'#22c55e' }}>{deviationCount}</b></span>
                 </div>
-                <div style={{ ...LABS_CARD, padding:'10px 8px', textAlign:'center', background:'rgba(20,22,30,0.52)', backdropFilter:'blur(10px)' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700 }}>Тренд-сигналы</div>
-                  <div style={{ fontSize:20, fontWeight:900, color: trendAlertList.length?'#f97316':'#94a3b8', lineHeight:1, marginTop:4 }}>{trendAlertList.length}</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:2 }}>{trendAlertList.length? 'критических' : 'без сигналов'}</div>
-                  <div style={{ fontSize:8, marginTop:8, color:'rgba(255,255,255,0.35)' }}>{labs.length} всего • {new Set(labs.map(l=>l.code)).size} уник.</div>
+                <div style={{ width:1, height:14, background:'rgba(255,255,255,0.15)', alignSelf:'center' }} />
+                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                  <span style={{ fontSize:11 }}>📈</span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Тренды <b style={{ color: trendAlertList.length?'#f97316':'#fff' }}>{trendAlertList.length}</b></span>
                 </div>
               </div>
             )}
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {[
-                { id: 'lab', icon: '🔬', title: 'Анализы', badge: `${hasLabs? submittedCount + '/' + requiredLabs.length : 'старт'}`, desc: 'Ввод, каталог, динамика, дневник и графики. Единый ввод по фазе, импорт PDF/фото.', color: LABS_ACCENT, accentBg:'rgba(0,230,138,0.14)', hint:'→ открыть' },
-                { id: 'risks', icon: '⚠️', title: 'Риски и индексы', badge: labRisks ? `${labRisks.overallNet}%` : '—', desc: 'ASI/HMI/CR, риски по системам, механизм-модель ТЗ и верификация.', color: '#f97316', accentBg:'rgba(249,115,22,0.12)', hint:'→ оценить' },
+                { id: 'lab', icon: '🔬', title: 'Анализы', desc: 'Ввод, каталог, динамика, дневник и графики. Единый ввод по фазе, импорт PDF/фото.', color: LABS_ACCENT },
+                { id: 'risks', icon: '⚠️', title: 'Риски и индексы', desc: 'ASI/HMI/CR, риски по системам, механизм-модель ТЗ и верификация.', color: '#f97316' },
               ].map(card => (
                 <button key={card.id} onClick={() => setMainTab(card.id as MainLabTab)} style={{
-                  display:'flex', alignItems:'center', gap:12, padding:'14px 14px', borderRadius:18, cursor:'pointer', textAlign:'left', width:'100%',
-                  background:'rgba(20,22,30,0.48)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff',
-                  backdropFilter:'blur(14px)', boxShadow:'0 12px 30px rgba(0,0,0,0.22)', transition:'transform 0.18s, border-color 0.18s', transform:'translateZ(0)',
-                }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor = card.color+'55'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; }}>
-                  <div style={{ width:46, height:46, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background: card.accentBg, border:`1px solid ${card.color}22`, fontSize:18 }}>{card.icon}</div>
+                  display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14, cursor:'pointer', textAlign:'left', width:'100%',
+                  background:'transparent', border:'1px solid rgba(255,255,255,0.14)', backdropFilter:'none', WebkitBackdropFilter:'none', boxShadow:'none', color:'#fff', transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
+                }} onMouseEnter={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.22)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.06)'; }} onMouseLeave={e=>{ (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.background='transparent'; }}>
+                  <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:`${card.color}18`, border:`1px solid ${card.color}22`, fontSize:18 }}>{card.icon}</div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:2 }}>
-                      <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{card.title}</span>
-                      <span style={{ fontSize:9, fontWeight:800, padding:'2px 7px', borderRadius:999, background:card.accentBg, border:`1px solid ${card.color}22`, color:card.color }}>{card.badge}</span>
+                    <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6, textShadow:'0 1px 10px rgba(0,0,0,0.7)' }}>
+                      {card.title}
+                      <span style={{ width:5, height:5, borderRadius:'50%', background:card.color }} />
                     </div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.72)', lineHeight:1.35 }}>{card.desc}</div>
+                    <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>{card.desc}</div>
                   </div>
-                  <span style={{ color: card.color, fontSize: 16, opacity: 0.6 }}>→</span>
+                  <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.10)', border:'1px solid rgba(255,255,255,0.14)', color:'#fff', fontSize:12, flexShrink:0 }}>→</span>
                 </button>
               ))}
               {trendAlertList.length > 0 && (
@@ -657,7 +647,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 2, color: '#ef4444' }}>Критические тренды ({trendAlertList.length})</div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.3 }}>
                       {trendAlertList.slice(0, 2).map(a => `${a.name} ${a.direction === 'up' ? '↑' : '↓'}`).join(', ')}
                       {trendAlertList.length > 2 && ` +${trendAlertList.length - 2}`}
                     </div>
@@ -665,6 +655,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <span style={{ color: '#ef4444', fontSize: 14, opacity: 0.8 }}>→</span>
                 </button>
               )}
+              <div style={{ marginTop:10, textAlign:'center', fontSize:10, color:'#fff', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>Нажми на раздел — откроются инструменты и данные</div>
             </div>
           </div>
         </div>
@@ -693,7 +684,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
                 whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
                 background: subTab === t.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: subTab === t.id ? '#000' : 'var(--text-dim)',
+                color: subTab === t.id ? '#000' : '#fff',
                 border: `1px solid ${subTab === t.id ? 'var(--accent)' : 'var(--border)'}`,
               }}>
                 {t.icon} {t.label}
@@ -744,7 +735,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   {hasSelection && <span style={{ fontSize: 9, color: 'var(--accent)' }}>{selCodes.length} выбрано</span>}
                   <button onClick={() => setChartGridOpen(g => !g)} style={{
                     marginLeft: 'auto', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                    borderRadius: 6, padding: '3px 8px', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap',
+                    borderRadius: 6, padding: '3px 8px', fontSize: 10, color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap',
                   }}>{chartGridOpen ? '▲ Скрыть' : '▼ Маркеры'}</button>
                 </div>
                 {chartGridOpen && (<>
@@ -752,7 +743,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <button onClick={() => { setChartMarkerSearch(''); setChartFilterSys('all'); }} style={{
                     padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
                     background: chartFilterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-                    color: chartFilterSys === 'all' ? '#000' : 'var(--text-dim)',
+                    color: chartFilterSys === 'all' ? '#000' : '#fff',
                     border: `1px solid ${chartFilterSys === 'all' ? 'var(--accent)' : 'var(--border)'}`,
                   }}>Все</button>
                   {['hepatic','renal','endocrine','hematologic','cardio','metabolic','reproductive','neuro','other'].map(sys => {
@@ -765,7 +756,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       <button key={sys} onClick={() => setChartFilterSys(prev => prev === sys ? 'all' : sys)} style={{
                         padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
                         background: chartFilterSys === sys ? 'var(--accent)' : 'var(--bg-secondary)',
-                        color: chartFilterSys === sys ? '#000' : 'var(--text-dim)',
+                        color: chartFilterSys === sys ? '#000' : '#fff',
                         border: `1px solid ${chartFilterSys === sys ? 'var(--accent)' : 'var(--border)'}`,
                       }}>
                         {sysLabels[sys] || sys}
@@ -797,13 +788,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</div>
-                          <div style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.code}</div>
+                          <div style={{ fontSize: 8, color: '#fff' }}>{m.code}</div>
                         </div>
                       </button>
                     );
                   })}
                   {uniqMarkers.length === 0 && (
-                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30, color: 'var(--text-dim)', fontSize: 12 }}>
+                    <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 30, color: '#fff', fontSize: 12 }}>
                       Введите анализы во вкладке «Текущие»
                     </div>
                   )}
@@ -815,7 +806,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       {selCodes.map((code, i) => {
                         const info = UCUM_MAP[code];
                         return (
-                          <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--text-dim)' }}>
+                          <span key={code} style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#fff' }}>
                             <span style={{ width: 10, height: 10, borderRadius: 3, background: chartPalette[i % chartPalette.length], flexShrink: 0 }} />
                             {info?.name || code}
                           </span>
@@ -829,7 +820,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         return (
                           <g key={f}>
                             <line x1={xBase} y1={y} x2={chartW - 10} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth={0.5} />
-                            <text x={xBase - 5} y={y + 3} fill="var(--text-dim)" fontSize={8} textAnchor="end">{(chartMin + f * chartRange).toFixed(1)}</text>
+                            <text x={xBase - 5} y={y + 3} fill="#fff" fontSize={8} textAnchor="end">{(chartMin + f * chartRange).toFixed(1)}</text>
                           </g>
                         );
                       })}
@@ -839,7 +830,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         const perBarW = selCodes.length > 1 ? groupW / selCodes.length : groupW;
                         return (
                           <g key={date}>
-                            <text x={x + barW / 2} y={chartH + 12} fill="var(--text-dim)" fontSize={7} textAnchor="middle">{date.slice(5)}</text>
+                            <text x={x + barW / 2} y={chartH + 12} fill="#fff" fontSize={7} textAnchor="middle">{date.slice(5)}</text>
                             {selCodes.map((code, ci) => {
                               const pts = seriesByCode[code] || [];
                               const pt = pts.find(p => p.date === date);
@@ -863,14 +854,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     </svg>
                     <div style={{ marginTop: 8, textAlign: 'center' }}>
                       <button onClick={() => setChartSelectedCodes(new Set())} style={{
-                        fontSize: 9, color: 'var(--text-dim)', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                        fontSize: 9, color: '#fff', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
                         borderRadius: 8, padding: '4px 12px', cursor: 'pointer',
                       }}>✕ Сбросить выбор</button>
                     </div>
                   </div>
                 ) : (
                   <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 160, padding: 20 }}>
-                    <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>
+                    <div style={{ textAlign: 'center', fontSize: 11, color: '#fff' }}>
                       <div style={{ fontSize: 28, marginBottom: 10 }}>📊</div>
                       Выберите 1+ маркеров для сравнения
                     </div>
@@ -892,7 +883,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
                 whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s',
                 background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: selectedPhase === key ? '#000' : 'var(--text-dim)',
+                color: selectedPhase === key ? '#000' : '#fff',
                 border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
                 flexShrink: 0,
               }}>
@@ -914,7 +905,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
               ))}
               {trendAlertList.length > 5 && (
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginTop:4 }}>
+                <div style={{ fontSize:9, color:'#fff', marginTop:4 }}>
                   +{trendAlertList.length - 5} дополнительных — перейдите во вкладку «Тренды»
                 </div>
               )}
@@ -963,7 +954,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--accent)' }}>📋 Новые анализы — {PHASE_LABELS[selectedPhase]}</span>
                 <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
-                  background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)',
+                  background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: '#fff',
                   borderRadius: 8, padding: '3px 10px', fontSize: 10, cursor: 'pointer',
                 }}>✕</button>
               </div>
@@ -984,7 +975,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           border: `1px solid ${filled ? 'rgba(0,230,138,0.25)' : 'var(--border)'}`,
                           transition: 'all 0.15s',
                         }}>
-                          <span style={{ fontSize: 10, fontWeight: filled ? 600 : 400, color: filled ? 'var(--accent)' : 'var(--text-dim)' }}>
+                          <span style={{ fontSize: 10, fontWeight: filled ? 600 : 400, color: filled ? 'var(--accent)' : '#fff' }}>
                             {filled ? '✓' : '○'} {info?.name || code}
                           </span>
                           <input
@@ -997,7 +988,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                               borderRadius: 3, color: 'var(--accent)', fontSize: 10, fontWeight: 600, textAlign: 'right',
                             }}
                           />
-                          <span style={{ fontSize: 7, color: 'var(--text-dim)', minWidth: 16 }}>{info?.prefUnit || ''}</span>
+                          <span style={{ fontSize: 7, color: '#fff', minWidth: 16 }}>{info?.prefUnit || ''}</span>
                         </div>
                       );
                     })}
@@ -1007,7 +998,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={() => { setShowNewLabsInline(false); setBatchValues({}); }} style={{
                   flex: 1, padding: '8px 12px', borderRadius: 10, border: '1px solid var(--border)',
-                  background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                  background: 'var(--bg-secondary)', color: '#fff', fontWeight: 600, fontSize: 11, cursor: 'pointer',
                 }}>✕ Отмена</button>
                 <button onClick={handleBatchSave} style={{
                   flex: 1, padding: '8px 12px', borderRadius: 10, border: 'none',
@@ -1031,7 +1022,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             {anyNoLabs ? (
               <div style={{ fontSize: 10, color: '#ef4444' }}>Штраф ×{penalty.totalMultiplier.toFixed(2)} — коэффициент на все риски</div>
             ) : (
-              <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нажмите чтобы применить штраф или введите анализы</div>
+              <div style={{ fontSize: 10, color: '#fff' }}>Нажмите чтобы применить штраф или введите анализы</div>
             )}
           </div>
 
@@ -1064,7 +1055,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', transition: 'all 0.15s',
                         background: isSubmitted ? (isHigh ? 'rgba(239,68,68,0.12)' : isLow ? 'rgba(249,115,22,0.12)' : 'rgba(0,230,138,0.08)') : 'var(--bg-secondary)',
                         border: `1px solid ${isSubmitted ? (isHigh ? 'rgba(239,68,68,0.3)' : isLow ? 'rgba(249,115,22,0.3)' : 'rgba(0,230,138,0.15)') : 'var(--border)'}`,
-                        color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : 'var(--text-dim)',
+                        color: isSubmitted ? (isHigh ? '#ef4444' : isLow ? '#f97316' : 'var(--accent)') : '#fff',
                         fontWeight: isSubmitted ? 600 : 400,
                       }}>
                         {isSubmitted ? (isHigh ? '↑' : isLow ? '↓' : '✓') : '○'} {info?.name || code}
@@ -1076,7 +1067,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </div>
             ))}
             {missingLabs.length > 0 && missingLabs.length < requiredLabs.length && (
-              <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, fontSize: 9, color: 'var(--text-dim)' }}>
+              <div style={{ marginTop: 4, padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, fontSize: 9, color: '#fff' }}>
                 Не сдано: {missingLabs.slice(0, 8).join(', ')}{missingLabs.length > 8 ? ` +${missingLabs.length - 8}` : ''}
               </div>
             )}
@@ -1095,7 +1086,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             <div style={{ marginTop: 10 }}>
               <div className="card" style={{ marginBottom: 10, padding: 10 }}>
                 <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#ec4899' }}>🧬 Фертильность — расширенная спермограмма</h4>
-                <div style={{ fontSize:9, color:'var(--text-dim)', marginBottom:6 }}>
+                <div style={{ fontSize:9, color:'#fff', marginBottom:6 }}>
                   Фаза: <b>{PHASE_LABELS[selectedPhase] || selectedPhase}</b>
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
@@ -1141,7 +1132,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
               <div className="card" style={{ marginBottom: 10, padding: 10 }}>
                 <h4 style={{ margin:'0 0 8px', fontSize:12, color:'#22c55e' }}>📋 Нормы ВОЗ 2021</h4>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'3px 12px', fontSize:9, color:'var(--text-dim)' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:'3px 12px', fontSize:9, color:'#fff' }}>
                   <span>Объём эякулята</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥1.4 мл</span>
                   <span>Концентрация</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥16 млн/мл</span>
                   <span>Подвижность (PR+NP)</span><span style={{ fontWeight:600, color:'#22c55e' }}>≥42%</span>
@@ -1174,7 +1165,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
                 whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
                 background: journalSubView === v.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: journalSubView === v.id ? '#000' : 'var(--text-dim)',
+                color: journalSubView === v.id ? '#000' : '#fff',
                 border: `1px solid ${journalSubView === v.id ? 'var(--accent)' : 'var(--border)'}`,
               }}>
                 {v.icon} {v.label}
@@ -1219,9 +1210,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div style={{ borderRadius:12, padding:14, marginBottom:10, background:'rgba(24,24,27,0.15)', border:'1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
                     <span style={{ fontSize:12, fontWeight:700, color:'#00e68a' }}>✅ Отчёт сгенерирован</span>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.4)' }}>{new Date().toLocaleString()}</span>
+                    <span style={{ fontSize:9, color:'#fff' }}>{new Date().toLocaleString()}</span>
                   </div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.85)' }}><b>Маркеров:</b> {labs.length} ({deviationCount} с откл.)</div>
+                  <div style={{ fontSize:10, color:'#fff' }}><b>Маркеров:</b> {labs.length} ({deviationCount} с откл.)</div>
                   <div style={{ maxHeight:160, overflowY:'auto', marginTop:4 }}>
                     {labs.map((l:any,i:number) => (
                       <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'2px 6px', borderRadius:4, background:i%2===0?'rgba(255,255,255,0.03)':'transparent', fontSize:9 }}>
@@ -1229,7 +1220,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       </div>
                     ))}
                   </div>
-                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', textAlign:'center', marginTop:6 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
+                  <div style={{ fontSize:8, color:'#fff', textAlign:'center', marginTop:6 }}>Сохранено в архив. Доступно в Профиле → Отчёты.</div>
                 </div>
               )}
               {labArchive.length > 0 && (
@@ -1239,13 +1230,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     <div key={r.id} onClick={() => setSelectedArchivedLabReport(selectedArchivedLabReport?.id === r.id ? null : r)} style={{ borderRadius:8, padding:8, marginBottom:4, background: selectedArchivedLabReport?.id === r.id ? 'rgba(0,230,138,0.08)' : 'rgba(24,24,27,0.12)', border:'1px solid rgba(255,255,255,0.03)', fontSize:9, cursor:'pointer' }}>
                       <div style={{ display:'flex', justifyContent:'space-between' }}>
                         <span style={{ color:'#00e68a', fontWeight:700 }}>{r.date}</span>
-                        <span style={{ color:'rgba(255,255,255,0.5)' }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
+                        <span style={{ color:'#fff' }}>{r.totalMarkers} марк. · {r.abnormalCount || 0} откл.</span>
                       </div>
                       {selectedArchivedLabReport?.id === r.id && (
                         <div style={{ marginTop:6, padding:6, background:'rgba(0,0,0,0.15)', borderRadius:6 }}>
                           <div style={{ fontSize:9, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 Отчёт от {r.date}</div>
                           {(r.labs||[]).map((l:any, i:number) => (
-                            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', color:'rgba(255,255,255,0.85)' }}>
+                            <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:8, padding:'1px 0', color:'#fff' }}>
                               <span>{l.name || l.code}</span>
                               <span>{l.value} {l.unit}</span>
                             </div>
@@ -1253,7 +1244,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           {r.trends && (
                             <div style={{ marginTop:6, paddingTop:6, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
                               <div style={{ fontSize:8, fontWeight:700, color:'var(--accent)', marginBottom:3 }}>📈 Тренды</div>
-                              <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:3 }}>{r.trends.summary}</div>
+                              <div style={{ fontSize:8, color:'#fff', marginBottom:3 }}>{r.trends.summary}</div>
                               {r.trends.insights?.map((insight: string, i: number) => (
                                 <div key={i} style={{ fontSize:8, color:'var(--text)', padding:'1px 0' }}>{insight}</div>
                               ))}
@@ -1272,7 +1263,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 </div>
               )}
               {!labReportGenerated && labArchive.length === 0 && (
-                <div style={{ textAlign:'center', padding:30, fontSize:10, color:'rgba(255,255,255,0.4)' }}>Нажмите «Сгенерировать отчёт»</div>
+                <div style={{ textAlign:'center', padding:30, fontSize:10, color:'#fff' }}>Нажмите «Сгенерировать отчёт»</div>
               )}
             </div>
           )}
@@ -1283,7 +1274,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
                 <span style={{ fontSize: 18 }}>📦</span>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>Архив результатов</span>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 'auto' }}>{archiveLabs.length} записей • {new Set(archiveLabs.map(l => l.code.toUpperCase())).size} тестов</span>
+                <span style={{ fontSize: 11, color: '#fff', marginLeft: 'auto' }}>{archiveLabs.length} записей • {new Set(archiveLabs.map(l => l.code.toUpperCase())).size} тестов</span>
               </div>
               <LabsResults labs={archiveLabs} />
             </div>
@@ -1334,7 +1325,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, flexWrap:'wrap', gap:8 }}>
               <div>
                 <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>📈 Динамика маркеров ({report.trends.length})</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)' }}>{report.summary}</div>
+                <div style={{ fontSize:10, color:'#fff' }}>{report.summary}</div>
               </div>
               {report.trends.length > 0 && (
                 <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
@@ -1342,7 +1333,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     <button key={f} onClick={() => setTrendFilter(f)} style={{
                       padding:'4px 10px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
                        background: trendFilter === f ? 'var(--accent)' : 'var(--bg-secondary)',
-                       color: trendFilter === f ? '#000' : 'var(--text-dim)',
+                       color: trendFilter === f ? '#000' : '#fff',
                        border: `1px solid ${trendFilter === f ? 'var(--accent)' : 'var(--border)'}`,
                     }}>
                       {f === 'all' ? 'Все' : f === 'significant' ? 'Значимые' : f === 'critical' ? 'Критические' : f === 'worsened' ? 'Ухудшения' : 'Улучшения'}
@@ -1351,7 +1342,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                    <button onClick={() => { setTrendSystemFilter('all'); }} style={{
                      padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
                      background: trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-                     color: trendSystemFilter === 'all' ? '#000' : 'var(--text-dim)',
+                     color: trendSystemFilter === 'all' ? '#000' : '#fff',
                      border: `1px solid ${trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--border)'}`,
                    }}>Все системы</button>
                    {Object.entries(LAB_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
@@ -1360,7 +1351,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                        <button key={sys} onClick={() => setTrendSystemFilter(trendSystemFilter === sys ? 'all' : sys)} style={{
                          padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
                          background: trendSystemFilter === sys ? (info?.icon || '') + ' var(--accent)' : 'var(--bg-secondary)',
-                         color: trendSystemFilter === sys ? '#000' : 'var(--text-dim)',
+                         color: trendSystemFilter === sys ? '#000' : '#fff',
                          border: `1px solid ${trendSystemFilter === sys ? 'var(--accent)' : 'var(--border)'}`,
                        }}>
                          {info?.icon || ''} {info?.label || sys}
@@ -1440,7 +1431,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       <button key={t.code} onClick={() => toggleTrend(t.code)} style={{
                         padding:'2px 8px', borderRadius:4, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
                         background: isVisible ? color + '22' : 'transparent',
-                        color: isVisible ? color : 'var(--text-dim)',
+                        color: isVisible ? color : '#fff',
                         border: `1px solid ${isVisible ? color + '44' : 'var(--border)'}`,
                         opacity: isVisible ? 1 : 0.5,
                       }}>
@@ -1499,7 +1490,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                             );
                           })}
                           {dates.map((d, i) => (
-                            <text key={i} x={i * xStep} y={h + 14} fill="var(--text-dim)" fontSize="7" textAnchor="middle">{d.slice(5)}</text>
+                            <text key={i} x={i * xStep} y={h + 14} fill="#fff" fontSize="7" textAnchor="middle">{d.slice(5)}</text>
                           ))}
                         </g>
                       );
@@ -1535,7 +1526,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
               </div>
             )}
             {report.trends.length === 0 && (
-              <div style={{ textAlign:'center', padding:30, fontSize:10, color:'var(--text-dim)' }}>Загрузите 2+ анализа для сравнения</div>
+              <div style={{ textAlign:'center', padding:30, fontSize:10, color:'#fff' }}>Загрузите 2+ анализа для сравнения</div>
             )}
             <div style={{ marginTop:10 }}>
               <div style={{ fontSize:11, fontWeight:700, color:'var(--text)', marginBottom:6 }}>📋 Все маркеры</div>
@@ -1562,7 +1553,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
                 whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
                 background: catalogView === v.id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: catalogView === v.id ? '#000' : 'var(--text-dim)',
+                color: catalogView === v.id ? '#000' : '#fff',
                 border: `1px solid ${catalogView === v.id ? 'var(--accent)' : 'var(--border)'}`,
               }}>
                 {v.icon} {v.label}
@@ -1590,7 +1581,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <button key={key} onClick={() => handlePhaseChange(key)} style={{
                     padding:'6px 12px', borderRadius:16, fontSize:11, fontWeight:600, whiteSpace:'nowrap', cursor:'pointer',
                     background: selectedPhase===key?'var(--accent)':'var(--bg-secondary)',
-                    color: selectedPhase===key?'#000':'var(--text-dim)',
+                    color: selectedPhase===key?'#000':'#fff',
                     border:`1px solid ${selectedPhase===key?'var(--accent)':'var(--border)'}`,
                   }}>{label}</button>
                 ))}
@@ -1599,7 +1590,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:6 }}>
                   📋 План сдачи: {PHASE_LABELS[selectedPhase]}
                 </div>
-                <div style={{ fontSize:10, color:'var(--text-dim)', marginBottom:8, lineHeight:1.5 }}>
+                <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.5 }}>
                   {(() => {
                     const phases: Record<string,string> = {
                        baseline:`Перед началом курса — полный базовый скрининг (${requiredLabs.length} маркеров, включая ОАМ)`,
@@ -1621,7 +1612,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
                           <div style={{ width:8, height:8, borderRadius:'50%', background: sysColors[system]||'#6b7280' }}/>
                           <span style={{ fontSize:10, fontWeight:600, color:'var(--accent)' }}>{sysLabels[system]||system}</span>
-                          <span style={{ fontSize:9, color:'var(--text-dim)', marginLeft:'auto' }}>{submitted}/{total} · {pct}%</span>
+                          <span style={{ fontSize:9, color:'#fff', marginLeft:'auto' }}>{submitted}/{total} · {pct}%</span>
                         </div>
                         <div style={{ height:6, background:'rgba(255,255,255,0.05)', borderRadius:3, overflow:'hidden' }}>
                           <div style={{ width:`${pct}%`, height:'100%', background:pct===100?'var(--accent)':pct>50?'#eab308':'#f97316', borderRadius:3, transition:'width 0.4s' }}/>
@@ -1649,7 +1640,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 {missingLabs.length > 0 && (
                   <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
                     <div style={{ fontSize:10, fontWeight:600, color:'#ef4444', marginBottom:4 }}>⚠️ Не сдано ({missingLabs.length})</div>
-                    <div style={{ fontSize:9, color:'var(--text-dim)', lineHeight:1.5 }}>{missingLabs.slice(0,15).join(', ')}{missingLabs.length>15?` +${missingLabs.length-15}`:''}</div>
+                    <div style={{ fontSize:9, color:'#fff', lineHeight:1.5 }}>{missingLabs.slice(0,15).join(', ')}{missingLabs.length>15?` +${missingLabs.length-15}`:''}</div>
                   </div>
                 )}
               </div>
@@ -1701,7 +1692,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
                   whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
                   background: risksView === v ? 'var(--accent)' : 'var(--bg-secondary)',
-                  color: risksView === v ? '#000' : 'var(--text-dim)',
+                  color: risksView === v ? '#000' : '#fff',
                   border: `1px solid ${risksView === v ? 'var(--accent)' : 'var(--border)'}`,
                 }}>
                   {v === 'risks' ? '⚠️ Риски и индексы' : '🔬 Верификация рисков'}
@@ -1752,12 +1743,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           {a.severity === 'critical' ? 'КРИТ' : a.severity === 'high' ? 'ВЫСОК' : 'МОНИТ'}
                         </span>
                       </div>
-                      <div style={{ color: 'var(--text-dim)', fontSize: 8 }}>{(a.drugCause || []).map((id: string) => { const p = PHARMA_DB[id]; return p?.name || id.replace(/_/g, ' '); }).join(', ')} — {a.recommendation}</div>
+                      <div style={{ color: '#fff', fontSize: 8 }}>{(a.drugCause || []).map((id: string) => { const p = PHARMA_DB[id]; return p?.name || id.replace(/_/g, ' '); }).join(', ')} — {a.recommendation}</div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
+                <div style={{ fontSize: 10, color: '#fff', textAlign: 'center', padding: '12px 0' }}>
                   {hasLabs ? 'Связи анализов с препаратами не обнаружены' : 'Введите анализы для расчёта рисков'}
                 </div>
               )}
@@ -1784,14 +1775,14 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontSize: 10, fontWeight: 600 }}>{item.label}</div>
-                        <div style={{ fontSize: 8, color: 'var(--text-dim)', marginTop: 2 }}>{item.desc}</div>
+                        <div style={{ fontSize: 8, color: '#fff', marginTop: 2 }}>{item.desc}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         {item.val !== null ? (
                           <><div style={{ fontSize: 18, fontWeight: 700, color: statusColor(item.val, item.inv) }}>{item.val}%</div>
                             <div style={{ fontSize: 8, color: statusColor(item.val, item.inv), fontWeight: 600 }}>{statusLabel(item.val, item.inv)}</div></>
                         ) : (
-                          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Нет данных</div>
+                          <div style={{ fontSize: 10, color: '#fff' }}>Нет данных</div>
                         )}
                       </div>
                     </div>
@@ -1843,7 +1834,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   })}
                 </div>
               ) : (
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
+                <div style={{ fontSize: 10, color: '#fff', textAlign: 'center', padding: '12px 0' }}>
                   {hasLabs ? 'Все системы в норме' : 'Введите анализы для расчёта рисков'}
                 </div>
               )}
@@ -1872,16 +1863,16 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     const dc = devColors[devLevel];
                     return (
                       <div key={m.code + m.value} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 8px', borderRadius: 6, background: dc.bg, border: `1px solid ${dc.bg.replace('0.06', '0.12')}` }}>
-                        <span style={{ fontSize: 8, color: 'var(--text-dim)', minWidth: 46 }}>{sysLabels[m.system] || m.system}</span>
+                        <span style={{ fontSize: 8, color: '#fff', minWidth: 46 }}>{sysLabels[m.system] || m.system}</span>
                         <span style={{ fontSize: 10, fontWeight: 600, flex: 1, color: 'var(--text)' }}>{m.name}</span>
-                        <span style={{ fontSize: 8, color: 'var(--text-dim)' }}>{m.lln}–{m.uln}</span>
+                        <span style={{ fontSize: 8, color: '#fff' }}>{m.lln}–{m.uln}</span>
                         <span style={{ fontSize: 10, fontWeight: 700, color: dc.text }}>{m.value} <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, fontWeight: 600, background: dc.text + '22', color: dc.text }}>{isHigh ? '↑' : '↓'}{absDev}%</span></span>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', textAlign: 'center', padding: '12px 0' }}>
+                <div style={{ fontSize: 10, color: '#fff', textAlign: 'center', padding: '12px 0' }}>
                   {hasLabs ? 'Все маркеры в норме' : 'Введите анализы для просмотра отклонений'}
                 </div>
               )}
@@ -1938,13 +1929,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                     <div style={{ textAlign: 'center', padding: '8px 0', borderRadius: 10, marginBottom: 6,
                       background: 'linear-gradient(135deg, rgba(0,230,138,0.06) 0%, rgba(0,230,138,0.02) 100%)',
                       border: '1px solid rgba(0,230,138,0.15)' }}>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>Общий риск</div>
+                      <div style={{ fontSize: 9, color: '#fff', marginBottom: 2 }}>Общий риск</div>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: 10, alignItems: 'center' }}>
                         <span style={{ fontSize: 20, fontWeight: 800, color: tzSpecResult.overallRaw < 25 ? '#22c55e' : tzSpecResult.overallRaw < 50 ? '#eab308' : '#f97316' }}>{tzSpecResult.overallRaw}%</span>
-                        <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)' }}>→</span>
+                        <span style={{ fontSize: 14, color: '#fff' }}>→</span>
                         <span style={{ fontSize: 20, fontWeight: 800, color: tzSpecResult.overallAfter < 25 ? '#22c55e' : tzSpecResult.overallAfter < 50 ? '#eab308' : '#f97316' }}>{tzSpecResult.overallAfter}%</span>
                       </div>
-                      <div style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>
+                      <div style={{ fontSize: 9, fontWeight: 600, color: '#fff' }}>
                         {tzSpecResult.overallCategory} · K_protect {tzSpecResult.k_protect_overall}%
                       </div>
                       {tzSpecResult.overallVerification !== undefined && (
@@ -1988,12 +1979,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         );
                       })}
                     </div>
-                    <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 4 }}>
+                    <div style={{ fontSize: 7, color: '#fff', textAlign: 'center', marginTop: 4 }}>
                       Из фазы «{PHASE_LABELS[selectedPhase]}» · покрытие {Math.round(tzSpecResult.d_cov * 100)}%
                     </div>
                   </>
                 ) : (
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', textAlign: 'center', padding: '10px 0' }}>
+                  <div style={{ fontSize: 9, color: '#fff', textAlign: 'center', padding: '10px 0' }}>
                     {hasLabs ? 'Недостаточно данных' : 'Введите анализы в текущей фазе'}
                   </div>
                 )}
@@ -2019,7 +2010,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 📋 Требуемые анализы (MDSS + Калькулятор поддержки)
               </button>
               {riskSections.requiredLabs && (<div style={{ padding: '0 12px 12px' }}>
-                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 6 }}>
+                <div style={{ fontSize: 9, color: '#fff', marginBottom: 6 }}>
                   Сводка маркеров, необходимых для полного расчёта рисков MDSS, подбора поддержки и лабораторных индексов.
                 </div>
                 {[
@@ -2059,7 +2050,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <div key={group.title} style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 2 }}>{group.icon} {group.title}</div>
                     {group.markers.map((m, i) => (
-                      <div key={i} style={{ fontSize: 8, color: 'var(--text-dim)', lineHeight: 1.5, paddingLeft: 6 }}>• {m}</div>
+                      <div key={i} style={{ fontSize: 8, color: '#fff', lineHeight: 1.5, paddingLeft: 6 }}>• {m}</div>
                     ))}
                   </div>
                 ))}
@@ -2078,7 +2069,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
             <button key={t.id} onClick={() => setSubTab(t.id)} style={{
               flex:'0 0 auto', padding:'6px 10px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
-              background: subTab===t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)', color: subTab===t.id ? '#000' : 'rgba(255,255,255,0.70)', border: subTab===t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
+              background: subTab===t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)', color: subTab===t.id ? '#000' : '#fff', border: subTab===t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
             }}>{t.icon} {t.label}</button>
           ))}
         </div>
@@ -2090,18 +2081,18 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <span style={{ fontWeight: 700, fontSize: 16 }}>📄 Импорт анализов</span>
-               <button onClick={cancelOcr} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-dim)', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
+               <button onClick={cancelOcr} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 13, cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', maxHeight: '70vh' }}>
               {ocrLoading && (
                 <div style={{ textAlign: 'center', padding: 40 }}>
                   <div className="loading-spinner" style={{ margin: '0 auto 16px' }} />
-                  <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Распознаю документ...</div>
+                  <div style={{ fontSize: 13, color: '#fff' }}>Распознаю документ...</div>
                 </div>
               )}
               {!ocrLoading && !ocrResult && (
                 <div>
-                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Загрузите PDF, фото или вставьте текст результатов анализов.</p>
+                  <p style={{ fontSize: 12, color: '#fff', marginBottom: 12 }}>Загрузите PDF, фото или вставьте текст результатов анализов.</p>
                   <div style={{ display: 'grid', gap: 8 }}>
                     <button onClick={() => fileInputRef.current?.click()} style={{ padding: 16, borderRadius: 12, border: '2px dashed var(--border)', background: 'var(--bg-secondary)', color: 'var(--accent)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                       📄 Выбрать PDF или фото
@@ -2139,7 +2130,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <span style={{ fontWeight: 700, fontSize: 13 }}>{ocrResult.labs.length > 0 ? `✅ Найдено: ${ocrResult.labs.length}` : '⚠️ Не найдено'}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{Math.round(ocrResult.confidence * 100)}%</span>
+                    <span style={{ fontSize: 10, color: '#fff' }}>{Math.round(ocrResult.confidence * 100)}%</span>
                   </div>
                   {ocrResult.warnings.length > 0 && (
                     <div role="alert" style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.28)', color: '#f59e0b', fontSize: 11, lineHeight: 1.4 }}>
@@ -2158,7 +2149,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       const delta = lab.value - existing.value;
                       const pct = existing.value !== 0 ? Math.round((delta / Math.abs(existing.value)) * 100) : null;
                       const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '→';
-                      const color = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : 'var(--text-dim)';
+                      const color = delta > 0 ? '#ef4444' : delta < 0 ? '#22c55e' : '#fff';
                       return <span style={{ fontSize:8, color, fontWeight:600, marginLeft:4 }}>{arrow} {existing.value} → {lab.value} {pct !== null ? `(${pct > 0 ? '+' : ''}${pct}%)` : ''}</span>;
                     })() : null;
                     return (
@@ -2178,7 +2169,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                           </span>
                         </button>
                         {lab.raw && !/^(?:error|warning|invalid pdf|pdf parsing)/i.test(lab.raw.trim()) && (
-                          <div style={{ margin: '-2px 4px 6px', fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.3 }}>
+                          <div style={{ margin: '-2px 4px 6px', fontSize: 9, color: '#fff', lineHeight: 1.3 }}>
                             {lab.refLow !== undefined || lab.refHigh !== undefined ? `Норма: ${lab.refLow ?? '—'}–${lab.refHigh ?? '—'} · ` : ''}Источник: {lab.raw}
                           </div>
                         )}
@@ -2188,13 +2179,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                   <button onClick={confirmOcrLabs} disabled={selectedLabs.size === 0} style={{
                     width: '100%', marginTop: 12, padding: 12,
                     background: selectedLabs.size > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
-                    color: selectedLabs.size > 0 ? '#000' : 'var(--text-dim)',
+                    color: selectedLabs.size > 0 ? '#000' : '#fff',
                     border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: selectedLabs.size > 0 ? 'pointer' : 'not-allowed',
                   }}>✓ Сохранить {selectedLabs.size} показателей</button>
                   {ocrResult.labs.length === 0 && (
                     <button onClick={() => { setOcrResult(null); setSelectedLabs(new Set()); }} style={{
                       width: '100%', marginTop: 6, padding: 10,
-                      background: 'var(--bg-secondary)', color: 'var(--text-dim)',
+                      background: 'var(--bg-secondary)', color: '#fff',
                       border: '1px solid var(--border)', borderRadius: 10, fontWeight: 600, fontSize: 12, cursor: 'pointer',
                     }}>🔄 Попробовать другой файл или вставить текст</button>
                   )}
@@ -2214,7 +2205,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                 <span style={{ fontSize: 18 }}>🧪</span>
                 <span style={{ fontWeight: 700, fontSize: 15 }}>Ввести результат</span>
               </div>
-              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: 'var(--text-dim)', borderRadius: 8, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>✕</button>
+              <button onClick={() => setShowLabInput(false)} style={{ background: 'var(--bg-secondary)', border: 'none', color: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>✕</button>
             </div>
             {(() => { const info = UCUM_MAP[inputCode.toUpperCase()]; return info ? (
               <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 8, padding: '6px 10px', background: 'rgba(0,230,138,0.06)', borderRadius: 8 }}>
@@ -2223,19 +2214,19 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             ) : null; })()}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Код маркера</label>
+                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Код маркера</label>
                 <input value={inputCode} onChange={e => setInputCode(e.target.value)} placeholder="ALT" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Значение</label>
+                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Значение</label>
                 <input type="number" value={inputValue || ''} onChange={e => setInputValue(e.target.value)} placeholder="40" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Единица</label>
+                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Единица</label>
                 <input value={inputUnit} onChange={e => setInputUnit(e.target.value)} placeholder="U/L" style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 9, color: 'var(--text-dim)', fontWeight: 600 }}>Дата</label>
+                <label style={{ fontSize: 9, color: '#fff', fontWeight: 600 }}>Дата</label>
                 <input type="date" value={inputDate} onChange={e => setInputDate(e.target.value)} style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13 }} />
               </div>
             </div>
@@ -2243,7 +2234,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
               <button onClick={() => setShowLabInput(false)} style={{
                 padding: 10, borderRadius: 10, border: '1px solid var(--border)',
-                background: 'var(--bg-secondary)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                background: 'var(--bg-secondary)', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer',
               }}>✕ Отмена</button>
               <button onClick={() => { setAddError(''); addLab(); }} style={{
                 padding: 10, borderRadius: 10, border: 'none',
@@ -2288,7 +2279,7 @@ function TrendRow({ trend }: { trend: LabTrend }) {
       )}
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ fontWeight:600, fontSize:11, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{trend.name}</div>
-        <div style={{ fontSize:8, color:'var(--text-dim)' }}>
+        <div style={{ fontSize:8, color:'#fff' }}>
           {trend.previousDate && <span>{trend.previousDate.slice(5)}: {trend.previousValue}</span>}
           {trend.previousDate && <span> → </span>}
           <span>{trend.currentDate.slice(5)}: {trend.currentValue} {trend.unit}</span>
@@ -2306,7 +2297,7 @@ function TrendRow({ trend }: { trend: LabTrend }) {
         </div>
       </div>
       {trend.refLow !== undefined && trend.refHigh !== undefined && (
-        <span style={{ fontSize:8, color:'var(--text-dim)', whiteSpace:'nowrap' }}>Норма: {trend.refLow}–{trend.refHigh}</span>
+        <span style={{ fontSize:8, color:'#fff', whiteSpace:'nowrap' }}>Норма: {trend.refLow}–{trend.refHigh}</span>
       )}
     </div>
   );
