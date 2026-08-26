@@ -49,6 +49,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const [rpe, setRpe] = useState('');
   const [hr, setHr] = useState('');
   const [km, setKm] = useState('');
+  const [notes, setNotes] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [undo, setUndo] = useState<CardioLogEntry[] | null>(null);
@@ -69,6 +70,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     setRpe(e.rpe != null ? String(e.rpe) : '');
     setHr(e.avgHr != null ? String(e.avgHr) : '');
     setKm(e.distanceKm != null ? String(e.distanceKm) : '');
+    setNotes(e.notes ?? '');
   };
 
   const stats7 = useMemo(() => cardioLogStats(log, 7), [log]);
@@ -137,20 +139,33 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const weeklyHistogram = useMemo(() => buildWeeklyHistogram(log.map(e => ({ date: e.date, value: e.durationMin }))), [log]);
   const distribution = useMemo(() => computeDistribution(log.filter(e => e.completed).map(e => e.durationMin)), [log]);
   const extremes = useMemo(() => {
-    const entries = log.map(e => ({ date: e.date, fields: [{ label: 'Минуты', value: String(e.durationMin), unit: 'мин' }] }));
-    // @ts-ignore — DiaryEntryLike compat
-    return computeExtremes('sleep' as any, entries as any);
+    if (log.length === 0) return { min: null, max: null } as { min: { date: string; value: number } | null; max: { date: string; value: number } | null };
+    let min: { date: string; value: number } | null = null;
+    let max: { date: string; value: number } | null = null;
+    for (const e of log) {
+      const v = e.durationMin;
+      if (!Number.isFinite(v)) continue;
+      if (!min || v < min.value) min = { date: e.date, value: v };
+      if (!max || v > max.value) max = { date: e.date, value: v };
+    }
+    return { min, max };
   }, [log]);
   const streak = useMemo(() => computeStreak(log.filter(e => e.completed).map(e => ({ date: e.date }))), [log]);
 
   const add = () => {
-    const w = validateCardioLogFields({ rpe, hr, km, minutes });
+    const w = validateCardioLogFields({ rpe, hr, km, minutes, notes });
     if (Object.keys(w).length) {
       const msg = Object.values(w).join(' · ');
       flashMsg(`⚠ ${msg}`);
       // не блокируем — сохраняем клампнутые значения, но подсвечиваем проблему
     }
-    const dur = Math.max(5, Math.min(180, Number(minutes) || 30));
+    // Унифицированный кламп 1–600 мин (как в validateCardioLogFields), было 5–180
+    const rawDur = Number(String(minutes).replace(',', '.'));
+    const dur = Number.isFinite(rawDur) ? Math.max(1, Math.min(600, Math.round(rawDur))) : 30;
+    if (dur < 1 || dur > 600) {
+      flashMsg('⚠ Длительность 1–600 мин');
+      return;
+    }
     let weight: number | null = null;
     try {
       const weights = getWeightLog();
@@ -159,14 +174,16 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     } catch { /* ignore */ }
     const entry: CardioLogEntry = {
       id: editingId ?? newId(), date, type, durationMin: dur, completed: true,
-      rpe: Number(rpe) > 0 ? Number(rpe) : undefined,
-      avgHr: Number(hr) > 0 ? Number(hr) : undefined,
+      rpe: Number(String(rpe).replace(',', '.')) > 0 ? Math.max(1, Math.min(10, Math.round(Number(String(rpe).replace(',', '.'))))) : undefined,
+      avgHr: Number(String(hr).replace(',', '.')) > 0 ? Math.max(20, Math.min(260, Math.round(Number(String(hr).replace(',', '.'))))) : undefined,
       calories: estimateCardioEntryKcal(type, dur, weight ?? undefined),
-      distanceKm: Number(km) > 0 ? Math.round(Number(km) * 10) / 10 : undefined,
+      distanceKm: Number(String(km).replace(',', '.')) > 0 ? Math.max(0, Math.min(200, Math.round(Number(String(km).replace(',', '.')) * 10) / 10)) : undefined,
+      notes: notes.trim() ? notes.trim().slice(0, 300) : undefined,
     };
     setUndo(log);
     saveCardioLogEntry(entry);
     setEditingId(null);
+    setNotes('');
     reload();
     flashMsg(editingId ? '✏️ Сессия обновлена' : '💾 Сессия записана');
   };
@@ -193,11 +210,11 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   };
 
   const exportCsv = () => {
-    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,День ног,Завершено\n';
+    const head = 'Дата,Тип,Минуты,Км,Темп,Ккал,ЧСС ср.,RPE,День ног,Заметка,Завершено\n';
     const body = log.map(e =>
       [e.date, TYPES.find(t => t.id === e.type)?.label ?? e.type, e.durationMin,
         e.distanceKm ?? '', cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? '', e.calories ?? '', e.avgHr ?? '', e.rpe ?? '',
-        legDayDates.has(e.date) ? 'да' : '', e.completed ? 'да' : 'нет'].map(csvCell).join(','),
+        legDayDates.has(e.date) ? 'да' : '', e.notes ?? '', e.completed ? 'да' : 'нет'].map(csvCell).join(','),
     ).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + head + body], { type: 'text/csv' }));
@@ -213,7 +230,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
     const rows = log.map(e =>
       `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(typeLabel(e.type))}</td><td>${e.durationMin}</td>` +
       `<td>${e.distanceKm != null ? e.distanceKm : ''}</td><td>${cardioPaceMinPerKm(e.distanceKm, e.durationMin) ?? ''}</td><td>${e.calories != null ? e.calories : ''}</td>` +
-      `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td><td>${legDayDates.has(e.date) ? '🦵' : ''}</td></tr>`,
+      `<td>${e.avgHr ?? ''}</td><td>${e.rpe ?? ''}</td><td>${legDayDates.has(e.date) ? '🦵' : ''}</td><td>${escapeHtml(e.notes ?? '')}</td></tr>`,
     ).join('');
     const html = `<!doctype html>
 <meta charset="utf-8">
@@ -235,7 +252,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   <div class="card"><b>Всего</b><br>${doneSessions} сесс · ${totalMinutes} мин</div>
 </div>
 <table>
-  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th></tr>
+  <tr><th>Дата</th><th>Тип</th><th>Минуты</th><th>Км</th><th>Темп</th><th>Ккал</th><th>ЧСС ср.</th><th>RPE</th><th>День ног</th><th>Заметка</th></tr>
   ${rows}
 </table>`;
     w.document.write(html);
@@ -410,7 +427,16 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
             <span style={labelStyle}>км</span>
             <input value={km} onChange={e => setKm(e.target.value)} inputMode="decimal" style={{ ...inputStyle, width: 70, borderColor: warnings.km ? '#f87171' : undefined }} aria-label="Км сессии" title="Дистанция (для бега/езды)" />
           </label>
+          <label style={{ display: 'block', flex: '1 1 180px', minWidth: 160 }}>
+            <span style={labelStyle}>Заметка</span>
+            <input value={notes} onChange={e => setNotes(e.target.value)} placeholder="Самочувствие, погода, интервалы…" style={{ ...inputStyle, width: '100%' }} aria-label="Заметка сессии" maxLength={300} />
+          </label>
           <button style={btnPrimary(ACCENT)} onClick={add}>{editingId ? '💾 Обновить' : '💾 Записать'}</button>
+          {editingId && (
+            <button style={{ ...btnBase(ACCENT), background: 'rgba(255,255,255,0.06)' }} onClick={() => { setEditingId(null); setNotes(''); }}>
+              ✕ Отмена
+            </button>
+          )}
         </div>
         {Object.keys(warnings).length > 0 && (
           <div role="alert" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.35)', color: '#fca5a5', fontSize: 12 }}>
@@ -457,6 +483,7 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
                 )}
                 {e.avgHr != null && <span style={{ fontSize: 12, color: colors.textMuted }}>{e.avgHr} уд</span>}
                 {e.rpe != null && <span style={{ fontSize: 12, color: colors.textMuted }}>RPE {e.rpe}</span>}
+                {e.notes && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.notes}>{e.notes}</span>}
                 {!e.completed && <span style={{ fontSize: 11, color: colors.warning }}>пропущена</span>}
                 <span style={{ flex: 1 }} />
                 <button
