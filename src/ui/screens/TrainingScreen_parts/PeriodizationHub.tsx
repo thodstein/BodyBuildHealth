@@ -9,11 +9,12 @@ import { MicrocyclePlannerCard } from './MicrocyclePlannerCard';
 import { DeloadSchedulerTab } from './DeloadSchedulerTab';
 import { TaperPlannerTab } from './TaperPlannerTab';
 import { SplitGenCard } from './SplitGenCard';
+import { CompetitionPlansView } from './CompetitionPlansView';
 const ACCENT = '#00e68a';
 const DIM = '#fff';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
 const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' } as any;
-type PeriodizationHubMode = 'designer' | 'progression' | 'tracker' | 'micro' | 'deload' | 'taper' | 'splits';
+type PeriodizationHubMode = 'designer' | 'progression' | 'tracker' | 'micro' | 'deload' | 'taper' | 'splits' | 'history';
 
 const MODE_DEFS: Array<{ m: PeriodizationHubMode; label: string; icon: string; desc: string }> = [
   { m: 'designer', label: 'Дизайнер ★ Единый', icon: '🧠', desc: 'Единый инструмент: блоки + микро + делод + прогрессия + трекер (синхронизированы)' },
@@ -23,6 +24,7 @@ const MODE_DEFS: Array<{ m: PeriodizationHubMode; label: string; icon: string; d
   { m: 'deload', label: 'Делод', icon: '🧘', desc: 'Отдельно: делод-планировщик' },
   { m: 'taper', label: 'Тейпер/Пик', icon: '🔻', desc: 'PL 3 нед / BB 4 нед + шоу-пик' },
   { m: 'splits', label: 'Сплиты', icon: '🧩', desc: 'Отдельно: 9 сплитов' },
+  { m: 'history', label: 'История', icon: '🏁', desc: 'Сохранённые соревновательные циклы' },
 ];
 
 export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> = ({ initialMode }) => {
@@ -67,6 +69,7 @@ export const PeriodizationHub: React.FC<{ initialMode?: PeriodizationHubMode }> 
       {mode === 'deload' && <PeriodizationDesignerTab initialUnifiedMode="deload" />}
       {mode === 'taper' && <PeriodizationDesignerTab initialUnifiedMode="taper" />}
       {mode === 'splits' && <PeriodizationDesignerTab initialActivePanel="splits" />}
+      {mode === 'history' && <CompetitionPlansView />}
     </div>
   );
 };

@@ -10,6 +10,7 @@ import type { StrengthStats } from '../../../engines/strength-diary.engine';
 import { MethodsTab } from './MethodsTab';
 import { ProgramsTab } from './ProgramsTab';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
+import { MyTrainingTab } from './MyTrainingTab';
 import type { TrainingTab } from './shared';
 
 type CustomEx = { name: string; sets: number; reps: number; rir: number };
@@ -41,6 +42,7 @@ export const LibraryZone: React.FC<Props> = (p) => {
   const TITLE_MAP: Record<string, { icon:string; title:string; accent:string; desc:string }> = {
     library: { icon:'📖', title:'Каталог циклов', accent:'#f59e0b', desc:'Готовые циклы ПЛ и ББ с фильтрами и раскладкой' },
     programs: { icon:'📚', title:'Программы', accent:'#8b5cf6', desc:'Полные программы по неделям и дням' },
+    mytraining: { icon:'⭐', title:'Мои тренировки', accent:'#f59e0b', desc:'Пользовательские упражнения, планы и циклы + прогресс' },
     methods: { icon:'🧠', title:'Методики', accent:'#a855f7', desc:'Техники интенсификации и периодизации' },
     exercises: { icon:'🏋️', title:'Упражнения', accent:'#00e68a', desc:'Каталог 500+ упражнений с биомеханикой' },
   };
@@ -91,6 +93,11 @@ export const LibraryZone: React.FC<Props> = (p) => {
             onLoadToConstructor={(prog) => { p.setCustomExercises(prev => [...prev, ...(prog.exercises || [])]); }}
             goPlannerManual={p.goPlannerManual}
           />
+        </InfoErrorBoundary>
+      )}
+      {p.tab === 'mytraining' && (
+        <InfoErrorBoundary label="Мои тренировки">
+          <MyTrainingTab customExercises={p.customExercises} setCustomExercises={p.setCustomExercises} goal={p.goal} level={p.level} daysPerWeek={p.daysPerWeek} mesoLength={p.mesoLength} onLoadToConstructor={(plan) => { p.setCustomExercises(prev => [...prev, ...(plan.exercises || [])]); }} />
         </InfoErrorBoundary>
       )}
       {p.tab === 'peaking' && (

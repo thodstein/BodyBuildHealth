@@ -24,6 +24,8 @@ import { loadReadinessHistory } from './readiness-history';
 import { getCalibrationStats } from '../../../engines/rir-calibration.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { applyToPlanner } from './planner-bridge';
+import { generateBBRecommendations, bbRecSummary } from '../../../engines/bb/bb-training-recommendations.engine';
+import { weeklySetsByGroup } from '../../../engines/training-recommendations.engine';
 import { MetricCard, ExpandableCard, PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
 
 const ACCENT = '#00e68a';
@@ -44,12 +46,13 @@ const ZONE_META: Record<string, { label: string; color: string; short: string }>
 const READINESS_COLOR = (v: number) => v >= 75 ? '#22c55e' : v >= 55 ? '#84cc16' : v >= 35 ? '#eab308' : '#ef4444';
 const RECOVERY_LABEL_COLOR = (l: string) => l === 'Отлично' ? '#22c55e' : l === 'Хорошо' ? '#84cc16' : l === 'Средне' ? '#eab308' : l === 'Низко' ? '#f97316' : '#ef4444';
 
-type SectionId = 'load' | 'recovery' | 'autoreg' | 'forecast';
+type SectionId = 'load' | 'recovery' | 'autoreg' | 'forecast' | 'recommendations';
 const SECTIONS: { id: SectionId; label: string; icon: string; accent: string; desc: string }[] = [
   { id: 'load', label: 'Нагрузка', icon: '📊', accent: '#3b82f6', desc: 'ACWR/Banister/монотонность — факты нагрузки из sRPE' },
   { id: 'recovery', label: 'Восстановление', icon: '🔋', accent: '#22c55e', desc: 'Сон/HRV/готовность → вердикт train/deload/supercompensation' },
   { id: 'autoreg', label: 'Авторегуляция', icon: '⚙️', accent: '#a855f7', desc: 'PRI + pro-регуляция веса/объёма/RIR + RPE↔вес + калибрация' },
   { id: 'forecast', label: 'Прогноз', icon: '🔮', accent: '#f59e0b', desc: 'Хольт-прогноз готовности + сценарий «что-если»' },
+  { id: 'recommendations', label: 'Рекомендации', icon: '💡', accent: '#8b5cf6', desc: 'ББ-аудит: план/PED/питание/сапплементы/выполнение' },
 ];
 
 function useStickySection(active: SectionId, setActive: (s: SectionId) => void) {
@@ -190,6 +193,60 @@ export const UnifiedIntelligenceHub: React.FC = () => {
 
   const workWeight = useMemo(()=> loadForRPE(e1rm, rpe, repCnt), [e1rm, rpe, repCnt]);
   const rpeBack = useMemo(()=> rpeFromLoad(e1rm, workWeight, repCnt), [e1rm, workWeight, repCnt]);
+
+  // BB-аудит (перенесён из дневника — без дубля, канон тут)
+  const bbRecs = useMemo(() => {
+    try {
+      const loadPlan = () => {
+        try {
+          const a = JSON.parse(localStorage.getItem('he_bb_plan_saved') || 'null');
+          if (a && a.weeks) return a;
+          const b = JSON.parse(localStorage.getItem('he_bb_plans') || '[]');
+          if (Array.isArray(b) && b[0]?.weeks) return b[0];
+          const c = JSON.parse(localStorage.getItem('he_bb_session') || 'null');
+          if (c?.builtBb?.weeks) return c.builtBb;
+        } catch {}
+        return null;
+      };
+      const plan = loadPlan();
+      if (!plan) return null;
+      const profile: any = (()=> { try { return JSON.parse(localStorage.getItem('he_profile_v2')||'{}').settings || {}; } catch { return {}; }})();
+      const historyWorkouts: any[] = (()=> { try { return JSON.parse(localStorage.getItem('he_workout_log_v2')||'[]'); } catch { return []; }})();
+      // nutrition avg 7d
+      const nutDiary: any = (()=> { try { return JSON.parse(localStorage.getItem('nutrition_diary_v2')||'null'); } catch { return null; }})();
+      let nutrition: any = null;
+      if (nutDiary && Array.isArray(nutDiary.days)) {
+        let sumK=0,sumP=0,sumC=0,cnt=0;
+        for (const d of nutDiary.days.slice(-7)) {
+          const meals = Array.isArray(d.meals)? d.meals: [];
+          if (meals.length===0) continue;
+          let k=0,p=0,c=0;
+          for (const m of meals) for (const it of (m.items||[])) { k+= it.calories||0; p+= it.protein||0; c+= it.carbs||0; }
+          sumK+=k; sumP+=p; sumC+=c; cnt++;
+        }
+        if (cnt>0) nutrition = { avgKcal: Math.round(sumK/cnt), avgProtein: Math.round(sumP/cnt), avgCarbs: Math.round(sumC/cnt) };
+      }
+      const supportSubs: string[] = (()=> { try {
+        const r = JSON.parse(localStorage.getItem('he_support_plan_result')||'null');
+        if (r?.substances) return r.substances.map((s:any)=> s.name||s.id).filter(Boolean);
+        const rr = JSON.parse(localStorage.getItem('he_support_risk')||'null');
+        if (rr?.subs) return rr.subs;
+      } catch {} return [];})();
+      const sleepDiary: any[] = (()=> { try { return JSON.parse(localStorage.getItem('he_sleep_diary')||'[]'); } catch { return []; }})();
+      const lastSleep = sleepDiary.length? [...sleepDiary].sort((a,b)=> b.date.localeCompare(a.date))[0]?.hours ?? null : null;
+      const sections = generateBBRecommendations({
+        plan: plan as any,
+        params: { goal: profile?.goals?.bbGoal || 'hypertrophy', level: profile?.training?.level || 'intermediate' } as any,
+        historyWorkouts,
+        profile: { weight: profile?.personal?.weight || 80, proteinPerKg: profile?.nutrition?.proteinPerKg } as any,
+        nutrition, supportSubs,
+        readiness: { lastRecovery: readiness, lowDays: 0 },
+        acwr: { ratio: acwr.ratio, zone: acwr.zone } as any,
+        lastSleepHours: lastSleep,
+      } as any);
+      return { sections, summary: bbRecSummary(sections) };
+    } catch { return null; }
+  }, [readiness, acwr, sessions.length]);
 
   // unified apply: один раз, без дублей
   const applyUnified = ()=> {
@@ -647,6 +704,43 @@ export const UnifiedIntelligenceHub: React.FC = () => {
             </div>
             <div style={{ ...SMALL, marginTop:8, padding:'7px 10px', borderRadius:9, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)' }}>{whatIf.note}</div>
           </MetricCard>
+        </div>
+      </section>
+
+      {/* ——— РЕКОМЕНДАЦИИ ББ (перенесено из дневника) ——— */}
+      <section id="sec-recommendations" ref={el=> refs.current['recommendations']=el} style={{ scrollMarginTop:56 }}>
+        <div style={{ ...CARD, borderLeft:`3px solid #8b5cf6` }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+            <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.22)', fontSize:14 }}>💡</span>
+            <div>
+              <div style={{ fontSize:13, fontWeight:900, color:'#8b5cf6' }}>Рекомендации · ББ-аудит</div>
+              <div style={{ fontSize:10, color:DIM }}>План / PED / питание / добавки / выполнение — единственный ББ-аудит (перенесён из дневника)</div>
+            </div>
+            {bbRecs && <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 8px', borderRadius:20, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.22)', color:'#8b5cf6', fontWeight:800 }}>{bbRecs.summary.total} · ⚠{bbRecs.summary.warns} · 🔴{bbRecs.summary.criticals}</span>}
+          </div>
+          {!bbRecs ? (
+            <div style={{ ...SMALL, padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+              Нет активного ББ-плана для аудита. Соберите план в <b>ББ-авто</b> или <b>Ручном конструкторе</b> — рекомендации появятся (PED, питание, добавки, выполнение vs факт, сон, ACWR).
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {bbRecs.sections.map((sec:any, idx:number)=> (
+                <div key={idx} style={{ padding:'10px 12px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:4 }}>{sec.title}</div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                    {sec.items.map((it:any,i:number)=> {
+                      const col = it.severity==='critical' ? '#ef4444' : it.severity==='warn' ? '#eab308' : '#60a5fa';
+                      return <div key={i} style={{ display:'flex', gap:8, fontSize:11, lineHeight:1.4, color:'#fff', background:`${col}0d`, border:`1px solid ${col}22`, borderRadius:8, padding:'6px 8px' }}>
+                        <span style={{ minWidth:6, height:6, borderRadius:6, background:col, marginTop:6, flexShrink:0 }} />
+                        <span>{it.text}</span>
+                        {it.severity!=='info' && <span style={{ marginLeft:'auto', fontSize:9, padding:'2px 6px', borderRadius:10, background:`${col}18`, color:col, fontWeight:800, whiteSpace:'nowrap' }}>{it.severity==='critical'?'🔴 крит':'⚠ варн'}</span>}
+                      </div>;
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

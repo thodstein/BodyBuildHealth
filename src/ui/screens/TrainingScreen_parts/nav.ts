@@ -62,11 +62,10 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     title: '📖 Библиотека',
     icon: '📖',
     color: '#f59e0b',
-    subtitle: 'Каталог процессов: циклы, программы, методики, упражнения',
-    // «Мои тренировки» перенесены в Дневник. peaking/calc_taper перенесены в Интеллект → taper_planner (единый калькулятор ПЛ/ББ)
-    tabs: ['library', 'programs', 'methods', 'exercises'],
+    subtitle: 'Каталог процессов: циклы, программы, методики, упражнения + мои',
+    tabs: ['library', 'programs', 'mytraining', 'methods', 'exercises'],
     categories: [
-      { label: 'Процессы', icon: '🗂', tabs: ['library', 'programs'] },
+      { label: 'Процессы', icon: '🗂', tabs: ['library', 'programs', 'mytraining'] },
       { label: 'Знания и методики', icon: '🧠', tabs: ['methods', 'exercises'] },
     ],
   },
