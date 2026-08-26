@@ -864,15 +864,15 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
   return (
     <div className="screen risk" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
-      {/* ─── HERO PAGE — glass + KPI, фикс перекрытия ─── */}
+      {/* ─── HERO PAGE — на весь экран, fixed overlay ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', overflowY:'auto', WebkitOverflowScrolling:'touch', background:'#080a12' }}>
-          <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:80, display:'flex', flexDirection:'column', overflowY:'auto', WebkitOverflowScrolling:'touch', background:'#080a12' }}>
+          <div style={{ position:'absolute', inset:0, zIndex:0, pointerEvents:'none' }}>
             <img src="/risk-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:0.92 }} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(8,10,18,0.18) 0%, rgba(8,10,18,0.52) 42%, rgba(8,10,18,0.92) 78%, #080a12 100%)' }} />
             <div style={{ position:'absolute', inset:0, background:'radial-gradient(560px 380px at 16% 14%, rgba(139,92,246,0.16), transparent 68%), radial-gradient(600px 420px at 92% 88%, rgba(34,197,94,0.10), transparent 65%)' }} />
           </div>
-          <div style={{ position:'relative', zIndex:1, flex:'0 0 auto', display:'flex', flexDirection:'column', justifyContent:'flex-start', padding:'26px 16px calc(18px + 72px + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box', minHeight:'100dvh' }}>
+          <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'28px 16px calc(84px + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
               <span style={{ padding:'4px 9px', borderRadius:999, background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.24)', color:'#a78bfa', fontSize:9, fontWeight:800, letterSpacing:0.6 }}>RISK • HEALTH OS</span>
               <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{riskResult ? `риск ${Math.round(riskResult.overallNet)}% • ${riskResult.overallNet<25?'низкий':riskResult.overallNet<50?'умеренный':'высокий'}` : 'модель ТЗ'}</span>
@@ -1083,14 +1083,14 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       </div>
          </div>
        )}
-      {/* ─── BOTTOM TABS — зеро, внизу, только механизм ─── */}
+      {/* ─── BOTTOM TABS — зеро, внизу, только механизм, уменьшены ─── */}
       {mainTab !== 'hero' && (
-        <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:6, overflowX:'auto', padding:'8px 10px calc(8px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.84)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.06)', scrollbarWidth:'none' }}>
+        <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:5, overflowX:'auto', padding:'6px 8px calc(6px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.88)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.07)', scrollbarWidth:'none' }}>
           <button onClick={() => { setMainTab('tz_spec' as any); setSubTab('overview' as any); }} style={{
-            flex:'0 0 auto', padding:'8px 14px', borderRadius:999, fontSize:11, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
-            background: mainTab==='tz_spec' ? '#8b5cf6' : 'rgba(255,255,255,0.06)', color: mainTab==='tz_spec' ? '#fff' : 'rgba(255,255,255,0.72)', border: mainTab==='tz_spec' ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)',
+            flex:'0 0 auto', padding:'6px 10px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
+            background: mainTab==='tz_spec' ? '#8b5cf6' : 'rgba(255,255,255,0.06)', color: mainTab==='tz_spec' ? '#fff' : 'rgba(255,255,255,0.70)', border: mainTab==='tz_spec' ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)',
           }}>🧬 Механизм</button>
-          <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)', alignSelf:'center', marginLeft:6 }}>только механизм-ориентированная модель</span>
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)', alignSelf:'center', marginLeft:4 }}>только механизм</span>
         </div>
       )}
      </div>

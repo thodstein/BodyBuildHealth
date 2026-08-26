@@ -36,6 +36,19 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
     expertRecentVol, expertRirStats, tprofile, mesoLength, level, linked, onRefresh,
     setMode, onGoRecord,
   } = hub;
+  if (!analytics) {
+    return (
+      <div style={style.card}>
+        <div style={style.label}>📊 Аналитика</div>
+        <div style={{ fontSize: 11, color: '#fff', textAlign: 'center', padding: 20, lineHeight:1.5 }}>
+          Нет данных для аналитики. Запишите хотя бы 2 тренировки — здесь появится объём, интенсивность, баланс мышц и прогресс.
+        </div>
+        <div style={{ marginTop:8, display:'flex', justifyContent:'center' }}>
+          <button onClick={() => hub.setMode('record' as any)} style={{ padding:'7px 12px', borderRadius:999, fontSize:11, fontWeight:700, background:'var(--accent)', color:'#000', border:'none', cursor:'pointer' }}>← К записи</button>
+        </div>
+      </div>
+    );
+  }
   return (
         <div>
           {analytics ? (

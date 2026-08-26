@@ -583,15 +583,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   return (
     <div className="screen labs" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
 
-      {/* ─── HERO PAGE — на весь экран, без fixed (фикс: hero не показывался из-за fixed+zIndex) ─── */}
+      {/* ─── HERO PAGE — на весь экран, fixed overlay, glass не перекрывает ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position:'relative', minHeight:'100vh', display:'flex', flexDirection:'column', background:'#070a12', overflow:'hidden' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:80, display:'flex', flexDirection:'column', overflowY:'auto', WebkitOverflowScrolling:'touch', background:'#070a12' }}>
           <div style={{ position:'absolute', inset:0, zIndex:0, pointerEvents:'none' }}>
             <img src="/lab-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:0.92 }} />
             <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(7,10,18,0.22) 0%, rgba(7,10,18,0.58) 42%, rgba(7,10,18,0.94) 78%, #070a12 100%)' }} />
             <div style={{ position:'absolute', inset:0, background:'radial-gradient(560px 380px at 18% 14%, rgba(0,230,138,0.16), transparent 68%), radial-gradient(600px 420px at 92% 88%, rgba(59,130,246,0.11), transparent 65%)' }} />
           </div>
-          <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'28px 16px calc(28px + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
+          <div style={{ position:'relative', zIndex:1, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'28px 16px calc(84px + env(safe-area-inset-bottom,0px))', maxWidth:560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
               <span style={{ padding:'4px 9px', borderRadius:999, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.24)', color:LABS_ACCENT, fontSize:9, fontWeight:800, letterSpacing:0.6 }}>LABS • HEALTH OS</span>
               <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{hasLabs ? `${currentLabs.length} маркеров • ${PHASE_LABELS[selectedPhase]}` : 'Нет данных — начните с ввода'}</span>
@@ -2072,13 +2072,13 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
 
       </div>
        )}
-      {/* ─── BOTTOM TABS — зеро, внизу ─── */}
-      {mainTab === 'lab' && (
-        <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:6, overflowX:'auto', padding:'8px 10px calc(8px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.84)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.06)', scrollbarWidth:'none' }}>
+      {/* ─── BOTTOM TABS — зеро, внизу, уменьшены ─── */}
+      {mainTab === 'lab' && mainTab !== 'hero' && (
+        <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:5, overflowX:'auto', padding:'6px 8px calc(6px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.88)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.07)', scrollbarWidth:'none' }}>
           {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
             <button key={t.id} onClick={() => setSubTab(t.id)} style={{
-              flex:'0 0 auto', padding:'8px 14px', borderRadius:999, fontSize:11, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
-              background: subTab===t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)', color: subTab===t.id ? '#000' : 'rgba(255,255,255,0.72)', border: subTab===t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', boxShadow: subTab===t.id ? '0 4px 12px rgba(0,230,138,0.18)' : 'none',
+              flex:'0 0 auto', padding:'6px 10px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
+              background: subTab===t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)', color: subTab===t.id ? '#000' : 'rgba(255,255,255,0.70)', border: subTab===t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)',
             }}>{t.icon} {t.label}</button>
           ))}
         </div>
