@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeEnergyAvailability, getCalciumTarget, calciumDoseSplitNote, getMenstrualPhaseNutrition } from '../planner-female-cycle';
-import { getBBCategory, getPeakWeekDay, getCombinedDeficitMod, getCategoryDeficitMod, getTargetBFDeficitMod } from '../planner-categories';
+import { getBBCategory, getCombinedDeficitMod, getCategoryDeficitMod, getTargetBFDeficitMod } from '../planner-categories';
 import { detectMealInteractions, cookMethodGuidance } from '../planner-food-interactions';
 import { getMicro } from '../../../../../core/nutrition-micros';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
@@ -83,23 +83,6 @@ describe('category deficit + target-BF (#3, #7)', () => {
   it('getBBCategory respects sex', () => {
     expect(getBBCategory('bikini', 'male')).toBeNull();
     expect(getBBCategory('mens_bb', 'male')).not.toBeNull();
-  });
-});
-
-describe('peak-week protocol (#4)', () => {
-  it('depletion (D-6) low carb, high water', () => {
-    const d = getPeakWeekDay(6);
-    expect(d.carbMod).toBeLessThan(1);
-    expect(d.waterMod).toBeGreaterThan(1);
-  });
-  it('load (D-4) high carb', () => {
-    const d = getPeakWeekDay(4);
-    expect(d.carbMod).toBeGreaterThan(1.5);
-  });
-  it('show day (D-0) min water + min sodium', () => {
-    const d = getPeakWeekDay(0);
-    expect(d.waterMod).toBeLessThan(0.5);
-    expect(d.sodiumMod).toBeLessThan(0.5);
   });
 });
 

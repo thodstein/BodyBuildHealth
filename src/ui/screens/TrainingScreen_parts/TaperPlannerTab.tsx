@@ -12,7 +12,7 @@ import {
 import { generateBBPeaking, type BBPeakingOutput } from '../../../engines/peaking-engine';
 import { buildPLTaperCurve, type TaperMode } from '../../../engines/lms/lms-taper.engine';
 import { getPeakCycles, buildPeakCycleTaperCurve } from '../../../engines/lms/pl-peak-cycle-taper.engine';
-import { buildBBContestPrep, isoToday, isoAddDays, normalizeContestCategory, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
+import { buildBBContestPrep, isoToday, isoAddDays, normalizeContestCategory, planFromStored, configFromPlan, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
 import {
   selectWeightClassForSex, generateCompetitionTimeline,
   getRecoveryProtocols, getMentalRoutines, recommendWeightCut,
@@ -203,14 +203,39 @@ export const TaperPlannerTab: React.FC = () => {
   const mental = useMemo(() => getMentalRoutines(), []);
   const warmup = plan ? warmupSequence(plan.attempts.squat.opener) : [];
 
-  // ── Расчёты BB (canonical engine: bb-contest-prep.engine.ts) ──
+  // ── Расчёты BB — единый план из профиля (bb-contest-prep-sync) ──
+  // Хардкод weeksOut=1 / minimal / constant удалён — читаем сохранённый план, иначе подсказка настроить в ББ-авто/питании.
   const bb: BBPeakingOutput | null = useMemo(() => {
     if (kind !== 'bb') return null;
     try {
-      const profile = (() => { try { return (getProfile().settings as any) || {}; } catch { return {}; } })();
-      const bbSex: 'male' | 'female' = profile?.personal?.sex === 'female' ? 'female' : 'male';
-      const bbCategory = String(profile?.goals?.bbCategory || (bbSex === 'female' ? 'bikini' : 'mens_physique'));
-      const bbWeight = Number(profile?.personal?.weight) > 0 ? Number(profile.personal.weight) : 80;
+      const s: any = (() => { try { return (getProfile().settings as any) || {}; } catch { return {}; } })();
+      // Приоритет — сохранённый версионированный план
+      const storedPlan = planFromStored(s?.goals?.bbContestPrepPlan, s?.goals?.bbPeakConfig, s?.goals, s?.personal);
+      if (storedPlan) {
+        const cfgForPeak = (() => { try { return configFromPlan(storedPlan); } catch { return null; } })();
+        const res = cfgForPeak ? buildBBContestPrep(cfgForPeak) : null;
+        if (res) {
+          return {
+            weekPlan: res.peakWeek.map((d: any) => ({
+              day: d.day,
+              training: d.training.type,
+              carbs: `${d.carbsG} г`,
+              water: `${d.waterLiters} л`,
+              sodium: `${d.sodiumMg} мг`,
+              posing: `${d.posingMinutes} мин`,
+            })),
+            recommendations: [
+              ...res.warnings,
+              `План: шоу ${storedPlan.showDate} · ${storedPlan.category} · тапер ${storedPlan.taper.weeks} нед`,
+              'Вода и натрий стабильны по умолчанию; резкие манипуляции — только с подтверждением.',
+            ],
+          };
+        }
+      }
+      // Fallback — превью на дату showDate из профиля (минимальный безопасный конфиг)
+      const bbSex: 'male' | 'female' = s?.personal?.sex === 'female' ? 'female' : 'male';
+      const bbCategory = String(s?.goals?.bbCategory || (bbSex === 'female' ? 'bikini' : 'mens_physique'));
+      const bbWeight = Number(s?.personal?.weight) > 0 ? Number(s.personal.weight) : 80;
       const cfg: BBContestPrepConfig = {
         sex: bbSex,
         category: normalizeContestCategory(bbCategory, bbSex),
@@ -225,9 +250,9 @@ export const TaperPlannerTab: React.FC = () => {
         waterStrategy: 'minimal',
         sodiumStrategy: 'constant',
       };
-      const res = buildBBContestPrep(cfg);
+      const res2 = buildBBContestPrep(cfg);
       return {
-        weekPlan: res.peakWeek.map(d => ({
+        weekPlan: res2.peakWeek.map((d: any) => ({
           day: d.day,
           training: d.training.type,
           carbs: `${d.carbsG} г`,
@@ -236,9 +261,8 @@ export const TaperPlannerTab: React.FC = () => {
           posing: `${d.posingMinutes} мин`,
         })),
         recommendations: [
-          ...res.warnings,
-          'Вода и натрий стабильны по умолчанию; резкие манипуляции недоступны без подтверждения.',
-          'Объём тапера снижается, интенсивность сохраняется, RIR 2–4 — без отказных серий.',
+          ...res2.warnings,
+          'Нет сохранённого плана — показано превью на выбранную дату. Настройте полный тапер в ББ-авто или во вкладке «🏁 Тапер ББ» питания.',
         ],
       };
     } catch { return null; }

@@ -32,8 +32,9 @@ import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine
 import { buildDayPlan as buildDayPlanV2, snapPortionG, type DayPlanV2, type MealPlanInput, type BreakfastStyle, type BreakfastTemplateId } from "./meal-plan-engine";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
-import { getBBCategory, type BBCategory, getPeakWeekDay, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
+import { getBBCategory, type BBCategory, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
 import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
+import { saveContestPrepEverywhere, clearContestPrepEverywhere, migrateLegacyContestPrepIfNeeded, CONTEST_PREP_UPDATED_EVENT } from "../../../../engines/bb/bb-contest-prep-sync";
 import { annualPlanPhaseForDate } from "../../../../engines/annual-training/block-builders.engine";
 import { loadAnnualTrainingPlan } from "../../../../engines/annual-training/annual-training-storage";
 import type { AnnualTrainingPlan, AnnualBlockState } from "../../../../engines/annual-training/annual-training.types";
@@ -445,17 +446,29 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch { return null; }
   });
   const setBBPrepConfig = (cfg: BBContestPrepConfig | null) => {
+    if (!cfg) {
+      setBBPrepConfigState(null);
+      setBBPrepPlan(null);
+      try { clearContestPrepEverywhere(); } catch {}
+      return;
+    }
+    // Единая запись: версионированный план + зеркало конфига + событие
+    try {
+      const plan = saveContestPrepEverywhere(cfg, { source: 'planner', prepWeeks: 12, taperWeeks: cfg.weeksOut });
+      if (plan) {
+        setBBPrepConfigState(cfg);
+        setBBPrepPlan(plan);
+        return;
+      }
+    } catch {}
+    // fallback — старая логика, если сборка плана не удалась
     setBBPrepConfigState(cfg);
     setBBPrepPlan(null);
     try {
-      if (cfg) {
-        updateSection('goals', { bbPeakConfig: serializeBBPrepConfig(cfg), peakWeek: true, peakShowDay: cfg.showDate });
-      } else {
-        updateSection('goals', { bbPeakConfig: undefined as any, peakWeek: false });
-      }
+      updateSection('goals', { bbPeakConfig: serializeBBPrepConfig(cfg), peakWeek: true, peakShowDay: cfg.showDate });
     } catch {}
   };
-  // 🏁 Живая синхронизация: событие he-bb-contest-prep-updated из BB Auto
+  // 🏁 Живая синхронизация: событие he-bb-contest-prep-updated из BB Auto / питания
   // (собран/изменён prep-план) → перечитать единый план из профиля.
   useEffect(() => {
     const onPrepUpdated = () => {
@@ -465,8 +478,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         if (p) { setBBPrepPlan(p); setBBPrepConfigState(configFromPlan(p)); }
       } catch { /* ignore */ }
     };
+    window.addEventListener(CONTEST_PREP_UPDATED_EVENT as any, onPrepUpdated);
     window.addEventListener('he-bb-contest-prep-updated', onPrepUpdated);
-    return () => window.removeEventListener('he-bb-contest-prep-updated', onPrepUpdated);
+    return () => {
+      window.removeEventListener(CONTEST_PREP_UPDATED_EVENT as any, onPrepUpdated);
+      window.removeEventListener('he-bb-contest-prep-updated', onPrepUpdated);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Однократная миграция: голый bbPeakConfig → версионированный план
+  useEffect(() => {
+    try {
+      const migrated = migrateLegacyContestPrepIfNeeded({ prepWeeks: 12 });
+      if (migrated) {
+        setBBPrepPlan(migrated);
+        setBBPrepConfigState(configFromPlan(migrated));
+      }
+    } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // 🗓 Годовой план (событие he-annual-training-plan-updated): живьё перечитываем
@@ -486,11 +514,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     [annualPlan],
   );
   const applyBBPeakToPlan = (cfg: BBContestPrepConfig | null) => {
-    setBBPrepConfig(cfg);
-    // D-28 fix (жалоба «тапер план невозможно отключить»): при cfg=null сбрасываем и
-    // peakWeekEnabled (иначе legacy _legacyPeakDay продолжал применять пик-день, т.к.
-    // setBBPrepConfig(null) писал только в профиль, а локальный state оставался true).
-    if (!cfg) setPeakWeekEnabled(false);
+    if (!cfg) {
+      try { clearContestPrepEverywhere(); } catch {}
+      setBBPrepConfigState(null);
+      setBBPrepPlan(null);
+      setPeakWeekEnabled(false);
+    } else {
+      setBBPrepConfig(cfg);
+    }
     try {
       generatePlan(planDays as 1 | 3 | 7, undefined, selectedDayIndex);
       setPlanTab('plan');
@@ -2388,7 +2419,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // #3+#7 Категория + target-BF: комбинированный дефицит-мод (более консервативный, без RED-S).
         if (_bbCat) { const _defMod = getCombinedDeficitMod(bfPct, _bbCat.targetBodyFatPct, goal === 'cutting' || goal === 'fat_loss'); dayKcalMod *= _defMod; }
         // #4 Пик-неделя ББ: legacy-множители работают только без нового конфига (bbPrepConfig).
-        const _legacyPeakDay = (peakWeekEnabled && !bbPrepConfig) ? getPeakWeekDay(peakWeekShowDay - (offset % 7)) : null;
+        const _legacyPeakDay = null; // legacy getPeakWeekDay удалён — единый план через bbContestPrepPlan
         if (_legacyPeakDay) { dayCarbMod *= _legacyPeakDay.carbMod; }
         let _peakNote: string | undefined = _legacyPeakDay ? _legacyPeakDay.note : undefined;
         // #10 Жизненные этапы / контрацепция.

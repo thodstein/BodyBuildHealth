@@ -51,24 +51,9 @@ export function categoriesForSex(sex: 'male' | 'female'): BBCategoryInfo[] {
 }
 
 
-// ── #4 Peak-week protocol (competition prep) ─────────────────────────
-// daysBeforeShow: 0 = show day, 1 = day before, ..., 6 = 6 days out.
-// Стандартный протокол: depletion → load → cut water/Na в день выступления.
-export interface PeakWeekDay {
-  carbMod: number;
-  waterMod: number;   // множитель воды
-  sodiumMod: number;  // множитель натрия
-  note: string;
-}
-
-export function getPeakWeekDay(daysBeforeShow: number): PeakWeekDay {
-  if (daysBeforeShow >= 5) return { carbMod: 0.5, waterMod: 1.3, sodiumMod: 1.0, note: `🏋 Peak-week D-${daysBeforeShow}: ИСТОЩЕНИЕ гликогена — низкие углеводы (×0.5), много воды (×1.3), натрий стабилен. Тяжёлые тренировки depletion.` };
-  if (daysBeforeShow >= 3) return { carbMod: 2.0, waterMod: 1.3, sodiumMod: 1.0, note: `🏋 Peak-week D-${daysBeforeShow}: ЗАГРУЗКА гликогена — высокие углеводы (×2.0), вода высокая, натрий стабилен. Мышцы наполняются.` };
-  if (daysBeforeShow === 2) return { carbMod: 1.5, waterMod: 0.8, sodiumMod: 0.8, note: `🏋 Peak-week D-2: загрузка продолжается (×1.5), вода снижается (×0.8), натрий начинает снижаться (×0.8).` };
-  if (daysBeforeShow === 1) return { carbMod: 1.0, waterMod: 0.5, sodiumMod: 0.5, note: `🏋 Peak-week D-1: вода резко вниз (×0.5), наторий вниз (×0.5), углеводы умеренно. Сушка под кожей.` };
-  // show day
-  return { carbMod: 0.8, waterMod: 0.3, sodiumMod: 0.3, note: `🏆 SHOW DAY: минимум воды (×0.3), минимум натрия (×0.3), углеводы умеренно для пампинга. Тренировка пампинга перед выходом.` };
-}
+// ── #4 Peak-week protocol — УДАЛЁН ──
+// Legacy getPeakWeekDay (depletion/load множители) заменён единой системой bb-contest-prep.engine
+// (buildBBContestPrep/buildPeakWeek + nutritionTargetsForPrepDate). См. bb-contest-prep-sync.ts.
 
 
 // ── #3 Категория -> агрессивность дефицита при сушке ────────────────

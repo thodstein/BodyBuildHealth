@@ -89,6 +89,7 @@ import {
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
 } from '../../../engines/bb/bb-contest-prep.engine';
+import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded } from '../../../engines/bb/bb-contest-prep-sync';
 import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
@@ -901,8 +902,24 @@ export const BbAutoConstructor: React.FC = () => {
     flash(`⚖️ Применено (одна переменная): ${parts.join(' · ')}. Эффект оценивайте через 5-7 дней по среднему весу.`);
   };
 
-  // 🏁 Авто-восстановление сохранённого prep-плана после перезагрузки.
+  // 🏁 Авто-восстановление сохранённого prep-плана после перезагрузки + миграция legacy.
   useEffect(() => {
+    try {
+      const migrated = migrateLegacyContestPrepIfNeeded({ prepWeeks: 12 });
+      if (migrated) {
+        setPrepPlan(migrated);
+        setPrepShowDate(migrated.showDate);
+        setPrepWeeks(migrated.preparation.weeks);
+        setPrepTaperWeeks(migrated.taper.weeks);
+        setPeakWeekCategory(migrated.category);
+        setPrepWaterMode(migrated.peakWeek.waterMode);
+        setPrepSodiumMode(migrated.peakWeek.sodiumMode);
+        setPrepCarbMode(migrated.peakWeek.carbMode);
+        if (migrated.preparation.volumeMult != null) setPrepVolumeMode(migrated.preparation.volumeMult);
+        setLastTest(migrated.testPeakWeekId ? latestTestPeakWeek(migrated.id) : null);
+        return;
+      }
+    } catch {}
     try {
       const prof = (linked.profile?.settings ?? {}) as any;
       const stored = planFromStored(prof?.goals?.bbContestPrepPlan, prof?.goals?.bbPeakConfig, prof?.goals, prof?.personal);
@@ -918,6 +935,36 @@ export const BbAutoConstructor: React.FC = () => {
       if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
       setLastTest(stored.testPeakWeekId ? latestTestPeakWeek(stored.id) : null);
     } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Кросс-синхронизация: правки из питания (saveContestPrepEverywhere source=planner) → обновить локальные состояния без пересборки плана
+  useEffect(() => {
+    const handler = () => {
+      try {
+        const prof = (linked.profile?.settings ?? {}) as any;
+        const stored = planFromStored(prof?.goals?.bbContestPrepPlan, prof?.goals?.bbPeakConfig, prof?.goals, prof?.personal);
+        if (!stored) return;
+        // Не трогаем builtPlan — только мета-состояния шага contest
+        setPrepPlan(prev => {
+          if (prev && prev.id === stored.id && prev.updatedAt === stored.updatedAt) return prev;
+          return stored;
+        });
+        setPrepShowDate(stored.showDate);
+        setPrepWeeks(stored.preparation.weeks);
+        setPrepTaperWeeks(stored.taper.weeks);
+        setPeakWeekCategory(stored.category);
+        setPrepWaterMode(stored.peakWeek.waterMode);
+        setPrepSodiumMode(stored.peakWeek.sodiumMode);
+        setPrepCarbMode(stored.peakWeek.carbMode);
+        if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
+      } catch {}
+    };
+    window.addEventListener(CONTEST_PREP_UPDATED_EVENT as any, handler);
+    window.addEventListener('he-bb-contest-prep-updated' as any, handler);
+    return () => {
+      window.removeEventListener(CONTEST_PREP_UPDATED_EVENT as any, handler);
+      window.removeEventListener('he-bb-contest-prep-updated' as any, handler);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
@@ -962,16 +1009,9 @@ export const BbAutoConstructor: React.FC = () => {
   const applyPeakWeekToCurrentPlan = (category: BBContestCategory, spec: ContestSpecialization = peakSpec) => {
     setPeakWeekCategory(category);
     setPeakSpec(spec);
-    if (!builtPlan) return;
-    try {
-      const cfg = buildPeakConfig();
-      const res = buildBBContestPrep({ ...cfg, category, sex: (CATEGORY_PROFILES[category] ?? CATEGORY_PROFILES.mens_physique).sex, specialization: spec });
-      setPeakPrep(res);
-      setBuiltPlan(applyPeakWeekOverlayToBBPlan(builtPlan, res.config));
-      setShowPeakWeek(true);
-    } catch (e) {
-      flash(`Не удалось построить пик-неделю: ${(e as Error).message}`);
-    }
+    // Единый путь: вести на шаг Contest Prep (полный тапер), а не deprecated overlay
+    setStep('contest');
+    flash('→ Шаг «🏁 Contest Prep»: настройте полный тапер и пик-неделю, затем «Собрать и применить»');
   };
   // PRO: per-muscle frequency optimization
   const [freqOptResult, setFreqOptResult] = useState<FrequencyOptimizationResult | null>(null);
