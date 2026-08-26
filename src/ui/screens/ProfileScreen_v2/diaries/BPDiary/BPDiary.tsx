@@ -44,7 +44,6 @@ import {
   calcPulsePressure,
   calcBPLoad,
   calcVariability,
-  checkOrthostatic,
   getCircadianPattern,
   compareMedsVsNoMeds,
   calculateGoalAchievement,
@@ -243,13 +242,12 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
     normalPct: recentRows.length ? Math.round(recentRows.filter(x => x.systolic < 130 && x.diastolic < 80).length / recentRows.length * 100) : 0,
   }), [recentRows]);
 
-  // Advanced metrics — memo
-  const { bpLoad, variability, mapAvg, ppAvg, orthostatic, circadian, medsCompare, goalAchievement, defaultGoals } = useMemo(() => ({
+  // Advanced metrics — memo (ортостатический тест — только парные замеры одного дня via getOrthostaticPairs)
+  const { bpLoad, variability, mapAvg, ppAvg, circadian, medsCompare, goalAchievement, defaultGoals } = useMemo(() => ({
     bpLoad: calcBPLoad(recentRows),
     variability: calcVariability(recentRows),
     mapAvg: recentRows.length ? Math.round(recentRows.reduce((n, x) => n + calcMAP(x.systolic, x.diastolic), 0) / recentRows.length) : 0,
     ppAvg: recentRows.length ? Math.round(recentRows.reduce((n, x) => n + calcPulsePressure(x.systolic, x.diastolic), 0) / recentRows.length) : 0,
-    orthostatic: checkOrthostatic(recentRows),
     circadian: getCircadianPattern(recentRows),
     medsCompare: compareMedsVsNoMeds(recentRows),
     goalAchievement: calculateGoalAchievement(recentRows, { systolicTarget: bpGoal, diastolicTarget: 80, hrTarget: 72 }),
@@ -398,7 +396,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   <h2>Анализ</h2>
   <p><b>Вариабельность (SD):</b> систола ${variability.sysSD.toFixed(1)}, диастола ${variability.diaSD.toFixed(1)}</p>
   <p><b>Достижение целей:</b> систола ≤${bpGoal} — ${goalAchievement.systolicAchieved}%, диастола ≤80 — ${goalAchievement.diastolicAchieved}%</p>
-  ${orthostatic.detected ? `<p><b>Ортостатический тест:</b> сидя→стоя ${orthostatic.dropS >= 20 ? '⚠ падение систолы на ' + orthostatic.dropS : 'норма'}</p>` : ''}
+  ${orthoLatest ? `<p><b>Ортостатический тест (${orthoLatest.date}):</b> сидя ${orthoLatest.sitting.systolic}/${orthoLatest.sitting.diastolic} → стоя ${orthoLatest.standing.systolic}/${orthoLatest.standing.diastolic} — ${orthoLatest.isOrthostatic ? '⚠ ортостатическая гипотензия' : 'норма'}</p>` : ''}
   ${circadian.isNonDipper ? '<p><b>⚠ Non-dipper паттерн:</b> ночное АД не снижается</p>' : ''}
 </div>
 
@@ -613,9 +611,11 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
               </thead>
               <tbody>
                 {(() => {
+                  // Карта id→запись для O(1) и корректного маппинга при дублях даты (напр. 2 замера в день)
+                  const byId = new Map<string, BPEntry>(rows.map((r) => [r.id ?? '', r]));
                   const dayGroups = new Map<string, BPEntry[]>();
                   for (const e of pageData.pageItems) {
-                    const x = rows.find(r => r.id === e.id) || rows.find(r => r.date === e.date);
+                    const x = e.id ? byId.get(e.id) : undefined;
                     if (!x) continue;
                     const list = dayGroups.get(x.date) || [];
                     list.push(x);
