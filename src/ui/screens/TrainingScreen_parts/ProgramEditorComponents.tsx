@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ProgramEditorComponents.tsx — extracted sub-components for BB/PL program editing.
  * Extracted from ProgramManagerPanel.tsx.
