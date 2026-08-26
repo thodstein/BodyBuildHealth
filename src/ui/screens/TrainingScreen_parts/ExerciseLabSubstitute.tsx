@@ -1,3 +1,4 @@
+/** @deprecated — дубль ProSubstitute (канон в ExerciseLabMerged → ProSubstitute). Оставлен как редирект. */
 import React, { useMemo, useState } from 'react';
 import { EXERCISE_CATALOG, canReplace, getExerciseById, getSubstitutes } from '../../../core/exercise-catalog';
 import { PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';

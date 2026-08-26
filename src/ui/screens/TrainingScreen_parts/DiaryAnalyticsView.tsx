@@ -157,32 +157,18 @@ export const DiaryAnalyticsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
                   <span>🟢 Выносливость {analytics.intensity.intensityDistribution.endurance}%</span>
                 </div>
               </div>
-              {/* Volume by group stacked bars */}
+              {/* Volume by group stacked bars — ACWR/MRV демотированы к хабам */}
               {totals.some(t => t > 0) && (
                 <div style={style.card}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <div style={style.label} >📊 Объём по неделям (сеты)</div>
-                    {(() => {
-                      const acwr = expertAcwr;
-                      const zoneColor = acwr > 1.5 ? '#ef4444' : acwr > 1.3 ? '#eab308' : acwr < 0.8 ? '#3b82f6' : '#22c55e';
-                      const zoneLabel = acwr > 1.5 ? 'опасно' : acwr > 1.3 ? 'осторожно' : acwr < 0.8 ? 'недотрен' : 'оптимум';
-                      return (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, padding: '2px 8px', borderRadius: 10, color: zoneColor, border: `1px solid ${zoneColor}55`, background: `${zoneColor}14` }}>
-                          ACWR {acwr.toFixed(2)} · {zoneLabel}
-                        </span>
-                      );
-                    })()}
+                    <span style={{ fontSize:9, padding:'2px 8px', borderRadius:20, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', color:'#3b82f6' }}>факт · история</span>
                   </div>
-                  {/* MRV reference: avg ~20 sets/week for large groups */}
+                  <div style={{ fontSize:9, color:'#fff', background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.14)', borderRadius:8, padding:'6px 8px', marginBottom:6, lineHeight:1.4 }}>
+                    ACWR → <b>⚡ Интеллект → Нагрузка</b> · MRV/MEV → <b>📐 Объём-хаб</b> (канон)
+                  </div>
                   <div style={{ position: 'relative', height: 100, marginBottom: 4 }}>
-                    {/* MRV reference line */}
-                    {totals.some(t => t > 0) && (() => {
-                      const maxT = Math.max(...totals, 1);
-                      const mrvPct = Math.min((20 / maxT) * 100, 95);
-                      return <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${mrvPct}%`, height: 1, background: 'rgba(239,68,68,0.4)', zIndex: 1 }}>
-                        <span style={{ position: 'absolute', right: 0, top: -8, fontSize: 8, color: 'rgba(239,68,68,0.6)' }}>MRV</span>
-                      </div>;
-                    })()}
+
                     <div style={{ display: 'flex', gap: 2, height: '100%', alignItems: 'flex-end' }}>
                       {totals.map((t, wi) => (
                         <div key={wi} style={{ flex: 1, display: 'flex', flexDirection: 'column-reverse', height: '100%', borderRadius: 3, overflow: 'visible', background: t > 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>

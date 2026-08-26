@@ -1,19 +1,17 @@
-/** ToolsHub.tsx — инструмент PRI/паттерн (ПРИ-готовность → объём/RIR + схема повторов).
- * Блины перенесены в Объём-хаб, «Основа ББ» удалена — без дублей. */
+/** ToolsHub.tsx — DEPRECATED: PRI вынесен в Интеллект → Авторегуляция (единственный источник).
+ * Оставлен как редирект, чтобы не ломать deep-link. */
 import React from 'react';
-import { PriRepPatternCard } from './PriRepPatternCard';
 
-const ACCENT = '#00e68a';
+const ACCENT = '#a855f7';
 const DIM = '#fff';
 
 export const ToolsHub: React.FC = () => {
   return (
-    <div style={{ padding: 12, color: '#fff' }}>
-      <div style={{ fontSize: 16, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>🧠 PRI / схема повторов</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 8, lineHeight: 1.45 }}>
-        PRI готовность → целевой объём/RIR + схема повторов (ПРИ-тест Masuda). Источник: PRI (Masuda), Helms/RPE/RIR — без выдумок.
+    <div style={{ padding: 14, textAlign:'center' }}>
+      <div style={{ fontSize:13, fontWeight:800, color:ACCENT, marginBottom:6 }}>🧠 PRI → Интеллект → Авторегуляция</div>
+      <div style={{ fontSize:11, color:DIM, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.18)', borderRadius:10, padding:'10px 12px', lineHeight:1.5 }}>
+        Канон теперь в <b>⚡ Интеллект тренировки → Авторегуляция</b> (PRI + pro-регуляция веса/объёма/RIR + RPE↔вес).<br/>Откройте <b>Тренировки → ⚡ Интеллект → ⚙️ Авторегуляция</b>.
       </div>
-      <PriRepPatternCard />
     </div>
   );
 };
