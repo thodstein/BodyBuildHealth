@@ -58,7 +58,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     return (
       <div style={{ position:'fixed', inset:0, zIndex:5, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
         <img src="/pharma-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.04) 55%, rgba(0,0,0,0.12) 85%, rgba(0,0,0,0.18) 100%)' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, transparent 0%, transparent 62%, rgba(0,0,0,0.10) 88%, rgba(0,0,0,0.18) 100%)' }} />
 
         {/* header — без стекла, hero открыт */}
         <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(20px + var(--nav-height,68px) + env(safe-area-inset-bottom))', maxWidth:560, width:'100%', margin:'0 auto' }}>
@@ -93,24 +93,24 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
               <button key={c.key} onClick={() => setPage(c.key)} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14,
                 cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.10)',
+                background:'transparent', border:'1px solid rgba(255,255,255,0.14)',
                 backdropFilter:'none', WebkitBackdropFilter:'none',
                 boxShadow:'none',
                 transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.18)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(0,0,0,0.32)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.10)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(0,0,0,0.22)'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.22)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.06)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.background='transparent'; }}
               >
                 <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center',
                   flexShrink:0, background:`${c.color}18`, border:`1px solid ${c.color}22`, fontSize:18 }}>{c.icon}</div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6, textShadow:'0 1px 10px rgba(0,0,0,0.7)' }}>
                     {c.title}
                     <span style={{ width:5, height:5, borderRadius:'50%', background:c.color }} />
                   </div>
-                  <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.desc}</div>
+                  <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', textShadow:'0 1px 8px rgba(0,0,0,0.6)' }}>{c.desc}</div>
                 </div>
-                <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', fontSize:12, flexShrink:0 }}>→</span>
+                <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.10)', border:'1px solid rgba(255,255,255,0.14)', color:'#fff', fontSize:12, flexShrink:0 }}>→</span>
               </button>
             ))}
           </div>

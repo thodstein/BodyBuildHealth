@@ -211,6 +211,27 @@ export const PharmaCourseScreen: React.FC = () => {
     return { left: `${s}%`, width: `${e}%` };
   };
 
+  const getDaysFromFreq = (freq: string): number[] => {
+    const s = String(freq||'').trim();
+    if (s === 'daily') return [0,1,2,3,4,5,6];
+    if (s === 'eod') return [0,2,4,6];
+    if (s === '3x/wk') return [0,2,4];
+    if (s === '2x/wk') return [1,4];
+    if (s === '1x/wk') return [3];
+    if (s.includes(',')) return s.split(',').map(v=>parseInt(v.trim(),10)).filter(n=>!isNaN(n)&&n>=0&&n<7);
+    const m = s.match(/(\d+)/);
+    if (m) { const n=Math.min(7,parseInt(m[1],10)); if(n<=0) return []; if(n>=7) return [0,1,2,3,4,5,6]; return Array.from({length:n},(_,i)=> (i*2)%7).slice(0,n).sort((a,b)=>a-b); }
+    return [];
+  };
+  const freqFromDays = (days: number[]): string => {
+    if (days.length===7) return 'daily';
+    if (days.length===4 && days.join(',')==='0,2,4,6') return 'eod';
+    if (days.length===3 && days.join(',')==='0,2,4') return '3x/wk';
+    if (days.length===2 && days.join(',')==='1,4') return '2x/wk';
+    if (days.length===1 && days[0]===3) return '1x/wk';
+    if (days.length===0) return '1x/wk';
+    return days.slice().sort((a,b)=>a-b).join(',');
+  };
   const scheduleData = useMemo(() => {
     const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     const grid: { day: string; entries: { entry: CourseEntry; color: string }[] }[] = days.map(day => ({ day, entries: [] }));
@@ -218,13 +239,8 @@ export const PharmaCourseScreen: React.FC = () => {
       const cls = subClass(entry.substanceId);
       const color = classColor(cls);
       const freq = typeof entry.frequency === 'string' ? entry.frequency : `${entry.frequency}x/wk`;
-      let dayIndices: number[] = [];
-      if (freq === 'daily') dayIndices = [0, 1, 2, 3, 4, 5, 6];
-      else if (freq === 'eod') dayIndices = [0, 2, 4, 6];
-      else if (freq === '3x/wk') dayIndices = [0, 2, 4];
-      else if (freq === '2x/wk') dayIndices = [1, 4];
-      else if (freq === '1x/wk') dayIndices = [3];
-      for (const idx of dayIndices) { grid[idx].entries.push({ entry, color }); }
+      const dayIndices = getDaysFromFreq(freq);
+      for (const idx of dayIndices) { if(grid[idx]) grid[idx].entries.push({ entry, color }); }
     }
     return grid;
   }, [course, subClass, classColor]);
@@ -313,13 +329,15 @@ export const PharmaCourseScreen: React.FC = () => {
         <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{course.length>0 ? 'Прогресс бара = окно приёма' : 'Выбери дату — подсветим активные препараты'}</span>
       </div>
 
-      {/* View tabs — компактные без пилюль */}
-      <div style={{ display:'flex', gap:2, overflowX:'auto', scrollbarWidth:'none', borderBottom:'1px solid rgba(255,255,255,0.06)', paddingBottom:0 }}>
-        {([['current', 'Текущий'], ['schedule', 'Расписание'], ['graph', 'График'], ['history', 'История']] as const).map(([key, label]) => (
+      {/* View tabs */}
+      <div style={{ display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
+        {([['current', '📋 Текущий'], ['schedule', '📅 Расписание'], ['graph', '📊 График'], ['history', '📚 История']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setViewTab(key)} style={{
-            padding:'5px 8px 6px', cursor:'pointer', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
-            background:'transparent', border:'none', borderBottom: viewTab===key ? '2px solid #8b5cf6' : '2px solid transparent', borderRadius:0, marginBottom:-1,
-            color: viewTab === key ? '#fff' : '#fff', opacity: viewTab===key ? 1 : 0.62,
+            padding:'7px 13px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:700, whiteSpace:'nowrap',
+            border:`1px solid ${viewTab === key ? 'rgba(139,92,246,0.38)' : 'rgba(255,255,255,0.07)'}`,
+            background: viewTab === key ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(124,58,237,0.18))' : 'rgba(255,255,255,0.05)',
+            color: viewTab === key ? '#fff' : '#fff',
+            boxShadow: viewTab===key ? '0 4px 14px rgba(139,92,246,0.18)' : 'none',
           }}>{label}</button>
         ))}
       </div>
@@ -505,29 +523,40 @@ export const PharmaCourseScreen: React.FC = () => {
                 </div>
               </div>
               <div className="pc-glass" style={{ padding:'12px' }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:9, display:'flex', alignItems:'center', gap:7 }}>💊 Дозировки по препаратам <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{course.length} позиций</span></div>
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:9, display:'flex', alignItems:'center', gap:7 }}>💊 Дозировки по препаратам — редактируй дни <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', opacity:0.7 }}>{course.length} позиций · тапни день</span></div>
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   {course.map(entry => {
                     const cls = subClass(entry.substanceId);
                     const color = classColor(cls);
                     const isAct = (entry.startWeek || 0) <= currentWeek && currentWeek < entry.endWeek;
+                    const selected = getDaysFromFreq(String(entry.frequency||''));
                     return (
                       <div key={entry.id} style={{
-                        display:'flex', alignItems:'center', gap:9, padding:'8px 9px',
+                        display:'flex', flexDirection:'column', gap:6, padding:'8px 9px',
                         background: isAct ? `${color}10` : 'rgba(255,255,255,0.03)', borderRadius:12,
                         border:`1px solid ${isAct ? color+'22' : 'rgba(255,255,255,0.06)'}`,
                         borderLeft:`3px solid ${color}`,
                       }}>
-                        <div style={{ width:26, height:26, borderRadius:8, background:`${color}16`, border:`1px solid ${color}22`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, flexShrink:0 }}>
-                          {CLASS_ICONS[cls] || '💊'}
+                        <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+                          <div style={{ width:26, height:26, borderRadius:8, background:`${color}16`, border:`1px solid ${color}22`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, flexShrink:0 }}>
+                            {CLASS_ICONS[cls] || '💊'}
+                          </div>
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ fontSize:11, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</div>
+                            <div style={{ fontSize:10, color:'#fff' }}>{CLASS_LABELS[cls] || cls}</div>
+                          </div>
+                          <div style={{ textAlign:'right', flexShrink:0 }}>
+                            <div style={{ fontSize:12, fontWeight:800, color: isAct ? '#a78bfa' : '#fff' }}>{entry.doseValue} <span style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{entry.doseUnit}</span></div>
+                            <div style={{ fontSize:10, color:'#fff' }}>{freqDisplay(entry)} · нед {entry.startWeek || 0}–{entry.endWeek}</div>
+                          </div>
                         </div>
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:11, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</div>
-                          <div style={{ fontSize:10, color:'#fff' }}>{CLASS_LABELS[cls] || cls}</div>
-                        </div>
-                        <div style={{ textAlign:'right', flexShrink:0 }}>
-                          <div style={{ fontSize:12, fontWeight:800, color: isAct ? '#a78bfa' : '#fff' }}>{entry.doseValue} <span style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{entry.doseUnit}</span></div>
-                          <div style={{ fontSize:10, color:'#fff' }}>{freqDisplay(entry)} · нед {entry.startWeek || 0}–{entry.endWeek}</div>
+                        <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                          {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((d,i)=>{
+                            const active = selected.includes(i);
+                            return (
+                              <button key={i} onClick={()=>{ const cur=getDaysFromFreq(String(entry.frequency||'')); const next=cur.includes(i)?cur.filter(x=>x!==i):[...cur,i].sort((a,b)=>a-b); const nf=freqFromDays(next.length?next:[i]); updateEntry(entry.id,{frequency:nf}); }} style={{ flex:1, minWidth:30, height:26, borderRadius:7, fontSize:9, fontWeight:700, cursor:'pointer', border:`1px solid ${active?'#8b5cf6':'rgba(255,255,255,0.08)'}`, background: active?'rgba(139,92,246,0.18)':'rgba(255,255,255,0.04)', color:'#fff' }}>{d}</button>
+                            );
+                          })}
                         </div>
                       </div>
                     );
