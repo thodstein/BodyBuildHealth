@@ -2215,8 +2215,8 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         );
       })()}
 
-      {/* ===== BOTTOM TAB BAR — стеклянный, не перекрывает контент (паддинг у корня уже учитывает высоту) ===== */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.82)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.07)', padding:'8px 6px calc(env(safe-area-inset-bottom, 0px) + 8px)', boxShadow:'0 -8px 32px rgba(0,0,0,0.45)' }}>
+      {/* ===== BOTTOM TAB BAR — компактный, стеклянный, херо на весь экран за ним ===== */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.84)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.06)', padding:'6px 4px calc(env(safe-area-inset-bottom, 0px) + 6px)', boxShadow:'0 -6px 24px rgba(0,0,0,0.40)' }}>
         {[
           { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
           { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },
@@ -2235,15 +2235,15 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
             if (item.id === 'protocols') { setProtocolTab(''); setProtocolView('menu'); }
           }} style={{
-            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-            padding:'6px 2px', background: active ? `${item.accent}14` : 'transparent', border: active ? `1px solid ${item.accent}30` : '1px solid transparent', cursor:'pointer',
+            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
+            padding:'4px 2px', background: active ? `${item.accent}12` : 'transparent', border: active ? `1px solid ${item.accent}28` : '1px solid transparent', cursor:'pointer',
             color: active ? item.accent : 'rgba(255,255,255,0.55)',
-            fontSize:10, fontWeight: active ? 800 : 500,
-            borderRadius:12, transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', minHeight:44,
+            fontSize:9, fontWeight: active ? 800 : 500,
+            borderRadius:10, transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', minHeight:40,
           }}>
-            <span style={{ fontSize:20, lineHeight:1, filter: active ? `drop-shadow(0 0 8px ${item.accent}60)` : 'none', transform: active ? 'scale(1.06)' : 'none', transition:'transform 0.2s' }}>{item.icon}</span>
-            <span style={{ letterSpacing: active ? '0.2px' : '0px' }}>{item.label}</span>
-            {active && <span style={{ width:22, height:3, borderRadius:2, background:item.accent, marginTop:1, boxShadow:`0 0 8px ${item.accent}80` }} />}
+            <span style={{ fontSize:18, lineHeight:1, filter: active ? `drop-shadow(0 0 8px ${item.accent}60)` : 'none', transform: active ? 'scale(1.05)' : 'none', transition:'transform 0.2s' }}>{item.icon}</span>
+            <span style={{ letterSpacing: active ? '0.2px' : '0px', lineHeight:1 }}>{item.label}</span>
+            {active && <span style={{ width:18, height:2, borderRadius:2, background:item.accent, marginTop:1, boxShadow:`0 0 8px ${item.accent}70` }} />}
           </button>
         );})}
       </div>
@@ -3094,8 +3094,8 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     weeklyPlan,
   };
 
-  // ── Нижняя навигация: высота 64 + safe-area, все скролл-контейнеры получают соответствующий паддинг чтобы контент не прятался
-  const BOTTOM_NAV_H = 64;
+  // ── Нижняя навигация: компактная 52 + safe-area, все скролл-контейнеры получают соответствующий паддинг чтобы контент не прятался, херо фиксирован на весь экран
+  const BOTTOM_NAV_H = 56;
   return (
     <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '56px' : section === 'generator' ? '92px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '126px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', minHeight: '100%', boxSizing: 'border-box' }}>
 

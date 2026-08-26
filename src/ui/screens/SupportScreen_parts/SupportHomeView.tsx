@@ -50,11 +50,12 @@ export const SupportHomeView: React.FC<{ s: Record<string, any> }> = ({ s }) => 
 
   return (
     <InfoErrorBoundary label="Главная бады">
-      <div style={{ position: 'relative', minHeight: 'calc(100dvh - 96px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 20, border: '1px solid rgba(255,255,255,0.07)', boxShadow: '0 12px 40px rgba(0,0,0,0.35)' }}>
+      {/* ХЕРО — на весь экран, фиксирован, вкладки компактно внизу. Нижний дашборд (SupportScreen bottom bar, z200) поверх херо, но контент херо имеет запас 80px+safe-area чтобы не перекрывался */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column' }}>
         <img src="/support-hero.jpg" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.35) 35%, rgba(0,0,0,0.78) 65%, rgba(0,0,0,0.88) 100%)' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(520px 320px at 18% 12%, rgba(0,230,138,0.18), transparent 55%), radial-gradient(560px 360px at 88% 22%, rgba(139,92,246,0.14), transparent 55%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '18px 16px calc(18px + env(safe-area-inset-bottom, 0px))', gap: 14 }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.38) 38%, rgba(0,0,0,0.82) 68%, rgba(0,0,0,0.92) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(560px 360px at 16% 10%, rgba(0,230,138,0.20), transparent 55%), radial-gradient(520px 320px at 86% 18%, rgba(139,92,246,0.16), transparent 55%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '16px 16px calc(80px + env(safe-area-inset-bottom, 0px))', gap: 14, overflowY: 'auto' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderRadius: 20, background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.4px', backdropFilter: 'blur(10px)' }}>
               <span style={{ width: 6, height: 6, borderRadius: 6, background: '#00e68a', boxShadow: '0 0 10px rgba(0,230,138,0.7)', display: 'inline-block' }} /> БЛОК БАД · ПОДДЕРЖКА
