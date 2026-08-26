@@ -9,10 +9,10 @@ interface Props { onNavigate?: (screen: ScreenId) => void; }
 
 const SYMPTOM_CARD: React.CSSProperties = {
   display:'flex', flexDirection:'column', gap:4, padding:'10px 12px',
-  borderRadius:10, background:'rgba(18,18,20,0.28)',
-  border:'1px solid rgba(255,255,255,0.10)',
-  backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)',
-  boxShadow:'0 3px 12px rgba(0,0,0,0.22)',
+  borderRadius:10, background:'rgba(255,255,255,0.06)',
+  border:'1px solid rgba(255,255,255,0.08)',
+  backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
+  boxShadow:'0 3px 10px rgba(0,0,0,0.16)',
   minWidth:0,
 };
 
@@ -31,8 +31,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'transparent' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center', filter:'saturate(1.05) contrast(1.04)' }} />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 82%, rgba(0,0,0,0.08) 92%, rgba(0,0,0,0.16) 100%)' }} />
+      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center', filter:'saturate(1.05) contrast(1.04) brightness(1.06)' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 85%, rgba(0,0,0,0.06) 92%, rgba(0,0,0,0.12) 100%)' }} />
       <div style={{ position:'absolute', bottom:70, left:16, right:16, zIndex:2 }}>
 
         {/* 🩺 Сводка симптомов */}
@@ -81,8 +81,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
           ].map(c => (
             <button key={c.id} onClick={() => onNavigate?.(c.id)} style={{
               display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:6,
-              aspectRatio:'1', borderRadius:14, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)',
-              background:'rgba(18,18,20,0.28)', backdropFilter:'blur(8px)', WebkitBackdropFilter:'blur(8px)', boxShadow:'0 3px 12px rgba(0,0,0,0.22)',
+              aspectRatio:'1', borderRadius:14, cursor:'pointer', border:'1px solid rgba(255,255,255,0.08)',
+              background:'rgba(255,255,255,0.06)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', boxShadow:'0 3px 10px rgba(0,0,0,0.16)',
               color:'#fff', transition:'all 0.2s',
             }}>
               <span style={{ fontSize:32 }}>{c.icon}</span>
