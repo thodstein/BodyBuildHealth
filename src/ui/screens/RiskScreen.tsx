@@ -1081,10 +1081,20 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
             </>
           )}
       </div>
+         </div>
+       )}
+      {/* ─── BOTTOM TABS — зеро, внизу, только механизм ─── */}
+      {mainTab !== 'hero' && (
+        <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:6, overflowX:'auto', padding:'8px 10px calc(8px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.84)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.06)', scrollbarWidth:'none' }}>
+          <button onClick={() => { setMainTab('tz_spec' as any); setSubTab('overview' as any); }} style={{
+            flex:'0 0 auto', padding:'8px 14px', borderRadius:999, fontSize:11, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
+            background: mainTab==='tz_spec' ? '#8b5cf6' : 'rgba(255,255,255,0.06)', color: mainTab==='tz_spec' ? '#fff' : 'rgba(255,255,255,0.72)', border: mainTab==='tz_spec' ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.08)',
+          }}>🧬 Механизм</button>
+          <span style={{ fontSize:9, color:'rgba(255,255,255,0.35)', alignSelf:'center', marginLeft:6 }}>только механизм-ориентированная модель</span>
         </div>
       )}
-    </div>
-  );
+     </div>
+   );
 };
 
 // ── MDSS Risk Display Component ──

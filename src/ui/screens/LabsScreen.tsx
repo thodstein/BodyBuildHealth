@@ -2071,9 +2071,20 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       })()}
 
       </div>
+       )}
+      {/* ─── BOTTOM TABS — зеро, внизу ─── */}
+      {mainTab === 'lab' && mainTab !== 'hero' && (
+        <div style={{ position:'fixed', bottom:'calc(var(--nav-height,56px) + env(safe-area-inset-bottom,0px))', left:0, right:0, zIndex:25, display:'flex', gap:6, overflowX:'auto', padding:'8px 10px calc(8px + env(safe-area-inset-bottom,0px))', background:'rgba(10,12,18,0.84)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:'1px solid rgba(255,255,255,0.06)', scrollbarWidth:'none' }}>
+          {LAB_SUB_TABS.filter(t => t.id !== 'hero').map(t => (
+            <button key={t.id} onClick={() => setSubTab(t.id)} style={{
+              flex:'0 0 auto', padding:'8px 14px', borderRadius:999, fontSize:11, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer',
+              background: subTab===t.id ? 'var(--accent)' : 'rgba(255,255,255,0.06)', color: subTab===t.id ? '#000' : 'rgba(255,255,255,0.72)', border: subTab===t.id ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.08)', boxShadow: subTab===t.id ? '0 4px 12px rgba(0,230,138,0.18)' : 'none',
+            }}>{t.icon} {t.label}</button>
+          ))}
+        </div>
       )}
 
-       {/* OCR Import Modal — centered */}
+        {/* OCR Import Modal — centered */}
       {showImport && (
          <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={backdropClick}>
           <div style={{ width: '100%', maxWidth: 480, zIndex: 201, background: 'var(--bg)', borderRadius: 20, maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 12px 48px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
