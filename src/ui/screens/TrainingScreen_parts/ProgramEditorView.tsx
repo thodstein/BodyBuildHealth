@@ -1327,6 +1327,48 @@ return (
       )}
 
 
+      {/* 🧭 Конструктивный помощник — следующий шаг (1 клик до качества) */}
+      {estep === 'weeks' && (
+        <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #00e68a', background: 'linear-gradient(180deg, rgba(0,230,138,0.08), rgba(255,255,255,0.02))', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, fontWeight: 850, color: '#00e68a' }}>🧭 Что дальше?</span>
+            <span style={{ fontSize: 10, color: DIM, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.14)', borderRadius: 20, padding: '2px 7px' }}>1 клик до качества</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: DIM }}>{program.bb?.weeks.length ?? 0} нед · {program.bb?.weeks[0]?.sessions.length ?? program.meta.daysPerWeek} дн</span>
+          </div>
+          {(() => {
+            const titleOk = !!(program.meta.title && program.meta.title.trim().length >= 3);
+            const hasWeeks = (program.bb?.weeks.length ?? 0) > 0;
+            const hasEmptySession = !!(program.bb?.weeks.some(w => w.sessions.some(s => !(s.blocks??[]).some(b=> b.exerciseName?.trim()))));
+            const daysMismatch = !!(program.bb && program.bb.weeks[0] && program.bb.weeks[0].sessions.length !== program.meta.daysPerWeek);
+            let q: any = null;
+            try { q = computePlanQualityFor(program, program.meta.level, { onCourse: tprofile.onCourse ?? false, courseIntensity: tprofile.courseIntensity ?? 'moderate', labMult: labAdjust.mrvMultiplier }); } catch {}
+            const lows = q?.perMuscle?.filter((m:any)=> m.status==='low') ?? [];
+            const overs = q?.perMuscle?.filter((m:any)=> m.status==='over') ?? [];
+            const hasDeload = !!(program.bb?.weeks.some(w=> w.deload));
+            const needDeload = program.meta.weeks >= 6 && !hasDeload;
+            let step: { icon:string; title:string; desc:string; btn:string; action:()=>void; color:string } | null = null;
+            if (!titleOk) step = { icon: '✏️', title: 'Добавьте название', desc: 'Без названия Итог не будет качественным — 3+ символов.', color: '#ef4444', btn: 'К параметрам →', action: ()=>{ setEstep('params'); scrollEditorTop(); } };
+            else if (!hasWeeks) step = { icon: '🗓', title: 'Создайте недели', desc: 'Добавьте недели и дни — каркас программы.', color: '#3b82f6', btn: 'К параметрам →', action: ()=>{ setEstep('params'); scrollEditorTop(); } };
+            else if (hasEmptySession) step = { icon: '⚡', title: 'Заполните пустые тренировки', desc: 'Есть дни без упражнений — 1 клик по «Заполнить пустые» добавит базу под ваш зал.', color: '#f59e0b', btn: 'К упражнениям ↓', action: ()=> window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'}) };
+            else if (daysMismatch) step = { icon: '⚖️', title: 'Выровняйте дни', desc: `meta ${program.meta.daysPerWeek}д ↔ в неделе ${program.bb?.weeks[0]?.sessions.length}д — нажмите Выровнять.`, color: '#f59e0b', btn: 'Выровнять', action: ()=>{} };
+            else if (lows.length>0) step = { icon: '⬇️', title: `Недобор: ${lows.slice(0,2).map((l:any)=> GROUP_RU[l.muscle] ?? l.muscle).join(', ')}`, desc: `MEV не достигнут — добавьте 1 сет в день. Score ${q?.score??'—'}/100.`, color: '#3b82f6', btn: '+ Добавить сет', action: ()=>{} };
+            else if (overs.length>0) step = { icon: '⚠️', title: `Перегруз: ${overs.slice(0,2).map((o:any)=> GROUP_RU[o.muscle] ?? o.muscle).join(', ')}`, desc: `> MRV — снимите 1 сет, иначе перетрен.`, color: '#ef4444', btn: 'Исправить', action: ()=>{} };
+            else if (needDeload) step = { icon: '🔄', title: 'Добавьте делод', desc: `${program.meta.weeks} нед без делода — каждая 4-я нед −30% объёма.`, color: '#f59e0b', btn: 'К неделям', action: ()=>{} };
+            else step = { icon: '✅', title: 'Готово к Итогу', desc: `Score ${q?.score ?? '—'}/100 ${q?.grade ?? ''} · можно сохранять.`, color: '#22c55e', btn: 'Далее: Итог →', action: ()=> onNext?.() };
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, background: step.color + '12', border: `1px solid ${step.color}30` }}>
+                <span style={{ width: 32, height: 32, borderRadius: 8, background: step.color + '18', border: `1px solid ${step.color}35`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{step.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: step.color }}>{step.title}</div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.72)', lineHeight: 1.4 }}>{step.desc}</div>
+                </div>
+                <button onClick={step.action} style={{ padding: '7px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: step.color, color: step.color==='#ef4444' ? '#fff' : step.color==='#22c55e' ? '#06281c' : '#fff', border: `1px solid ${step.color}`, whiteSpace: 'nowrap' }}>{step.btn}</button>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
       {/* P3.2 — Bulk-apply методик ко всем блокам (инструмент тренера, шаг «🗓 Недели») */}
       {/* P2-3: extracted to BulkApplyCard with week-range selector */}
       {estep === 'weeks' && isPro && dir === 'bb' && program.bb && program.bb.weeks.length > 0 && (
