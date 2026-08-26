@@ -771,14 +771,20 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
   const workingCount = session.exercises.filter((e: any) => !(e as any).warmupActivator).length;
   const hasMidDelt = session.exercises.some((e: any) => e.muscle === 'shoulders' && /мах|lateral|raise|отведен|разведен|жим/i.test(e.name || '') && !/наклон|задн|rear|обратн|лёжа|лёж|жим ногам|жим.*тренаж/i.test(e.name || ''));
   if (!hasMidDelt && workingCount < maxEx) {
-    const lateral = EXERCISE_CATALOG.find((x: any) => {
+    const dayIdx = Number(session.day ?? 1);
+    const preferMachine = dayIdx % 2 === 0;
+    const findLateral = (machineOnly: boolean | null): any => EXERCISE_CATALOG.find((x: any) => {
       if (trueMuscleOf(x) !== 'shoulders') return false;
       if (!/мах|lateral|raise|отведен|разведен/i.test(x.name || '')) return false;
       if (/наклон|задн|rear|обратн/i.test(x.name || '')) return false;
       if (session.exercises.some((e: any) => e.name === x.name)) return false;
       if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+      if (machineOnly === true) return /тренаж|машин|кроссовер|crossover|cable|блок/i.test(x.name);
+      if (machineOnly === false) return /гантел|dumbbell/i.test(x.name);
       return true;
     });
+    let lateral: any = findLateral(preferMachine);
+    if (!lateral) lateral = findLateral(null);
     if (lateral) {
       const baseWeight = options.workMax?.shoulders || 50;
       session.exercises.push({
@@ -835,20 +841,40 @@ function diversifyExperiencedChestSession(session: any, week: any, options: BBFi
   }
 }
 
-/** PPL: в день груди — памповые махи на среднюю дельту (медл. опускание + пауза), опционально. */
+/** PPL: в день груди — памповые махи на среднюю дельту (медл. опускание + пауза), опционально.
+ *  Чередование: если в этот день уже есть махи гантелями — ставится только тренажёр/кроссовер;
+ *  иначе вариант выбирается с чередованием по дню (нечётный — гантели, чётный — тренажёр/кроссовер). */
 function ensurePPLMidDeltFinisher(session: any, week: any, options: BBFinalizeOptions): void {
   if (options.preserveSource) return;
   if (!/^(Push|Chest)$/i.test(session.sessionTag || '')) return;
   const isPPL = String((options as any).patternId || '').includes('ppl') || String((options as any).pattern?.id || '').includes('ppl') || /Push|Pull/.test(session.sessionTag || '');
   if (session.exercises.some((e: any) => e.muscle === 'shoulders' && /мах.*сторон|lateral.*raise|отведен.*сторон/i.test(e.name) && (e as any).optional)) return;
-  const lateral = EXERCISE_CATALOG.find((x: any) => {
+  const hasDumbbellLateral = session.exercises.some((e: any) =>
+    e.muscle === 'shoulders' && /мах.*сторон|lateral.*raise|отведен.*сторон/i.test(e.name || '') && /гантел|dumbbell/i.test(e.name || '')
+  );
+  const hasMachineLateral = session.exercises.some((e: any) =>
+    e.muscle === 'shoulders' && /мах.*сторон|lateral.*raise|отведен.*сторон/i.test(e.name || '') && /тренаж|машин|кроссовер|crossover|cable|блок/i.test(e.name || '')
+  );
+  let preferMachine: boolean | null = null;
+  if (hasDumbbellLateral && !hasMachineLateral) preferMachine = true;
+  else if (!hasDumbbellLateral && hasMachineLateral) preferMachine = false;
+  else if (!hasDumbbellLateral && !hasMachineLateral) {
+    const dayIdx = Number(session.day ?? 1);
+    preferMachine = dayIdx % 2 === 0;
+  }
+  const findLateral = (machineOnly: boolean | null): any => EXERCISE_CATALOG.find((x: any) => {
     if (trueMuscleOf(x) !== 'shoulders') return false;
     if (!/мах.*сторон|lateral.*raise|отведен.*сторон/i.test(x.name)) return false;
     if (/наклон|задн|rear|обратн|лёжа/i.test(x.name)) return false;
     if (session.exercises.some((e: any) => e.name === x.name)) return false;
     if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    if (machineOnly === true) return /тренаж|машин|кроссовер|crossover|cable|блок/i.test(x.name);
+    if (machineOnly === false) return /гантел|dumbbell/i.test(x.name);
     return true;
   });
+  let lateral: any = null;
+  if (preferMachine !== null) lateral = findLateral(preferMachine);
+  if (!lateral) lateral = findLateral(null);
   if (!lateral) return;
   const baseWeight = options.workMax?.shoulders || 40;
   session.exercises.push({
