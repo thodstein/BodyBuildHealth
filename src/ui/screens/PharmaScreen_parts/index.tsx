@@ -93,13 +93,13 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
               <button key={c.key} onClick={() => setPage(c.key)} style={{
                 display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14,
                 cursor:'pointer', textAlign:'left', width:'100%',
-                background:'transparent', border:'1px solid rgba(255,255,255,0.14)',
+                background:'rgba(18,18,20,0.62)', border:'1px solid rgba(255,255,255,0.12)',
                 backdropFilter:'none', WebkitBackdropFilter:'none',
-                boxShadow:'none',
-                transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
+                boxShadow:'0 3px 12px rgba(0,0,0,0.30)',
+                transition:'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.22)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.06)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.14)'; (e.currentTarget as HTMLButtonElement).style.background='transparent'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor=`${c.color}40`; (e.currentTarget as HTMLButtonElement).style.boxShadow=`0 6px 18px rgba(0,0,0,0.32), 0 0 0 1px ${c.color}18 inset`; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.12)'; (e.currentTarget as HTMLButtonElement).style.boxShadow='0 3px 12px rgba(0,0,0,0.30)'; }}
               >
                 <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center',
                   flexShrink:0, background:`${c.color}18`, border:`1px solid ${c.color}22`, fontSize:18 }}>{c.icon}</div>
