@@ -24,7 +24,25 @@ import { RECIPE_DB_P22 } from './recipe-db-p22';
 import { RECIPE_DB_P23 } from './recipe-db-p23';
 import { RECIPE_DB_P24 } from './recipe-db-p24';
 import { RECIPE_DB_P25 } from './recipe-db-p25';
+import { RECIPE_DB_P26 } from './recipe-db-p26';
+import { RECIPE_DB_P27 } from './recipe-db-p27';
 import { enrichRecipes } from './recipe-enrichment';
+
+/**
+ * C-требование «КБЖУ-консистентность ≤3%»: kcal рецепта не должен расходиться с формулой
+ * 4×белки + 4×углеводы + 9×жиры более чем на 3%. Легаси-рецепты писались вручную и у части
+ * записей kcal расходится вплоть до ~27%. Нормализуем kcal к формуле (округление до 5) на
+ * этапе сборки БД — единственная точка правды, шардовые файлы не трогаются. Ингредиенты
+ * (ingredientIds/portions) остаются авторскими — при разборе в план макросы считаются
+ * из FOOD_DB, поэтому итог приёма консистентен по построению.
+ */
+function normalizeRecipeKcal(r: Recipe): Recipe {
+  const formula = 4 * (r.protein || 0) + 4 * (r.carbs || 0) + 9 * (r.fat || 0);
+  if (!(r.kcal > 0) || formula <= 0) return r;
+  const devPct = Math.abs(r.kcal - formula) / r.kcal * 100;
+  if (devPct <= 3) return r;
+  return { ...r, kcal: Math.max(50, Math.round(formula / 5) * 5) };
+}
 
 export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P1,
@@ -52,4 +70,6 @@ export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P23,
   ...RECIPE_DB_P24,
   ...RECIPE_DB_P25,
-]);
+  ...RECIPE_DB_P26,
+  ...RECIPE_DB_P27,
+]).map(normalizeRecipeKcal);

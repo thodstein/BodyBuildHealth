@@ -119,6 +119,7 @@ export const IndividualPlanSettings: React.FC = () => {
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
     histamineSensitive, setHistamineSensitive,
     plannerMode, setPlannerMode,
+    generationMode, setGenerationMode,
     dietPrefs, setDietPrefs,
     userRecipes, labAnalysis, labs,
     errorMsg, setErrorMsg,
@@ -310,16 +311,53 @@ export const IndividualPlanSettings: React.FC = () => {
            ].map(mode => <button key={mode.id} onClick={() => setPlannerMode(mode.id)} title={mode.hint} style={{ padding:'7px 3px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700, background: plannerMode === mode.id ? `${mode.color}22` : '#202023', border: plannerMode === mode.id ? `1px solid ${mode.color}` : '1px solid rgba(255,255,255,0.06)', color: plannerMode === mode.id ? mode.color : 'rgba(255,255,255,0.7)' }}>{mode.label}</button>)}
          </div>
          <div style={{ fontSize:8, color:'rgba(255,255,255,0.65)', marginBottom:8 }}>{plannerMode === 'pro' ? 'Полный подбор с V2-скорингом, микроанализом и расширенными рекомендациями.' : plannerMode === 'simple' ? 'Рацион подбирается по КБЖУ и ограничениям без V2-оценок.' : 'Остаются базовые параметры и сухое КБЖУ; необязательные настройки не используются.'}</div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', marginBottom: 8, lineHeight: 1.5 }}>
-          ✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин
-        </div>
         {errorMsg && <div style={{ fontSize: 9, color: '#ef4444', padding: '4px 8px', background: 'rgba(239,68,68,0.06)', borderRadius: 6, marginBottom: 6 }}>⚠️ {errorMsg}</div>}
+        {/* Два режима генерации: «по продуктам» (классика) и «по рецептам» */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, margin: '8px 0' }}>
+          <button
+            onClick={() => setGenerationMode('products')}
+            aria-pressed={generationMode === 'products'}
+            title="Классический рацион из продуктов с точными КБЖУ"
+            style={{
+              textAlign: 'left', padding: '12px 10px', borderRadius: 12, cursor: 'pointer',
+              background: generationMode === 'products' ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.10))' : '#202023',
+              border: generationMode === 'products' ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.08)',
+              boxShadow: generationMode === 'products' ? '0 4px 16px rgba(0,230,138,0.15)' : 'none',
+              minHeight: 64,
+            }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'products' ? '#00e68a' : 'rgba(255,255,255,0.85)' }}>🥩 По продуктам</div>
+            <div style={{ fontSize: 9, color: generationMode === 'products' ? 'rgba(0,230,138,0.85)' : 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.45 }}>
+              Классический план из продуктов с точными КБЖУ и круглыми порциями (молоко 250/500/750 г)
+            </div>
+          </button>
+          <button
+            onClick={() => setGenerationMode('recipes')}
+            aria-pressed={generationMode === 'recipes'}
+            title="Основные приёмы собираются из готовых рецептов"
+            style={{
+              textAlign: 'left', padding: '12px 10px', borderRadius: 12, cursor: 'pointer',
+              background: generationMode === 'recipes' ? 'linear-gradient(135deg, rgba(249,115,22,0.16), rgba(245,158,11,0.10))' : '#202023',
+              border: generationMode === 'recipes' ? '2px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
+              boxShadow: generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.18)' : 'none',
+              minHeight: 64,
+            }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: generationMode === 'recipes' ? '#f97316' : 'rgba(255,255,255,0.85)' }}>🍳 По рецептам</div>
+            <div style={{ fontSize: 9, color: generationMode === 'recipes' ? 'rgba(253,186,116,0.95)' : 'rgba(255,255,255,0.55)', marginTop: 3, lineHeight: 1.45 }}>
+              Завтрак/обед/ужин — готовые рецепты: на каждый приём 2–3 варианта на выбор, день сходится в КБЖУ ±3%. Перекусы — продуктами
+            </div>
+          </button>
+        </div>
+        <div style={{ fontSize: 9, color: generationMode === 'recipes' ? 'rgba(253,186,116,0.9)' : 'rgba(255,255,255,0.7)', marginBottom: 8, lineHeight: 1.5 }}>
+          {generationMode === 'recipes'
+            ? '🍲 Генерация будет ТОЛЬКО по рецептам: каждый основной приём — цельное блюдо с ингредиентами и пошаговой готовкой. После выбора варианта рацион автоматически перестраивается (без недобора и перебора), закупки и процесс готовки обновятся под рецепты.'
+            : '✅ Pro Engine: MPS · mTOR · лейцин 2.5г · LBM-белок · carb periodization · pre/intra/post-W · pre-sleep казеин'}
+        </div>
         <button onClick={() => { try { const _err = _validatePlannerInput(); if (_err) { setErrorMsg(_err); return; } setErrorMsg(null); generatePlan(1); setPlanTab('plan'); } catch (e: any) { try { setErrorMsg('Ошибка: ' + (e?.message || String(e))); } catch {} } }} style={{
           width: '100%', padding: '12px', borderRadius: 10, cursor: 'pointer',
           fontSize: 12, fontWeight: 700,
-          background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
-          boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
-        }}>✨ Сгенерировать план питания →</button>
+          background: generationMode === 'recipes' ? 'linear-gradient(135deg,#f97316,#ea580c)' : 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#fff',
+          boxShadow: generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.25)' : '0 4px 16px rgba(0,230,138,0.2)',
+        }}>{generationMode === 'recipes' ? '🍳 Сгенерировать план по рецептам →' : '✨ Сгенерировать план питания →'}</button>
       </GlassCard>
       )}
 

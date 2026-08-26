@@ -855,8 +855,11 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   const isMeatFish = cat === 'protein';
   const isFruitVegFresh = cat === 'veg_fruit';
   const isDairy = cat === 'dairy';
-  if (isPorridge) base = snap(base, [50, 100, 125, 150, 200, 250]);
-  else if (isLiquid) base = snap(base, [250, 500]);
+  // Яйца целыми штуками: 1 яйцо ≈ 55 г съедобной части (55/110/165/220…)
+  const isEggWhole = id === 'egg_whole' || id.startsWith('egg_whole');
+  if (isEggWhole) { const eggs = Math.max(1, Math.round(base / 55)); base = eggs * 55; }
+  else if (isPorridge) base = snap(base, [50, 100, 125, 150, 200, 250]);
+  else if (isLiquid) base = snap(base, [100, 150, 200, 250, 300, 400, 500, 750, 1000]);
   else if (isOil) base = snap(base, [5, 10, 15, 30]);
   else if (isAvocado) base = snap(base, [50, 70, 100, 150]);
   else if (isNutDry) base = snap(base, [25, 50, 75, 100]);
@@ -883,8 +886,10 @@ export function snapPortionG(food: FoodItem, grams: number): number {
   const isFruitVeg = cat === 'veg_fruit';
   const isDairy = cat === 'dairy';
   let brackets: number[];
+  const _isEggWholeSnap = id === 'egg_whole' || id.startsWith('egg_whole');
+  if (_isEggWholeSnap) { const eggs = Math.max(1, Math.round(grams / 55)); return eggs * 55; }
   if (isPorridge) brackets = [50, 100, 125, 150, 200, 250];
-  else if (isLiquid) brackets = [250, 500, 750, 1000];
+  else if (isLiquid) brackets = [100, 150, 200, 250, 300, 400, 500, 750, 1000];
   else if (isOil) brackets = [5, 10, 15, 30];
   else if (isAvocado) brackets = [50, 70, 100, 150];
   else if (isNutDry) brackets = [25, 50, 75, 100];
@@ -893,6 +898,9 @@ export function snapPortionG(food: FoodItem, grams: number): number {
   else if (isFruitVeg) brackets = [100, 150, 200, 250];
   else if (isDairy) brackets = [100, 150, 200, 250];
   else brackets = [50, 100, 150, 200];
+  // Жидкости: маленькие объёмы (<100 мл — молоко в кофе/кашу) не раздуваем до первой ступени,
+  // оставляем человеческое значение с шагом 10 мл.
+  if (isLiquid && grams < brackets[0]) return Math.max(10, Math.round(grams / 10) * 10);
   if (grams < brackets[0]) return brackets[0];
   if (grams > brackets[brackets.length - 1]) {
     const step = brackets[0] === 50 ? 25 : brackets[0] === 5 ? 5 : brackets[0] === 25 ? 25 : brackets[0] === 30 ? 25 : 10;
