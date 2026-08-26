@@ -2,7 +2,7 @@
 // Запуск: node scripts/fix-kcal.mjs
 import fs from 'node:fs';
 
-const files = ['src/data/recipe-db-p26.ts', 'src/data/recipe-db-p27.ts'];
+const files = ['src/data/recipe-db-p26.ts', 'src/data/recipe-db-p27.ts', 'src/data/recipe-db-p28.ts'];
 const re = /kcal: (\d+), protein: (\d+(?:\.\d+)?), fat: (\d+(?:\.\d+)?), carbs: (\d+(?:\.\d+)?),/g;
 for (const f of files) {
   const src = fs.readFileSync(f, 'utf8');

@@ -1592,14 +1592,24 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (!res.ok || !res.meals) return;
       const newDay = { ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) };
       // FIX button-audit: синхронизация правки обратно в недельный план
+      let weekDaysUpdated: any[] | null = null;
       if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
         const days = [...weekPlan.days];
         const wres = rebuildMealsWithRecipeOption(days[weekEditDay].meals || [], mealIdx, optionName);
         days[weekEditDay] = wres.ok && wres.meals ? { ...days[weekEditDay], meals: wres.meals } : newDay;
         setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+        weekDaysUpdated = days;
       }
       setDayPlan(newDay);
-      setShoppingList(buildShoppingFromPlans(planDays >= 7 && weekPlan?.days?.length ? [newDay] : [newDay]));
+      // F: закупки пересчитываются из ВСЕХ видимых дней плана (отредактированный день
+      // подставлен), а не только из одного дня — иначе список «сжимался» до дня правки.
+      const visiblePlans: any[] =
+        planDays >= 7 && weekPlan?.days?.length
+          ? (weekDaysUpdated ?? weekPlan.days)
+          : planDays >= 3 && threeDayPlan?.days?.length
+            ? threeDayPlan.days.map((d: any, i: number) => (i === selectedDayIndex ? newDay : d))
+            : [newDay];
+      setShoppingList(buildShoppingFromPlans(visiblePlans));
     } else {
       const resolved = _resolvePlanDay(dayIdx);
       if (!resolved || resolved.plan === 'day') return;

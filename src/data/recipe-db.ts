@@ -26,6 +26,7 @@ import { RECIPE_DB_P24 } from './recipe-db-p24';
 import { RECIPE_DB_P25 } from './recipe-db-p25';
 import { RECIPE_DB_P26 } from './recipe-db-p26';
 import { RECIPE_DB_P27 } from './recipe-db-p27';
+import { RECIPE_DB_P28 } from './recipe-db-p28';
 import { enrichRecipes } from './recipe-enrichment';
 
 /**
@@ -72,4 +73,5 @@ export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P25,
   ...RECIPE_DB_P26,
   ...RECIPE_DB_P27,
+  ...RECIPE_DB_P28,
 ]).map(normalizeRecipeKcal);

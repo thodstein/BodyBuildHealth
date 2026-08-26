@@ -1,5 +1,55 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Планировщик питания: двухрежимная генерация «по продуктам / по рецептам» (Aug 26 2026, pushed 04e360049 + продолжение)
+
+Две крупные карточки-кнопки в настройках генерации; режим «по рецептам» собирает основные
+приёмы из готовых блюд, день сходится в КБЖУ ±3%, закупки/готовка следуют за рецептами.
+
+- **A. UI** (`IndividualPlanSettings`): карточки «🥩 По продуктам» / «🍳 По рецептам» (aria-pressed,
+  подсветка активной), `generationMode: 'products'|'recipes'` персист `he_planner_gen_mode`,
+  текст генерации и пояснение меняются («Генерация будет ТОЛЬКО по рецептам…»).
+- **B. Движок** (`IndividualPlan/planner-recipe-mode.ts`, NEW ~470 строк): `pickRecipeOptions`
+  (топ-3 через `pickRecipesForMeal`, исключение показанных имён), `flattenRecipeOption`/
+  `rebuildRecipeFromFlat` (JSON-safe хранение варианта прямо в meal — планы персистятся),
+  `buildRecipeMealItems` (авторские порции через decomposeRecipe: ingredientIds+portions →
+  FOOD_DB; null если разбор пуст), `rebalanceDayAfterRecipes` — недобор закрывается топ-апом
+  в гибкий слот (перекус; белковые/углеводные/жировые пулы FOOD_DB), перебор режется по
+  НЕ-рецептурным приёмам с «комнатой» по каждому макросу (`loFrac = max(1−room/im)` — окно
+  [lo, hi=85%], ступени лестницы SHRINK_LADDER); при переборе ккал+недоборе белка худший
+  низкобелковый продукт перекуса заменяется на белковый (🔁). Гарантия ±3% при согласуемых
+  целях, иначе best-effort + `withinTolerance:false`. Разнообразие: `_usedRecipeNames`
+  между днями генерации. В generatePlan (pro-V2) после подсказок: автовыбор лучшего
+  кандидата на основные приёмы (Завтрак/Обед/Ужин; перекусы остаются продуктами),
+  ребаланс, заметки в proNotes, итоги дня из фактических meals. Хендлеры контекста:
+  `pickRecipeOption(dayIdx,mealIdx,name)` (пересборка+ребаланс+синк в weekEditDay/3дн/нед,
+  закупки из ВСЕХ видимых дней), `moreRecipeOptions` (пул минус показанные, накопление
+  recipeOptionNames), `refreshRecipeSuggestions` (чипы заново).
+- **C. КБЖУ ≤3%**: `kbjuFormulaDeviationPct`; легаси-БД нормализуется на сборке
+  (`recipe-db.ts normalizeRecipeKcal`: kcal = round5(4Б+9Ж+4У) при отклонении >3%) — тест
+  гарантирует всю БД ≤3%; новые партии написаны сразу по формуле (+ скрипт
+  `scripts/fix-kcal.mjs` пересчитывает kcal в шардах, regex с /g!).
+- **D. Круглые суммы** (`meal-plan-engine.ts`): liquids сетка [100,150,200,250,300,400,500,
+  750,1000] в `gramsForMacro` И `snapPortionG`; <100 мл жидкостей не раздувается до первой
+  ступени (шаг 10); яйца `egg_whole` кратны целому (~55 г, min 1).
+- **E. Готовка**: `buildRecipeCookingPlan(applied, days)` — шаги = инструкции выбранных
+  рецептов (+подготовка ингредиентов, упаковка при days>1), формат совместим с рендером
+  mealPrepPlan; `generateMealPrep` использует её, если в плане есть recipeApplied.
+- **F. Закупки**: `buildShoppingFromPlans(allDayPlans)` — единая агрегация (batch-cook
+  подсказки внутри); вызывается в generatePlan (замена инлайн-кода) и после каждой замены
+  рецептом (`syncShoppingListFromPlans`). Фикс продолжения: pickRecipeOption для дня считал
+  список только из отредактированного дня → теперь все видимые дни (week/threeDay/day).
+- **G. Контент**: NEW шарды `recipe-db-p26.ts` (50) + `-p27.ts` (38) + `-p28.ts` (34) = **122
+  русских BB-рецепта** (белковые завтраки, обеды/ужины из курицы/индейки/говядины/печени/
+  рыбы/морепродуктов, 30+ перекусов); у всех ingredientIds проверены по FOOD_DB, portions
+  обязательны. Чипы-подсказки: фильтр по тегам (быстро/высокий белок/low-carb/масса/сушка/пп)
+  + кнопка «🔄»; блок вариантов рецептов с ✅-выбором и «🔄 Другие варианты».
+- **Тесты NEW**: `planner-recipe-mode.test.ts` (21), `recipe-kbju-consistency.test.ts` (6),
+  `planner-generation-mode.test.tsx` (3), `planner-recipe-mode-e2e.test.tsx` (2 — реальный
+  рендер IndividualPlan: варианты отрисованы, клик «Выбрать» перестраивает рацион). Область
+  планировщика 376+/386 — падения только пред-существующие 5 файлов (в их базе было 12).
+- Проверено: tsc 0 по своим файлам; чужие untracked (`scripts/full_assign_check.mjs`,
+  `bb/__tests__/full_assign_check.test.ts`) не тронуты; коммит строго pathspec.
+
 ## Питание: живой поиск продуктов супермаркетов РФ — ВкусВилл/Пятёрочка/Магнит с КБЖУ (Aug 26 2026, uncommitted)
 
 «Как FatSecret»: в дневнике питания и каталоге любой продукт из сетей ищется по имени,
