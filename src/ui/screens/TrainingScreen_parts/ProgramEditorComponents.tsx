@@ -573,14 +573,23 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </div>
         );
       })()}
-       <button className="editor-add-week editor-action-card" style={{ ...CARD_ACTION, width: '100%', borderColor: 'rgba(96,165,250,0.30)', background: 'linear-gradient(180deg, rgba(96,165,250,0.10), rgba(255,255,255,0.02))' }} onClick={addWeek}>
-         <span style={{ fontSize: 18, color: '#60a5fa' }}>＋</span>
-         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
-           <span style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>Добавить неделю</span>
-           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>прогрессия +2.5% · копируйте предыдущую</span>
-         </div>
-       </button>
-       <MethodHint icon="📈" title="Прогрессия без калькулятора" text="Каждая неделя — +2.5% к весу или +1 повтор в диапазоне (double progression). На 4-й неделе — делод (−30% объёма). Так растёт сила без плато." color="#60a5fa" />
+       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+          <button className="editor-add-week editor-action-card" style={{ ...CARD_ACTION, borderColor: 'rgba(96,165,250,0.30)', background: 'linear-gradient(180deg, rgba(96,165,250,0.10), rgba(255,255,255,0.02))' }} onClick={addWeek}>
+            <span style={{ fontSize: 18, color: '#60a5fa' }}>＋</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>Пустая неделя</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>accumulation · 1 клик</span>
+            </div>
+          </button>
+          <button className="editor-action-card" style={{ ...CARD_ACTION, borderColor: 'rgba(0,230,138,0.28)', background: 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(255,255,255,0.02))' }} onClick={() => cloneWeek(body.weeks.length - 1)} disabled={body.weeks.length === 0}>
+            <span style={{ fontSize: 18, color: '#00e68a' }}>⧉</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>Копия +2.5%</span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>прогрессия веса · умно</span>
+            </div>
+          </button>
+        </div>
+        <MethodHint icon="📈" title="Прогрессия без калькулятора" text="Копия +2.5% — double progression: вес растёт каждую неделю, на 4-й — делод −30%. Так без плато, использует интеллектуальный движок." color="#60a5fa" />
     </div>
   );
 };
