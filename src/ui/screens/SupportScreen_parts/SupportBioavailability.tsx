@@ -46,8 +46,10 @@ const CATEGORY_LABELS_RU: Record<string, string> = {
 
 // ─── Main component ───
 
-const AAS_CATEGORY_SET = new Set(['anabolic','androgen','aas_derivative','steroidal','ai','aromatase_inhibitor','estrogen','androgen_receptor','mTOR','gh_releasing','gh_secretagogue']);
-const isAAS = (e: EnrichedEntry) => e.category.some(c => AAS_CATEGORY_SET.has(c.toLowerCase())) || /тестостерон|нандролон|тренболон|болденон|станозолол|оксандролон|метандростенолон|туринабол|мастерон|примоболан/i.test(e.nameRu + ' ' + e.nameEn);
+const AAS_PHARMA_CLASSES = new Set(['testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','drostanolone','dht_inject','dht_derivative','sarm','sarm_s23','sarms']);
+// категории каталога + фарма-классы ААС (чтобы сустанон/омнадрен и все тестостероны/трен/нандролоны/оралка корректно скрывались)
+const AAS_CATEGORY_SET = new Set(['anabolic','androgen','aas_derivative','steroidal','ai','aromatase_inhibitor','estrogen','androgen_receptor','mTOR','gh_releasing','gh_secretagogue','testosterone','trenbolone','nandrolone','boldenone','primobolan','oral_17aa','drostanolone','dht_inject','dht_derivative','sarm']);
+const isAAS = (e: EnrichedEntry) => e.category.some(c => AAS_CATEGORY_SET.has(c.toLowerCase()) || AAS_PHARMA_CLASSES.has(c.toLowerCase())) || /тестостерон|сустанон|омнадрен|sustanon|omnadren|нандролон|тренболон|болденон|станозолол|оксандролон|метандростенолон|метандиенон|метан|данабол|туринабол|мастерон|примоболан|метенолон|дростанолон|анаполон|оксиметолон|халотестин|супердрол|провирон|местеролон|анавар/i.test(e.nameRu + ' ' + e.nameEn) || e.source === 'pharma' && AAS_PHARMA_CLASSES.has((e.category[1] || '').toLowerCase());
 
 export const SupportBioavailability: React.FC<{ s: Record<string, any> }> = ({ s }) => {
   const [tab, setTab] = useState<'catalog'>('catalog');
@@ -118,12 +120,13 @@ const CatalogTab: React.FC<CatalogTabProps> = ({ catalog, filtered, allCategorie
           <PopupSelect label="📦 Тип" value={sourceFilter} options={[{id:'all',label:'Все типы'},{id:'catalog',label:'БАД'},{id:'pharma',label:'Фарма'},{id:'peptide',label:'Пептиды'}]} onChange={setSourceFilter} />
           <PopupSelect label="🔀 Сортировка" value={sortBy} options={[{id:'bio',label:'По биодоступности'},{id:'name',label:'По алфавиту'},{id:'forms',label:'По числу форм'}]} onChange={v => setSortBy(v as any)} />
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6, padding:'7px 10px', borderRadius:8, background: showAAS ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)', border: showAAS ? '1px solid rgba(239,68,68,0.22)' : '1px solid rgba(255,255,255,0.06)' }}>
-          <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:10, color: showAAS ? '#f87171' : '#fff', fontWeight:700 }}>
-            <input type="checkbox" checked={showAAS} onChange={e=> setShowAAS(e.target.checked)} style={{ accentColor:'#ef4444' }} />
-            {showAAS ? '✓ ААС показаны отдельно' : 'ААС скрыты (не смешиваются с БАД/фармой)'}
-          </label>
-          <span style={{ marginLeft:'auto', fontSize:9, color:'rgba(255,255,255,0.5)' }}>{showAAS ? 'ААС в списке — помечены 🔴' : 'Включите, чтобы увидеть ААС отдельно'}</span>
+        <div onClick={() => setShowAAS(!showAAS)} role="button" tabIndex={0} aria-pressed={showAAS} aria-label={showAAS ? 'Скрыть ААС' : 'Показать ААС'} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAAS(!showAAS); } }} style={{ ...S.card, cursor: 'pointer', border: showAAS ? '1px solid rgba(239,68,68,0.35)' : '1px solid rgba(255,255,255,0.07)', background: showAAS ? 'rgba(239,68,68,0.06)' : 'rgba(24,24,27,0.50)', borderLeft: `4px solid ${showAAS ? '#ef4444' : '#6b7280'}`, display: 'flex', alignItems: 'center', gap: 12, transition: 'all 0.18s', boxShadow: showAAS ? '0 4px 20px rgba(239,68,68,0.12)' : '0 2px 12px rgba(0,0,0,0.15)', marginTop: 6 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: showAAS ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'rgba(107,114,128,0.15)', fontSize: 18, fontWeight: 800, color: showAAS ? '#fff' : '#fff', flexShrink: 0, border: showAAS ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.06)' }}>{showAAS ? '✓' : '💉'}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: showAAS ? '#f87171' : '#fff', lineHeight: 1.2 }}>{showAAS ? '✓ ААС показаны отдельно' : 'ААС скрыты'}</div>
+            <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.3, marginTop: 2 }}>{showAAS ? 'ААС в списке — помечены 🔴 отдельно' : 'Не смешиваются с БАД/фармой · нажмите чтобы показать'}</div>
+          </div>
+          <div style={{ padding: '6px 14px', borderRadius: 20, background: showAAS ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.08)', border: showAAS ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.08)', color: showAAS ? '#f87171' : '#fff', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{showAAS ? 'Скрыть' : 'Показать'}</div>
         </div>
       </div>
       {/* Compare card-button */}

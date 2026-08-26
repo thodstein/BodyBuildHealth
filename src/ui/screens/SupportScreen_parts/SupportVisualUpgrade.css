@@ -53,20 +53,64 @@
 .support-screen h3 { font-size: 14px !important; }
 .support-screen h4 { font-size: 13px !important; }
 
-/* ВЕСЬ СЕРЫЙ ТЕКСТ В БЛОКЕ → БЕЛЫЙ (по требованию) — переопределяем inline rgba серый) */
-.support-screen [style*="color: rgba(255,255,255,0.38)"],
-.support-screen [style*="color: rgba(255,255,255,0.4)"],
-.support-screen [style*="color: rgba(255,255,255,0.45)"],
-.support-screen [style*="color: rgba(255,255,255,0.5)"],
-.support-screen [style*="color: rgba(255,255,255,0.55)"],
-.support-screen [style*="color: rgba(255,255,255,0.6)"],
-.support-screen [style*="color: rgba(255,255,255,0.65)"],
-.support-screen [style*="color: rgba(255,255,255,0.7)"],
-.support-screen [style*="color: rgba(255,255,255,0.72)"],
-.support-screen [style*="color: rgba(255,255,255,0.78)"],
-.support-screen [style*="color: rgba(255,255,255,0.8)"],
-.support-screen [style*="color: rgba(255,255,255,0.85)"],
-.support-screen [style*="color: var(--text-dim)"] {
+/* ВЕСЬ СЕРЫЙ ТЕКСТ В БЛОКЕ → БЕЛЫЙ (по требованию) — АБСОЛЮТНО ВЕСЬ, любой rgba серый + var(--text-dim/light) → #fff */
+.support-screen {
+  --text-dim: #fff !important;
+  --text-light: #fff !important;
+  --text-muted: #fff !important;
+  --text-secondary: #fff !important;
+}
+.support-screen [style*="color: rgba(255,255,255,0."],
+.support-screen [style*="color: rgba(255,255,255, 0."],
+.support-screen [style*="color:rgba(255,255,255,0"],
+.support-screen [style*="color: rgba(255, 255, 255, 0."],
+.support-screen [style*="color:rgba(255,"],
+.support-screen [style*="color: var(--text-dim)"],
+.support-screen [style*="color:var(--text-dim)"],
+.support-screen [style*="color: var(--text-light)"],
+.support-screen [style*="color:var(--text-light)"],
+.support-screen [style*="color: var(--text-muted)"],
+.support-screen [style*="color:var(--text-muted)"],
+.support-screen [style*="color: var(--text-secondary)"],
+.support-screen [style*="color:var(--text-secondary)"],
+.support-screen [style*="var(--text-dim)"],
+.support-screen [style*="var(--text-light)"] {
+  color: #fff !important;
+}
+/* Явный fallback по каждому уровню серого + с пробелами после запятых (браузер пишет rgba(255, 255, 255, 0.5)) */
+.support-screen [style*="rgba(255,255,255,0.3"],
+.support-screen [style*="rgba(255, 255, 255, 0.3"],
+.support-screen [style*="rgba(255,255,255,0.35"],
+.support-screen [style*="rgba(255, 255, 255, 0.35"],
+.support-screen [style*="rgba(255,255,255,0.38"],
+.support-screen [style*="rgba(255, 255, 255, 0.38"],
+.support-screen [style*="rgba(255,255,255,0.4"],
+.support-screen [style*="rgba(255, 255, 255, 0.4"],
+.support-screen [style*="rgba(255,255,255,0.45"],
+.support-screen [style*="rgba(255, 255, 255, 0.45"],
+.support-screen [style*="rgba(255,255,255,0.5"],
+.support-screen [style*="rgba(255, 255, 255, 0.5"],
+.support-screen [style*="rgba(255,255,255,0.55"],
+.support-screen [style*="rgba(255, 255, 255, 0.55"],
+.support-screen [style*="rgba(255,255,255,0.6"],
+.support-screen [style*="rgba(255, 255, 255, 0.6"],
+.support-screen [style*="rgba(255,255,255,0.65"],
+.support-screen [style*="rgba(255, 255, 255, 0.65"],
+.support-screen [style*="rgba(255,255,255,0.7"],
+.support-screen [style*="rgba(255, 255, 255, 0.7"],
+.support-screen [style*="rgba(255,255,255,0.72"],
+.support-screen [style*="rgba(255, 255, 255, 0.72"],
+.support-screen [style*="rgba(255,255,255,0.78"],
+.support-screen [style*="rgba(255, 255, 255, 0.78"],
+.support-screen [style*="rgba(255,255,255,0.8"],
+.support-screen [style*="rgba(255, 255, 255, 0.8"],
+.support-screen [style*="rgba(255,255,255,0.85"],
+.support-screen [style*="rgba(255, 255, 255, 0.85"] {
+  color: #fff !important;
+}
+/* Абсолютный fallback: любой inline color с rgba(255, — белый */
+.support-screen [style*="color: rgba(255,"],
+.support-screen [style*="color:rgba(255,"] {
   color: #fff !important;
 }
 
