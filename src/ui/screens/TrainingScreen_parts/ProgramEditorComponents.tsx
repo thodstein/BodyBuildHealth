@@ -661,11 +661,31 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
 
   return (
     <div style={{ display: 'flex', flexDirection: boardMode ? 'row' : 'column', gap: 6, overflowX: boardMode ? 'auto' : undefined, paddingBottom: boardMode ? 4 : undefined }}>
-      {sessions.length === 0 && (
-        <div style={{ padding: 12, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px dashed rgba(0,230,138,0.35)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center', minWidth: boardMode ? 260 : undefined }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>В этой неделе пока нет тренировок</div>
-          <div style={{ fontSize: 10, color: DIM }}>Создайте первый день, например «Пн · Грудь / Трицепс».</div>
-          <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={addSession}>+ Добавить первый день</button>
+       {sessions.length === 0 && (
+        <div style={{ padding: 14, borderRadius: 14, background: 'linear-gradient(180deg, rgba(26,28,38,0.72), rgba(18,20,30,0.52))', border: '1px dashed rgba(0,230,138,0.35)', display: 'flex', flexDirection: 'column', gap: 10, textAlign: 'center', minWidth: boardMode ? 260 : undefined }}>
+          <div style={{ width: 36, height: 36, borderRadius: 18, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.18)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, margin: '0 auto' }}>🗓</div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>Неделя пуста — 1 клик до старта</div>
+          <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>Выберите шаблон — интеллект уже учёл слабые группы и оборудование. Фиолетовые — приоритет +10%.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, width: '100%' }}>
+            {(() => {
+              let weak: string[] = [];
+              try { weak = (loadTrainingProfile().weakPoints ?? []) as string[]; } catch {}
+              const scored = DAY_TEMPLATES.map(t => {
+                const muscles = t.blocks.map(b => b.muscle);
+                const hit = muscles.filter(m => weak.includes(m)).length;
+                return { t, hit };
+              }).sort((a,b) => b.hit - a.hit);
+              return scored.map(({t, hit}) => (
+                <button key={t.label} onClick={() => addSessionFromTemplate(t)} className="editor-action-card" style={{ ...(hit>0 ? { ...CARD_BTN, border: '1px solid rgba(167,139,250,0.30)', background: 'linear-gradient(180deg, rgba(167,139,250,0.12), rgba(255,255,255,0.02))' } : CARD_BTN) }}>
+                  <span style={{ fontSize: 16 }}>{t.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: hit>0 ? '#a78bfa' : '#fff', display: 'flex', alignItems: 'center', gap: 4 }}>{t.label}{hit>0 && <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', background: 'rgba(167,139,250,0.14)', border: '1px solid rgba(167,139,250,0.22)', borderRadius: 6, padding: '1px 5px' }}>слабое</span>}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{t.blocks.length} упр. · готово{hit>0 ? ' · рекомендовано' : ''}</span>
+                </button>
+              ));
+            })()}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}><div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} /><span style={{ fontSize: 10, color: DIM }}>или</span><div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} /></div>
+          <button style={{ ...BTN_GHOST, padding: '7px 14px', fontSize: 11, minHeight: 38, borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.04)' }} onClick={addSession}>＋ Пустой день — настроить вручную</button>
         </div>
       )}
       {sessions.map((s, si) => {
