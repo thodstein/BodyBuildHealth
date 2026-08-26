@@ -42,7 +42,7 @@ export const PharmaScoreCard: React.FC<PharmaScoreCardProps> = ({ course, weight
           return (
             <div key={sys.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'7px 8px', borderRadius:10, background:'rgba(0,0,0,0.16)', border:'1px solid rgba(255,255,255,0.05)' }}>
               <span style={{ width:20, height:20, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background: meta.bg, border:`1px solid ${meta.border}`, fontSize:9 }}>{meta.icon}</span>
-              <span style={{ fontSize:11, color:'rgba(255,255,255,0.88)', flex:1, fontWeight:600, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{sys.label}</span>
+              <span style={{ fontSize:11, color:'#fff', flex:1, fontWeight:600, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{sys.label}</span>
               <span style={{ fontSize:11, fontWeight:800, color: meta.color, background: meta.bg, padding:'2px 7px', borderRadius:20, border:`1px solid ${meta.border}` }}>{sys.weightedScore}%</span>
               <div style={{ width:56, height:6, background:'rgba(255,255,255,0.07)', borderRadius:20, overflow:'hidden', flexShrink:0 }}>
                 <div style={{ height:'100%', width:`${Math.min(sys.weightedScore, 100)}%`, background: meta.color, borderRadius:20, boxShadow:`0 0 8px ${meta.color}55` }} />
@@ -57,7 +57,7 @@ export const PharmaScoreCard: React.FC<PharmaScoreCardProps> = ({ course, weight
         </button>
       )}
       {pkProfiles.length > 0 && (
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:8, background:'rgba(0,0,0,0.16)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>T½: {pkProfiles.map((p: any) => `${p.name} ${p.halfLifeHours}ч`).join(' • ')}</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:8, background:'rgba(0,0,0,0.16)', padding:'7px 8px', borderRadius:9, border:'1px solid rgba(255,255,255,0.04)' }}>T½: {pkProfiles.map((p: any) => `${p.name} ${p.halfLifeHours}ч`).join(' • ')}</div>
       )}
       {interactions.length > 0 && (
         <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:8 }}>

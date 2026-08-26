@@ -165,16 +165,16 @@ export const InteractionCheckerTab: React.FC = () => {
           <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
             <span style={{ width:24, height:24, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', fontSize:11 }}>🔬</span>
             <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Unified View</span>
-            <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>{result.all.length} пар</span>
+            <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>{result.all.length} пар</span>
           </div>
-          <p style={{ fontSize:11, color:'rgba(255,255,255,0.52)', margin:'0 0 10px', lineHeight:1.4 }}>
+          <p style={{ fontSize:11, color:'#fff', margin:'0 0 10px', lineHeight:1.4 }}>
             Объединённый список из AAS/PED и БАД-правил — единый safety score.
           </p>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexWrap:'wrap', background:'rgba(0,0,0,0.18)', padding:'8px 10px', borderRadius:11, border:'1px solid rgba(255,255,255,0.05)' }}>
-            <span style={{ fontSize:11, color:'rgba(255,255,255,0.52)', fontWeight:700 }}>Score</span>
+            <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Score</span>
             <span style={{ fontSize:18, fontWeight:900, color: result.score < 50 ? '#f87171' : result.score < 80 ? '#fbbf24' : '#00e68a' }}>{result.score}/100</span>
             {result.blocked && <span style={{ fontSize:10, fontWeight:800, padding:'3px 7px', borderRadius:20, background:'rgba(239,68,68,0.12)', color:'#f87171', border:'1px solid rgba(239,68,68,0.18)' }}>⛔ BLOCKED</span>}
-            <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>{result.bySeverity.CRITICAL.length} CRIT · {result.bySeverity.HIGH.length} HIGH</span>
+            <span style={{ fontSize:10, color:'#fff' }}>{result.bySeverity.CRITICAL.length} CRIT · {result.bySeverity.HIGH.length} HIGH</span>
             <div style={{ marginLeft:'auto', display:'flex', gap:2 }}>
               {(['CRITICAL','HIGH','ALL'] as const).map(s => (
                 <button key={s} onClick={() => { if (s==='CRITICAL') { setUnifiedOnlyCritical(true); } else { setUnifiedOnlyCritical(false); setUnifiedSeverity(s); } }} style={{
@@ -189,7 +189,7 @@ export const InteractionCheckerTab: React.FC = () => {
           <TimingTelemetryPanel autoRefreshMs={3000} />
           <div style={{ display:'flex', flexDirection:'column', gap:7, marginTop:10 }}>
             {items.length === 0 ? (
-              <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.52)', fontSize:12, background:'rgba(0,0,0,0.14)', borderRadius:10, border:'1px dashed rgba(255,255,255,0.06)' }}>
+              <div style={{ textAlign:'center', padding:20, color:'#fff', fontSize:12, background:'rgba(0,0,0,0.14)', borderRadius:10, border:'1px dashed rgba(255,255,255,0.06)' }}>
                 {unifiedOnlyCritical ? '✅ Нет CRITICAL' : 'Нет взаимодействий — стек чист'}
               </div>
             ) : items.map((item, i) => (
@@ -210,14 +210,14 @@ export const InteractionCheckerTab: React.FC = () => {
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.18)', fontSize:12 }}>⚡</span>
           <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Проверка взаимодействий</span>
         </div>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:6, lineHeight:1.45 }}>Собери стек — увидишь конфликты, синергии и рекомендации по защите. Данные тянутся из курса.</div>
+        <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.45 }}>Собери стек — увидишь конфликты, синергии и рекомендации по защите. Данные тянутся из курса.</div>
       </div>
 
       {/* drug selector */}
       <div style={card}>
         <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:8 }}>
           <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>💊 Стек для проверки</span>
-          <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{validIds.length} выбрано</span>
+          <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{validIds.length} выбрано</span>
           <button onClick={addDrug} style={{ padding:'5px 10px', borderRadius:20, border:'1px dashed rgba(139,92,246,0.32)', background:'rgba(139,92,246,0.08)', color:'#a78bfa', fontSize:11, fontWeight:700, cursor:'pointer' }}>+ Препарат</button>
         </div>
         <div style={{ display:'flex', flexDirection:'column', gap:7, marginBottom:8 }}>
@@ -233,11 +233,11 @@ export const InteractionCheckerTab: React.FC = () => {
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
           <div>
-            <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4 }}>Доза на препарат (мг/нед)</label>
+            <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4 }}>Доза на препарат (мг/нед)</label>
             <input type="number" value={doseMgWk} onChange={e=>setDoseMgWk(parseFloat(e.target.value)||0)} style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
           </div>
           <div style={{ display:'flex', alignItems:'flex-end' }}>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', flex:1 }}>
+            <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', padding:'8px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)', flex:1 }}>
               Подсказка: доза влияет на силу алертов. Оставь 300 для теста.
             </div>
           </div>
@@ -262,9 +262,9 @@ export const InteractionCheckerTab: React.FC = () => {
           <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:4 }}>
             <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', fontSize:11 }}>💥</span>
             <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Синергии по препаратам</span>
-            <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)' }}>{pharmaSubstancesWithSynergies.length} с парами</span>
+            <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{pharmaSubstancesWithSynergies.length} с парами</span>
           </div>
-          <p style={{ fontSize:11, color:'rgba(255,255,255,0.52)', margin:'0 0 10px', lineHeight:1.4 }}>
+          <p style={{ fontSize:11, color:'#fff', margin:'0 0 10px', lineHeight:1.4 }}>
             Готовые стеки с оценкой синергии — для планирования комбинаций.
           </p>
           <div style={{ display:'flex', flexDirection:'column', gap:8, maxHeight:520, overflowY:'auto', paddingRight:2 }}>
@@ -289,7 +289,7 @@ export const InteractionCheckerTab: React.FC = () => {
                             <span style={{ fontSize:11, fontWeight:800, color: stColor }}>{Math.round(p.strength * 100)}%</span>
                           </div>
                           <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:2 }}>+ {s.partnerName}</div>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', lineHeight:1.35 }}>{decodeGarbled(p.mechanism).slice(0, 140)}{p.mechanism.length>140?'…':''}</div>
+                          <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}>{decodeGarbled(p.mechanism).slice(0, 140)}{p.mechanism.length>140?'…':''}</div>
                         </div>
                       );
                     })}
@@ -298,7 +298,7 @@ export const InteractionCheckerTab: React.FC = () => {
               );
             })}
             {pharmaSubstancesWithSynergies.length === 0 && (
-              <div style={{ textAlign:'center', padding:20, color:'rgba(255,255,255,0.52)', fontSize:12 }}>Нет синергий для отображения</div>
+              <div style={{ textAlign:'center', padding:20, color:'#fff', fontSize:12 }}>Нет синергий для отображения</div>
             )}
           </div>
         </div>
@@ -311,7 +311,7 @@ export const InteractionCheckerTab: React.FC = () => {
                 <span style={{ fontSize:13, fontWeight:800, color:'#f87171' }}>Обнаруженные взаимодействия</span>
                 <span style={{ marginLeft:'auto', background:'rgba(239,68,68,0.12)', color:'#f87171', padding:'2px 7px', borderRadius:20, fontSize:10, fontWeight:800, border:'1px solid rgba(239,68,68,0.16)' }}>{alerts.length}</span>
               </div>
-              <p style={{ fontSize:11, color:'rgba(255,255,255,0.52)', margin:'0 0 10px' }}>Авто-детект для выбранного стека</p>
+              <p style={{ fontSize:11, color:'#fff', margin:'0 0 10px' }}>Авто-детект для выбранного стека</p>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {alerts.map((alert, i) => {
                   const colors = alertTypeColors[alert.type];
@@ -321,8 +321,8 @@ export const InteractionCheckerTab: React.FC = () => {
                         <span style={{ fontSize:10, fontWeight:800, padding:'3px 7px', borderRadius:20, background:`${colors.text}16`, color: colors.text, border:`1px solid ${colors.border}`, letterSpacing:0.3 }}>{colors.label}</span>
                         <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{alert.drugs.map(d => PHARMA_DB[d]?.name || d).join(' + ')}</span>
                       </div>
-                      <div style={{ fontSize:11, color:'rgba(255,255,255,0.82)', lineHeight:1.45, background:'rgba(0,0,0,0.14)', padding:'7px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>
-                        <b style={{ color:'rgba(255,255,255,0.62)' }}>Механизм:</b> {alert.mechanism}
+                      <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, background:'rgba(0,0,0,0.14)', padding:'7px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>
+                        <b style={{ color:'#fff' }}>Механизм:</b> {alert.mechanism}
                       </div>
                       <div style={{ fontSize:11, color: colors.text, lineHeight:1.45, padding:'7px 8px', borderRadius:8, background:`${colors.text}0d`, border:`1px solid ${colors.border}`, marginTop:6 }}>
                         <b>Рекомендация:</b> {alert.recommendation}
@@ -340,7 +340,7 @@ export const InteractionCheckerTab: React.FC = () => {
                 <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.12)', fontSize:11 }}>📋</span>
                 <span style={{ fontSize:13, fontWeight:800, color:'#60a5fa' }}>Рекомендации для курса</span>
               </div>
-              <p style={{ fontSize:11, color:'rgba(255,255,255,0.52)', margin:'0 0 10px' }}>Защита органов и лаб-мониторинг</p>
+              <p style={{ fontSize:11, color:'#fff', margin:'0 0 10px' }}>Защита органов и лаб-мониторинг</p>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {courseRecs.map((rec, i) => {
                   const typeColor = rec.type === 'critical' ? '#f87171' : rec.type === 'warning' ? '#fbbf24' : '#60a5fa';
@@ -349,7 +349,7 @@ export const InteractionCheckerTab: React.FC = () => {
                     <div key={i} style={{ padding:'11px', borderRadius:12, background:bg, border:`1px solid ${typeColor}18` }}>
                       <div style={{ fontSize:12, fontWeight:800, color: typeColor, marginBottom:6 }}>{rec.title}</div>
                       {rec.items.map((item, j) => (
-                        <div key={j} style={{ fontSize:11, color:'rgba(255,255,255,0.82)', lineHeight:1.45, padding:'3px 0 3px 14px', position:'relative' }}>
+                        <div key={j} style={{ fontSize:11, color:'#fff', lineHeight:1.45, padding:'3px 0 3px 14px', position:'relative' }}>
                           <span style={{ position:'absolute', left:0, color: typeColor, fontWeight:800 }}>•</span>{item}
                         </div>
                       ))}
@@ -373,7 +373,7 @@ export const InteractionCheckerTab: React.FC = () => {
                     <div style={{ marginBottom:8 }}>
                       <div style={{ fontSize:10, fontWeight:800, color:'#00e68a', marginBottom:4 }}>Инструкции</div>
                       {cls.instructions.map((inst, j) => (
-                        <div key={j} style={{ fontSize:11, color:'rgba(255,255,255,0.82)', lineHeight:1.4, padding:'2px 0 2px 14px', position:'relative' }}>
+                        <div key={j} style={{ fontSize:11, color:'#fff', lineHeight:1.4, padding:'2px 0 2px 14px', position:'relative' }}>
                           <span style={{ position:'absolute', left:0, color:'#00e68a' }}>•</span>{inst}
                         </div>
                       ))}
@@ -389,7 +389,7 @@ export const InteractionCheckerTab: React.FC = () => {
                     <div>
                       <div style={{ fontSize:10, fontWeight:800, color:'#f87171', marginBottom:4 }}>⚠ Предупреждения</div>
                       {cls.warnings.map((w, j) => (
-                        <div key={j} style={{ fontSize:11, color:'rgba(255,255,255,0.82)', lineHeight:1.4, padding:'4px 0 4px 10px', borderLeft:'3px solid rgba(239,68,68,0.22)', marginBottom:4, background:'rgba(239,68,68,0.04)', borderRadius:6 }}>{w}</div>
+                        <div key={j} style={{ fontSize:11, color:'#fff', lineHeight:1.4, padding:'4px 0 4px 10px', borderLeft:'3px solid rgba(239,68,68,0.22)', marginBottom:4, background:'rgba(239,68,68,0.04)', borderRadius:6 }}>{w}</div>
                       ))}
                     </div>
                   </div>
@@ -412,7 +412,7 @@ export const InteractionCheckerTab: React.FC = () => {
 
             {interactDetail === 'conflicts' ? (
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#fff', display:'flex', alignItems:'center', gap:6 }}>⚡ Взаимодействия по препаратам <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)' }}>{validIds.length ? `${selectedPharma.length} показано` : `${allSubstances.length} всего`}</span></div>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', display:'flex', alignItems:'center', gap:6 }}>⚡ Взаимодействия по препаратам <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{validIds.length ? `${selectedPharma.length} показано` : `${allSubstances.length} всего`}</span></div>
                 {(validIds.length === 0 ? allSubstances : selectedPharma).slice(0, 12).map(sub => {
                   const conflicts = sub.conflicts || [];
                   const linkedSubs = (sub.linkedSubstances || []).filter(ls => PHARMA_DB[ls.id]);
@@ -431,7 +431,7 @@ export const InteractionCheckerTab: React.FC = () => {
                                   <span style={{ fontSize:10, fontWeight:800, color: sevColor }}>{c.with}</span>
                                   <span style={{ fontSize:9, padding:'1px 6px', borderRadius:20, background:`${sevColor}16`, color: sevColor, fontWeight:800, border:`1px solid ${sevColor}22` }}>{c.severity}</span>
                                 </div>
-                                <div style={{ fontSize:10, color:'rgba(255,255,255,0.72)', lineHeight:1.35 }}>{c.effect}</div>
+                                <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}>{c.effect}</div>
                               </div>
                             );
                           })}
@@ -454,7 +454,7 @@ export const InteractionCheckerTab: React.FC = () => {
                   );
                 })}
                 {(validIds.length === 0 ? allSubstances : selectedPharma).length > 12 && (
-                  <div style={{ textAlign:'center', fontSize:11, color:'rgba(255,255,255,0.42)', padding:6 }}>Показаны первые 12 — сузь стек для фокуса</div>
+                  <div style={{ textAlign:'center', fontSize:11, color:'#fff', padding:6 }}>Показаны первые 12 — сузь стек для фокуса</div>
                 )}
               </div>
             ) : (
@@ -463,7 +463,7 @@ export const InteractionCheckerTab: React.FC = () => {
                   <div key={sub.id} style={{ borderRadius:11, padding:'10px', background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:6 }}>💊 {sub.name}</div>
                     {(sub.specialInstructions||[]).slice(0,2).map((si, j) => (
-                      <div key={j} style={{ fontSize:10, color:'rgba(255,255,255,0.72)', lineHeight:1.4, padding:'2px 0 2px 12px', position:'relative' }}>
+                      <div key={j} style={{ fontSize:10, color:'#fff', lineHeight:1.4, padding:'2px 0 2px 12px', position:'relative' }}>
                         <span style={{ position:'absolute', left:0, color:'#fbbf24' }}>•</span>{si}
                       </div>
                     ))}
@@ -483,7 +483,7 @@ export const InteractionCheckerTab: React.FC = () => {
                 {supportCrossAlerts.slice(0,5).map((inter, i) => (
                   <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)' }}>
                     <div style={{ fontSize:11, fontWeight:700, color:'#c4b5fd' }}>{inter.substanceA} ↔ {inter.substanceB}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', marginTop:2 }}>{inter.effect}</div>
+                    <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{inter.effect}</div>
                   </div>
                 ))}
               </div>
@@ -494,7 +494,7 @@ export const InteractionCheckerTab: React.FC = () => {
             <div style={{ ...card, textAlign:'center', padding:18 }}>
               <div style={{ width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 6px', background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.14)', fontSize:16 }}>✅</div>
               <div style={{ fontSize:12, fontWeight:800, color:'#00e68a' }}>Не обнаружено критических взаимодействий</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', marginTop:4 }}>Стек выглядит чистым — но соблюдай дозировки и мониторинг.</div>
+              <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Стек выглядит чистым — но соблюдай дозировки и мониторинг.</div>
             </div>
           )}
         </div>

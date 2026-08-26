@@ -78,7 +78,7 @@ export const MapperTab: React.FC = () => {
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', fontSize:12 }}>🧬</span>
           <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Маппер: стек → патологии</span>
         </div>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:6, lineHeight:1.45 }}>
+        <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.45 }}>
           Граф знаний находит патологии для твоего стека. Кумулятивный удар: 2+ препарата по одной системе усиливают риск.
         </div>
       </div>
@@ -140,21 +140,21 @@ export const MapperTab: React.FC = () => {
           <div style={{ ...card, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, textAlign:'center', padding:12 }}>
             <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ fontSize:20, fontWeight:900, color:'#a78bfa' }}>{mapperResult.activePathologies?.length ?? 0}</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Патологии</div>
+              <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Патологии</div>
             </div>
             <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ fontSize:20, fontWeight:900, color:'#60a5fa' }}>{mapperResult.requiredBiomarkers?.length ?? 0}</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Биомаркеры</div>
+              <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Биомаркеры</div>
             </div>
             <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ fontSize:20, fontWeight:900, color: (mapperResult.unknownDrugs?.length ?? 0) > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>
                 {mapperResult.knownDrugs}/{mapperResult.totalDrugs}
               </div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Распознано</div>
+              <div style={{ fontSize:10, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Распознано</div>
             </div>
           </div>
 
-          <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.72)', letterSpacing:0.3, textTransform:'uppercase' as const, padding:'0 2px' }}>Активные патологии — по тяжести</div>
+          <div style={{ fontSize:11, fontWeight:800, color:'#fff', letterSpacing:0.3, textTransform:'uppercase' as const, padding:'0 2px' }}>Активные патологии — по тяжести</div>
           {(mapperResult.activePathologies || []).map(p => {
             const sev = getSeverityClass(p.cumulativeTriggerStrength);
             const ZONE_COLORS: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#eab308' };
@@ -183,7 +183,7 @@ export const MapperTab: React.FC = () => {
 
           <div style={card}>
             <div style={{ fontSize:11, fontWeight:800, marginBottom:4, color:'#fff', display:'flex', alignItems:'center', gap:6 }}>
-              🧪 Требуемые биомаркеры <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)' }}>{mapperResult.requiredBiomarkers?.length ?? 0} шт</span>
+              🧪 Требуемые биомаркеры <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{mapperResult.requiredBiomarkers?.length ?? 0} шт</span>
             </div>
             <div style={{ fontSize:10, color:'#a78bfa', marginBottom:8, background:'rgba(139,92,246,0.06)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(139,92,246,0.10)' }}>
               Зелёные — есть в анализах, серые — нужно сдать
@@ -208,7 +208,7 @@ export const MapperTab: React.FC = () => {
               <div style={{ fontSize:11, color:'#fbbf24', fontWeight:800 }}>
                 Неизвестные препараты: {(mapperResult.unknownDrugs || []).join(', ')}
               </div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:4 }}>
+              <div style={{ fontSize:10, color:'#fff', marginTop:4 }}>
                 Отсутствуют в графе знаний — исключены из расчёта. Проверь написание.
               </div>
             </div>
@@ -226,7 +226,7 @@ export const MapperTab: React.FC = () => {
             borderLeft:`3px solid ${(clinicalResult.overallMaxRisk ?? 0) >= 80 ? '#ef4444' : (clinicalResult.overallMaxRisk ?? 0) >= 50 ? '#f59e0b' : '#00e68a'}`,
           }}>
             <div style={{ fontSize:12, color:'#fff', lineHeight:1.4, fontWeight:600 }}>{clinicalResult.summary}</div>
-            <div style={{ display:'flex', gap:8, marginTop:8, fontSize:10, color:'rgba(255,255,255,0.52)', flexWrap:'wrap' }}>
+            <div style={{ display:'flex', gap:8, marginTop:8, fontSize:10, color:'#fff', flexWrap:'wrap' }}>
               <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>🧪 {clinicalResult.markersAnalyzed ?? 0} маркеров</span>
               <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>📋 {clinicalResult.requiredLabPanel?.length ?? 0} в панели</span>
               <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>🔬 {clinicalResult.requiredInstrumental?.length ?? 0} иссл.</span>
@@ -249,7 +249,7 @@ export const MapperTab: React.FC = () => {
                   color: (system?.maxRisk ?? 0) >= 80 ? '#f87171' : (system?.maxRisk ?? 0) >= 50 ? '#fbbf24' : '#00e68a',
                   border:`1px solid ${(system?.maxRisk ?? 0) >= 80 ? 'rgba(239,68,68,0.18)' : (system?.maxRisk ?? 0) >= 50 ? 'rgba(245,158,11,0.18)' : 'rgba(0,230,138,0.18)'}`,
                 }}>{Math.round(system?.maxRisk ?? 0)}%</span>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>({(system?.pathologies?.length ?? 0)})</span>
+                <span style={{ fontSize:10, color:'#fff' }}>({(system?.pathologies?.length ?? 0)})</span>
               </summary>
               <div style={{ padding:'8px', display:'flex', flexDirection:'column', gap:6 }}>
                 {(system?.pathologies || []).map((r: any) => {
@@ -265,7 +265,7 @@ export const MapperTab: React.FC = () => {
                           {(r?.riskPercent ?? 0)}% — {(r?.status || '').split('(')[0].trim()}
                         </span>
                       </div>
-                      <div style={{ display:'flex', gap:6, fontSize:10, color:'rgba(255,255,255,0.52)', flexWrap:'wrap' }}>
+                      <div style={{ display:'flex', gap:6, fontSize:10, color:'#fff', flexWrap:'wrap' }}>
                         <span>Hill: {r?.hillScore ?? '—'}</span>
                         <span>MC95: {r?.severity95 ?? '—'}</span>
                         {(r?.contributingCompounds?.length ?? 0) > 0 && (
@@ -289,7 +289,7 @@ export const MapperTab: React.FC = () => {
       {!mapperResult && !clinicalResult && (
         <div style={{ ...card, textAlign:'center', padding:24, borderStyle:'dashed', background:'rgba(22,22,26,0.32)' }}>
           <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(139,92,246,0.10)', border:'1px solid rgba(139,92,246,0.14)', fontSize:20 }}>🧬</div>
-          <div style={{ fontSize:12, color:'rgba(255,255,255,0.62)', fontWeight:600 }}>{course.length > 0 ? 'Нажми «Запустить маппинг» — увидишь патологии и маркеры' : 'Добавь препараты в курс или вручную — затем запусти маппинг'}</div>
+          <div style={{ fontSize:12, color:'#fff', fontWeight:600 }}>{course.length > 0 ? 'Нажми «Запустить маппинг» — увидишь патологии и маркеры' : 'Добавь препараты в курс или вручную — затем запусти маппинг'}</div>
         </div>
       )}
     </div>

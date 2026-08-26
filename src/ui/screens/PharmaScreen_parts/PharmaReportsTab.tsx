@@ -116,12 +116,12 @@ export const PharmaReportsTab: React.FC = () => {
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.14)', border:'1px solid rgba(245,158,11,0.18)', fontSize:12 }}>📊</span>
           <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Фарма-отчёт</span>
-          <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.52)', background:'rgba(0,0,0,0.18)', padding:'3px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>{course.length} преп. · {totalWeeks} нед</span>
+          <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(0,0,0,0.18)', padding:'3px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>{course.length} преп. · {totalWeeks} нед</span>
         </div>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:6, lineHeight:1.45 }}>
+        <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.45 }}>
           Состав курса, валидация, взаимодействия и PK/PD риск — сформируй отчёт и сохрани в «Профиль → Отчёты».
         </div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.42)', marginTop:6, background:'rgba(0,0,0,0.14)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>Оценка курса: состав · дозировки · валидация · взаимодействия · риск</div>
+        <div style={{ fontSize:10, color:'#fff', marginTop:6, background:'rgba(0,0,0,0.14)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>Оценка курса: состав · дозировки · валидация · взаимодействия · риск</div>
       </div>
 
       <div style={{ display:'flex', gap:8 }}>
@@ -152,20 +152,20 @@ export const PharmaReportsTab: React.FC = () => {
         <div style={{ ...card, textAlign:'center', padding:24, borderStyle:'dashed', background:'rgba(22,22,26,0.32)' }}>
           <div style={{ width:42, height:42, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.14)', fontSize:20 }}>💊</div>
           <div style={{ fontSize:13, color:'#fff', fontWeight:700 }}>Курс пуст</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', marginTop:4, lineHeight:1.4 }}>Добавь препараты в «Курс», чтобы собрать отчёт — он подтянет дозировки и недели автоматически.</div>
+          <div style={{ fontSize:11, color:'#fff', marginTop:4, lineHeight:1.4 }}>Добавь препараты в «Курс», чтобы собрать отчёт — он подтянет дозировки и недели автоматически.</div>
         </div>
       ) : (
         <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
           <div style={card}>
             <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', marginBottom:8, display:'flex', alignItems:'center', gap:7 }}>
-              💊 Состав курса <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.52)', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{course.length} преп. · {totalWeeks} нед</span>
+              💊 Состав курса <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{course.length} преп. · {totalWeeks} нед</span>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
               {course.map((c, i) => (
                 <div key={c.id || i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:11, padding:'8px 10px', background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.05)', borderRadius:10 }}>
                   <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.14)', fontSize:10, flexShrink:0 }}>💊</span>
                   <span style={{ color:'#fff', fontWeight:700, flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{PHARMA_DB[c.substanceId]?.name || c.substanceId}</span>
-                  <span style={{ color:'rgba(255,255,255,0.62)', fontSize:10, background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)', whiteSpace:'nowrap' }}>
+                  <span style={{ color:'#fff', fontSize:10, background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)', whiteSpace:'nowrap' }}>
                     {c.doseValue}{c.doseUnit} · {c.startWeek || 0}–{c.endWeek}
                   </span>
                 </div>
@@ -177,7 +177,7 @@ export const PharmaReportsTab: React.FC = () => {
             <div style={{ ...card, background:'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03))', borderColor:'rgba(245,158,11,0.16)' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', marginBottom:7, display:'flex', alignItems:'center', gap:6 }}>⚠️ Валидация <span style={{ marginLeft:'auto', background:'rgba(245,158,11,0.14)', padding:'2px 7px', borderRadius:20, fontSize:10 }}>{validation.warnings.length}</span></div>
               {validation.warnings.map((w, i) => (
-                <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.82)', padding:'5px 0 5px 14px', position:'relative', lineHeight:1.4, borderBottom: i<validation.warnings.length-1 ? '1px solid rgba(245,158,11,0.08)' : 'none' }}><span style={{ position:'absolute', left:0, color:'#f59e0b' }}>•</span>{w}</div>
+                <div key={i} style={{ fontSize:11, color:'#fff', padding:'5px 0 5px 14px', position:'relative', lineHeight:1.4, borderBottom: i<validation.warnings.length-1 ? '1px solid rgba(245,158,11,0.08)' : 'none' }}><span style={{ position:'absolute', left:0, color:'#f59e0b' }}>•</span>{w}</div>
               ))}
             </div>
           )}
@@ -186,9 +186,9 @@ export const PharmaReportsTab: React.FC = () => {
             <div style={{ ...card, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.03))', borderColor:'rgba(239,68,68,0.16)' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#f87171', marginBottom:7, display:'flex', alignItems:'center', gap:6 }}>⚡ Взаимодействия <span style={{ marginLeft:'auto', background:'rgba(239,68,68,0.12)', padding:'2px 7px', borderRadius:20, fontSize:10 }}>{interactions.length}</span></div>
               {interactions.slice(0, 8).map((al, i) => (
-                <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.82)', padding:'6px 8px', background:'rgba(0,0,0,0.14)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)', marginBottom:6 }}>
+                <div key={i} style={{ fontSize:11, color:'#fff', padding:'6px 8px', background:'rgba(0,0,0,0.14)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)', marginBottom:6 }}>
                   <span style={{ fontWeight:800, color: al.type==='critical' ? '#f87171' : '#fbbf24' }}>[{al.type.toUpperCase()}]</span> <span style={{ fontWeight:700 }}>{al.drugs.join(' + ')}</span>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', marginTop:2, lineHeight:1.4 }}>{al.recommendation}</div>
+                  <div style={{ fontSize:10, color:'#fff', marginTop:2, lineHeight:1.4 }}>{al.recommendation}</div>
                 </div>
               ))}
             </div>
@@ -208,25 +208,25 @@ export const PharmaReportsTab: React.FC = () => {
                   <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', fontSize:11 }}>✅</span>
                   <span style={{ fontSize:12, fontWeight:800, color:'#00e68a' }}>Отчёт сгенерирован</span>
                 </div>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,0.52)', background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize:10, color:'#fff', background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>
                   {generated.generatedAt ? new Date(generated.generatedAt).toLocaleString() : generated.date}
                 </span>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7, fontSize:11 }}>
                 <div style={{ background:'rgba(0,0,0,0.18)', padding:'8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700 }}>Препаратов</div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{generated.totalSubstances}</div>
+                  <div style={{ fontSize:10, color:'#fff', fontWeight:700 }}>Препаратов</div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{generated.totalSubstances}</div>
                 </div>
                 <div style={{ background:'rgba(0,0,0,0.18)', padding:'8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700 }}>Длительность</div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{generated.totalWeeks} нед</div>
+                  <div style={{ fontSize:10, color:'#fff', fontWeight:700 }}>Длительность</div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{generated.totalWeeks} нед</div>
                 </div>
                 <div style={{ background:'rgba(0,0,0,0.18)', padding:'8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700 }}>Риск</div><div style={{ fontSize:14, fontWeight:900, color: (generated.riskOverall??0) >=60 ? '#f87171' : (generated.riskOverall??0)>=30 ? '#fbbf24' : '#00e68a' }}>{generated.riskOverall!=null ? `${Math.round(generated.riskOverall)}%` : '—'}</div>
+                  <div style={{ fontSize:10, color:'#fff', fontWeight:700 }}>Риск</div><div style={{ fontSize:14, fontWeight:900, color: (generated.riskOverall??0) >=60 ? '#f87171' : (generated.riskOverall??0)>=30 ? '#fbbf24' : '#00e68a' }}>{generated.riskOverall!=null ? `${Math.round(generated.riskOverall)}%` : '—'}</div>
                 </div>
                 <div style={{ background:'rgba(0,0,0,0.18)', padding:'8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700 }}>Алертов</div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{generated.warnings.length + generated.interactions.length}</div>
+                  <div style={{ fontSize:10, color:'#fff', fontWeight:700 }}>Алертов</div><div style={{ fontSize:14, fontWeight:900, color:'#fff' }}>{generated.warnings.length + generated.interactions.length}</div>
                 </div>
               </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', marginTop:8, textAlign:'center' }}>
+              <div style={{ fontSize:11, color:'#fff', marginTop:8, textAlign:'center' }}>
                 Сохранён в архив — смотри «Профиль → Отчёты → Архив»
               </div>
             </div>

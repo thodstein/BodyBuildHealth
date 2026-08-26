@@ -87,7 +87,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:15, fontWeight:900, color:'#fff', letterSpacing:-0.3, lineHeight:1.1 }}>{sub.name}</div>
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
-              <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.78)', fontWeight:700 }}>{CLASS_LABELS[sub.class] || sub.class}</span>
+              <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontWeight:700 }}>{CLASS_LABELS[sub.class] || sub.class}</span>
               {sub.pk && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.18)', color:'#00e68a', fontWeight:700 }}>T½ {formatHalfLife(sub.pk.halfLifeHours)}</span>}
               {sub.pk && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.18)', color:'#60a5fa', fontWeight:700 }}>{(sub.pk.bioavailability*100).toFixed(0)}% биодоступность</span>}
             </div>
@@ -103,12 +103,12 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           { k:'Vd', v: sub.pk ? sub.pk.Vd + ' л' : '—' },
         ].map(i=>(
           <div key={i.k} style={{ padding:'8px 10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>{i.k}</div>
+            <div style={{ fontSize:9, color:'#fff', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>{i.k}</div>
             <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginTop:2 }}>{i.v}</div>
           </div>
         ))}
         <div style={{ gridColumn:'1 / -1', padding:'8px 10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Эстеры</div>
+          <div style={{ fontSize:9, color:'#fff', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Эстеры</div>
           <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginTop:2 }}>{sub.esters?.join(', ') || '—'}</div>
         </div>
       </div>
@@ -151,7 +151,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
 
       {sub.linkedRisks && sub.linkedRisks.length > 0 && (
         <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:800, marginBottom:6 }}>Связанные риски</div>
+          <div style={{ fontSize:10, color:'#fff', fontWeight:800, marginBottom:6 }}>Связанные риски</div>
           <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {sub.linkedRisks.map((r, i) => (
               <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background: r.direction === 'down' ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)', color: r.direction === 'down' ? '#4ade80' : '#f87171', fontWeight:700, border:`1px solid ${r.direction==='down'?'rgba(34,197,94,0.18)':'rgba(239,68,68,0.18)'}` }}>
@@ -180,7 +180,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
                       {isSynergy ? 'СИНЕРГИЯ' : 'АНТАГОНИЗМ'} {Math.round(ls.strength * 100)}%
                     </span>
                   </div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.72)', lineHeight:1.4 }}>{ls.mechanism}</div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>{ls.mechanism}</div>
                 </div>
               );
             })}
@@ -202,8 +202,8 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
                     <span style={{ fontSize:10, fontWeight:800, color:sevColor }}>{c.with}</span>
                     <span style={{ fontSize:9, padding:'2px 6px', borderRadius:20, background:`${sevColor}16`, color:sevColor, fontWeight:800 }}>{c.severity}</span>
                   </div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.78)', lineHeight:1.4 }}>{c.effect}</div>
-                  {c.mechanism && <div style={{ fontSize:9, color:'rgba(255,255,255,0.42)', marginTop:4, fontStyle:'italic' }}>{c.mechanism}</div>}
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>{c.effect}</div>
+                  {c.mechanism && <div style={{ fontSize:9, color:'#fff', marginTop:4, fontStyle:'italic' }}>{c.mechanism}</div>}
                 </div>
               );
             })}
@@ -215,7 +215,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.16)' }}>
           <div style={{ fontSize:11, color:'#fbbf24', fontWeight:800, marginBottom:7 }}>📋 Особые указания</div>
           {sub.specialInstructions.map((si, i) => (
-            <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.84)', lineHeight:1.5, padding:'4px 0 4px 14px', position:'relative', borderBottom: i < sub.specialInstructions!.length-1 ? '1px solid rgba(245,158,11,0.08)' : 'none' }}>
+            <div key={i} style={{ fontSize:10, color:'#fff', lineHeight:1.5, padding:'4px 0 4px 14px', position:'relative', borderBottom: i < sub.specialInstructions!.length-1 ? '1px solid rgba(245,158,11,0.08)' : 'none' }}>
               <span style={{ position:'absolute', left:0, color:'#f59e0b', fontWeight:800 }}>•</span>{si}
             </div>
           ))}
@@ -246,7 +246,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
       )}
 
       <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Фармакодинамика <span style={{ marginLeft:'auto', fontSize:9, color:'rgba(255,255,255,0.42)' }}>тапни для описания</span></div>
+          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Фармакодинамика <span style={{ marginLeft:'auto', fontSize:9, color:'#fff' }}>тапни для описания</span></div>
             {pdEntries.map(([key, val]) => {
               const absVal = Math.abs(val);
               const maxScale = key === 'AR_affinity' ? 2 : key === 'hct_impact' ? 6 : key === 'hepatotoxicity' ? 4 : 1.2;
@@ -256,14 +256,14 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
               return (
                 <div key={key} style={{ marginBottom:8, padding:'7px 8px', borderRadius:9, background: isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent', border:`1px solid ${isExpanded ? 'rgba(255,255,255,0.06)' : 'transparent'}` }}>
                   <div style={{ display:'flex', justifyContent:'space-between', cursor:'pointer', alignItems:'center' }} onClick={() => setExpandedPD(isExpanded ? null : key)}>
-                    <span style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.88)' }}>{PD_LABELS[key] || key} <span style={{ fontSize:9, color:'rgba(255,255,255,0.32)' }}>{isExpanded ? '▾' : '▸'}</span></span>
+                    <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{PD_LABELS[key] || key} <span style={{ fontSize:9, color:'#fff' }}>{isExpanded ? '▾' : '▸'}</span></span>
                     <span style={{ color: pdBarColor(key, val), fontWeight:800, fontSize:11, background:`${pdBarColor(key,val)}14`, padding:'2px 7px', borderRadius:20 }}>{val.toFixed(2)}</span>
                   </div>
                   <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:20, height:6, marginTop:6, overflow:'hidden' }}>
                     <div style={{ width:`${pct}%`, background: pdBarColor(key, val), height:6, borderRadius:20, minWidth:2, boxShadow:`0 0 8px ${pdBarColor(key,val)}55` }} />
                   </div>
                   {isExpanded && mechanism && (
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', lineHeight:1.45, marginTop:6, padding:'6px 8px', background:'rgba(0,0,0,0.18)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>
+                    <div style={{ fontSize:10, color:'#fff', lineHeight:1.45, marginTop:6, padding:'6px 8px', background:'rgba(0,0,0,0.18)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>
                       {mechanism}
                     </div>
                   )}
@@ -292,12 +292,12 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
               <details key={organId} style={{ marginBottom:6, background:'rgba(255,255,255,0.02)', borderRadius:9, border:'1px solid rgba(255,255,255,0.05)', overflow:'hidden' }}>
                 <summary style={{ cursor:'pointer', padding:'8px 10px', fontSize:11, fontWeight:700, listStyle:'none', display:'flex', alignItems:'center', gap:6, color:'#fff' }}>
                   <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', fontSize:11 }}>{TZ_SYSTEM_ICONS[organId] || '•'}</span> {TZ_SYSTEM_LABELS[organId] || organId}
-                  <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{mechs.length} мех.</span>
+                  <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{mechs.length} мех.</span>
                 </summary>
                 <div style={{ padding:'6px 8px 8px', display:'flex', flexDirection:'column', gap:4 }}>
                   {mechs.map(m => (
                     <div key={m.mechId} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:8, fontSize:10, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}>
-                      <span style={{ color:'rgba(255,255,255,0.84)', flex:1, fontWeight:600 }}>{m.label}</span>
+                      <span style={{ color:'#fff', flex:1, fontWeight:600 }}>{m.label}</span>
                       <span style={{ fontWeight:800, padding:'2px 7px', borderRadius:20, fontSize:10, background:m.weight >= 4 ? 'rgba(239,68,68,0.14)' : m.weight >= 3 ? 'rgba(249,115,22,0.14)' : m.weight >= 2 ? 'rgba(234,179,8,0.14)' : 'rgba(34,197,94,0.14)', color:m.weight >= 4 ? '#f87171' : m.weight >= 3 ? '#fb923c' : m.weight >= 2 ? '#facc15' : '#4ade80', border:`1px solid ${m.weight>=4?'rgba(239,68,68,0.18)':m.weight>=3?'rgba(249,115,22,0.18)':m.weight>=2?'rgba(234,179,8,0.18)':'rgba(34,197,94,0.18)'}` }}>
                         w={m.weight}
                       </span>
@@ -319,11 +319,11 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:11, fontWeight:800, color:'#fff' }}>
                       {getMarkerName(eff.marker)}
-                      <span style={{ marginLeft:6, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:20 }}>
+                      <span style={{ marginLeft:6, fontSize:9, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:20 }}>
                         {eff.strength >= 0.4 ? 'значимо' : eff.strength >= 0.2 ? 'умеренно' : 'слабо'} {(eff.strength * 100).toFixed(0)}%
                       </span>
                     </div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.58)', lineHeight:1.4, marginTop:2 }}>{eff.reason}</div>
+                    <div style={{ fontSize:10, color:'#fff', lineHeight:1.4, marginTop:2 }}>{eff.reason}</div>
                   </div>
                 </div>
             ))}
@@ -334,14 +334,14 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
       {(sub.description || (detail?.description)) && (
         <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>📝 Описание</div>
-          <div style={{ color:'rgba(255,255,255,0.72)', lineHeight:1.5, fontSize:11 }}>{decodeGarbled((detail?.description || sub.description) || '')}</div>
+          <div style={{ color:'#fff', lineHeight:1.5, fontSize:11 }}>{decodeGarbled((detail?.description || sub.description) || '')}</div>
         </div>
       )}
       {(detail?.mechanism || sub.mechanisms?.length) && (
         <div style={{ padding:'12px', borderRadius:12, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
           <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>⚙️ Механизм действия</div>
           {detail?.mechanism ? (
-            <div style={{ color:'rgba(255,255,255,0.72)', lineHeight:1.5, fontSize:11 }}>{decodeGarbled(detail.mechanism)}</div>
+            <div style={{ color:'#fff', lineHeight:1.5, fontSize:11 }}>{decodeGarbled(detail.mechanism)}</div>
           ) : sub.mechanisms?.length ? (
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {sub.mechanisms.map((m, i) => (
@@ -356,9 +356,9 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:8 }}>💉 Диапазон дозировок</div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {(() => { const dr = detail?.dosageRange || sub.dosageRange; if (!dr) return null; return <>
-              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700 }}>Минимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{dr.min} <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>{dr.unit}</span></div></div>
+              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Минимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{dr.min} <span style={{ fontSize:10, color:'#fff' }}>{dr.unit}</span></div></div>
               <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)' }}><div style={{ fontSize:9, color:'#fbbf24', fontWeight:700 }}>Максимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fbbf24' }}>{dr.max} <span style={{ fontSize:10, color:'#fbbf24' }}>{dr.unit}</span></div></div>
-              <div style={{ gridColumn:'1 / -1', padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700 }}>Частота</div><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{String(dr.frequency)}</div></div>
+              <div style={{ gridColumn:'1 / -1', padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'#fff', fontWeight:700 }}>Частота</div><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{String(dr.frequency)}</div></div>
             </>; })()}
           </div>
         </div>
@@ -380,7 +380,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
                     <span style={{ fontSize:9, fontWeight:800, padding:'3px 7px', borderRadius:20, background:`${clr}18`, color:clr, border:`1px solid ${clr}30` }}>{lbl}</span>
                     <span style={{ fontSize:11, fontWeight:800, color:clr }}>{linkedName}</span>
                   </div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.72)', lineHeight:1.4 }}>{s.desc || ''}</div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>{s.desc || ''}</div>
                 </div>
               );
             }); } catch { return null; }})()}
@@ -393,7 +393,7 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
           <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
           {(detail?.sideEffects || sub.sideEffects || []).map((se, i) => (
             <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.16)', border:'1px solid rgba(255,255,255,0.04)' }}>
-              <span style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.84)' }}>{se.effect}</span>
+              <span style={{ fontSize:11, fontWeight:600, color:'#fff' }}>{se.effect}</span>
               <span style={{ color: se.frequency === 'common' ? '#fbbf24' : se.frequency === 'rare' ? '#60a5fa' : '#f87171', fontWeight:800, fontSize:10, background:`${se.frequency==='common'?'rgba(251,191,36,0.12)':se.frequency==='rare'?'rgba(96,165,250,0.12)':'rgba(248,113,113,0.12)'}`, padding:'2px 7px', borderRadius:20, border:`1px solid ${se.frequency==='common'?'rgba(251,191,36,0.18)':se.frequency==='rare'?'rgba(96,165,250,0.18)':'rgba(248,113,113,0.18)'}` }}>
                 {se.frequency === 'common' ? 'часто' : se.frequency === 'rare' ? 'редко' : se.frequency === 'very_rare' ? 'очень редко' : se.frequency}
               </span>
@@ -534,14 +534,14 @@ export const CatalogTab: React.FC = () => {
           style={{ width:'100%', padding:'11px 36px 11px 36px', borderRadius:14, border:'1px solid rgba(255,255,255,0.07)',
             background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:13, fontWeight:500, boxSizing:'border-box', backdropFilter:'blur(8px)', outline:'none' }} />
         {searchQuery && (
-          <button onClick={()=>setSearchQuery('')} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', width:26, height:26, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.72)', cursor:'pointer', fontSize:10 }}>✕</button>
+          <button onClick={()=>setSearchQuery('')} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', width:26, height:26, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer', fontSize:10 }}>✕</button>
         )}
       </div>
 
       <div style={{ padding:'10px 10px', borderRadius:14, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
-          <span style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.62)', letterSpacing:0.4, textTransform:'uppercase' as const }}>Фильтр по классу</span>
-          <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.38)', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{filteredList.length} поз.</span>
+          <span style={{ fontSize:10, fontWeight:800, color:'#fff', letterSpacing:0.4, textTransform:'uppercase' as const }}>Фильтр по классу</span>
+          <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{filteredList.length} поз.</span>
         </div>
         <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
           <button onClick={() => setFilterClass('all')} style={{
@@ -581,7 +581,7 @@ export const CatalogTab: React.FC = () => {
                       {substances.length}
                     </span>
                   </span>
-                  <span style={{ width:24, height:24, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'rgba(255,255,255,0.72)' }}>{isCollapsed ? '▸' : '▾'}</span>
+                  <span style={{ width:24, height:24, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff' }}>{isCollapsed ? '▸' : '▾'}</span>
                 </div>
                 {!isCollapsed && <div style={{ padding:'8px', display:'flex', flexDirection:'column', gap:0 }}>{substances.map(s => (
                   <CatalogRow
@@ -615,8 +615,8 @@ export const CatalogTab: React.FC = () => {
       {filteredList.length === 0 && (
         <div style={{ padding:24, textAlign:'center', borderRadius:14, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ fontSize:22, marginBottom:6, opacity:0.6 }}>🔍</div>
-          <div style={{ color:'rgba(255,255,255,0.62)', fontSize:12, fontWeight:600 }}>{debouncedSearch ? 'Ничего не найдено' : 'Нет данных'}</div>
-          {debouncedSearch && <div style={{ color:'rgba(255,255,255,0.38)', fontSize:10, marginTop:4 }}>Попробуй другой запрос или сбрось фильтр</div>}
+          <div style={{ color:'#fff', fontSize:12, fontWeight:600 }}>{debouncedSearch ? 'Ничего не найдено' : 'Нет данных'}</div>
+          {debouncedSearch && <div style={{ color:'#fff', fontSize:10, marginTop:4 }}>Попробуй другой запрос или сбрось фильтр</div>}
         </div>
       )}
 
@@ -641,7 +641,7 @@ export const CatalogTab: React.FC = () => {
               </div>
               <button onClick={() => setSelectedId(null)} style={{
                 background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)',
-                color:'rgba(255,255,255,0.72)', borderRadius:10, padding:'6px 10px',
+                color:'#fff', borderRadius:10, padding:'6px 10px',
                 cursor:'pointer', fontSize:11, fontWeight:800, flexShrink:0,
               }}>✕ Закрыть</button>
             </div>

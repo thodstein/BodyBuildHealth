@@ -66,13 +66,13 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
           <div style={{ marginBottom:14 }}>
             <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 10px', borderRadius:20, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.12)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', marginBottom:10 }}>
               <span style={{ width:6, height:6, borderRadius:'50%', background:'#00e68a', boxShadow:'0 0 8px rgba(0,230,138,0.7)' }} />
-              <span style={{ fontSize:9, fontWeight:800, letterSpacing:0.7, color:'rgba(255,255,255,0.92)', textTransform:'uppercase' as const }}>Pharma · BioStack</span>
-              <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>• {pharmaSubstances.length} веществ</span>
+              <span style={{ fontSize:9, fontWeight:800, letterSpacing:0.7, color:'#fff', textTransform:'uppercase' as const }}>Pharma · BioStack</span>
+              <span style={{ fontSize:9, color:'#fff' }}>• {pharmaSubstances.length} веществ</span>
             </div>
             <h1 style={{ fontSize:26, fontWeight:900, color:'#fff', margin:'0 0 6px', letterSpacing:-0.8, lineHeight:1, textShadow:'0 2px 18px rgba(0,0,0,0.85), 0 0 24px rgba(139,92,246,0.18)' }}>
               Фармакология
             </h1>
-            <p style={{ fontSize:12.5, color:'rgba(255,255,255,0.82)', margin:'0 0 12px', lineHeight:1.45, textShadow:'0 1px 10px rgba(0,0,0,0.75)', maxWidth:360 }}>
+            <p style={{ fontSize:12.5, color:'#fff', margin:'0 0 12px', lineHeight:1.45, textShadow:'0 1px 10px rgba(0,0,0,0.75)', maxWidth:360 }}>
               Курс, PK/PD симуляция, каталог веществ и проверка взаимодействий — всё в одном хабе
             </p>
             {/* quick stats */}
@@ -80,21 +80,21 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
               <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:12, background:'rgba(0,0,0,0.42)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
                 <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', fontSize:11 }}>💊</span>
                 <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1 }}>В курсе</div>
+                  <div style={{ fontSize:9, color:'#fff', lineHeight:1 }}>В курсе</div>
                   <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>{courseLen}</div>
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:12, background:'rgba(0,0,0,0.42)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
                 <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background: (risk ?? 0) >=60 ? 'rgba(239,68,68,0.18)' : (risk ?? 0) >=30 ? 'rgba(245,158,11,0.18)' : 'rgba(0,230,138,0.18)', fontSize:11 }}>{(risk ?? 0) >=60 ? '🔴' : (risk ?? 0) >=30 ? '🟡' : '🟢'}</span>
                 <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1 }}>Риск</div>
+                  <div style={{ fontSize:9, color:'#fff', lineHeight:1 }}>Риск</div>
                   <div style={{ fontSize:13, fontWeight:800, color: (risk ?? 0) >=60 ? '#ef4444' : (risk ?? 0) >=30 ? '#f59e0b' : '#00e68a', lineHeight:1 }}>{risk != null ? `${Math.round(risk)}%` : '—'}</div>
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 10px', borderRadius:12, background:'rgba(0,0,0,0.42)', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)' }}>
                 <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.18)', fontSize:11 }}>🧬</span>
                 <div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1 }}>Каталог</div>
+                  <div style={{ fontSize:9, color:'#fff', lineHeight:1 }}>Каталог</div>
                   <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>{pharmaSubstances.length}</div>
                 </div>
               </div>
@@ -121,13 +121,13 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
                     {c.title}
                     <span style={{ width:5, height:5, borderRadius:'50%', background:c.color, boxShadow:`0 0 6px ${c.color}` }} />
                   </div>
-                  <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.66)', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.desc}</div>
+                  <div style={{ fontSize:10.5, color:'#fff', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.desc}</div>
                 </div>
                 <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:c.color, fontSize:12, flexShrink:0 }}>→</span>
               </button>
             ))}
           </div>
-          <div style={{ marginTop:10, textAlign:'center', fontSize:10, color:'rgba(255,255,255,0.38)' }}>Нажми на раздел — откроются инструменты и данные</div>
+          <div style={{ marginTop:10, textAlign:'center', fontSize:10, color:'#fff' }}>Нажми на раздел — откроются инструменты и данные</div>
         </div>
       </div>
     );
@@ -142,20 +142,20 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
       <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexShrink:0 }}>
         <button onClick={() => setPage('main')} style={{
           display:'inline-flex', alignItems:'center', gap:6, padding:'7px 12px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:700,
-          background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'rgba(255,255,255,0.92)', backdropFilter:'blur(8px)',
+          background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.10)', color:'#fff', backdropFilter:'blur(8px)',
         }}>← Назад</button>
         <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
           <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.22)', fontSize:13 }}>{pageIcon[page]}</span>
           <div style={{ minWidth:0 }}>
             <div style={{ fontSize:13, fontWeight:800, color:'#fff', lineHeight:1 }}>{pageTitle[page]}</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', lineHeight:1 }}>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1 }}>
               {page==='course' ? `${linked.course.length} преп. • ${Math.max(1, linked.course.reduce((m,c)=>Math.max(m,(c.endWeek||12)-(c.startWeek||0)),4))} нед` : page==='calculators' ? 'PK/PD · Дозировки · Пептиды' : page==='info' ? `${pharmaSubstances.length} веществ • взаимодействия` : page==='reports' ? 'Состав · валидация · риск' : ''}
             </div>
           </div>
         </div>
         {(page==='course' || page==='reports' || page==='info') && (
           <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0 }}>
-            <span style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{linked.course.length}💊</span>
+            <span style={{ fontSize:10, color:'#fff' }}>{linked.course.length}💊</span>
             <span style={{ fontSize:10, fontWeight:700, color: (linked.risk?.overallNet ?? 0) >=60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >=30 ? '#f59e0b' : '#00e68a' }}>{linked.risk ? `${Math.round(linked.risk.overallNet)}%` : '—'}</span>
           </div>
         )}
@@ -166,26 +166,26 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
           background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))', border:'1px solid rgba(139,92,246,0.16)', flexShrink:0,
           backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
         }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Сводка расчётов <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.5)', fontWeight:600 }}>{pharmaSubstances.length} веществ</span></div>
+          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Сводка расчётов <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', fontWeight:600 }}>{pharmaSubstances.length} веществ</span></div>
           <div style={{ display:'flex', gap:8 }}>
             <div style={{ flex:1, padding:'10px 8px', borderRadius:12, textAlign:'center',
               background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)',
             }}>
-              <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', letterSpacing:0.4, fontWeight:700, textTransform:'uppercase' as const }}>Препаратов в курсе</div>
+              <div style={{ fontSize:8, color:'#fff', letterSpacing:0.4, fontWeight:700, textTransform:'uppercase' as const }}>Препаратов в курсе</div>
               <div style={{ fontSize:20, fontWeight:900, color:'#fff', marginTop:2 }}>{linked.course.length}</div>
             </div>
             <div style={{ flex:1, padding:'10px 8px', borderRadius:12, textAlign:'center',
               background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)',
             }}>
-              <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', letterSpacing:0.4, fontWeight:700, textTransform:'uppercase' as const }}>Общий риск</div>
+              <div style={{ fontSize:8, color:'#fff', letterSpacing:0.4, fontWeight:700, textTransform:'uppercase' as const }}>Общий риск</div>
               <div style={{ fontSize:20, fontWeight:900, color: (linked.risk?.overallNet ?? 0) >= 60 ? '#ef4444' : (linked.risk?.overallNet ?? 0) >= 30 ? '#f59e0b' : '#00e68a', marginTop:2 }}>
                 {linked.risk ? `${Math.round(linked.risk.overallNet)}%` : '—'}
               </div>
             </div>
           </div>
           {Object.keys(linked.activeDrugs).length > 0 && (
-            <div style={{ marginTop:8, fontSize:10, color:'rgba(255,255,255,0.62)', lineHeight:1.4, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ color:'rgba(255,255,255,0.45)', fontWeight:700 }}>Активные:</span> {Object.keys(linked.activeDrugs).map(d => PHARMA_DB[d]?.name || d).join(' • ')}
+            <div style={{ marginTop:8, fontSize:10, color:'#fff', lineHeight:1.4, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
+              <span style={{ color:'#fff', fontWeight:700 }}>Активные:</span> {Object.keys(linked.activeDrugs).map(d => PHARMA_DB[d]?.name || d).join(' • ')}
             </div>
           )}
           <div style={{ marginTop:8 }}>
@@ -205,7 +205,7 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
         <span style={{
           display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
           color:'#a78bfa', borderBottom:'2px solid #8b5cf6', marginBottom:-1,
-        }}>📋 Курс <span style={{ color:'rgba(255,255,255,0.52)', fontWeight:700 }}>{linked.course.length}</span></span>
+        }}>📋 Курс <span style={{ color:'#fff', fontWeight:700 }}>{linked.course.length}</span></span>
       )}
       {page === 'reports' && (
         <span style={{

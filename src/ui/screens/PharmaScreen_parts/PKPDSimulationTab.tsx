@@ -210,9 +210,9 @@ export const PKPDSimulationTab: React.FC = () => {
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', fontSize:12 }}>⚗️</span>
           <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>PK/PD симуляция</span>
-          <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{drugDoses.length} преп.</span>
+          <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{drugDoses.length} преп.</span>
         </div>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', lineHeight:1.45 }}>
+        <div style={{ fontSize:11, color:'#fff', lineHeight:1.45 }}>
           Мульти-вещество: суперпозиция концентраций + эффект + толерантность. Задай дозу и дни — получи Cmax/Cmin и стационар.
         </div>
       </div>
@@ -246,18 +246,18 @@ export const PKPDSimulationTab: React.FC = () => {
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                 <div>
-                  <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Доза на инъекцию (мг)</label>
+                  <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Доза на инъекцию (мг)</label>
                   <input type="number" value={dd.doseMg} onChange={(e) => updateDrug(idx, 'doseMg', parseFloat(e.target.value) || 0)}
                     style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Длительность (нед)</label>
+                  <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Длительность (нед)</label>
                   <input type="number" value={dd.totalWeeks} onChange={(e) => updateDrug(idx, 'totalWeeks', parseFloat(e.target.value) || 0)}
                     style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
                 </div>
               </div>
               <div>
-                <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:6, letterSpacing:0.2 }}>Дни инъекций</label>
+                <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:6, letterSpacing:0.2 }}>Дни инъекций</label>
                 <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
                   {[1,2,3,4,5,6,7].map(d => {
                     const active = (dd.frequencyDays || []).includes(d);
@@ -292,7 +292,7 @@ export const PKPDSimulationTab: React.FC = () => {
               placeholder={drugDoses.length === 0 ? 'Начни вводить название...' : 'Поиск препарата...'}
               style={{ width:'100%', padding:'8px 10px 8px 30px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.07)', color:'#fff', fontSize:12, boxSizing:'border-box', outline:'none' }} />
           </div>
-          {pkSearch && <button onClick={()=>setPkSearch('')} style={{ width:30, height:30, borderRadius:9, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.72)', cursor:'pointer' }}>✕</button>}
+          {pkSearch && <button onClick={()=>setPkSearch('')} style={{ width:30, height:30, borderRadius:9, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>✕</button>}
         </div>
 
         {(() => {
@@ -313,7 +313,7 @@ export const PKPDSimulationTab: React.FC = () => {
                     background:'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', border:'1px solid rgba(139,92,246,0.22)', textAlign:'center',
                   }}>
                     <div style={{ fontSize:12, fontWeight:800, color:'#a78bfa', marginBottom:2 }}>{g.label}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:600 }}>👆 Эфиры</div>
+                    <div style={{ fontSize:10, color:'#fff', fontWeight:600 }}>👆 Эфиры</div>
                   </div>
                 ))}
                 {pkSingles.map(s => (
@@ -322,7 +322,7 @@ export const PKPDSimulationTab: React.FC = () => {
                     background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', transition:'all 0.15s',
                   }}>
                     <div style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{s.name}</div>
-                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:3 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', marginTop:3 }}>
                       <span>{CLASS_LABELS[s.class] || s.class}</span>
                       <span style={{ color:'#a78bfa', fontWeight:700 }}>{s.pk?.halfLifeHours ? `${(s.pk.halfLifeHours / 24).toFixed(1)} дн` : ''}</span>
                     </div>
@@ -331,12 +331,12 @@ export const PKPDSimulationTab: React.FC = () => {
               </div>
             )}
             {!showAllDrugs && !pkClass && !pkSearch && drugDoses.length > 0 && (
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', textAlign:'center', padding:10, background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px dashed rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize:11, color:'#fff', textAlign:'center', padding:10, background:'rgba(255,255,255,0.02)', borderRadius:10, border:'1px dashed rgba(255,255,255,0.07)' }}>
                 Введи название или выбери эфир выше
               </div>
             )}
             {pkFiltered.length === 0 && (pkClass || pkSearch) && (
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', textAlign:'center', padding:10 }}>
+              <div style={{ fontSize:11, color:'#fff', textAlign:'center', padding:10 }}>
                 Все препараты этого класса уже добавлены
               </div>
             )}
@@ -349,7 +349,7 @@ export const PKPDSimulationTab: React.FC = () => {
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
                 <span style={{ width:26, height:26, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', fontSize:12 }}>🧬</span>
                 <h3 style={{ margin:0, fontSize:14, fontWeight:800, color:'#fff' }}>{pkEsterPopup.label} — эфир</h3>
-                <button onClick={()=>setPkEsterPopup(null)} style={{ marginLeft:'auto', width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.72)', cursor:'pointer' }}>✕</button>
+                <button onClick={()=>setPkEsterPopup(null)} style={{ marginLeft:'auto', width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>✕</button>
               </div>
               {allSubstances.filter(p => p.class === pkEsterPopup.baseClass).map(p => (
                 <div key={p.id} onClick={() => { addDrug(p.id); setPkEsterPopup(null); }} style={{
@@ -357,7 +357,7 @@ export const PKPDSimulationTab: React.FC = () => {
                   background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
                 }}>
                   <div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{p.name}</div>
-                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', marginTop:2 }}>
+                  <div style={{ fontSize:11, color:'#fff', marginTop:2 }}>
                     T½ {(p.pk.halfLifeHours/24).toFixed(1)} дн {p.esters?.[0] ? `• ${p.esters[0]}` : ''}
                   </div>
                 </div>
@@ -386,9 +386,9 @@ export const PKPDSimulationTab: React.FC = () => {
                 { label:'Стационар', v:`≈${simResult.ssDays}`, unit:'дн', color:'#00e68a' },
               ].map(c=>(
                 <div key={c.label} style={{ textAlign:'center', padding:'10px 6px', background:'rgba(0,0,0,0.22)', borderRadius:12, border:'1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>{c.label}</div>
+                  <div style={{ fontSize:9, color:'#fff', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>{c.label}</div>
                   <div style={{ fontSize:18, fontWeight:900, color:c.color, marginTop:2 }}>{c.v}</div>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>{c.unit}</div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{c.unit}</div>
                 </div>
               ))}
             </div>
@@ -409,7 +409,7 @@ export const PKPDSimulationTab: React.FC = () => {
             borderRadius:14, padding:10, boxShadow:'0 6px 18px rgba(0,0,0,0.18)',
           }}>
             {chart}
-            <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:10, marginTop:8, fontSize:11, color:'rgba(255,255,255,0.62)' }}>
+            <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:10, marginTop:8, fontSize:11, color:'#fff' }}>
               <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}><span style={{ width:14, height:3, borderRadius:2, background:'#8b5cf6', display:'inline-block' }} /> Суммарная</span>
               {simResult.perDrug.map((d, i) => (
                 <span key={d.substanceId} style={{ display:'inline-flex', alignItems:'center', gap:4 }}><span style={{ width:14, height:3, borderRadius:2, background:DRUG_COLORS[i % DRUG_COLORS.length], display:'inline-block', opacity:0.7, borderTop:'1px dashed rgba(255,255,255,0.6)' }} /> {d.name}</span>

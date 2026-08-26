@@ -242,7 +242,7 @@ export const PharmaCourseScreen: React.FC = () => {
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: 12 }}>
       <div style={{ width: 34, height: 34, border: '3px solid rgba(255,255,255,0.08)', borderTopColor: '#8b5cf6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight:600 }}>Загрузка курса...</span>
+      <span style={{ fontSize: 12, color:'#fff', fontWeight:600 }}>Загрузка курса...</span>
     </div>
   );
 
@@ -264,25 +264,25 @@ export const PharmaCourseScreen: React.FC = () => {
         .pc-input2:focus { border-color: #8b5cf6 !important; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); outline: none; }
       `}</style>
 
-      {/* Header */}
-      <div className="pc-glass" style={{ padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+      {/* Header — фикс наложения: перенос, белый текст, не перекрывает инфу */}
+      <div className="pc-glass" style={{ padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap', background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0, flex:'1 1 200px' }}>
           <div style={{ width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, #8b5cf6, #6d28d9)', color:'#fff', fontSize:16, boxShadow:'0 4px 14px rgba(139,92,246,0.35)', flexShrink:0 }}>💊</div>
-          <div style={{ minWidth:0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+          <div style={{ minWidth:0, flex:1 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:7, flexWrap:'wrap' }}>
               <span style={{ fontWeight:800, fontSize:14, color:'#fff', letterSpacing:-0.3 }}>Мой курс</span>
-              <span style={{ background:'rgba(139,92,246,0.16)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.22)', borderRadius:10, padding:'1px 7px', fontSize:11, fontWeight:800 }}>{course.length}</span>
-              {course.length>0 && <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>· {totalWeeks} нед · {[...new Set(course.map(e=>subClass(e.substanceId)).filter(Boolean))].length} классов</span>}
+              <span style={{ background:'rgba(139,92,246,0.16)', color:'#fff', border:'1px solid rgba(139,92,246,0.22)', borderRadius:10, padding:'1px 7px', fontSize:11, fontWeight:800 }}>{course.length}</span>
+              {course.length>0 && <span style={{ fontSize:10, color:'#fff' }}>· {totalWeeks} нед · {[...new Set(course.map(e=>subClass(e.substanceId)).filter(Boolean))].length} классов</span>}
             </div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+            <div style={{ fontSize:10, color:'#fff', marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
               {course.length===0 ? 'Добавь препараты и настрой недели • PK/PD учтётся автоматически' : `Неделя ${currentWeek} • ${course.length} преп. • длительность 0–${totalWeeks}`}
             </div>
           </div>
         </div>
-        <div style={{ display:'flex', gap:7, flexShrink:0 }}>
+        <div style={{ display:'flex', gap:7, flexShrink:0, flexWrap:'wrap', justifyContent:'flex-end' }}>
           {course.length > 0 && (
             <button onClick={saveCourseHistory} className="pc-btn2" style={{
-              background: 'rgba(245,158,11,0.12)', color: '#fbbf24',
+              background: 'rgba(245,158,11,0.12)', color: '#fff',
               border: '1px solid rgba(245,158,11,0.22)', borderRadius: 12, padding: '8px 11px', fontWeight:700,
               fontSize:11, backdropFilter:'blur(8px)',
             }}>
@@ -302,15 +302,15 @@ export const PharmaCourseScreen: React.FC = () => {
 
       {/* Course start date */}
       <div className="pc-glass" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', flexWrap:'wrap' }}>
-        <span style={{ fontSize:11, color:'rgba(255,255,255,0.62)', fontWeight:700, display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>📅 Старт курса</span>
+        <span style={{ fontSize:11, color:'#fff', fontWeight:700, display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>📅 Старт курса</span>
         <input type="date" value={courseStartDate} onChange={e => {
           setCourseStartDate(e.target.value);
           localStorage.setItem('he_course_start_date', e.target.value);
         }} style={{ background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, padding:'7px 10px', color:'#fff', fontSize:12, fontWeight:600, outline:'none' }} />
         {currentWeek > 0 && (
-          <span style={{ fontSize:11, color:'#a78bfa', fontWeight:800, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', padding:'5px 9px', borderRadius:20 }}>▶ Неделя {currentWeek}</span>
+          <span style={{ fontSize:11, color:'#fff', fontWeight:800, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', padding:'5px 9px', borderRadius:20 }}>▶ Неделя {currentWeek}</span>
         )}
-        <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.38)' }}>{course.length>0 ? 'Прогресс бара = окно приёма' : 'Выбери дату — подсветим активные препараты'}</span>
+        <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{course.length>0 ? 'Прогресс бара = окно приёма' : 'Выбери дату — подсветим активные препараты'}</span>
       </div>
 
       {/* View tabs */}
@@ -361,7 +361,7 @@ export const PharmaCourseScreen: React.FC = () => {
                           <span style={{ ...pillStyle, background:`${color}18`, color, border:`1px solid ${color}30`, borderRadius:20, padding:'2px 8px' }}>{CLASS_LABELS[cls] || cls}</span>
                           {isActive && <span style={{ ...pillStyle, fontSize:9, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', borderRadius:20 }}>● Активен</span>}
                         </div>
-                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:11, color:'rgba(255,255,255,0.58)' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:11, color:'#fff' }}>
                           {editId === entry.id && editDraft ? (
                             <>
                               <input type="number" value={editDraft.doseValue || ''} onChange={e => setEditDraft({ ...editDraft, doseValue: parseFloat(e.target.value) || 0 })}
@@ -376,23 +376,23 @@ export const PharmaCourseScreen: React.FC = () => {
                               </select>
                               <input type="number" value={editDraft.startWeek} onChange={e => setEditDraft({ ...editDraft, startWeek: parseFloat(e.target.value) || 0 })}
                                 className="pc-input2" style={{ width:52, padding:'6px 6px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:11, boxSizing:'border-box' }} />
-                              <span style={{ color:'rgba(255,255,255,0.35)' }}>–</span>
+                              <span style={{ color:'#fff' }}>–</span>
                               <input type="number" value={editDraft.endWeek} onChange={e => setEditDraft({ ...editDraft, endWeek: parseFloat(e.target.value) || 0 })}
                                 className="pc-input2" style={{ width:52, padding:'6px 6px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:11 }} />
                               <button onClick={saveEdit} className="pc-btn2" style={{ background:'linear-gradient(135deg, #00e68a, #00b368)', color:'#000', border:'none', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:800 }}>Сохранить</button>
-                              <button onClick={() => { setEditId(null); setEditDraft(null); }} className="pc-btn2" style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.72)', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:700 }}>✕</button>
+                              <button onClick={() => { setEditId(null); setEditDraft(null); }} className="pc-btn2" style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:700 }}>✕</button>
                             </>
                           ) : (
                             <>
                               <span style={{ color:'#fff', fontWeight:800, fontSize:12 }}>{entry.doseValue}</span>
-                              <span style={{ color:'rgba(255,255,255,0.45)', fontWeight:600 }}>{entry.doseUnit}</span>
+                              <span style={{ color:'#fff', fontWeight:600 }}>{entry.doseUnit}</span>
                               <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
                               <span style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20, fontSize:10, fontWeight:700 }}>{freqDisplay(entry)}</span>
-                              <span style={{ color:'rgba(255,255,255,0.55)' }}>нед {entry.startWeek}–{entry.endWeek}</span>
+                              <span style={{ color:'#fff' }}>нед {entry.startWeek}–{entry.endWeek}</span>
                               {sub?.pk?.halfLifeHours && (
                                 <>
                                   <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
-                                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>T½ {sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours / 24).toFixed(1)} дн`}</span>
+                                  <span style={{ fontSize:10, color:'#fff' }}>T½ {sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours / 24).toFixed(1)} дн`}</span>
                                 </>
                               )}
                             </>
@@ -415,7 +415,7 @@ export const PharmaCourseScreen: React.FC = () => {
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 18px', borderStyle:'dashed', background:'rgba(20,20,24,0.42)' }}>
               <div style={{ width:52, height:52, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', background:'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(59,130,246,0.12))', border:'1px solid rgba(139,92,246,0.18)', fontSize:24 }}>💊</div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:800, marginBottom:4 }}>Курс пуст</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', lineHeight:1.45, maxWidth:320, margin:'0 auto 10px' }}>Нажми «Добавить» — выбери класс и препарат, доза и недели настроятся автоматически</div>
+              <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, maxWidth:320, margin:'0 auto 10px' }}>Нажми «Добавить» — выбери класс и препарат, доза и недели настроятся автоматически</div>
               <button onClick={()=>setShowPicker(true)} className="pc-btn2" style={{ background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', border:'none', borderRadius:12, padding:'9px 16px', fontWeight:800, fontSize:12 }}>+ Добавить первый препарат</button>
             </div>
           )}
@@ -423,7 +423,7 @@ export const PharmaCourseScreen: React.FC = () => {
             <div className="pc-glass" style={{ background:'linear-gradient(135deg, rgba(245,158,11,0.09), rgba(245,158,11,0.04))', borderColor:'rgba(245,158,11,0.20)', padding:'10px 12px' }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>⚠️ Предупреждения <span style={{ marginLeft:'auto', background:'rgba(245,158,11,0.16)', padding:'2px 7px', borderRadius:20, fontSize:10 }}>{validation.warnings.length}</span></div>
               {validation.warnings.map((w, i) => (
-                <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.82)', padding:'4px 0 4px 14px', position:'relative', lineHeight:1.4 }}><span style={{ position:'absolute', left:0, color:'#f59e0b' }}>•</span>{w}</div>
+                <div key={i} style={{ fontSize:11, color:'#fff', padding:'4px 0 4px 14px', position:'relative', lineHeight:1.4 }}><span style={{ position:'absolute', left:0, color:'#f59e0b' }}>•</span>{w}</div>
               ))}
             </div>
           )}
@@ -432,8 +432,8 @@ export const PharmaCourseScreen: React.FC = () => {
               <div style={{ padding:'10px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:7, background:'linear-gradient(90deg, rgba(239,68,68,0.08), transparent)' }}>
                 <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', fontSize:11 }}>⚡</span>
                 <span style={{ fontWeight:800, fontSize:12, color:'#fff' }}>Взаимодействия</span>
-                <span style={{ background:'rgba(255,255,255,0.06)', borderRadius:20, padding:'2px 8px', fontSize:10, color:'rgba(255,255,255,0.62)', fontWeight:700 }}>{interactions.length}</span>
-                <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.42)' }}>проверь перед стартом</span>
+                <span style={{ background:'rgba(255,255,255,0.06)', borderRadius:20, padding:'2px 8px', fontSize:10, color:'#fff', fontWeight:700 }}>{interactions.length}</span>
+                <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>проверь перед стартом</span>
               </div>
               <div style={{ display:'flex', flexDirection:'column' }}>
                 {interactions.map((alert: any, i: number) => {
@@ -451,7 +451,7 @@ export const PharmaCourseScreen: React.FC = () => {
                         </span>
                         <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{alert.drugs?.join(' + ')}</span>
                       </div>
-                      <div style={{ fontSize:11, color:'rgba(255,255,255,0.72)', lineHeight:1.45 }}>{alert.mechanism}</div>
+                      <div style={{ fontSize:11, color:'#fff', lineHeight:1.45 }}>{alert.mechanism}</div>
                     </div>
                   );
                 })}
@@ -460,11 +460,11 @@ export const PharmaCourseScreen: React.FC = () => {
           )}
           {course.length > 1 && (
             <div className="pc-glass" style={{ padding:'10px 12px', display:'flex', gap:10, flexWrap:'wrap', background:'rgba(0,0,0,0.18)' }}>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.58)' }}>Всего <b style={{ color:'#fff' }}>{course.length}</b></div>
+              <div style={{ fontSize:11, color:'#fff' }}>Всего <b style={{ color:'#fff' }}>{course.length}</b></div>
               <div style={{ width:1, height:14, background:'rgba(255,255,255,0.08)', alignSelf:'center' }} />
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.58)' }}>Длительность <b style={{ color:'#fff' }}>0–{totalWeeks} нед</b></div>
+              <div style={{ fontSize:11, color:'#fff' }}>Длительность <b style={{ color:'#fff' }}>0–{totalWeeks} нед</b></div>
               <div style={{ width:1, height:14, background:'rgba(255,255,255,0.08)', alignSelf:'center' }} />
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.58)' }}>Классов <b style={{ color:'#fff' }}>{[...new Set(course.map(e => subClass(e.substanceId)).filter(Boolean))].length}</b></div>
+              <div style={{ fontSize:11, color:'#fff' }}>Классов <b style={{ color:'#fff' }}>{[...new Set(course.map(e => subClass(e.substanceId)).filter(Boolean))].length}</b></div>
             </div>
           )}
         </>
@@ -476,12 +476,12 @@ export const PharmaCourseScreen: React.FC = () => {
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
               <div style={{ fontSize:28, marginBottom:8, opacity:0.7 }}>📅</div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:4 }}>Нет препаратов</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>Добавь препараты на вкладке «Текущий»</div>
+              <div style={{ fontSize:11, color:'#fff' }}>Добавь препараты на вкладке «Текущий»</div>
             </div>
           ) : (
             <>
               <div className="pc-glass" style={{ padding:'12px' }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:7 }}>📅 Недельное расписание <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)', fontWeight:600 }}>по дням частоты</span></div>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:7 }}>📅 Недельное расписание <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', fontWeight:600 }}>по дням частоты</span></div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:6 }}>
                   {scheduleData.map(day => (
                     <div key={day.day} style={{
@@ -491,7 +491,7 @@ export const PharmaCourseScreen: React.FC = () => {
                     }}>
                       <div style={{ fontSize:10, fontWeight:800, color: day.entries.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.32)', marginBottom:6, letterSpacing:0.3 }}>{day.day}</div>
                       <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                        {day.entries.length===0 && <span style={{ fontSize:9, color:'rgba(255,255,255,0.18)' }}>—</span>}
+                        {day.entries.length===0 && <span style={{ fontSize:9, color:'#fff' }}>—</span>}
                         {day.entries.map((item, i) => (
                           <div key={i} style={{
                             fontSize:8, color:'#fff', background:`${item.color}18`,
@@ -507,7 +507,7 @@ export const PharmaCourseScreen: React.FC = () => {
                 </div>
               </div>
               <div className="pc-glass" style={{ padding:'12px' }}>
-                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:9, display:'flex', alignItems:'center', gap:7 }}>💊 Дозировки по препаратам <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.42)' }}>{course.length} позиций</span></div>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:9, display:'flex', alignItems:'center', gap:7 }}>💊 Дозировки по препаратам <span style={{ marginLeft:'auto', fontSize:10, color:'#fff' }}>{course.length} позиций</span></div>
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   {course.map(entry => {
                     const cls = subClass(entry.substanceId);
@@ -525,11 +525,11 @@ export const PharmaCourseScreen: React.FC = () => {
                         </div>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={{ fontSize:11, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</div>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{CLASS_LABELS[cls] || cls}</div>
+                          <div style={{ fontSize:10, color:'#fff' }}>{CLASS_LABELS[cls] || cls}</div>
                         </div>
                         <div style={{ textAlign:'right', flexShrink:0 }}>
-                          <div style={{ fontSize:12, fontWeight:800, color: isAct ? '#a78bfa' : '#fff' }}>{entry.doseValue} <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)', fontWeight:600 }}>{entry.doseUnit}</span></div>
-                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{freqDisplay(entry)} · нед {entry.startWeek || 0}–{entry.endWeek}</div>
+                          <div style={{ fontSize:12, fontWeight:800, color: isAct ? '#a78bfa' : '#fff' }}>{entry.doseValue} <span style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{entry.doseUnit}</span></div>
+                          <div style={{ fontSize:10, color:'#fff' }}>{freqDisplay(entry)} · нед {entry.startWeek || 0}–{entry.endWeek}</div>
                         </div>
                       </div>
                     );
@@ -547,7 +547,7 @@ export const PharmaCourseScreen: React.FC = () => {
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
               <div style={{ fontSize:28, marginBottom:8, opacity:0.6 }}>📊</div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:4 }}>Нет данных для графика</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>Добавь хотя бы один препарат</div>
+              <div style={{ fontSize:11, color:'#fff' }}>Добавь хотя бы один препарат</div>
             </div>
           ) : (
             <>
@@ -570,7 +570,7 @@ export const PharmaCourseScreen: React.FC = () => {
                   const ew = entry.endWeek || totalWeeks;
                   return (
                     <div key={entry.id} style={{ display:'flex', alignItems:'center', marginBottom:6, gap:6 }}>
-                      <div style={{ width:78, fontSize:9, color:'rgba(255,255,255,0.72)', textAlign:'right', paddingRight:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:700 }}>
+                      <div style={{ width:78, fontSize:9, color:'#fff', textAlign:'right', paddingRight:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:700 }}>
                         {subName(entry.substanceId)}
                       </div>
                       <div style={{ flex:1, display:'flex', position:'relative', height:18, background:'rgba(255,255,255,0.04)', borderRadius:8, overflow:'hidden', border:'1px solid rgba(255,255,255,0.04)' }}>
@@ -597,16 +597,16 @@ export const PharmaCourseScreen: React.FC = () => {
                     </div>
                   );
                 })}
-                {currentWeek>=0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.42)', marginTop:4, textAlign:'center' }}>● Текущая неделя подсвечена фиолетовым</div>}
+                {currentWeek>=0 && <div style={{ fontSize:10, color:'#fff', marginTop:4, textAlign:'center' }}>● Текущая неделя подсвечена фиолетовым</div>}
               </div>
               <div className="pc-glass" style={{ padding:'9px 12px', display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
-                <span style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.62)' }}>Легенда:</span>
+                <span style={{ fontSize:10, fontWeight:800, color:'#fff' }}>Легенда:</span>
                 {[...new Set(course.map(e => subClass(e.substanceId)))].map(cls => {
                   const color = classColor(cls);
                   return (
                     <div key={cls} style={{ display:'flex', alignItems:'center', gap:5 }}>
                       <div style={{ width:10, height:10, borderRadius:3, background:`${color}66`, border:`1px solid ${color}55` }} />
-                      <span style={{ fontSize:10, color:'rgba(255,255,255,0.72)', fontWeight:600 }}>{CLASS_LABELS[cls] || cls}</span>
+                      <span style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{CLASS_LABELS[cls] || cls}</span>
                     </div>
                   );
                 })}
@@ -622,7 +622,7 @@ export const PharmaCourseScreen: React.FC = () => {
             <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
               <div style={{ width:48, height:48, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.14)', fontSize:22 }}>📚</div>
               <div style={{ fontSize:13, color:'#fff', fontWeight:800, marginBottom:4 }}>Нет сохранённых курсов</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', lineHeight:1.5 }}>
+              <div style={{ fontSize:11, color:'#fff', lineHeight:1.5 }}>
                 Нажми «📦 Завершить курс» на вкладке «Текущий»<br />чтобы сохранить курс в историю
               </div>
             </div>
@@ -632,7 +632,7 @@ export const PharmaCourseScreen: React.FC = () => {
                 <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8, gap:8 }}>
                   <div style={{ minWidth:0 }}>
                     <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cr.name}</div>
-                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{cr.date} • {cr.entries.length} преп.</div>
+                    <div style={{ fontSize:10, color:'#fff' }}>{cr.date} • {cr.entries.length} преп.</div>
                   </div>
                   <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
                     <span style={{ ...pillStyle, fontSize:10, color:'#fbbf24', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.18)', borderRadius:20 }}>{cr.entries.length} пр.</span>
@@ -672,8 +672,8 @@ export const PharmaCourseScreen: React.FC = () => {
                         <span style={{ fontSize:11 }}>{CLASS_ICONS[cls] || '💊'}</span>
                         <span style={{ fontSize:11, fontWeight:700, color:'#fff', flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</span>
                         <span style={{ fontSize:11, color:'#a78bfa', fontWeight:800 }}>{entry.doseValue}{entry.doseUnit}</span>
-                        <span style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{freqDisplay(entry)}</span>
-                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.34)', whiteSpace:'nowrap' }}>{entry.startWeek || 0}–{entry.endWeek} нед</span>
+                        <span style={{ fontSize:10, color:'#fff' }}>{freqDisplay(entry)}</span>
+                        <span style={{ fontSize:9, color:'#fff', whiteSpace:'nowrap' }}>{entry.startWeek || 0}–{entry.endWeek} нед</span>
                       </div>
                     );
                   })}
@@ -710,11 +710,11 @@ export const PharmaCourseScreen: React.FC = () => {
               <div style={{ display:'flex', alignItems:'center', gap:9 }}>
                 <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', fontSize:13 }}>💊</span>
                 <span style={{ fontWeight:800, fontSize:14, color:'#fff' }}>Добавить препарат</span>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,0.42)', border:'1px solid rgba(255,255,255,0.08)', padding:'2px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)' }}>{subsForClass.length} в классе</span>
+                <span style={{ fontSize:10, color:'#fff', border:'1px solid rgba(255,255,255,0.08)', padding:'2px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)' }}>{subsForClass.length} в классе</span>
               </div>
               <button onClick={() => setShowPicker(false)} className="pc-btn2" style={{
                 background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)',
-                color:'rgba(255,255,255,0.72)', borderRadius:10, padding:'6px 10px',
+                color:'#fff', borderRadius:10, padding:'6px 10px',
                 fontSize:12, fontWeight:700,
               }}>
                 ✕
@@ -769,7 +769,7 @@ export const PharmaCourseScreen: React.FC = () => {
                     }}>
                       <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background: color, opacity: customDose ? 1 : 0.85 }} />
                       <div style={{ fontWeight:800, fontSize:11, color:'#fff', marginBottom:3, lineHeight:1.3 }}>{sub.name}</div>
-                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.52)', marginBottom:6, lineHeight:1.3 }}>
+                      <div style={{ fontSize:9, color:'#fff', marginBottom:6, lineHeight:1.3 }}>
                         {hl ? (hl >= 168 ? `T½ ${(hl / 168).toFixed(1)} нед` : `T½ ${(hl / 24).toFixed(1)} дн`) : ''}
                         {sub.dosageRange ? ` · ${sub.dosageRange.min}–${sub.dosageRange.max} ${sub.dosageRange.unit}` : ''}
                       </div>
@@ -789,7 +789,7 @@ export const PharmaCourseScreen: React.FC = () => {
                 background:'rgba(139,92,246,0.07)', borderRadius:14, padding:'11px 12px',
                 border:'1px solid rgba(139,92,246,0.14)',
               }}>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', marginBottom:8, lineHeight:1.4, fontWeight:700 }}>
+                <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.4, fontWeight:700 }}>
                   ⚙️ Настрой дозировку и недели, затем тапни на препарат выше
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
@@ -810,7 +810,7 @@ export const PharmaCourseScreen: React.FC = () => {
                     </select>
                   </div>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:3, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.52)', fontWeight:700, whiteSpace:'nowrap' }}>Дни:</span>
+                    <span style={{ fontSize:9, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>Дни:</span>
                     {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => (
                       <button key={idx} onClick={() => {
                         setSelectedDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort());
@@ -826,7 +826,7 @@ export const PharmaCourseScreen: React.FC = () => {
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', fontWeight:700, whiteSpace:'nowrap' }}>с нед</span>
+                    <span style={{ fontSize:10, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>с нед</span>
                     <input type="number" value={startWeek} onChange={e => setStartWeek(parseFloat(e.target.value) || 0 || 0)} min={0} placeholder="0"
                       className="pc-input2" style={{
                         flex:1, padding:'7px 8px', background:'rgba(255,255,255,0.06)',
@@ -835,7 +835,7 @@ export const PharmaCourseScreen: React.FC = () => {
                       }} />
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', fontWeight:700, whiteSpace:'nowrap' }}>по нед</span>
+                    <span style={{ fontSize:10, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>по нед</span>
                     <input type="number" value={endWeek} onChange={e => setEndWeek(parseFloat(e.target.value) || 0 || 12)} min={1} placeholder="12"
                       className="pc-input2" style={{
                         flex:1, padding:'7px 8px', background:'rgba(255,255,255,0.06)',

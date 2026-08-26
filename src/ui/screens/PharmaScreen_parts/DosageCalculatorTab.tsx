@@ -63,7 +63,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
         <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Андрогенный индекс стека</span>
         {aiResult!==null && <span style={{ marginLeft:'auto', fontSize:11, fontWeight:800, padding:'3px 8px', borderRadius:20, background: aiResult>3?'rgba(239,68,68,0.12)': aiResult>1.5?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.12)', color: aiResult>3?'#f87171':aiResult>1.5?'#fbbf24':'#00e68a', border:`1px solid ${aiResult>3?'rgba(239,68,68,0.18)':aiResult>1.5?'rgba(245,158,11,0.18)':'rgba(0,230,138,0.18)'}` }}>{aiResult.toFixed(2)}</span>}
       </div>
-      <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', marginBottom:12, lineHeight:1.45 }}>
+      <div style={{ fontSize:11, color:'#fff', marginBottom:12, lineHeight:1.45 }}>
         Σ (доза × AR_affinity / 100) — сложи вклады каждого препарата. Выбери эфир — доза подтянется.
       </div>
 
@@ -74,7 +74,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
             background:'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.22)',
           }}>
             <div style={{ fontSize:11, fontWeight:800, color:'#00e68a', marginBottom:2 }}>{g.label}</div>
-            <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:600 }}>👆 Выбрать эфир</div>
+            <div style={{ fontSize:10, color:'#fff', fontWeight:600 }}>👆 Выбрать эфир</div>
           </div>
         ))}
         {Array.from(aiSingles).slice(0, 20).map(id => {
@@ -86,7 +86,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
               background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
             }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:2 }}>{s.name}</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>AR {DRUG_THRESHOLDS[id]?.androgenicity}%</div>
+              <div style={{ fontSize:10, color:'#fff' }}>AR {DRUG_THRESHOLDS[id]?.androgenicity}%</div>
             </div>
           );
         })}
@@ -113,9 +113,9 @@ const AndrogenicIndexCalculator: React.FC = () => {
           <div style={{ display:'flex', gap:8, alignItems:'center' }}>
             <input type="number" value={entry.doseMgWeek} onChange={e => setDoseFor(i, parseFloat(e.target.value) || 0)}
               style={{ flex:1, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
-            <span style={{ fontSize:11, color:'rgba(255,255,255,0.55)', fontWeight:700, whiteSpace:'nowrap' }}>мг/нед</span>
+            <span style={{ fontSize:11, color:'#fff', fontWeight:700, whiteSpace:'nowrap' }}>мг/нед</span>
           </div>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:6, display:'flex', gap:6, alignItems:'center' }}>
+          <div style={{ fontSize:10, color:'#fff', marginTop:6, display:'flex', gap:6, alignItems:'center' }}>
             <span style={{ background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>AR {DRUG_THRESHOLDS[entry.drug]?.androgenicity}%</span>
             <span>· Вклад <b style={{ color:'#fff' }}>{(entry.doseMgWeek * (DRUG_THRESHOLDS[entry.drug]?.androgenicity || 0) / 100).toFixed(1)}</b></span>
           </div>
@@ -135,9 +135,9 @@ const AndrogenicIndexCalculator: React.FC = () => {
 
       {aiResult !== null && (
         <div style={{ marginTop:12, background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.16)', borderRadius:14, padding:14, textAlign:'center' }}>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginBottom:4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Андрогенный индекс стека</div>
+          <div style={{ fontSize:10, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Андрогенный индекс стека</div>
           <div style={{ fontSize:30, fontWeight:900, color: aiResult > 3 ? '#f87171' : aiResult > 1.5 ? '#fbbf24' : '#00e68a', letterSpacing:-0.8 }}>{aiResult.toFixed(2)}</div>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:4, fontWeight:600 }}>
+          <div style={{ fontSize:11, color:'#fff', marginTop:4, fontWeight:600 }}>
             {aiResult > 3 ? '⚡ Высокая андрогенная нагрузка' : aiResult > 1.5 ? '⚠ Умеренная — следи за давлением и липидами' : '✓ Низкая — мягкий курс'}
           </div>
         </div>
@@ -148,7 +148,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
           <div style={{ background:'linear-gradient(180deg, #1a1a1f, #111113)', borderRadius:16, padding:14, maxWidth:340, width:'100%', maxHeight:'72vh', overflowY:'auto', border:'1px solid rgba(255,255,255,0.08)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
               <h3 style={{ margin:0, fontSize:13, fontWeight:800, color:'#fff', flex:1 }}>{aiEsterPopup.label} — выбери эфир</h3>
-              <button onClick={()=>setAiEsterPopup(null)} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.72)', cursor:'pointer' }}>✕</button>
+              <button onClick={()=>setAiEsterPopup(null)} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>✕</button>
             </div>
             {aiFiltered.filter(s => s.class === aiEsterPopup.baseClass).map(s => (
               <div key={s.id} onClick={() => { setDrugFor(aiEsterPopup.entryIdx, s.id); setAiEsterPopup(null); }} style={{
@@ -156,7 +156,7 @@ const AndrogenicIndexCalculator: React.FC = () => {
                 background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
               }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{s.name}</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:2 }}>
+                <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>
                   AR {DRUG_THRESHOLDS[s.id]?.androgenicity}% {s.esters?.[0] ? `• ${s.esters[0]}` : ''}
                 </div>
               </div>
@@ -237,7 +237,7 @@ export const DosageCalculatorTab: React.FC = () => {
           <div style={{ background:'linear-gradient(180deg, #1a1a1f, #111113)', borderRadius:16, padding:14, maxWidth:340, width:'100%', maxHeight:'72vh', overflowY:'auto', border:'1px solid rgba(255,255,255,0.08)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
               <h3 style={{ margin:0, fontSize:13, fontWeight:800, color:'#fff', flex:1 }}>{esterPopup.label} — эфир</h3>
-              <button onClick={()=>setEsterPopup(null)} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.72)', cursor:'pointer' }}>✕</button>
+              <button onClick={()=>setEsterPopup(null)} style={{ width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>✕</button>
             </div>
             {pharmaFiltered.filter(p => p.class === esterPopup.baseClass).map(p => (
               <div key={p.id} onClick={() => handleDrugChange(p.id)} style={{
@@ -245,7 +245,7 @@ export const DosageCalculatorTab: React.FC = () => {
                 background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)',
               }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'#fff' }}>{p.name}</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:2 }}>
+                <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>
                   T½ {(p.pk.halfLifeHours/24).toFixed(1)} дн {p.esters?.[0] ? `• ${p.esters[0]}` : ''}
                 </div>
               </div>
@@ -285,7 +285,7 @@ export const DosageCalculatorTab: React.FC = () => {
                 background:'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', border:'1px solid rgba(139,92,246,0.22)',
               }}>
                 <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:2 }}>{g.label}</div>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:600 }}>👆 Выбрать эфир</div>
+                <div style={{ fontSize:10, color:'#fff', fontWeight:600 }}>👆 Выбрать эфир</div>
               </div>
             ))}
             {singles.map(p => {
@@ -297,7 +297,7 @@ export const DosageCalculatorTab: React.FC = () => {
                   border: isSelected ? '1px solid rgba(0,230,138,0.28)' : '1px solid rgba(255,255,255,0.07)',
                 }}>
                   <div style={{ fontSize:11, fontWeight:800, color: isSelected ? '#00e68a' : '#fff', marginBottom:2 }}>{p.name}</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{CLASS_LABELS[p.class] || p.class}</div>
+                  <div style={{ fontSize:10, color:'#fff' }}>{CLASS_LABELS[p.class] || p.class}</div>
                 </div>
               );
             })}
@@ -305,9 +305,9 @@ export const DosageCalculatorTab: React.FC = () => {
 
           {drug && subDetail && (
             <div style={{ marginBottom:12, padding:'9px 11px', background:'linear-gradient(135deg, rgba(0,230,138,0.07), rgba(0,230,138,0.03))', borderRadius:11, border:'1px solid rgba(0,230,138,0.14)', display:'flex', gap:12, flexWrap:'wrap' }}>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)' }}><b style={{ color:'#00e68a' }}>Конц.:</b> {(subDetail as any).concentration || '—'} мг/мл</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)' }}><b style={{ color:'#00e68a' }}>T½:</b> {subDetail.pk?.halfLifeHours ? formatHalfLife(subDetail.pk.halfLifeHours) : '—'}</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)' }}><b style={{ color:'#00e68a' }}>Эфир:</b> {(subDetail as any).esters?.[0] || '—'}</div>
+              <div style={{ fontSize:11, color:'#fff' }}><b style={{ color:'#00e68a' }}>Конц.:</b> {(subDetail as any).concentration || '—'} мг/мл</div>
+              <div style={{ fontSize:11, color:'#fff' }}><b style={{ color:'#00e68a' }}>T½:</b> {subDetail.pk?.halfLifeHours ? formatHalfLife(subDetail.pk.halfLifeHours) : '—'}</div>
+              <div style={{ fontSize:11, color:'#fff' }}><b style={{ color:'#00e68a' }}>Эфир:</b> {(subDetail as any).esters?.[0] || '—'}</div>
             </div>
           )}
 
@@ -332,42 +332,42 @@ export const DosageCalculatorTab: React.FC = () => {
             {doseMode === 'per_kg' ? (
               <>
                 <div>
-                  <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>мг/кг/нед</label>
+                  <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>мг/кг/нед</label>
                   <input type="number" value={mgKg} onChange={(e) => setMgKg(parseFloat(e.target.value) || 0)}
                     style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Вес (кг)</label>
+                  <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Вес (кг)</label>
                   <input type="number" value={weight} onChange={(e) => setWeight(parseFloat(e.target.value) || 0)}
                     style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
                 </div>
               </>
             ) : (
               <div style={{ gridColumn:'1 / -1' }}>
-                <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Недельная доза (мг/нед)</label>
+                <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Недельная доза (мг/нед)</label>
                 <input type="number" value={weeklyMg} onChange={(e) => setWeeklyMg(parseFloat(e.target.value) || 0)}
                   style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
               </div>
             )}
             <div>
-              <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Инъекций/нед</label>
+              <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Инъекций/нед</label>
               <select value={injectionsPerWeek} onChange={(e) => setInjectionsPerWeek(parseFloat(e.target.value) || 0)}
                 style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, outline:'none' }}>
                 {[1, 2, 3, 4, 5, 6, 7].map(v => <option key={v} value={v} style={{ background:'#1a1a1f' }}>{v}x/нед</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Конц-ция (мг/мл)</label>
+              <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Конц-ция (мг/мл)</label>
               <input type="number" value={concentration} onChange={(e) => setConcentration(parseFloat(e.target.value) || 0)}
                 style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
             </div>
             <div>
-              <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Флакон (мл)</label>
+              <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Флакон (мл)</label>
               <input type="number" value={vialMl} onChange={(e) => setVialMl(parseFloat(e.target.value) || 0)}
                 style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', outline:'none' }} />
             </div>
             <div>
-              <label style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Шприц (мл)</label>
+              <label style={{ fontSize:10, color:'#fff', fontWeight:700, display:'block', marginBottom:4, letterSpacing:0.2 }}>Шприц (мл)</label>
               <select value={syringeMl} onChange={(e) => setSyringeMl(parseFloat(e.target.value) || 0)}
                 style={{ width:'100%', padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, outline:'none' }}>
                 {[0.3, 0.5, 1, 3, 5, 10, 20].map(v => <option key={v} value={v} style={{ background:'#1a1a1f' }}>{v} мл</option>)}
@@ -386,28 +386,28 @@ export const DosageCalculatorTab: React.FC = () => {
               <div style={{ display:'grid', gap:9 }}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04))', border:'1px solid rgba(139,92,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.52)', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Недельная доза</div>
+                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Недельная доза</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#a78bfa' }}>{weeklyTotal.toFixed(0)}</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>мг/нед</div>
+                  <div style={{ fontSize:10, color:'#fff' }}>мг/нед</div>
                 </div>
                 <div style={{ background:'linear-gradient(135deg, rgba(59,130,246,0.10), rgba(59,130,246,0.04))', border:'1px solid rgba(59,130,246,0.14)', borderRadius:12, padding:'12px 8px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.52)', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>На инъекцию</div>
+                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>На инъекцию</div>
                   <div style={{ fontSize:22, fontWeight:900, color:'#60a5fa' }}>{perInjectionMg.toFixed(1)}</div>
-                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>мг × {injectionsPerWeek}/нед</div>
+                  <div style={{ fontSize:10, color:'#fff' }}>мг × {injectionsPerWeek}/нед</div>
                 </div>
               </div>
               <div style={{ background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.04))', border:'1px solid rgba(0,230,138,0.14)', borderRadius:14, padding:'14px 10px', textAlign:'center' }}>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Объём инъекции</div>
+                <div style={{ fontSize:10, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Объём инъекции</div>
                 <div style={{ fontSize:34, fontWeight:900, color:'#00e68a', letterSpacing:-0.8 }}>{doseResult.volumeMl}</div>
-                <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>мл</div>
+                <div style={{ fontSize:11, color:'#fff' }}>мл</div>
               </div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'12px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.52)', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Деления шприца</div>
+                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Деления шприца</div>
                   <div style={{ fontSize:20, fontWeight:800, color:'#fff' }}>{doseResult.divisions}</div>
                 </div>
                 <div style={{ background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'12px', textAlign:'center' }}>
-                  <div style={{ fontSize:9, color:'rgba(255,255,255,0.52)', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Доз / флакон</div>
+                  <div style={{ fontSize:9, color:'#fff', marginBottom:4, fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Доз / флакон</div>
                   <div style={{ fontSize:20, fontWeight:800, color:'#fff' }}>{doseResult.dosesPerVial || '—'}</div>
                 </div>
               </div>
@@ -426,12 +426,12 @@ export const DosageCalculatorTab: React.FC = () => {
           <div style={{
             background:'rgba(22,22,26,0.42)', border:'1px dashed rgba(255,255,255,0.08)', backdropFilter:'blur(8px)',
             borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
-            minHeight:160, color:'rgba(255,255,255,0.42)', fontSize:12, flexDirection:'column', gap:6,
+            minHeight:160, color:'#fff', fontSize:12, flexDirection:'column', gap:6,
           }}>
             <div style={{ width:42, height:42, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.10)', border:'1px solid rgba(139,92,246,0.14)', fontSize:20 }}>💉</div>
             <div style={{ textAlign:'center', lineHeight:1.4 }}>
-              <div style={{ color:'rgba(255,255,255,0.72)', fontWeight:700 }}>Выбери препарат и дозировку</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.42)' }}>объём рассчитается автоматически</div>
+              <div style={{ color:'#fff', fontWeight:700 }}>Выбери препарат и дозировку</div>
+              <div style={{ fontSize:11, color:'#fff' }}>объём рассчитается автоматически</div>
             </div>
           </div>
         )}
