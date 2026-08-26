@@ -413,7 +413,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       cancelled = true;
     };
   }, [open]);
-  const commit = (next: WeightEntry[], remember = true) => {
+  const commit = async (next: WeightEntry[], remember = true) => {
     // Дедупликация по дате: последняя запись на дату выигрывает.
     // Нормализация до state — чтобы NaN/невалидные не попадали в таблицу.
     const byDate = new Map<string, WeightEntry>();
@@ -422,24 +422,30 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       if (n) byDate.set(n.date, n);
     }
     const ordered = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
-    if (remember) setUndo(rows);
-    saveWeightLog(ordered);
+    const prevRows = rows;
+    if (remember) setUndo(prevRows);
     setRows(ordered);
-    setArchiveRows(getWeightLogArchived());
-    onDataChange?.();
+    try {
+      await saveWeightLog(ordered);
+      setArchiveRows(getWeightLogArchived());
+      onDataChange?.();
+    } catch {
+      setRows(prevRows);
+      (window as any).showToast?.('⚠️ Не удалось сохранить (хранилище переполнено)');
+    }
   };
   /** Удалить ВСЕ фото из лога (photos раздувают localStorage). */
-  const clearAllPhotos = () => {
+  const clearAllPhotos = async () => {
     if (!rows.some((r) => r.photos && r.photos.length)) {
       (window as any).showToast?.('📷 Фото в дневнике нет');
       return;
     }
     if (!window.confirm('Удалить ВСЕ фото из всех записей веса? Это освободит место в хранилище.')) return;
-    commit(rows.map((r) => (r.photos && r.photos.length ? { ...r, photos: undefined } : r)));
+    await commit(rows.map((r) => (r.photos && r.photos.length ? { ...r, photos: undefined } : r)));
     (window as any).showToast?.('🖼 Все фото удалены');
   };
   /** Импорт фото из архива в основные записи (по совпадающим датам, если фото нет). */
-  const importArchivePhotos = () => {
+  const importArchivePhotos = async () => {
     const withPhotos = archiveRows.filter((a) => a.photos && a.photos.length);
     if (!withPhotos.length) {
       (window as any).showToast?.('🗄 В архиве нет записей с фото');
@@ -457,10 +463,10 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       (window as any).showToast?.('Нет совпадающих дат с фото в архиве');
       return;
     }
-    commit(next);
+    await commit(next);
     (window as any).showToast?.('📥 Фото импортированы из архива');
   };
-  const quickAdd = () => {
+  const quickAdd = async () => {
     const raw = Number(quickW);
     const maxRaw = isLbs ? 880 : 400;
     if (!Number.isFinite(raw) || raw <= 0 || raw > maxRaw) return;
@@ -469,7 +475,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const next = rows.some((r) => r.date === today)
       ? rows.map((r) => (r.date === today ? { ...r, weight: w, timeOfDay: quickTod } : r))
       : [{ date: today, weight: w, timeOfDay: quickTod }, ...rows];
-    commit(next);
+    await commit(next);
     setQuickW('');
     (window as any).showToast?.(`✅ Вес записан (${quickTod === 'morning' ? 'утро' : 'вечер'})`);
   };
@@ -751,7 +757,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     setEditing(row.date);
     setDraft({ ...row });
   };
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editing || !draft.weight || !Number.isFinite(Number(draft.weight))) return;
     const newDate = typeof draft.date === 'string' && draft.date ? draft.date : editing;
     // При смене даты на занятую — мерджим в существующую запись, дубликат не создаётся
@@ -762,7 +768,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       date: newDate,
       weight: Number(draft.weight),
     } as WeightEntry;
-    commit(rows.filter((r) => r.date !== editing && r.date !== newDate).concat([merged]));
+    await commit(rows.filter((r) => r.date !== editing && r.date !== newDate).concat([merged]));
     setDraft({});
     setEditing(null);
   };

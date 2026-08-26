@@ -58,37 +58,39 @@ const num = (v: unknown): number | undefined => {
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 };
+const clampOpt = (v: number | undefined, min: number, max: number): number | undefined =>
+  v === undefined ? undefined : Math.min(max, Math.max(min, v));
 
-/** Нормализация одной записи: числа, фильтр NaN-веса, строка даты. */
+/** Нормализация одной записи: числа, фильтр NaN-веса, строка даты. Кламует диапазоны к правдоподобным (P0). */
 export function normalizeWeightEntry(e: any): WeightEntry | null {
   if (!e || typeof e.date !== 'string' || !e.date) return null;
-  const weight = num(e.weight);
+  const weight = clampOpt(num(e.weight), 20, 400);
   if (weight === undefined || weight <= 0) return null;
   return {
     date: e.date,
     weight,
-    bodyFat: num(e.bodyFat),
-    waistCm: num(e.waistCm),
-    chestCm: num(e.chestCm),
-    hipCm: num(e.hipCm),
-    shoulderCm: num(e.shoulderCm),
-    bicepCm: num(e.bicepCm),
-    bicepLeftCm: num(e.bicepLeftCm),
-    bicepRightCm: num(e.bicepRightCm),
-    thighCm: num(e.thighCm),
-    thighLeftCm: num(e.thighLeftCm),
-    thighRightCm: num(e.thighRightCm),
-    calfCm: num(e.calfCm),
-    calfLeftCm: num(e.calfLeftCm),
-    calfRightCm: num(e.calfRightCm),
-    neckCm: num(e.neckCm),
-    forearmCm: num(e.forearmCm),
-    forearmLeftCm: num(e.forearmLeftCm),
-    forearmRightCm: num(e.forearmRightCm),
-    muscleMass: num(e.muscleMass),
-    waterMass: num(e.waterMass),
-    notes: typeof e.notes === 'string' && e.notes ? e.notes : undefined,
-    photos: Array.isArray(e.photos) ? e.photos.filter((p: any) => typeof p === 'string') : undefined,
+    bodyFat: clampOpt(num(e.bodyFat), 0, 80),
+    waistCm: clampOpt(num(e.waistCm), 20, 250),
+    chestCm: clampOpt(num(e.chestCm), 20, 250),
+    hipCm: clampOpt(num(e.hipCm), 20, 300),
+    shoulderCm: clampOpt(num(e.shoulderCm), 20, 250),
+    bicepCm: clampOpt(num(e.bicepCm), 10, 100),
+    bicepLeftCm: clampOpt(num(e.bicepLeftCm), 10, 100),
+    bicepRightCm: clampOpt(num(e.bicepRightCm), 10, 100),
+    thighCm: clampOpt(num(e.thighCm), 20, 150),
+    thighLeftCm: clampOpt(num(e.thighLeftCm), 20, 150),
+    thighRightCm: clampOpt(num(e.thighRightCm), 20, 150),
+    calfCm: clampOpt(num(e.calfCm), 15, 100),
+    calfLeftCm: clampOpt(num(e.calfLeftCm), 15, 100),
+    calfRightCm: clampOpt(num(e.calfRightCm), 15, 100),
+    neckCm: clampOpt(num(e.neckCm), 20, 80),
+    forearmCm: clampOpt(num(e.forearmCm), 10, 80),
+    forearmLeftCm: clampOpt(num(e.forearmLeftCm), 10, 80),
+    forearmRightCm: clampOpt(num(e.forearmRightCm), 10, 80),
+    muscleMass: clampOpt(num(e.muscleMass), 10, 200),
+    waterMass: clampOpt(num(e.waterMass), 0, 80),
+    notes: typeof e.notes === 'string' && e.notes ? e.notes.slice(0, 500) : undefined,
+    photos: Array.isArray(e.photos) ? e.photos.filter((p: any) => typeof p === 'string').slice(0, 5) : undefined,
     timeOfDay: e.timeOfDay === 'morning' || e.timeOfDay === 'evening' ? e.timeOfDay : undefined,
   };
 }
