@@ -4,6 +4,7 @@
  * Формулы: EFSA/Mifflin-St Jeor + Katch-McArdle, ISSN/Helms, US Navy, Gabbett ACWR.
  * Pro-уровень: инвалидация дубль-PAL, cm→in, дозозависимый ААС, HPA-индекс.
  */
+export interface WeightPoint { date: string; kg: number }
 export interface MetabolicInput {
   weight: number; height: number; age: number; sex: 'male'|'female';
   bodyFat?: number; neck?: number; waist?: number; hip?: number;
@@ -16,11 +17,42 @@ export interface MetabolicInput {
   // pro-расширения (опциональные, backward compat)
   climate?: 'temperate'|'hot'|'cold';
   sweatRate?: number; // мл/ч 400-800, если известен
+  weightHistory?: WeightPoint[]; // для адаптивного TDEE по тренду
 }
 
 const clamp = (v:number, lo:number, hi:number)=> Math.max(lo, Math.min(hi, v));
 const toIn = (cm:number)=> cm * 0.393701;
 const log10 = (x:number)=> Math.log(x)/Math.log(10);
+
+// ——— адаптивный тренд как в nutrition-v2-data.ts:113 ———
+export function calcTrendFromHistory(history: WeightPoint[]): number {
+  if(!history || history.length < 3) return 0;
+  const recent = history.slice(-7);
+  if(recent.length < 2) return 0;
+  const first = recent[0].kg, last = recent[recent.length-1].kg;
+  const days = (new Date(recent[recent.length-1].date).getTime() - new Date(recent[0].date).getTime()) / 86400000;
+  if(days < 3) return 0;
+  return (last - first) / (days / 7);
+}
+export function calcAdaptiveAdjustment(trendKgPerWeek:number, goal: 'cut'|'maintain'|'bulk'|undefined, baseTdee:number): { adjustment:number; expected:number; trend:number; suggest:string } {
+  const isCut = goal==='cut';
+  const isBulk = goal==='bulk';
+  let expected = 0;
+  if(isCut) expected = -0.5; // кг/нед целевая сушка
+  else if(isBulk) expected = 0.25;
+  let adjustment = 0;
+  if((isCut || isBulk) && Math.abs(trendKgPerWeek - expected) > 0.05){
+    const diff = trendKgPerWeek - expected;
+    adjustment = Math.round(diff * 770); // 7700ккал/кг → 770/0.1кг
+    adjustment = isCut ? clamp(adjustment, -500, 500) : clamp(adjustment, -300, 300);
+  }
+  let suggest = 'Тренд в норме';
+  if(isCut && trendKgPerWeek > -0.1 && trendKgPerWeek > expected*0.5) suggest = 'Плато сушки — проверь дефицит или добавь 1000 шагов';
+  else if(isBulk && trendKgPerWeek < 0.08) suggest = 'Набор стоит — +200ккал';
+  else if(Math.abs(trendKgPerWeek - expected) < 0.12) suggest = 'Тренд совпадает с целью';
+  void baseTdee;
+  return { adjustment, expected, trend: trendKgPerWeek, suggest };
+}
 
 // ——— общий BMR ———
 function bmrKatchMcArdle(lean:number){ return 370 + 21.6 * lean; }
@@ -88,7 +120,7 @@ export function calcSteps(input: MetabolicInput) {
   const tdeeNat = Math.round(bmr * palEff);
   const mult = aasMult(input, 0.08);
   const tdeeAAS = Math.round(tdeeNat * mult);
-  // цель — % от TDEE (профессионально) c полом -500/+300
+  // цель — % от TDEE (профессионально)
   const cutDelta = Math.round(-Math.min(750, Math.max(400, tdeeNat * 0.18)));
   const bulkDelta = Math.round(Math.min(450, Math.max(250, tdeeNat * 0.10)));
   const goalDelta = input.goal === 'cut' ? cutDelta : input.goal === 'bulk' ? bulkDelta : 0;
@@ -100,6 +132,18 @@ export function calcSteps(input: MetabolicInput) {
   const sedentKcal = Math.round(bmr * 1.20);
   const stepsNat = Math.round(clamp((targetNat - sedentKcal) / kcalPerStepClamped, 3000, 22000));
   const stepsAAS = Math.round(clamp(stepsNat * (input.onAAS ? 0.92 : 1), 3000, 22000));
+  // TEF 10% для waterfall (наглядно, внутри PAL)
+  const tefNat = Math.round(tdeeNat * 0.10);
+  const tefAAS = Math.round(tdeeAAS * 0.10);
+  const neat = Math.round(bmr * (palBase - 1));
+  const eat = Math.round(bmr * (trainAdd + cardioAdd));
+  // адаптивный TDEE по weightHistory
+  let adaptive: { trend:number; adjustment:number; tdee:number; suggest:string } | null = null;
+  if(input.weightHistory && input.weightHistory.length >=3){
+    const trend = calcTrendFromHistory(input.weightHistory);
+    const { adjustment, suggest } = calcAdaptiveAdjustment(trend, input.goal, tdeeNat);
+    adaptive = { trend: Math.round(trend*100)/100, adjustment, tdee: tdeeNat + adjustment, suggest };
+  }
   return {
     tdeeNat, tdeeAAS,
     targetNat, targetAAS,
@@ -108,6 +152,8 @@ export function calcSteps(input: MetabolicInput) {
     pal: Math.round(palEff*100)/100,
     kcalPerStep: Math.round(kcalPerStepClamped*1000)/1000,
     sedentKcal,
+    tefNat, tefAAS, neat, eat, bmr: Math.round(bmr),
+    adaptive,
     note: input.onAAS ? `ААС: TDEE +${Math.round((mult-1)*100)}% (NEAT↑) → шагов −8% для того же дефицита` : `Натурал: PAL ${palEff.toFixed(2)} (бытовая ${palBase}+train ${trainAdd.toFixed(2)}+cardio ${cardioAdd.toFixed(2)})`
   };
 }
@@ -127,6 +173,10 @@ export function calcKBJU(input: MetabolicInput) {
   const bulkDelta = Math.round(Math.min(450, Math.max(250, tdeeNat * 0.10)));
   const goalDelta = input.goal === 'cut' ? cutDelta : input.goal === 'bulk' ? bulkDelta : 0;
   tdeeNat += goalDelta; tdeeAAS += goalDelta;
+  const tefNat = Math.round(tdeeNat * 0.10);
+  const tefAAS = Math.round(tdeeAAS * 0.10);
+  const neat = Math.round(bmr * (palBase - 1));
+  const eat = Math.round(bmr * (trainAdd + cardioAdd));
   // Белок ISSN/Helms: натурал 1.8-2.2 maintain/bulk, 2.3-3.1 cut по сухости
   const bf = input.bodyFat ?? (input.sex==='male'?15:22);
   let protNat: number;
@@ -159,12 +209,20 @@ export function calcKBJU(input: MetabolicInput) {
   // пересчёт ккал после клампа углеводов
   const kcalNatFinal = pNat*4 + fNat*9 + cNat*4;
   const kcalAASFinal = pAAS*4 + fAAS*9 + cAAS*4;
+  let adaptive: { trend:number; adjustment:number; tdee:number; suggest:string } | null = null;
+  if(input.weightHistory && input.weightHistory.length >=3){
+    const trend = calcTrendFromHistory(input.weightHistory);
+    const { adjustment, suggest } = calcAdaptiveAdjustment(trend, input.goal, tdeeNat);
+    adaptive = { trend: Math.round(trend*100)/100, adjustment, tdee: tdeeNat + adjustment, suggest };
+  }
   return {
     nat: { kcal: kcalNatFinal, p: pNat, f: fNat, c: cNat, protPerKg: protNat, tdee: tdeeNat, bmr, lean: Math.round(lean), method, pal: Math.round(palEff*100)/100 },
     aas: { kcal: kcalAASFinal, p: pAAS, f: fAAS, c: cAAS, protPerKg: protAAS, tdee: tdeeAAS, bmr, lean: Math.round(lean), method, pal: Math.round(palEff*100)/100 },
     delta: { kcal: Math.round(kcalAASFinal - kcalNatFinal), p: pAAS - pNat, c: cAAS - cNat },
     carbTiming: input.trainingDays && input.trainingDays>=4 ? 'Тренировочный: 55% вокруг тренировки, 25% утро, 20% вечер · Отдых: 35/35/30' : '50% вокруг тренировки, 30% утро, 20% вечер',
     fiber: { nat: input.sex==='male'? 32: 25, aas: input.sex==='male'? 34: 26 },
+    tefNat, tefAAS, neat, eat, bmr: Math.round(bmr),
+    adaptive,
     note: input.onAAS ? `ААС: белок ${protAAS}г/кг (+${aasProtAdd.toFixed(1)}), TDEE +${Math.round((mult-1)*100)}%, жиры 1.0г/кг` : `Натурал: белок ${protNat}г/кг (Helms/ISSN), жиры ${fMinNat}г/кг, PAL ${palEff.toFixed(2)}`
   };
 }

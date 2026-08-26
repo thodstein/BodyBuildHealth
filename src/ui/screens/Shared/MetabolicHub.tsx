@@ -6,6 +6,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { getProfile } from '../../../core/profile-manager';
+import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -57,6 +58,7 @@ export const MetabolicHub: React.FC = () => {
   const [sleepHours, setSleepHours] = useState(7);
   const [sleepQuality, setSleepQuality] = useState(3);
   const [climate, setClimate] = useState<'temperate'|'hot'|'cold'>('temperate');
+  const [weightHistory, setWeightHistory] = useState<{date:string;kg:number}[]>([]);
   const [toast, setToast] = useState<string|null>(null);
   const showToast = useCallback((m:string)=>{ setToast(m); setTimeout(()=> setToast(null), 2400); }, []);
 
@@ -74,6 +76,19 @@ export const MetabolicHub: React.FC = () => {
     window.addEventListener('focus', onFocus);
     return ()=>{ clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', onFocus); };
   }, [refreshAcwr]);
+
+  // weightHistory для адаптивного TDEE — live из nutrition-v2-data
+  const refreshWeightHistory = useCallback(()=>{
+    try{ const wh = getNutritionV2Data().weightHistory || []; setWeightHistory(wh.slice(-30)); }catch{ setWeightHistory([]); }
+  }, []);
+  useEffect(()=>{
+    refreshWeightHistory();
+    const id = setInterval(refreshWeightHistory, 8000);
+    const onStorage = (e: StorageEvent)=>{ if(e.key && e.key.includes('he_nutrition_v2')) refreshWeightHistory(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', refreshWeightHistory);
+    return ()=>{ clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refreshWeightHistory); };
+  }, [refreshWeightHistory]);
 
   // init from snapshot v2 → v1 → profile v2 (расширенный)
   useEffect(()=>{
@@ -134,7 +149,7 @@ export const MetabolicHub: React.FC = () => {
     try{ localStorage.setItem(SNAP_KEY, JSON.stringify({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate})); }catch{}
   }, [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate]);
 
-  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate }), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate]);
+  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, weightHistory: weightHistory.length>=3 ? weightHistory : undefined }), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,weightHistory]);
 
   const water = useMemo(()=> calcWater(input), [input]);
   const stepsCalc = useMemo(()=> calcSteps(input), [input]);
@@ -343,6 +358,24 @@ export const MetabolicHub: React.FC = () => {
                 <div style={{ flex:1, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>сидяч <b>{stepsCalc.sedentKcal}ккал</b></div>
                 <div style={{ flex:1, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>{stepsCalc.kcalPerStep}ккал/шаг</div>
               </div>
+              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.6)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>Waterfall TDEE · BMR + NEAT + EAT + TEF 10%</div>
+                <div style={{ display:'flex', gap:6, alignItems:'end' }}>
+                  <Bar v={stepsCalc.bmr} max={stepsCalc.tdeeNat} color="#60a5fa" label={`BMR ${stepsCalc.bmr}`} />
+                  <Bar v={stepsCalc.neat} max={stepsCalc.tdeeNat} color="#22c55e" label={`NEAT ${stepsCalc.neat}`} />
+                  <Bar v={stepsCalc.eat} max={stepsCalc.tdeeNat} color="#f59e0b" label={`EAT ${stepsCalc.eat}`} />
+                  <Bar v={stepsCalc.tefNat} max={stepsCalc.tdeeNat} color="#a78bfa" label={`TEF ${stepsCalc.tefNat}`} />
+                </div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4, lineHeight:1.3 }}>TDEE {stepsCalc.tdeeNat}= BMR{stepsCalc.bmr}+NEAT{stepsCalc.neat}+EAT{stepsCalc.eat}+TEF{stepsCalc.tefNat} (TEF ~10% уже внутри PAL, показан для наглядности · EAT = train+cardio)</div>
+              </div>
+              {stepsCalc.adaptive ? (
+                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background: Math.abs(stepsCalc.adaptive.adjustment)>120 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${Math.abs(stepsCalc.adaptive.adjustment)>120 ? 'rgba(245,158,11,0.18)' : 'rgba(34,197,94,0.18)'}`, fontSize:10, color:'#fff', lineHeight:1.4 }}>
+                  <b style={{ color: Math.abs(stepsCalc.adaptive.adjustment)>120 ? '#fbbf24' : '#22c55e' }}>Адаптивный TDEE по весу:</b> тренд {stepsCalc.adaptive.trend>0?'+':''}{stepsCalc.adaptive.trend}кг/нед · коррекция {stepsCalc.adaptive.adjustment>0?'+':''}{stepsCalc.adaptive.adjustment}ккал → {stepsCalc.adaptive.tdee}ккал · {stepsCalc.adaptive.suggest}
+                  <span style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:2 }}>История: {weightHistory.length} точек (he_nutrition_v2 · calcTrend). {weightHistory.length<3 ? 'Добавь ≥3 взвешивания — появится тренд.' : ''}</span>
+                </div>
+              ) : weightHistory.length>=1 && weightHistory.length<3 ? (
+                <div style={{ marginTop:8, padding:'7px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'rgba(255,255,255,0.55)' }}>Адаптивный TDEE: нужно ≥3 взвешивания в дневнике веса (сейчас {weightHistory.length}) — данные из he_nutrition_v2.</div>
+              ) : null}
               <div style={{ marginTop:8, fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'8px 10px' }}>{stepsCalc.note}</div>
             </div>
           )}
@@ -377,6 +410,24 @@ export const MetabolicHub: React.FC = () => {
                 <div style={{ flex:1, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>Δ белок <b style={{color:'#f87171'}}>+{kbju.delta.p}г</b></div>
                 <div style={{ flex:1, padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>клетчатка {onAAS? kbju.fiber.aas:kbju.fiber.nat}г</div>
               </div>
+              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:9, fontWeight:800, color:'rgba(255,255,255,0.6)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>Waterfall TDEE · BMR + NEAT + EAT + TEF 10%</div>
+                <div style={{ display:'flex', gap:6, alignItems:'end' }}>
+                  <Bar v={kbju.bmr} max={kbju.nat.tdee} color="#60a5fa" label={`BMR ${kbju.bmr}`} />
+                  <Bar v={kbju.neat} max={kbju.nat.tdee} color="#22c55e" label={`NEAT ${kbju.neat}`} />
+                  <Bar v={kbju.eat} max={kbju.nat.tdee} color="#f59e0b" label={`EAT ${kbju.eat}`} />
+                  <Bar v={kbju.tefNat} max={kbju.nat.tdee} color="#a78bfa" label={`TEF ${kbju.tefNat}`} />
+                </div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4 }}>TDEE {kbju.nat.tdee}= BMR{kbju.bmr}+NEAT{kbju.neat}+EAT{kbju.eat}+TEF{kbju.tefNat} (TEF ~10% внутри PAL, показан для наглядности)</div>
+              </div>
+              {kbju.adaptive ? (
+                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background: Math.abs(kbju.adaptive.adjustment)>120 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${Math.abs(kbju.adaptive.adjustment)>120 ? 'rgba(245,158,11,0.18)' : 'rgba(34,197,94,0.18)'}`, fontSize:10, color:'#fff', lineHeight:1.4 }}>
+                  <b style={{ color: Math.abs(kbju.adaptive.adjustment)>120 ? '#fbbf24' : '#22c55e' }}>Адаптивный TDEE по весу:</b> тренд {kbju.adaptive.trend>0?'+':''}{kbju.adaptive.trend}кг/нед · коррекция {kbju.adaptive.adjustment>0?'+':''}{kbju.adaptive.adjustment}ккал → {kbju.adaptive.tdee}ккал · {kbju.adaptive.suggest}
+                  <span style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:2 }}>История {weightHistory.length} точек · calcTrendFromHistory (he_nutrition_v2). Формула: diff*770ккал.</span>
+                </div>
+              ) : weightHistory.length>=1 && weightHistory.length<3 ? (
+                <div style={{ marginTop:8, padding:'7px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'rgba(255,255,255,0.55)' }}>Адаптивный TDEE: нужно ≥3 взвешивания (сейчас {weightHistory.length}) — данные из he_nutrition_v2.</div>
+              ) : null}
               <div style={{ marginTop:6, fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'8px 10px' }}>{kbju.note} · {kbju.carbTiming}</div>
               <div style={{ marginTop:6, display:'flex', gap:6 }}>
                 <button onClick={applyKBJU} style={{ flex:1, padding:10, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:800, fontSize:11 }}>🍽 Применить к плану питания → буфер</button>
