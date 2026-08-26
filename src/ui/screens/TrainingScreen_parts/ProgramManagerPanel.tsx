@@ -211,12 +211,17 @@ export const ProgramManagerPanel: React.FC = () => {
   const [pendingAutoFill, setPendingAutoFill] = useState(false);
   const [pickerOpen, setPickerOpen] = useState<'bb' | 'pl' | null>(null);
   const [toast, setToast] = useState('');
-  // Режим конструктора: «Стандартный» (базовая сборка/загрузка/отчёт) vs «Профессиональный» (все инструменты).
-  // Персистится в localStorage 'he_manual_mode', чтобы выбор пользователя сохранялся между сессиями.
+  // UNIFIED: режимы standard/pro объединены — все инструменты доступны всем.
+  // Legacy ключ he_manual_mode читается для миграции, но новый UI не показывает переключатель.
   const [manualMode, setManualMode] = useState<ManualMode>(() => {
-    try { return (localStorage.getItem('he_manual_mode') as ManualMode) || 'standard'; } catch { return 'standard'; }
+    try {
+      const stored = localStorage.getItem('he_manual_mode') as ManualMode | null;
+      if (stored === 'pro' || stored === 'standard') return 'pro';
+      return 'pro';
+    } catch { return 'pro'; }
   });
-  useEffect(() => { try { localStorage.setItem('he_manual_mode', manualMode); } catch {} }, [manualMode]);
+  // совместимость: пишем 'pro' чтобы старые проверки не ломались
+  useEffect(() => { try { localStorage.setItem('he_manual_mode', 'pro'); } catch {} }, [manualMode]);
   // Онбординг конструктора — показывается при первом запуске, скрывается кнопкой
   const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
     try { return localStorage.getItem('he_manual_onboarding_done') !== '1'; } catch { return true; }
@@ -865,8 +870,12 @@ export const ProgramManagerPanel: React.FC = () => {
           </div>
         )}
 
-        {/* Выбор режима: «Стандартный» / «Профессиональный» */}
-        <ManualModeToggle mode={manualMode} onMode={setManualMode} />
+        {/* UNIFIED: единый режим — все фичи доступны, без калькуляторов, с подсказками */}
+        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>✋ Единый конструктор</span>
+          <span style={{ fontSize: 10, color: DIM, flex: '1 1 220px' }}>Все инструменты — профи + база — в одном месте. Подсказки объяснят, когда применять дроп-сеты, суперсеты, DUP и периодизацию, без калькуляторов.</span>
+          <span style={{ fontSize: 10, color: '#00e68a', background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)', borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap' }}>без разделения standard/pro</span>
+        </div>
 
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -977,8 +986,11 @@ export const ProgramManagerPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Выбор режима: «Стандартный» / «Профессиональный» */}
-      <ManualModeToggle mode={manualMode} onMode={setManualMode} />
+      {/* UNIFIED: переключатель удалён — единый режим */}
+      <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a' }}>✋ Единый конструктор</span>
+        <span style={{ fontSize: 10, color: DIM }}>Все инструменты доступны — подсказки внутри секций</span>
+      </div>
 
       {/* 🚀 Быстрый старт — всегда видим и в непустом списке, свёртываемый (1 клик до качества) */}
       <div style={{ ...CARD, padding: quickTplCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #00e68a' }}>

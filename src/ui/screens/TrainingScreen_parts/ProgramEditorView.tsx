@@ -39,7 +39,7 @@ import { loadDesigns } from '../../../engines/periodization-designer.engine';
 import type { MacrocycleDesign } from '../../../engines/periodization-designer.engine';
 import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL, UI_METRICS } from './training-ui';
-import { ManualHeader, ManualStepper, SectionCard as ManualSectionCard, Badge, ProgressBar, InfoBanner, VolumeMiniBar, ScoreBadge } from './ManualUI';
+import { ManualHeader, ManualStepper, SectionCard as ManualSectionCard, Badge, ProgressBar, InfoBanner, VolumeMiniBar, ScoreBadge, MethodHint, CARD_BTN, CARD_BTN_ACTIVE } from './ManualUI';
 import { buildProgramIcs, downloadIcs } from './ManualExport';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
@@ -135,7 +135,10 @@ export interface ProgramEditorProps {
 
 export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange, onSave, onBack, onNext, mode, onMode, autoFillOnMount = false }) => {
   const dir = program.meta.direction;
-  const isPro = mode === 'pro';
+  // UNIFIED: pro и standard объединены — все фичи доступны всем, прогрессивное раскрытие через аккордеоны.
+  // mode/onMode сохранены для совместимости, но не влияют на отображение.
+  const isPro = true;
+  void mode; void onMode;
   // P4: Undo/Redo — snapshot перед каждым onChange, чтобы Ctrl+Z работал из редактора
   const { pushSnapshot, undo, redo } = useProgramUndo(program, (p) => { if (p) onChange(p); });
   const onChangeWithUndo = useCallback((p: UserProgram) => {
@@ -263,9 +266,9 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  // Единый конструктор: standard [Параметры, Недели], pro [Профиль, Параметры, Недели]
-  // Анализ/Обратная связь/Инструменты теперь аккордеоны внутри Недели — не отдельные шаги.
-  const editorSteps = isPro ? PRO_EDITOR_STEPS : STANDARD_EDITOR_STEPS;
+  // Единый конструктор: все шаги доступны всем — Профиль → Параметры → Недели
+  // (раньше standard не видел Профиль; теперь объединено — меньше путаницы)
+  const editorSteps = PRO_EDITOR_STEPS;
   // Шаг восстанавливается из sessionStorage (he_editor_step). Legacy analysis/feedback/tools → weeks + аккордеон.
   const [estep, setEstep] = useState<EditorStep>(() => {
     try {
@@ -279,15 +282,13 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         }
       }
     } catch { /* ignore */ }
-    return isPro ? 'profile' : 'params';
+    return 'profile';
   });
   const estepResetFirst = useRef(true);
   useEffect(() => {
-    // Первый рендер пропускаем (инициализатор уже восстановил/выбрал шаг),
-    // дальше — сброс к первому шагу при смене программы или режима.
     if (estepResetFirst.current) { estepResetFirst.current = false; return; }
-    setEstep(isPro ? 'profile' : 'params');
-  }, [program.meta.id, isPro]);
+    setEstep('profile');
+  }, [program.meta.id]);
   useEffect(() => {
     try { sessionStorage.setItem('he_editor_step', JSON.stringify({ id: program.meta.id, step: estep })); } catch { /* ignore */ }
   }, [estep, program.meta.id]);
@@ -1328,10 +1329,30 @@ return (
         </>
       )}
 
+      {/* 💡 Интеллектуальные подсказки без калькулятора — фичи BB-авто и умных тренировок как карточки-советы */}
+      {estep === 'weeks' && (
+        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>🧠 Интеллектуальные подсказки</span>
+            <span style={{ fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>без калькулятора · карточки-правила</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+            <MethodHint icon="📊" title="Объём по MEV/MRV" text="Держите 10-20 сетов/нед на мышцу. Недобор — добавьте фидер (2 лёгких сета в день другой группы). Перегруз (>MRV) — снимите 1 сет, не весь день." color="#22c55e" />
+            <MethodHint icon="🔥" title="Суперсеты" text="Антагонисты (грудь↔спина) без отдыха — экономят 20 мин, но снижают силу на 5%. Для памп-дня — да, для тяжёлого — нет." color="#a78bfa" />
+            <MethodHint icon="📈" title="DUP без калькулятора" text="3 тренировки/нед: тяж (5×5), сред (3×10), лёг (3×15) — одна группа получает разный стимул без расчётов." color="#3b82f6" />
+            <MethodHint icon="🔄" title="Делод и ACWR" text="Каждая 4-я неделя — −30% объёма. Если за 7 дней RIR упал на 2 — следующую неделю сделайте deload." color="#f59e0b" />
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <MethodHint icon="🎯" title="Специализация" text="Отстающую — 1.3× объёма 6 недель, за счёт других (не + сверху). Затем баланс." color="#ec4899" />
+            <MethodHint icon="⏱" title="Темп и TUT" text="3-1-1-0 для массы (5с/повт), 2-1-1-0 для силы. TUT = повторы × сек/повт." color="#06b6d4" />
+          </div>
+        </div>
+      )}
+
       {/* Единый конструктор: Pro-аккордеоны внутри «Недели» — прогрессивное раскрытие без перегрузки.
           Раньше это были отдельные шаги analysis/feedback/tools (6 пилюль), теперь — 3 коллапса внутри weeks.
           Сохраняет ручной контроль (ядро — недели→упражнения), анализ/обратная связь/инструменты — по запросу. */}
-      {estep === 'weeks' && isPro && (
+      {estep === 'weeks' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 2 }}>
           {/* Анализ */}
           <div className="constructor-surface" style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${proAccAnalysis ? '#22c55e' : 'rgba(255,255,255,0.06)'}` }}>

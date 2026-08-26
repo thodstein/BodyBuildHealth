@@ -3345,3 +3345,41 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
     background: rgba(0, 230, 138, 0.12) !important;
   }
 }
+/* ═══ MANUAL CONSTRUCTOR FIXES (vertical text + card buttons) ═══ */
+.manual-constructor--editor .editor-exercise-title {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  max-width: min(58vw, 360px);
+}
+@media (max-width: 480px) {
+  .manual-constructor--editor .editor-exercise-title {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: anywhere !important;
+    word-break: normal !important;
+  }
+  .manual-constructor--editor .bb-block-list,
+  .manual-constructor--editor .bb-block-list * {
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+.manual-constructor--editor .editor-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 8px;
+}
+@media (max-width: 380px) {
+  .manual-constructor--editor .editor-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.manual-constructor--editor button.editor-action-card {
+  word-break: normal !important;
+  overflow-wrap: anywhere !important;
+  white-space: normal !important;
+}

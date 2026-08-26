@@ -224,3 +224,44 @@ export const ScoreBadge: React.FC<{ score: number; grade: string }> = ({ score, 
   const color = score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
   return <span style={{ fontSize: 12, fontWeight: 800, color, background: color + '15', border: `1px solid ${color}40`, borderRadius: 20, padding: '3px 10px' }}>{score}/100 {grade}</span>;
 };
+
+// ─── Карточные кнопки (замена всем мелким BTN_GHOST) ───
+// Карточка-кнопка: иконка + заголовок + подсказка, стеклянный фон, hover-подъём.
+// Используется для выбора групп мышц, шаблонов, действий — вместо россыпи мелких кнопок.
+export const CARD_BTN: React.CSSProperties = {
+  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3,
+  padding: '10px 11px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02))',
+  border: '1px solid rgba(255,255,255,0.08)', color: '#fff',
+  boxShadow: '0 2px 10px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)',
+  transition: 'all 0.15s ease', minHeight: 56,
+  whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'normal',
+} as const;
+export const CARD_BTN_ACTIVE: React.CSSProperties = {
+  ...CARD_BTN, background: 'linear-gradient(180deg, rgba(0,230,138,0.14), rgba(0,230,138,0.06))',
+  border: '1px solid rgba(0,230,138,0.35)', boxShadow: '0 4px 14px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.06)',
+} as const;
+export const CARD_BTN_GRID: React.CSSProperties = {
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8,
+} as const;
+export const CARD_ACTION: React.CSSProperties = {
+  ...CARD_BTN, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 8, minHeight: 48, padding: '10px 12px',
+} as const;
+
+// Маленькая иконка-кнопка в карточке (⧉/🔄/📋/✕/▲/▼) — тоже карточка, но компактная
+export const ICON_CARD_BTN: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 44, height: 44, minWidth: 44, minHeight: 44, borderRadius: 10, cursor: 'pointer',
+  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff',
+  fontSize: 13, transition: 'all 0.15s ease',
+} as const;
+
+export const MethodHint: React.FC<{ icon?: string; title: string; text: string; color?: string }> = ({ icon = '💡', title, text, color = '#60a5fa' }) => (
+  <div style={{ display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 10, background: `${color}10`, border: `1px solid ${color}22`, lineHeight: 1.45 }}>
+    <span style={{ fontSize: 14, flexShrink: 0 }}>{icon}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color }}>{title}</span>
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', overflowWrap: 'anywhere', wordBreak: 'normal' }}>{text}</span>
+    </div>
+  </div>
+);

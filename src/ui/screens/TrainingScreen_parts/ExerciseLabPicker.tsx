@@ -27,25 +27,34 @@ export const ExerciseLabPicker: React.FC<{
 
   return (
     <>
-      <button 
-        type="button" 
-        onClick={() => setOpen(true)} 
-        style={{ 
-          flex: 1, 
-          minWidth: 0,
-          padding: '6px 8px', 
-          fontSize: 11, 
-          textAlign: 'left', 
-          cursor: 'pointer', 
-          color: value ? '#fff' : '#fff', 
-          background: 'rgba(118,118,128,0.12)',
-          border: '0.5px solid rgba(255,255,255,0.1)',
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          flex: '1 1 160px',
+          minWidth: 140,
+          maxWidth: '100%',
+          padding: '8px 10px',
+          fontSize: 11,
+          fontWeight: 700,
+          textAlign: 'left',
+          cursor: 'pointer',
+          color: value ? '#fff' : 'rgba(255,255,255,0.85)',
+          background: value ? 'rgba(0,230,138,0.10)' : 'rgba(118,118,128,0.12)',
+          border: value ? '1px solid rgba(0,230,138,0.30)' : '0.5px solid rgba(255,255,255,0.10)',
           borderRadius: 12,
-          minHeight: 38,
-          transition: 'all 0.2s'
+          minHeight: 44,
+          transition: 'all 0.2s',
+          whiteSpace: 'normal',
+          wordBreak: 'normal',
+          overflowWrap: 'anywhere',
+          lineHeight: 1.3,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
         }}
       >
-        {value || '🧬 Выбрать из лаборатории…'}
+        <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'normal', whiteSpace: 'normal' }}>{value || '🧬 Выбрать из лаборатории…'}</span>
       </button>
       
       {open && ReactDOM.createPortal(

@@ -32,37 +32,41 @@ describe('Ручной конструктор — последовательны
     expect(localStorage.getItem('he_manual_onboarding_done')).toBe('1');
   });
 
-  it('standard: создание → «Далее: Недели →» (первый шаг Параметры), затем «Далее: Итог →» + «← Назад»', async () => {
+  it('standard: создание → «Далее: Параметры →» (первый шаг Профиль — unified), затем «Далее: Недели →» + «← Назад»', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getAllByText('ББ')[0]);
-    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
-    // Пилюля «2 Редактор» активна, внутренние пилюли standard видны, счётчик шага
+    await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 15000 });
+    // Пилюля «2 Редактор» активна, unified 3 шага: Профиль → Параметры → Недели
     expect(screen.getAllByText(/2 Редактор/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/👤 Профиль/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/🎛 Параметры/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/🗓 Недели/).length).toBeGreaterThan(0);
-    expect(screen.getByText('шаг 1 из 2')).toBeTruthy();
-    // Заголовок активного шага с описанием
+    expect(screen.getByText('шаг 1 из 3')).toBeTruthy();
+    // Заголовок активного шага — Профиль (unified)
+    expect(screen.getByText('Данные атлета')).toBeTruthy();
+    // На первом шаге кнопки «← Назад» нет
+    expect(screen.queryByText('← Назад: Профиль')).toBeNull();
+    fireEvent.click(screen.getByText('Далее: Параметры →'));
+    expect(screen.getByText('Далее: Недели →')).toBeTruthy();
+    expect(screen.getByText('шаг 2 из 3')).toBeTruthy();
     expect(screen.getByText('Параметры программы')).toBeTruthy();
-    expect(screen.getByText('Название, цель, уровень, дни и недели + заметки тренера')).toBeTruthy();
-    // На первом шаге кнопки «← Назад» нет, галочек на пройденных шагах нет
-    expect(screen.queryByText('← Назад: Параметры')).toBeNull();
-    expect(screen.queryByText(/✓.*Параметры/)).toBeNull();
     fireEvent.click(screen.getByText('Далее: Недели →'));
     expect(screen.getByText('Далее: Итог →')).toBeTruthy();
-    expect(screen.getByText('шаг 2 из 2')).toBeTruthy();
+    expect(screen.getByText('шаг 3 из 3')).toBeTruthy();
     expect(screen.getByText('Недели и упражнения')).toBeTruthy();
-    // Пройденный шаг «Параметры» получает галочку
-    expect(screen.getByText(/✓.*Параметры/)).toBeTruthy();
-    // На втором шаге «← Назад: Параметры» — в нижней панели навигации, возвращает на первый шаг
+    // Пройденный шаг «Профиль» получает галочку
+    expect(screen.getByText(/✓.*Профиль/)).toBeTruthy();
+    // «← Назад: Параметры» возвращает на предыдущий
     expect(screen.getByText('← Назад: Параметры')).toBeTruthy();
     fireEvent.click(screen.getByText('← Назад: Параметры'));
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
   });
 
-  it('standard: «Далее: Недели →» → «Далее: Итог →» открывает шаг «Итог»', async () => {
+  it('standard: «Далее: Параметры →» → «Далее: Недели →» → «Далее: Итог →» открывает шаг «Итог»', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getAllByText('ББ')[0]);
-    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
+    await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 15000 });
+    fireEvent.click(screen.getByText('Далее: Параметры →'));
     fireEvent.click(screen.getByText('Далее: Недели →'));
     fireEvent.click(screen.getByText('Далее: Итог →'));
     expect(screen.getByText('💾 Сохранить и завершить')).toBeTruthy();
@@ -73,7 +77,8 @@ describe('Ручной конструктор — последовательны
   it('Итог: предпросмотр «Неделя 1» с днями виден после авто-сборки', async () => {
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getAllByText('ББ')[0]);
-    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
+    await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 15000 });
+    fireEvent.click(screen.getByText('Далее: Параметры →'));
     fireEvent.click(screen.getByText('Далее: Недели →'));
     fireEvent.click(screen.getByText('Далее: Итог →'));
     await waitFor(() => expect(screen.getByText(/🗓 Неделя 1:/)).toBeTruthy(), { timeout: 15000 });
@@ -82,7 +87,7 @@ describe('Ручной конструктор — последовательны
 
   it('pro: внутренние шаги редактора (Профиль → Параметры → Недели → Итог) с «← Назад» — единый конструктор', async () => {
     render(<ProgramManagerPanelWithProvider />);
-    fireEvent.click(screen.getByText('Профессиональный'));
+    // UNIFIED: переключатель удалён — сразу unified 3 шага, без клика «Профессиональный»
     fireEvent.click(screen.getAllByText('ББ')[0]);
     await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 15000 });
     // 3 пилюли Pro (было 6, стало 3 — Анализ/Обратная связь/Инструменты теперь аккордеоны внутри Недели)
@@ -127,16 +132,20 @@ describe('Ручной конструктор — последовательны
   it('клавиатура: ArrowRight → следующий шаг, ArrowLeft → предыдущий (вне полей ввода)', async () => {
     const { container } = render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getAllByText('ББ')[0]);
-    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 15000 });
+    await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 15000 });
     const editor = container.querySelector('.manual-constructor--editor');
     expect(editor).toBeTruthy();
-    // ArrowLeft на первом шаге — ничего не меняет
+    // ArrowLeft на первом шаге (Профиль) — ничего не меняет
     fireEvent.keyDown(editor!, { key: 'ArrowLeft' });
+    expect(screen.getByText('Далее: Параметры →')).toBeTruthy();
+    // ArrowRight → шаг «Параметры»
+    fireEvent.keyDown(editor!, { key: 'ArrowRight' });
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
+    expect(screen.getByText('шаг 2 из 3')).toBeTruthy();
     // ArrowRight → шаг «Недели»
     fireEvent.keyDown(editor!, { key: 'ArrowRight' });
     expect(screen.getByText('Далее: Итог →')).toBeTruthy();
-    expect(screen.getByText('шаг 2 из 2')).toBeTruthy();
+    expect(screen.getByText('шаг 3 из 3')).toBeTruthy();
     // ArrowLeft → назад на «Параметры»
     fireEvent.keyDown(editor!, { key: 'ArrowLeft' });
     expect(screen.getByText('Далее: Недели →')).toBeTruthy();
@@ -156,7 +165,8 @@ describe('Ручной конструктор — последовательны
     ]));
     render(<ProgramManagerPanelWithProvider />);
     fireEvent.click(screen.getAllByText('ББ')[0]);
-    await waitFor(() => expect(screen.getByText('Далее: Недели →')).toBeTruthy(), { timeout: 20000 });
+    await waitFor(() => expect(screen.getByText('Далее: Параметры →')).toBeTruthy(), { timeout: 20000 });
+    fireEvent.click(screen.getByText('Далее: Параметры →'));
     fireEvent.click(screen.getByText('Далее: Недели →'));
     // карточка связи видна в режиме выбора
     expect(screen.getByText('🎨 Привязать дизайн периодизации:')).toBeTruthy();
