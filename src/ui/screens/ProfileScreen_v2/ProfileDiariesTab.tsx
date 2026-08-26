@@ -15,9 +15,12 @@ import {
   todayIso,
   buildWeeklyHistogram,
   crossCorrelation,
+  computeAllCorrelations,
+  CORRELATION_PAIRS,
   type DiaryKey,
   type WeeklyHistogramGoal,
 } from './diary-helpers';
+import { calculateTrend } from './diaries/BPDiary/bp-trend-prediction';
 import { buildDiariesExportHtml } from './diary-pdf-export';
 import { DiaryCard } from './diary-ui';
 import { SleepDiary } from './diaries/SleepDiary/SleepDiary';
@@ -1316,28 +1319,44 @@ const exportAllDiariesPdf = () => {
               </div>
             );
           })()}
-          {/* 🔗 Кросс-дневниковая сводка — недельный объём + корреляции */}
+          {/* 🔗 Кросс-дневниковая сводка — недельный объём + корреляции r≥0.4 + тренд-прогноз */}
           {(() => {
             const sleepPoints = sleepEntries.map(e => ({ date: e.date, value: Number(e.hours) })).filter(p => Number.isFinite(p.value));
             const bpPoints = bpEntries.map(e => ({ date: e.date, value: Number(e.systolic) })).filter(p => Number.isFinite(p.value));
             const weightPoints = weights.map(e => ({ date: e.date, value: Number(e.weight) })).filter(p => Number.isFinite(p.value));
-            const painPoints = healthEntries.map(e => ({ date: e.date, value: Number(e.pain?.totalScore ?? 0) })).filter(p => p.value > 0);
-            const corrs = [
-              { label: 'Сон↔АД', r: crossCorrelation(sleepPoints as any, bpPoints as any) },
-              { label: 'Сон↔Вес', r: crossCorrelation(sleepPoints as any, weightPoints as any) },
-              { label: 'Сон↔Боль', r: crossCorrelation(sleepPoints as any, painPoints as any) },
-            ].filter(c => c.r && c.r.n >= 3) as { label: string; r: { r: number; n: number; strength: string } }[];
+            const cardioPoints = (() => { try { const v = JSON.parse(localStorage.getItem('he_cardio_sessions')||'[]'); return Array.isArray(v)? v.map((e:any)=>({date:String(e.date), value:Number(e.durationMin)})).filter((p:any)=>Number.isFinite(p.value)):[];} catch{ return [];} })();
+            // Полная карта для CORRELATION_PAIRS (sleep/bp/weight/pain/cardio)
+            const diariesMap: Record<string, {date:string; value:number}[]> = {
+              sleep: sleepPoints, bp: bpPoints, weight: weightPoints,
+              pain: healthEntries.map(e => ({ date: e.date, value: Number(e.pain?.totalScore ?? 0) })).filter(p => p.value > 0),
+              cardio: cardioPoints,
+              neuro: healthEntries.map(e => ({ date: e.date, value: Number(e.neuro?.totalScore ?? 0) })).filter(p => p.value >= 0 && Number.isFinite(p.value)),
+              hemato: healthEntries.map(e => ({ date: e.date, value: Number(e.hemato?.totalScore ?? 0) })).filter(p => Number.isFinite(p.value)),
+            } as any;
+            const allCorrs = computeAllCorrelations(diariesMap as any);
+            const strongCorrs = allCorrs.filter(c => Math.abs(c.r) >= 0.4).slice(0, 6);
+            const weakCorrs = allCorrs.filter(c => Math.abs(c.r) < 0.4).slice(0, 2);
             const sleepGoal: WeeklyHistogramGoal = { key: 'sleep', target: 8, label: 'Сон ≥ 8ч', color: '#a78bfa' };
             const hist = buildWeeklyHistogram(sleepPoints, [sleepGoal]);
+            // Тренд-прогноз АД (систола) и веса (7д)
+            const bpTrend = (()=>{ try{ return bpEntries.length>=4 ? calculateTrend(bpEntries as any, 'systolic') : null; }catch{return null;}})();
+            const weightTrend = (()=>{ try{
+              if (weightPoints.length<4) return null;
+              const sorted = [...weightPoints].sort((a,b)=>a.date.localeCompare(b.date));
+              const last = sorted[sorted.length-1].value, first = sorted[0].value;
+              const days = (Date.parse(sorted[sorted.length-1].date)-Date.parse(sorted[0].date))/86400000;
+              const slope = days>0 ? (last-first)/days : 0;
+              return { slopePerDay: slope, last, first };
+            }catch{return null;}})();
             const hasData = sleepPoints.length + bpPoints.length + weightPoints.length > 0;
             if (!hasData) return null;
             return (
               <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>🔗 Кросс-аналитика (последние записи)</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 6 }}>🔗 Кросс-аналитика + тренд (r≥0.4)</div>
                 {hist.length > 0 && (() => {
                   const maxMean = Math.max(...hist.map(x => x.mean), 1);
                   return (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6, alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8, alignItems: 'flex-end' }}>
                       {hist.slice(-6).map(h => (
                         <div key={h.weekStart} title={`${h.weekStart}: ${h.mean.toFixed(1)} ч, ${h.count}д${h.goal ? ` (цель ${h.goal.target}ч)` : ''}`} style={{ flex: '1 1 60px', textAlign: 'center', padding: 4, borderRadius: 6, background: 'rgba(167,139,250,0.08)', fontSize: 10, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', minHeight: 56 }}>
                           <div style={{ 
@@ -1356,16 +1375,29 @@ const exportAllDiariesPdf = () => {
                     </div>
                   );
                 })()}
-                {corrs.length > 0 ? (
-                  <div style={{ fontSize: 11, color: colors.textMuted }}>
-                    {corrs.slice(0, 3).map(c => (
-                      <span key={c.label} style={{ marginRight: 10 }}>
-                        {c.label}: <b style={{ color: Math.abs(c.r.r) >= 0.5 ? '#f59e0b' : colors.text }}>{c.r.r.toFixed(2)} (n={c.r.n})</b>
+                {strongCorrs.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                    {strongCorrs.map(c => (
+                      <span key={c.label} title={c.interpretation} style={{ padding: '4px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, background: c.strength==='strong'? 'rgba(245,158,11,0.18)' : 'rgba(96,165,250,0.14)', border: `1px solid ${c.strength==='strong'? 'rgba(245,158,11,0.35)' : 'rgba(96,165,250,0.25)'}`, color: c.strength==='strong'? '#f59e0b' : '#60a5fa' }}>
+                        {c.label}: r={c.r.toFixed(2)} · n={c.n} {c.positive? '↗' : '↘'} {c.strength==='strong'? 'сильная' : 'умеренная'}
                       </span>
                     ))}
                   </div>
+                ) : weakCorrs.length > 0 ? (
+                  <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6 }}>Слабые связи: {weakCorrs.map(c=>`${c.label} r=${c.r.toFixed(2)}`).join(' · ')} — нужно больше парных дней.</div>
                 ) : (
-                  <div style={{ fontSize: 11, color: colors.textMuted }}>Недостаточно парных дат для корреляций (нужно ≥3 общих дня).</div>
+                  <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 6 }}>Недостаточно парных дат для корреляций (нужно ≥3 общих дня).</div>
+                )}
+                {(bpTrend || weightTrend) && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', fontSize: 11, color: colors.textMuted, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 6 }}>
+                    {bpTrend && typeof bpTrend === 'object' && 'slope' in (bpTrend as any) && (
+                      <span>АД тренд: <b style={{ color: (bpTrend as any).slope > 0.1 ? '#ef4444' : (bpTrend as any).slope < -0.1 ? '#22c55e' : colors.text }}>{(bpTrend as any).slope > 0 ? '↗' : (bpTrend as any).slope < 0 ? '↘' : '→'} {(bpTrend as any).slope?.toFixed?.(2) ?? ''}</b></span>
+                    )}
+                    {weightTrend && (
+                      <span>Вес Δ {((weightTrend.slopePerDay*7).toFixed(2))} кг/нед {weightTrend.slopePerDay>0.05? '↗' : weightTrend.slopePerDay<-0.05? '↘' : '→'}</span>
+                    )}
+                    <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.7 }}>r≥0.4 — порог умеренной связи</span>
+                  </div>
                 )}
               </div>
             );
