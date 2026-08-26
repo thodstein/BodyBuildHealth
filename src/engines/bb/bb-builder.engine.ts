@@ -1300,7 +1300,8 @@ export function buildExercisePool(muscle: string, role: string, opts: BuildExerc
     if (opts.equipmentList.length > 0) {
       const rawEq = ex.equipment;
       const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-      if (exEq.length > 0 && !exEq.some(eq => opts.equipmentList.includes(eq))) return false;
+      // bodyweight всегда разрешён (не требует оборудования)
+      if (exEq.length > 0 && !exEq.includes('bodyweight') && !exEq.some(eq => opts.equipmentList.includes(eq))) return false;
     }
     if (opts.excludeIds.includes(ex.id) || opts.excludeIds.includes(ex.name)) return false;
     return true;
@@ -1336,7 +1337,7 @@ export function buildExercisePool(muscle: string, role: string, opts: BuildExerc
     if (opts.equipmentList.length > 0) {
       const rawEq = ex.equipment;
       const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-      if (exEq.length > 0 && !exEq.some(eq => opts.equipmentList.includes(eq))) return false;
+      if (exEq.length > 0 && !exEq.includes('bodyweight') && !exEq.some(eq => opts.equipmentList.includes(eq))) return false;
     }
     // B5: avAxial — даже в fallback НЕ берём осевые упражнения
     if (opts.avoidAxialLoad && ex.name && isAxialLoadExercise(ex)) return false;

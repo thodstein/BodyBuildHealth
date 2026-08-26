@@ -493,7 +493,9 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
     const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
-    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+    if (!eq.length) return true;
+    if (eq.includes('bodyweight')) return true;
+    return eq.some((e: string) => options.equipment!.includes(e));
   };
   const findCatalog = (pred: (c: any) => boolean) => EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pred(c));
 
@@ -593,7 +595,9 @@ function ensureLegPumpBlock(session: any, options: BBFinalizeOptions, muscle: st
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
     const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
-    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+    if (!eq.length) return true;
+    if (eq.includes('bodyweight')) return true;
+    return eq.some((e: string) => options.equipment!.includes(e));
   };
   const existing = session.exercises.filter((e: any) => e.muscle === muscle && !(e as any).warmupActivator);
   for (const e of existing) {
@@ -625,7 +629,9 @@ function ensureGlutesBlock(session: any, options: BBFinalizeOptions, target: num
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
     const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
-    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+    if (!eq.length) return true;
+    if (eq.includes('bodyweight')) return true;
+    return eq.some((e: string) => options.equipment!.includes(e));
   };
   if (existing.some((e: any) => /мост|hip.?thrust|glute.?bridge/i.test(e.name))) {
     // Доводим существующий hip thrust до 5 сетов (тяж).
@@ -868,6 +874,10 @@ function ensurePPLMidDeltFinisher(session: any, week: any, options: BBFinalizeOp
     if (/наклон|задн|rear|обратн|лёжа/i.test(x.name)) return false;
     if (session.exercises.some((e: any) => e.name === x.name)) return false;
     if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    if (options.equipment?.length) {
+      const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+      if (eq.length && !eq.includes('bodyweight') && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+    }
     if (machineOnly === true) return /тренаж|машин|кроссовер|crossover|cable|блок/i.test(x.name);
     if (machineOnly === false) return /гантел|dumbbell/i.test(x.name);
     return true;
@@ -907,6 +917,10 @@ function ensurePPLRearDeltFinisher(session: any, week: any, options: BBFinalizeO
     if (!/лёжа|лежа|наклон|incline/i.test(x.name)) return false;
     if (session.exercises.some((e: any) => e.name === x.name)) return false;
     if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
+    if (options.equipment?.length) {
+      const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
+      if (eq.length && !eq.includes('bodyweight') && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+    }
     return true;
   }) || EXERCISE_CATALOG.find((x: any) => {
     if (trueMuscleOf(x) !== 'shoulders') return false;
@@ -1127,13 +1141,15 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
     const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
-    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+    if (!eq.length) return true;
+    if (eq.includes('bodyweight')) return true;
+    return eq.some((e: string) => options.equipment!.includes(e));
   };
   const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
   const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
   const isEnhanced = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3;
   const addEx = (muscle: string, pattern: RegExp, sets: number, reps: [number, number], note: string): void => {
-    const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pattern.test(c.name || '') && !working.some((e: any) => e.name === c.name) && !isMobilityRestricted(c, options.mobilityRestrictions));
+    const candidate = EXERCISE_CATALOG.find((c: any) => trueMuscleOf(c) === muscle && !used(c) && equipmentOk(c) && pattern.test(c.name || '') && !/tibialis|tibia/i.test(c.name || '') && !working.some((e: any) => e.name === c.name) && !isMobilityRestricted(c, options.mobilityRestrictions));
     if (!candidate) return;
     const baseWeight = options.workMax?.[muscle] || 40;
     if (working.length < maxEx) {
@@ -1190,12 +1206,12 @@ function ensureSmallMuscleQuality(session: any, week: any, options: BBFinalizeOp
       }
     } else {
       // Стоя или в жиме ногами — оба закрывают растянутую позицию.
-      addEx('calves', /подъём.*носк|подъем.*носк|жим.*ног.*носк|жим.*платформ|calf.*raise|leg.*press.*calf/i, isEnhanced ? 5 : 4, [12, 20], 'Икры: стоя / в жиме ногами — растянутая икроножная (прямое колено, пауза 2 сек внизу)');
+      addEx('calves', /подъём.*носк|подъем.*носк|жим.*ног.*носк|жим.*платформ|calf.*raise|leg.*press.*calf/i, isEnhanced ? 4 : 4, [12, 20], 'Икры: стоя / в жиме ногами — растянутая икроножная (прямое колено, пауза 2 сек внизу)');
     }
     // Сидячие (камбаловидная) — обязательно во второй слот КАЖДОГО дня ног.
     const seated = calves.find((e: any) => /сидя|sitting|seated/i.test(e.name || ''));
     if (!seated) {
-      addEx('calves', /подъём.*носк.*сидя|подъем.*носк.*сидя|сидя.*носк|seated.*calf/i, isEnhanced ? 4 : 3, [15, 25], 'Икры: сидя — камбаловидная (колено 90°, пауза 1 сек в растяжке)');
+      addEx('calves', /подъём.*носк.*сидя|подъем.*носк.*сидя|сидя.*носк|seated.*calf|ослик|donkey/i, 3, [15, 25], 'Икры: сидя — камбаловидная (колено 90°, пауза 1 сек в растяжке, ослик)');
     }
   }
   // Пресс: скручивания/подъёмы ног добираются до MEV (5 сетов) в Upper/FullBody.
@@ -1501,7 +1517,9 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
   const equipmentOk = (c: any) => {
     if (!options.equipment?.length) return true;
     const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
-    return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
+    if (!eq.length) return true;
+    if (eq.includes('bodyweight')) return true;
+    return eq.some((e: string) => options.equipment!.includes(e));
   };
 
   for (const week of plan.weeks) {
@@ -2533,11 +2551,13 @@ for (const week of next.weeks) {
               // и bodyweight-капабилити), но не более одной на сессию.
               const template = s.exercises[0];
               const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
-              const equipmentOk = (c: any) => {
-                if (!options.equipment?.length) return true;
-                const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
-                return !eq.length || eq.some((e: string) => options.equipment!.includes(e));
-              };
+  const equipmentOk = (c: any) => {
+    if (!options.equipment?.length) return true;
+    const eq = Array.isArray(c.equipment) ? c.equipment : [String(c.equipment || '')];
+    if (!eq.length) return true;
+    if (eq.includes('bodyweight')) return true;
+    return eq.some((e: string) => options.equipment!.includes(e));
+  };
               const cap = options.bodyweightCapability;
               const canPullUp = !!(cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0));
               const pool = EXERCISE_CATALOG.filter((x: any) => /подтяг|pull.?up/i.test(x.name || ''));
