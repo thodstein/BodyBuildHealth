@@ -476,8 +476,8 @@ export const detectAnomalies = (
     } else if (key === 'pain') {
       const total = extractValue('pain', e);
       const painMax = PAIN_ZONE_LIST.length * 10;
-      if (total !== null && total >= Math.round(painMax * 0.86)) issues.push({ date: e.date, severity: 'danger', message: `Боль Σ=${total.toFixed(0)}/${painMax} (критично)` });
-      else if (total !== null && total >= Math.round(painMax * 0.57)) issues.push({ date: e.date, severity: 'warn', message: `Боль Σ=${total.toFixed(0)}/${painMax} (выражено)` });
+      if (total !== null && total >= 60) issues.push({ date: e.date, severity: 'danger', message: `Боль Σ=${total.toFixed(0)}/${painMax} (критично)` });
+      else if (total !== null && total >= 40) issues.push({ date: e.date, severity: 'warn', message: `Боль Σ=${total.toFixed(0)}/${painMax} (выражено)` });
     } else if (key === 'neuro') {
       const sc = extractValue('neuro', e);
       if (sc !== null && sc >= 6) issues.push({ date: e.date, severity: 'danger', message: `Нейро Σ=${sc.toFixed(0)}/10 (тяжёлое)` });
@@ -823,7 +823,7 @@ const NORMAL_RANGES: Partial<Record<DiaryKey, NormalRange>> = {
   sleep: { low: 7, high: 9, warnLow: 6, warnHigh: 10, unit: 'ч', description: 'Норма сна для взрослого: 7–9 ч' },
   bp: { low: 90, high: 120, warnLow: 80, warnHigh: 140, unit: 'мм рт.ст.', description: 'Норма систолического АД: 90–120' },
   weight: { low: 50, high: 120, unit: 'кг', description: 'Вес в пределах нормы ИМТ' },
-  pain: { low: 0, high: Math.round(PAIN_MAX * 0.22), warnLow: 0, warnHigh: Math.round(PAIN_MAX * 0.57), unit: `/${PAIN_MAX}`, description: `Боль в суставах: ≤${Math.round(PAIN_MAX * 0.22)} из ${PAIN_MAX}` },
+  pain: { low: 0, high: 20, warnLow: 0, warnHigh: 40, unit: `/${PAIN_MAX}`, description: `Боль в суставах: ≤20 из ${PAIN_MAX}` },
   neuro: { low: 0, high: 1, warnLow: 0, warnHigh: 4, unit: '/10', description: 'Нейросимптомы: ≤1 из 10' },
   acne: { low: 0, high: 3, warnLow: 0, warnHigh: 7, unit: '/12', description: 'Акне: ≤3 из 12' },
   hemato: { low: 0, high: 1, warnLow: 0, warnHigh: 2, unit: '/8', description: 'Гематологические симптомы: ≤1 из 8' },
