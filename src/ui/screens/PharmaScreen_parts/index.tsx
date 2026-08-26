@@ -57,9 +57,9 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
     const risk = linked.risk?.overallNet;
     return (
       <div style={{ position:'fixed', inset:0, zIndex:5, display:'flex', flexDirection:'column', overflow:'hidden', background:'#050508' }}>
-        <img src="/pharma-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:0.92 }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.18) 32%, rgba(5,5,12,0.62) 58%, rgba(5,5,12,0.92) 82%, #050508 100%)' }} />
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 820px 420px at 50% 18%, rgba(139,92,246,0.14), transparent 62%), radial-gradient(ellipse 560px 360px at 92% 42%, rgba(0,230,138,0.07), transparent 62%)', pointerEvents:'none' }} />
+        <img src="/pharma-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:1 }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.10) 45%, rgba(5,5,8,0.22) 72%, rgba(5,5,8,0.38) 100%)' }} />
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 700px 360px at 50% 18%, rgba(139,92,246,0.08), transparent 62%), radial-gradient(ellipse 520px 320px at 92% 42%, rgba(0,230,138,0.05), transparent 62%)', pointerEvents:'none' }} />
 
         {/* header badge + stats */}
         <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'16px 16px calc(20px + var(--nav-height,68px) + env(safe-area-inset-bottom))', maxWidth:560, width:'100%', margin:'0 auto' }}>
@@ -101,29 +101,29 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
             </div>
           </div>
 
-          <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {cards.map(c => (
               <button key={c.key} onClick={() => setPage(c.key)} style={{
-                display:'flex', alignItems:'center', gap:13, padding:'13px 14px', borderRadius:16,
+                display:'flex', alignItems:'center', gap:12, padding:'11px 12px', borderRadius:14,
                 cursor:'pointer', textAlign:'left', width:'100%',
-                background:'rgba(18,18,22,0.58)', border:'1px solid rgba(255,255,255,0.07)',
-                backdropFilter:'blur(18px) saturate(140%)', WebkitBackdropFilter:'blur(18px) saturate(140%)',
-                boxShadow:'0 8px 32px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.06)',
-                transition:'transform 0.18s ease, border-color 0.18s ease, background 0.18s ease',
+                background:'rgba(16,16,20,0.38)', border:'1px solid rgba(255,255,255,0.08)',
+                backdropFilter:'blur(10px) saturate(120%)', WebkitBackdropFilter:'blur(10px) saturate(120%)',
+                boxShadow:'0 4px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
+                transition:'transform 0.16s ease, border-color 0.16s ease, background 0.16s ease',
               }}
-              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor=c.border; (e.currentTarget as HTMLButtonElement).style.background='rgba(22,22,28,0.72)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.07)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(18,18,22,0.58)'; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(-1px)'; (e.currentTarget as HTMLButtonElement).style.borderColor=c.border; (e.currentTarget as HTMLButtonElement).style.background='rgba(20,20,26,0.48)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform='translateY(0)'; (e.currentTarget as HTMLButtonElement).style.borderColor='rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.background='rgba(16,16,20,0.38)'; }}
               >
-                <div style={{ width:46, height:46, borderRadius:13, display:'flex', alignItems:'center', justifyContent:'center',
-                  flexShrink:0, background:`linear-gradient(135deg, ${c.color}28, ${c.color}10)`, border:`1px solid ${c.color}22`, fontSize:20, boxShadow:`0 4px 16px ${c.color}18` }}>{c.icon}</div>
+                <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center',
+                  flexShrink:0, background:`linear-gradient(135deg, ${c.color}22, ${c.color}0e)`, border:`1px solid ${c.color}20`, fontSize:18, boxShadow:`0 2px 10px ${c.color}12` }}>{c.icon}</div>
                 <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13.5, fontWeight:800, marginBottom:2, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6 }}>
+                  <div style={{ fontSize:13, fontWeight:800, marginBottom:1, color:'#fff', letterSpacing:-0.2, display:'flex', alignItems:'center', gap:6 }}>
                     {c.title}
-                    <span style={{ width:5, height:5, borderRadius:'50%', background:c.color, boxShadow:`0 0 8px ${c.color}` }} />
+                    <span style={{ width:5, height:5, borderRadius:'50%', background:c.color, boxShadow:`0 0 6px ${c.color}` }} />
                   </div>
-                  <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', lineHeight:1.35, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.desc}</div>
+                  <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.66)', lineHeight:1.3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{c.desc}</div>
                 </div>
-                <span style={{ width:30, height:30, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:c.color, fontSize:14, flexShrink:0 }}>→</span>
+                <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:c.color, fontSize:12, flexShrink:0 }}>→</span>
               </button>
             ))}
           </div>
@@ -199,39 +199,33 @@ export const PharmaScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubT
         </div>
       )}
 
-      {/* pill nav */}
-      <div style={{ display:'flex', gap:6, overflowX:'auto', overflowY:'hidden', marginBottom:10, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', paddingBottom:2, flexShrink:0, paddingRight:4 }}>
+      {/* tabs — компактные, без пилюль */}
+      <div style={{ display:'flex', gap:2, overflowX:'auto', overflowY:'hidden', marginBottom:8, scrollbarWidth:'none', WebkitOverflowScrolling:'touch' as any, flexWrap:'nowrap', flexShrink:0, borderBottom:'1px solid rgba(255,255,255,0.06)', paddingBottom:0 }}>
       {page === 'course' && (
         <span style={{
-          display:'inline-flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:20, fontSize:11, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
-          background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', border:'1px solid rgba(139,92,246,0.35)', boxShadow:'0 4px 16px rgba(139,92,246,0.28)',
-        }}>📋 Курс <span style={{ background:'rgba(255,255,255,0.18)', padding:'1px 6px', borderRadius:10, fontSize:10 }}>{linked.course.length}</span></span>
+          display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
+          color:'#a78bfa', borderBottom:'2px solid #8b5cf6', marginBottom:-1,
+        }}>📋 Курс <span style={{ color:'rgba(255,255,255,0.52)', fontWeight:700 }}>{linked.course.length}</span></span>
       )}
       {page === 'reports' && (
         <span style={{
-          display:'inline-flex', alignItems:'center', gap:6, padding:'7px 14px', borderRadius:20, fontSize:11, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
-          background:'linear-gradient(135deg, #f59e0b, #e07b00)', color:'#fff', border:'1px solid rgba(245,158,11,0.35)', boxShadow:'0 4px 16px rgba(245,158,11,0.22)',
+          display:'inline-flex', alignItems:'center', gap:5, padding:'5px 0 6px', fontSize:10, fontWeight:800, whiteSpace:'nowrap', flexShrink:0,
+          color:'#fbbf24', borderBottom:'2px solid #f59e0b', marginBottom:-1,
         }}>📊 Фарма-отчёт</span>
       )}
       {page === 'calculators' && (['pkpd','dosage','peptides','mapper','diagnostics'] as const).map(t => (
         <button key={t} onClick={() => setSubTab(t)} style={{
-          padding:'7px 13px', borderRadius:20, fontSize:11, fontWeight:700, whiteSpace:'nowrap',
-          cursor:'pointer', flexShrink:0, transition:'all 0.18s ease',
-          background: subTab === t ? 'linear-gradient(135deg, #3b82f6, #2563eb)' : 'rgba(255,255,255,0.06)',
-          color: subTab === t ? '#fff' : 'rgba(255,255,255,0.72)',
-          border: `1px solid ${subTab === t ? 'rgba(59,130,246,0.45)' : 'rgba(255,255,255,0.08)'}`,
-          boxShadow: subTab===t ? '0 4px 14px rgba(59,130,246,0.28)' : 'none',
-        }}>{t === 'pkpd' ? '⚗️ PK/PD' : t === 'dosage' ? '💉 Дозировки' : t === 'peptides' ? '🧬 Пептиды' : t === 'mapper' ? '🗺 Маппер' : '🩺 Диагностика'}</button>
+          padding:'5px 7px 6px', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
+          cursor:'pointer', flexShrink:0, transition:'all 0.14s ease', background:'transparent', border:'none', borderBottom: subTab===t ? '2px solid #3b82f6' : '2px solid transparent', borderRadius:0, marginBottom:-1,
+          color: subTab === t ? '#fff' : 'rgba(255,255,255,0.52)',
+        }}>{t === 'pkpd' ? 'PK/PD' : t === 'dosage' ? 'Дозировки' : t === 'peptides' ? 'Пептиды' : t === 'mapper' ? 'Маппер' : 'Диагностика'}</button>
       ))}
       {page === 'info' && (['catalog','interactions'] as const).map(t => (
         <button key={t} onClick={() => setSubTab(t)} style={{
-          padding:'7px 13px', borderRadius:20, fontSize:11, fontWeight:700, whiteSpace:'nowrap',
-          cursor:'pointer', flexShrink:0, transition:'all 0.18s ease',
-          background: subTab === t ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.06)',
-          color: subTab === t ? '#fff' : 'rgba(255,255,255,0.72)',
-          border: `1px solid ${subTab === t ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.08)'}`,
-          boxShadow: subTab===t ? '0 4px 14px rgba(34,197,94,0.22)' : 'none',
-        }}>{t === 'catalog' ? '📚 Каталог' : '⚡ Взаимодействия'}</button>
+          padding:'5px 7px 6px', fontSize:10, fontWeight:700, whiteSpace:'nowrap',
+          cursor:'pointer', flexShrink:0, transition:'all 0.14s ease', background:'transparent', border:'none', borderBottom: subTab===t ? '2px solid #22c55e' : '2px solid transparent', borderRadius:0, marginBottom:-1,
+          color: subTab === t ? '#fff' : 'rgba(255,255,255,0.52)',
+        }}>{t === 'catalog' ? 'Каталог' : 'Взаимодействия'}</button>
       ))}
       </div>
 
