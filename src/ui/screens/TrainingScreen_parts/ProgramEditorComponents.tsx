@@ -1856,8 +1856,8 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                 <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
               </label>
               <span className="editor-week-summary">{w.days.length} дн. · {exerciseCount} упр. · {setCount} подх.</span>
-              <button aria-label={`Копировать неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44 }} onClick={() => cloneWeek(wi)} title="Создать копию недели">Копировать</button>
-              <button aria-label={`Удалить неделю ${w.week}`} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeWeek(wi)}>Удалить</button>
+              <button aria-label={`Копировать неделю ${w.week}`} style={{ ...ICON_CARD_BTN, width: 'auto', minWidth: 44, padding: '6px 10px', fontSize: 10 }} onClick={() => cloneWeek(wi)} title="Клонировать — копия недели">⧉ Копировать</button>
+              <button aria-label={`Удалить неделю ${w.week}`} style={{ ...ICON_CARD_BTN, width: 'auto', minWidth: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.22)', background: 'rgba(239,68,68,0.08)', padding: '6px 10px', fontSize: 10 }} onClick={() => removeWeek(wi)}>✕ Удалить</button>
             </div>
 
             {isExp && (
@@ -1873,7 +1873,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                         ariaLabel={`День недели ${d.name}`}
                       />
                       <span style={{ fontSize: 10, color: DIM }}>{d.exercises.length} упр. · {TRAINING_DAY_NAMES[d.dayOfWeek ?? di % 7]}</span>
-                      <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeDay(wi, di)}>✕ день</button>
+                      <button style={{ ...ICON_CARD_BTN, width: 'auto', minWidth: 44, color: '#ef4444', borderColor: 'rgba(239,68,68,0.22)', background: 'rgba(239,68,68,0.08)', padding: '6px 10px', fontSize: 10 }} onClick={() => removeDay(wi, di)}>✕ день</button>
                     </div>
                     {d.exercises.map((ex, ei) => (
                       <div key={ei} className="editor-exercise-card" style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.06)', border: '1px solid rgba(167,139,250,0.14)' }}>
@@ -1904,7 +1904,7 @@ const PLEditor: React.FC<{ body: PLProgramBody; onChange: (b: PLProgramBody) => 
                             placeholder="Мышца"
                             buttonStyle={{ flex: '0 0 110px' }}
                           />
-                          <button style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 44, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => removeExercise(wi, di, ei)}>✕</button>
+                          <button style={{ ...ICON_CARD_BTN, width: 36, minWidth: 36, height: 36, color: '#ef4444', borderColor: 'rgba(239,68,68,0.22)', background: 'rgba(239,68,68,0.08)', fontSize: 11 }} onClick={() => removeExercise(wi, di, ei)}>✕</button>
                         </div>
                         <PLSetEditor sets={ex.sets} lift={ex.lift} workMax={body.workMax} onChange={(sets) => updateExercise(wi, di, ei, { sets })} />
                         <input style={{ ...IN, padding: '5px 8px', fontSize: 11, width: '100%', minHeight: 44, marginTop: 4 }} value={ex.note ?? ''} onChange={e => updateExercise(wi, di, ei, { note: e.target.value })} placeholder="💬 Комментарий к упражнению (техника, цель, примечания)" />
