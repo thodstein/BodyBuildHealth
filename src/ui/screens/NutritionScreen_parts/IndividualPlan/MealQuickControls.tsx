@@ -241,7 +241,10 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
         if (mi !== mealIdx) return m;
         const items = m.items.map((it: any, ii: number) => {
           if (ii !== itemIdx) return it;
-          return { ...it, name: newFood.name || food.foodName, id: newFood.id || food.foodId, amount: grams, kcal: Math.round(((newFood as any).kcal || 0) * ratio), p: Math.round(((newFood as any).protein ?? (newFood as any).p ?? 0) * ratio * 10) / 10, f: Math.round(((newFood as any).fat ?? (newFood as any).f ?? 0) * ratio * 10) / 10, c: Math.round(((newFood as any).carbs ?? (newFood as any).c ?? 0) * ratio * 10) / 10, fiber: Math.round(((newFood as any).fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
+          const _p = Math.round(((newFood as any).protein ?? (newFood as any).p ?? 0) * ratio * 10) / 10;
+          const _f = Math.round(((newFood as any).fat ?? (newFood as any).f ?? 0) * ratio * 10) / 10;
+          const _c = Math.round(((newFood as any).carbs ?? (newFood as any).c ?? 0) * ratio * 10) / 10;
+          return { ...it, name: newFood.name || food.foodName, id: newFood.id || food.foodId, amount: grams, kcal: Math.round(4 * _p + 9 * _f + 4 * _c), p: _p, f: _f, c: _c, fiber: Math.round(((newFood as any).fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
         });
         const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0), fiber: items.reduce((s: number, x: any) => s + (x.fiber || 0), 0), leucine_mg: items.reduce((s: number, x: any) => s + (x.leucine_mg || 0), 0) };
         return { ...m, items, totals };
@@ -295,7 +298,7 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       if (!prev) return prev;
       const meals2 = prev.meals.map((m: any, mi: number) => {
         if (mi !== mealIdx) return m;
-        const items = [...m.items, { name: result.foodName, id: result.foodId, amount, kcal: Math.round(result.kcal * amount / 100), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10, fiber: Math.round((result.fiber || 0) * amount / 100 * 10) / 10, leucine_mg: Math.round(leuPer100 * amount / 100) }];
+        const items = [...m.items, { name: result.foodName, id: result.foodId, amount, kcal: (() => { const p = Math.round(result.protein * amount / 100 * 10) / 10, f = Math.round(result.fat * amount / 100 * 10) / 10, c = Math.round(result.carbs * amount / 100 * 10) / 10; return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10, fiber: Math.round((result.fiber || 0) * amount / 100 * 10) / 10, leucine_mg: Math.round(leuPer100 * amount / 100) }];
         const totals = { kcal: items.reduce((s: number, x: any) => s + x.kcal, 0), p: items.reduce((s: number, x: any) => s + x.p, 0), f: items.reduce((s: number, x: any) => s + x.f, 0), c: items.reduce((s: number, x: any) => s + x.c, 0), fiber: items.reduce((s: number, x: any) => s + (x.fiber || 0), 0), leucine_mg: items.reduce((s: number, x: any) => s + (x.leucine_mg || 0), 0) };
         return { ...m, items, totals };
       });

@@ -177,13 +177,17 @@ const SHRINK_LADDER = [10, 15, 20, 25, 30, 40, 50, 60, 75, 90, 100, 120, 125, 15
 
 function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
   const r = newAmount / (it.amount || 1);
+  const p = Math.round((it.p || 0) * r * 10) / 10;
+  const f = Math.round((it.f || 0) * r * 10) / 10;
+  const c = Math.round((it.c || 0) * r * 10) / 10;
+  // KBЖУ-консистентность ≤3%: kcal пересчитываем из формулы, а не линейно от старых kcal
   return {
     ...it,
     amount: newAmount,
-    kcal: Math.round((it.kcal || 0) * r),
-    p: Math.round((it.p || 0) * r * 10) / 10,
-    f: Math.round((it.f || 0) * r * 10) / 10,
-    c: Math.round((it.c || 0) * r * 10) / 10,
+    kcal: Math.round(4 * p + 9 * f + 4 * c),
+    p,
+    f,
+    c,
     fiber: it.fiber != null ? Math.round(it.fiber * r * 10) / 10 : undefined,
     leucine_mg: it.leucine_mg != null ? Math.round(it.leucine_mg * r) : undefined,
   };

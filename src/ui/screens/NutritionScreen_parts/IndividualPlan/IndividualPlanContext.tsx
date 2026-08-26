@@ -1461,7 +1461,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (food.id && String(food.id).startsWith('spice_') && grams > 10) grams = 10;
     const ratio = grams / 100;
     const leuPer100 = (food as any).amino_acid_profile_100g?.leucine_mg ?? (food.micros?.Leucine != null ? (food.micros.Leucine as number) : Math.round((food.protein || 0) * 75));
-    const item = { name: food.name, id: food.id, amount: grams, kcal: Math.round((food.kcal || 0) * ratio), p: Math.round((food.protein || 0) * ratio * 10) / 10, f: Math.round((food.fat || 0) * ratio * 10) / 10, c: Math.round((food.carbs || 0) * ratio * 10) / 10, fiber: Math.round((food.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
+    const _p = Math.round((food.protein || 0) * ratio * 10) / 10;
+    const _f = Math.round((food.fat || 0) * ratio * 10) / 10;
+    const _c = Math.round((food.carbs || 0) * ratio * 10) / 10;
+    // KBЖУ-консистентность ≤3%: kcal из формулы
+    const item = { name: food.name, id: food.id, amount: grams, kcal: Math.round(4 * _p + 9 * _f + 4 * _c), p: _p, f: _f, c: _c, fiber: Math.round((food.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
     if (resolved.plan === 'day') {
       _applyDayPlanMealUpdate(mealIdx, items => [...items, item]);
     } else if (resolved.plan === 'three') {
@@ -1477,7 +1481,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (!resolved) return;
     const dayData = resolved.plan === 'day' ? dayPlan : resolved.plan === 'three' ? threeDayPlan?.days?.[resolved.day] : weekPlan?.days?.[resolved.day];
     if (!dayData?.meals?.[mealIdx]) return;
-    const mk = (f: any, grams: number) => ({ name: f.name, id: f.id, amount: grams, kcal: Math.round((f.kcal || 0) * grams / 100), p: Math.round((f.protein || 0) * grams / 100), f: Math.round((f.fat || 0) * grams / 100), c: Math.round((f.carbs || 0) * grams / 100), fiber: Math.round((f.fiber || 0) * grams / 100) });
+    const mk = (f: any, grams: number) => { const p = Math.round((f.protein || 0) * grams / 100), f2 = Math.round((f.fat || 0) * grams / 100), c = Math.round((f.carbs || 0) * grams / 100); return { name: f.name, id: f.id, amount: grams, kcal: Math.round(4 * p + 9 * f2 + 4 * c), p, f: f2, c, fiber: Math.round((f.fiber || 0) * grams / 100) }; };
     const whey = FOOD_DB.find(f => f.id === 'whey_isolate') || FOOD_DB.find(f => f.id === 'whey_protein');
     const isWorkDayForAdd = (()=>{ try{ if(!workScheduleEnabled) return false; if(workScheduleType==='standard') return !!workDays[dayIdx%7]; if(workScheduleType==='sliding'||workScheduleType==='custom') return !!workDays[dayIdx%7]; return !!workDays[dayIdx%7]; }catch{ return false; }})();
     const usePortable = workFood === 'portable' && isWorkDayForAdd;
@@ -1516,7 +1520,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (newFood.id && String(newFood.id).startsWith('spice_') && grams > 10) grams = 10;
     const ratio = grams / 100;
     const leuPer100 = (newFood as any).amino_acid_profile_100g?.leucine_mg ?? (newFood.micros?.Leucine != null ? (newFood.micros.Leucine as number) : Math.round((newFood.protein || 0) * 75));
-    const replacement = { ...old, name: newFood.name, id: newFood.id, amount: grams, kcal: Math.round((newFood.kcal || 0) * ratio), p: Math.round((newFood.protein || 0) * ratio * 10) / 10, f: Math.round((newFood.fat || 0) * ratio * 10) / 10, c: Math.round((newFood.carbs || 0) * ratio * 10) / 10, fiber: Math.round((newFood.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
+    const replacement = { ...old, name: newFood.name, id: newFood.id, amount: grams, kcal: (() => { const p = Math.round((newFood.protein || 0) * ratio * 10) / 10, f = Math.round((newFood.fat || 0) * ratio * 10) / 10, c = Math.round((newFood.carbs || 0) * ratio * 10) / 10; return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round((newFood.protein || 0) * ratio * 10) / 10, f: Math.round((newFood.fat || 0) * ratio * 10) / 10, c: Math.round((newFood.carbs || 0) * ratio * 10) / 10, fiber: Math.round((newFood.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
     if (resolved.plan === 'day') {
       _applyDayPlanMealUpdate(mealIdx, items => { items[itemIdx] = replacement; return items; });
     } else if (resolved.plan === 'three') {
@@ -1771,27 +1775,33 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           if (food.category === 'grain' && grams < 50) grams = 50;
           if (food.id === 'oats' && grams < 60) grams = 60;
           const ratio = grams / 100;
+          const _p = Math.round((food.protein || 0) * ratio * 10) / 10;
+          const _f = Math.round((food.fat || 0) * ratio * 10) / 10;
+          const _c = Math.round((food.carbs || 0) * ratio * 10) / 10;
           return {
             name: food.name,
             id: food.id,
             amount: grams,
-            kcal: Math.round((food.kcal || 0) * ratio),
-            p: Math.round((food.protein || 0) * ratio * 10) / 10,
-            f: Math.round((food.fat || 0) * ratio * 10) / 10,
-            c: Math.round((food.carbs || 0) * ratio * 10) / 10,
+            kcal: Math.round(4 * _p + 9 * _f + 4 * _c),
+            p: _p,
+            f: _f,
+            c: _c,
             fiber: Math.round((food.fiber || 0) * ratio * 10) / 10,
           };
         }
         // Fallback: ингредиент не найден в FOOD_DB — распределяем макросы равномерно
         const fallbackGrams = 100;
+        const fbP = Math.round(recipe.protein / n * 10) / 10;
+        const fbF = Math.round(recipe.fat / n * 10) / 10;
+        const fbC = Math.round(recipe.carbs / n * 10) / 10;
         return {
           name: ing,
           id: ing,
           amount: fallbackGrams,
-          kcal: Math.round(perItemKcal),
-          p: Math.round(recipe.protein / n * 10) / 10,
-          f: Math.round(recipe.fat / n * 10) / 10,
-          c: Math.round(recipe.carbs / n * 10) / 10,
+          kcal: Math.round(4 * fbP + 9 * fbF + 4 * fbC),
+          p: fbP,
+          f: fbF,
+          c: fbC,
         };
       });
     };
@@ -3152,7 +3162,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const treatId = treatPool[Math.floor(Math.random() * treatPool.length)];
             const treat = FOOD_DB.find(f => f.id === treatId);
             if (treat && !excludedIds.has(treat.id) && !allergenIds.has(treat.id)) {
-              items.push({ name: treat.name, id: treat.id, amount: 30, kcal: Math.round(treat.kcal * 0.3), p: Math.round(treat.protein * 0.3), f: Math.round(treat.fat * 0.3), c: Math.round(treat.carbs * 0.3) });
+              items.push({ name: treat.name, id: treat.id, amount: 30, kcal: (() => { const p = Math.round(treat.protein * 0.3), f = Math.round(treat.fat * 0.3), c = Math.round(treat.carbs * 0.3); return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round(treat.protein * 0.3), f: Math.round(treat.fat * 0.3), c: Math.round(treat.carbs * 0.3) });
               remainingC -= (treat.carbs || 0) * 0.3;
             }
           }
@@ -3227,7 +3237,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const v = effectiveVegPool[vIdx % effectiveVegPool.length];
             const vegAmt = variety === 'max' ? 120 : variety === 'minimal' ? 60 : 80;
             usedFoodIds.add(v.id); allDayFoodIds.push(v.id);
-            items.push({ name: v.name, id: v.id, amount: vegAmt, kcal: Math.round(v.kcal * vegAmt / 100), p: Math.round(v.protein * vegAmt / 100), f: Math.round(v.fat * vegAmt / 100), c: Math.round(v.carbs * vegAmt / 100) });
+            items.push({ name: v.name, id: v.id, amount: vegAmt, kcal: (() => { const p = Math.round(v.protein * vegAmt / 100), f = Math.round(v.fat * vegAmt / 100), c = Math.round(v.carbs * vegAmt / 100); return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round(v.protein * vegAmt / 100), f: Math.round(v.fat * vegAmt / 100), c: Math.round(v.carbs * vegAmt / 100) });
           }
           if (remainingP > 10 && !isBreakfast) {
             const extraPool = topProtein.filter((f: any) => !items.some((it: any) => it.id === f.id));
@@ -3273,7 +3283,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const suppCap = SUPP_CAPS[f.id];
           const amount = suppCap ? Math.min(suppCap, rawAmount) : (f ? snapPortionG(f, rawAmount) : rawAmount);
           const r = amount / 100;
-          targetMeal.items.push({ name: f.name, id: f.id, amount, kcal: Math.round((f.kcal || 0) * r), p: Math.round((f.protein || 0) * r), f: Math.round((f.fat || 0) * r), c: Math.round((f.carbs || 0) * r) });
+          targetMeal.items.push({ name: f.name, id: f.id, amount, kcal: (() => { const p = Math.round((f.protein || 0) * r), f2 = Math.round((f.fat || 0) * r), c = Math.round((f.carbs || 0) * r); return Math.round(4 * p + 9 * f2 + 4 * c); })(), p: Math.round((f.protein || 0) * r), f: Math.round((f.fat || 0) * r), c: Math.round((f.carbs || 0) * r) });
           targetMeal.totals = { kcal: targetMeal.items.reduce((s: number, i: any) => s + i.kcal, 0), p: targetMeal.items.reduce((s: number, i: any) => s + i.p, 0), f: targetMeal.items.reduce((s: number, i: any) => s + i.f, 0), c: targetMeal.items.reduce((s: number, i: any) => s + i.c, 0) };
           return true;
         };
@@ -3339,7 +3349,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const r = topUpGrams / 100;
             m.items.push({
               name: mpsWhey.name, id: mpsWheyId, amount: topUpGrams,
-              kcal: Math.round(mpsWhey.kcal * r), p: Math.round(mpsWhey.protein * r),
+              kcal: (() => { const p = Math.round(mpsWhey.protein * r), f = Math.round(mpsWhey.fat * r), c = Math.round(mpsWhey.carbs * r); return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round(mpsWhey.protein * r),
               f: Math.round(mpsWhey.fat * r), c: Math.round(mpsWhey.carbs * r)
             });
             m.totals = {
@@ -3427,7 +3437,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           if (fb && !m.items.some((it:any)=> it.id===fb.id)) {
             const grams = 30;
             const r = grams/100;
-            m.items.push({ name: fb.name, id: fb.id, amount: grams, kcal: Math.round((fb.kcal||0)*r), p: Math.round((fb.protein||0)*r), f: Math.round((fb.fat||0)*r), c: Math.round((fb.carbs||0)*r) });
+            m.items.push({ name: fb.name, id: fb.id, amount: grams, kcal: (() => { const p = Math.round((fb.protein||0)*r), f = Math.round((fb.fat||0)*r), c = Math.round((fb.carbs||0)*r); return Math.round(4*p+9*f+4*c); })(), p: Math.round((fb.protein||0)*r), f: Math.round((fb.fat||0)*r), c: Math.round((fb.carbs||0)*r) });
             m.totals = { kcal: m.items.reduce((s:any,i:any)=>s+i.kcal,0), p: m.items.reduce((s:any,i:any)=>s+i.p,0), f: m.items.reduce((s:any,i:any)=>s+i.f,0), c: m.items.reduce((s:any,i:any)=>s+i.c,0) };
           }
         }

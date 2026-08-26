@@ -94,16 +94,19 @@ function scaleToRecipeKcal(items: MealItem[], recipe: Recipe): MealItem[] {
   if (Math.abs(scale - 1) < 0.05) return items; // ±5% — не масштабируем
   return items.map(it => {
     const newAmount = Math.max(5, Math.round(it.amount * scale / 5) * 5);
-    const r = newAmount / (it.amount || 1);
+    const r2 = newAmount / (it.amount || 1);
+    const p = Math.round(it.p * r2 * 10) / 10;
+    const f = Math.round(it.f * r2 * 10) / 10;
+    const c = Math.round(it.c * r2 * 10) / 10;
     return {
       ...it,
       amount: newAmount,
-      kcal: Math.round(it.kcal * r),
-      p: Math.round(it.p * r * 10) / 10,
-      f: Math.round(it.f * r * 10) / 10,
-      c: Math.round(it.c * r * 10) / 10,
-      fiber: Math.round((it.fiber || 0) * r * 10) / 10,
-      leucine_mg: Math.round((it.leucine_mg || 0) * r),
+      kcal: Math.round(4 * p + 9 * f + 4 * c),
+      p,
+      f,
+      c,
+      fiber: Math.round((it.fiber || 0) * r2 * 10) / 10,
+      leucine_mg: Math.round((it.leucine_mg || 0) * r2),
     };
   });
 }
@@ -189,12 +192,17 @@ function roleForFood(food: FoodItem): MealItem['role'] {
 function makeMealItem(food: FoodItem, grams: number, role: MealItem['role']): MealItem {
   const cleanGrams = Math.max(5, Math.round(grams / 5) * 5);
   const r = cleanGrams / 100;
+  const p = Math.round((food.protein || 0) * r * 10) / 10;
+  const f = Math.round((food.fat || 0) * r * 10) / 10;
+  const c = Math.round((food.carbs || 0) * r * 10) / 10;
+  // KBЖУ-консистентность ≤3%: kcal из формулы (FOOD_DB-дрейф не наследуем)
+  const kcal = Math.round(4 * p + 9 * f + 4 * c);
   return {
     id: food.id, name: food.name, amount: cleanGrams, role,
-    kcal: Math.round((food.kcal || 0) * r),
-    p: Math.round((food.protein || 0) * r * 10) / 10,
-    f: Math.round((food.fat || 0) * r * 10) / 10,
-    c: Math.round((food.carbs || 0) * r * 10) / 10,
+    kcal,
+    p,
+    f,
+    c,
     fiber: Math.round((food.fiber || 0) * r * 10) / 10,
     leucine_mg: 0,
   };

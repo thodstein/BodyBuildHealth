@@ -916,12 +916,18 @@ function makeItem(food: FoodItem, grams: number, role: MealItem['role']): MealIt
   // FIX: snap к человеческой сетке (протеин 30/60/90, молоко 250/500, масло 5/10/15, каша 50/100/125/150/200/250)
   const cleanGrams = snapPortionG(food, grams);
   const r = cleanGrams / 100;
+  const p = Math.round((food.protein || 0) * r);
+  const f = Math.round((food.fat || 0) * r);
+  const c = Math.round((food.carbs || 0) * r);
+  // KBЖУ-консистентность ≤3%: kcal items ВСЕГДА из формулы 4Б+9Ж+4У (у ~56% FOOD_DB
+  // табличный kcal дрейфует до десятков % — план наследовал этот разброс).
+  const kcal = Math.round(4 * p + 9 * f + 4 * c);
   return {
     id: food.id, name: food.name, amount: cleanGrams, role,
-    kcal: Math.round((food.kcal || 0) * r),
-    p: Math.round((food.protein || 0) * r),
-    f: Math.round((food.fat || 0) * r),
-    c: Math.round((food.carbs || 0) * r),
+    kcal,
+    p,
+    f,
+    c,
     fiber: Math.round((food.fiber || 0) * r),
     leucine_mg: Math.round(getLeucine(food) * r),
   };
@@ -2436,7 +2442,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (fb && !m.items.some((it:any)=> it.id===fb.id)) {
         const grams = Math.min(carbPortionCap(fb), 30);
         const r = grams/100;
-        const it: MealItem = { id: fb.id, name: fb.name, amount: grams, role: 'carb_slow' as const, kcal: Math.round((fb.kcal||0)*r), p: Math.round((fb.protein||0)*r), f: Math.round((fb.fat||0)*r), c: Math.round((fb.carbs||0)*r), fiber: Math.round((fb.fiber||0)*r), leucine_mg: Math.round(getLeucine(fb)*r) };
+        const pN = Math.round((fb.protein||0)*r), fN = Math.round((fb.fat||0)*r), cN = Math.round((fb.carbs||0)*r);
+        const it: MealItem = { id: fb.id, name: fb.name, amount: grams, role: 'carb_slow' as const, kcal: Math.round(4*pN+9*fN+4*cN), p: pN, f: fN, c: cN, fiber: Math.round((fb.fiber||0)*r), leucine_mg: Math.round(getLeucine(fb)*r) };
         m.items.push(it);
         m.totals = m.items.reduce((acc:any, it:any)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+(it.fiber||0),leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
       }
@@ -3039,6 +3046,42 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
       totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
       totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+  }
+
+  // KBЖУ-посадка дня по ккал (≤3% консистентность + сходимость к цели): формула-нормализация
+  // item'ов подняла kcal у части профилей (FOOD_DB-дрейф) — жадно ужаем самые калорийные
+  // НЕ-белковые порции на 15% за шаг, пока день не войдёт в ±6% от цели.
+  {
+    const goalK = input.goalKcal || 0;
+    let guard = 50;
+    const dayK = () => meals.reduce((s, m) => s + m.totals.kcal, 0);
+    while (goalK > 0 && dayK() > goalK * 1.04 && guard-- > 0) {
+      let bMi = -1, bIi = -1, bSaved = 0;
+      meals.forEach((m, mi) => (m.items || []).forEach((it, ii) => {
+        const role = (it as any).role || '';
+        if (role === 'protein' || role === 'slow_protein' || role === 'fast_protein') return;
+        if ((it.amount || 0) < 30) return;
+        const saved = (it.kcal || 0) * 0.12;
+        if (saved > bSaved) { bSaved = saved; bMi = mi; bIi = ii; }
+      }));
+      if (bIi < 0 || bSaved < 20) break;
+      const meal = meals[bMi];
+      const it = meal.items[bIi];
+      const na = Math.max(20, Math.round(it.amount * 0.88));
+      const r2 = na / (it.amount || 1);
+      it.p = +(it.p * r2).toFixed(1); it.f = +(it.f * r2).toFixed(1); it.c = +(it.c * r2).toFixed(1);
+      it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+      it.amount = na;
+      it.fiber = Math.round((it.fiber || 0) * r2 * 10) / 10;
+      it.leucine_mg = Math.round((it.leucine_mg || 0) * r2);
+      meal.totals = meal.items.reduce((acc, x) => ({ kcal: acc.kcal + x.kcal, p: acc.p + x.p, f: acc.f + x.f, c: acc.c + x.c, fiber: acc.fiber + (x.fiber || 0), leucine_mg: acc.leucine_mg + (x.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+    }
+    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+    totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
+    totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
+    totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
+    totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+    totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
   }
 
   return {

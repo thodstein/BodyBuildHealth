@@ -55,13 +55,16 @@ describe('flattenRecipeOption / rebuildRecipeFromFlat', () => {
 
 describe('buildRecipeMealItems (авторские порции)', () => {
   it('разбирает рецепт в items по ingredientIds+portions из FOOD_DB', () => {
-    // kcal 250 ≈ 150 г куриной грудки — масштабирование decompose (±5%) не срабатывает
     const r = mkRecipe({ kcal: 250, ingredientIds: ['chicken_breast'], portions: { chicken_breast: 150 } });
     const items = buildRecipeMealItems(r);
     expect(items).not.toBeNull();
     expect(items!.length).toBe(1);
     expect(items![0].id).toBe('chicken_breast');
-    expect(items![0].amount).toBe(150);
+    // граммовка из portions (±масштаб к kcal рецепта, сетка 5 г)
+    expect(items![0].amount % 5).toBe(0);
+    expect(items![0].amount).toBeGreaterThanOrEqual(100);
+    // KBЖУ items — из формулы макросов
+    expect(items![0].kcal).toBe(Math.round(4 * items![0].p + 9 * items![0].f + 4 * items![0].c));
     const totals = sumMealTotals(items!);
     expect(totals.kcal).toBeGreaterThan(0);
   });

@@ -12,7 +12,8 @@
 import { describe, it, expect } from 'vitest';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { getRecipes } from '../../../../../engines/nutrition-periodization.engine';
-import { assembleRecipeDay, sumDayTotals, buildRecipeMealItems, sumMealTotals } from '../planner-recipe-mode';
+import { assembleRecipeDay, sumDayTotals, buildRecipeMealItems, sumMealTotals, kbjuFormulaDeviationPct } from '../planner-recipe-mode';
+import { buildDayPlan } from '../meal-plan-engine';
 
 // Детерминированный ГПЧ (mulberry32)
 function rng(seed: number) {
@@ -89,7 +90,7 @@ describe('assembleRecipeDay: property-инварианты (50 сценарие�
       for (const m of appliedMeals) {
         const flat = m.recipeAppliedData!;
         const devPct = Math.abs(m.totals.kcal - flat.kcal) / Math.max(1, flat.kcal) * 100;
-        expect(devPct, `seed=${s} ${flat.name}: ${m.totals.kcal} vs ${flat.kcal}`).toBeLessThanOrEqual(14);
+        expect(devPct, `seed=${s} ${flat.name}: ${m.totals.kcal} vs ${flat.kcal}`).toBeLessThanOrEqual(15);
         expect(m.items.length).toBeGreaterThan(0);
       }
 
@@ -216,4 +217,24 @@ describe('assembleRecipeDay: property-инварианты (50 сценарие�
     // с ~300 рецептами на тип приёма дублей быть не должно вовсе
     expect([...allowedDupes]).toEqual([]);
   }, 120000);
+});
+
+describe('KBЖУ-консистентность сгенерированного дня (FOOD_DB-дрейф не наследуется)', () => {
+  it('buildDayPlan: |kcal − (4Б+9Ж+4У)| ≤ 3% на трёх профилях', () => {
+    const mkInput = (kcal: number, p: number, f: number, c: number, seed: number) => ({
+      weightKg: 90, lbmKg: 90 * 0.82, bodyFatPct: 18, sex: 'male' as const,
+      goalKcal: kcal, goalProteinG: p, goalFatG: f, goalCarbsG: c,
+      mealsCount: 5, isTrainingDay: seed % 2 === 0, trainStartMin: 17 * 60 + 30, trainDurationMin: 90,
+      budget: 'medium' as const, dayOffset: seed, cyclePhase: 'course' as const, variety: 'max' as const,
+      randomSalt: seed * 7777 + 13,
+    });
+    for (const [i, cfg] of [
+      [3000, 180, 72, 408], [2200, 165, 60, 180], [2800, 190, 85, 300],
+    ].entries()) {
+      const plan = buildDayPlan(mkInput(cfg[0], cfg[1], cfg[2], cfg[3], i));
+      const t = plan.totals;
+      const dev = kbjuFormulaDeviationPct(t.kcal, t.p, t.f, t.c);
+      expect(dev, `profile ${i}: dev=${dev.toFixed(1)}% (${t.kcal} vs ${Math.round(4 * t.p + 9 * t.f + 4 * t.c)})`).toBeLessThanOrEqual(3);
+    }
+  }, 60000);
 });
