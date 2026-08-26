@@ -6,6 +6,7 @@ import { calcNutrition } from '../../engines/nutrition.engine';
 import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
+import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../engines/retail-search.engine';
 import { IndividualPlan } from './NutritionScreen_parts/IndividualPlan';
 import { NutritionReference } from './NutritionScreen_parts/NutritionReference';
 import { addToCart, getCarts, saveCarts, getActiveStoreId, setActiveStoreId, CART_CAT_LABELS, CartStore, CartItemEnhanced } from '../../core/nutrition-utils';
@@ -309,6 +310,8 @@ const CatalogTab: React.FC = () => {
   }, [catFilter, catSearch, showExclusive, allFoods]);
   const [catInternet, setCatInternet] = React.useState<any[]>([]);
   const [catSearching, setCatSearching] = React.useState(false);
+  const [catRetail, setCatRetail] = React.useState<RetailProduct[]>([]);
+  const [catSearchingRetail, setCatSearchingRetail] = React.useState(false);
   React.useEffect(() => {
     const q = catSearch.trim();
     if (!q || q.length < 3) { setCatInternet([]); return; }
@@ -320,6 +323,16 @@ const CatalogTab: React.FC = () => {
       const mapped = res.map(productToFoodItem as any).filter((f:any)=> f && f.kcal > 0).slice(0, 6);
       setCatInternet(mapped);
     }).catch(()=>{ if(!cancelled) setCatInternet([]); }).finally(()=>{ if(!cancelled) setCatSearching(false); });
+    return () => { cancelled = true; };
+  }, [catSearch]);
+  React.useEffect(() => {
+    const q = catSearch.trim();
+    if (!q || q.length < 3 || filtered.length >= 6) { setCatRetail([]); return; }
+    let cancelled = false;
+    setCatSearchingRetail(true);
+    searchRetailProducts(q, 9).then(res => {
+      if (!cancelled) setCatRetail(res.available ? res.items.slice(0, 9) : []);
+    }).catch(() => { if (!cancelled) setCatRetail([]); }).finally(() => { if (!cancelled) setCatSearchingRetail(false); });
     return () => { cancelled = true; };
   }, [catSearch]);
   const toggleExpanded = (id: string) => setCatExpanded(prev => prev === id ? null : id);
@@ -467,7 +480,46 @@ const CatalogTab: React.FC = () => {
         </div>
       </div>
     )}
-    {filtered.length===0 && catInternet.length===0 && !catSearching && <div style={{ ...modernCardBg, padding:24, textAlign:'center' }}><div style={{fontSize:22}}>🔍</div><div style={{fontSize:12,fontWeight:700,color:'#fff',marginTop:6}}>Ничего не нашлось</div><div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:4}}>Попробуй сбросить фильтр или изменить запрос — или проверь написание «Ратимир»</div></div>}
+    {(catSearchingRetail || catRetail.length > 0) && (
+      <div style={{ ...modernCardBg, padding:12 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>🏪 Супермаркеты РФ {catRetail.length > 0 && <span style={{ fontSize:9, padding:'2px 6px', borderRadius:999, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)' }}>{catRetail.length}</span>}</div>
+        {catSearchingRetail && catRetail.length === 0 && <div style={{ textAlign:'center', fontSize:11, color:'rgba(0,230,138,0.8)', padding:8 }}>🏪 Ищем в каталогах сетей…</div>}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:8 }}>
+          {catRetail.map(p => {
+            const meta = RETAIL_CHAINS[p.source];
+            return (
+              <div key={`${p.source}-${p.id}`} style={{ padding:12, borderRadius:16, background:'#202023', border:'1px solid rgba(0,230,138,0.10)', boxShadow:'0 4px 16px rgba(0,0,0,0.16)', display:'flex', flexDirection:'column', gap:8 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <span style={{ fontSize:9, fontWeight:700, padding:'3px 7px', borderRadius:999, background:`${meta.color}1c`, color:meta.color, border:`1px solid ${meta.color}35`, whiteSpace:'nowrap' }}>{meta.emoji} {meta.label}</span>
+                      <span style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:1.2 }}>{p.name}</span>
+                    </div>
+                    <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:3 }}>{[p.brand, p.weight].filter(Boolean).join(' • ') || meta.label} • на 100 г</div>
+                  </div>
+                  <span style={{ fontSize:8, fontWeight:800, padding:'2px 6px', borderRadius:999, background:'rgba(0,230,138,0.12)', color:'#00e68a', border:'1px solid rgba(0,230,138,0.18)' }}>🏪</span>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6 }}>
+                  {[
+                    {l:'ккал',v:p.kcal,col:'#00e68a',bg:'rgba(0,230,138,0.08)'},
+                    {l:'Б',v:p.protein,col:'#60a5fa',bg:'rgba(96,165,250,0.08)'},
+                    {l:'Ж',v:p.fat,col:'#fbbf24',bg:'rgba(251,191,36,0.08)'},
+                    {l:'У',v:p.carbs,col:'#fb923c',bg:'rgba(251,146,60,0.08)'},
+                  ].map(b => (
+                    <div key={b.l} style={{ background:b.bg, border:`1px solid ${b.col}18`, borderRadius:10, padding:'5px 2px', textAlign:'center' }}>
+                      <div style={{ fontSize:7, fontWeight:700, color:'rgba(255,255,255,0.45)', letterSpacing:0.3, textTransform:'uppercase' }}>{b.l}</div>
+                      <div style={{ fontSize:11, fontWeight:800, color:b.col }}>{b.v}</div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => addFav({ id: `retail:${p.source}:${p.id}`, name: p.name, kcal: p.kcal, protein: p.protein, fat: p.fat, carbs: p.carbs })} style={{ width:'100%', padding:'7px 8px', borderRadius:10, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:10, fontWeight:600 }}>⭐ В избранное</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+    {filtered.length===0 && catInternet.length===0 && catRetail.length===0 && !catSearching && !catSearchingRetail && <div style={{ ...modernCardBg, padding:24, textAlign:'center' }}><div style={{fontSize:22}}>🔍</div><div style={{fontSize:12,fontWeight:700,color:'#fff',marginTop:6}}>Ничего не нашлось</div><div style={{fontSize:10,color:'rgba(255,255,255,0.5)',marginTop:4}}>Попробуй сбросить фильтр или изменить запрос — или проверь написание «Ратимир»</div></div>}
   </div>);
 };
 const RecipesTab = RecipesTabModern;

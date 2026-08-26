@@ -92,3 +92,5 @@ src/docs/training-block-architecture.md
 exercise-catalog_from_backup.ts
 training-periodization.engine_from_backup.ts
 training.engine_from_backup.ts
+.tmp/
+supabase/.temp/

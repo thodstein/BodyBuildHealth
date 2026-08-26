@@ -4,6 +4,7 @@ import { CAT_MAP_EMOJI } from '../../../../core/nutrition-utils';
 import { type FoodItemLike } from '../NutritionDiary';
 import { BarcodeScanner } from '../../../components/BarcodeScanner';
 import { type OFFProduct, productToFoodItem, searchByName as searchOFF } from '../../../../engines/openfoodfacts.engine';
+import { RETAIL_CHAINS, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../../../engines/retail-search.engine';
 import { processUploadedFile } from '../../../../core/ocr-engine';
 import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
 import { readDiaryV2 } from '../diary-storage-v2';
@@ -103,6 +104,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   });
   const [internetResults, setInternetResults] = useState<any[]>([]);
   const [isSearchingNet, setIsSearchingNet] = useState(false);
+  const [retailResults, setRetailResults] = useState<RetailProduct[]>([]);
+  const [isSearchingRetail, setIsSearchingRetail] = useState(false);
 
   useEffect(() => {
     if (debouncedSearch.trim() && foodSearchResults.length>0) {
@@ -145,6 +148,17 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       const mapped = res.map(productToFoodItem as any).filter((f: any) => f && f.kcal > 0).slice(0, 6);
       setInternetResults(mapped);
     }).catch(() => { if (!cancelled) setInternetResults([]); }).finally(() => { if (!cancelled) setIsSearchingNet(false); });
+    return () => { cancelled = true; };
+  }, [debouncedSearch]);
+
+  useEffect(() => {
+    const q = debouncedSearch.trim();
+    if (!q || q.length < 3) { setRetailResults([]); return; }
+    let cancelled = false;
+    setIsSearchingRetail(true);
+    searchRetailProducts(q, 9).then(res => {
+      if (!cancelled) setRetailResults(res.available ? res.items.slice(0, 9) : []);
+    }).catch(() => { if (!cancelled) setRetailResults([]); }).finally(() => { if (!cancelled) setIsSearchingRetail(false); });
     return () => { cancelled = true; };
   }, [debouncedSearch]);
 
@@ -214,6 +228,47 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             ))}
           </div>
         )}
+        {(isSearchingRetail || retailResults.length > 0) && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: '#00e68a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>🏪 Супермаркеты РФ</span>
+              {retailResults.length > 0 && (
+                <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.18)' }}>{retailResults.length}</span>
+              )}
+            </div>
+            {isSearchingRetail && retailResults.length === 0 && (
+              <div style={{ fontSize: 10, color: 'rgba(0,230,138,0.8)', textAlign: 'center', padding: '8px 10px', background: 'rgba(0,230,138,0.05)', borderRadius: 8, border: '1px solid rgba(0,230,138,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <span style={{ width: 12, height: 12, border: '2px solid rgba(0,230,138,0.3)', borderTop: '2px solid #00e68a', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                🏪 Ищем в каталогах сетей…
+              </div>
+            )}
+            {retailResults.length > 0 && (
+              <div style={{ maxHeight: 220, overflowY: 'auto', borderRadius: 10, background: '#202023', border: '1px solid rgba(0,230,138,0.12)' }}>
+                {retailResults.map(p => {
+                  const meta = RETAIL_CHAINS[p.source];
+                  return (
+                    <div key={`${p.source}-${p.id}`} style={{ padding: '10px 12px', fontSize: 11, borderBottom: '1px solid rgba(0,230,138,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', minHeight: 48, background: 'rgba(0,230,138,0.03)', borderRadius: 8, margin: '2px 4px' }} onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,230,138,0.08)'; }} onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,230,138,0.03)'; }}>
+                      <div onClick={() => onAddFoodFromDB(retailToFoodItem(p) as any)} role="button" aria-label={`Добавить ${p.name} из ${meta.label}`} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 999, background: `${meta.color}1c`, color: meta.color, border: `1px solid ${meta.color}35`, whiteSpace: 'nowrap', flexShrink: 0 }}>{meta.emoji} {meta.label}</span>
+                        <span style={{ fontWeight: 600, flex: 1, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}{p.brand ? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400, fontSize: 10 }}> • {p.brand}</span> : null}</span>
+                        <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.7)', flexShrink: 0 }}>
+                          <span style={{ color: '#00e68a', fontWeight: 700 }}>{p.kcal}</span>
+                          <span style={{ color: '#3b82f6' }}>Б{p.protein}</span>
+                          <span style={{ color: '#f59e0b' }}>Ж{p.fat}</span>
+                          <span style={{ color: '#f97316' }}>У{p.carbs}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, marginLeft: 8, flexShrink: 0 }}>
+                        <button onClick={() => onAddFoodFromDB(retailToFoodItem(p) as any)} title="В очередь (потом Сохранить)" style={{ padding: '5px 8px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 10, cursor: 'pointer', minHeight: 28 }}>＋</button>
+                        {onDirectAdd && <button onClick={() => onDirectAdd(retailToFoodItem(p) as any)} title={`Сразу в ${mealType || 'дневник'} 100г`} style={{ padding: '5px 9px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 28 }}>⚡ 100г</button>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         {isSearchingNet && (
           <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(96,165,250,0.8)', textAlign: 'center', padding: '8px 10px', background: 'rgba(59,130,246,0.06)', borderRadius: 8, border: '1px solid rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <span style={{ width: 12, height: 12, border: '2px solid rgba(96,165,250,0.3)', borderTop: '2px solid #60a5fa', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
@@ -248,7 +303,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             </div>
           </div>
         )}
-        {debouncedSearch.trim() && foodSearchResults.length===0 && internetResults.length===0 && !isSearchingNet && (
+        {debouncedSearch.trim() && foodSearchResults.length===0 && internetResults.length===0 && retailResults.length===0 && !isSearchingNet && !isSearchingRetail && (
           <div style={{ marginTop:8, fontSize:10, color:'rgba(255,255,255,0.4)', textAlign:'center', padding:'8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>Ничего не найдено — попробуйте другое написание или создайте <span style={{ color:'#8b5cf6' }}>свою еду</span></div>
         )}
         {!debouncedSearch.trim() && history.length>0 && (

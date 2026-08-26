@@ -1,5 +1,69 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Питание: живой поиск продуктов супермаркетов РФ — ВкусВилл/Пятёрочка/Магнит с КБЖУ (Aug 26 2026, uncommitted)
+
+«Как FatSecret»: в дневнике питания и каталоге любой продукт из сетей ищется по имени,
+КБЖУ на 100 г приходит из каталогов магазинов в момент поиска (не краудсорсинг — база это
+сами каталоги; FatSecret отпал: free-тариф только US).
+
+- **`src/engines/retail-search.engine.ts`** (NEW): `searchRetailProducts(query, limit)` → POST на
+  Edge Function `retail-search` (apikey+Bearer anon), `RetailProduct {id, source: vkusvill|pyaterochka|magnit,
+  name, brand?, kcal/protein/fat/carbs на 100 г, weight?}`; `sanitizeRetailItems` (валидация сети/имени/
+  kcal>0, дедуп сеть+имя, round1); кэш localStorage `he_retail_search_cache_v1` (TTL 24 ч, кап 40 запросов,
+  негативные ответы тоже кэшируются); без конфига Supabase / HTTP-ошибка / таймаут → `{available:false}`
+  тихо (секция не показывается, OFF-путь работает как раньше); `RETAIL_CHAINS` (лейбл/эмодзи/цвет),
+  `guessRetailCategory` (снэки чипсы/снеки приоритетно fast_food до dairy «вкус сыра»),
+  `retailToFoodItem` → FoodItemLike (`id retail:<source>:<id>`, servingSize строго «100 г» для дневной
+  математики, описание «Сеть • Бренд • вес»).
+- **`supabase/functions/retail-search/index.ts`** (NEW, Deno без зависимостей): CORS + POST {query,limit≤20};
+  адаптеры через `Promise.allSettled`, merge round-robin по источникам, дедуп:
+  - **ВкусВилл** — официальный анонимный MCP-API `mcp.vkusvill.ru/mcp` (fallback mcp001): JSON-RPC
+    initialize (session из заголовка Mcp-Session-Id) → notifications/initialized → tools/call
+    `vkusvill_products_search` {q,page,sort:popular} → детали топ-N через `vkusvill_product_details`
+    (аргументы product_id→id fallback); ответ JSON или SSE (парс последних data:{...} строк);
+    КБЖУ regex'ами из текста свойств (калорийность/белки/жиры с lookahead (?!ность)/углеводы,
+    «около N», kcal = Б×4+Ж×9+У×4 при отсутствии);
+  - **Пятёрочка** — `5ka.ru/api/v2/products/search/` (+v4 fallback): КБЖУ сразу в выдаче
+    (nutritional_value.calories/proteins/fats/carbohydrates), UA/Referer заголовки;
+  - **Магнит** — экспериментально, 2 кандидата URL, молча [] при неудаче.
+  `clampMacros` отбрасывает мусор (kcal 0–950, макросы ≤100); таймауты 8–9 c. Деплой вручную
+  пользователем (Dashboard → Edge Functions → вставить index.ts, имя строго `retail-search`) —
+  инструкция + curl-проверка в `docs/RETAIL-SEARCH.md`; миграций SQL НЕ требует.
+- **UI дневника** (`AddFoodPanel.tsx`): параллельный эффект (q≥3, debounce уже есть) → секция
+  «🏪 Супермаркеты РФ» между локальными результатами и OFF-блоком: чип сети в цвете сети,
+  название + серый бренд, КБЖУ-строка, кнопки «＋» (в очередь) и «⚡ 100г» (direct add) через
+  `retailToFoodItem`; спиннер «Ищем в каталогах сетей…»; empty-state учитывает retail-состояния.
+- **UI каталога** (`NutritionScreen.tsx` CatalogTab): тот же триггер что OFF (filtered<6), карточки-
+  гриды как у catInternet с зелёным стилем, бейдж сети, «⭐ В избранное» (id retail:*), пустое
+  состояние обновлено.
+- Тесты NEW `retail-search.test.ts` **13/13** (vi.stubEnv+resetModules+dynamic import для env-зависимого
+  модуля: нормализация ё/пробелы, категории ×9, маппинг food-item, sanitize дедуп/мусор, no-env
+  available:false без fetch, короткий запрос, успех+кэш (1 fetch на 2 вызова), TTL-истечение, 500 не
+  кэшируется, network-fail, мусор в ответе, clearRetailCache).
+- Проверено: tsc 0 по моим файлам (1 чужая ошибка ProgramManagerPanel setManualMode — WIP другого);
+  NutritionScreen_parts **406/423** — 17 падений пред-существующие/чужие (planner-convergence/
+  dietology/d28/preferred/planner числовая сходимость движка, FrequentFoodsPanel — мои файлы ни один
+  тест-файл не импортирует). **Диск C: был переполнен (ENOSPC валит сюиты)** — очищен Temp старше 2д
+  (+1.1 ГБ), тестовые TMP перенесены на D:\BodyBuildHealth\.tmp (в .gitignore).
+- **Деплой выполнен и E2E работает** (CLI `supabase functions deploy` с SUPABASE_ACCESS_TOKEN пользователя,
+  токен отозвать). Отладка: (1) sort должен быть `popularity` (не popular — enum MCP); выдача в
+  `data.items[]` с КБЖУ прямо в `properties[]` («Пищевая…ценность в 100 г»: «белки 6.4 г, …; 549.3 ккал»)
+  → детали почти не нужны (fallback при <3 распарсенных, аргумент деталей = `id`); (2) корень пустых
+  ответов — сдвиг аргументов в mcpPost (строка метода попадала в body, объект параметров в diag);
+  (3) PowerShell-тесты ломали JSON (`\"`) — только --data-binary @file. `&nbsp;` в названиях чистится.
+  Ответ функции несёт `debug[]`. **Пятёрочка: HTTP 403 анти-бот на датацентровые IP — недоступна с Supabase;
+  Магнит: публичный API не найден** — оба адаптера остаются best-effort, основной поток даёт ВкусВилл.
+  supabase/config.toml создан (project_id), .env.local почищен от BOM (ломал CLI).
+  MCP ВкусВилла также имеет `vkusvill_product_barcode {barcode}` — задел на штрихкоды сетей.
+- **Аудит остальных сетей РФ (Aug 26, все закрыты)**: Ашан `/v1/catalog/products` → WAF «Access
+  Blocked» даже с полными браузерными заголовками; Перекрёсток → капча+cookie+Auth (perekrestok_api
+  требует Playwright/Camoufox); Лента api/v1 → 401; Азбука Вкуса services-api.av.ru/search и
+  av.ru/rest/v1 → SPA HTML; Чижик → stealth-анти-бот; О'КЕЙ/Утконос/Метро → блокировка/401/логин.
+  ВкусВилл остаётся единственным открытым источником. **Штрихкод-режим внедрён**: edge {barcode}
+  → vkusvillProductByBarcode (строго EAN-13, `^\\d{13}$`); клиент `searchRetailProductByBarcode()`
+  (кэш `bc:<ean>` 24ч) подключён в BarcodeScanner после OFF: OFF → Supabase shared → retail-barcode →
+  ручной ввод. Тесты движка **15/15** (+2 barcode).
+
 ## Кардио: пакеты A–D — валидация журнала, undo, работа дня, советы по рабочим неделям (Aug 20 2026, pushed 3ccc5af0)
 
 Поверх дней ног: комплексная доводка кардио-конструктора и дневника по плану A–D.

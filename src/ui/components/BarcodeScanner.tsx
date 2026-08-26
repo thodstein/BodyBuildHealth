@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { searchByBarcode, searchByName, saveToCache, type OFFProduct } from '../../engines/openfoodfacts.engine';
+import { guessRetailCategory, searchRetailProductByBarcode } from '../../engines/retail-search.engine';
 
 interface Props {
   onProductFound: (product: OFFProduct) => void;
@@ -38,12 +39,31 @@ export const BarcodeScanner: React.FC<Props> = ({ onProductFound, onClose }) => 
       if (product) {
         onProductFoundRef.current(product);
         onCloseRef.current();
-      } else {
-        const isRu = /^46/.test(bc);
-        setError(isRu
-          ? `Продукт 46… (РФ) не найден в ru.openfoodfacts.org. Попробуйте Поиск по названию или создайте свою еду — сохранится оффлайн.`
-          : 'Продукт не найден в OFF (ru/world/us). Проверьте штрихкод или введите название вручную / создайте свою еду.');
+        return;
       }
+      const retail = await searchRetailProductByBarcode(bc);
+      if (retail) {
+        onProductFoundRef.current({
+          id: bc,
+          barcode: bc,
+          name: retail.name,
+          brand: retail.brand || 'ВкусВилл',
+          category: guessRetailCategory(retail.name),
+          kcal: retail.kcal,
+          protein: retail.protein,
+          fat: retail.fat,
+          carbs: retail.carbs,
+          fiber: 0,
+          servingSize: '100 г',
+          cachedAt: Date.now(),
+        } as OFFProduct);
+        onCloseRef.current();
+        return;
+      }
+      const isRu = /^46/.test(bc);
+      setError(isRu
+        ? `Продукт 46… (РФ) не найден в ru.openfoodfacts.org и каталогах сетей. Попробуйте Поиск по названию или создайте свою еду — сохранится оффлайн.`
+        : 'Продукт не найден (OFF ru/world/us + каталоги сетей). Проверьте штрихкод или введите название вручную / создайте свою еду.');
     } catch {
       setError('Ошибка сети. OFF недоступен — создайте свою еду оффлайн, она сохранится в кэш и найдётся при след. сканировании.');
     } finally {
