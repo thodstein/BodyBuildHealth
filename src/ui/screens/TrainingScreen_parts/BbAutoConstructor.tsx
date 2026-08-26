@@ -88,8 +88,10 @@ import {
   type BBContestPrepConfig, type BBContestPrepResult, type BBContestCategory, type ContestSpecialization,
   type BBContestPrepPlan, type PrepWaterMode, type PrepSodiumMode, type PrepCarbMode, type BBPlanWithPrep,
   type PrepPhaseKey, type ContestEventEntry, type PeakNutritionBase,
+  type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy,
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded } from '../../../engines/bb/bb-contest-prep-sync';
+import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
 import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
@@ -238,9 +240,9 @@ export interface AnnualBlockCtxToPrepPatch {
   prepShowDate: string;
   prepTaperWeeks: number;
   prepWeeks: number;
-  prepWaterMode: PrepWaterMode;
-  prepSodiumMode: PrepSodiumMode;
-  prepCarbMode: PrepCarbMode;
+  prepWaterMode: WaterStrategy;
+  prepSodiumMode: SodiumStrategy;
+  prepCarbMode: CarbLoadStrategy;
   prepConfirmedManip: boolean;
 }
 
@@ -258,9 +260,9 @@ export function annualBlockCtxToPrepPatch(
     prepShowDate: cfg.showDate ?? isoAddDays(isoToday(), 8 * 7),
     prepTaperWeeks: Number.isFinite(cfg.weeksOut) ? Math.min(4, Math.max(1, Math.round(cfg.weeksOut!))) : 2,
     prepWeeks: ctx.weeks && ctx.weeks > 0 ? Math.min(52, Math.max(1, Math.round(ctx.weeks))) : 12,
-    prepWaterMode: cfg.waterStrategy === 'moderate' ? 'moderate' : 'stable',
-    prepSodiumMode: cfg.sodiumStrategy === 'cut_2d' || cfg.sodiumStrategy === 'cut_3d' ? 'moderate' : 'stable',
-    prepCarbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate',
+    prepWaterMode: (cfg.waterStrategy as WaterStrategy) || 'minimal',
+    prepSodiumMode: (cfg.sodiumStrategy as SodiumStrategy) || 'constant',
+    prepCarbMode: (cfg.carbLoadStrategy as CarbLoadStrategy) || 'moderate',
     prepConfirmedManip: !!cfg.confirmedManipulation,
   };
 }
@@ -613,9 +615,12 @@ export const BbAutoConstructor: React.FC = () => {
   });
   const [prepWeeks, setPrepWeeks] = useState<number>(12);
   const [prepTaperWeeks, setPrepTaperWeeks] = useState<number>(2);
-  const [prepWaterMode, setPrepWaterMode] = useState<PrepWaterMode>('stable');
-  const [prepSodiumMode, setPrepSodiumMode] = useState<PrepSodiumMode>('stable');
-  const [prepCarbMode, setPrepCarbMode] = useState<PrepCarbMode>('moderate');
+  const [prepWaterMode, setPrepWaterMode] = useState<WaterStrategy>('minimal');
+  const [prepSodiumMode, setPrepSodiumMode] = useState<SodiumStrategy>('constant');
+  const [prepCarbMode, setPrepCarbMode] = useState<CarbLoadStrategy>('moderate');
+  const [prepTrainingProtocol, setPrepTrainingProtocol] = useState<PeakingProtocol>('bb');
+  const [prepPreferLowFiber, setPrepPreferLowFiber] = useState(false);
+  const [prepCreatineStop, setPrepCreatineStop] = useState(false);
   // 🏁 Режим подготовки (тренировочная логика недель подготовки): 1.0 = сохранение
   // (RIR 1–3, без отказа, объём как в плане), 0.85 = поддерживающий объём при дефиците.
   const [prepVolumeMode, setPrepVolumeMode] = useState<number>(1.0);
@@ -672,10 +677,12 @@ export const BbAutoConstructor: React.FC = () => {
       prepCount: 0,
       showDate: prepShowDate,
       weeksOut: Math.min(4, Math.max(1, prepTaperWeeks)),
-      trainingProtocol: 'bb',
-      carbLoadStrategy: prepCarbMode === 'high' ? 'front' : prepCarbMode === 'conservative' ? 'back' : 'moderate',
-      waterStrategy: prepWaterMode === 'moderate' ? 'moderate' : 'minimal',
-      sodiumStrategy: prepSodiumMode === 'moderate' ? 'cut_2d' : 'constant',
+      carbLoadStrategy: prepCarbMode,
+      waterStrategy: prepWaterMode,
+      sodiumStrategy: prepSodiumMode,
+      trainingProtocol: prepTrainingProtocol,
+      preferLowFiberCarbs: prepPreferLowFiber || undefined,
+      creatineStrategy: prepCreatineStop ? 'stop' : undefined,
       confirmedManipulation: prepConfirmedManip || undefined,
       contraindications: allPrepContra.length > 0 ? allPrepContra : undefined,
       specialization: peakSpec === 'none' ? undefined : peakSpec,
@@ -912,9 +919,9 @@ export const BbAutoConstructor: React.FC = () => {
         setPrepWeeks(migrated.preparation.weeks);
         setPrepTaperWeeks(migrated.taper.weeks);
         setPeakWeekCategory(migrated.category);
-        setPrepWaterMode(migrated.peakWeek.waterMode);
-        setPrepSodiumMode(migrated.peakWeek.sodiumMode);
-        setPrepCarbMode(migrated.peakWeek.carbMode);
+        setPrepWaterMode(migrated.peakWeek.waterMode === 'stable' ? 'minimal' : 'moderate' as WaterStrategy);
+        setPrepSodiumMode(migrated.peakWeek.sodiumMode === 'stable' ? 'constant' : 'cut_2d' as SodiumStrategy);
+        setPrepCarbMode(migrated.peakWeek.carbMode === 'conservative' ? 'back' : migrated.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
         if (migrated.preparation.volumeMult != null) setPrepVolumeMode(migrated.preparation.volumeMult);
         setLastTest(migrated.testPeakWeekId ? latestTestPeakWeek(migrated.id) : null);
         return;
@@ -929,9 +936,9 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepWeeks(stored.preparation.weeks);
       setPrepTaperWeeks(stored.taper.weeks);
       setPeakWeekCategory(stored.category);
-      setPrepWaterMode(stored.peakWeek.waterMode);
-      setPrepSodiumMode(stored.peakWeek.sodiumMode);
-      setPrepCarbMode(stored.peakWeek.carbMode);
+      setPrepWaterMode(stored.peakWeek.waterMode === 'stable' ? 'minimal' : 'moderate' as WaterStrategy);
+      setPrepSodiumMode(stored.peakWeek.sodiumMode === 'stable' ? 'constant' : 'cut_2d' as SodiumStrategy);
+      setPrepCarbMode(stored.peakWeek.carbMode === 'conservative' ? 'back' : stored.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
       if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
       setLastTest(stored.testPeakWeekId ? latestTestPeakWeek(stored.id) : null);
     } catch { /* ignore */ }
@@ -953,9 +960,9 @@ export const BbAutoConstructor: React.FC = () => {
         setPrepWeeks(stored.preparation.weeks);
         setPrepTaperWeeks(stored.taper.weeks);
         setPeakWeekCategory(stored.category);
-        setPrepWaterMode(stored.peakWeek.waterMode);
-        setPrepSodiumMode(stored.peakWeek.sodiumMode);
-        setPrepCarbMode(stored.peakWeek.carbMode);
+        setPrepWaterMode(stored.peakWeek.waterMode === 'stable' ? 'minimal' : 'moderate' as WaterStrategy);
+        setPrepSodiumMode(stored.peakWeek.sodiumMode === 'stable' ? 'constant' : 'cut_2d' as SodiumStrategy);
+        setPrepCarbMode(stored.peakWeek.carbMode === 'conservative' ? 'back' : stored.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
         if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
       } catch {}
     };
@@ -1369,9 +1376,9 @@ export const BbAutoConstructor: React.FC = () => {
     setPrepShowDate(patch.prepShowDate);
     setPrepTaperWeeks(patch.prepTaperWeeks);
     setPrepWeeks(patch.prepWeeks);
-    setPrepWaterMode(patch.prepWaterMode);
-    setPrepSodiumMode(patch.prepSodiumMode);
-    setPrepCarbMode(patch.prepCarbMode);
+    setPrepWaterMode(patch.prepWaterMode as WaterStrategy);
+    setPrepSodiumMode(patch.prepSodiumMode as SodiumStrategy);
+    setPrepCarbMode(patch.prepCarbMode as CarbLoadStrategy);
     setPrepConfirmedManip(patch.prepConfirmedManip);
     setStep('contest');
     flash('🏁 Блок годового плана: пик-неделя предзаполнена — проверьте и соберите Contest prep');
@@ -4775,21 +4782,21 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:8 }}>
             <div>
-              <div style={{ ...SMALL, marginBottom:4 }}>💧 Вода (по умолчанию стабильна)</div>
+              <div style={{ ...SMALL, marginBottom:4 }}>💧 Вода</div>
               <div style={{ display:'flex', gap:6 }}>
-                {(['stable', 'moderate'] as PrepWaterMode[]).map(m => (
+                {(['minimal', 'moderate', 'classic'] as WaterStrategy[]).map(m => (
                   <button key={m} onClick={() => setPrepWaterMode(m)} style={{ ...BTN_GHOST, background: prepWaterMode === m ? 'rgba(59,130,246,0.2)' : 'transparent', borderColor: prepWaterMode === m ? '#3b82f6' : undefined, color: prepWaterMode === m ? '#60a5fa' : undefined }}>
-                    {m === 'stable' ? 'Стабильная' : 'Умеренная'}
+                    {m === 'minimal' ? 'Minimal' : m === 'moderate' ? 'Moderate' : 'Classic load+cut'}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <div style={{ ...SMALL, marginBottom:4 }}>🧂 Натрий (по умолчанию стабилен)</div>
+              <div style={{ ...SMALL, marginBottom:4 }}>🧂 Натрий</div>
               <div style={{ display:'flex', gap:6 }}>
-                {(['stable', 'moderate'] as PrepSodiumMode[]).map(m => (
+                {(['constant', 'cut_2d', 'cut_3d'] as SodiumStrategy[]).map(m => (
                   <button key={m} onClick={() => setPrepSodiumMode(m)} style={{ ...BTN_GHOST, background: prepSodiumMode === m ? 'rgba(245,158,11,0.2)' : 'transparent', borderColor: prepSodiumMode === m ? '#f59e0b' : undefined, color: prepSodiumMode === m ? '#fbbf24' : undefined }}>
-                    {m === 'stable' ? 'Стабильный' : 'Умеренный'}
+                    {m === 'constant' ? 'Constant' : m === 'cut_2d' ? 'Cut 2д' : 'Cut 3д'}
                   </button>
                 ))}
               </div>
@@ -4797,11 +4804,29 @@ export const BbAutoConstructor: React.FC = () => {
             <div>
               <div style={{ ...SMALL, marginBottom:4 }}>🍚 Карб-загрузка</div>
               <div style={{ display:'flex', gap:6 }}>
-                {(['conservative', 'moderate', 'high'] as PrepCarbMode[]).map(m => (
+                {(['back', 'moderate', 'front'] as CarbLoadStrategy[]).map(m => (
                   <button key={m} onClick={() => setPrepCarbMode(m)} style={{ ...BTN_GHOST, background: prepCarbMode === m ? 'rgba(34,197,94,0.2)' : 'transparent', borderColor: prepCarbMode === m ? '#22c55e' : undefined, color: prepCarbMode === m ? '#4ade80' : undefined }}>
-                    {m === 'conservative' ? 'Консервативная' : m === 'moderate' ? 'Умеренная' : 'Высокая'}
+                    {m === 'back' ? 'Back-load' : m === 'moderate' ? 'Классика 3/3' : 'Front-load'}
                   </button>
                 ))}
+              </div>
+            </div>
+            <div>
+              <div style={{ ...SMALL, marginBottom:4 }}>🏋️ Протокол (Библиотека)</div>
+              <div style={{ display:'flex', gap:6, marginBottom:8 }}>
+                {(['bb', 'classic', 'pl'] as PeakingProtocol[]).map(m => (
+                  <button key={m} onClick={() => setPrepTrainingProtocol(m)} style={{ ...BTN_GHOST, background: prepTrainingProtocol === m ? 'rgba(236,72,153,0.2)' : 'transparent', borderColor: prepTrainingProtocol === m ? '#ec4899' : undefined, color: prepTrainingProtocol === m ? '#f472b6' : undefined }}>
+                    {m === 'bb' ? 'BB 4н' : m === 'classic' ? 'Classic WF' : 'PL 3н'}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
+                <label style={{ display:'flex', gap:6, alignItems:'center', fontSize:11, color: prepPreferLowFiber ? '#22c55e' : 'rgba(255,255,255,0.6)', cursor:'pointer' }}>
+                  <input type="checkbox" checked={prepPreferLowFiber} onChange={e => setPrepPreferLowFiber(e.target.checked)} /> Низковолокнистые карбс
+                </label>
+                <label style={{ display:'flex', gap:6, alignItems:'center', fontSize:11, color: prepCreatineStop ? '#f87171' : 'rgba(255,255,255,0.6)', cursor:'pointer' }}>
+                  <input type="checkbox" checked={prepCreatineStop} onChange={e => setPrepCreatineStop(e.target.checked)} /> Стоп креатин
+                </label>
               </div>
             </div>
             <div>
@@ -4819,7 +4844,7 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
             </div>
           </div>
-          {(prepWaterMode === 'moderate' || prepSodiumMode === 'moderate') && (
+          {(prepWaterMode === 'classic' || prepWaterMode === 'moderate' || prepSodiumMode !== 'constant') && (
             <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:8, fontSize:11, color:'#fbbf24', background:'rgba(245,158,11,0.08)', padding:10, borderRadius:8 }}>
               <input type="checkbox" checked={prepConfirmedManip} onChange={e => setPrepConfirmedManip(e.target.checked)} />
               <span>⚠ Я понимаю: умеренная модуляция воды/натрия допустима только при стабильном здоровье, без противопоказаний; диуретики не назначаются; при симптомах нарушения электролитов — план остановить. Подтверждаю выбор.</span>
@@ -5524,9 +5549,9 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepWeeks(res.prepPlan.preparation.weeks);
       setPrepTaperWeeks(res.prepPlan.taper.weeks);
       setPeakWeekCategory(res.prepPlan.category);
-      setPrepWaterMode(res.prepPlan.peakWeek.waterMode);
-      setPrepSodiumMode(res.prepPlan.peakWeek.sodiumMode);
-      setPrepCarbMode(res.prepPlan.peakWeek.carbMode);
+      setPrepWaterMode(res.prepPlan.peakWeek.waterMode === 'stable' ? 'minimal' : 'moderate' as WaterStrategy);
+      setPrepSodiumMode(res.prepPlan.peakWeek.sodiumMode === 'stable' ? 'constant' : 'cut_2d' as SodiumStrategy);
+      setPrepCarbMode(res.prepPlan.peakWeek.carbMode === 'conservative' ? 'back' : res.prepPlan.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
       setBuiltPlan(res.bbPlan);
       setPrepApplied(true);
       // 🏁 Авто-подключение к таперу питания: сохраняем prep-план + конфиг и уведомляем

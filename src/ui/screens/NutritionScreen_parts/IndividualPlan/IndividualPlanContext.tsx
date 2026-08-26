@@ -2418,10 +2418,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // #3 Категория -> агрессивность дефицита при сушке (суше категории -> больше дефицит, с капом RED-S).
         // #3+#7 Категория + target-BF: комбинированный дефицит-мод (более консервативный, без RED-S).
         if (_bbCat) { const _defMod = getCombinedDeficitMod(bfPct, _bbCat.targetBodyFatPct, goal === 'cutting' || goal === 'fat_loss'); dayKcalMod *= _defMod; }
-        // #4 Пик-неделя ББ: legacy-множители работают только без нового конфига (bbPrepConfig).
-        const _legacyPeakDay = null; // legacy getPeakWeekDay удалён — единый план через bbContestPrepPlan
-        if (_legacyPeakDay) { dayCarbMod *= _legacyPeakDay.carbMod; }
-        let _peakNote: string | undefined = _legacyPeakDay ? _legacyPeakDay.note : undefined;
+        // #4 Пик-неделя ББ: legacy-множители удалены — единый план через bbContestPrepPlan
+        let _peakNote: string | undefined = undefined;
         // #10 Жизненные этапы / контрацепция.
         const _lifeStageNote: string | undefined = (sex === 'female') ? (getLifeStageNote(lifeStage) || undefined) : undefined;
         const _dietBreakNote: string | undefined = ((goal === 'cutting' || goal === 'fat_loss') && metabolicAdaptEnabled && metabolicAdaptPct > 0)
@@ -2548,7 +2546,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           breakfastTemplate,
           labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
           calciumTargetOverride: _caInfo ? _caInfo.target : undefined,
-          sodiumTargetOverride: _peakTargets?.phase ? _peakTargets.sodiumMg : (_legacyPeakDay ? Math.round((isTrain ? Math.max(3000, 3000 + weight * 5) : 2300) * _legacyPeakDay.sodiumMod) : undefined),
+          sodiumTargetOverride: _peakTargets?.phase ? _peakTargets.sodiumMg : undefined,
            menstrualPhaseNote: _mp ? _mp.note : undefined,
            carbGiPref: _mp ? _mp.carbGiPref : undefined,
            quality: plannerModeRef.current === 'pro' ? 'full' : 'basic',
@@ -2684,7 +2682,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               const mult = total > 0 ? _peakTargets.waterMl / total : 1;
               return wl.map((w: any) => ({ ...w, ml: Math.max(50, Math.round((w.ml || 0) * mult)) }));
             }
-            if (_legacyPeakDay) return wl.map((w: any) => ({ ...w, ml: Math.round(w.ml * _legacyPeakDay.waterMod) }));
             return wl;
           })(),
           nutritionLogic: [],
