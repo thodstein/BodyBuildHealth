@@ -1151,7 +1151,7 @@ export const ProgramManagerPanel: React.FC = () => {
                 {p.meta.direction === 'bb' ? '💪' : p.meta.direction === 'pl' ? '🏆' : '⚡'}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.meta.title}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{p.meta.title}</div>{(() => { try { const q=computePlanQualityFor(p, p.meta.level); const col=q.score>=75?'#22c55e':q.score>=50?'#f59e0b':'#ef4444'; return <span style={{ fontSize: 10, fontWeight: 800, color: col, background: col+'14', border:`1px solid ${col}30`, borderRadius: 20, padding:'2px 6px', whiteSpace:'nowrap' }}>{q.score} {q.grade}</span>; } catch { return null; }})()}</div>
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
                   <span style={chip}>🎯 {goalLabel}</span>
                   <span style={chip}>📶 {levelLabel}</span>
