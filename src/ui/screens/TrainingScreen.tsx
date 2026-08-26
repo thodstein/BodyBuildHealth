@@ -834,7 +834,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
           return (<>
             <button style={backBtnStyle} onClick={() => { setTab('runtime'); }}>← К дашборду</button>
             {effectiveTab === 'intelligence_hub' && <InfoErrorBoundary label="Интеллект — единый пульт"><UnifiedIntelligenceHub /></InfoErrorBoundary>}
-            {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'relstr' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
+            {effectiveTab === 'strength_analysis' && <InfoErrorBoundary label="Анализ силы"><StrengthAnalysisHub initialMode={tab === 'calc_vbt' ? 'vbt' : tab === 'rel_strength' ? 'norms' : tab === 'pl_norms' ? 'norms' : tab === 'strength' ? 'analytics' : '1rm'} /></InfoErrorBoundary>}
             {(effectiveTab as any) === 'load_safety' && <InfoErrorBoundary label="Безопасность и нагрузка"><TrainingSafetyHub sessions={historyWorkouts} /></InfoErrorBoundary>}
             {effectiveTab === 'joints_ortho' && <InfoErrorBoundary label="Суставы и ортопедия — единый инструмент"><JointMasterCard /></InfoErrorBoundary>}
             {effectiveTab === 'quality_hub' && <InfoErrorBoundary label="Качество программы"><QualityHub onBuildPlan={() => goPlannerManual()} /></InfoErrorBoundary>}

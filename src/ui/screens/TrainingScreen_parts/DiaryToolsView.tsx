@@ -5,9 +5,7 @@ import { loadMeasurements, saveMeasurement } from '../../../engines/log-analytic
 import { getWeightLog, saveWeightLog } from '../../../engines/profile-store';
 import { findDuplicateWorkouts } from '../../../engines/workout-logger.engine';
 import { CsvImportTab } from './CsvImportTab';
-import { OneRmCalcTab } from './OneRmCalcTab';
-import { PlateCalcTab } from './PlateCalcTab';
-import { WorkoutComparisonCard, ExerciseSubstitutionCard, WarmupRampCard } from './diary-cards';
+import { WorkoutComparisonCard } from './diary-cards';
 import { diaryStyles as style } from './diary-tokens';
 import { useDiaryHub, type DiaryHubCtx } from './diary-hub-context';
 import { exportMindsetCheckinsCSV, loadCheckins } from '../../../engines/mindset-protocol.engine';
@@ -256,23 +254,19 @@ export const DiaryToolsView: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) => {
               </div>
             )}
           </div>
-          {/* Workout Comparison */}
+          {/* Workout Comparison — diary unique */}
           {historyWorkouts.length >= 2 && <WorkoutComparisonCard historyWorkouts={historyWorkouts} />}
-          {/* Exercise Substitution */}
+          {/* Калькуляторы → линки в Интеллект/Объём (без дублей) */}
           <div style={style.card}>
-            <div style={style.label}>🔄 Подбор замены</div>
-            <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>Альтернативы по мышечной группе</div>
-            <ExerciseSubstitutionCard />
-          </div>
-          {/* 1RM Calculator — existing component */}
-          <div style={style.card}>
-            <OneRmCalcTab />
-          </div>
-          {/* Warm-up Ramp Calculator */}
-          <WarmupRampCard />
-          {/* Plate Calculator — existing component */}
-          <div style={style.card}>
-            <PlateCalcTab />
+            <div style={style.label}>🔢 Калькуляторы</div>
+            <div style={{ fontSize:10, color:'#fff', marginBottom:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'8px 10px', lineHeight:1.45 }}>
+              <b>Один источник:</b> 1RM (7 формул) → <b>🏋️ Анализ силы</b> · Блины 8 грифов + SVG → <b>📐 Объём-хаб → Блины</b> · Тоннаж/КПШ → <b>📐 Объём-хаб → Тоннаж</b> · Разминка-рампа `гриф×15 → 50%×10` → <b>📐 Объём-хаб</b> · Замена — полный каталог 591 → <b>🧬 Лаборатория упражнений</b>
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              <span style={{ fontSize:10, padding:'6px 10px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.25)', color:'#00e68a' }}>🎯 1RM — без дублей</span>
+              <span style={{ fontSize:10, padding:'6px 10px', borderRadius:20, background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.25)', color:'#f59e0b' }}>🥞 Блины — без дублей</span>
+              <span style={{ fontSize:10, padding:'6px 10px', borderRadius:20, background:'rgba(59,130,246,0.12)', border:'1px solid rgba(59,130,246,0.25)', color:'#3b82f6' }}>⚖️ Тоннаж — без дублей</span>
+            </div>
           </div>
           {/* Хранилище: диагностика дублей + импорт/экспорт веса (Google Fit мост) */}
           <div style={style.card}>

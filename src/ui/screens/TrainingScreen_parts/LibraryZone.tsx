@@ -10,8 +10,6 @@ import type { StrengthStats } from '../../../engines/strength-diary.engine';
 import { MethodsTab } from './MethodsTab';
 import { ProgramsTab } from './ProgramsTab';
 import ExerciseLabCatalog from './ExerciseLabCatalog';
-import { PeakingProtocolsTab } from './PeakingProtocolsTab';
-import { TaperPlannerTab } from './TaperPlannerTab';
 import type { TrainingTab } from './shared';
 
 type CustomEx = { name: string; sets: number; reps: number; rir: number };
@@ -97,12 +95,19 @@ export const LibraryZone: React.FC<Props> = (p) => {
       )}
       {p.tab === 'peaking' && (
         <InfoErrorBoundary label="Пик-протоколы">
-          <PeakingProtocolsTab />
+          <div style={{ padding:14, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.22)', borderRadius:12, textAlign:'center' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#3b82f6', marginBottom:6 }}>📈 Пик-протоколы → Интеллект</div>
+            <div style={{ fontSize:11, color:'#fff', marginBottom:10 }}>Полный тапер-планер (PL 1-3нед + BB пик-неделя + весовая + таймлайн) теперь в <b>⚡ Интеллект → Периодизация и тапер</b>.</div>
+            <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', borderRadius:8, padding:'8px 10px' }}>Откройте <b>Тренировки → ⚡ Интеллект → 🔄 Периодизация и тапер</b> (канон `TaperPlannerTab`).</div>
+          </div>
         </InfoErrorBoundary>
       )}
       {p.tab === 'calc_taper' && (
         <InfoErrorBoundary label="Тапинг-методики">
-          <TaperPlannerTab />
+          <div style={{ padding:14, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.22)', borderRadius:12, textAlign:'center' }}>
+            <div style={{ fontSize:13, fontWeight:800, color:'#00e68a', marginBottom:6 }}>🔻 Тапинг → Интеллект</div>
+            <div style={{ fontSize:11, color:'#fff' }}>Полный инструмент теперь в <b>⚡ Интеллект → Периодизация и тапер → taper</b>.</div>
+          </div>
         </InfoErrorBoundary>
       )}
       {p.tab === 'exercises' && (

@@ -108,7 +108,7 @@ const RecordModeSelector: React.FC<{
 const style = diaryStyles;
 
 interface TrainingDiaryHubProps {
-  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
+  initialMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'analytics_lite' | 'rituals' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -128,13 +128,20 @@ interface TrainingDiaryHubProps {
   linked: any;
 }
 
-type HubMode = 'record' | 'history' | 'analytics' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining' | 'feedback';
+type HubMode = 'record' | 'history' | 'analytics' | 'analytics_lite' | 'progress' | 'tools' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'competition' | 'recommendations' | 'mytraining' | 'feedback' | 'rituals';
 
 export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   initialMode, diary, diaryStats, diaryProgress, historyWorkouts, macrocycle, selectedWeek, level, onRefresh, onGoRecord,
   trainingOutput, goal, daysPerWeek, splitType, periodizationType, mesoLength, tprofile, linked,
 }) => {
-  const resolvedMode: HubMode = initialMode === 'diary' ? 'record' : initialMode === 'reports' ? 'tools' : (initialMode as HubMode) || 'record';
+  const normalizeMode = (m: string): HubMode => {
+    if (m === 'diary') return 'record';
+    if (m === 'reports' || m === 'import_data') return 'tools';
+    if (m === 'analytics') return 'analytics_lite';
+    if (m === 'mindset' || m === 'mobility' || m === 'warmup' || m === 'cooldown' || m === 'mmc' || m === 'checkin') return 'rituals';
+    return (m as HubMode) || 'record';
+  };
+  const resolvedMode: HubMode = normalizeMode(initialMode as string);
   const [mode, setMode] = useState<HubMode>(resolvedMode);
   // The hub is reused while the parent tab changes. Keep the visible content
   // in sync instead of relying on a remount/key as an accidental reset.
@@ -153,6 +160,8 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
   // Режим записи (быстро/подробно) + предзаполнение из плана дня
   const [recordSub, setRecordSub] = useState<'quick' | 'full'>('quick');
   const [planToRecord, setPlanToRecord] = useState<{ day: any; nonce: number } | null>(null);
+  const [ritualsSub, setRitualsSub] = useState<'mindset'|'mobility'|'warmup'|'cooldown'|'checkin'|'mmc'>('mindset');
+  const [progressSub, setProgressSub] = useState<'progress'|'calendar'>('progress');
   // «Мои тренировки» (перенесено из Библиотеки): рабочий список упражнений
   const [myTrainingExs, setMyTrainingExs] = useState<{ name: string; sets: number; reps: number; rir: number }[]>([]);
   // Принудительная перерисовка блока «Сегодня» (быстрые отметки рутин/протоколов)
@@ -801,19 +810,57 @@ export const TrainingDiaryHub: React.FC<TrainingDiaryHubProps> = ({
         </InfoErrorBoundary>
       )}
 
-      {/* ═══ MODE: ANALYTICS ═══ */}
-      {mode === 'analytics' && (
+      {/* ═══ MODE: ANALYTICS (lite) ═══ — обезжирен: линки в хабы */}
+      {(mode === 'analytics' || mode === 'analytics_lite') && (
         <>
           <DiaryAnalyticsView hub={hub} />
           <MixEffectivenessCard workouts={historyWorkouts} />
+          <div style={{ marginTop:8, padding:'10px 12px', borderRadius:10, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.18)', fontSize:11, lineHeight:1.5, color:'#fff' }}>
+            <div style={{ fontWeight:800, color:'#3b82f6', marginBottom:4 }}>🔗 Глубже — в Интеллекте</div>
+            <div>ACWR/монотонность/напряжение → <b>⚡ Интеллект → Нагрузка</b> · MEV/MAV/MRV → <b>📐 Объём-хаб</b> · 1RM/VBT/DOTS → <b>🏋️ Анализ силы</b> · прогноз → <b>🔮 Прогноз</b></div>
+          </div>
         </>
       )}
 
-      {/* ═══ MODE: PROGRESS ═══ */}
-      {mode === 'progress' && <DiaryProgressView hub={hub} />}
+      {/* ═══ MODE: PROGRESS (lite + календарь) ═══ */}
+      {mode === 'progress' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:6, background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
+            {([['progress','📏 Прогресс'],['calendar','📅 Календарь']] as const).map(([k,l]) => (
+              <button key={k} onClick={()=> setProgressSub(k)} style={{
+                flex:1, padding:'7px 10px', borderRadius:10, border: progressSub===k ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.08)',
+                background: progressSub===k ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.04)', color: progressSub===k ? '#22c55e' : '#fff',
+                fontWeight: progressSub===k?800:600, fontSize:11, cursor:'pointer',
+              }}>{l}</button>
+            ))}
+          </div>
+          {progressSub==='progress' ? <DiaryProgressView hub={hub} /> : <TrainingCalendarTab />}
+        </div>
+      )}
 
-      {/* Dedicated diary sub-tabs. These used to fall through to record/body,
-          which made the navigation appear clickable without changing content. */}
+      {/* ═══ MODE: RITUALS ═══ — практики 6 в 1 (психика/мобильность/разминка/заминка/чек-ин/MMC) */}
+      {mode === 'rituals' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', background:'rgba(24,24,27,0.42)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', borderRadius:12, padding:6 }}>
+            {([
+              ['mindset','🧠 Психология'],['mobility','🧘 Мобильность'],['warmup','🔥 Разминка'],['cooldown','❄️ Заминка'],['checkin','📋 Чек-ин'],['mmc','🔄 MMC'],
+            ] as const).map(([k,l]) => (
+              <button key={k} onClick={()=> setRitualsSub(k)} style={{
+                flex:'1 1 90px', padding:'7px 10px', borderRadius:10, border: ritualsSub===k ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.08)',
+                background: ritualsSub===k ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)', color: ritualsSub===k ? '#a855f7' : '#fff',
+                fontWeight: ritualsSub===k?800:600, fontSize:10, cursor:'pointer',
+              }}>{l}</button>
+            ))}
+          </div>
+          {ritualsSub==='mindset' && <InfoErrorBoundary label="Психология"><MindsetTab hub={hub} /></InfoErrorBoundary>}
+          {ritualsSub==='mobility' && <InfoErrorBoundary label="Мобильность"><MobilityTab hub={hub} /></InfoErrorBoundary>}
+          {ritualsSub==='warmup' && <InfoErrorBoundary label="Разминка"><WarmupDiaryView historyWorkouts={historyWorkouts} planDay={planDayToday} /></InfoErrorBoundary>}
+          {ritualsSub==='cooldown' && <InfoErrorBoundary label="Заминка"><CooldownDiaryView planDay={planDayToday} /></InfoErrorBoundary>}
+          {ritualsSub==='checkin' && <CheckinMetricsCard />}
+          {ritualsSub==='mmc' && <MMCTrackingCard />}
+        </div>
+      )}
+      {/* legacy direct modes → редирект в rituals */}
       {mode === 'calendar' && <TrainingCalendarTab />}
       {mode === 'checkin' && <CheckinMetricsCard />}
       {mode === 'mmc' && <MMCTrackingCard />}

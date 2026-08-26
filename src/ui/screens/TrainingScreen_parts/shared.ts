@@ -38,19 +38,20 @@ export const PHASE_HINTS: Record<string, string> = {
 export type TrainingTab =
   | 'constructor' | 'runtime' | 'exercises' | 'exercise_lab' | 'calculators' | 'diary' | 'cycles' | 'history'
   | 'tonnage'
-  | 'analytics' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
+  | 'analytics' | 'analytics_lite' | 'methods' | 'visual' | 'programs' | 'timers' | 'progress' | 'mytraining'
   | 'reports' | 'srcbb' | 'volume' | 'library' | 'powerlifting' | 'bodybuilding'
   | 'calc_quality' | 'calc_1rm' | 'import_data' | 'pl_norms' | 'rel_strength' | 'calendar' | 'mixes' | 'periodization_designer' | 'deload_scheduler' | 'meso_progression'
   | 'calc_taper' | 'calc_fatigue' | 'calc_vbt' | 'calc_plates' | 'calc_mrv'
   | 'tempo' | 'meso_tracker' | 'specialization' | 'peaking'   | 'mmc_tracking' | 'mindset' | 'mobility'
   | 'checkin' | 'strength' | 'bb_tools' | 'pl_weakpoints' | 'load_safety' | 'split_gen' | 'goals' | 'pri_reppat' | 'insights'
    | 'strength_analysis' | 'load_management' | 'diagnostics' | 'diagnostics_hub' | 'quality_hub' | 'periodization_hub' | 'periodization_taper_hub' | 'quality_diagnostics' | 'quality_joint_hub' | 'volume_hub'
-    | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'rir_calibration' | 'readiness_forecast' | 'rir_forecast_hub' | 'tools_hub' | 'taper_planner' | 'joint_health' | 'joints_ortho' | 'intelligence_hub' | 'metabolic_hub' | 'tempo_hub';
+    | 'training_mix_hub' | 'mix_presets' | 'mix_hub' | 'warmup' | 'cooldown' | 'rir_calibration' | 'readiness_forecast' | 'rir_forecast_hub' | 'tools_hub' | 'taper_planner' | 'joint_health' | 'joints_ortho' | 'intelligence_hub' | 'metabolic_hub' | 'tempo_hub'
+    | 'rituals' | 'tools';
 export type TrainingPage = 'hero' | 'planning' | 'constructor' | 'tabs';
 
 export const TAB_LABELS: Record<TrainingTab, string> = {
   constructor: '🛠 Конструктор тренировок', runtime: '▶️ Проведение тренировки', exercises: '🏋️ Упражнения', calculators: '⚖️ Тоннаж',
-  diary: '📝 Дневник', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика',
+  diary: '📝 Дневник', cycles: '🔄 Циклы', history: '📜 История', analytics: '📊 Аналитика', analytics_lite: '📊 Аналитика', rituals: '🧠 Практики', tools: '🧰 Инструменты',
   methods: '🧠 Методики', visual: '📈 Визуализация', programs: '📚 Программы', timers: '⏱️ Таймеры отдыха',
   progress: '📏 Прогресс', mytraining: '⭐ Мои тренировки', exercise_lab: '🧬 Лаборатория упражнений', volume: '📐 Расчёт объёма',
   reports: '📄 Отчёты',

@@ -39,17 +39,13 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     title: '📓 Дневник',
     icon: '📓',
     color: '#a855f7',
-    subtitle: 'Дневник тренировок: запись, история, аналитика, прогресс, календарь, чек-ин',
-    // Дневник — единственная навигация для hub. Не смешиваем её с
-    // внутренним переключателем TrainingDiaryHub.
-    // «История тренировок» и «Сводка недели» — ТОЛЬКО подвкладка дневника
-    // (не дублируются на экранах ББ-авто/ПЛ-авто).
-    tabs: ['diary', 'analytics', 'progress', 'calendar', 'checkin', 'mmc_tracking', 'mindset', 'mobility', 'warmup', 'cooldown', 'reports'],
+    subtitle: 'Дневник тренировок: запись, история, прогресс, аналитика, практики, инструменты',
+    tabs: ['diary', 'history', 'progress', 'analytics_lite', 'rituals', 'tools'],
     categories: [
-      { label: 'Запись и день', icon: '✍️', tabs: ['diary', 'calendar'] },
-      { label: 'Анализ и сила', icon: '📊', tabs: ['analytics', 'progress', 'mmc_tracking'] },
-      { label: 'Психика и восстановление', icon: '🧠', tabs: ['mindset', 'mobility', 'warmup', 'cooldown', 'checkin'] },
-      { label: 'Инструменты', icon: '🧰', tabs: ['reports'] },
+      { label: 'Работа', icon: '✍️', tabs: ['diary', 'history'] },
+      { label: 'Отслеживание', icon: '📈', tabs: ['progress', 'analytics_lite'] },
+      { label: 'Практики', icon: '🧠', tabs: ['rituals'] },
+      { label: 'Управление', icon: '🧰', tabs: ['tools'] },
     ],
   },
   calculators: {
@@ -99,6 +95,19 @@ export const ZONE_ORDER: TrainingZone[] = ['planner', 'training', 'diary', 'calc
 /** Карта: какая вкладка в какой зоне живёт (для внешней навигации по имени вкладки). */
 const TAB_TO_ZONE: Partial<Record<TrainingTab, TrainingZone>> = {};
 for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
+// алиасы дневника (старые подвкладки → новые 6)
+(TAB_TO_ZONE as Record<string, TrainingZone>)['analytics'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['calendar'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['checkin'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['mmc_tracking'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['mindset'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['mobility'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['warmup'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['cooldown'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['reports'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['import_data'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['mytraining'] = 'diary';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['history'] = 'diary';
 // алиасы для депрекейтнутых дублей (удалены из ZONES.tabs, но должны резолвиться)
 (TAB_TO_ZONE as Record<string, TrainingZone>)['diagnostics'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['diagnostics_hub'] = 'calculators';

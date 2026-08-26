@@ -5,7 +5,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { OneRmCalcTab } from './OneRmCalcTab';
 import { VBTCalcTab } from './VBTCalcTab';
-import { RelativeStrengthCalcTab } from './RelativeStrengthCalcTab';
 import { PlNormsCalcTab } from './PlNormsCalcTab';
 import { StrengthAnalyticsCard } from './StrengthAnalyticsCard';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -19,12 +18,11 @@ const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, mar
 const DIM = '#fff';
 const SMALL: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
 
-type StrengthAnalysisHubMode = '1rm' | 'vbt' | 'relstr' | 'norms' | 'analytics';
+type StrengthAnalysisHubMode = '1rm' | 'vbt' | 'norms' | 'analytics';
 
 const MODE_DEFS: Array<{ m: StrengthAnalysisHubMode; label: string; icon: string; desc: string; accent: string }> = [
   { m: '1rm', label: '1RM', icon: '🎯', desc: '7 формул, консенсус', accent: '#00e68a' },
   { m: 'vbt', label: 'VBT', icon: '⚡', desc: 'Скорость штанги', accent: '#3b82f6' },
-  { m: 'relstr', label: 'Отн. сила', icon: '⚖️', desc: '×BW по движениям + DOTS', accent: '#a855f7' },
   { m: 'norms', label: 'Нормативы', icon: '🏆', desc: 'Разряды + DOTS/Wilks/IPF GL', accent: '#f59e0b' },
   { m: 'analytics', label: 'Аналитика', icon: '📊', desc: 'Процентили, соотношения, MEV', accent: '#22c55e' },
 ];
@@ -166,13 +164,12 @@ export const StrengthAnalysisHub: React.FC<{ initialMode?: StrengthAnalysisHubMo
           <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: `${MODE_DEFS.find(x=>x.m===mode)!.accent}18`, border:`1px solid ${MODE_DEFS.find(x=>x.m===mode)!.accent}33`, fontSize:14 }}>{MODE_DEFS.find(x=>x.m===mode)!.icon}</span>
           <div>
             <div style={{ fontSize:12, fontWeight:900, color: MODE_DEFS.find(x=>x.m===mode)!.accent }}>{MODE_DEFS.find(x=>x.m===mode)!.label} · {MODE_DEFS.find(x=>x.m===mode)!.desc}</div>
-            <div style={{ fontSize:10, color:'#fff' }}>{mode === '1rm' ? 'Вес×повторы → 1RM' : mode === 'vbt' ? 'Скорость штанги → %1RM/вес' : mode === 'relstr' ? '×BW по движениям' : mode === 'norms' ? 'Разряды + очки' : 'Процентили и объём'}</div>
+            <div style={{ fontSize:10, color:'#fff' }}>{mode === '1rm' ? 'Вес×повторы → 1RM' : mode === 'vbt' ? 'Скорость штанги → %1RM/вес' : mode === 'norms' ? 'Разряды + очки' : 'Процентили и объём'}</div>
           </div>
         </div>
         <div style={{ padding: 10 }}>
           {mode === '1rm' && <OneRmCalcTab />}
           {mode === 'vbt' && <VBTCalcTab />}
-          {mode === 'relstr' && <RelativeStrengthCalcTab />}
           {mode === 'norms' && <PlNormsCalcTab />}
           {mode === 'analytics' && <StrengthAnalyticsCard />}
         </div>

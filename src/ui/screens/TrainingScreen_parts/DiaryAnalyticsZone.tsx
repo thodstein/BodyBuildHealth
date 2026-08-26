@@ -13,7 +13,7 @@ import type { TrainingTab } from './shared';
 
 interface Props {
   tab: TrainingTab;
-  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
+  initialDiaryMode?: 'record' | 'tools' | 'diary' | 'reports' | 'history' | 'analytics' | 'analytics_lite' | 'rituals' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining';
   diary: StrengthDiary;
   diaryStats: StrengthStats[];
   diaryProgress: WeeklyProgress[];
@@ -33,22 +33,25 @@ interface Props {
   linked: any;
 }
 
-/** Map old external tabs and legacy mode names to hub modes */
-export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining' {
-  // Legacy initialDiaryMode values
+/** Map tabs to hub modes — 6-pill diary (v3): record/history/progress/analytics_lite/rituals/tools.
+ *  Legacy 11 tabs aliased → новые 6 без дублей. */
+export function tabToHubMode(tab: TrainingTab, initialDiaryMode?: string): 'record' | 'tools' | 'history' | 'analytics' | 'progress' | 'calendar' | 'checkin' | 'mmc' | 'mindset' | 'mobility' | 'warmup' | 'cooldown' | 'mytraining' | 'analytics_lite' | 'rituals' {
   if (initialDiaryMode === 'reports') return 'tools';
   if (initialDiaryMode === 'diary') return 'record';
   switch (tab) {
-    case 'analytics': return 'analytics';
+    case 'analytics_lite': return 'analytics_lite';
+    case 'rituals': return 'rituals';
+    case 'tools': return 'tools';
     case 'history': return 'history';
+    case 'analytics': return 'analytics_lite';
     case 'progress': return 'progress';
     case 'calendar': return 'calendar';
     case 'checkin': return 'checkin';
     case 'mmc_tracking': return 'mmc';
-    case 'mindset': return 'mindset';
-    case 'mobility': return 'mobility';
-    case 'warmup': return 'warmup';
-    case 'cooldown': return 'cooldown';
+    case 'mindset': return 'rituals';
+    case 'mobility': return 'rituals';
+    case 'warmup': return 'rituals';
+    case 'cooldown': return 'rituals';
     case 'mytraining': return 'mytraining';
     case 'reports':
     case 'import_data': return 'tools';
