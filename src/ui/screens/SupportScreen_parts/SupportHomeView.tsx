@@ -20,13 +20,13 @@ export const SupportHomeView: React.FC<{ s: Record<string, any> }> = ({ s }) => 
   // Hero остаётся на главной, но контент больше не перекрывается нижним дашбордом:
   // контейнер hero занимает доступную высоту с учётом нижнего бара (64px + safe-area), внутренний паддинг тоже с запасом.
   const CARD_BASE: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', gap: 14, padding: '16px 16px', borderRadius: 18, cursor: 'pointer', textAlign: 'left', width: '100%',
-    border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-    boxShadow: '0 6px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)',
+    display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 18, cursor: 'pointer', textAlign: 'left', width: '100%',
+    border: '1px solid rgba(255,255,255,0.10)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+    boxShadow: '0 4px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)',
     transition: 'transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
   };
   const cardGlow = (accent: string): React.CSSProperties => ({
-    background: `linear-gradient(135deg, ${accent}14, rgba(24,24,27,0.55))`,
+    background: `linear-gradient(135deg, ${accent}10, rgba(24,24,27,0.18))`,
   });
 
   const renderCard = (onClick: () => void, icon: string, bg: string, title: string, titleColor: string, desc: string, accent: string) => (
@@ -50,12 +50,12 @@ export const SupportHomeView: React.FC<{ s: Record<string, any> }> = ({ s }) => 
 
   return (
     <InfoErrorBoundary label="Главная бады">
-      {/* ХЕРО — на весь экран, фиксирован, вкладки компактно внизу. Нижний дашборд (SupportScreen bottom bar, z200) поверх херо, но контент херо имеет запас 80px+safe-area чтобы не перекрывался */}
+      {/* ХЕРО — на весь экран, фиксирован, вкладки компактно внизу. Херо-картинка полностью видна: градиент только внизу (50% прозрачно сверху) */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column' }}>
         <img src="/support-hero.jpg" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.38) 38%, rgba(0,0,0,0.82) 68%, rgba(0,0,0,0.92) 100%)' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(560px 360px at 16% 10%, rgba(0,230,138,0.20), transparent 55%), radial-gradient(520px 320px at 86% 18%, rgba(139,92,246,0.16), transparent 55%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '16px 16px calc(80px + env(safe-area-inset-bottom, 0px))', gap: 14, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 42%, rgba(0,0,0,0.45) 62%, rgba(0,0,0,0.88) 100%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(520px 300px at 18% 14%, rgba(0,230,138,0.10), transparent 60%), radial-gradient(480px 300px at 84% 16%, rgba(139,92,246,0.08), transparent 60%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '14px 14px calc(72px + env(safe-area-inset-bottom, 0px))', gap: 12, overflowY: 'auto' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 10px', borderRadius: 20, background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.4px', backdropFilter: 'blur(10px)' }}>
               <span style={{ width: 6, height: 6, borderRadius: 6, background: '#00e68a', boxShadow: '0 0 10px rgba(0,230,138,0.7)', display: 'inline-block' }} /> БЛОК БАД · ПОДДЕРЖКА
