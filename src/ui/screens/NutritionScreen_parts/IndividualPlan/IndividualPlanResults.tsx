@@ -14,6 +14,7 @@ import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, ty
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
 import { buildDayReportPrintHtml, printDayReport, buildMealTimelinePrintHtml, printMealTimeline, buildRecipePlanPrintHtml } from "./planner-day-print";
+import { buildDayBriefing } from "./planner-briefing";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
@@ -662,6 +663,31 @@ export const IndividualPlanResults: React.FC = () => {
               <button onClick={() => switchPlanDays(7)} style={{ marginLeft: 'auto', padding: '3px 8px', borderRadius: 6, cursor: 'pointer', border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.15)', color: '#c4b5fd', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap' }}>↩ К неделе</button>
             </div>
           )}
+          {/* 🧭 Брифинг дня — помощник спортсмена */}
+          {(() => {
+            try {
+              const now = new Date();
+              const b = buildDayBriefing({
+                totals: dayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
+                goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
+                meals: dayPlan.meals || [],
+                isTrainingDay: !!dayPlan.isTrainingDay,
+                trainTime: linkToTraining ? trainStart : undefined,
+                nowTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+                waterL: waterCalc?.total,
+              });
+              if (b.cookToday.length === 0 && !b.nextMeal && b.tips.length === 0) return null;
+              return (
+                <div style={{ margin: '4px 0 8px', padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05))', border: '1px solid rgba(59,130,246,0.18)' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🧭 {b.dayTypeLabel}{waterCalc?.total ? ` · 💧 ${waterCalc.total} л/день` : ''}</div>
+                  {b.cookToday.length > 0 && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 3 }}>👨‍🍳 Готовить сегодня: <b>{b.cookToday.join(' · ')}</b></div>}
+                  {b.nextMeal && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>⏰ Следующий приём: <b>{b.nextMeal.label}</b> в {b.nextMeal.time}</div>}
+                  {b.proteinLeftG >= 10 && <div style={{ fontSize: 9, color: '#60a5fa' }}>🎯 План: Б{Math.round(dayPlan.totals?.p || 0)}/{effectiveP} · К{Math.round(dayPlan.totals?.kcal || 0)} ({b.kcalDeltaPct > 0 ? '+' : ''}{b.kcalDeltaPct}%)</div>}
+                  {b.tips.map((t: string, i: number) => <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 3 }}>{t}</div>)}
+                </div>
+              );
+            } catch { return null; }
+          })()}
           {renderMealList(dayPlan, false, 0)}
           <textarea value={dayPlanNotes} onChange={e => setDayPlanNotes(e.target.value)} onBlur={() => { try { localStorage.setItem('he_day_notes', dayPlanNotes); } catch {} }} maxLength={2000} placeholder="Заметки на сегодня..." style={{ width:'100%', marginTop:6, padding:'6px 10px', borderRadius:8, fontSize:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'rgba(255,255,255,0.85)', resize:'vertical', minHeight:30, boxSizing:'border-box' }} rows={1} />
           <button onClick={() => generatePlan(1, undefined, selectedDayIndex)} style={{ width:'100%', padding:'10px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight:700, marginTop:8, marginBottom:4, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', boxShadow:'0 4px 16px rgba(0,230,138,0.2)' }}>

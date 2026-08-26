@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { FOOD_DB } from "../../../../core/nutrition-database";
 import { getRecipesByMeal } from "../../../../engines/nutrition-periodization.engine";
+import { recipeMacroDistance } from "./recipe-engine";
 import { MealQuickControls } from "./MealQuickControls";
 import { MealComposerMode, type ComposerMode } from "./MealComposerMode";
 import type { AdvancedFilter } from "../../../../engines/kbju-food-match.engine";
@@ -80,6 +81,7 @@ export const MealComposer: React.FC = () => {
     generated, setGenerated,
     renderMealList,
     recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe,
+    favoriteRecipes, isFavoriteRecipe, toggleFavoriteRecipe,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
     setDayPlan, setThreeDayPlan, setWeekPlan, saveUndo,
      setPlanTab, plannerMode,
@@ -88,6 +90,21 @@ export const MealComposer: React.FC = () => {
   const [composerMode, setComposerMode] = useState<ComposerMode>('basic');
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>({});
   const [selectedMealForTargeting, setSelectedMealForTargeting] = useState<number | null>(null);
+  // 🧠 Умный пикер: сортировка рецептов под конкретный приём (КБЖУ-дистанция) + ⭐ избранное
+  const sortedPickerRecipes = useMemo(() => {
+    if (!recipePickerMeal) return [];
+    const mealType = recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack';
+    const day = dayPlan || (threeDayPlan?.days ? threeDayPlan.days[selectedDayIndex] : null) || (weekPlan?.days ? weekPlan.days[selectedDayIndex] : null);
+    const m = day?.meals?.[recipePickerMeal.mealIdx];
+    const tgt = m?.target || { p: m?.totals?.p ?? 30, c: m?.totals?.c ?? 40, f: m?.totals?.f ?? 15 };
+    const tKcal = m?.totals?.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300;
+    try {
+      return getRecipesByMeal(mealType as any).map((r: any) => ({
+        r,
+        dist: recipeMacroDistance(r, { targetKcal: tKcal, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15 }),
+      })).sort((a: any, b: any) => a.dist - b.dist).map((x: any) => x.r);
+    } catch { return getRecipesByMeal(mealType as any); }
+  }, [recipePickerMeal, dayPlan, threeDayPlan, weekPlan, selectedDayIndex]);
   const allowAdvancedComposer = plannerMode === 'pro';
   React.useEffect(() => {
     if (!allowAdvancedComposer && composerMode !== 'basic') {
@@ -311,13 +328,16 @@ export const MealComposer: React.FC = () => {
                 <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4 }}>🍳 Заменить «{recipePickerMeal.label}» рецептом</div>
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:12 }}>Подходящие рецепты</div>
                 <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
-                  {getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').length === 0 ? (
+                  {sortedPickerRecipes.length === 0 ? (
                     <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
-                  ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r: any, i: number) => (
-                    <button key={i} onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx)} style={{ width:'100%', padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9 }}>
-                      <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>
-                      <div style={{ color:'rgba(255,255,255,0.85)' }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
-                    </button>
+                  ) : sortedPickerRecipes.map((r: any, i: number) => (
+                    <div key={i} style={{ display:'flex', gap:4, alignItems:'stretch' }}>
+                      <span onClick={(e) => { e.stopPropagation(); toggleFavoriteRecipe(r.name); }} title={isFavoriteRecipe(r.name) ? 'Убрать из избранного' : 'В избранное (приоритет в подборе)'} style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, borderRadius:12, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color: isFavoriteRecipe(r.name) ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize:13 }}>{isFavoriteRecipe(r.name) ? '⭐' : '☆'}</span>
+                      <button onClick={() => replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx)} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:`1px solid ${isFavoriteRecipe(r.name) ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.06)'}`, color:'#fff', fontSize:9 }}>
+                        <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{isFavoriteRecipe(r.name) ? '⭐ ' : ''}{r.name}</div>
+                        <div style={{ color:'rgba(255,255,255,0.85)' }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
+                      </button>
+                    </div>
                   ))}
                 </div>
                 <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:8, fontWeight:600 }}>✕ Отмена</button>

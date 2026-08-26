@@ -73,6 +73,31 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
   const timeEdit = useMealTimeEdit(dayPlan, saveUndo, setDayPlan);
   // UX чипов: пресеты рецептов (масса = большое У, сушка, белок…)
   const [recipePreset, setRecipePreset] = useState<string | null>(null);
+  const _planKeyRef = React.useRef<string>('');
+  try {
+    const planKey = `${dayPlan?.totals?.kcal || 0}-${(dayPlan?.meals || []).length}`;
+    if (_planKeyRef.current && _planKeyRef.current !== planKey && recipePreset) setRecipePreset(null);
+    _planKeyRef.current = planKey;
+  } catch {}
+  // Чипы пресетов: показывать только если ≥2 активных; рендер-хелпер
+  const renderPresetRow = (pool: any[]) => {
+    const activePresets = RECIPE_PRESETS.filter(p => pool.some(o => p.match(o)));
+    if (activePresets.length < 2) return null;
+    const visibleCount = pool.filter((r: any) => recipeMatchesPreset(r, recipePreset)).length;
+    return (
+      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', marginBottom: 2, alignItems: 'center' }}>
+        {activePresets.map(p => (
+          <span key={p.id} title={p.hint} onClick={() => setRecipePreset(recipePreset === p.id ? null : p.id)} style={{ cursor: 'pointer', padding: '1px 6px', borderRadius: 6, fontSize: 7, fontWeight: 700, border: `1px solid ${recipePreset === p.id ? 'rgba(249,115,22,0.55)' : 'rgba(249,115,22,0.18)'}`, background: recipePreset === p.id ? 'rgba(249,115,22,0.15)' : 'transparent', color: recipePreset === p.id ? '#fb923c' : 'rgba(255,255,255,0.6)' }}>{p.label}</span>
+        ))}
+        {recipePreset && (
+          <>
+            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.5)' }}>{visibleCount}/{pool.length}</span>
+            <span onClick={() => setRecipePreset(null)} title="Сбросить фильтр" style={{ cursor: 'pointer', fontSize: 8, color: '#fb923c', padding: '0 3px', fontWeight: 800 }}>✕</span>
+          </>
+        )}
+      </div>
+    );
+  };
   return (dayData: any, editable = false, dayIdx = 0) => {
     if (!dayData) return null;
     const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0); const totalFiber = Math.round(d.totals?.fiber || 0);
@@ -191,18 +216,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                   <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:3}}>
                     <div style={{fontSize:8,fontWeight:700,color:'#f97316',padding:'2px 0'}}>🍳 Варианты рецептов — выберите один, рацион перестроится:{m.recipeApplied ? <span style={{color:'#22c55e',fontWeight:600}}> выбрано «{m.recipeApplied}»</span> : null}</div>
                     {/* Пресеты подбора (масса = большое У, сушка, белок…) */}
-                    {(() => {
-                      const optsAll = m.recipeOptions as any[];
-                      const activePresets = RECIPE_PRESETS.filter(p => optsAll.some(o => p.match(o)));
-                      if (activePresets.length < 2) return null;
-                      return (
-                        <div style={{display:'flex',gap:3,flexWrap:'wrap',marginBottom:2}}>
-                          {activePresets.map(p => (
-                            <span key={p.id} title={p.hint} onClick={()=>setRecipePreset(recipePreset===p.id?null:p.id)} style={{cursor:'pointer',padding:'1px 6px',borderRadius:6,fontSize:7,fontWeight:700,border:`1px solid ${recipePreset===p.id?'rgba(249,115,22,0.55)':'rgba(249,115,22,0.18)'}`,background:recipePreset===p.id?'rgba(249,115,22,0.15)':'transparent',color:recipePreset===p.id?'#fb923c':'rgba(255,255,255,0.6)'}}>{p.label}</span>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                    {renderPresetRow(m.recipeOptions as any[])}
                     {(m.recipeOptions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).map((r: any, ri: number) => {
                       const selected = m.recipeApplied === r.name;
                       return (
@@ -244,19 +258,8 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                       <div style={{fontSize:8,fontWeight:700,color:'#f97316'}}>🍲 Рецепты для этого приёма:</div>
                       <span onClick={()=>refreshRecipeSuggestions(dayIdx)} title="Подобрать другие рецепты" style={{cursor:'pointer',fontSize:9,padding:'1px 6px',borderRadius:5,border:'1px solid rgba(249,115,22,0.25)',color:'#f97316',fontWeight:700}}>🔄</span>
                     </div>
-                    {(() => {
-                      // Пресеты подбора (масса = большое У, сушка, белок…) — фиксированный набор
-                      const sugAll = m.recipeSuggestions as any[];
-                      const activePresets = RECIPE_PRESETS.filter(p => sugAll.some(o => p.match(o)));
-                      if (activePresets.length < 2) return null;
-                      return (
-                        <div style={{display:'flex',gap:3,flexWrap:'wrap',marginBottom:2}}>
-                          {activePresets.map(p => (
-                            <span key={p.id} title={p.hint} onClick={()=>setRecipePreset(recipePreset===p.id?null:p.id)} style={{cursor:'pointer',padding:'1px 6px',borderRadius:6,fontSize:7,fontWeight:700,border:`1px solid ${recipePreset===p.id?'rgba(249,115,22,0.55)':'rgba(249,115,22,0.18)'}`,background:recipePreset===p.id?'rgba(249,115,22,0.15)':'transparent',color:recipePreset===p.id?'#fb923c':'rgba(255,255,255,0.6)'}}>{p.label}</span>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                    {/* Пресеты подбора — фиксированный набор */}
+                    {renderPresetRow(m.recipeSuggestions as any[])}
                     {(m.recipeSuggestions as any[]).filter((r:any)=>recipeMatchesPreset(r, recipePreset)).slice(0, 3).map((r: any, ri: number) => (
                       <details key={ri} style={{borderRadius:8,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.12)',overflow:'hidden'}}>
                         <summary style={{cursor:'pointer',padding:'3px 6px',fontSize:8,color:'#f97316',fontWeight:600,listStyle:'none'}}>
