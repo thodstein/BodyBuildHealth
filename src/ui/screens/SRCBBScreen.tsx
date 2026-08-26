@@ -2313,7 +2313,7 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
       </>)}
       {subView === 'analytics' && (<><AnalyticsTab sessions={historyWorkouts} /><VisualTab sessions={historyWorkouts} /></>)}
       {subView === 'prometrics' && <ProMetricsPanel />}
-      {subView === 'charts' && <TrainingMetricsChart lms={lmsChart} bb={bbChart} />}
+      {mainTab === 'bb' && subView === 'charts' && <TrainingMetricsChart lms={lmsChart} bb={bbChart} />}
       {/* Модалка подтверждения «Начать заново» */}
       {resetAsk && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 260, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)', padding: 16 }}
