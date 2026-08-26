@@ -3117,450 +3117,6 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* PRO: Per-muscle frequency optimization — полностью на русском */}
-        {freqOptResult && freqOptResult.totalAdjustments > 0 && (
-          <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🔧 Оптимизация частоты по мышцам — {freqOptResult.totalAdjustments} корректировок</div>
-            <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.4, padding:'6px 8px', background:'rgba(245,158,11,0.04)', borderRadius:8 }}>На основе восстановления: ACWR (острая/хроническая нагрузка) и тренд силы e1RM. Малая мышца → 2-3×/нед, большая → 1.5-2×/нед. Рекомендации уже учитывают PED и стаж.</div>
-            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-              {freqOptResult.recommendations.map((rec: any, i: number) => {
-                const up = rec.recommendedFrequency > rec.currentFrequency;
-                const direction = up ? '↑ повысить' : '↓ снизить';
-                const color = up ? '#22c55e' : '#ef4444';
-                const ruMuscle = (MUSCLE_LABEL_RU as any)[rec.muscle] || rec.muscle;
-                return (
-                  <div key={i} style={{ fontSize:11, color:'#fff', display:'flex', gap:6, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)', lineHeight:1.4 }}>
-                    <span style={{ color, fontWeight:800, whiteSpace:'nowrap' }}>{direction}</span>
-                    <span style={{ fontWeight:700 }}>{ruMuscle}:</span>
-                    <span style={{ fontWeight:700, color }}>{rec.currentFrequency}→{rec.recommendedFrequency}×/нед</span>
-                    <span style={{ color:'#fff', flex:1 }}>{rec.reason}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* PRO: Авто-регуляция — полностью на русском */}
-        {(() => {
-          const summary = summarizeAutoRegulation(builtPlan);
-          if (summary.adjustedExercises === 0) return null;
-          return (
-            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#a855f7', marginBottom:6 }}>
-                ↻ Авто-регуляция по дневнику: {summary.adjustedExercises}/{summary.totalExercises} упражнений скорректировано
-              </div>
-              <div style={{ fontSize:10, color:'#fff', marginBottom:6, lineHeight:1.4 }}>Сравнение плана и факта (RIR, вес × повторы) — веса/повторы следующей недели подстраиваются под вашу реальную силу, а не слепую линейку.</div>
-              <div style={{ display:'flex', gap:12, fontSize:11, color:'#fff', marginBottom:6, flexWrap:'wrap' }}>
-                {summary.weightIncreases > 0 && <span style={{ color:'#22c55e' }}>↑ Вес повышен: {summary.weightIncreases} упр.</span>}
-                {summary.weightDecreases > 0 && <span style={{ color:'#ef4444' }}>↓ Вес снижен: {summary.weightDecreases} упр.</span>}
-                {summary.rirAdjustments > 0 && <span style={{ color:'#f59e0b' }}>RIR скорректирован: {summary.rirAdjustments} упр.</span>}
-                {summary.plateauDetected > 0 && <span style={{ color:'#ef4444' }}>⚠ Плато: {summary.plateauDetected} групп</span>}
-              </div>
-              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                {summary.details.slice(0, 5).map((d, i) => (
-                  <div key={i} style={{ fontSize:10, color:'#fff' }}>
-                    {d.exercise}: {d.from} → {d.to}
-                  </div>
-                ))}
-                {summary.details.length > 5 && <div style={{ fontSize:10, color:'#fff' }}>+{summary.details.length - 5} ещё...</div>}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Overload targets for this week */}
-        {(() => {
-           // Per-muscle частота и объём
-           const freq = builtPlan.muscleFrequency || {};
-           const vol = builtPlan.rotationMuscleVolume || {};
-           const actualVolume = builtPlan.weeklyVolume?.[wk.week] || {};
-            const muscleEntries = Object.keys(freq).map(m => {
-              const metric = metrics?.perMuscle.find(x => x.muscle === m);
-              const target = builtPlan.volumeTargets?.[m];
-               const actual = actualVolume[m];
-              const landmarks = metric ? { mev: metric.mev, mav: metric.mav, mrv: metric.mrv } : null;
-              const status = landmarks
-                ? ((actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mrv ? 'MRV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) > landmarks.mav ? 'MAV+' : (actual?.effectiveSets ?? metric?.effectiveSets ?? 0) >= landmarks.mev ? 'OK' : 'MEV-')
-                : '—';
-              return {
-                muscle: m,
-                freq: freq[m] || 0,
-                sets: actual?.directSets ?? metric?.directSets ?? vol[m] ?? 0,
-                effectiveSets: actual?.effectiveSets ?? metric?.effectiveSets ?? metric?.totalSets ?? vol[m] ?? 0,
-               targetSets: target?.targetSets ?? vol[m] ?? 0,
-                 status,
-               };
-           }).sort((a, b) => b.effectiveSets - a.effectiveSets);
-          if (muscleEntries.length === 0) return null;
-          const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
-          const freqColor = (f: number) => f >= 3 ? '#ef4444' : f === 2 ? '#22c55e' : '#f59e0b';
-          const freqLabel = (f: number) => f >= 3 ? `${f}×/нед (высокая)` : f === 2 ? `${f}×/нед (оптимум)` : `${f}×/нед`;
-          return (
-            <ExpandableCard title="📊 Частота и объём по мышцам" icon="📊"
-              short={`${muscleEntries.length} групп · ${muscleEntries.filter(e => e.freq >= 2).length} ×2+/нед`}
-              full={
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                    {muscleEntries.map(({ muscle, freq: f, sets, effectiveSets, targetSets, status }) => (
-                    <div key={muscle} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: freqColor(f), flexShrink: 0 }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{MUSCLE_RU[muscle] || muscle}</div>
-                         <div style={{ fontSize: 10, color: status === 'MRV+' ? '#ef4444' : status === 'MEV-' ? '#f59e0b' : '#22c55e', lineHeight:1.4 }}>{freqLabel(f)} · прямых {sets} · эффективных {Math.round(effectiveSets * 10) / 10} · цель {targetSets} · {status === 'MRV+' ? 'перегруз' : status === 'MEV-' ? 'недотрен' : status === 'MAV+' ? 'выше оптимума' : status === 'OK' ? 'оптимум' : status}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              }
-            />
-          );
-        })()}
-
-        {builtPlan.expandedSummary && (() => {
-          const sum = builtPlan.expandedSummary;
-          const MUSCLE_RU: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадрицепс', hamstrings: 'Бицепс бедра', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предплечье', abs: 'Пресс', traps: 'Трапеции', arms: 'Руки', legs: 'Ноги', core: 'Кор' };
-          const entries = Object.entries(sum.byMuscle).sort((a, b) => b[1].workingSets - a[1].workingSets);
-          return (
-            <ExpandableCard title="📋 Недельная сводка сетов" icon="📋"
-              short={`${entries.length} групп · ${sum.totalWorkingSets} раб. сетов/нед`}
-              full={
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {entries.map(([m, v]) => {
-                    const isExpanded = expandedMuscles.has(m);
-                    const byEx = (v as any).byExercise as Record<string, number> | undefined;
-                    const subGroups = (v as any).subGroups as Record<string, { workingSets: number; byPattern: Record<string, number>; byExercise: Record<string, number>; explanation?: { why: string; how: string; patternRu: string; labelRu: string } }> | undefined;
-                    return (
-                    <div key={m} onClick={() => setExpandedMuscles(prev => { const n = new Set(prev); if (n.has(m)) n.delete(m); else n.add(m); return n; })} style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
-                      {(() => {
-                        const lm = (builtPlan.volumeLandmarks || []).find((l: any) => l.group === m);
-                        const freqVal = (builtPlan.muscleFrequency?.[m] ?? v.sessionsPerWeek) as number;
-                        const targetSets = (builtPlan as any).volumeTargets?.[m]?.targetSets ?? lm?.mav ?? v.workingSets;
-                        const pedMult = (builtPlan as any).pedAdaptation?.combinedMrvMultiplier || 1;
-                        const freqColor = freqVal >= 3 ? '#ef4444' : freqVal === 2 ? '#22c55e' : '#f59e0b';
-                        const volColor = (() => {
-                          if (!lm) return '#374151';
-                          if (v.workingSets > (lm.mrv + 1)) return '#ef4444';
-                          if (v.workingSets > lm.mav) return '#f59e0b';
-                          if (v.workingSets >= lm.mev) return '#22c55e';
-                          return '#3b82f6';
-                        })();
-                        const pct = lm ? Math.min(100, Math.round((v.workingSets / (lm.mrv || v.workingSets || 1)) * 100)) : 50;
-                        return (<>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <span>{MUSCLE_RU[m] || m} — <span style={{ color: freqColor }}>{freqVal} тренировки/нед</span> · {v.workingSets} рабочих {targetSets ? `(цель ${targetSets})` : ''} · {v.warmupSets} разминочных{pedMult > 1 ? ` · PED ×${pedMult.toFixed(2)}` : ''}</span>
-                        <span style={{ fontSize:10, color:'#fff' }}>{isExpanded ? '▲ свернуть' : '▼ подробнее'}</span>
-                      </div>
-                      {lm && (
-                        <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4 }}>
-                          <div style={{ flex:1, height:4, borderRadius:2, background:'rgba(255,255,255,0.08)', position:'relative', overflow:'hidden' }}>
-                            <div style={{ position:'absolute', left:`${(lm.mev/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(59,130,246,0.6)' }} />
-                            <div style={{ position:'absolute', left:`${(lm.mav/lm.mrv)*100}%`, top:0, bottom:0, width:1, background:'rgba(245,158,11,0.6)' }} />
-                            <div style={{ height:'100%', borderRadius:2, background:volColor, width:`${pct}%`, transition:'width 0.3s' }} />
-                          </div>
-                          <span style={{ fontSize:8, color:volColor, fontWeight:700, whiteSpace:'nowrap' }}>Мин MEV{lm.mev} · Опт MAV{lm.mav} · Макс MRV{lm.mrv}</span>
-                        </div>
-                      )}
-                      <div style={{ fontSize: 10, color: '#fff', marginTop:4, lineHeight:1.4 }}>
-                        <b>Паттерны:</b> {Object.entries(v.byPattern).map(([p, n]) => `${SUMMARY_PATTERN_RU[p] || p} — ${n} подход.`).join(' · ') || '—'}<br/>
-                        <b>Прямая нагрузка:</b> {v.directSets} подход. · <b>Косвенная:</b> {Math.round(v.indirectSets)} подход. (от базовых жимов/тяг других мышц)
-                      </div>
-                        </>);
-                      })()}
-                      {isExpanded && (
-                        <>
-                          <div style={{ fontSize:10, color:'#fff', marginTop:4, paddingTop:4, borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-                            упражнения: {byEx ? Object.entries(byEx).map(([e, n]) => `${e} ${n}`).join(', ') : '—'}
-                          </div>
-                          {subGroups && Object.keys(subGroups).length > 0 && (
-                            <div style={{ marginTop:4, display:'flex', flexDirection:'column', gap:3 }}>
-                              {Object.entries(subGroups).map(([subId, sub]) => {
-                                const expl = (sub as any).explanation as { why?: string; how?: string; patternRu?: string; labelRu?: string } | undefined;
-                                const label = expl?.labelRu || subId;
-                                return (
-                                <div key={subId} style={{ fontSize:10, color:'#fff', padding:'5px 7px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                                  <div style={{ display:'flex', justifyContent:'space-between', gap:6 }}>
-                                    <b style={{ color:'#e5e7eb' }}>{label}</b>
-                                    <span style={{ fontWeight:700, color:'#22c55e' }}>{sub.workingSets} сетов</span>
-                                  </div>
-                                   <div style={{ color:'#fff', marginTop:2 }}><b>Паттерн:</b> {Object.entries(sub.byPattern).map(([p, n]) => `${SUMMARY_PATTERN_RU[p] || p} — ${n} подход.`).join(' · ') || '—'}{expl?.patternRu ? ` · ${expl.patternRu}` : ''}</div>
-                                  <div style={{ color:'#fff' }}>упражнения: {Object.entries(sub.byExercise).map(([e, n]) => `${e} ${n}`).join(', ') || '—'}</div>
-                                  {expl?.why && <div style={{ color:'#fbbf24', marginTop:3, lineHeight:1.35 }}>▸ Чем хорошо: {expl.why}</div>}
-                                  {expl?.how && <div style={{ color:'#93c5fd', lineHeight:1.35 }}>▸ Как работает: {expl.how}</div>}
-                                </div>
-                              );})}
-                            </div>
-                          )}
-                           <div style={{ fontSize:10, color:'#fff', marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)' }}>
-                            <div style={{ fontWeight:700, color:'#60a5fa', marginBottom:4 }}>Распределение по тренировкам недели (шаблон):</div>
-                            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                              {v.bySession.map((sess, idx) => (
-                                <span key={idx} style={{ padding:'3px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'#fff' }}>
-                                  День {sess.day || idx+1}: <b style={{ color:'#22c55e' }}>{sess.working} рабочих</b> · {sess.warmup} разминочных
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      )}
-                      {!isExpanded && v.bySession.length > 0 && (
-                        <div style={{ fontSize: 10, color: '#fff' }}>нажмите для развертки — подгруппы/паттерны/пояснения (чем хорошо / как работает)</div>
-                      )}
-                    </div>
-                  );})}
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', marginTop: 2 }}>Итого: {sum.totalWorkingSets} рабочих сетов/нед</div>
-                </div>
-              }
-            />
-          );
-        })()}
-
-        {builtPlan.rotationReport && (() => {
-          const report = builtPlan.rotationReport;
-          const primaryCount = Object.keys(report.primaryByMuscle).length;
-          const warningCount = report.issues.length;
-          const totalPrimary = Object.values(report.primaryByMuscle).flat().length;
-          const uniqPrimaries = new Set(Object.values(report.primaryByMuscle).flat()).size;
-          return (
-            <ExpandableCard title="🔁 Ротация упражнений — стабильность базы, вариативность изоляции" icon="🔁"
-              short={`${primaryCount} групп с базой · ${uniqPrimaries} уникальных базовых · ${warningCount} предупреждений`}
-              full={
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, padding:'7px 9px', background:'rgba(59,130,246,0.06)', borderRadius:8, border:'1px solid rgba(59,130,246,0.12)' }}>
-                    <b>Принцип:</b> базовые (primary) — стабильны внутри фазы для прогрессии весов; изолирующие (accessory) — ротируются по углам/хватам каждую неделю. Всего базовых движений в плане: {totalPrimary} (уникальных {uniqPrimaries}).
-                  </div>
-                  {Object.keys(report.primaryByMuscle).length > 0 && (
-                    <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.12)' }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>🎯 Базовые движения по мышцам (якоря, не меняются внутри фазы):</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                        {Object.entries(report.primaryByMuscle).map(([muscle, names]) => {
-                          const uniq = Array.from(new Set(names as string[]));
-                          const ruMuscle = (MUSCLE_LABEL_RU as any)[muscle] || muscle;
-                          return (
-                            <div key={muscle} style={{ display:'flex', justifyContent:'space-between', gap:8, padding:'4px 7px', background:'rgba(255,255,255,0.03)', borderRadius:6, fontSize:10, color:'#fff' }}>
-                              <span style={{ fontWeight:700, color:'#22c55e' }}>{ruMuscle}</span>
-                              <span style={{ flex:1, textAlign:'right', opacity:0.9 }}>{uniq.join(' · ') || '—'}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {Object.keys(report.accessoryPatternsByMuscle).length > 0 && (
-                    <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🔄 Паттерны изоляции по мышцам (ротируются):</div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                        {Object.entries(report.accessoryPatternsByMuscle).map(([muscle, pats]) => {
-                          const uniqPats = Array.from(new Set(pats as string[]));
-                          const ruMuscle = (MUSCLE_LABEL_RU as any)[muscle] || muscle;
-                          const ruPats = uniqPats.map(p => (SUMMARY_PATTERN_RU as any)[p] || p).join(' · ');
-                          return (
-                            <div key={muscle} style={{ display:'flex', justifyContent:'space-between', gap:8, padding:'4px 7px', background:'rgba(255,255,255,0.03)', borderRadius:6, fontSize:10, color:'#fff' }}>
-                              <span style={{ fontWeight:700, color:'#a855f7' }}>{ruMuscle}</span>
-                              <span style={{ flex:1, textAlign:'right', opacity:0.9 }}>{ruPats || '—'}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ padding:'6px 9px', borderRadius:8, background: report.issues.length === 0 ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.07)', border:`1px solid ${report.issues.length === 0 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.15)'}` }}>
-                    <div style={{ fontSize:11, fontWeight:700, color: report.issues.length === 0 ? '#22c55e' : '#f59e0b', marginBottom:4 }}>{report.issues.length === 0 ? '✅ Ротация в норме' : `⚠️ Найдено ${report.issues.length} замечаний:`}</div>
-                    {report.issues.length === 0
-                      ? <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>Базовые стабильны, изоляция варьируется — прогрессия и разнообразие сбалансированы.</div>
-                      : report.issues.slice(0, 8).map((issue: { code?: string; phase?: string; message: string }, i: number) => (
-                        <div key={i} style={{ fontSize:10, color: issue.code === 'primary_changed' ? '#f59e0b' : '#fff', padding:'3px 6px', background: issue.code === 'primary_changed' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:3 }}>
-                           {issue.phase ? <span style={{ fontWeight:700, color:'#60a5fa' }}>[{PHASE_LABELS[issue.phase as BBPhase] || issue.phase}]</span> : null} {issue.message}
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              }
-            />
-          );
-        })()}
-
-        {builtPlan.fatigueReport && (() => {
-          const current = builtPlan.fatigueReport.find(item => item.week === wk.week) || builtPlan.fatigueReport[0];
-          const time = current.sessions.reduce((sum, session) => sum + session.timeSeconds, 0);
-          const axial = current.sessions.reduce((sum, session) => sum + session.axial, 0);
-          const systemic = current.sessions.reduce((sum, session) => sum + session.systemic, 0);
-          const timeMin = Math.round(time / 60);
-          const axialLvl = axial > 12 ? 'высокая' : axial > 6 ? 'умеренная' : 'низкая';
-          const sysLvl = systemic > 20 ? 'высокая' : systemic > 12 ? 'умеренная' : 'низкая';
-          return (
-            <ExpandableCard title="⚙️ Усталость и длительность" icon="⚙️"
-              short={`${timeMin} мин в неделю · осевая ${axial.toFixed(1)} (${axialLvl})`}
-              full={
-                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, fontSize:11 }}>
-                    <div style={{ padding:'8px 6px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}>
-                      <div style={{ fontSize:10, color:'#fff' }}>⏱ Длительность (неделя)</div><b style={{ color:'#60a5fa', fontSize:14 }}>{timeMin} мин</b><div style={{ fontSize:9, color:'#fff', marginTop:2 }}>сумма времени всех тренировок недели с отдыхом</div>
-                    </div>
-                    <div style={{ padding:'8px 6px', borderRadius:8, background: systemic > 20 ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.06)', border: systemic > 20 ? '1px solid rgba(239,68,68,0.15)' : '1px solid rgba(34,197,94,0.15)', textAlign:'center' }}>
-                      <div style={{ fontSize:10, color:'#fff' }}>🧠 Системная усталость</div><b style={{ color: systemic > 20 ? '#ef4444' : '#22c55e', fontSize:14 }}>{systemic.toFixed(1)}</b><div style={{ fontSize:9, color:'#fff', marginTop:2 }}>общая нагрузка на ЦНС ({sysLvl}) · изоляция 1.0, база 2.0 × RIR</div>
-                    </div>
-                    <div style={{ padding:'8px 6px', borderRadius:8, background: axial > 12 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: axial > 12 ? '1px solid rgba(239,68,68,0.15)' : '1px solid rgba(245,158,11,0.15)', textAlign:'center' }}>
-                      <div style={{ fontSize:10, color:'#fff' }}>🦴 Осевая нагрузка</div><b style={{ color: axial > 12 ? '#ef4444' : '#f59e0b', fontSize:14 }}>{axial.toFixed(1)}</b><div style={{ fontSize:9, color:'#fff', marginTop:2 }}>на позвоночник ({axialLvl}) · присед/становая = 2 за сет</div>
-                    </div>
-                  </div>
-                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.4, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8 }}>
-                    <b>Как читать:</b> Длительность — чистое время тренировок + отдых. Системная — сумма усталости всех упражнений (чем больше база и ближе к отказу, тем выше). Осевая — нагрузка на поясницу/позвоночник от приседов/тяг. При высокой осевой (&gt;12) добавьте день отдыха между тяжёлыми днями ног.
-                  </div>
-                </div>
-              }
-            />
-          );
-        })()}
-
-        {builtPlan.report && (() => {
-          const report = builtPlan.report;
-          const LEVEL_RU: Record<string,string> = { beginner:'Новичок', intermediate:'Средний', advanced:'Опытный', enhanced:'Enhanced' };
-          const GOAL_RU: Record<string,string> = { mass:'Масса', cut:'Сушка', recomp:'Рекомпозиция', maintenance:'Поддержание', strength_mass:'Сила+Масса' };
-          const FOCUS_RU: Record<string,string> = { strength:'Сила', hypertrophy:'Гипертрофия', endurance:'Выносливость' };
-          const METH_RU: Record<string,string> = { compound_first:'База→изоляция', pre_exhaust:'Пред-истощение', post_exhaust:'Пост-истощение' };
-          const ROT_RU: Record<string,string> = { forbid:'запрет', strict:'строгий', variety:'разнообразие' };
-          const INT_RU: Record<string,string> = { light:'лёгкая', moderate:'умеренная', high:'высокая' };
-          return (
-            <ExpandableCard title="📋 Итоговый отчёт программы — сводка и проверка" icon="📋"
-              short={`${report.weeks} недель · ${report.totalDirectSets} прямых подходов всего (~${Math.round(report.totalDirectSets / Math.max(1, report.weeks))} в неделю) · пик неделя ${report.peakWeek} · ${report.sessionsPerWeek} тренировок в неделю`}
-              full={
-                <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
-                  <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'#fff', lineHeight:1.55 }}>
-                    <div style={{ fontWeight:800, color:'#60a5fa', marginBottom:4 }}>⚙️ Параметры сборки</div>
-                    <div><b>Уровень:</b> {LEVEL_RU[(builtPlan as any).level] || (builtPlan as any).level || '—'} · <b>Цель:</b> {GOAL_RU[(builtPlan as any).goal] || (builtPlan as any).goal || '—'} · <b>Фокус:</b> {FOCUS_RU[(builtPlan as any).trainingFocus] || (builtPlan as any).trainingFocus || '—'} · <b>Методика:</b> {METH_RU[(builtPlan as any).methodology] || (builtPlan as any).methodology || '—'}</div>
-                    <div style={{ marginTop:3 }}><b>Объём:</b> {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (' + ((builtPlan as any).volumeScheme || 'MRV') + ', кап 5 подходов)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'MAV') + ')'} · <b>Стаж:</b> {(builtPlan as any).trainingYears ?? '—'} лет · <b>Лимиты сессии:</b> {(builtPlan as any).maxWorkingSets} подходов / {(builtPlan as any).maxExercises} упражнений</div>
-                    {pedAdapt.activePEDs.length > 0 && (
-                      <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background: pedAdapt.combinedMrvMultiplier > 1.2 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(245,158,11,0.2)' }}>
-                        <b>💉 Фарма:</b> {pedAdapt.activePEDs.join(', ')} · MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} · Восстановление ×{(pedAdapt as any).combinedRecoveryMultiplier?.toFixed(2) || '—'}
-                        {Object.keys(pedDoses).length > 0 && <><br/>Дозы: {Object.entries(pedDoses).map(([k,v])=>`${k}: ${v} мг/нед`).join(' · ')}</>}
-                      </div>
-                    )}
-                    {(() => {
-                      const pp = (linked as any)?.profile?.settings?.personal;
-                      if (!pp || (!pp.weight && !pp.bodyFat && !pp.sex)) return null;
-                      const leanMass = pp.weight && pp.bodyFat ? (pp.weight * (1 - pp.bodyFat/100)).toFixed(1) : null;
-                      const sexRu = pp.sex === 'male' ? 'муж' : pp.sex === 'female' ? 'жен' : pp.sex;
-                      return (
-                        <div style={{ marginTop:6, fontSize:10, color:'#fff', padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:8 }}>
-                          <b>👤 Атлет:</b> {sexRu || '—'} {pp.age ? `${pp.age} лет` : '—'} {pp.weight ? `${pp.weight} кг` : '—'}{pp.height ? ` / ${pp.height} см` : ''} {pp.bodyFat ? ` · жир ${pp.bodyFat}%` : ''} {leanMass ? ` · сухая масса ${leanMass} кг` : ''}
-                        </div>
-                      );
-                    })()}
-                    {(() => {
-                      const methods = buildBBMethodologySummary(builtPlan);
-                      const SUPER_RU: Record<string,string> = { none:'выкл', antagonist:'антагонисты (грудь↔спина, биц↔триц)', same_muscle:'одна группа (пробить)', giant:'гигант-сет (3 упр.)' };
-                      const DUP_RU: Record<string,string> = { none:'выкл', heavy_light:'тяж/лёг', strength_hypertrophy:'сила/гипертрофия', full_dup:'полный DUP (3 дня)' };
-                      const SCHEME_RU: Record<string,string> = { standard:'Стандарт', gvt:'GVT 10×10', fst7:'FST-7', gironda:'8×8 Жиронда' };
-                      const superset = (builtPlan as any).supersetMode;
-                      const dup = (builtPlan as any).dupMode;
-                      const scheme = (builtPlan as any).volumeScheme;
-                      const hasMeth = methods.length > 0 || superset || dup || scheme || (builtPlan as any).priorityMuscles?.length;
-                      if (!hasMeth) return null;
-                      return (
-                        <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(168,85,247,0.06)', borderRadius:8, border:'1px solid rgba(168,85,247,0.12)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                          <div style={{ fontWeight:800, color:'#a855f7', marginBottom:4 }}>🧩 Применённые методики</div>
-                          {methods.length > 0 && <div style={{ marginBottom:4 }}>{methods.map((m, i) => <div key={i}>✓ {m}</div>)}</div>}
-                          {superset && superset !== 'none' && <div>✓ Суперсеты: {SUPER_RU[superset] || superset}</div>}
-                          {dup && dup !== 'none' && <div>✓ Волновая периодизация (DUP): {DUP_RU[dup] || dup}</div>}
-                          {scheme && scheme !== 'standard' && <div>✓ Схема объёма памп-дней: {SCHEME_RU[scheme] || scheme}</div>}
-                          {(builtPlan as any).priorityMuscles?.length ? <div>✓ Акцент (специализация): {(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}</div> : null}
-                        </div>
-                      );
-                    })()}
-                    {(() => {
-                      const s = (builtPlan as any).inputSnapshot;
-                      if (!s) return null;
-                      const parts: string[] = [];
-                      if (s.rotationMode) parts.push(`Ротация: ${ROT_RU[s.rotationMode] || s.rotationMode}`);
-                      if (s.intensityLevel) parts.push(`Интенсивность: ${INT_RU[s.intensityLevel] || s.intensityLevel}`);
-                      if (s.avoidAxialLoad) parts.push('Без осевой нагрузки');
-                      if (s.equipment?.length) parts.push(`Оборудование: ${s.equipment.slice(0, 3).join(', ')}${s.equipment.length > 3 ? '…' : ''}`);
-                      if (s.injuries?.length) parts.push(`Травм учтено: ${s.injuries.length}`);
-                      if (s.mobilityRestrictions?.length) parts.push(`Ограничения мобильности: ${s.mobilityRestrictions.join(', ')}`);
-                      if (s.autoDeload != null) parts.push(`Авто-разгрузка: ${s.autoDeload ? 'да' : 'нет'}`);
-                      if (s.eccentricMult && s.eccentricMult !== 1) parts.push(`Эксцентрик ×${s.eccentricMult}`);
-                      return parts.length ? <div style={{ marginTop:6, fontSize:10, color:'#fff', lineHeight:1.4 }}><b>Детали:</b> {parts.join(' · ')}</div> : null;
-                    })()}
-                  </div>
-                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', color:'#fff', lineHeight:1.45 }}>
-                    <b>Фазы:</b> {(() => {
-                      const ru: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
-                      const seq: Array<{ p: string; from: number; to: number }> = [];
-                      for (const wk of (builtPlan as any).weeks || []) {
-                        const ph = String(wk.phase || '').toLowerCase();
-                        const last = seq[seq.length - 1];
-                        if (last && last.p === ph) last.to = wk.week; else seq.push({ p: ph, from: wk.week, to: wk.week });
-                      }
-                      return seq.map(s => `${ru[s.p] || s.p}: нед ${s.from}${s.to !== s.from ? '-' + s.to : ''}${(builtPlan as any).weeks.find((w: any) => w.week === s.to)?.deload ? ' (делод)' : ''}`).join(' · ');
-                    })()}
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Сессий в неделю</div><b style={{ color:'#fff' }}>{report.sessionsPerWeek}</b></div>
-                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Пик объёма</div><b style={{ color:'#f59e0b' }}>неделя {report.peakWeek}</b></div>
-                    <div style={{ padding:6, borderRadius:8, background: report.rotationWarnings > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border: `1px solid ${report.rotationWarnings > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(34,197,94,0.15)'}`, textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Предупреждений ротации</div><b style={{ color: report.rotationWarnings > 0 ? '#f59e0b' : '#22c55e' }}>{report.rotationWarnings}</b></div>
-                  </div>
-                  <div style={{ color:'#fff', fontSize:10, lineHeight:1.4, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
-                    <b>Нагрузка пиковой сессии:</b> {report.maxSessionMinutes} мин · осевая нагрузка {report.maxAxialCost.toFixed(1)} (на позвоночник) · утечек по мышцам {report.sessionLeakWarnings} {report.sessionLeakWarnings > 0 ? '— упражнение стоит не в свой день' : '— всё по дням'}
-                  </div>
-                </div>
-              }
-            />
-          );
-        })()}
-        {builtPlan.balanceReport && (() => {
-          const b = builtPlan.balanceReport;
-          const MUSCLE_RU_B: Record<string,string> = { chest:'Грудь', back:'Спина', shoulders:'Плечи', quads:'Квадрицепс', hamstrings:'Бицепс бедра', glutes:'Ягодицы', calves:'Икры', biceps:'Бицепс', triceps:'Трицепс', forearms:'Предплечья', abs:'Пресс', traps:'Трапеции' };
-          const ratio = b.pullPressRatio;
-          const ratioOk = ratio >= 0.9 && ratio <= 1.6;
-          const ratioColor = ratioOk ? '#22c55e' : '#f59e0b';
-          return (
-          <ExpandableCard title="⚖️ Баланс паттернов и мышечных позиций" icon="⚖️"
-            short={`${b.press} жимовых · ${b.pull} тяговых · ${b.lengthened} в растянутой`}
-            full={<div style={{ display:'flex', flexDirection:'column', gap:8, fontSize:11, lineHeight:1.5 }}>
-              <div style={{ padding:'8px 10px', borderRadius:10, background: ratioOk ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.07)', border: `1px solid ${ratioOk ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.25)'}`}}>
-                <div style={{ fontWeight:700, color: ratioColor, marginBottom:4 }}>Тяги vs жимы (верх тела): {b.upperPull} / {b.upperPress} — соотношение {ratio.toFixed(2)} {ratioOk ? '✅ норма (0.9-1.6)' : '⚠ вне оптимума'}</div>
-                <div style={{ color:'#fff' }}>Всего: жимы <b>{b.press}</b> · тяги <b>{b.pull}</b> · подъёмы/разводки <b>{b.raise}</b>. Баланс 1:1 тяг к жимам защищает плечевой сустав (тяг должно быть не меньше жимов).</div>
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'#fff' }}>Базовые (compound)</div><b style={{ color:'#60a5fa', fontSize:13 }}>{b.compound}</b><div style={{ fontSize:9, color:'#fff' }}>многосуставные</div>
-                </div>
-                <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)', textAlign:'center' }}>
-                  <div style={{ fontSize:10, color:'#fff' }}>Изоляция</div><b style={{ color:'#a855f7', fontSize:13 }}>{b.isolation}</b><div style={{ fontSize:9, color:'#fff' }}>односуставные</div>
-                </div>
-              </div>
-              <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.12)'}}>
-                <div style={{ fontWeight:700, color:'#22c55e', marginBottom:4 }}>Длина мышцы под нагрузкой (позиции — ключ к гипертрофии):</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, textAlign:'center' }}>
-                  <div style={{ padding:6, background:'rgba(34,197,94,0.06)', borderRadius:8 }}><div style={{ color:'#fff', fontSize:10 }}>Растянутая</div><b style={{ color:'#22c55e' }}>{b.lengthened}</b><div style={{ fontSize:9, color:'#fff' }}>наклон, RDL, overhead</div></div>
-                  <div style={{ padding:6, background:'rgba(59,130,246,0.06)', borderRadius:8 }}><div style={{ color:'#fff', fontSize:10 }}>Средняя</div><b style={{ color:'#3b82f6' }}>{b.midRange}</b><div style={{ fontSize:9, color:'#fff' }}>горизонталь</div></div>
-                  <div style={{ padding:6, background:'rgba(245,158,11,0.06)', borderRadius:8 }}><div style={{ color:'#fff', fontSize:10 }}>Сокращённая</div><b style={{ color:'#f59e0b' }}>{b.shortened}</b><div style={{ fontSize:9, color:'#fff' }}>кроссовер, пик</div></div>
-                </div>
-                <div style={{ fontSize:9, color:'#fff', marginTop:4, lineHeight:1.35 }}>Растянутая позиция — приоритет для роста (Schoenfeld 2022). Стремитесь, чтобы растянутых сетов было не меньше сокращённых.</div>
-              </div>
-              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
-                <div style={{ fontWeight:700, color:'#fff', marginBottom:4 }}>По мышцам (паттерны / позиции растянутая-средняя-сокращённая):</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-                  {Object.entries(b.byMuscle).map(([muscle, cov]) => (
-                    <div key={muscle} style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(255,255,255,0.02)', borderRadius:6 }}>
-                      <span style={{ color:'#fff', fontWeight:600 }}>{MUSCLE_RU_B[muscle] || muscle}</span>
-                      <span style={{ color:'#fff', fontSize:10 }}>{Object.keys(cov.patterns).length} паттернов · {cov.lengthened}-{cov.midRange}-{cov.shortened} · баз {cov.compound} / изо {cov.isolation}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {b.issues.length > 0 && (
-                <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)'}}>
-                  <div style={{ fontWeight:700, color:'#f59e0b', marginBottom:4 }}>⚠ Рекомендации по балансу:</div>
-                  {b.issues.map((issue: string, idx: number) => <div key={idx} style={{ color:'#fff', fontSize:10, lineHeight:1.4 }}>• {issue}</div>)}
-                </div>
-              )}
-              {b.issues.length === 0 && <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(34,197,94,0.06)', color:'#22c55e', fontSize:10 }}>✅ Баланс в норме — все позиции и тяги/жимы покрыты.</div>}
-            </div>}
-          />
-          );
-        })()}
-
         {builtPlan.validation && !builtPlan.validation.valid && (
           <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
             <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', marginBottom:5 }}>🚫 План требует исправления</div>
@@ -4483,6 +4039,309 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         {/* Бюджет объёма — единственный источник perMuscle (пиковая неделя) */}
         {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
+        {/* === Перенесено из Step4 — детальные карточки теперь в Step5 === */}
+        {/* PRO: Per-muscle frequency optimization — полностью на русском */}
+        {freqOptResult && freqOptResult.totalAdjustments > 0 && (
+          <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+            <div style={{ fontSize:12, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>🔧 Оптимизация частоты по мышцам — {freqOptResult.totalAdjustments} корректировок</div>
+            <div style={{ fontSize:10, color:'#fff', marginBottom:8, lineHeight:1.4, padding:'6px 8px', background:'rgba(245,158,11,0.04)', borderRadius:8 }}>На основе восстановления: ACWR (острая/хроническая нагрузка) и тренд силы e1RM. Малая мышца → 2-3×/нед, большая → 1.5-2×/нед. Рекомендации уже учитывают PED и стаж.</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {freqOptResult.recommendations.map((rec: any, i: number) => {
+                const up = rec.recommendedFrequency > rec.currentFrequency;
+                const direction = up ? '↑ повысить' : '↓ снизить';
+                const color = up ? '#22c55e' : '#ef4444';
+                const ruMuscle = (MUSCLE_LABEL_RU as any)[rec.muscle] || rec.muscle;
+                return (
+                  <div key={i} style={{ fontSize:11, color:'#fff', display:'flex', gap:6, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)', lineHeight:1.4 }}>
+                    <span style={{ color, fontWeight:800, whiteSpace:'nowrap' }}>{direction}</span>
+                    <span style={{ fontWeight:700 }}>{ruMuscle}:</span>
+                    <span style={{ fontWeight:700, color }}>{rec.currentFrequency}→{rec.recommendedFrequency}×/нед</span>
+                    <span style={{ color:'#fff', flex:1 }}>{rec.reason}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PRO: Авто-регуляция — полностью на русском */}
+        {(() => {
+          const summary = summarizeAutoRegulation(builtPlan);
+          if (summary.adjustedExercises === 0) return null;
+          return (
+            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:12, fontWeight:800, color:'#a855f7', marginBottom:6 }}>
+                ↻ Авто-регуляция по дневнику: {summary.adjustedExercises}/{summary.totalExercises} упражнений скорректировано
+              </div>
+              <div style={{ fontSize:10, color:'#fff', marginBottom:6, lineHeight:1.4 }}>Сравнение плана и факта (RIR, вес × повторы) — веса/повторы следующей недели подстраиваются под вашу реальную силу, а не слепую линейку.</div>
+              <div style={{ display:'flex', gap:12, fontSize:11, color:'#fff', marginBottom:6, flexWrap:'wrap' }}>
+                {summary.weightIncreases > 0 && <span style={{ color:'#22c55e' }}>↑ Вес повышен: {summary.weightIncreases} упр.</span>}
+                {summary.weightDecreases > 0 && <span style={{ color:'#ef4444' }}>↓ Вес снижен: {summary.weightDecreases} упр.</span>}
+                {summary.rirAdjustments > 0 && <span style={{ color:'#f59e0b' }}>RIR скорректирован: {summary.rirAdjustments} упр.</span>}
+                {summary.plateauDetected > 0 && <span style={{ color:'#ef4444' }}>⚠ Плато: {summary.plateauDetected} групп</span>}
+              </div>
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                {summary.details.slice(0, 5).map((d, i) => (
+                  <div key={i} style={{ fontSize:10, color:'#fff' }}>
+                    {d.exercise}: {d.from} → {d.to}
+                  </div>
+                ))}
+                {summary.details.length > 5 && <div style={{ fontSize:10, color:'#fff' }}>+{summary.details.length - 5} ещё...</div>}
+              </div>
+            </div>
+          );
+        })()}
+
+        {builtPlan.rotationReport && (() => {
+          const report = builtPlan.rotationReport;
+          const primaryCount = Object.keys(report.primaryByMuscle).length;
+          const warningCount = report.issues.length;
+          const totalPrimary = Object.values(report.primaryByMuscle).flat().length;
+          const uniqPrimaries = new Set(Object.values(report.primaryByMuscle).flat()).size;
+          return (
+            <ExpandableCard title="🔁 Ротация упражнений — стабильность базы, вариативность изоляции" icon="🔁"
+              short={`${primaryCount} групп с базой · ${uniqPrimaries} уникальных базовых · ${warningCount} предупреждений`}
+              full={
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <div style={{ fontSize:11, color:'#fff', lineHeight:1.45, padding:'7px 9px', background:'rgba(59,130,246,0.06)', borderRadius:8, border:'1px solid rgba(59,130,246,0.12)' }}>
+                    <b>Принцип:</b> базовые (primary) — стабильны внутри фазы для прогрессии весов; изолирующие (accessory) — ротируются по углам/хватам каждую неделю. Всего базовых движений в плане: {totalPrimary} (уникальных {uniqPrimaries}).
+                  </div>
+                  {Object.keys(report.primaryByMuscle).length > 0 && (
+                    <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.12)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#22c55e', marginBottom:6 }}>🎯 Базовые движения по мышцам (якоря, не меняются внутри фазы):</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {Object.entries(report.primaryByMuscle).map(([muscle, names]) => {
+                          const uniq = Array.from(new Set(names as string[]));
+                          const ruMuscle = (MUSCLE_LABEL_RU as any)[muscle] || muscle;
+                          return (
+                            <div key={muscle} style={{ display:'flex', justifyContent:'space-between', gap:8, padding:'4px 7px', background:'rgba(255,255,255,0.03)', borderRadius:6, fontSize:10, color:'#fff' }}>
+                              <span style={{ fontWeight:700, color:'#22c55e' }}>{ruMuscle}</span>
+                              <span style={{ flex:1, textAlign:'right', opacity:0.9 }}>{uniq.join(' · ') || '—'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {Object.keys(report.accessoryPatternsByMuscle).length > 0 && (
+                    <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🔄 Паттерны изоляции по мышцам (ротируются):</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                        {Object.entries(report.accessoryPatternsByMuscle).map(([muscle, pats]) => {
+                          const uniqPats = Array.from(new Set(pats as string[]));
+                          const ruMuscle = (MUSCLE_LABEL_RU as any)[muscle] || muscle;
+                          const ruPats = uniqPats.map(p => (SUMMARY_PATTERN_RU as any)[p] || p).join(' · ');
+                          return (
+                            <div key={muscle} style={{ display:'flex', justifyContent:'space-between', gap:8, padding:'4px 7px', background:'rgba(255,255,255,0.03)', borderRadius:6, fontSize:10, color:'#fff' }}>
+                              <span style={{ fontWeight:700, color:'#a855f7' }}>{ruMuscle}</span>
+                              <span style={{ flex:1, textAlign:'right', opacity:0.9 }}>{ruPats || '—'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ padding:'6px 9px', borderRadius:8, background: report.issues.length === 0 ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.07)', border:`1px solid ${report.issues.length === 0 ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.15)'}` }}>
+                    <div style={{ fontSize:11, fontWeight:700, color: report.issues.length === 0 ? '#22c55e' : '#f59e0b', marginBottom:4 }}>{report.issues.length === 0 ? '✅ Ротация в норме' : `⚠️ Найдено ${report.issues.length} замечаний:`}</div>
+                    {report.issues.length === 0
+                      ? <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>Базовые стабильны, изоляция варьируется — прогрессия и разнообразие сбалансированы.</div>
+                      : report.issues.slice(0, 8).map((issue: { code?: string; phase?: string; message: string }, i: number) => (
+                        <div key={i} style={{ fontSize:10, color: issue.code === 'primary_changed' ? '#f59e0b' : '#fff', padding:'3px 6px', background: issue.code === 'primary_changed' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)', borderRadius:6, marginBottom:3 }}>
+                           {issue.phase ? <span style={{ fontWeight:700, color:'#60a5fa' }}>[{PHASE_LABELS[issue.phase as BBPhase] || issue.phase}]</span> : null} {issue.message}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan.fatigueReport && (() => {
+          const wkForFatigue = (W[0] as any) as any;
+          const current = builtPlan.fatigueReport.find(item => item.week === (wkForFatigue?.week ?? 1)) || builtPlan.fatigueReport[0];
+          const time = current.sessions.reduce((sum, session) => sum + session.timeSeconds, 0);
+          const axial = current.sessions.reduce((sum, session) => sum + session.axial, 0);
+          const systemic = current.sessions.reduce((sum, session) => sum + session.systemic, 0);
+          const timeMin = Math.round(time / 60);
+          const axialLvl = axial > 12 ? 'высокая' : axial > 6 ? 'умеренная' : 'низкая';
+          const sysLvl = systemic > 20 ? 'высокая' : systemic > 12 ? 'умеренная' : 'низкая';
+          return (
+            <ExpandableCard title="⚙️ Усталость и длительность" icon="⚙️"
+              short={`${timeMin} мин в неделю · осевая ${axial.toFixed(1)} (${axialLvl})`}
+              full={
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, fontSize:11 }}>
+                    <div style={{ padding:'8px 6px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}>
+                      <div style={{ fontSize:10, color:'#fff' }}>⏱ Длительность (неделя)</div><b style={{ color:'#60a5fa', fontSize:14 }}>{timeMin} мин</b><div style={{ fontSize:9, color:'#fff', marginTop:2 }}>сумма времени всех тренировок недели с отдыхом</div>
+                    </div>
+                    <div style={{ padding:'8px 6px', borderRadius:8, background: systemic > 20 ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.06)', border: systemic > 20 ? '1px solid rgba(239,68,68,0.15)' : '1px solid rgba(34,197,94,0.15)', textAlign:'center' }}>
+                      <div style={{ fontSize:10, color:'#fff' }}>🧠 Системная усталость</div><b style={{ color: systemic > 20 ? '#ef4444' : '#22c55e', fontSize:14 }}>{systemic.toFixed(1)}</b><div style={{ fontSize:9, color:'#fff', marginTop:2 }}>общая нагрузка на ЦНС ({sysLvl}) · изоляция 1.0, база 2.0 × RIR</div>
+                    </div>
+                    <div style={{ padding:'8px 6px', borderRadius:8, background: axial > 12 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.06)', border: axial > 12 ? '1px solid rgba(239,68,68,0.15)' : '1px solid rgba(245,158,11,0.15)', textAlign:'center' }}>
+                      <div style={{ fontSize:10, color:'#fff' }}>🦴 Осевая нагрузка</div><b style={{ color: axial > 12 ? '#ef4444' : '#f59e0b', fontSize:14 }}>{axial.toFixed(1)}</b><div style={{ fontSize:9, color:'#fff', marginTop:2 }}>на позвоночник ({axialLvl}) · присед/становая = 2 за сет</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.4, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8 }}>
+                    <b>Как читать:</b> Длительность — чистое время тренировок + отдых. Системная — сумма усталости всех упражнений (чем больше база и ближе к отказу, тем выше). Осевая — нагрузка на поясницу/позвоночник от приседов/тяг. При высокой осевой (&gt;12) добавьте день отдыха между тяжёлыми днями ног.
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan.report && (() => {
+          const report = builtPlan.report;
+          const LEVEL_RU: Record<string,string> = { beginner:'Новичок', intermediate:'Средний', advanced:'Опытный', enhanced:'Enhanced' };
+          const GOAL_RU: Record<string,string> = { mass:'Масса', cut:'Сушка', recomp:'Рекомпозиция', maintenance:'Поддержание', strength_mass:'Сила+Масса' };
+          const FOCUS_RU: Record<string,string> = { strength:'Сила', hypertrophy:'Гипертрофия', endurance:'Выносливость' };
+          const METH_RU: Record<string,string> = { compound_first:'База→изоляция', pre_exhaust:'Пред-истощение', post_exhaust:'Пост-истощение' };
+          const ROT_RU: Record<string,string> = { forbid:'запрет', strict:'строгий', variety:'разнообразие' };
+          const INT_RU: Record<string,string> = { light:'лёгкая', moderate:'умеренная', high:'высокая' };
+          return (
+            <ExpandableCard title="📋 Итоговый отчёт программы — сводка и проверка" icon="📋"
+              short={`${report.weeks} недель · ${report.totalDirectSets} прямых подходов всего (~${Math.round(report.totalDirectSets / Math.max(1, report.weeks))} в неделю) · пик неделя ${report.peakWeek} · ${report.sessionsPerWeek} тренировок в неделю`}
+              full={
+                <div style={{ display:'flex', flexDirection:'column', gap:6, fontSize:11 }}>
+                  <div style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.08)', border:'1px solid rgba(59,130,246,0.15)', color:'#fff', lineHeight:1.55 }}>
+                    <div style={{ fontWeight:800, color:'#60a5fa', marginBottom:4 }}>⚙️ Параметры сборки</div>
+                    <div><b>Уровень:</b> {LEVEL_RU[(builtPlan as any).level] || (builtPlan as any).level || '—'} · <b>Цель:</b> {GOAL_RU[(builtPlan as any).goal] || (builtPlan as any).goal || '—'} · <b>Фокус:</b> {FOCUS_RU[(builtPlan as any).trainingFocus] || (builtPlan as any).trainingFocus || '—'} · <b>Методика:</b> {METH_RU[(builtPlan as any).methodology] || (builtPlan as any).methodology || '—'}</div>
+                    <div style={{ marginTop:3 }}><b>Объём:</b> {(builtPlan as any).trainingVolumeMode === 'high' ? 'Объёмный (' + ((builtPlan as any).volumeScheme || 'MRV') + ', кап 5 подходов)' : 'Обычный (' + ((builtPlan as any).volumeGoal || 'MAV') + ')'} · <b>Стаж:</b> {(builtPlan as any).trainingYears ?? '—'} лет · <b>Лимиты сессии:</b> {(builtPlan as any).maxWorkingSets} подходов / {(builtPlan as any).maxExercises} упражнений</div>
+                    {pedAdapt.activePEDs.length > 0 && (
+                      <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background: pedAdapt.combinedMrvMultiplier > 1.2 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)', border:'1px solid rgba(245,158,11,0.2)' }}>
+                        <b>💉 Фарма:</b> {pedAdapt.activePEDs.join(', ')} · MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} · Восстановление ×{(pedAdapt as any).combinedRecoveryMultiplier?.toFixed(2) || '—'}
+                        {Object.keys(pedDoses).length > 0 && <><br/>Дозы: {Object.entries(pedDoses).map(([k,v])=>`${k}: ${v} мг/нед`).join(' · ')}</>}
+                      </div>
+                    )}
+                    {(() => {
+                      const pp = (linked as any)?.profile?.settings?.personal;
+                      if (!pp || (!pp.weight && !pp.bodyFat && !pp.sex)) return null;
+                      const leanMass = pp.weight && pp.bodyFat ? (pp.weight * (1 - pp.bodyFat/100)).toFixed(1) : null;
+                      const sexRu = pp.sex === 'male' ? 'муж' : pp.sex === 'female' ? 'жен' : pp.sex;
+                      return (
+                        <div style={{ marginTop:6, fontSize:10, color:'#fff', padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:8 }}>
+                          <b>👤 Атлет:</b> {sexRu || '—'} {pp.age ? `${pp.age} лет` : '—'} {pp.weight ? `${pp.weight} кг` : '—'}{pp.height ? ` / ${pp.height} см` : ''} {pp.bodyFat ? ` · жир ${pp.bodyFat}%` : ''} {leanMass ? ` · сухая масса ${leanMass} кг` : ''}
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      const methods = buildBBMethodologySummary(builtPlan);
+                      const SUPER_RU: Record<string,string> = { none:'выкл', antagonist:'антагонисты (грудь↔спина, биц↔триц)', same_muscle:'одна группа (пробить)', giant:'гигант-сет (3 упр.)' };
+                      const DUP_RU: Record<string,string> = { none:'выкл', heavy_light:'тяж/лёг', strength_hypertrophy:'сила/гипертрофия', full_dup:'полный DUP (3 дня)' };
+                      const SCHEME_RU: Record<string,string> = { standard:'Стандарт', gvt:'GVT 10×10', fst7:'FST-7', gironda:'8×8 Жиронда' };
+                      const superset = (builtPlan as any).supersetMode;
+                      const dup = (builtPlan as any).dupMode;
+                      const scheme = (builtPlan as any).volumeScheme;
+                      const hasMeth = methods.length > 0 || superset || dup || scheme || (builtPlan as any).priorityMuscles?.length;
+                      if (!hasMeth) return null;
+                      return (
+                        <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(168,85,247,0.06)', borderRadius:8, border:'1px solid rgba(168,85,247,0.12)', fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                          <div style={{ fontWeight:800, color:'#a855f7', marginBottom:4 }}>🧩 Применённые методики</div>
+                          {methods.length > 0 && <div style={{ marginBottom:4 }}>{methods.map((m, i) => <div key={i}>✓ {m}</div>)}</div>}
+                          {superset && superset !== 'none' && <div>✓ Суперсеты: {SUPER_RU[superset] || superset}</div>}
+                          {dup && dup !== 'none' && <div>✓ Волновая периодизация (DUP): {DUP_RU[dup] || dup}</div>}
+                          {scheme && scheme !== 'standard' && <div>✓ Схема объёма памп-дней: {SCHEME_RU[scheme] || scheme}</div>}
+                          {(builtPlan as any).priorityMuscles?.length ? <div>✓ Акцент (специализация): {(builtPlan as any).priorityMuscles.slice(0, 3).join(', ')}</div> : null}
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      const s = (builtPlan as any).inputSnapshot;
+                      if (!s) return null;
+                      const parts: string[] = [];
+                      if (s.rotationMode) parts.push(`Ротация: ${ROT_RU[s.rotationMode] || s.rotationMode}`);
+                      if (s.intensityLevel) parts.push(`Интенсивность: ${INT_RU[s.intensityLevel] || s.intensityLevel}`);
+                      if (s.avoidAxialLoad) parts.push('Без осевой нагрузки');
+                      if (s.equipment?.length) parts.push(`Оборудование: ${s.equipment.slice(0, 3).join(', ')}${s.equipment.length > 3 ? '…' : ''}`);
+                      if (s.injuries?.length) parts.push(`Травм учтено: ${s.injuries.length}`);
+                      if (s.mobilityRestrictions?.length) parts.push(`Ограничения мобильности: ${s.mobilityRestrictions.join(', ')}`);
+                      if (s.autoDeload != null) parts.push(`Авто-разгрузка: ${s.autoDeload ? 'да' : 'нет'}`);
+                      if (s.eccentricMult && s.eccentricMult !== 1) parts.push(`Эксцентрик ×${s.eccentricMult}`);
+                      return parts.length ? <div style={{ marginTop:6, fontSize:10, color:'#fff', lineHeight:1.4 }}><b>Детали:</b> {parts.join(' · ')}</div> : null;
+                    })()}
+                  </div>
+                  <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', color:'#fff', lineHeight:1.45 }}>
+                    <b>Фазы:</b> {(() => {
+                      const ru: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+                      const seq: Array<{ p: string; from: number; to: number }> = [];
+                      for (const wk of (builtPlan as any).weeks || []) {
+                        const ph = String(wk.phase || '').toLowerCase();
+                        const last = seq[seq.length - 1];
+                        if (last && last.p === ph) last.to = wk.week; else seq.push({ p: ph, from: wk.week, to: wk.week });
+                      }
+                      return seq.map(s => `${ru[s.p] || s.p}: нед ${s.from}${s.to !== s.from ? '-' + s.to : ''}${(builtPlan as any).weeks.find((w: any) => w.week === s.to)?.deload ? ' (делод)' : ''}`).join(' · ');
+                    })()}
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6 }}>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Сессий в неделю</div><b style={{ color:'#fff' }}>{report.sessionsPerWeek}</b></div>
+                    <div style={{ padding:6, borderRadius:8, background:'rgba(255,255,255,0.03)', textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Пик объёма</div><b style={{ color:'#f59e0b' }}>неделя {report.peakWeek}</b></div>
+                    <div style={{ padding:6, borderRadius:8, background: report.rotationWarnings > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.06)', border: `1px solid ${report.rotationWarnings > 0 ? 'rgba(245,158,11,0.15)' : 'rgba(34,197,94,0.15)'}`, textAlign:'center' }}><div style={{ fontSize:10, color:'#fff' }}>Предупреждений ротации</div><b style={{ color: report.rotationWarnings > 0 ? '#f59e0b' : '#22c55e' }}>{report.rotationWarnings}</b></div>
+                  </div>
+                  <div style={{ color:'#fff', fontSize:10, lineHeight:1.4, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.05)' }}>
+                    <b>Нагрузка пиковой сессии:</b> {report.maxSessionMinutes} мин · осевая нагрузка {report.maxAxialCost.toFixed(1)} (на позвоночник) · утечек по мышцам {report.sessionLeakWarnings} {report.sessionLeakWarnings > 0 ? '— упражнение стоит не в свой день' : '— всё по дням'}
+                  </div>
+                </div>
+              }
+            />
+          );
+        })()}
+
+        {builtPlan.balanceReport && (() => {
+          const b = builtPlan.balanceReport;
+          const MUSCLE_RU_B: Record<string,string> = { chest:'Грудь', back:'Спина', shoulders:'Плечи', quads:'Квадрицепс', hamstrings:'Бицепс бедра', glutes:'Ягодицы', calves:'Икры', biceps:'Бицепс', triceps:'Трицепс', forearms:'Предплечья', abs:'Пресс', traps:'Трапеции' };
+          const ratio = b.pullPressRatio;
+          const ratioOk = ratio >= 0.9 && ratio <= 1.6;
+          const ratioColor = ratioOk ? '#22c55e' : '#f59e0b';
+          return (
+          <ExpandableCard title="⚖️ Баланс паттернов и мышечных позиций" icon="⚖️"
+            short={`${b.press} жимовых · ${b.pull} тяговых · ${b.lengthened} в растянутой`}
+            full={<div style={{ display:'flex', flexDirection:'column', gap:8, fontSize:11, lineHeight:1.5 }}>
+              <div style={{ padding:'8px 10px', borderRadius:10, background: ratioOk ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.07)', border: `1px solid ${ratioOk ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.25)'}`}}>
+                <div style={{ fontWeight:700, color: ratioColor, marginBottom:4 }}>Тяги vs жимы (верх тела): {b.upperPull} / {b.upperPress} — соотношение {ratio.toFixed(2)} {ratioOk ? '✅ норма (0.9-1.6)' : '⚠ вне оптимума'}</div>
+                <div style={{ color:'#fff' }}>Всего: жимы <b>{b.press}</b> · тяги <b>{b.pull}</b> · подъёмы/разводки <b>{b.raise}</b>. Баланс 1:1 тяг к жимам защищает плечевой сустав (тяг должно быть не меньше жимов).</div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.12)', textAlign:'center' }}>
+                  <div style={{ fontSize:10, color:'#fff' }}>Базовые (compound)</div><b style={{ color:'#60a5fa', fontSize:13 }}>{b.compound}</b><div style={{ fontSize:9, color:'#fff' }}>многосуставные</div>
+                </div>
+                <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)', textAlign:'center' }}>
+                  <div style={{ fontSize:10, color:'#fff' }}>Изоляция</div><b style={{ color:'#a855f7', fontSize:13 }}>{b.isolation}</b><div style={{ fontSize:9, color:'#fff' }}>односуставные</div>
+                </div>
+              </div>
+              <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.12)'}}>
+                <div style={{ fontWeight:700, color:'#22c55e', marginBottom:4 }}>Длина мышцы под нагрузкой (позиции — ключ к гипертрофии):</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, textAlign:'center' }}>
+                  <div style={{ padding:6, background:'rgba(34,197,94,0.06)', borderRadius:8 }}><div style={{ color:'#fff', fontSize:10 }}>Растянутая</div><b style={{ color:'#22c55e' }}>{b.lengthened}</b><div style={{ fontSize:9, color:'#fff' }}>наклон, RDL, overhead</div></div>
+                  <div style={{ padding:6, background:'rgba(59,130,246,0.06)', borderRadius:8 }}><div style={{ color:'#fff', fontSize:10 }}>Средняя</div><b style={{ color:'#3b82f6' }}>{b.midRange}</b><div style={{ fontSize:9, color:'#fff' }}>горизонталь</div></div>
+                  <div style={{ padding:6, background:'rgba(245,158,11,0.06)', borderRadius:8 }}><div style={{ color:'#fff', fontSize:10 }}>Сокращённая</div><b style={{ color:'#f59e0b' }}>{b.shortened}</b><div style={{ fontSize:9, color:'#fff' }}>кроссовер, пик</div></div>
+                </div>
+                <div style={{ fontSize:9, color:'#fff', marginTop:4, lineHeight:1.35 }}>Растянутая позиция — приоритет для роста (Schoenfeld 2022). Стремитесь, чтобы растянутых сетов было не меньше сокращённых.</div>
+              </div>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)'}}>
+                <div style={{ fontWeight:700, color:'#fff', marginBottom:4 }}>По мышцам (паттерны / позиции растянутая-средняя-сокращённая):</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                  {Object.entries(b.byMuscle).map(([muscle, cov]) => (
+                    <div key={muscle} style={{ display:'flex', justifyContent:'space-between', padding:'3px 6px', background:'rgba(255,255,255,0.02)', borderRadius:6 }}>
+                      <span style={{ color:'#fff', fontWeight:600 }}>{MUSCLE_RU_B[muscle] || muscle}</span>
+                      <span style={{ color:'#fff', fontSize:10 }}>{Object.keys(cov.patterns).length} паттернов · {cov.lengthened}-{cov.midRange}-{cov.shortened} · баз {cov.compound} / изо {cov.isolation}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {b.issues.length > 0 && (
+                <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)'}}>
+                  <div style={{ fontWeight:700, color:'#f59e0b', marginBottom:4 }}>⚠ Рекомендации по балансу:</div>
+                  {b.issues.map((issue: string, idx: number) => <div key={idx} style={{ color:'#fff', fontSize:10, lineHeight:1.4 }}>• {issue}</div>)}
+                </div>
+              )}
+              {b.issues.length === 0 && <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(34,197,94,0.06)', color:'#22c55e', fontSize:10 }}>✅ Баланс в норме — все позиции и тяги/жимы покрыты.</div>}
+            </div>}
+          />
+          );
+        })()}
+
+
         {/* Логика построения — ВСЕ пункты, без обрезки и EN-мусора */}
         {(() => {
           const rationale = builtPlan.rationale || [];
