@@ -28,9 +28,9 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   }, []);
 
   return (
-    <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#000' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center center' }} />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.9) 100%)' }} />
+    <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#000' }}>
+      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center', filter:'saturate(1.05) contrast(1.04)' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0) 42%, rgba(0,0,0,0.55) 72%, rgba(0,0,0,0.85) 100%)' }} />
       <div style={{ position:'absolute', bottom:70, left:16, right:16, zIndex:2 }}>
 
         {/* 🩺 Сводка симптомов */}
@@ -40,12 +40,12 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
               <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:2 }}>
                 🩺 Симптомы: {symptomStats.activeSymptoms} активных
               </div>
-              <div style={{ display:'flex', gap:8, fontSize:10, color:'#94a3b8', flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:8, fontSize:10, color:'#fff', flexWrap:'wrap' }}>
                 <span style={{ color:'#4caf50' }}>📉 {symptomStats.improving}</span>
                 <span style={{ color:'#ff9800' }}>➡️ {symptomStats.stable}</span>
                 <span style={{ color:'#f44336' }}>📈 {symptomStats.worsening}</span>
                 <span style={{ color:'#8bc34a' }}>✅ {symptomStats.resolved}</span>
-                <span>Ср. {symptomStats.todayScore}/10</span>
+                <span style={{ color:'#fff' }}>Ср. {symptomStats.todayScore}/10</span>
               </div>
               {adherence.activeCount > 0 && (
                 <div style={{ fontSize:9, color:'#8b5cf6', marginTop:2 }}>

@@ -81,7 +81,7 @@ export const MarketplaceScreen: React.FC = () => {
   }, [items, filter, sort]);
 
   if (loading) {
-    return <div className="screen marketplace" style={{ padding: 24, color:'rgba(255,255,255,0.72)', fontFamily: FONT }}>Загрузка Маркетплейс…</div>;
+    return <div className="screen marketplace" style={{ padding: 24, color:'#fff', fontFamily: FONT }}>Загрузка Маркетплейс…</div>;
   }
 
   return (
@@ -91,9 +91,9 @@ export const MarketplaceScreen: React.FC = () => {
         <div style={{ width:34, height:34, borderRadius:11, background:'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,230,138,0.06))', border:'1px solid rgba(0,230,138,0.20)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, boxShadow:'0 4px 16px rgba(0,230,138,0.18)' }}>🛍️</div>
         <div style={{ flex:1, minWidth:0 }}>
           <h2 style={{ margin:0, fontSize:17, fontWeight:900, color:'#fff', letterSpacing:'-0.03em', lineHeight:1 }}>Магазин</h2>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.48)', fontWeight:600, letterSpacing:'0.02em' }}>{items.length} товаров · лучшие цены · партнёрские ссылки</div>
+          <div style={{ fontSize:10, color:'#fff', fontWeight:600, letterSpacing:'0.02em' }}>{items.length} товаров · лучшие цены · партнёрские ссылки</div>
         </div>
-        <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.62)' }}>{filtered.length} найдено</span>
+        <span style={{ padding:'5px 10px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, fontWeight:800, color:'#fff' }}>{filtered.length} найдено</span>
       </div>
 
       {/* Tab pills — premium */}
@@ -102,7 +102,7 @@ export const MarketplaceScreen: React.FC = () => {
           flex:1, padding:'11px 12px', borderRadius:12, fontSize:12, fontWeight:800, cursor:'pointer', fontFamily: FONT, letterSpacing:'-0.01em',
           background: shopTab === 'catalog' ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(0,230,138,0.08))' : 'rgba(255,255,255,0.05)',
           border: shopTab === 'catalog' ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.07)',
-          color: shopTab === 'catalog' ? '#00e68a' : 'rgba(255,255,255,0.72)',
+          color: shopTab === 'catalog' ? '#00e68a' : '#fff',
           backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
           boxShadow: shopTab === 'catalog' ? '0 6px 18px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.07)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
           transition:'all 0.18s',
@@ -111,7 +111,7 @@ export const MarketplaceScreen: React.FC = () => {
           flex:1, padding:'11px 12px', borderRadius:12, fontSize:12, fontWeight:800, cursor:'pointer', fontFamily: FONT, letterSpacing:'-0.01em',
           background: shopTab === 'cart' ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(0,230,138,0.08))' : 'rgba(255,255,255,0.05)',
           border: shopTab === 'cart' ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.07)',
-          color: shopTab === 'cart' ? '#00e68a' : 'rgba(255,255,255,0.72)',
+          color: shopTab === 'cart' ? '#00e68a' : '#fff',
           backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
           boxShadow: shopTab === 'cart' ? '0 6px 18px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.07)' : 'inset 0 1px 0 rgba(255,255,255,0.04)',
           transition:'all 0.18s',
@@ -130,7 +130,7 @@ export const MarketplaceScreen: React.FC = () => {
                   padding:'7px 13px', borderRadius:999, fontSize:11, cursor:'pointer', fontWeight: active ? 800 : 600, fontFamily: FONT,
                   background: active ? `${grad}` : 'rgba(255,255,255,0.05)',
                   border: active ? '1px solid rgba(255,255,255,0.14)' : '1px solid rgba(255,255,255,0.07)',
-                  color: active ? '#fff' : 'rgba(255,255,255,0.62)',
+                  color: '#fff',
                   boxShadow: active ? '0 6px 16px rgba(0,0,0,0.22)' : 'none',
                   backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
                   transition:'all 0.18s',
@@ -140,14 +140,14 @@ export const MarketplaceScreen: React.FC = () => {
           </div>
           {/* Sort + count — glass bar */}
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10, padding:'7px 8px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
-            <span style={{ fontSize:11, color:'rgba(255,255,255,0.48)', fontWeight:700 }}>Найдено <b style={{ color:'#fff' }}>{filtered.length}</b></span>
+            <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>Найдено <b style={{ color:'#fff' }}>{filtered.length}</b></span>
             <div style={{ display:'flex', gap:5 }}>
               {([['price','Цена'],['category','Категория'],['name','Название']] as [SortMode,string][]).map(([mode,label]) => (
                 <button key={mode} onClick={() => setSort(mode)} style={{
                   padding:'5px 10px', borderRadius:999, fontSize:10, cursor:'pointer', fontWeight:700, fontFamily: FONT,
                   background: sort === mode ? 'rgba(0,230,138,0.14)' : 'transparent',
                   border: sort === mode ? '1px solid rgba(0,230,138,0.26)' : '1px solid rgba(255,255,255,0.07)',
-                  color: sort === mode ? '#00e68a' : 'rgba(255,255,255,0.56)',
+                  color: sort === mode ? '#00e68a' : '#fff',
                 }}>{label}</button>
               ))}
             </div>
@@ -189,9 +189,9 @@ export const MarketplaceScreen: React.FC = () => {
                           {best && <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', padding:'3px 9px', borderRadius:999 }}>от {best.price} {best.currency}</span>}
                         </div>
                       </div>
-                      <span style={{ width:28, height:28, borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'rgba(255,255,255,0.72)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.22s', flexShrink:0 }}>▼</span>
+                      <span style={{ width:28, height:28, borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#fff', transform: isExpanded ? 'rotate(180deg)' : 'none', transition:'transform 0.22s', flexShrink:0 }}>▼</span>
                     </div>
-                    {item.dailyDose && <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:7, display:'flex', alignItems:'center', gap:6, position:'relative' }}><span style={{ width:6, height:6, borderRadius:'50%', background:'rgba(0,230,138,0.9)', boxShadow:'0 0 8px rgba(0,230,138,0.5)', display:'inline-block' }} /> {item.dailyDose}</div>}
+                    {item.dailyDose && <div style={{ fontSize:11, color:'#fff', marginTop:7, display:'flex', alignItems:'center', gap:6, position:'relative' }}><span style={{ width:6, height:6, borderRadius:'50%', background:'rgba(0,230,138,0.9)', boxShadow:'0 0 8px rgba(0,230,138,0.5)', display:'inline-block' }} /> {item.dailyDose}</div>}
                     {item.mechanisms && item.mechanisms.length > 0 && (
                       <div style={{ display:'flex', gap:5, marginTop:7, flexWrap:'wrap', position:'relative' }}>
                         {item.mechanisms.map(m => (
@@ -203,14 +203,14 @@ export const MarketplaceScreen: React.FC = () => {
                   </div>
                   {isExpanded && (
                     <div style={{ margin:'0 12px 12px', padding:'10px 10px 8px', borderRadius:12, background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)', position:'relative' }}>
-                      <div style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.42)', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:6 }}>Где купить</div>
+                      <div style={{ fontSize:10, fontWeight:800, color:'#fff', letterSpacing:'0.06em', textTransform:'uppercase', marginBottom:6 }}>Где купить</div>
                       {item.purchaseOptions.map((opt, idx) => {
                         const isBest = best && opt.platform === best.platform && opt.price === best.price;
                         return (
                           <div key={idx} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom: idx < item.purchaseOptions.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                             <div style={{ display:'flex', alignItems:'center', gap:7 }}>
                               <span style={{ fontWeight:800, color:'#fff', fontSize:12 }}>{opt.platform}</span>
-                              <span style={{ color:'rgba(255,255,255,0.62)', fontSize:12, fontWeight:700 }}>{opt.price} {opt.currency}</span>
+                              <span style={{ color:'#fff', fontSize:12, fontWeight:700 }}>{opt.price} {opt.currency}</span>
                               {isBest && <span style={{ marginLeft:2, padding:'2px 7px', borderRadius:999, background:'rgba(0,230,138,0.14)', color:'#00e68a', fontSize:9, fontWeight:800, border:'1px solid rgba(0,230,138,0.22)' }}>✓ Лучшая</span>}
                             </div>
                             <a href={generateAffiliateLink(opt)} target="_blank" rel="noopener noreferrer" style={{
@@ -239,7 +239,7 @@ export const MarketplaceScreen: React.FC = () => {
             <div style={{ marginTop:14, padding:'30px 16px', borderRadius:16, background:'rgba(255,255,255,0.03)', border:'1px dashed rgba(255,255,255,0.10)', textAlign:'center' }}>
               <div style={{ fontSize:28, marginBottom:6 }}>🔍</div>
               <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Ничего не найдено</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.48)', marginTop:4 }}>Попробуйте сменить фильтр или сортировку</div>
+              <div style={{ fontSize:11, color:'#fff', marginTop:4 }}>Попробуйте сменить фильтр или сортировку</div>
             </div>
           )}
         </div>
@@ -248,7 +248,7 @@ export const MarketplaceScreen: React.FC = () => {
       {shopTab === 'cart' && (
         <div style={{ padding:'0 12px 84px' }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', margin:'10px 0 10px', padding:'8px 10px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize:11, color:'rgba(255,255,255,0.52)', fontWeight:700 }}>{cart.length} позиций в корзине</span>
+            <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>{cart.length} позиций в корзине</span>
             {cart.length > 0 && (
               <button onClick={() => updateCart([])} style={{
                 padding:'7px 12px', borderRadius:999, fontSize:11, cursor:'pointer', fontWeight:700, fontFamily: FONT,
@@ -260,7 +260,7 @@ export const MarketplaceScreen: React.FC = () => {
             <div style={{ textAlign:'center', padding:'48px 20px', borderRadius:16, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(12px)' }}>
               <div style={{ width:64, height:64, borderRadius:18, margin:'0 auto 12px', background:'radial-gradient(120% 120% at 30% 20%, rgba(0,230,138,0.16), transparent 65%)', border:'1px solid rgba(0,230,138,0.14)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, boxShadow:'0 12px 32px rgba(0,230,138,0.12)' }}>🛒</div>
               <div style={{ fontSize:15, fontWeight:800, color:'#fff', letterSpacing:'-0.02em' }}>Корзина пуста</div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,0.48)', lineHeight:1.5, marginTop:6 }}>
+              <div style={{ fontSize:11, color:'#fff', lineHeight:1.5, marginTop:6 }}>
                 Добавьте препараты из каталога<br/>или из плана поддержки — соберём список покупок
               </div>
               <button onClick={()=>setShopTab('catalog')} style={{ marginTop:14, padding:'9px 16px', borderRadius:999, background:'#fff', color:'#000', border:'none', fontWeight:800, fontSize:12, cursor:'pointer', fontFamily: FONT }}>Перейти в каталог →</button>
@@ -278,7 +278,7 @@ export const MarketplaceScreen: React.FC = () => {
                     <div style={{ width:38, height:38, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,230,138,0.06))', border:'1px solid rgba(0,230,138,0.18)', fontSize:17, flexShrink:0 }}>💊</div>
                     <div style={{ flex:1, minWidth:0 }}>
                       <div style={{ fontSize:12, fontWeight:800, color:'#fff', letterSpacing:'-0.01em', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{item.name}</div>
-                      <div style={{ fontSize:10, color:'rgba(255,255,255,0.48)', marginTop:2 }}>{item.dose || '—'}{item.timing ? ` · ${item.timing}` : ''}</div>
+                      <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>{item.dose || '—'}{item.timing ? ` · ${item.timing}` : ''}</div>
                     </div>
                     <button onClick={() => removeFromCart(idx)} style={{
                       padding:'7px 11px', borderRadius:999, fontSize:10, cursor:'pointer', fontFamily: FONT, fontWeight:700,
@@ -289,8 +289,8 @@ export const MarketplaceScreen: React.FC = () => {
               </div>
               <div style={{ marginTop:14, padding:14, background:'rgba(255,255,255,0.04)', borderRadius:16, border:'1px solid rgba(0,230,138,0.18)', backdropFilter:'blur(14px)', boxShadow:'0 10px 28px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
-                  <span style={{ fontSize:11, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:'0.04em', textTransform:'uppercase' }}>Итого</span>
-                  <span style={{ fontSize:18, fontWeight:900, color:'#00e68a', letterSpacing:'-0.03em' }}>{cart.length} <span style={{ fontSize:11, color:'rgba(255,255,255,0.48)', fontWeight:700 }}>шт</span></span>
+                  <span style={{ fontSize:11, color:'#fff', fontWeight:700, letterSpacing:'0.04em', textTransform:'uppercase' }}>Итого</span>
+                  <span style={{ fontSize:18, fontWeight:900, color:'#00e68a', letterSpacing:'-0.03em' }}>{cart.length} <span style={{ fontSize:11, color:'#fff', fontWeight:700 }}>шт</span></span>
                 </div>
                 <div style={{ height:1, background:'rgba(255,255,255,0.06)', marginBottom:12 }} />
                 <div style={{ display:'flex', gap:8 }}>
