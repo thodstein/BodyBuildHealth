@@ -78,65 +78,83 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
   const dirArrow: Record<string, string> = { up: '↑', down: '↓', normalize: '↕' };
 
   return (
-    <div className="card" style={{
-      fontSize: 12, lineHeight: 1.6,
-      background: 'transparent', border: 'none', padding: 0, margin: 0,
-      boxShadow: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none', transition: 'none',
-    }}>
-      <h3 style={{ margin: '0 0 8px', color: 'var(--accent)' }}>{sub.name}</h3>
-      <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', marginBottom: 8 }}>
-        <span>Класс:</span><span style={{ fontWeight: 600 }}>{CLASS_LABELS[sub.class] || sub.class}</span>
-        <span>T½:</span><span style={{ fontWeight: 600 }}>{sub.pk ? formatHalfLife(sub.pk.halfLifeHours) : '—'}</span>
-        <span>Биодоступность:</span><span style={{ fontWeight: 600 }}>{sub.pk ? (sub.pk.bioavailability * 100).toFixed(0) : '—'}%</span>
-        <span>Vd:</span><span style={{ fontWeight: 600 }}>{sub.pk ? sub.pk.Vd + ' л' : '—'}</span>
-        <span>Эстеры:</span><span style={{ fontWeight: 600 }}>{sub.esters?.join(', ') || '—'}</span>
+    <div style={{ fontSize:12, lineHeight:1.6, display:'flex', flexDirection:'column', gap:12 }}>
+      {/* hero header */}
+      <div style={{ padding:'14px', borderRadius:14, background:'linear-gradient(135deg, rgba(139,92,246,0.14), rgba(59,130,246,0.08))', border:'1px solid rgba(139,92,246,0.18)', position:'relative', overflow:'hidden' }}>
+        <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 320px 140px at 85% 0%, rgba(139,92,246,0.18), transparent 60%)', pointerEvents:'none' }} />
+        <div style={{ position:'relative', display:'flex', alignItems:'flex-start', gap:10 }}>
+          <div style={{ width:40, height:40, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', fontSize:16, flexShrink:0, boxShadow:'0 6px 16px rgba(139,92,246,0.35)' }}>🧬</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', letterSpacing:-0.3, lineHeight:1.1 }}>{sub.name}</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+              <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.78)', fontWeight:700 }}>{CLASS_LABELS[sub.class] || sub.class}</span>
+              {sub.pk && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.18)', color:'#00e68a', fontWeight:700 }}>T½ {formatHalfLife(sub.pk.halfLifeHours)}</span>}
+              {sub.pk && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.18)', color:'#60a5fa', fontWeight:700 }}>{(sub.pk.bioavailability*100).toFixed(0)}% биодоступность</span>}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* target systems chips */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+        {[
+          { k:'Класс', v: CLASS_LABELS[sub.class] || sub.class },
+          { k:'T½', v: sub.pk ? formatHalfLife(sub.pk.halfLifeHours) : '—' },
+          { k:'Биодоступность', v: sub.pk ? (sub.pk.bioavailability * 100).toFixed(0)+'%' : '—' },
+          { k:'Vd', v: sub.pk ? sub.pk.Vd + ' л' : '—' },
+        ].map(i=>(
+          <div key={i.k} style={{ padding:'8px 10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>{i.k}</div>
+            <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginTop:2 }}>{i.v}</div>
+          </div>
+        ))}
+        <div style={{ gridColumn:'1 / -1', padding:'8px 10px', borderRadius:11, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Эстеры</div>
+          <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginTop:2 }}>{sub.esters?.join(', ') || '—'}</div>
+        </div>
+      </div>
+
       {sub.targetSystems && sub.targetSystems.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Системы-мишени</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.12)' }}>
+          <div style={{ fontSize:10, color:'#818cf8', fontWeight:800, marginBottom:6, letterSpacing:0.3 }}>🎯 Системы-мишени</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {sub.targetSystems.map(s => (
-              <span key={s} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.12)', color: '#818cf8', fontWeight: 500 }}>{SYSTEM_LABELS[s] || s}</span>
+              <span key={s} style={{ fontSize:10, padding:'4px 9px', borderRadius:20, background:'rgba(99,102,241,0.12)', color:'#a5b4fc', fontWeight:700, border:'1px solid rgba(99,102,241,0.18)' }}>{SYSTEM_LABELS[s] || s}</span>
             ))}
           </div>
         </div>
       )}
 
-      {/* cv profile chips */}
       {sub.cvProfile && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Сердечно-сосудистый профиль</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.05)', border:'1px solid rgba(239,68,68,0.12)' }}>
+          <div style={{ fontSize:10, color:'#f87171', fontWeight:800, marginBottom:6 }}>❤️ Сердечно-сосудистый профиль</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {Object.entries(sub.cvProfile).map(([key, val]) => {
               const lbl = CV_VALUE_LABELS[key]?.[val] || val;
               const clr = CV_VALUE_COLORS[key]?.[val] || '#9e9e9e';
               return (
-                <span key={key} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: `${clr}18`, color: clr, fontWeight: 500 }}>{CV_LABELS[key] || key}: {lbl}</span>
+                <span key={key} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:`${clr}14`, color:clr, fontWeight:700, border:`1px solid ${clr}22` }}>{CV_LABELS[key] || key}: {lbl}</span>
               );
             })}
           </div>
         </div>
       )}
-      {labMarkers.length > 0 ? (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>🩸 Контролировать анализы</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+      {labMarkers.length > 0 && (
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.14)' }}>
+          <div style={{ fontSize:10, color:'#f59e0b', fontWeight:800, marginBottom:6 }}>🩸 Контролировать анализы</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {labMarkers.map((marker: string) => (
-              <span key={marker} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(255,152,0,0.12)', color: '#ff9800', fontWeight: 500 }}>{marker}</span>
+              <span key={marker} style={{ fontSize:10, padding:'4px 9px', borderRadius:20, background:'rgba(245,158,11,0.12)', color:'#fbbf24', fontWeight:700, border:'1px solid rgba(245,158,11,0.18)' }}>{marker}</span>
             ))}
           </div>
         </div>
-      ) : null}
+      )}
 
-      {/* linked risks chips */}
       {sub.linkedRisks && sub.linkedRisks.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 3 }}>Связанные риски</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:800, marginBottom:6 }}>Связанные риски</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {sub.linkedRisks.map((r, i) => (
-              <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: r.direction === 'down' ? 'rgba(76,175,80,0.12)' : 'rgba(244,67,54,0.12)', color: r.direction === 'down' ? '#4caf50' : '#f44336', fontWeight: 500 }}>
+              <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background: r.direction === 'down' ? 'rgba(34,197,94,0.10)' : 'rgba(239,68,68,0.10)', color: r.direction === 'down' ? '#4ade80' : '#f87171', fontWeight:700, border:`1px solid ${r.direction==='down'?'rgba(34,197,94,0.18)':'rgba(239,68,68,0.18)'}` }}>
                 {SYSTEM_LABELS[r.system] || r.system} {r.direction === 'up' ? '↑' : '↓'} {Math.round(r.strength * 100)}%
               </span>
             ))}
@@ -144,26 +162,25 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         </div>
       )}
 
-      {/* linked substances — expanded */}
       {sub.linkedSubstances && sub.linkedSubstances.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 10, color: '#22c55e', fontWeight: 700, marginBottom: 4 }}>🔗 Связанные вещества</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+          <div style={{ fontSize:11, color:'#00e68a', fontWeight:800, marginBottom:7, display:'flex', alignItems:'center', gap:6 }}>🔗 Связанные вещества <span style={{ marginLeft:'auto', fontSize:10, background:'rgba(0,230,138,0.12)', padding:'2px 7px', borderRadius:20, color:'#00e68a' }}>{sub.linkedSubstances.length}</span></div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {sub.linkedSubstances.map((ls, i) => {
               const linked = PHARMA_DB[ls.id];
               const isSynergy = ls.type === 'synergy';
-              const clr = isSynergy ? '#00e68a' : '#ff1744';
-              const bg = isSynergy ? 'rgba(0,230,138,0.06)' : 'rgba(255,23,68,0.06)';
-              const border = isSynergy ? 'rgba(0,230,138,0.15)' : 'rgba(255,23,68,0.15)';
+              const clr = isSynergy ? '#00e68a' : '#ef4444';
+              const bg = isSynergy ? 'rgba(0,230,138,0.08)' : 'rgba(239,68,68,0.08)';
+              const border = isSynergy ? 'rgba(0,230,138,0.18)' : 'rgba(239,68,68,0.18)';
               return (
-                <div key={i} style={{ padding: '5px 8px', borderRadius: 6, background: bg, border: `1px solid ${border}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: clr }}>{isSynergy ? '⊕' : '⊖'} {linked?.name || ls.id}</span>
-                    <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 3, background: `${clr}20`, color: clr, fontWeight: 600 }}>
+                <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:bg, border:`1px solid ${border}` }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
+                    <span style={{ fontSize:11, fontWeight:800, color:clr }}>{isSynergy ? '⊕' : '⊖'} {linked?.name || ls.id}</span>
+                    <span style={{ fontSize:9, padding:'2px 6px', borderRadius:20, background:`${clr}18`, color:clr, fontWeight:800 }}>
                       {isSynergy ? 'СИНЕРГИЯ' : 'АНТАГОНИЗМ'} {Math.round(ls.strength * 100)}%
                     </span>
                   </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', lineHeight: 1.3 }}>{ls.mechanism}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.72)', lineHeight:1.4 }}>{ls.mechanism}</div>
                 </div>
               );
             })}
@@ -171,27 +188,22 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         </div>
       )}
 
-      {/* conflicts — expanded */}
       {sub.conflicts && sub.conflicts.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700, marginBottom: 4 }}>🔴 Конфликты и несовместимости</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.14)' }}>
+          <div style={{ fontSize:11, color:'#f87171', fontWeight:800, marginBottom:7 }}>🔴 Конфликты и несовместимости</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {sub.conflicts.map((c, i) => {
-              const sevBg = c.severity === 'HIGH' ? 'rgba(239,68,68,0.08)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.02)';
-              const sevBorder = c.severity === 'HIGH' ? 'rgba(239,68,68,0.2)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)';
-              const sevColor = c.severity === 'HIGH' ? '#ef4444' : c.severity === 'MEDIUM' ? '#f59e0b' : '#9e9e9e';
+              const sevBg = c.severity === 'HIGH' ? 'rgba(239,68,68,0.10)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)';
+              const sevBorder = c.severity === 'HIGH' ? 'rgba(239,68,68,0.22)' : c.severity === 'MEDIUM' ? 'rgba(245,158,11,0.22)' : 'rgba(255,255,255,0.07)';
+              const sevColor = c.severity === 'HIGH' ? '#f87171' : c.severity === 'MEDIUM' ? '#fbbf24' : '#9ca3af';
               return (
-                <div key={i} style={{ padding: '6px 8px', borderRadius: 6, background: sevBg, border: `1px solid ${sevBorder}` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color: sevColor }}>{c.with}</span>
-                    <span style={{ fontSize: 7, padding: '1px 4px', borderRadius: 3, background: `${sevColor}18`, color: sevColor, fontWeight: 600 }}>
-                      {c.severity}
-                    </span>
+                <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:sevBg, border:`1px solid ${sevBorder}` }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                    <span style={{ fontSize:10, fontWeight:800, color:sevColor }}>{c.with}</span>
+                    <span style={{ fontSize:9, padding:'2px 6px', borderRadius:20, background:`${sevColor}16`, color:sevColor, fontWeight:800 }}>{c.severity}</span>
                   </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.35 }}>{c.effect}</div>
-                  {c.mechanism && (
-                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>{c.mechanism}</div>
-                  )}
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.78)', lineHeight:1.4 }}>{c.effect}</div>
+                  {c.mechanism && <div style={{ fontSize:9, color:'rgba(255,255,255,0.42)', marginTop:4, fontStyle:'italic' }}>{c.mechanism}</div>}
                 </div>
               );
             })}
@@ -199,46 +211,42 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         </div>
       )}
 
-      {/* special instructions — expanded */}
       {sub.specialInstructions && sub.specialInstructions.length > 0 && (
-        <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
-          <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, marginBottom: 4 }}>📋 Особые указания</div>
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.16)' }}>
+          <div style={{ fontSize:11, color:'#fbbf24', fontWeight:800, marginBottom:7 }}>📋 Особые указания</div>
           {sub.specialInstructions.map((si, i) => (
-            <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.45, padding: '3px 0 3px 10px', position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 0, color: '#f59e0b', fontWeight: 700 }}>•</span>
-              {si}
+            <div key={i} style={{ fontSize:10, color:'rgba(255,255,255,0.84)', lineHeight:1.5, padding:'4px 0 4px 14px', position:'relative', borderBottom: i < sub.specialInstructions!.length-1 ? '1px solid rgba(245,158,11,0.08)' : 'none' }}>
+              <span style={{ position:'absolute', left:0, color:'#f59e0b', fontWeight:800 }}>•</span>{si}
             </div>
           ))}
         </div>
       )}
 
-      {/* contraindications */}
-      {(sub.contraindications || detail?.contraindications) && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: '#ef4444', fontWeight: 600, marginBottom: 2 }}>🚫 Противопоказания</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+      {(sub.contraindications || detail?.contraindications) && (sub.contraindications || detail?.contraindications || []).length>0 && (
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)' }}>
+          <div style={{ fontSize:10, color:'#f87171', fontWeight:800, marginBottom:6 }}>🚫 Противопоказания</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {(sub.contraindications || detail?.contraindications || []).map((c: string, i: number) => (
-              <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>{c}</span>
+              <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(239,68,68,0.08)', color:'#fca5a5', border:'1px solid rgba(239,68,68,0.12)', fontWeight:600 }}>{c}</span>
             ))}
           </div>
         </div>
       )}
 
-      {/* side effects */}
-      {(sub.sideEffects || detail?.sideEffects) && (
-        <div style={{ marginBottom: 6 }}>
-          <div style={{ fontSize: 9, color: '#f59e0b', fontWeight: 600, marginBottom: 2 }}>⚠ Побочные эффекты</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+      {(sub.sideEffects || detail?.sideEffects) && (sub.sideEffects || detail?.sideEffects || []).length>0 && (
+        <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(245,158,11,0.04)', border:'1px solid rgba(245,158,11,0.12)' }}>
+          <div style={{ fontSize:10, color:'#fbbf24', fontWeight:800, marginBottom:6 }}>⚠ Побочные эффекты</div>
+          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
             {(sub.sideEffects || detail?.sideEffects || []).map((se: any, i: number) => {
-              if (typeof se === 'string') return <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: 'rgba(245,158,11,0.08)', color: '#f59e0b' }}>{se}</span>;
-              return <span key={i} style={{ fontSize: 8, padding: '1px 5px', borderRadius: 3, background: se.frequency === 'common' ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)', color: se.frequency === 'common' ? '#f59e0b' : 'rgba(255,255,255,0.5)' }}>{se.effect}</span>;
+              if (typeof se === 'string') return <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(245,158,11,0.08)', color:'#fcd34d', border:'1px solid rgba(245,158,11,0.12)' }}>{se}</span>;
+              return <span key={i} style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background: se.frequency === 'common' ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.04)', color: se.frequency === 'common' ? '#fcd34d' : 'rgba(255,255,255,0.58)', border:`1px solid ${se.frequency==='common'?'rgba(245,158,11,0.14)':'rgba(255,255,255,0.06)'}` }}>{se.effect} <span style={{ opacity:0.6, fontSize:9 }}>• {se.frequency==='common'?'часто':se.frequency==='rare'?'редко':'очень редко'}</span></span>;
             })}
           </div>
         </div>
       )}
 
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Фармакодинамика</div>
+      <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>📊 Фармакодинамика <span style={{ marginLeft:'auto', fontSize:9, color:'rgba(255,255,255,0.42)' }}>тапни для описания</span></div>
             {pdEntries.map(([key, val]) => {
               const absVal = Math.abs(val);
               const maxScale = key === 'AR_affinity' ? 2 : key === 'hct_impact' ? 6 : key === 'hepatotoxicity' ? 4 : 1.2;
@@ -246,16 +254,16 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
               const mechanism = PD_MECHANISMS[key] || '';
               const isExpanded = expandedPD === key;
               return (
-                <div key={key} style={{ marginBottom: 3 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setExpandedPD(isExpanded ? null : key)}>
-                    <span style={{ fontSize: 11 }}>{PD_LABELS[key] || key} {isExpanded ? '▾' : '▸'}</span>
-                    <span style={{ color: pdBarColor(key, val), fontWeight: 600 }}>{val.toFixed(2)}</span>
+                <div key={key} style={{ marginBottom:8, padding:'7px 8px', borderRadius:9, background: isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent', border:`1px solid ${isExpanded ? 'rgba(255,255,255,0.06)' : 'transparent'}` }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', cursor:'pointer', alignItems:'center' }} onClick={() => setExpandedPD(isExpanded ? null : key)}>
+                    <span style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.88)' }}>{PD_LABELS[key] || key} <span style={{ fontSize:9, color:'rgba(255,255,255,0.32)' }}>{isExpanded ? '▾' : '▸'}</span></span>
+                    <span style={{ color: pdBarColor(key, val), fontWeight:800, fontSize:11, background:`${pdBarColor(key,val)}14`, padding:'2px 7px', borderRadius:20 }}>{val.toFixed(2)}</span>
                   </div>
-                  <div style={{ background: 'var(--border)', borderRadius: 2, height: 4 }}>
-                    <div style={{ width: `${pct}%`, background: pdBarColor(key, val), height: 4, borderRadius: 2, minWidth: 2 }} />
+                  <div style={{ background:'rgba(255,255,255,0.06)', borderRadius:20, height:6, marginTop:6, overflow:'hidden' }}>
+                    <div style={{ width:`${pct}%`, background: pdBarColor(key, val), height:6, borderRadius:20, minWidth:2, boxShadow:`0 0 8px ${pdBarColor(key,val)}55` }} />
                   </div>
                   {isExpanded && mechanism && (
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)', lineHeight: 1.4, marginTop: 2, padding: '3px 6px', background: 'rgba(255,255,255,0.03)', borderRadius: 4 }}>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', lineHeight:1.45, marginTop:6, padding:'6px 8px', background:'rgba(0,0,0,0.18)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>
                       {mechanism}
                     </div>
                   )}
@@ -265,33 +273,32 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
       </div>
 
       {effectLabels.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ fontWeight: 600 }}>Эффекты: </span>
-          <span style={{ color: '#4caf50' }}>{effectLabels.join(' · ')}</span>
+        <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.12)', display:'flex', gap:6, alignItems:'center' }}>
+          <span style={{ fontSize:10, fontWeight:800, color:'#22c55e', whiteSpace:'nowrap' }}>Эффекты:</span>
+          <span style={{ fontSize:10, color:'#86efac', fontWeight:600 }}>{effectLabels.join(' • ')}</span>
         </div>
       )}
       {riskLabels.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ fontWeight: 600 }}>Риски: </span>
-          <span style={{ color: '#ff5252' }}>{riskLabels.join(' · ')}</span>
+        <div style={{ padding:'8px 10px', borderRadius:10, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', display:'flex', gap:6, alignItems:'center' }}>
+          <span style={{ fontSize:10, fontWeight:800, color:'#ef4444', whiteSpace:'nowrap' }}>Риски:</span>
+          <span style={{ fontSize:10, color:'#fca5a5', fontWeight:600 }}>{riskLabels.join(' • ')}</span>
         </div>
       )}
 
-      {/* ── ТЗ механизмы ── */}
       {tzGroupedData && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>🧬 Механизм-ориентированная модель (ТЗ)</div>
+        <div style={{ padding:'12px', borderRadius:12, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>🧬 Механизм-ориентированная модель <span style={{ marginLeft:'auto', fontSize:10, background:'rgba(0,230,138,0.12)', padding:'2px 7px', borderRadius:20 }}>{Object.keys(tzGroupedData).length} систем</span></div>
           {Object.entries(tzGroupedData).map(([organId, mechs]) => (
-              <details key={organId} style={{ marginBottom: 4 }}>
-                <summary style={{ cursor:'pointer', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.02)', fontSize:10, fontWeight:600, listStyle:'none', display:'flex', alignItems:'center', gap:4 }}>
-                  {TZ_SYSTEM_ICONS[organId] || '•'} {TZ_SYSTEM_LABELS[organId] || organId}
-                  <span style={{ marginLeft:'auto', fontSize:8, color:'rgba(255,255,255,0.4)' }}>{mechs.length} мех.</span>
+              <details key={organId} style={{ marginBottom:6, background:'rgba(255,255,255,0.02)', borderRadius:9, border:'1px solid rgba(255,255,255,0.05)', overflow:'hidden' }}>
+                <summary style={{ cursor:'pointer', padding:'8px 10px', fontSize:11, fontWeight:700, listStyle:'none', display:'flex', alignItems:'center', gap:6, color:'#fff' }}>
+                  <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.12)', fontSize:11 }}>{TZ_SYSTEM_ICONS[organId] || '•'}</span> {TZ_SYSTEM_LABELS[organId] || organId}
+                  <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{mechs.length} мех.</span>
                 </summary>
-                <div style={{ padding:'4px 0 0 8px', display:'flex', flexDirection:'column', gap:2 }}>
+                <div style={{ padding:'6px 8px 8px', display:'flex', flexDirection:'column', gap:4 }}>
                   {mechs.map(m => (
-                    <div key={m.mechId} style={{ display:'flex', justifyContent:'space-between', padding:'2px 6px', borderRadius:4, fontSize:9, background:'rgba(255,255,255,0.02)' }}>
-                      <span style={{ color:'rgba(255,255,255,0.8)', flex:1 }}>{m.label}</span>
-                      <span style={{ fontWeight:700, color:m.weight >= 4 ? '#ef4444' : m.weight >= 3 ? '#f97316' : m.weight >= 2 ? '#eab308' : '#22c55e' }}>
+                    <div key={m.mechId} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:8, fontSize:10, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                      <span style={{ color:'rgba(255,255,255,0.84)', flex:1, fontWeight:600 }}>{m.label}</span>
+                      <span style={{ fontWeight:800, padding:'2px 7px', borderRadius:20, fontSize:10, background:m.weight >= 4 ? 'rgba(239,68,68,0.14)' : m.weight >= 3 ? 'rgba(249,115,22,0.14)' : m.weight >= 2 ? 'rgba(234,179,8,0.14)' : 'rgba(34,197,94,0.14)', color:m.weight >= 4 ? '#f87171' : m.weight >= 3 ? '#fb923c' : m.weight >= 2 ? '#facc15' : '#4ade80', border:`1px solid ${m.weight>=4?'rgba(239,68,68,0.18)':m.weight>=3?'rgba(249,115,22,0.18)':m.weight>=2?'rgba(234,179,8,0.18)':'rgba(34,197,94,0.18)'}` }}>
                         w={m.weight}
                       </span>
                     </div>
@@ -300,23 +307,23 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
               </details>
             ))}
           </div>
-        )}
+      )}
 
       {labInfoData.effects.length > 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#ef4444', marginBottom: 6 }}>🩸 Влияние на анализы</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ padding:'12px', borderRadius:12, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.12)' }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#f87171', marginBottom:8 }}>🩸 Влияние на анализы</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {labInfoData.effects.map((eff, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '4px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.02)' }}>
-                  <span style={{ color: dirColor[eff.direction], fontWeight: 700, fontSize: 14, lineHeight: 1 }}>{dirArrow[eff.direction]}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>
+                <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:8, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:`${dirColor[eff.direction]}18`, color: dirColor[eff.direction], fontWeight:800, fontSize:12, flexShrink:0, border:`1px solid ${dirColor[eff.direction]}30` }}>{dirArrow[eff.direction]}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:11, fontWeight:800, color:'#fff' }}>
                       {getMarkerName(eff.marker)}
-                      <span style={{ marginLeft: 6, fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>
-                        {eff.strength >= 0.4 ? 'значимо' : eff.strength >= 0.2 ? 'умеренно' : 'слабо'} ({(eff.strength * 100).toFixed(0)}%)
+                      <span style={{ marginLeft:6, fontSize:9, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.06)', padding:'1px 6px', borderRadius:20 }}>
+                        {eff.strength >= 0.4 ? 'значимо' : eff.strength >= 0.2 ? 'умеренно' : 'слабо'} {(eff.strength * 100).toFixed(0)}%
                       </span>
                     </div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>{eff.reason}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.58)', lineHeight:1.4, marginTop:2 }}>{eff.reason}</div>
                   </div>
                 </div>
             ))}
@@ -325,55 +332,55 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
       )}
 
       {(sub.description || (detail?.description)) && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Описание</div>
-          <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{decodeGarbled((detail?.description || sub.description) || '')}</div>
+        <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>📝 Описание</div>
+          <div style={{ color:'rgba(255,255,255,0.72)', lineHeight:1.5, fontSize:11 }}>{decodeGarbled((detail?.description || sub.description) || '')}</div>
         </div>
       )}
       {(detail?.mechanism || sub.mechanisms?.length) && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Механизм действия</div>
+        <div style={{ padding:'12px', borderRadius:12, background:'rgba(139,92,246,0.04)', border:'1px solid rgba(139,92,246,0.12)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>⚙️ Механизм действия</div>
           {detail?.mechanism ? (
-            <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{decodeGarbled(detail.mechanism)}</div>
+            <div style={{ color:'rgba(255,255,255,0.72)', lineHeight:1.5, fontSize:11 }}>{decodeGarbled(detail.mechanism)}</div>
           ) : sub.mechanisms?.length ? (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {sub.mechanisms.map((m, i) => (
-                <span key={i} style={{ fontSize: 9, padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', fontWeight: 500 }}>{PHARMA_MECH_LABELS[m] || m.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                <span key={i} style={{ fontSize:10, padding:'4px 9px', borderRadius:20, background:'rgba(139,92,246,0.12)', color:'#c4b5fd', fontWeight:700, border:'1px solid rgba(139,92,246,0.18)' }}>{PHARMA_MECH_LABELS[m] || m.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
               ))}
             </div>
           ) : null}
         </div>
       )}
       {(detail?.dosageRange || sub.dosageRange) && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Диапазон дозировок</div>
-          <div className="pharma-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+        <div style={{ padding:'12px', borderRadius:12, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:8 }}>💉 Диапазон дозировок</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {(() => { const dr = detail?.dosageRange || sub.dosageRange; if (!dr) return null; return <>
-              <span>Минимум:</span><span>{dr.min} {dr.unit}</span>
-              <span>Максимум:</span><span style={{ color: '#ff9100' }}>{dr.max} {dr.unit}</span>
-              <span>Частота:</span><span>{dr.frequency}</span>
+              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700 }}>Минимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{dr.min} <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>{dr.unit}</span></div></div>
+              <div style={{ padding:'7px 9px', borderRadius:9, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)' }}><div style={{ fontSize:9, color:'#fbbf24', fontWeight:700 }}>Максимум</div><div style={{ fontSize:12, fontWeight:800, color:'#fbbf24' }}>{dr.max} <span style={{ fontSize:10, color:'#fbbf24' }}>{dr.unit}</span></div></div>
+              <div style={{ gridColumn:'1 / -1', padding:'7px 9px', borderRadius:9, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.04)' }}><div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', fontWeight:700 }}>Частота</div><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{String(dr.frequency)}</div></div>
             </>; })()}
           </div>
         </div>
       )}
       {(detail?.synergies && detail.synergies.length > 0) && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#00e68a', marginBottom: 6 }}>💥 Синергии и комбинации</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ padding:'12px', borderRadius:12, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#00e68a', marginBottom:8 }}>💥 Синергии и комбинации</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             {(() => { try { return detail!.synergies.map((s: any, i: number) => {
               const linkedName = (typeof s.with === 'string' && PHARMA_DB[s.with]) ? PHARMA_DB[s.with].name : s.with || '—';
               const isSyn = s.type === 'synergistic';
               const isAnt = s.type === 'antagonistic';
-              const clr = isSyn ? '#00e68a' : isAnt ? '#ff1744' : '#2979ff';
-              const bg = isSyn ? 'rgba(0,230,138,0.06)' : isAnt ? 'rgba(255,23,68,0.06)' : 'rgba(41,121,255,0.06)';
+              const clr = isSyn ? '#00e68a' : isAnt ? '#f87171' : '#60a5fa';
+              const bg = isSyn ? 'rgba(0,230,138,0.08)' : isAnt ? 'rgba(239,68,68,0.08)' : 'rgba(59,130,246,0.08)';
               const lbl = isSyn ? '⊕ Синергия' : isAnt ? '⊖ Антагонизм' : '→ Комплемент';
               return (
-                <div key={i} style={{ padding: '6px 10px', borderRadius: 8, background: bg, border: `1px solid ${clr}20` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: `${clr}20`, color: clr }}>{lbl}</span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: clr }}>{linkedName}</span>
+                <div key={i} style={{ padding:'8px 10px', borderRadius:10, background:bg, border:`1px solid ${clr}22` }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                    <span style={{ fontSize:9, fontWeight:800, padding:'3px 7px', borderRadius:20, background:`${clr}18`, color:clr, border:`1px solid ${clr}30` }}>{lbl}</span>
+                    <span style={{ fontSize:11, fontWeight:800, color:clr }}>{linkedName}</span>
                   </div>
-                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4 }}>{s.desc || ''}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.72)', lineHeight:1.4 }}>{s.desc || ''}</div>
                 </div>
               );
             }); } catch { return null; }})()}
@@ -381,42 +388,35 @@ export const DrugDetailCard: React.FC<{ sub: PharmaSubstance; detail?: PharmaDet
         </div>
       )}
       {((detail?.sideEffects && detail.sideEffects.length > 0) || (sub.sideEffects && sub.sideEffects.length > 0)) && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Побочные эффекты</div>
+        <div style={{ padding:'12px', borderRadius:12, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:8 }}>⚠️ Побочные эффекты</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
           {(detail?.sideEffects || sub.sideEffects || []).map((se, i) => (
-            <div key={i} style={{ marginBottom: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>{se.effect}</span>
-              <span style={{ color: se.frequency === 'common' ? '#ff9100' : se.frequency === 'rare' ? '#2979ff' : '#ff1744', fontWeight: 600, fontSize: 11 }}>
+            <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.16)', border:'1px solid rgba(255,255,255,0.04)' }}>
+              <span style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.84)' }}>{se.effect}</span>
+              <span style={{ color: se.frequency === 'common' ? '#fbbf24' : se.frequency === 'rare' ? '#60a5fa' : '#f87171', fontWeight:800, fontSize:10, background:`${se.frequency==='common'?'rgba(251,191,36,0.12)':se.frequency==='rare'?'rgba(96,165,250,0.12)':'rgba(248,113,113,0.12)'}`, padding:'2px 7px', borderRadius:20, border:`1px solid ${se.frequency==='common'?'rgba(251,191,36,0.18)':se.frequency==='rare'?'rgba(96,165,250,0.18)':'rgba(248,113,113,0.18)'}` }}>
                 {se.frequency === 'common' ? 'часто' : se.frequency === 'rare' ? 'редко' : se.frequency === 'very_rare' ? 'очень редко' : se.frequency}
               </span>
             </div>
           ))}
-        </div>
-      )}
-      {sub.contraindications && sub.contraindications.length > 0 && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginBottom: 8 }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Противопоказания</div>
-          {sub.contraindications.map((c, i) => (
-            <div key={i} style={{ fontSize: 11, color: '#ff5252', marginBottom: 2 }}>• {c}</div>
-          ))}
+          </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      <div style={{ display:'flex', gap:8, position:'sticky', bottom:0, paddingTop:8, background:'linear-gradient(180deg, transparent, #18181b 28%)' }}>
         <button onClick={handleAddToCourse} style={{
-          flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-          fontSize: 11, fontWeight: 700, background: 'rgba(0,230,138,0.12)', color: '#00e68a',
-        }}>+ В план</button>
+          flex:1, padding:'11px 12px', borderRadius:12, border:'1px solid rgba(0,230,138,0.22)', cursor:'pointer',
+          fontSize:12, fontWeight:800, background:'linear-gradient(135deg, #00e68a, #00b368)', color:'#000', boxShadow:'0 4px 14px rgba(0,230,138,0.22)',
+        }}>+ В курс</button>
         <button onClick={handleAddToCart} style={{
-          flex: 1, padding: '8px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-          fontSize: 11, fontWeight: 700, background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+          flex:1, padding:'11px 12px', borderRadius:12, border:'1px solid rgba(245,158,11,0.18)', cursor:'pointer',
+          fontSize:12, fontWeight:800, background:'rgba(245,158,11,0.10)', color:'#fbbf24',
         }}>🛒 В корзину</button>
       </div>
     </div>
   );
 });
 
-/** Строка каталога — мемоизирована: не перерисовывается при смене выбора/коллапса других строк. */
 const CatalogRow = React.memo<{
   s: PharmaSubstance;
   selected: boolean;
@@ -425,29 +425,29 @@ const CatalogRow = React.memo<{
   onAddCourse: (s: PharmaSubstance) => void;
   onAddCart: (s: PharmaSubstance) => void;
 }>(({ s, selected, flat, onSelect, onAddCourse, onAddCart }) => {
-  const rowStyle: React.CSSProperties = flat
-    ? {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '7px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 3,
-        background: selected ? 'rgba(0,230,138,0.12)' : 'var(--bg-secondary)',
-        border: selected ? '1px solid var(--accent)' : '1px solid transparent',
-      }
-    : {
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '5px 10px 5px 16px', borderRadius: 4, cursor: 'pointer',
-        background: selected ? 'rgba(0,230,138,0.12)' : 'transparent',
-        borderLeft: selected ? '3px solid var(--accent)' : '3px solid transparent',
-        marginBottom: 1,
-      };
+  const isSelected = selected;
   return (
-    <div style={rowStyle} onClick={() => onSelect(s.id)}>
-      <div>
-        <div style={{ fontWeight: 600, fontSize: 12 }}>{s.name}</div>
-        {flat && <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[s.class] || s.class}</div>}
+    <div onClick={() => onSelect(s.id)} style={{
+      display:'flex', alignItems:'center', justifyContent:'space-between', gap:10,
+      padding: flat ? '9px 10px' : '8px 10px 8px 12px', borderRadius:12, cursor:'pointer', marginBottom:6,
+      background: isSelected ? 'linear-gradient(135deg, rgba(139,92,246,0.14), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)',
+      border: isSelected ? '1px solid rgba(139,92,246,0.32)' : '1px solid rgba(255,255,255,0.06)',
+      borderLeft: !flat && isSelected ? '3px solid #8b5cf6' : !flat ? '3px solid transparent' : undefined,
+      boxShadow: isSelected ? '0 4px 14px rgba(139,92,246,0.12)' : 'none',
+      transition:'all 0.18s ease',
+    }}>
+      <div style={{ display:'flex', alignItems:'center', gap:9, minWidth:0, flex:1 }}>
+        <div style={{ width:30, height:30, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: isSelected ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.06)', border:`1px solid ${isSelected ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.06)'}`, fontSize:12, flexShrink:0 }}>
+          {s.class.includes('test') ? '💉' : s.class.includes('oral') ? '💊' : s.class.includes('pept') ? '🧪' : s.class.includes('sarm') ? '🧬' : '🔬'}
+        </div>
+        <div style={{ minWidth:0, flex:1 }}>
+          <div style={{ fontWeight:800, fontSize:12, color: isSelected ? '#fff' : 'rgba(255,255,255,0.92)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', letterSpacing:-0.2 }}>{s.name}</div>
+          <div style={{ fontSize:10, color: isSelected ? '#a78bfa' : 'rgba(255,255,255,0.48)', fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{CLASS_LABELS[s.class] || s.class}{s.pk ? ` · T½ ${formatHalfLife(s.pk.halfLifeHours)}` : ''}</div>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
-        <button onClick={() => onAddCourse(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(0,230,138,0.12)', color:'#00e68a' }}>+</button>
-        <button onClick={() => onAddCart(s)} style={{ padding:'2px 6px', borderRadius:4, border:'none', cursor:'pointer', fontSize:8, background:'rgba(245,158,11,0.12)', color:'#f59e0b' }}>🛒</button>
+      <div style={{ display:'flex', gap:6, flexShrink:0 }} onClick={e => e.stopPropagation()}>
+        <button onClick={() => onAddCourse(s)} style={{ width:28, height:28, borderRadius:9, border:'1px solid rgba(0,230,138,0.18)', background:'rgba(0,230,138,0.10)', color:'#00e68a', cursor:'pointer', fontSize:11, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+        <button onClick={() => onAddCart(s)} style={{ width:28, height:28, borderRadius:9, border:'1px solid rgba(245,158,11,0.16)', background:'rgba(245,158,11,0.08)', color:'#fbbf24', cursor:'pointer', fontSize:11, display:'flex', alignItems:'center', justifyContent:'center' }}>🛒</button>
       </div>
     </div>
   );
@@ -526,50 +526,64 @@ export const CatalogTab: React.FC = () => {
   const handleSelect = useCallback((id: string) => setSelectedId(id), []);
 
   return (
-    <div>
-      <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)',
-          background: 'var(--bg-secondary)', color: 'var(--text)', fontSize: 13, marginBottom: 8, boxSizing: 'border-box' }} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
-        <button onClick={() => setFilterClass('all')} style={{
-          padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
-          background: filterClass === 'all' ? 'rgba(0,230,138,0.15)' : 'transparent',
-          color: filterClass === 'all' ? 'var(--accent)' : 'var(--text-dim)',
-          border: `1px solid ${filterClass === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-          fontWeight: filterClass === 'all' ? 700 : 400,
-        }}>Все</button>
-        {PHARMA_CLASSES.map(cls => (
-          <button key={cls} onClick={() => setFilterClass(cls)} style={{
-            padding: '4px 10px', borderRadius: 14, fontSize: 10, cursor: 'pointer',
-            background: filterClass === cls ? 'rgba(0,230,138,0.15)' : 'transparent',
-            color: filterClass === cls ? 'var(--accent)' : 'var(--text-dim)',
-            border: `1px solid ${filterClass === cls ? 'var(--accent)' : 'var(--border)'}`,
-            fontWeight: filterClass === cls ? 700 : 400,
-          }}>{CLASS_LABELS[cls] || cls}</button>
-        ))}
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {/* search */}
+      <div style={{ position:'relative' }}>
+        <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', fontSize:13, opacity:0.5, pointerEvents:'none' }}>🔍</span>
+        <input type="text" placeholder="Поиск по названию, классу, эфиру..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+          style={{ width:'100%', padding:'11px 36px 11px 36px', borderRadius:14, border:'1px solid rgba(255,255,255,0.07)',
+            background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:13, fontWeight:500, boxSizing:'border-box', backdropFilter:'blur(8px)', outline:'none' }} />
+        {searchQuery && (
+          <button onClick={()=>setSearchQuery('')} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', width:26, height:26, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:'rgba(255,255,255,0.72)', cursor:'pointer', fontSize:10 }}>✕</button>
+        )}
       </div>
 
-      {/* Grouped view when "Все" */}
+      <div style={{ padding:'10px 10px', borderRadius:14, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+          <span style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.62)', letterSpacing:0.4, textTransform:'uppercase' as const }}>Фильтр по классу</span>
+          <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.38)', background:'rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{filteredList.length} поз.</span>
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          <button onClick={() => setFilterClass('all')} style={{
+            padding:'6px 12px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:800,
+            background: filterClass === 'all' ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.05)',
+            color: filterClass === 'all' ? '#fff' : 'rgba(255,255,255,0.62)',
+            border:`1px solid ${filterClass === 'all' ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.07)'}`,
+            boxShadow: filterClass==='all' ? '0 4px 12px rgba(34,197,94,0.18)' : 'none',
+          }}>Все</button>
+          {PHARMA_CLASSES.map(cls => (
+            <button key={cls} onClick={() => setFilterClass(cls)} style={{
+              padding:'6px 11px', borderRadius:20, fontSize:11, cursor:'pointer', fontWeight:700,
+              background: filterClass === cls ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'rgba(255,255,255,0.05)',
+              color: filterClass === cls ? '#fff' : 'rgba(255,255,255,0.62)',
+              border:`1px solid ${filterClass === cls ? 'rgba(34,197,94,0.35)' : 'rgba(255,255,255,0.07)'}`,
+              boxShadow: filterClass===cls ? '0 4px 12px rgba(34,197,94,0.14)' : 'none',
+            }}>{CLASS_LABELS[cls] || cls}</button>
+          ))}
+        </div>
+      </div>
+
       {filteredGrouped ? (
-        <div>
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
           {Object.entries(filteredGrouped).map(([cls, substances]) => {
             const isCollapsed = collapsedClasses[cls] ?? false;
             return (
-              <div key={cls} style={{ marginBottom: 6 }}>
+              <div key={cls} style={{ borderRadius:14, overflow:'hidden', border:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)' }}>
                 <div onClick={() => toggleClass(cls)} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '6px 10px', borderRadius: 6, cursor: 'pointer',
-                  background: 'var(--bg-secondary)', marginBottom: 2,
+                  display:'flex', justifyContent:'space-between', alignItems:'center',
+                  padding:'10px 12px', cursor:'pointer',
+                  background: isCollapsed ? 'rgba(255,255,255,0.02)' : 'linear-gradient(90deg, rgba(139,92,246,0.10), rgba(139,92,246,0.02))', borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.06)',
                 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)' }}>
+                  <span style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, fontWeight:800, color:'#fff' }}>
+                    <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', fontSize:11 }}>🧬</span>
                     {CLASS_LABELS[cls] || cls}
-                    <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 6, fontWeight: 400 }}>
+                    <span style={{ fontSize:10, color:'#a78bfa', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.14)', padding:'2px 7px', borderRadius:20, fontWeight:800 }}>
                       {substances.length}
                     </span>
                   </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isCollapsed ? '▸' : '▾'}</span>
+                  <span style={{ width:24, height:24, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'rgba(255,255,255,0.72)' }}>{isCollapsed ? '▸' : '▾'}</span>
                 </div>
-                {!isCollapsed && substances.map(s => (
+                {!isCollapsed && <div style={{ padding:'8px', display:'flex', flexDirection:'column', gap:0 }}>{substances.map(s => (
                   <CatalogRow
                     key={s.id}
                     s={s}
@@ -578,55 +592,60 @@ export const CatalogTab: React.FC = () => {
                     onAddCourse={addToCourse}
                     onAddCart={addToCart}
                   />
-                ))}
+                ))}</div>}
               </div>
             );
           })}
         </div>
       ) : (
-        /* Flat list when filter is specific class or search is active */
-        filteredList.map(s => (
-          <CatalogRow
-            key={s.id}
-            s={s}
-            flat
-            selected={selectedId === s.id}
-            onSelect={handleSelect}
-            onAddCourse={addToCourse}
-            onAddCart={addToCart}
-          />
-        ))
+        <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+          {filteredList.map(s => (
+            <CatalogRow
+              key={s.id}
+              s={s}
+              flat
+              selected={selectedId === s.id}
+              onSelect={handleSelect}
+              onAddCourse={addToCourse}
+              onAddCart={addToCart}
+            />
+          ))}
+        </div>
       )}
       {filteredList.length === 0 && (
-        <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>
-          {debouncedSearch ? 'Ничего не найдено' : ''}
+        <div style={{ padding:24, textAlign:'center', borderRadius:14, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ fontSize:22, marginBottom:6, opacity:0.6 }}>🔍</div>
+          <div style={{ color:'rgba(255,255,255,0.62)', fontSize:12, fontWeight:600 }}>{debouncedSearch ? 'Ничего не найдено' : 'Нет данных'}</div>
+          {debouncedSearch && <div style={{ color:'rgba(255,255,255,0.38)', fontSize:10, marginTop:4 }}>Попробуй другой запрос или сбрось фильтр</div>}
         </div>
       )}
 
-      {/* Popup detail modal — same style as supplements catalog */}
       {selected && (
         <div style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0, left: 0, zIndex: 300,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.85)',
+          position:'fixed', inset:0, zIndex:300,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          background:'rgba(0,0,0,0.72)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', padding:12,
         }} onClick={() => setSelectedId(null)}>
           <div onClick={e => e.stopPropagation()} style={{
-            width: '92%', maxWidth: 480, maxHeight: '85vh',
-            borderRadius: 16, background: '#18181b',
-            border: '1px solid rgba(255,255,255,0.1)',
-            boxShadow: '0 16px 60px rgba(0,0,0,0.5)',
-            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            width:'100%', maxWidth:520, maxHeight:'88vh',
+            borderRadius:20, background:'linear-gradient(180deg, #1a1a1f, #121214)',
+            border:'1px solid rgba(255,255,255,0.08)',
+            boxShadow:'0 24px 64px rgba(0,0,0,0.55)',
+            overflow:'hidden', display:'flex', flexDirection:'column',
           }}>
-            <div style={{ height: 3, background: 'linear-gradient(90deg, var(--accent), #00c853)' }} />
-            <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '12px 16px 16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>{selected.name}</span>
-                <button onClick={() => setSelectedId(null)} style={{
-                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'rgba(255,255,255,0.5)', borderRadius: 8, padding: '4px 10px',
-                  cursor: 'pointer', fontSize: 10, fontWeight: 600,
-                }}>✕ Закрыть</button>
+            <div style={{ height:3, background:'linear-gradient(90deg, #8b5cf6, #00e68a)' }} />
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 14px', borderBottom:'1px solid rgba(255,255,255,0.06)', flexShrink:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:9, minWidth:0 }}>
+                <div style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', fontSize:13 }}>🧬</div>
+                <span style={{ fontSize:13, fontWeight:900, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{selected.name}</span>
               </div>
+              <button onClick={() => setSelectedId(null)} style={{
+                background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)',
+                color:'rgba(255,255,255,0.72)', borderRadius:10, padding:'6px 10px',
+                cursor:'pointer', fontSize:11, fontWeight:800, flexShrink:0,
+              }}>✕ Закрыть</button>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', WebkitOverflowScrolling:'touch', padding:'12px 12px 14px' }}>
               <DrugDetailCard sub={selected} detail={detail} />
             </div>
           </div>

@@ -51,8 +51,8 @@ const classColorOf = (cls: string) => CLASS_COLORS[cls] || 'var(--accent)';
 
 const pillStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
-  padding: '2px 8px', borderRadius: 10, fontSize: 10,
-  fontWeight: 600, whiteSpace: 'nowrap',
+  padding: '3px 8px', borderRadius: 10, fontSize: 10,
+  fontWeight: 700, whiteSpace: 'nowrap',
 };
 
 export const PharmaCourseScreen: React.FC = () => {
@@ -84,17 +84,13 @@ export const PharmaCourseScreen: React.FC = () => {
       try {
         await db.init();
         const entries = await db.getAll<CourseEntry>('course_log');
-        // Filter out support-class substances (keep only pharma AAS/PCT/peptides)
         const pharmaEntries = entries.filter(e => {
-          // Try direct PHARMA_DB lookup by id
           const subById = PHARMA_DB[e.substanceId];
           if (subById) return subById.class !== 'support';
-          // Try by name match across all PHARMA_DB entries
           const subByName = Object.values(PHARMA_DB).find(s => 
             s.id === e.substanceId || s.name === e.substanceId || (e.substanceId||'').toLowerCase().includes((s.id||'').toLowerCase())
           );
           if (subByName) return subByName.class !== 'support';
-          // If not found in PHARMA_DB at all, keep it (custom drug)
           return true;
         });
         setCourse(pharmaEntries);
@@ -245,91 +241,96 @@ export const PharmaCourseScreen: React.FC = () => {
 
   if (loading) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: 12 }}>
-      <div style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: '#00e68a', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>Загрузка курса...</span>
+      <div style={{ width: 34, height: 34, border: '3px solid rgba(255,255,255,0.08)', borderTopColor: '#8b5cf6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight:600 }}>Загрузка курса...</span>
     </div>
   );
 
   const subsForClass = SUBSTANCES_BY_CLASS[pickerClass] ?? [];
 
   return (
-    <div style={{ padding: '0 0 16px' }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        .pc-card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; transition: all 0.2s; }
-        .pc-card:hover { border-color: #3f3f46; }
-        .pc-btn { cursor: pointer; transition: all 0.15s; user-select: none; }
-        .pc-btn:active { background: rgba(0,230,138,0.15) !important; transform: scale(0.97); }
-        .pc-sub-btn { cursor: pointer; transition: all 0.15s; }
-        .pc-sub-btn:hover { transform: translateY(-2px); border-color: rgba(0,230,138,0.3) !important; }
-        .pc-sub-btn:active { background: rgba(0,230,138,0.08) !important; transform: scale(0.96); }
-        .pc-input { transition: border-color 0.15s; }
-        .pc-input:focus { border-color: #00e68a !important; outline: none; }
+        .pc-glass { background: rgba(20,20,24,0.62); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%); box-shadow: 0 8px 24px rgba(0,0,0,0.28); }
+        .pc-card2 { background: rgba(22,22,26,0.68); border: 1px solid rgba(255,255,255,0.07); border-radius: 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: all 0.2s ease; }
+        .pc-card2:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0,0,0,0.32); }
+        .pc-btn2 { cursor: pointer; transition: all 0.18s ease; user-select: none; }
+        .pc-btn2:active { transform: scale(0.97); }
+        .pc-sub-btn2 { cursor: pointer; transition: all 0.18s ease; }
+        .pc-sub-btn2:hover { transform: translateY(-2px); border-color: rgba(139,92,246,0.35) !important; box-shadow: 0 8px 20px rgba(0,0,0,0.22); }
+        .pc-sub-btn2:active { transform: scale(0.98); }
+        .pc-input2 { transition: border-color 0.15s, box-shadow 0.15s; }
+        .pc-input2:focus { border-color: #8b5cf6 !important; box-shadow: 0 0 0 3px rgba(139,92,246,0.15); outline: none; }
       `}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 20 }}>💊</span>
-          <span style={{ fontWeight: 700, fontSize: 16, color: '#fff' }}>Мой курс</span>
-          {course.length > 0 && (
-            <span style={{ background: 'rgba(0,230,138,0.15)', color: '#00e68a', borderRadius: 10, padding: '1px 8px', fontSize: 11, fontWeight: 600 }}>
-              {course.length}
-            </span>
-          )}
+      <div className="pc-glass" style={{ padding:'12px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
+          <div style={{ width:36, height:36, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg, #8b5cf6, #6d28d9)', color:'#fff', fontSize:16, boxShadow:'0 4px 14px rgba(139,92,246,0.35)', flexShrink:0 }}>💊</div>
+          <div style={{ minWidth:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+              <span style={{ fontWeight:800, fontSize:14, color:'#fff', letterSpacing:-0.3 }}>Мой курс</span>
+              <span style={{ background:'rgba(139,92,246,0.16)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.22)', borderRadius:10, padding:'1px 7px', fontSize:11, fontWeight:800 }}>{course.length}</span>
+              {course.length>0 && <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>· {totalWeeks} нед · {[...new Set(course.map(e=>subClass(e.substanceId)).filter(Boolean))].length} классов</span>}
+            </div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:1, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>
+              {course.length===0 ? 'Добавь препараты и настрой недели • PK/PD учтётся автоматически' : `Неделя ${currentWeek} • ${course.length} преп. • длительность 0–${totalWeeks}`}
+            </div>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display:'flex', gap:7, flexShrink:0 }}>
           {course.length > 0 && (
-            <button onClick={saveCourseHistory} className="pc-btn" style={{
-              background: 'rgba(255,165,2,0.15)', color: '#f59e0b',
-              border: '1px solid rgba(255,165,2,0.3)', borderRadius: 10, padding: '8px 12px', fontWeight: 600,
-              fontSize: 12,
+            <button onClick={saveCourseHistory} className="pc-btn2" style={{
+              background: 'rgba(245,158,11,0.12)', color: '#fbbf24',
+              border: '1px solid rgba(245,158,11,0.22)', borderRadius: 12, padding: '8px 11px', fontWeight:700,
+              fontSize:11, backdropFilter:'blur(8px)',
             }}>
-              📦 Завершить курс
+              📦 Завершить
             </button>
           )}
-          <button onClick={() => setShowPicker(true)} className="pc-btn" style={{
-            background: 'linear-gradient(135deg, #00e68a, #00b368)', color: '#000',
-            border: 'none', borderRadius: 10, padding: '8px 16px', fontWeight: 700,
-            fontSize: 13, display: 'flex', alignItems: 'center', gap: 6,
-            boxShadow: '0 2px 12px rgba(0,230,138,0.25)',
+          <button onClick={() => setShowPicker(true)} className="pc-btn2" style={{
+            background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: '#fff',
+            border: '1px solid rgba(139,92,246,0.35)', borderRadius: 12, padding: '9px 14px', fontWeight:800,
+            fontSize:12, display:'flex', alignItems:'center', gap:6,
+            boxShadow: '0 6px 18px rgba(139,92,246,0.28)',
           }}>
-            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Добавить
+            <span style={{ fontSize:14, lineHeight:1, background:'rgba(255,255,255,0.16)', width:18, height:18, borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center' }}>+</span> Добавить
           </button>
         </div>
       </div>
 
       {/* Course start date */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '8px 12px', background: '#18181b', borderRadius: 10, border: '1px solid #27272a' }}>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>📅 Дата начала курса:</span>
+      <div className="pc-glass" style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', flexWrap:'wrap' }}>
+        <span style={{ fontSize:11, color:'rgba(255,255,255,0.62)', fontWeight:700, display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>📅 Старт курса</span>
         <input type="date" value={courseStartDate} onChange={e => {
           setCourseStartDate(e.target.value);
           localStorage.setItem('he_course_start_date', e.target.value);
-        }} style={{ background: '#202023', border: '1px solid #3f3f46', borderRadius: 6, padding: '4px 8px', color: '#fff', fontSize: 11 }} />
+        }} style={{ background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:10, padding:'7px 10px', color:'#fff', fontSize:12, fontWeight:600, outline:'none' }} />
         {currentWeek > 0 && (
-          <span style={{ fontSize: 11, color: '#00e68a', fontWeight: 600 }}>Текущая неделя: {currentWeek}</span>
+          <span style={{ fontSize:11, color:'#a78bfa', fontWeight:800, background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.18)', padding:'5px 9px', borderRadius:20 }}>▶ Неделя {currentWeek}</span>
         )}
+        <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.38)' }}>{course.length>0 ? 'Прогресс бара = окно приёма' : 'Выбери дату — подсветим активные препараты'}</span>
       </div>
 
       {/* View tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 12, overflowX: 'auto', scrollbarWidth: 'none' }}>
+      <div style={{ display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
         {([['current', '📋 Текущий'], ['schedule', '📅 Расписание'], ['graph', '📊 График'], ['history', '📚 История']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setViewTab(key)} style={{
-            padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-            border: `1px solid ${viewTab === key ? '#00e68a' : '#3f3f46'}`,
-            background: viewTab === key ? 'rgba(0,230,138,0.15)' : '#202023',
-            color: viewTab === key ? '#00e68a' : 'rgba(255,255,255,0.5)',
+            padding:'7px 13px', borderRadius:20, cursor:'pointer', fontSize:11, fontWeight:700, whiteSpace:'nowrap',
+            border:`1px solid ${viewTab === key ? 'rgba(139,92,246,0.38)' : 'rgba(255,255,255,0.07)'}`,
+            background: viewTab === key ? 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(124,58,237,0.18))' : 'rgba(255,255,255,0.05)',
+            color: viewTab === key ? '#fff' : 'rgba(255,255,255,0.62)',
+            boxShadow: viewTab===key ? '0 4px 14px rgba(139,92,246,0.18)' : 'none',
           }}>{label}</button>
         ))}
       </div>
-
-      {/* ===== VIEW TABS ===== */}
 
       {/* ---- CURRENT TAB ---- */}
       {viewTab === 'current' && (
         <>
           {course.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
               {course.map((entry) => {
                 const cls = subClass(entry.substanceId);
                 const color = classColor(cls);
@@ -337,77 +338,73 @@ export const PharmaCourseScreen: React.FC = () => {
                 const bar = weekBar(entry);
                 const isActive = (entry.startWeek || 0) <= currentWeek && currentWeek < entry.endWeek;
                 return (
-                  <div key={entry.id} className="pc-card" style={{
-                    overflow: 'hidden', position: 'relative',
-                    borderLeft: `3px solid ${color}`,
+                  <div key={entry.id} className="pc-card2" style={{
+                    overflow:'hidden', position:'relative',
+                    borderLeft:`3px solid ${color}`,
+                    background: isActive ? `linear-gradient(90deg, ${color}0d, rgba(22,22,26,0.68))` : undefined,
                   }}>
-                    {totalWeeks > 0 && (
-                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'rgba(255,255,255,0.04)' }}>
-                        <div style={{ position: 'absolute', top: 0, left: bar.left, width: bar.width, height: '100%', background: `${color}60`, borderRadius: '0 2px 2px 0' }} />
-                      </div>
-                    )}
-                    <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:'rgba(255,255,255,0.05)' }}>
+                      <div style={{ position:'absolute', top:0, left:bar.left, width:bar.width, height:'100%', background:`linear-gradient(90deg, ${color}55, ${color})`, borderRadius:'0 2px 2px 0' }} />
+                    </div>
+                    <div style={{ padding:'11px 12px', display:'flex', alignItems:'flex-start', gap:11 }}>
                       <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        background: `${color}18`, border: `1px solid ${color}30`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 15, flexShrink: 0,
+                        width:38, height:38, borderRadius:11,
+                        background:`linear-gradient(135deg, ${color}22, ${color}0d)`, border:`1px solid ${color}2a`,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:16, flexShrink:0, boxShadow:`0 4px 12px ${color}18`,
                       }}>
                         {CLASS_ICONS[cls] || '💊'}
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 2 }}>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: '#fff' }}>{subName(entry.substanceId)}</span>
-                          <span style={{ ...pillStyle, background: `${color}20`, color, border: `1px solid ${color}40` }}>{CLASS_LABELS[cls] || cls}</span>
-                          {isActive && <span style={{ ...pillStyle, fontSize: 8, color: '#00e68a', background: 'rgba(0,230,138,0.15)' }}>● Активен</span>}
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:3 }}>
+                          <span style={{ fontWeight:800, fontSize:13, color:'#fff', letterSpacing:-0.2 }}>{subName(entry.substanceId)}</span>
+                          <span style={{ ...pillStyle, background:`${color}18`, color, border:`1px solid ${color}30`, borderRadius:20, padding:'2px 8px' }}>{CLASS_LABELS[cls] || cls}</span>
+                          {isActive && <span style={{ ...pillStyle, fontSize:9, color:'#00e68a', background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', borderRadius:20 }}>● Активен</span>}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', fontSize:11, color:'rgba(255,255,255,0.58)' }}>
                           {editId === entry.id && editDraft ? (
                             <>
                               <input type="number" value={editDraft.doseValue || ''} onChange={e => setEditDraft({ ...editDraft, doseValue: parseFloat(e.target.value) || 0 })}
-                                className="pc-input" style={{ width: 64, padding: '4px 6px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 12, boxSizing: 'border-box' }} />
+                                className="pc-input2" style={{ width:72, padding:'6px 8px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box' }} />
                               <select value={editDraft.doseUnit} onChange={e => setEditDraft({ ...editDraft, doseUnit: e.target.value })}
-                                className="pc-input" style={{ padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 10, boxSizing: 'border-box' }}>
+                                className="pc-input2" style={{ padding:'6px 6px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:11, boxSizing:'border-box' }}>
                                 {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
                               </select>
                               <select value={typeof editDraft.frequency === 'string' ? editDraft.frequency : '2x/wk'} onChange={e => setEditDraft({ ...editDraft, frequency: e.target.value })}
-                                className="pc-input" style={{ padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 10, boxSizing: 'border-box' }}>
+                                className="pc-input2" style={{ padding:'6px 6px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:11 }}>
                                 {FREQ_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                               </select>
                               <input type="number" value={editDraft.startWeek} onChange={e => setEditDraft({ ...editDraft, startWeek: parseFloat(e.target.value) || 0 })}
-                                className="pc-input" style={{ width: 40, padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 11, boxSizing: 'border-box' }} title="неделя с" />
-                              <span style={{ color: 'rgba(255,255,255,0.4)' }}>–</span>
+                                className="pc-input2" style={{ width:52, padding:'6px 6px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:11, boxSizing:'border-box' }} />
+                              <span style={{ color:'rgba(255,255,255,0.35)' }}>–</span>
                               <input type="number" value={editDraft.endWeek} onChange={e => setEditDraft({ ...editDraft, endWeek: parseFloat(e.target.value) || 0 })}
-                                className="pc-input" style={{ width: 40, padding: '4px 4px', background: '#202023', border: '1px solid #00e68a', borderRadius: 6, color: '#fff', fontSize: 11, boxSizing: 'border-box' }} title="неделя по" />
-                              <button onClick={saveEdit} className="pc-btn" style={{ background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 700 }}>Сохранить</button>
-                              <button onClick={() => { setEditId(null); setEditDraft(null); }} className="pc-btn" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '4px 8px', fontSize: 11 }}>✕</button>
+                                className="pc-input2" style={{ width:52, padding:'6px 6px', background:'rgba(0,0,0,0.32)', border:'1px solid rgba(139,92,246,0.35)', borderRadius:9, color:'#fff', fontSize:11 }} />
+                              <button onClick={saveEdit} className="pc-btn2" style={{ background:'linear-gradient(135deg, #00e68a, #00b368)', color:'#000', border:'none', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:800 }}>Сохранить</button>
+                              <button onClick={() => { setEditId(null); setEditDraft(null); }} className="pc-btn2" style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.72)', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:700 }}>✕</button>
                             </>
                           ) : (
                             <>
-                              <span style={{ color: '#fff', fontWeight: 600 }}>{entry.doseValue}</span>
-                              <span style={{ color: 'rgba(255,255,255,0.4)' }}>{entry.doseUnit}</span>
-                              <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                              <span>{freqDisplay(entry)}</span>
-                              <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                              <span>нед {entry.startWeek}–{entry.endWeek}</span>
+                              <span style={{ color:'#fff', fontWeight:800, fontSize:12 }}>{entry.doseValue}</span>
+                              <span style={{ color:'rgba(255,255,255,0.45)', fontWeight:600 }}>{entry.doseUnit}</span>
+                              <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
+                              <span style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20, fontSize:10, fontWeight:700 }}>{freqDisplay(entry)}</span>
+                              <span style={{ color:'rgba(255,255,255,0.55)' }}>нед {entry.startWeek}–{entry.endWeek}</span>
                               {sub?.pk?.halfLifeHours && (
                                 <>
-                                  <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                                  <span>T½ {sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours / 24).toFixed(1)} дн`}</span>
+                                  <span style={{ width:3, height:3, borderRadius:'50%', background:'rgba(255,255,255,0.22)' }} />
+                                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>T½ {sub.pk.halfLifeHours >= 168 ? `${(sub.pk.halfLifeHours / 168).toFixed(1)} нед` : `${(sub.pk.halfLifeHours / 24).toFixed(1)} дн`}</span>
                                 </>
                               )}
                             </>
                           )}
                         </div>
-                        {totalWeeks > 0 && (
-                          <div style={{ marginTop: 6, height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ position: 'absolute', top: 0, left: bar.left, width: bar.width, height: '100%', background: `linear-gradient(90deg, ${color}60, ${color})`, borderRadius: 2 }} />
-                          </div>
-                        )}
+                        <div style={{ marginTop:7, height:4, background:'rgba(255,255,255,0.07)', borderRadius:20, position:'relative', overflow:'hidden' }}>
+                          <div style={{ position:'absolute', top:0, left:bar.left, width:bar.width, height:'100%', background:`linear-gradient(90deg, ${color}55, ${color})`, borderRadius:20, boxShadow:`0 0 8px ${color}55` }} />
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                        <button onClick={() => startEdit(entry)} className="pc-btn" style={{ background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a', borderRadius: 8, padding: '6px 8px', fontSize: 12, lineHeight: 1 }} title="Изменить дозу">✎</button>
-                        <button onClick={() => removeEntry(entry.id)} className="pc-btn" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444', borderRadius: 8, padding: '6px 8px', fontSize: 12, lineHeight: 1 }} title="Удалить">✕</button>
+                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                        <button onClick={() => startEdit(entry)} className="pc-btn2" style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.22)', color:'#a78bfa', fontSize:12, fontWeight:800 }} title="Изменить">✎</button>
+                        <button onClick={() => removeEntry(entry.id)} className="pc-btn2" style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', color:'#f87171', fontSize:13 }} title="Удалить">✕</button>
                       </div>
                     </div>
                   </div>
@@ -415,44 +412,46 @@ export const PharmaCourseScreen: React.FC = () => {
               })}
             </div>
           ) : (
-            <div className="pc-card" style={{ textAlign: 'center', padding: '28px 16px' }}>
-              <div style={{ fontSize: 36, marginBottom: 8, opacity: 0.6 }}>💊</div>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>Курс пуст</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Нажмите «Добавить», чтобы начать</div>
+            <div className="pc-glass" style={{ textAlign:'center', padding:'30px 18px', borderStyle:'dashed', background:'rgba(20,20,24,0.42)' }}>
+              <div style={{ width:52, height:52, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', background:'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(59,130,246,0.12))', border:'1px solid rgba(139,92,246,0.18)', fontSize:24 }}>💊</div>
+              <div style={{ fontSize:13, color:'#fff', fontWeight:800, marginBottom:4 }}>Курс пуст</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.52)', lineHeight:1.45, maxWidth:320, margin:'0 auto 10px' }}>Нажми «Добавить» — выбери класс и препарат, доза и недели настроятся автоматически</div>
+              <button onClick={()=>setShowPicker(true)} className="pc-btn2" style={{ background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', border:'none', borderRadius:12, padding:'9px 16px', fontWeight:800, fontSize:12 }}>+ Добавить первый препарат</button>
             </div>
           )}
           {validation.warnings.length > 0 && (
-            <div style={{ marginTop: 10, background: 'rgba(255,165,2,0.08)', border: '1px solid rgba(255,165,2,0.25)', borderRadius: 10, padding: '8px 12px' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#f59e0b', marginBottom: 4 }}>⚠️ Предупреждения</div>
+            <div className="pc-glass" style={{ background:'linear-gradient(135deg, rgba(245,158,11,0.09), rgba(245,158,11,0.04))', borderColor:'rgba(245,158,11,0.20)', padding:'10px 12px' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#fbbf24', marginBottom:6, display:'flex', alignItems:'center', gap:6 }}>⚠️ Предупреждения <span style={{ marginLeft:'auto', background:'rgba(245,158,11,0.16)', padding:'2px 7px', borderRadius:20, fontSize:10 }}>{validation.warnings.length}</span></div>
               {validation.warnings.map((w, i) => (
-                <div key={i} style={{ fontSize: 11, color: 'rgba(255,165,2,0.8)', padding: '2px 0' }}>{w}</div>
+                <div key={i} style={{ fontSize:11, color:'rgba(255,255,255,0.82)', padding:'4px 0 4px 14px', position:'relative', lineHeight:1.4 }}><span style={{ position:'absolute', left:0, color:'#f59e0b' }}>•</span>{w}</div>
               ))}
             </div>
           )}
           {interactions.length > 0 && (
-            <div className="pc-card" style={{ marginTop: 10, padding: 0, overflow: 'hidden' }}>
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>⚡</span>
-                <span style={{ fontWeight: 700, fontSize: 12 }}>Взаимодействия</span>
-                <span style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '0 6px', fontSize: 10, color: 'var(--text-dim)' }}>{interactions.length}</span>
+            <div className="pc-glass" style={{ padding:0, overflow:'hidden' }}>
+              <div style={{ padding:'10px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:7, background:'linear-gradient(90deg, rgba(239,68,68,0.08), transparent)' }}>
+                <span style={{ width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', fontSize:11 }}>⚡</span>
+                <span style={{ fontWeight:800, fontSize:12, color:'#fff' }}>Взаимодействия</span>
+                <span style={{ background:'rgba(255,255,255,0.06)', borderRadius:20, padding:'2px 8px', fontSize:10, color:'rgba(255,255,255,0.62)', fontWeight:700 }}>{interactions.length}</span>
+                <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.42)' }}>проверь перед стартом</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display:'flex', flexDirection:'column' }}>
                 {interactions.map((alert: any, i: number) => {
                   const isCrit = alert.type === 'critical';
                   return (
                     <div key={i} style={{
-                      padding: '8px 12px',
+                      padding:'10px 12px',
                       borderBottom: i < interactions.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                      borderLeft: `3px solid ${isCrit ? '#ef4444' : '#eab308'}`,
-                      background: isCrit ? 'rgba(239,68,68,0.06)' : 'rgba(255,165,2,0.04)',
+                      borderLeft:`3px solid ${isCrit ? '#ef4444' : '#f59e0b'}`,
+                      background: isCrit ? 'rgba(239,68,68,0.06)' : 'rgba(245,158,11,0.05)',
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                        <span style={{ ...pillStyle, fontSize: 9, background: isCrit ? 'rgba(239,68,68,0.15)' : 'rgba(255,165,2,0.15)', color: isCrit ? '#ef4444' : '#f59e0b' }}>
-                          {isCrit ? 'Критично' : 'Внимание'}
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                        <span style={{ fontSize:9, fontWeight:800, padding:'3px 7px', borderRadius:20, letterSpacing:0.4, background: isCrit ? 'rgba(239,68,68,0.16)' : 'rgba(245,158,11,0.16)', color: isCrit ? '#f87171' : '#fbbf24', border:`1px solid ${isCrit ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.22)'}` }}>
+                          {isCrit ? 'КРИТИЧНО' : 'ВНИМАНИЕ'}
                         </span>
-                        <span style={{ fontSize: 11, fontWeight: 600 }}>{alert.drugs?.join(' + ')}</span>
+                        <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{alert.drugs?.join(' + ')}</span>
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.4 }}>{alert.mechanism}</div>
+                      <div style={{ fontSize:11, color:'rgba(255,255,255,0.72)', lineHeight:1.45 }}>{alert.mechanism}</div>
                     </div>
                   );
                 })}
@@ -460,42 +459,44 @@ export const PharmaCourseScreen: React.FC = () => {
             </div>
           )}
           {course.length > 1 && (
-            <div className="pc-card" style={{ marginTop: 10, padding: '10px 12px', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Всего: <span style={{ color: '#fff', fontWeight: 700 }}>{course.length}</span></div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Длительность: <span style={{ color: '#fff', fontWeight: 700 }}>нед 0–{totalWeeks}</span></div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Классы: <span style={{ color: '#fff', fontWeight: 700 }}>{[...new Set(course.map(e => subClass(e.substanceId)).filter(Boolean))].length}</span></div>
+            <div className="pc-glass" style={{ padding:'10px 12px', display:'flex', gap:10, flexWrap:'wrap', background:'rgba(0,0,0,0.18)' }}>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.58)' }}>Всего <b style={{ color:'#fff' }}>{course.length}</b></div>
+              <div style={{ width:1, height:14, background:'rgba(255,255,255,0.08)', alignSelf:'center' }} />
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.58)' }}>Длительность <b style={{ color:'#fff' }}>0–{totalWeeks} нед</b></div>
+              <div style={{ width:1, height:14, background:'rgba(255,255,255,0.08)', alignSelf:'center' }} />
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.58)' }}>Классов <b style={{ color:'#fff' }}>{[...new Set(course.map(e => subClass(e.substanceId)).filter(Boolean))].length}</b></div>
             </div>
           )}
         </>
       )}
 
-      {/* ---- SCHEDULE TAB ---- */}
       {viewTab === 'schedule' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {course.length === 0 ? (
-            <div className="pc-card" style={{ textAlign: 'center', padding: '28px 16px' }}>
-              <div style={{ fontSize: 36, marginBottom: 8, opacity: 0.6 }}>📅</div>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>Нет препаратов</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Добавьте препараты на вкладке «Текущий»</div>
+            <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
+              <div style={{ fontSize:28, marginBottom:8, opacity:0.7 }}>📅</div>
+              <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:4 }}>Нет препаратов</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>Добавь препараты на вкладке «Текущий»</div>
             </div>
           ) : (
             <>
-              {/* Weekly grid */}
-              <div className="pc-card" style={{ padding: '10px 12px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📅 Недельное расписание</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+              <div className="pc-glass" style={{ padding:'12px' }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:7 }}>📅 Недельное расписание <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)', fontWeight:600 }}>по дням частоты</span></div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:6 }}>
                   {scheduleData.map(day => (
                     <div key={day.day} style={{
-                      background: '#202023', borderRadius: 8, padding: 6, textAlign: 'center',
-                      border: day.entries.length > 0 ? '1px solid #3f3f46' : '1px solid #27272a',
+                      background: day.entries.length>0 ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.03)', borderRadius:12, padding:'7px 5px', textAlign:'center',
+                      border: day.entries.length > 0 ? '1px solid rgba(139,92,246,0.18)' : '1px solid rgba(255,255,255,0.06)',
+                      minHeight:84,
                     }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: day.entries.length > 0 ? '#00e68a' : 'rgba(255,255,255,0.3)', marginBottom: 4 }}>{day.day}</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div style={{ fontSize:10, fontWeight:800, color: day.entries.length > 0 ? '#a78bfa' : 'rgba(255,255,255,0.32)', marginBottom:6, letterSpacing:0.3 }}>{day.day}</div>
+                      <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+                        {day.entries.length===0 && <span style={{ fontSize:9, color:'rgba(255,255,255,0.18)' }}>—</span>}
                         {day.entries.map((item, i) => (
                           <div key={i} style={{
-                            fontSize: 8, color: '#fff', background: `${item.color}20`,
-                            borderRadius: 4, padding: '2px 3px', lineHeight: 1.2,
-                            borderLeft: `2px solid ${item.color}`,
+                            fontSize:8, color:'#fff', background:`${item.color}18`,
+                            borderRadius:7, padding:'3px 4px', lineHeight:1.25, fontWeight:700,
+                            borderLeft:`2px solid ${item.color}`, textAlign:'left', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                           }}>
                             {PHARMA_DB[item.entry.substanceId]?.name || item.entry.substanceId}
                           </div>
@@ -505,30 +506,30 @@ export const PharmaCourseScreen: React.FC = () => {
                   ))}
                 </div>
               </div>
-              {/* Dosage table */}
-              <div className="pc-card" style={{ padding: '10px 12px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>💊 Дозировки по препаратам</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div className="pc-glass" style={{ padding:'12px' }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:9, display:'flex', alignItems:'center', gap:7 }}>💊 Дозировки по препаратам <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.42)' }}>{course.length} позиций</span></div>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   {course.map(entry => {
                     const cls = subClass(entry.substanceId);
                     const color = classColor(cls);
                     const isAct = (entry.startWeek || 0) <= currentWeek && currentWeek < entry.endWeek;
                     return (
                       <div key={entry.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
-                        background: isAct ? `${color}10` : '#202023', borderRadius: 8,
-                        borderLeft: `3px solid ${color}`,
+                        display:'flex', alignItems:'center', gap:9, padding:'8px 9px',
+                        background: isAct ? `${color}10` : 'rgba(255,255,255,0.03)', borderRadius:12,
+                        border:`1px solid ${isAct ? color+'22' : 'rgba(255,255,255,0.06)'}`,
+                        borderLeft:`3px solid ${color}`,
                       }}>
-                        <div style={{ width: 20, height: 20, borderRadius: 6, background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, flexShrink: 0 }}>
+                        <div style={{ width:26, height:26, borderRadius:8, background:`${color}16`, border:`1px solid ${color}22`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, flexShrink:0 }}>
                           {CLASS_ICONS[cls] || '💊'}
                         </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>{subName(entry.substanceId)}</div>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{CLASS_LABELS[cls] || cls}</div>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:11, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</div>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{CLASS_LABELS[cls] || cls}</div>
                         </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: isAct ? '#00e68a' : '#fff' }}>{entry.doseValue}{entry.doseUnit}</div>
-                          <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{freqDisplay(entry)} · Нед {entry.startWeek || 0}–{entry.endWeek}</div>
+                        <div style={{ textAlign:'right', flexShrink:0 }}>
+                          <div style={{ fontSize:12, fontWeight:800, color: isAct ? '#a78bfa' : '#fff' }}>{entry.doseValue} <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)', fontWeight:600 }}>{entry.doseUnit}</span></div>
+                          <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{freqDisplay(entry)} · нед {entry.startWeek || 0}–{entry.endWeek}</div>
                         </div>
                       </div>
                     );
@@ -540,26 +541,25 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ---- GRAPH TAB ---- */}
       {viewTab === 'graph' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {course.length === 0 || !graphData ? (
-            <div className="pc-card" style={{ textAlign: 'center', padding: '28px 16px' }}>
-              <div style={{ fontSize: 36, marginBottom: 8, opacity: 0.6 }}>📊</div>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>Нет данных для графика</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>Добавьте хотя бы один препарат</div>
+            <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
+              <div style={{ fontSize:28, marginBottom:8, opacity:0.6 }}>📊</div>
+              <div style={{ fontSize:13, color:'#fff', fontWeight:700, marginBottom:4 }}>Нет данных для графика</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)' }}>Добавь хотя бы один препарат</div>
             </div>
           ) : (
             <>
-              <div className="pc-card" style={{ padding: '10px 12px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📊 График курса ({totalWeeks} нед)</div>
-                <div style={{ display: 'flex', gap: 0, marginBottom: 4 }}>
+              <div className="pc-glass" style={{ padding:'12px' }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#fff', marginBottom:10, display:'flex', alignItems:'center', gap:7 }}>📊 График курса <span style={{ marginLeft:'auto', fontSize:11, background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', color:'#a78bfa', padding:'3px 8px', borderRadius:20, fontWeight:800 }}>{totalWeeks} нед</span></div>
+                <div style={{ display:'flex', gap:0, marginBottom:6, paddingLeft:84 }}>
                   {graphData.map(w => (
                     <div key={w.week} style={{
-                      flex: 1, textAlign: 'center', fontSize: 8, fontWeight: 600,
-                      color: w.week === currentWeek ? '#00e68a' : 'rgba(255,255,255,0.3)',
-                      background: w.week === currentWeek ? 'rgba(0,230,138,0.1)' : 'transparent',
-                      padding: '2px 0', borderRadius: 2,
+                      flex:1, textAlign:'center', fontSize:8, fontWeight:700,
+                      color: w.week === currentWeek ? '#a78bfa' : 'rgba(255,255,255,0.32)',
+                      background: w.week === currentWeek ? 'rgba(139,92,246,0.12)' : 'transparent',
+                      padding:'3px 0', borderRadius:6,
                     }}>{w.week}</div>
                   ))}
                 </div>
@@ -569,40 +569,44 @@ export const PharmaCourseScreen: React.FC = () => {
                   const sw = entry.startWeek || 0;
                   const ew = entry.endWeek || totalWeeks;
                   return (
-                    <div key={entry.id} style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-                      <div style={{ width: 80, fontSize: 9, color: 'rgba(255,255,255,0.6)', textAlign: 'right', paddingRight: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div key={entry.id} style={{ display:'flex', alignItems:'center', marginBottom:6, gap:6 }}>
+                      <div style={{ width:78, fontSize:9, color:'rgba(255,255,255,0.72)', textAlign:'right', paddingRight:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:700 }}>
                         {subName(entry.substanceId)}
                       </div>
-                      <div style={{ flex: 1, display: 'flex', position: 'relative', height: 18 }}>
-                        {graphData.map(w => (
-                          <div key={w.week} style={{
-                            flex: 1, height: '100%', borderRight: '1px solid rgba(255,255,255,0.03)',
-                            background: w.week === currentWeek ? 'rgba(0,230,138,0.05)' : 'transparent',
-                          }} />
-                        ))}
+                      <div style={{ flex:1, display:'flex', position:'relative', height:18, background:'rgba(255,255,255,0.04)', borderRadius:8, overflow:'hidden', border:'1px solid rgba(255,255,255,0.04)' }}>
+                        <div style={{ position:'absolute', inset:0, display:'flex' }}>
+                          {graphData.map(w => (
+                            <div key={w.week} style={{
+                              flex:1, height:'100%', borderRight:'1px solid rgba(255,255,255,0.03)',
+                              background: w.week === currentWeek ? 'rgba(139,92,246,0.08)' : 'transparent',
+                            }} />
+                          ))}
+                        </div>
                         <div style={{
-                          position: 'absolute', top: 3, left: `${(sw / totalWeeks) * 100}%`,
-                          width: `${((ew - sw) / totalWeeks) * 100}%`,
-                          height: 12, borderRadius: 6, background: `${color}40`,
-                          border: `1px solid ${color}60`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          position:'absolute', top:3, bottom:3, left:`${(sw / totalWeeks) * 100}%`,
+                          width:`${((ew - sw) / totalWeeks) * 100}%`,
+                          borderRadius:7, background:`linear-gradient(90deg, ${color}66, ${color})`,
+                          border:`1px solid ${color}66`, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 2px 8px ${color}33`,
                         }}>
-                          <span style={{ fontSize: 7, fontWeight: 700, color: '#fff' }}>{entry.doseValue}{entry.doseUnit}</span>
+                          <span style={{ fontSize:7, fontWeight:800, color:'#fff', textShadow:'0 1px 4px rgba(0,0,0,0.45)' }}>{entry.doseValue}{entry.doseUnit}</span>
                         </div>
                         {currentWeek >= sw && currentWeek < ew && (
-                          <div style={{ position: 'absolute', top: 0, left: `${(currentWeek / totalWeeks) * 100}%`, width: 2, height: '100%', background: '#00e68a', borderRadius: 1 }} />
+                          <div style={{ position:'absolute', top:0, bottom:0, left:`${(currentWeek / totalWeeks) * 100}%`, width:2, background:'#a78bfa', borderRadius:1, boxShadow:'0 0 8px rgba(139,92,246,0.7)' }} />
                         )}
                       </div>
                     </div>
                   );
                 })}
+                {currentWeek>=0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.42)', marginTop:4, textAlign:'center' }}>● Текущая неделя подсвечена фиолетовым</div>}
               </div>
-              <div className="pc-card" style={{ padding: '8px 12px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="pc-glass" style={{ padding:'9px 12px', display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
+                <span style={{ fontSize:10, fontWeight:800, color:'rgba(255,255,255,0.62)' }}>Легенда:</span>
                 {[...new Set(course.map(e => subClass(e.substanceId)))].map(cls => {
                   const color = classColor(cls);
                   return (
-                    <div key={cls} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <div style={{ width: 10, height: 10, borderRadius: 3, background: `${color}40`, border: `1px solid ${color}60` }} />
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>{CLASS_LABELS[cls] || cls}</span>
+                    <div key={cls} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                      <div style={{ width:10, height:10, borderRadius:3, background:`${color}66`, border:`1px solid ${color}55` }} />
+                      <span style={{ fontSize:10, color:'rgba(255,255,255,0.72)', fontWeight:600 }}>{CLASS_LABELS[cls] || cls}</span>
                     </div>
                   );
                 })}
@@ -612,27 +616,26 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ---- HISTORY TAB ---- */}
       {viewTab === 'history' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
           {historyCourses.length === 0 ? (
-            <div className="pc-card" style={{ textAlign: 'center', padding: '28px 16px' }}>
-              <div style={{ fontSize: 36, marginBottom: 8, opacity: 0.6 }}>📚</div>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 4 }}>Нет сохранённых курсов</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', lineHeight: 1.5 }}>
-                Нажмите «📦 Завершить курс» на вкладке «Текущий»<br />чтобы сохранить курс в историю
+            <div className="pc-glass" style={{ textAlign:'center', padding:'30px 16px', borderStyle:'dashed' }}>
+              <div style={{ width:48, height:48, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.14)', fontSize:22 }}>📚</div>
+              <div style={{ fontSize:13, color:'#fff', fontWeight:800, marginBottom:4 }}>Нет сохранённых курсов</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,0.45)', lineHeight:1.5 }}>
+                Нажми «📦 Завершить курс» на вкладке «Текущий»<br />чтобы сохранить курс в историю
               </div>
             </div>
           ) : (
             historyCourses.map((cr, i) => (
-              <div key={i} className="pc-card" style={{ padding: '10px 12px', borderLeft: '3px solid #f59e0b' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{cr.name}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{cr.date}</div>
+              <div key={i} className="pc-card2" style={{ padding:'12px', borderLeft:'3px solid #f59e0b' }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8, gap:8 }}>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{cr.name}</div>
+                    <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{cr.date} • {cr.entries.length} преп.</div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span style={{ ...pillStyle, fontSize: 9, color: '#f59e0b', background: 'rgba(255,165,2,0.15)' }}>{cr.entries.length} пр.</span>
+                  <div style={{ display:'flex', gap:6, alignItems:'center', flexShrink:0 }}>
+                    <span style={{ ...pillStyle, fontSize:10, color:'#fbbf24', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.18)', borderRadius:20 }}>{cr.entries.length} пр.</span>
                     <button onClick={() => {
                       if (!confirm(`Восстановить курс "${cr.name}"?`)) return;
                       setCourse(cr.entries);
@@ -642,35 +645,35 @@ export const PharmaCourseScreen: React.FC = () => {
                       localStorage.setItem('he_course_history', JSON.stringify(newHistory));
                       notifyDataChange();
                       setViewTab('current');
-                    }} className="pc-btn" style={{
-                      background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.25)',
-                      color: '#00e68a', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 600,
+                    }} className="pc-btn2" style={{
+                      background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)',
+                      color:'#00e68a', borderRadius:9, padding:'6px 10px', fontSize:11, fontWeight:800,
                     }}>↺ Восстановить</button>
                     <button onClick={() => {
                       if (!confirm(`Удалить "${cr.name}" из истории?`)) return;
                       const newHistory = historyCourses.filter((_, j) => j !== i);
                       setHistoryCourses(newHistory);
                       localStorage.setItem('he_course_history', JSON.stringify(newHistory));
-                    }} className="pc-btn" style={{
-                      background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
-                      color: '#ef4444', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 600,
+                    }} className="pc-btn2" style={{
+                      background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)',
+                      color:'#f87171', borderRadius:9, padding:'6px 9px', fontSize:11, fontWeight:800,
                     }}>✕</button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
                   {cr.entries.map((entry: CourseEntry, j: number) => {
                     const cls = subClass(entry.substanceId);
                     const color = classColor(cls);
                     return (
                       <div key={j} style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px',
-                        background: '#202023', borderRadius: 6, borderLeft: `2px solid ${color}`,
+                        display:'flex', alignItems:'center', gap:7, padding:'6px 8px',
+                        background:'rgba(0,0,0,0.22)', borderRadius:10, border:'1px solid rgba(255,255,255,0.05)', borderLeft:`2px solid ${color}`,
                       }}>
-                        <span style={{ fontSize: 10 }}>{CLASS_ICONS[cls] || '💊'}</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: '#fff', flex: 1 }}>{subName(entry.substanceId)}</span>
-                        <span style={{ fontSize: 10, color: '#00e68a', fontWeight: 600 }}>{entry.doseValue}{entry.doseUnit}</span>
-                        <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{freqDisplay(entry)}</span>
-                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>Нед {entry.startWeek || 0}–{entry.endWeek}</span>
+                        <span style={{ fontSize:11 }}>{CLASS_ICONS[cls] || '💊'}</span>
+                        <span style={{ fontSize:11, fontWeight:700, color:'#fff', flex:1, minWidth:0, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{subName(entry.substanceId)}</span>
+                        <span style={{ fontSize:11, color:'#a78bfa', fontWeight:800 }}>{entry.doseValue}{entry.doseUnit}</span>
+                        <span style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{freqDisplay(entry)}</span>
+                        <span style={{ fontSize:9, color:'rgba(255,255,255,0.34)', whiteSpace:'nowrap' }}>{entry.startWeek || 0}–{entry.endWeek} нед</span>
                       </div>
                     );
                   })}
@@ -681,76 +684,75 @@ export const PharmaCourseScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ========= DRUG PICKER MODAL ========= */}
       {showPicker && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 200,
-          background: 'rgba(0,0,0,0.8)',
-          display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          alignItems: 'center',
+          position:'fixed', inset:0, zIndex:200,
+          background:'rgba(0,0,0,0.72)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+          display:'flex', flexDirection:'column', justifyContent:'center',
+          alignItems:'center', padding:'12px',
         }} onClick={() => setShowPicker(false)}>
           <div style={{
-            width: '92%', maxWidth: 420,
-            maxHeight: '88vh',
-            background: '#0a0a0f',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: 20,
-            overflow: 'hidden',
-            display: 'flex', flexDirection: 'column',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            width:'100%', maxWidth:440,
+            maxHeight:'90vh',
+            background:'linear-gradient(180deg, #111113, #0a0a0f)',
+            border:'1px solid rgba(255,255,255,0.08)',
+            borderRadius:20,
+            overflow:'hidden',
+            display:'flex', flexDirection:'column',
+            boxShadow:'0 24px 64px rgba(0,0,0,0.6)',
           }} onClick={e => e.stopPropagation()}>
-            {/* Modal header */}
             <div style={{
-              padding: '14px 16px 10px',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding:'14px 16px 12px',
+              borderBottom:'1px solid rgba(255,255,255,0.06)',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              background:'linear-gradient(90deg, rgba(139,92,246,0.10), transparent)',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 15, color: '#fff' }}>💊 Добавить препарат</span>
+              <div style={{ display:'flex', alignItems:'center', gap:9 }}>
+                <span style={{ width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.18)', fontSize:13 }}>💊</span>
+                <span style={{ fontWeight:800, fontSize:14, color:'#fff' }}>Добавить препарат</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.42)', border:'1px solid rgba(255,255,255,0.08)', padding:'2px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)' }}>{subsForClass.length} в классе</span>
               </div>
-              <button onClick={() => setShowPicker(false)} className="pc-btn" style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.5)', borderRadius: 8, padding: '5px 10px',
-                fontSize: 12, lineHeight: 1,
+              <button onClick={() => setShowPicker(false)} className="pc-btn2" style={{
+                background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)',
+                color:'rgba(255,255,255,0.72)', borderRadius:10, padding:'6px 10px',
+                fontSize:12, fontWeight:700,
               }}>
                 ✕
               </button>
             </div>
 
-            {/* Class selector — scrollable pills */}
             <div style={{
-              padding: '8px 10px 6px',
-              display: 'flex', gap: 5, flexWrap: 'wrap',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
-              maxHeight: 300, overflowY: 'auto',
+              padding:'8px 10px 6px',
+              display:'flex', gap:5, flexWrap:'wrap',
+              borderBottom:'1px solid rgba(255,255,255,0.06)',
+              maxHeight:120, overflowY:'auto',
+              background:'rgba(0,0,0,0.14)',
             }}>
               {Object.entries(CLASS_LABELS).map(([cls, label]) => {
                 const hasSubs = SUBSTANCES_BY_CLASS[cls]?.length > 0;
                 if (!hasSubs) return null;
                 const isActive = pickerClass === cls;
-                const color = CLASS_COLORS[cls] || '#00e68a';
+                const color = CLASS_COLORS[cls] || '#8b5cf6';
                 return (
-                  <button key={cls} onClick={() => setPickerClass(cls)} className="pc-btn" style={{
-                    background: isActive ? `${color}30` : '#202023',
-                    border: `1px solid ${isActive ? color : '#3f3f46'}`,
-                    color: isActive ? color : 'rgba(255,255,255,0.6)',
-                    borderRadius: 20, padding: '6px 12px', fontSize: 11,
-                    fontWeight: isActive ? 700 : 500,
-                    whiteSpace: 'nowrap',
+                  <button key={cls} onClick={() => setPickerClass(cls)} className="pc-btn2" style={{
+                    background: isActive ? `${color}22` : 'rgba(255,255,255,0.04)',
+                    border:`1px solid ${isActive ? color+'55' : 'rgba(255,255,255,0.07)'}`,
+                    color: isActive ? '#fff' : 'rgba(255,255,255,0.62)',
+                    borderRadius:20, padding:'6px 11px', fontSize:11,
+                    fontWeight: isActive ? 800 : 600,
+                    whiteSpace:'nowrap', boxShadow: isActive ? `0 4px 12px ${color}22` : 'none',
                   }}>
                     {label}
-                    <span style={{ marginLeft: 4, fontSize: 9, opacity: 0.6 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
+                    <span style={{ marginLeft:5, fontSize:9, opacity:0.6, background:isActive? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)', padding:'1px 5px', borderRadius:10 }}>{SUBSTANCES_BY_CLASS[cls]?.length || 0}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Scrollable content */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
-              {/* Substance grid — one-click add */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+            <div style={{ flex:1, overflowY:'auto', padding:'10px 10px 12px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:7, marginBottom:12 }}>
                 {subsForClass.map(sub => {
-                  const color = CLASS_COLORS[sub.class] || '#00e68a';
+                  const color = CLASS_COLORS[sub.class] || '#8b5cf6';
                   const defDose = sub.dosageRange?.min ? Math.round((sub.dosageRange.min + sub.dosageRange.max) / 2) : 250;
                   const customDose = (dose && parseFloat(dose) > 0) ? parseFloat(dose) : null;
                   const hl = sub.pk?.halfLifeHours;
@@ -758,23 +760,23 @@ export const PharmaCourseScreen: React.FC = () => {
                     <div key={sub.id} onClick={() => {
                       const doseVal = (dose && parseFloat(dose) > 0) ? parseFloat(dose) : defDose;
                       addEntry(sub.id, doseVal);
-                    }} className="pc-sub-btn" style={{
-                      background: '#202023',
-                      border: `1px solid ${customDose ? color : '#3f3f46'}`,
-                      borderRadius: 10, padding: '10px 8px',
-                      cursor: 'pointer', textAlign: 'center',
-                      position: 'relative', overflow: 'hidden',
+                    }} className="pc-sub-btn2" style={{
+                      background:'rgba(255,255,255,0.04)',
+                      border:`1px solid ${customDose ? color+'55' : 'rgba(255,255,255,0.07)'}`,
+                      borderRadius:14, padding:'11px 9px',
+                      cursor:'pointer', textAlign:'center',
+                      position:'relative', overflow:'hidden',
                     }}>
-                      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: color }} />
-                      <div style={{ fontWeight: 700, fontSize: 11, color, marginBottom: 3, lineHeight: 1.3 }}>{sub.name}</div>
-                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>
+                      <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background: color, opacity: customDose ? 1 : 0.85 }} />
+                      <div style={{ fontWeight:800, fontSize:11, color:'#fff', marginBottom:3, lineHeight:1.3 }}>{sub.name}</div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.52)', marginBottom:6, lineHeight:1.3 }}>
                         {hl ? (hl >= 168 ? `T½ ${(hl / 168).toFixed(1)} нед` : `T½ ${(hl / 24).toFixed(1)} дн`) : ''}
                         {sub.dosageRange ? ` · ${sub.dosageRange.min}–${sub.dosageRange.max} ${sub.dosageRange.unit}` : ''}
                       </div>
                       <div style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 3,
-                        background: customDose ? `${color}35` : `${color}25`, color, borderRadius: 6,
-                        padding: '3px 10px', fontSize: 10, fontWeight: 700, marginTop: 3,
+                        display:'inline-flex', alignItems:'center', gap:3,
+                        background: customDose ? `${color}2a` : 'rgba(255,255,255,0.06)', color: customDose ? '#fff' : 'rgba(255,255,255,0.72)', border:`1px solid ${customDose ? color+'40' : 'rgba(255,255,255,0.06)'}`, borderRadius:20,
+                        padding:'4px 10px', fontSize:10, fontWeight:800,
                       }}>
                         + {customDose ?? defDose} {unit}
                       </div>
@@ -783,63 +785,62 @@ export const PharmaCourseScreen: React.FC = () => {
                 })}
               </div>
 
-              {/* Custom dose settings */}
               <div style={{
-                background: '#18181b', borderRadius: 10, padding: '10px 12px',
-                border: '1px solid #27272a',
+                background:'rgba(139,92,246,0.07)', borderRadius:14, padding:'11px 12px',
+                border:'1px solid rgba(139,92,246,0.14)',
               }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 8, lineHeight: 1.3 }}>
-                  Задайте свою дозировку, затем нажмите на препарат выше:
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.62)', marginBottom:8, lineHeight:1.4, fontWeight:700 }}>
+                  ⚙️ Настрой дозировку и недели, затем тапни на препарат выше
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <input type="number" value={dose || ''} onChange={e => setDose(e.target.value)} placeholder="200"
-                      className="pc-input" style={{
-                        flex: 2, padding: '7px 8px', background: '#202023',
-                        border: '1px solid #3f3f46', borderRadius: 8,
-                        color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0,
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div style={{ display:'flex', gap:6 }}>
+                    <input type="number" value={dose || ''} onChange={e => setDose(e.target.value)} placeholder="250"
+                      className="pc-input2" style={{
+                        flex:2, padding:'8px 9px', background:'rgba(0,0,0,0.32)',
+                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:10,
+                        color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', minWidth:0,
                       }} />
                     <select value={unit} onChange={e => setUnit(e.target.value)}
                       style={{
-                        flex: 1, padding: '7px 6px', background: '#202023',
-                        border: '1px solid #3f3f46', borderRadius: 8,
-                        color: '#fff', fontSize: 10, boxSizing: 'border-box', minWidth: 56,
+                        flex:1, padding:'8px 6px', background:'rgba(0,0,0,0.32)',
+                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:10,
+                        color:'#fff', fontSize:10, fontWeight:700, boxSizing:'border-box', minWidth:56,
                       }}>
-                      {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                      {UNIT_OPTIONS.map(u => <option key={u} value={u} style={{ background:'#1a1a1f' }}>{u}</option>)}
                     </select>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent:'center', gap:3, flexWrap:'wrap' }}>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.5)', whiteSpace:'nowrap', minWidth:40 }}>Дни:</span>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:3, flexWrap:'wrap' }}>
+                    <span style={{ fontSize:9, color:'rgba(255,255,255,0.52)', fontWeight:700, whiteSpace:'nowrap' }}>Дни:</span>
                     {['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map((day, idx) => (
                       <button key={idx} onClick={() => {
                         setSelectedDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx].sort());
                       }} style={{
-                        width:28, height:28, borderRadius:'50%', fontSize:9, fontWeight:600,
-                        cursor:'pointer', border:`1px solid ${selectedDays.includes(idx) ? '#00e68a' : '#3f3f46'}`,
-                        background: selectedDays.includes(idx) ? 'rgba(0,230,138,0.25)' : '#202023',
-                        color: selectedDays.includes(idx) ? '#00e68a' : 'rgba(255,255,255,0.5)',
+                        width:28, height:28, borderRadius:9, fontSize:9, fontWeight:800,
+                        cursor:'pointer', border:`1px solid ${selectedDays.includes(idx) ? '#8b5cf6' : 'rgba(255,255,255,0.08)'}`,
+                        background: selectedDays.includes(idx) ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.04)',
+                        color: selectedDays.includes(idx) ? '#fff' : 'rgba(255,255,255,0.52)',
                         display:'flex', alignItems:'center', justifyContent:'center',
                       }}>{day}</button>
                     ))}
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginTop: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>c нед</span>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginTop:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', fontWeight:700, whiteSpace:'nowrap' }}>с нед</span>
                     <input type="number" value={startWeek} onChange={e => setStartWeek(parseFloat(e.target.value) || 0 || 0)} min={0} placeholder="0"
-                      className="pc-input" style={{
-                        flex: 1, padding: '7px 8px', background: '#202023',
-                        border: '1px solid #3f3f46', borderRadius: 8,
-                        color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0, width: '100%',
+                      className="pc-input2" style={{
+                        flex:1, padding:'7px 8px', background:'rgba(255,255,255,0.06)',
+                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:9,
+                        color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', minWidth:0, width:'100%',
                       }} />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', whiteSpace: 'nowrap' }}>по нед</span>
+                  <div style={{ display:'flex', alignItems:'center', gap:6, background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:10, border:'1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', fontWeight:700, whiteSpace:'nowrap' }}>по нед</span>
                     <input type="number" value={endWeek} onChange={e => setEndWeek(parseFloat(e.target.value) || 0 || 12)} min={1} placeholder="12"
-                      className="pc-input" style={{
-                        flex: 1, padding: '7px 8px', background: '#202023',
-                        border: '1px solid #3f3f46', borderRadius: 8,
-                        color: '#fff', fontSize: 12, boxSizing: 'border-box', minWidth: 0, width: '100%',
+                      className="pc-input2" style={{
+                        flex:1, padding:'7px 8px', background:'rgba(255,255,255,0.06)',
+                        border:'1px solid rgba(255,255,255,0.08)', borderRadius:9,
+                        color:'#fff', fontSize:12, fontWeight:700, boxSizing:'border-box', minWidth:0, width:'100%',
                       }} />
                   </div>
                 </div>

@@ -33,8 +33,6 @@ export const MapperTab: React.FC = () => {
       : [...manualDrugs];
     if (drugs.length === 0) return;
     setMapperResult(mapStackToPathologies(drugs));
-
-    // Lazy-load clinical analysis
     import('../../../engines/clinical-analyzer.engine').then(({ analyzeClinicalRisks }) => {
       const compoundNames = course.length > 0
         ? course.map(c => (c.substanceId||'').toLowerCase())
@@ -45,7 +43,6 @@ export const MapperTab: React.FC = () => {
       const labDates = (linked.labs || []).map(l => l.date).filter(Boolean).sort().reverse();
       const weeksSinceLab = labDates[0] ? (Date.now() - new Date(labDates[0]).getTime()) / (7 * 24 * 3600 * 1000) : 52;
       const tWeeks = course.length > 0 ? course.reduce((max, c) => Math.max(max, (c.endWeek || 12) - (c.startWeek || 0)), 0) : 4;
-
       setClinicalResult(analyzeClinicalRisks({ compounds: compoundNames, markers, tWeeks: Math.max(1, tWeeks), weeksSinceLab, genetics }));
     }).catch(console.error);
   };
@@ -72,55 +69,60 @@ export const MapperTab: React.FC = () => {
     return 'low';
   };
 
+  const card: React.CSSProperties = { background:'rgba(22,22,26,0.62)', border:'1px solid rgba(255,255,255,0.07)', backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)', borderRadius:14, padding:14, boxShadow:'0 6px 18px rgba(0,0,0,0.18)' };
+
   return (
-    <div>
-      <div className="card" style={{ marginBottom: 12 }}>
-        <h3 style={{ margin: '0 0 4px 0' }}>🧬 Маппер: Стек препаратов → Патологии органов</h3>
-        <p style={{ fontSize: 11, color: 'var(--text-dim)', margin: 0 }}>
-          Алгоритм ищет в графе знаний все патологии для вашего стека.
-          Стек-синергия: если 2+ препарата бьют по одной системе → кумулятивный удар.
-          <br />
-        </p>
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.06))', border:'1px solid rgba(139,92,246,0.16)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ width:26, height:26, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(139,92,246,0.14)', border:'1px solid rgba(139,92,246,0.18)', fontSize:12 }}>🧬</span>
+          <span style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Маппер: стек → патологии</span>
+        </div>
+        <div style={{ fontSize:11, color:'rgba(255,255,255,0.62)', marginTop:6, lineHeight:1.45 }}>
+          Граф знаний находит патологии для твоего стека. Кумулятивный удар: 2+ препарата по одной системе усиливают риск.
+        </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 12 }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+      <div style={card}>
+        <div style={{ display:'flex', gap:7, marginBottom:10 }}>
           <button onClick={() => setUseCourse(true)} style={{
-            flex: 1, padding: '8px 12px', borderRadius: 6, border: useCourse ? '1px solid var(--accent)' : '1px solid var(--border)',
-            background: useCourse ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            flex:1, padding:'9px 10px', borderRadius:11, fontSize:12, fontWeight:800, cursor:'pointer',
+            border:`1px solid ${useCourse ? 'rgba(139,92,246,0.32)' : 'rgba(255,255,255,0.07)'}`,
+            background: useCourse ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: useCourse ? '#fff' : 'rgba(255,255,255,0.62)',
           }}>
-            💊 Из курса ({course.length} преп.)
+            💊 Из курса ({course.length})
           </button>
           <button onClick={() => setUseCourse(false)} style={{
-            flex: 1, padding: '8px 12px', borderRadius: 6, border: !useCourse ? '1px solid var(--accent)' : '1px solid var(--border)',
-            background: !useCourse ? 'rgba(0,230,138,0.08)' : 'var(--bg-secondary)', color: 'var(--text)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            flex:1, padding:'9px 10px', borderRadius:11, fontSize:12, fontWeight:800, cursor:'pointer',
+            border:`1px solid ${!useCourse ? 'rgba(139,92,246,0.32)' : 'rgba(255,255,255,0.07)'}`,
+            background: !useCourse ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(139,92,246,0.06))' : 'rgba(255,255,255,0.04)', color: !useCourse ? '#fff' : 'rgba(255,255,255,0.62)',
           }}>
-            ✏️ Вручную ({manualDrugs.length} преп.)
+            ✏️ Вручную ({manualDrugs.length})
           </button>
         </div>
 
         {!useCourse && (
           <div>
-            <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+            <div style={{ display:'flex', gap:6, marginBottom:8 }}>
               <select value={newDrugName} onChange={e => setNewDrugName(e.target.value)}
-                style={{ flex: 1, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
-                <option value="">Выбрать препарат...</option>
-                {knownNames.map(n => (<option key={n} value={n}>{n}</option>))}
+                style={{ flex:1, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:600, outline:'none' }}>
+                <option value="" style={{ background:'#1a1a1f' }}>Выбрать препарат...</option>
+                {knownNames.map(n => (<option key={n} value={n} style={{ background:'#1a1a1f' }}>{n}</option>))}
               </select>
-              <input type="number" placeholder="" value={newDrugDose || ''}
+              <input type="number" placeholder="мг" value={newDrugDose || ''}
                 onChange={e => setNewDrugDose(parseFloat(e.target.value) || 0)}
-                style={{ width: 80, padding: '6px 8px', borderRadius: 6, background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} />
+                style={{ width:72, padding:'8px 10px', borderRadius:10, background:'rgba(0,0,0,0.28)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:12, fontWeight:700, outline:'none' }} />
               <button onClick={addManualDrug} style={{
-                padding: '6px 12px', borderRadius: 6, border: 'none', background: 'var(--accent)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                padding:'8px 12px', borderRadius:10, border:'1px solid rgba(139,92,246,0.22)', background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', fontWeight:800, fontSize:12, cursor:'pointer', boxShadow:'0 4px 12px rgba(139,92,246,0.22)',
               }}>+</button>
             </div>
             {manualDrugs.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+              <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:6 }}>
                 {manualDrugs.map(d => (
                   <span key={d.name} onClick={() => removeManualDrug(d.name)} style={{
-                    padding: '3px 8px', borderRadius: 6, background: 'rgba(139,92,246,0.15)', color: '#a78bfa',
-                    fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer',
-                  }}>{d.name} {d.dosageMg}мг ✕</span>
+                    padding:'5px 9px', borderRadius:20, background:'rgba(139,92,246,0.12)', color:'#c4b5fd', border:'1px solid rgba(139,92,246,0.18)',
+                    fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', gap:5, cursor:'pointer',
+                  }}>{d.name} <span style={{ background:'rgba(255,255,255,0.08)', padding:'1px 5px', borderRadius:10, fontSize:10 }}>{d.dosageMg}мг</span> ✕</span>
                 ))}
               </div>
             )}
@@ -128,160 +130,151 @@ export const MapperTab: React.FC = () => {
         )}
 
         <button onClick={handleRunManual} style={{
-          width: '100%', padding: 10, borderRadius: 8, border: 'none', cursor: 'pointer', marginTop: 4,
-          background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)', color: '#fff', fontWeight: 700, fontSize: 14,
-        }}>▶ Запустить маппинг стека</button>
+          width:'100%', padding:'11px 0', borderRadius:12, border:'1px solid rgba(139,92,246,0.28)', cursor:'pointer', marginTop:6,
+          background:'linear-gradient(135deg, #8b5cf6, #7c3aed)', color:'#fff', fontWeight:800, fontSize:13, boxShadow:'0 6px 16px rgba(139,92,246,0.22)',
+        }}>▶ Запустить маппинг</button>
       </div>
 
       {mapperResult && (
         <>
-          <div className="card" style={{ marginBottom: 12, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--accent)' }}>{mapperResult.activePathologies?.length ?? 0}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Патологии</div>
+          <div style={{ ...card, display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, textAlign:'center', padding:12 }}>
+            <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize:20, fontWeight:900, color:'#a78bfa' }}>{mapperResult.activePathologies?.length ?? 0}</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Патологии</div>
             </div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#60a5fa' }}>{mapperResult.requiredBiomarkers?.length ?? 0}</div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Биомаркеры</div>
+            <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize:20, fontWeight:900, color:'#60a5fa' }}>{mapperResult.requiredBiomarkers?.length ?? 0}</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Биомаркеры</div>
             </div>
-            <div>
-              <div style={{ fontSize: 20, fontWeight: 800, color: (mapperResult.unknownDrugs?.length ?? 0) > 0 ? '#f97316' : 'var(--text-dim)' }}>
+            <div style={{ background:'rgba(0,0,0,0.18)', borderRadius:12, padding:'10px 6px', border:'1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ fontSize:20, fontWeight:900, color: (mapperResult.unknownDrugs?.length ?? 0) > 0 ? '#f59e0b' : 'rgba(255,255,255,0.72)' }}>
                 {mapperResult.knownDrugs}/{mapperResult.totalDrugs}
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>Распознано</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', fontWeight:700, letterSpacing:0.3, textTransform:'uppercase' as const }}>Распознано</div>
             </div>
           </div>
 
-          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: 'var(--text-dim)' }}>Активные патологии (по убыванию тяжести)</div>
+          <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.72)', letterSpacing:0.3, textTransform:'uppercase' as const, padding:'0 2px' }}>Активные патологии — по тяжести</div>
           {(mapperResult.activePathologies || []).map(p => {
             const sev = getSeverityClass(p.cumulativeTriggerStrength);
-            const ZONE_COLORS: Record<string, string> = { high: '#ef4444', medium: '#f97316', low: '#eab308' };
+            const ZONE_COLORS: Record<string, string> = { high: '#ef4444', medium: '#f59e0b', low: '#eab308' };
+            const c = ZONE_COLORS[sev];
             return (
-              <div key={p.pathologyId} className="card" style={{ marginBottom: 8, borderLeft: `4px solid ${ZONE_COLORS[sev]}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <div>
-                    <span style={{ fontWeight: 600, fontSize: 13 }}>{p.pathologyLabel}</span>
-                    <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 4, background: `${ZONE_COLORS[sev]}22`, color: ZONE_COLORS[sev], fontSize: 10, fontWeight: 600 }}>
+              <div key={p.pathologyId} style={{ ...card, borderLeft:`3px solid ${c}`, padding:12 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, gap:8 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:7, flex:1, minWidth:0 }}>
+                    <span style={{ fontWeight:800, fontSize:13, color:'#fff', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.pathologyLabel}</span>
+                    <span style={{ padding:'2px 7px', borderRadius:20, background:`${c}16`, color:c, fontSize:10, fontWeight:800, border:`1px solid ${c}22`, flexShrink:0 }}>
                       {p.cumulativeTriggerStrength} Σ
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    {(p.contributingDrugs || []).map(d => (
-                      <span key={d} style={{ padding: '2px 6px', borderRadius: 4, background: 'rgba(139,92,246,0.12)', color: '#a78bfa', fontSize: 10 }}>{d}</span>
+                  <div style={{ display:'flex', gap:4, flexWrap:'wrap', flexShrink:0 }}>
+                    {(p.contributingDrugs || []).slice(0,3).map(d => (
+                      <span key={d} style={{ padding:'3px 7px', borderRadius:20, background:'rgba(139,92,246,0.10)', color:'#c4b5fd', fontSize:10, fontWeight:700, border:'1px solid rgba(139,92,246,0.14)' }}>{d}</span>
                     ))}
                   </div>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 4, height: 6, overflow: 'hidden', marginBottom: 4 }}>
-                  <div style={{ width: `${Math.min(100, p.cumulativeTriggerStrength * 35)}%`, height: '100%', background: ZONE_COLORS[sev], borderRadius: 4, transition: 'width 0.5s' }} />
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-                  {(p.contributingDrugs?.length ?? 0) > 1
-                    ? ``
-                    : ``}
+                <div style={{ background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:20, height:6, overflow:'hidden', marginBottom:4 }}>
+                  <div style={{ width:`${Math.min(100, p.cumulativeTriggerStrength * 35)}%`, height:'100%', background:`linear-gradient(90deg, ${c}88, ${c})`, borderRadius:20, transition:'width 0.5s', boxShadow:`0 0 8px ${c}55` }} />
                 </div>
               </div>
             );
           })}
 
-          <div className="card" style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, color: 'var(--text-dim)' }}>
-              🧪 Требуемые биомаркеры ({mapperResult.requiredBiomarkers?.length ?? 0})
+          <div style={card}>
+            <div style={{ fontSize:11, fontWeight:800, marginBottom:4, color:'#fff', display:'flex', alignItems:'center', gap:6 }}>
+              🧪 Требуемые биомаркеры <span style={{ marginLeft:'auto', fontSize:10, color:'rgba(255,255,255,0.45)' }}>{mapperResult.requiredBiomarkers?.length ?? 0} шт</span>
             </div>
-            <div style={{ fontSize: 10, color: 'var(--accent)', marginBottom: 6 }}>
-              Зелёные — есть в ваших анализах, серые — необходимо сдать
+            <div style={{ fontSize:10, color:'#a78bfa', marginBottom:8, background:'rgba(139,92,246,0.06)', padding:'6px 8px', borderRadius:8, border:'1px solid rgba(139,92,246,0.10)' }}>
+              Зелёные — есть в анализах, серые — нужно сдать
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               {(mapperResult.requiredBiomarkers || []).map(m => {
                 const has = markerInLabs(m);
                 return (
                   <span key={m} style={{
-                    padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                    background: has ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.05)',
-                    color: has ? '#00e68a' : 'var(--text-dim)',
-                    border: `1px solid ${has ? 'rgba(0,230,138,0.3)' : 'var(--border)'}`,
-                  }}>{has ? '✅ ' : '⬜ '}{m}</span>
+                    padding:'5px 9px', borderRadius:20, fontSize:10, fontWeight:700,
+                    background: has ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: has ? '#00e68a' : 'rgba(255,255,255,0.52)',
+                    border:`1px solid ${has ? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.06)'}`,
+                  }}>{has ? '✓ ' : '○ '}{m}</span>
                 );
               })}
             </div>
           </div>
 
           {(mapperResult.unknownDrugs?.length ?? 0) > 0 && (
-            <div className="card" style={{ marginBottom: 12, borderLeft: '4px solid #f97316' }}>
-              <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>
+            <div style={{ ...card, borderLeft:'3px solid #f59e0b', background:'linear-gradient(135deg, rgba(245,158,11,0.06), rgba(245,158,11,0.02))' }}>
+              <div style={{ fontSize:11, color:'#fbbf24', fontWeight:800 }}>
                 Неизвестные препараты: {(mapperResult.unknownDrugs || []).join(', ')}
               </div>
-              <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>
-                Эти препараты отсутствуют в графе знаний. Они исключены из расчёта.
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', marginTop:4 }}>
+                Отсутствуют в графе знаний — исключены из расчёта. Проверь написание.
               </div>
             </div>
           )}
         </>
       )}
 
-      {/* ── Clinical Pathology Analysis ── */}
       {clinicalResult?.results?.length > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: '#ec4899' }}>
-            🏥 Клинические патологии ({clinicalResult.results.length})
-          </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:9 }}>
+          <div style={{ fontSize:11, fontWeight:800, color:'#ec4899', letterSpacing:0.3, textTransform:'uppercase' as const }}>🏥 Клинические патологии ({clinicalResult.results.length})</div>
 
-          {/* Summary */}
-          <div className="card" style={{
-            marginBottom: 10, padding: '8px 12px',
-            background: (clinicalResult.overallMaxRisk ?? 0) >= 80 ? 'rgba(239,68,68,0.08)' :
-              (clinicalResult.overallMaxRisk ?? 0) >= 50 ? 'rgba(249,115,22,0.06)' : 'rgba(0,230,138,0.04)',
-            borderLeft: `3px solid ${(clinicalResult.overallMaxRisk ?? 0) >= 80 ? '#ef4444' : (clinicalResult.overallMaxRisk ?? 0) >= 50 ? '#f97316' : '#00e68a'}`,
+          <div style={{ ...card,
+            background: (clinicalResult.overallMaxRisk ?? 0) >= 80 ? 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.03))' :
+              (clinicalResult.overallMaxRisk ?? 0) >= 50 ? 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02))' : 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.02))',
+            borderLeft:`3px solid ${(clinicalResult.overallMaxRisk ?? 0) >= 80 ? '#ef4444' : (clinicalResult.overallMaxRisk ?? 0) >= 50 ? '#f59e0b' : '#00e68a'}`,
           }}>
-            <div style={{ fontSize: 11 }}>{clinicalResult.summary}</div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 2, fontSize: 9, color: 'var(--text-dim)' }}>
-              <span>🧪 {clinicalResult.markersAnalyzed ?? 0} маркеров</span>
-              <span>📋 {(clinicalResult.requiredLabPanel?.length ?? 0)} в панели</span>
-              <span>🔬 {(clinicalResult.requiredInstrumental?.length ?? 0)} исследований</span>
+            <div style={{ fontSize:12, color:'#fff', lineHeight:1.4, fontWeight:600 }}>{clinicalResult.summary}</div>
+            <div style={{ display:'flex', gap:8, marginTop:8, fontSize:10, color:'rgba(255,255,255,0.52)', flexWrap:'wrap' }}>
+              <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>🧪 {clinicalResult.markersAnalyzed ?? 0} маркеров</span>
+              <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>📋 {clinicalResult.requiredLabPanel?.length ?? 0} в панели</span>
+              <span style={{ background:'rgba(0,0,0,0.18)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>🔬 {clinicalResult.requiredInstrumental?.length ?? 0} иссл.</span>
             </div>
           </div>
 
-          {/* Per-system accordion */}
           {(clinicalResult.systems || []).map((system: any) => (
-            <details key={system?.systemKey || Math.random()} style={{ marginBottom: 6 }}>
+            <details key={system?.systemKey || Math.random()} style={{ ...card, padding:0, overflow:'hidden' }}>
               <summary style={{
-                padding: '6px 10px', borderRadius: 8, cursor: 'pointer',
-                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-                fontSize: 11, fontWeight: 600, listStyle: 'none',
-                display: 'flex', alignItems: 'center', gap: 6,
+                padding:'10px 12px', cursor:'pointer',
+                background:'linear-gradient(90deg, rgba(255,255,255,0.03), transparent)',
+                fontSize:11, fontWeight:800, listStyle:'none',
+                display:'flex', alignItems:'center', gap:7, color:'#fff',
               }}>
-                {system?.icon || ''} {system?.systemName || ''}
+                <span>{system?.icon || ''} {system?.systemName || ''}</span>
                 <span style={{
-                  marginLeft: 'auto', padding: '1px 6px', borderRadius: 4, fontSize: 10,
-                  background: (system?.maxRisk ?? 0) >= 80 ? 'rgba(239,68,68,0.15)' :
-                    (system?.maxRisk ?? 0) >= 50 ? 'rgba(249,115,22,0.15)' : 'rgba(0,230,138,0.10)',
-                  color: (system?.maxRisk ?? 0) >= 80 ? '#ef4444' : (system?.maxRisk ?? 0) >= 50 ? '#f97316' : '#00e68a',
+                  marginLeft:'auto', padding:'2px 8px', borderRadius:20, fontSize:11, fontWeight:800,
+                  background: (system?.maxRisk ?? 0) >= 80 ? 'rgba(239,68,68,0.14)' :
+                    (system?.maxRisk ?? 0) >= 50 ? 'rgba(245,158,11,0.14)' : 'rgba(0,230,138,0.12)',
+                  color: (system?.maxRisk ?? 0) >= 80 ? '#f87171' : (system?.maxRisk ?? 0) >= 50 ? '#fbbf24' : '#00e68a',
+                  border:`1px solid ${(system?.maxRisk ?? 0) >= 80 ? 'rgba(239,68,68,0.18)' : (system?.maxRisk ?? 0) >= 50 ? 'rgba(245,158,11,0.18)' : 'rgba(0,230,138,0.18)'}`,
                 }}>{Math.round(system?.maxRisk ?? 0)}%</span>
-                <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>({(system?.pathologies?.length ?? 0)})</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,0.45)' }}>({(system?.pathologies?.length ?? 0)})</span>
               </summary>
-              <div style={{ padding: '4px 0 0 8px' }}>
+              <div style={{ padding:'8px', display:'flex', flexDirection:'column', gap:6 }}>
                 {(system?.pathologies || []).map((r: any) => {
-                  const zoneColor = (r?.alertLevel ?? 0) >= 3 ? '#ef4444' : (r?.alertLevel ?? 0) >= 2 ? '#f97316' : (r?.alertLevel ?? 0) >= 1 ? '#eab308' : '#22c55e';
+                  const zoneColor = (r?.alertLevel ?? 0) >= 3 ? '#ef4444' : (r?.alertLevel ?? 0) >= 2 ? '#f59e0b' : (r?.alertLevel ?? 0) >= 1 ? '#eab308' : '#22c55e';
                   return (
                     <div key={r?.pathologyId || Math.random()} style={{
-                      marginBottom: 6, padding: '6px 8px', borderRadius: 6,
-                      background: 'rgba(255,255,255,0.02)', borderLeft: `3px solid ${zoneColor}`,
+                      padding:'8px 10px', borderRadius:11,
+                      background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.05)', borderLeft:`3px solid ${zoneColor}`,
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 600 }}>{r?.pathologyName || ''}</span>
-                        <span style={{ padding: '1px 5px', borderRadius: 3, background: `${zoneColor}20`, color: zoneColor, fontWeight: 600, fontSize: 9 }}>
+                      <div style={{ display:'flex', justifyContent:'space-between', gap:8, alignItems:'center', marginBottom:4 }}>
+                        <span style={{ fontWeight:800, fontSize:11, color:'#fff' }}>{r?.pathologyName || ''}</span>
+                        <span style={{ padding:'2px 7px', borderRadius:20, background:`${zoneColor}16`, color:zoneColor, fontWeight:800, fontSize:10, border:`1px solid ${zoneColor}22`, whiteSpace:'nowrap' }}>
                           {(r?.riskPercent ?? 0)}% — {(r?.status || '').split('(')[0].trim()}
                         </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 8, fontSize: 8, color: 'var(--text-dim)' }}>
+                      <div style={{ display:'flex', gap:6, fontSize:10, color:'rgba(255,255,255,0.52)', flexWrap:'wrap' }}>
                         <span>Hill: {r?.hillScore ?? '—'}</span>
                         <span>MC95: {r?.severity95 ?? '—'}</span>
                         {(r?.contributingCompounds?.length ?? 0) > 0 && (
                           <span>Препараты: {(r?.contributingCompounds || []).join(', ')}</span>
                         )}
                       </div>
-                      {(r?.alertLevel ?? 0) >= 2 && (
-                        <div style={{ marginTop: 3, fontSize: 9, color: '#f97316' }}>
-                          🔬 {r?.instrumental || ''}
+                      {(r?.alertLevel ?? 0) >= 2 && r?.instrumental && (
+                        <div style={{ marginTop:6, fontSize:10, color:'#fbbf24', background:'rgba(245,158,11,0.08)', padding:'5px 8px', borderRadius:8, border:'1px solid rgba(245,158,11,0.12)' }}>
+                          🔬 {r?.instrumental}
                         </div>
                       )}
                     </div>
@@ -294,13 +287,9 @@ export const MapperTab: React.FC = () => {
       )}
 
       {!mapperResult && !clinicalResult && (
-        <div className="card" style={{ textAlign: 'center', padding: 24 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🧬</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-            {course.length > 0
-              ? ``
-              : ''}
-          </div>
+        <div style={{ ...card, textAlign:'center', padding:24, borderStyle:'dashed', background:'rgba(22,22,26,0.32)' }}>
+          <div style={{ width:44, height:44, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', background:'rgba(139,92,246,0.10)', border:'1px solid rgba(139,92,246,0.14)', fontSize:20 }}>🧬</div>
+          <div style={{ fontSize:12, color:'rgba(255,255,255,0.62)', fontWeight:600 }}>{course.length > 0 ? 'Нажми «Запустить маппинг» — увидишь патологии и маркеры' : 'Добавь препараты в курс или вручную — затем запусти маппинг'}</div>
         </div>
       )}
     </div>
