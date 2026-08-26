@@ -11,46 +11,52 @@ interface Props {
   refreshKey: number;
 }
 
-const cardStyle: React.CSSProperties = { padding: 10, borderRadius: 14, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 6 };
+const cardStyle: React.CSSProperties = { padding: 14, borderRadius: 16, background: 'linear-gradient(135deg, #18181b 0%, #1e1e22 100%)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 8, boxShadow:'0 4px 20px rgba(0,0,0,0.18)', backdropFilter:'blur(8px)' };
 
-const DonutChart: React.FC<{ protein: number; fat: number; carbs: number; size?: number }> = ({ protein, fat, carbs, size = 90 }) => {
+const DonutChart: React.FC<{ protein: number; fat: number; carbs: number; size?: number }> = ({ protein, fat, carbs, size = 92 }) => {
   const total = protein + fat + carbs || 1;
   const segments = [
-    { value: protein / total, color: '#3b82f6', label: 'Белки' },
-    { value: fat / total, color: '#f59e0b', label: 'Жиры' },
-    { value: carbs / total, color: '#f97316', label: 'Углеводы' },
+    { value: protein / total, color: '#3b82f6', label: 'Белки', light:'#60a5fa' },
+    { value: fat / total, color: '#f59e0b', label: 'Жиры', light:'#fbbf24' },
+    { value: carbs / total, color: '#a78bfa', label: 'Углеводы', light:'#c4b5fd' },
   ];
-  const cx = size / 2, cy = size / 2, r = size / 2 - 8, strokeW = size * 0.2;
+  const cx = size / 2, cy = size / 2, r = size / 2 - 9, strokeW = size * 0.18;
   let offset = 0;
-  const arcs = segments.map((s, i) => {
+  const arcs = segments.map((s) => {
     const dash = s.value * Math.PI * 2 * r;
     const gap = dash > 0 ? Math.PI * 2 * r - dash : 0;
-    const arc = { dash, gap, color: s.color, offset, label: s.label, pct: Math.round(s.value * 100) };
+    const arc = { dash, gap, color: s.color, light:s.light, offset, label: s.label, pct: Math.round(s.value * 100) };
     offset += dash;
     return arc;
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        {arcs.map((a, i) => (
-          <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={a.color} strokeWidth={strokeW}
-            strokeDasharray={`${a.dash} ${a.gap}`} strokeDashoffset={-a.offset}
-            transform={`rotate(-90 ${cx} ${cy})`} opacity={a.dash > 0 ? 1 : 0.2}
-            style={{ transition: 'stroke-dasharray 0.5s ease' }} />
-        ))}
-        <text x={cx} y={cy - 6} textAnchor="middle" fill="#fff" fontSize={size * 0.16} fontWeight={700}>
-          {Math.round(protein + fat + carbs)}г
-        </text>
-        <text x={cx} y={cy + size * 0.13} textAnchor="middle" fill="rgba(255,255,255,0.5)" fontSize={size * 0.1}>
-          БЖУ
-        </text>
-      </svg>
-      <div style={{ display: 'flex', gap: 6, fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+      <div style={{ position:'relative', filter:'drop-shadow(0 4px 12px rgba(0,0,0,0.25))' }}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={cx} cy={cy} r={r} fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+          {arcs.map((a, i) => (
+            <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={a.color} strokeWidth={strokeW}
+              strokeDasharray={`${a.dash} ${a.gap}`} strokeDashoffset={-a.offset}
+              transform={`rotate(-90 ${cx} ${cy})`} opacity={a.dash > 0 ? 1 : 0.12}
+              strokeLinecap="round"
+              style={{ transition: 'stroke-dasharray 0.6s cubic-bezier(0.22,1,0.36,1)', filter: a.dash>0 ? `drop-shadow(0 2px 6px ${a.color}40)` : 'none' }} />
+          ))}
+          <circle cx={cx} cy={cy} r={r - strokeW/2 -2} fill="#18181b" />
+          <text x={cx} y={cy - 5} textAnchor="middle" fill="#fff" fontSize={size * 0.17} fontWeight={800} letterSpacing={-0.5}>
+            {Math.round(protein + fat + carbs)}г
+          </text>
+          <text x={cx} y={cy + size * 0.13} textAnchor="middle" fill="rgba(255,255,255,0.45)" fontSize={size * 0.09} fontWeight={600} letterSpacing={0.3}>
+            БЖУ
+          </text>
+        </svg>
+      </div>
+      <div style={{ display: 'flex', gap: 8, fontSize: 8 }}>
         {segments.map((s, i) => (
-          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
-            {s.label} {Math.round(s.value * 100)}%
+          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding:'3px 7px', borderRadius:999, background:`${s.color}12`, border:`1px solid ${s.color}18` }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, boxShadow:`0 0 6px ${s.color}60` }} />
+            <span style={{ color:'rgba(255,255,255,0.75)', fontWeight:600 }}>{s.label}</span>
+            <span style={{ color:s.color, fontWeight:800 }}>{Math.round(s.value * 100)}%</span>
           </span>
         ))}
       </div>
@@ -58,40 +64,63 @@ const DonutChart: React.FC<{ protein: number; fat: number; carbs: number; size?:
   );
 };
 
-const Sparkline: React.FC<{ data: number[]; color: string; height?: number; label: string; unit: string }> = ({ data, color, height = 36, label, unit }) => {
+const Sparkline: React.FC<{ data: number[]; color: string; height?: number; label: string; unit: string }> = ({ data, color, height = 42, label, unit }) => {
   const valid = data.filter(d => d > 0);
   if (valid.length < 2) return (
-    <div style={{ textAlign: 'center', padding: 4 }}>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)' }}>Нет данных</div>
+    <div style={{ textAlign: 'center', padding: 8, minWidth:110, background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px dashed rgba(255,255,255,0.06)' }}>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginBottom: 4, fontWeight:600, letterSpacing:0.4, textTransform:'uppercase' as const }}>{label}</div>
+      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }}>—</div>
+      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)' }}>нужно ≥2 дней</div>
     </div>
   );
   const max = Math.max(...valid, 1);
   const min = Math.min(...valid);
-  const w = 140, h = height, padX = 1, padY = 4;
+  const range = max - min || 1;
+  const w = 150, h = height, padX = 6, padY = 6;
   const scaleX = (w - padX * 2) / Math.max(valid.length - 1, 1);
-  const scaleY = (h - padY * 2) / (max - min || 1);
+  const scaleY = (h - padY * 2) / range;
   const points = valid.map((v, i) => {
     const x = padX + i * scaleX;
     const y = h - padY - (v - min) * scaleY;
     return `${x},${y}`;
   }).join(' ');
+  const areaPoints = `${padX},${h-padY} ${points} ${padX + (valid.length-1)*scaleX},${h-padY}`;
 
   const avg = Math.round(valid.reduce((s, v) => s + v, 0) / valid.length);
-  const trend = valid.length >= 2 ? ((valid[valid.length - 1] - valid[0]) / valid[0] * 100) : 0;
+  const trend = valid.length >= 2 ? ((valid[valid.length - 1] - valid[0]) / Math.max(valid[0],1) * 100) : 0;
+  const isUp = trend > 2, isDown = trend < -2;
 
   return (
-    <div style={{ textAlign: 'center', padding: 4 }}>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>{label}</div>
-      <svg width={w} height={h} style={{ overflow: 'visible' }}>
-        <polyline points={points} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
-          style={{ transition: 'all 0.3s' }} />
-        {valid.map((v, i) => (i === 0 || i === valid.length - 1) ? (
-          <circle key={i} cx={padX + i * scaleX} cy={h - padY - (v - min) * scaleY} r={2} fill={color} />
-        ) : null)}
+    <div style={{ textAlign: 'center', padding: '8px 10px', background:'rgba(255,255,255,0.02)', borderRadius:12, border:'1px solid rgba(255,255,255,0.04)', minWidth:150 }}>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginBottom: 4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const, display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+        <span style={{ width:6, height:6, borderRadius:4, background:color, boxShadow:`0 0 6px ${color}80` }} /> {label}
+      </div>
+      <svg width={w} height={h} style={{ overflow: 'visible', display:'block', margin:'0 auto' }}>
+        <defs>
+          <linearGradient id={`grad-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.22} />
+            <stop offset="100%" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <polygon points={areaPoints} fill={`url(#grad-${color.replace('#','')})`} />
+        <polyline points={points} fill="none" stroke={color} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"
+          style={{ transition: 'all 0.4s ease', filter:`drop-shadow(0 2px 4px ${color}30)` }} />
+        {valid.map((v, i) => {
+          const isEdge = i===0 || i===valid.length-1;
+          const x = padX + i * scaleX, y = h - padY - (v - min) * scaleY;
+          if (!isEdge && valid.length>6 && i%2!==0) return null;
+          return <g key={i}>
+            <circle cx={x} cy={y} r={isEdge?3:2} fill={color} stroke="#18181b" strokeWidth={1.5} style={{ filter:`drop-shadow(0 1px 3px ${color}60)` }} />
+          </g>;
+        })}
       </svg>
-      <div style={{ fontSize: 8, fontWeight: 700, color }}>
-        {avg}{unit} {trend !== 0 ? <span style={{ fontSize: 7, color: trend > 0 ? '#ef4444' : '#22c55e' }}>{trend > 0 ? '+' : ''}{Math.round(trend)}%</span> : null}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, marginTop:2 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color }}>{avg}<span style={{ fontSize:8, fontWeight:600, color:'rgba(255,255,255,0.5)' }}>{unit}</span></span>
+        {trend !== 0 && (
+          <span style={{ fontSize: 8, fontWeight:700, padding:'2px 6px', borderRadius:999, background: isUp ? 'rgba(239,68,68,0.12)' : isDown ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', color: isUp ? '#ef4444' : isDown ? '#22c55e' : 'rgba(255,255,255,0.6)', border:`1px solid ${isUp ? 'rgba(239,68,68,0.18)' : isDown ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)'}` }}>
+            {isUp ? '↗' : isDown ? '↘' : '→'} {trend > 0 ? '+' : ''}{Math.round(trend)}%
+          </span>
+        )}
       </div>
     </div>
   );
@@ -118,35 +147,49 @@ const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDat
     return Array.from(map.entries())
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .slice(0, 8);
   }, [diaryData, selectedDate]);
 
   if (freq.length < 2) return (
-    <div style={{ ...cardStyle, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 9 }}>
-      📊 Недостаточно данных для анализа частоты (нужно ≥2 продуктов)
+    <div style={{ ...cardStyle, textAlign: 'center', padding:20 }}>
+      <div style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.04)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px', fontSize:16 }}>📊</div>
+      <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight:600 }}>Ещё нет статистики</div>
+      <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, marginTop:4 }}>Запиши минимум 2 разных продукта — покажем топ</div>
     </div>
   );
 
   const maxCount = Math.max(...freq.map(f => f.count), 1);
-  const barColors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e', '#ef4444', '#f97316', '#06b6d4', '#ec4899', '#a855f7', '#14b8a6'];
+  const barGradients = [
+    'linear-gradient(90deg,#3b82f6,#60a5fa)', 'linear-gradient(90deg,#8b5cf6,#a78bfa)', 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+    'linear-gradient(90deg,#10b981,#34d399)', 'linear-gradient(90deg,#ef4444,#f87171)', 'linear-gradient(90deg,#f97316,#fb923c)',
+    'linear-gradient(90deg,#06b6d4,#22d3ee)', 'linear-gradient(90deg,#ec4899,#f472b6)',
+  ];
 
   return (
     <div style={cardStyle}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📊 Топ продуктов (30 дней)</div>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+        <span style={{ width:26, height:26, borderRadius:8, background:'linear-gradient(135deg,#8b5cf6,#7c3aed)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12 }}>🏆</span>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing:-0.2 }}>Топ продуктов</div>
+          <div style={{ fontSize: 9, color:'rgba(255,255,255,0.45)' }}>30 дней • частота</div>
+        </div>
+        <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 8px', borderRadius:999, background:'rgba(139,92,246,0.12)', color:'#a78bfa', border:'1px solid rgba(139,92,246,0.18)', fontWeight:700 }}>{freq.length} поз.</span>
+      </div>
       {freq.map((f, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', width: 80, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right' }}
-            title={f.name}>
-            {f.name.length > 14 ? f.name.slice(0, 13) + '...' : f.name}
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', width: 88, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textAlign: 'right', fontWeight:500 }}
+            title={`${f.name} • ${f.count} раз • ${Math.round(f.totalKcal)} ккал`}>
+            {f.name.length > 16 ? f.name.slice(0, 15) + '…' : f.name}
           </span>
-          <div style={{ flex: 1, height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${Math.round(f.count / maxCount * 100)}%`, borderRadius: 5, background: barColors[i % barColors.length], transition: 'width 0.5s', minWidth: 3 }} />
+          <div style={{ flex: 1, height: 14, borderRadius: 8, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', padding:1, boxShadow:'inset 0 1px 2px rgba(0,0,0,0.2)' }}>
+            <div style={{ height: '100%', width: `${Math.round(f.count / maxCount * 100)}%`, borderRadius: 7, background: barGradients[i % barGradients.length], transition: 'width 0.6s cubic-bezier(0.22,1,0.36,1)', minWidth: 6, boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }} />
           </div>
-          <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.8)', minWidth: 20, textAlign: 'right' }}>{f.count}</span>
+          <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', minWidth: 22, textAlign: 'right', background:'rgba(255,255,255,0.06)', padding:'2px 6px', borderRadius:6 }}>{f.count}</span>
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.35)', minWidth:42 }}>{Math.round(f.totalKcal)} ккал</span>
         </div>
       ))}
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>
-        Частота употребления за последние 30 дней
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 6, textAlign:'center', padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.03)' }}>
+        Частота за последние 30 дней • тап — быстро добавить (в вкладке ➕)
       </div>
     </div>
   );
@@ -155,22 +198,29 @@ const FoodFrequencyChart: React.FC<{ diaryData: Record<string, any>; selectedDat
 const MacroBalanceGauge: React.FC<{ actual: number; target: number; label: string; color: string }> = ({ actual, target, label, color }) => {
   const pct = target > 0 ? Math.min(100, Math.round(actual / target * 100)) : 0;
   const isOk = pct >= 85 && pct <= 115;
+  const isOver = pct > 115;
+  const displayColor = isOk ? color : isOver ? '#ef4444' : '#f59e0b';
+  const bgColor = isOk ? `${color}12` : isOver ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)';
+  const borderColor = isOk ? `${color}18` : isOver ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
   return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ position: 'relative', width: 52, height: 52, margin: '0 auto' }}>
-        <svg width={52} height={52} viewBox="0 0 52 52">
-          <circle cx={26} cy={26} r={22} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4} />
-          <circle cx={26} cy={26} r={22} fill="none" stroke={isOk ? color : pct > 115 ? '#ef4444' : '#f59e0b'}
+    <div style={{ textAlign: 'center', padding:'8px 6px', borderRadius:12, background:bgColor, border:`1px solid ${borderColor}`, minWidth:74 }}>
+      <div style={{ position: 'relative', width: 56, height: 56, margin: '0 auto' }}>
+        <svg width={56} height={56} viewBox="0 0 56 56" style={{ filter: `drop-shadow(0 2px 6px ${displayColor}20)` }}>
+          <circle cx={28} cy={28} r={22} fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)" strokeWidth={4} />
+          <circle cx={28} cy={28} r={22} fill="none" stroke={displayColor}
             strokeWidth={4} strokeDasharray={`${pct * 1.38} ${276 - pct * 1.38}`}
-            strokeDashoffset={0} transform="rotate(-90 26 26)" strokeLinecap="round"
-            style={{ transition: 'stroke-dasharray 0.5s' }} />
-          <text x={26} y={28} textAnchor="middle" fill={isOk ? color : pct > 115 ? '#ef4444' : '#f59e0b'} fontSize={13} fontWeight={700}>
+            strokeDashoffset={0} transform="rotate(-90 28 28)" strokeLinecap="round"
+            style={{ transition: 'stroke-dasharray 0.7s cubic-bezier(0.22,1,0.36,1)' }} />
+          <text x={28} y={30} textAnchor="middle" fill={displayColor} fontSize={13} fontWeight={800} letterSpacing={-0.3}>
             {pct}%
           </text>
         </svg>
+        <div style={{ position:'absolute', top:-2, right:-2, width:14, height:14, borderRadius:7, background: isOk ? color : isOver ? '#ef4444' : '#f59e0b', display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, boxShadow:'0 2px 6px rgba(0,0,0,0.2)' }}>
+          {isOk ? '✓' : isOver ? '↑' : '↓'}
+        </div>
       </div>
-      <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>{label}</div>
-      <div style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{Math.round(actual)}/{target}</div>
+      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginTop: 4, fontWeight:600, letterSpacing:0.3, textTransform:'uppercase' as const }}>{label}</div>
+      <div style={{ fontSize: 9, fontWeight: 700, color: displayColor }}>{Math.round(actual)}/{target}</div>
     </div>
   );
 };
@@ -203,24 +253,24 @@ export const NutritionDiaryCharts: React.FC<Props> = ({ dayMeals, dayTotals, tar
   if (!hasData) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* Macro distribution donut + gauge cards */}
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-        <DonutChart protein={dayTotals.p} fat={dayTotals.f} carbs={dayTotals.c} size={80} />
-        <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', flexWrap: 'wrap', padding:16 }}>
+        <DonutChart protein={dayTotals.p} fat={dayTotals.f} carbs={dayTotals.c} size={92} />
+        <div style={{ display: 'flex', gap: 8 }}>
           <MacroBalanceGauge actual={dayTotals.kcal} target={targets?.kcal || 2500} label="Ккал" color="#00e68a" />
           <MacroBalanceGauge actual={dayTotals.p} target={targets?.protein || 160} label="Белки" color="#3b82f6" />
         </div>
       </div>
 
-      {/* Weekly trend sparklines */}
-      <div style={{ ...cardStyle, display: 'flex', justifyContent: 'space-around', alignItems: 'center', flexWrap: 'wrap' }}>
-        <Sparkline data={weeklyKcal} color="#22c55e" label="Ккал (7 дн)" unit="" />
-        <Sparkline data={weeklyProtein} color="#3b82f6" label="Белок (7 дн)" unit="г" />
-        <div style={{ textAlign: 'center', padding: 4 }}>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)', marginBottom: 2 }}>Приёмов</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#8b5cf6' }}>{Object.keys(dayMeals).length}</div>
-          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)' }}>за день</div>
+      {/* Weekly trend sparklines — enhanced */}
+      <div style={{ ...cardStyle, display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap:8, padding:12 }}>
+        <Sparkline data={weeklyKcal} color="#00e68a" label="Ккал • 7 дн" unit="" />
+        <Sparkline data={weeklyProtein} color="#3b82f6" label="Белок • 7 дн" unit="г" />
+        <div style={{ textAlign: 'center', padding: '10px 14px', background:'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.06))', borderRadius:12, border:'1px solid rgba(139,92,246,0.15)', minWidth:88 }}>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)', marginBottom: 4, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase' as const }}>Приёмов</div>
+          <div style={{ fontSize: 26, fontWeight: 900, color: '#a78bfa', lineHeight:1 }}>{Object.keys(dayMeals).length}</div>
+          <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.45)', marginTop:2 }}>за день</div>
         </div>
       </div>
 

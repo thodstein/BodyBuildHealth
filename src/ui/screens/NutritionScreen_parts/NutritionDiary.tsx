@@ -350,11 +350,24 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
 
   const clearDay = useCallback(() => { 
     if (!diaryData[selectedDate]) return; 
-    const data = { ...diaryData }; 
-    delete data[selectedDate]; 
-    saveDiary(data); 
-    showToast('🗑 День очищен'); 
+    setClearDayConfirmOpen(true);
+  }, [diaryData, selectedDate]);
+
+  const confirmClearDay = useCallback(() => {
+    const data = { ...diaryData };
+    delete data[selectedDate];
+    saveDiary(data);
+    setClearDayConfirmOpen(false);
+    showToast('🗑 День очищен');
   }, [diaryData, selectedDate, saveDiary, showToast]);
+
+  const confirmClearDiary = useCallback(() => {
+    writeDiaryV2({});
+    setDiaryData({});
+    setRefreshKey(k => k + 1);
+    setClearDiaryConfirmOpen(false);
+    showToast('🗑 Дневник очищен');
+  }, [showToast]);
 
   const openEdit = useCallback((meal: string, idx: number, item: any) => { 
     setEditItem({ meal, idx, item }); 
@@ -474,19 +487,66 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
     setParsedItems(prev => prev.map((x, j) => j === idx ? { ...x, qty: Math.max(10, Math.min(1000, qty)) } : x));
   }, []);
 
-  const addPresetItems = useCallback((items: any[]) => {
-    setParsedItems(prev => [...prev, ...items.map((it: any) => ({ name: it.name, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, qty: it.qty || 100 }))]);
+  const extractQty = useCallback((item: any): number => {
+    if (typeof item.qty === 'string') {
+      const m = String(item.qty).match(/[\d.,]+/);
+      if (m) return Math.max(10, Math.round(parseFloat(m[0].replace(',', '.')))) || 100;
+    }
+    if (typeof item.qty === 'number' && Number.isFinite(item.qty)) return Math.max(10, Math.round(item.qty));
+    if (typeof item.qtyGrams === 'number' && Number.isFinite(item.qtyGrams)) return Math.max(10, Math.round(item.qtyGrams));
+    return 100;
   }, []);
 
+  const addPresetItems = useCallback((items: any[]) => {
+    // Items in presets are stored per 100g; queue expects per-100 values + qty in grams
+    setParsedItems(prev => [...prev, ...items.map((it: any) => ({
+      name: it.name, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0,
+      qty: it.qty || 100, category: it.category, foodId: it.foodId,
+    }))]);
+    showToast(`📦 Набор "${items.length} поз." → очередь`);
+  }, [showToast]);
+
+  const [presetDialog, setPresetDialog] = useState<{ meal: string; items: any[] } | null>(null);
+  const [presetName, setPresetName] = useState('');
+  const [dayPresetDialogOpen, setDayPresetDialogOpen] = useState(false);
+  const [dayPresetName, setDayPresetName] = useState('');
+  const [clearDayConfirmOpen, setClearDayConfirmOpen] = useState(false);
+  const [clearDiaryConfirmOpen, setClearDiaryConfirmOpen] = useState(false);
+
   const savePreset = useCallback((meal: string, items: any[]) => {
-    const name = prompt('Название пресета:', `${meal} (пресет)`);
-    if (!name?.trim()) return;
-    const preset = { name: name.trim(), items: items.map((i: any) => ({ name: i.name, kcal: i.kcal, p: i.p, f: i.f, c: i.c })) };
-    const upd = [...mealPresets, preset];
-    setMealPresets(upd);
-    safeSet('he_meal_presets', upd);
-    showToast('✅ Пресет сохранён');
-  }, [mealPresets, safeSet, showToast]);
+    setPresetDialog({ meal, items });
+    setPresetName(`${meal} (набор)`);
+  }, []);
+
+  const confirmSavePreset = useCallback(() => {
+    if (!presetDialog) return;
+    const name = presetName.trim();
+    if (!name) { showToast('❌ Введите название'); return; }
+    const { items } = presetDialog;
+    // Normalize to per-100g to fix "Не собирается набор еды" — previously saved scaled kcal directly
+    const presetItems = items.map((i: any) => {
+      const qty = extractQty(i);
+      const factor = qty > 0 ? 100 / qty : 1;
+      return {
+        name: i.name,
+        kcal: Math.round((i.kcal || 0) * factor),
+        p: Math.round((i.p || 0) * factor * 10) / 10,
+        f: Math.round((i.f || 0) * factor * 10) / 10,
+        c: Math.round((i.c || 0) * factor * 10) / 10,
+        qty,
+        category: i.category, foodId: i.foodId,
+      };
+    });
+    const preset = { name, items: presetItems };
+    setMealPresets(prev => {
+      const upd = [...prev, preset];
+      safeSet('he_meal_presets', upd);
+      return upd;
+    });
+    setPresetDialog(null);
+    setPresetName('');
+    showToast('✅ Набор сохранён');
+  }, [presetDialog, presetName, extractQty, safeSet, showToast]);
 
   const copyDay = useCallback(() => {
     if (!diaryData[selectedDate]?.meals) { showToast('❌ День пуст'); return; }
@@ -503,13 +563,22 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
   const saveDayPreset = useCallback(() => {
     const day = diaryData[selectedDate];
     if (!day?.meals || Object.keys(day.meals).length===0) { showToast('❌ День пуст'); return; }
-    const name = prompt('Название шаблона дня:', `Шаблон ${selectedDate}`);
-    if (!name?.trim()) return;
-    const upd = [...dayPresets, { name: name.trim(), meals: JSON.parse(JSON.stringify(day.meals)) }];
+    setDayPresetName(`Шаблон ${selectedDate}`);
+    setDayPresetDialogOpen(true);
+  }, [diaryData, selectedDate]);
+
+  const confirmSaveDayPreset = useCallback(() => {
+    const name = dayPresetName.trim();
+    if (!name) { showToast('❌ Введите название'); return; }
+    const day = diaryData[selectedDate];
+    if (!day?.meals) return;
+    const upd = [...dayPresets, { name, meals: JSON.parse(JSON.stringify(day.meals)) }];
     setDayPresets(upd);
     safeSet('he_day_presets', upd);
+    setDayPresetDialogOpen(false);
+    setDayPresetName('');
     showToast('💾 Шаблон дня сохранён');
-  }, [diaryData, selectedDate, dayPresets, safeSet, showToast]);
+  }, [diaryData, selectedDate, dayPresets, dayPresetName, safeSet, showToast]);
   const loadDayPreset = useCallback((preset: any) => {
     const data = { ...diaryData };
     if (!data[selectedDate]) data[selectedDate] = { meals: {} };
@@ -561,20 +630,24 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       {/* Week day selector */}
       <WeekDaySelector weekDays={weekDays} selectedDate={selectedDate} onSelectDate={setSelectedDate} diaryData={diaryData} />
 
-      {/* Tab bar — полный редизайн */}
-      <div style={{ display:'flex', gap:6, padding:6, borderRadius:14, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.04)', backdropFilter:'blur(8px)' }}>
+      {/* Tab bar — улучшенный: крупнее и красивее */}
+      <div style={{ display:'flex', gap:8, padding:8, borderRadius:16, background:'linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01))', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(12px)', boxShadow:'0 4px 20px rgba(0,0,0,0.15)' }}>
         {([
-          { key: 'add', label: '➕ Добавить', icon:'➕', badge: parsedItems.length>0 ? parsedItems.length : null, color:'#00e68a' },
-          { key: 'day', label: '📋 День', icon:'📋', badge: Object.values(dayMeals).flat().length || null, color:'#60a5fa' },
-          { key: 'week', label: '📊 Неделя', icon:'📊', badge: Object.keys(diaryData).length || null, color:'#a78bfa' },
+          { key: 'add', label: 'Добавить', icon:'➕', badge: parsedItems.length>0 ? parsedItems.length : null, color:'#00e68a', desc:'поиск' },
+          { key: 'day', label: 'День', icon:'📋', badge: Object.values(dayMeals).flat().length || null, color:'#60a5fa', desc:'приёмы' },
+          { key: 'week', label: 'Неделя', icon:'📊', badge: Object.keys(diaryData).length || null, color:'#a78bfa', desc:'итоги' },
         ] as const).map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)} aria-label={t.label} style={{
-            flex: 1, padding:'10px 8px', borderRadius:10, cursor:'pointer', fontSize:11, fontWeight: tab === t.key ? 800 : 600, position:'relative', display:'flex', alignItems:'center', justifyContent:'center', gap:4,
-            border: tab === t.key ? `1px solid ${t.color}` : '1px solid rgba(255,255,255,0.06)',
-            background: tab === t.key ? `${t.color}14` : '#202023',
-            color: tab === t.key ? t.color : 'rgba(255,255,255,0.6)', minHeight: 42, transition:'all 0.15s', boxShadow: tab === t.key ? `0 4px 12px ${t.color}20` : 'none',
+            flex: 1, padding:'14px 10px', borderRadius:12, cursor:'pointer', fontSize:13, fontWeight: tab === t.key ? 800 : 600, position:'relative', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3,
+            border: tab === t.key ? `1.5px solid ${t.color}` : '1px solid rgba(255,255,255,0.06)',
+            background: tab === t.key ? `linear-gradient(135deg, ${t.color}18, ${t.color}0d)` : '#202023',
+            color: tab === t.key ? t.color : 'rgba(255,255,255,0.65)', minHeight: 56, transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)', boxShadow: tab === t.key ? `0 6px 20px ${t.color}28, inset 0 1px 0 rgba(255,255,255,0.08)` : '0 2px 8px rgba(0,0,0,0.1)',
+            transform: tab === t.key ? 'translateY(-1px)' : 'none',
           }}>
-            <span style={{ fontSize:12 }}>{t.icon}</span> {t.label}{t.badge ? <span style={{ marginLeft:2, fontSize:9, background: tab===t.key ? t.color : 'rgba(255,255,255,0.06)', color: tab===t.key ? '#000' : t.color, padding:'2px 6px', borderRadius:999, fontWeight:700 }}>{t.badge}</span> : null}
+            <span style={{ fontSize:18, filter: tab===t.key ? 'none' : 'grayscale(0.2)', transition:'all 0.2s' }}>{t.icon}</span>
+            <span style={{ fontSize:13, fontWeight:800, letterSpacing:-0.2 }}>{t.label}</span>
+            <span style={{ fontSize:8, fontWeight:600, color: tab===t.key ? t.color+'b0' : 'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:0.5 }}>{t.desc}</span>
+            {t.badge ? <span style={{ position:'absolute', top:6, right:8, fontSize:9, background: tab===t.key ? t.color : 'rgba(255,255,255,0.08)', color: tab===t.key ? '#000' : t.color, padding:'2px 6px', borderRadius:999, fontWeight:800, minWidth:18, textAlign:'center', boxShadow: tab===t.key ? `0 2px 6px ${t.color}40` : 'none' }}>{t.badge}</span> : null}
           </button>
         ))}
       </div>
@@ -859,12 +932,8 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
         </label>
         
         <button
-          onClick={() => {
-            if (confirm('Очистить весь дневник? Это действие нельзя отменить.')) {
-              writeDiaryV2({});
-            }
-          }}
-          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', background: '#202023', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginLeft: 'auto' }}
+          onClick={() => setClearDiaryConfirmOpen(true)}
+          style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.15)', background: 'rgba(239,68,68,0.06)', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginLeft: 'auto' }}
         >
           🗑 Очистить всё
         </button>
@@ -877,6 +946,68 @@ export const NutritionDiary: React.FC<{ foodEntries: { name: string; kcal: numbe
       </div>
       {tab !== 'add' && (
         <button onClick={()=>setTab('add')} aria-label="Быстро добавить" style={{ position:'fixed', bottom:20, right:20, width:56, height:56, borderRadius:16, background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', boxShadow:'0 6px 20px rgba(0,230,138,0.35)', fontSize:26, cursor:'pointer', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', color:'#000', fontWeight:700 }}>＋</button>
+      )}
+
+      {/* Modern popups */}
+      {presetDialog && (
+        <div onClick={e => { if (e.target===e.currentTarget) setPresetDialog(null); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ width:'100%', maxWidth:380, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(0,230,138,0.2)', boxShadow:'0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,230,138,0.08)', backdropFilter:'blur(20px)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+              <span style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#00e68a,#00c8a0)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>📦</span>
+              <div>
+                <div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>Сохранить набор</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{presetDialog.items.length} поз. • {presetDialog.meal}</div>
+              </div>
+              <button onClick={()=>setPresetDialog(null)} style={{ marginLeft:'auto', width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>✕</button>
+            </div>
+            <input autoFocus value={presetName} onChange={e=>setPresetName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') confirmSavePreset(); if(e.key==='Escape') setPresetDialog(null); }} placeholder="Название набора, например: Завтрак спортсмена" style={{ width:'100%', boxSizing:'border-box', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none' }} />
+            <div style={{ display:'flex', gap:8, marginTop:14 }}>
+              <button onClick={()=>setPresetDialog(null)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer' }}>Отмена</button>
+              <button onClick={confirmSavePreset} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#00e68a,#00c8a0)', color:'#000', fontWeight:700, cursor:'pointer', boxShadow:'0 4px 16px rgba(0,230,138,0.25)' }}>💾 Сохранить</button>
+            </div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.35)', marginTop:8, textAlign:'center' }}>Сохранит КБЖУ на 100г • при сборке можно менять граммы</div>
+          </div>
+        </div>
+      )}
+      {dayPresetDialogOpen && (
+        <div onClick={e => { if (e.target===e.currentTarget) setDayPresetDialogOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ width:'100%', maxWidth:380, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(245,158,11,0.2)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+              <span style={{ width:36, height:36, borderRadius:10, background:'linear-gradient(135deg,#f59e0b,#f97316)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>💾</span>
+              <div><div style={{ fontSize:14, fontWeight:800, color:'#f59e0b' }}>Шаблон дня</div><div style={{ fontSize:10, color:'rgba(255,255,255,0.5)' }}>{selectedDate} • {Object.values(dayMeals).flat().length} поз.</div></div>
+              <button onClick={()=>setDayPresetDialogOpen(false)} style={{ marginLeft:'auto', width:28, height:28, borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.6)', cursor:'pointer' }}>✕</button>
+            </div>
+            <input autoFocus value={dayPresetName} onChange={e=>setDayPresetName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') confirmSaveDayPreset(); if(e.key==='Escape') setDayPresetDialogOpen(false); }} placeholder="Название шаблона" style={{ width:'100%', boxSizing:'border-box', padding:'12px 14px', borderRadius:12, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:13, outline:'none' }} />
+            <div style={{ display:'flex', gap:8, marginTop:14 }}>
+              <button onClick={()=>setDayPresetDialogOpen(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer' }}>Отмена</button>
+              <button onClick={confirmSaveDayPreset} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#f59e0b,#f97316)', color:'#000', fontWeight:700, cursor:'pointer' }}>💾 Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {clearDayConfirmOpen && (
+        <div onClick={e => { if (e.target===e.currentTarget) setClearDayConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', marginBottom:8 }}>⚠️ Очистить день?</div>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:16 }}>Все приёмы за <b style={{color:'#fff'}}>{selectedDate}</b> будут удалены. Это нельзя отменить.</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>setClearDayConfirmOpen(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:600, cursor:'pointer' }}>Отмена</button>
+              <button onClick={confirmClearDay} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, cursor:'pointer' }}>🗑 Очистить</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {clearDiaryConfirmOpen && (
+        <div onClick={e => { if (e.target===e.currentTarget) setClearDiaryConfirmOpen(false); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.75)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ width:'100%', maxWidth:360, padding:20, borderRadius:20, background:'linear-gradient(135deg, #1a1c26 0%, #18181b 100%)', border:'1px solid rgba(239,68,68,0.25)', boxShadow:'0 20px 60px rgba(0,0,0,0.6)', backdropFilter:'blur(20px)' }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#ef4444', marginBottom:8 }}>⚠️ Очистить весь дневник?</div>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.7)', lineHeight:1.5, marginBottom:16 }}>Удалятся все дни и приёмы без возможности восстановления. Рекомендуем сначала сделать экспорт JSON/CSV.</div>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={()=>setClearDiaryConfirmOpen(false)} style={{ flex:1, padding:'11px', borderRadius:12, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:600, cursor:'pointer' }}>Отмена</button>
+              <button onClick={confirmClearDiary} style={{ flex:1, padding:'11px', borderRadius:12, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:700, cursor:'pointer' }}>🗑 Удалить всё</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

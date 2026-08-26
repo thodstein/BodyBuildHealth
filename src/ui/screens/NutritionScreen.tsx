@@ -1508,8 +1508,8 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
 
       <div style={{ flex:1, minHeight:0, overflowY:'auto', padding:'0 8px 80px' }}>
         <div style={{
-          display:'flex', gap:3, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
-          padding:'8px 4px 10px',
+          display:'flex', gap:6, flexWrap:'nowrap', overflowX:'auto', overflowY:'hidden',
+          padding:'10px 4px 12px',
           scrollbarWidth:'none', msOverflowStyle:'none',
           WebkitOverflowScrolling:'touch', whiteSpace:'nowrap',
         }}>
@@ -1517,16 +1517,19 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
             const isActive = tab === t;
             return (
               <button key={t} onClick={() => setTab(t as ActiveTab)} style={{
-                flexShrink:0, padding:'6px 14px', borderRadius:20, cursor:'pointer',
-                fontSize:10, fontWeight: isActive ? 700 : 500, letterSpacing:0.2,
-                border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#18181b',
-                color: isActive ? '#000' : '#fff',
+                flexShrink:0, padding:'10px 16px', borderRadius:14, cursor:'pointer',
+                fontSize:13, fontWeight: isActive ? 800 : 600, letterSpacing:-0.2,
+                border: isActive ? '1.5px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
+                background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+                color: isActive ? '#000' : 'rgba(255,255,255,0.85)',
                 transition:'all 0.2s cubic-bezier(0.22,1,0.36,1)',
+                boxShadow: isActive ? '0 4px 16px rgba(0,230,138,0.25), 0 1px 0 rgba(255,255,255,0.1) inset' : '0 2px 8px rgba(0,0,0,0.12)',
+                minHeight:40, display:'inline-flex', alignItems:'center', gap:6,
+                transform: isActive ? 'translateY(-1px)' : 'none',
               }}>
                 {TAB_LABELS[t] || t}
                 {t === 'cart' && cartCount > 0 && (
-                  <span style={{ marginLeft:3, background:'rgba(0,0,0,0.2)', borderRadius:8, padding:'1px 5px', fontSize:8, fontWeight:700 }}>{cartCount}</span>
+                  <span style={{ marginLeft:2, background: isActive ? 'rgba(0,0,0,0.12)' : 'rgba(0,230,138,0.12)', borderRadius:999, padding:'2px 7px', fontSize:10, fontWeight:800, color: isActive ? '#000' : '#00e68a', border: isActive ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(0,230,138,0.18)' }}>{cartCount}</span>
                 )}
               </button>
             );

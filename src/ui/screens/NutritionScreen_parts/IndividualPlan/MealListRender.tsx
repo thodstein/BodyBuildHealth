@@ -23,31 +23,45 @@ const _dayMicrosCache = new WeakMap<object, { visibleMicros: any[] } | null>();
 // FIX week-perf: findSimilarFoods сканирует FOOD_DB+сортирует — кэш по объекту продукта
 const _similarFoodsCache = new WeakMap<object, any[]>();
 
-// Этап 3 (Пробел-1): редактирование времени отдельного приёма. Вынесено на уровень модуля,
-// чтобы избежать хрупкого JSX-inline-парсинга. Возвращает новую копию dayPlan или null при отмене.
-function shiftMealTime(plan: any, mealIdx: number, saveUndo: () => void, setDayPlan: (v: any) => void): void {
-  const cur = plan?.meals?.[mealIdx]?.time || '12:00';
-  const res = window.prompt('🕒 Время приёма (ЧЧ:ММ):', cur);
-  if (!res) return;
-  const mt = res.trim().split(':');
-  if (mt.length !== 2) return;
-  const h = parseInt(mt[0], 10);
-  const mm = parseInt(mt[1], 10);
-  if (isNaN(h) || isNaN(mm) || h < 0 || h > 23 || mm < 0 || mm > 59) return;
-  const nt = (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
-  saveUndo();
-  setDayPlan((prev: any) => {
-    if (!prev) return prev;
-    const meals = prev.meals.slice();
-    if (meals[mealIdx]) meals[mealIdx] = Object.assign({}, meals[mealIdx], { time: nt });
-    const totals = {
-      kcal: meals.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0),
-      p: meals.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0),
-      f: meals.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0),
-      c: meals.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0),
-    };
-    return { ...prev, meals, totals };
-  });
+// Этап 3 (Пробел-1): редактирование времени — теперь через современный модал (без window.prompt)
+function useMealTimeEdit(plan: any, saveUndo: () => void, setDayPlan: (v:any)=>void) {
+  const [edit, setEdit] = React.useState<{ idx:number; value:string } | null>(null);
+  const open = (idx:number) => {
+    const cur = plan?.meals?.[idx]?.time || '12:00';
+    setEdit({ idx, value: cur });
+  };
+  const confirm = () => {
+    if (!edit) return;
+    const res = edit.value.trim();
+    const mt = res.split(':');
+    if (mt.length !== 2) return;
+    const h = parseInt(mt[0],10), mm = parseInt(mt[1],10);
+    if (isNaN(h)||isNaN(mm)||h<0||h>23||mm<0||mm>59) return;
+    const nt = `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+    saveUndo();
+    setDayPlan((prev:any)=>{
+      if(!prev) return prev;
+      const meals = prev.meals.slice();
+      if (meals[edit.idx]) meals[edit.idx] = Object.assign({}, meals[edit.idx], { time: nt });
+      const totals={kcal:meals.reduce((s:number,m:any)=>s+(m.totals?.kcal||0),0),p:meals.reduce((s:number,m:any)=>s+(m.totals?.p||0),0),f:meals.reduce((s:number,m:any)=>s+(m.totals?.f||0),0),c:meals.reduce((s:number,m:any)=>s+(m.totals?.c||0),0)};
+      return { ...prev, meals, totals };
+    });
+    setEdit(null);
+  };
+  const modal = edit ? (
+    <div onClick={e=>{ if(e.target===e.currentTarget) setEdit(null); }} style={{ position:'fixed', inset:0, zIndex:1000, background:'rgba(0,0,0,0.65)', backdropFilter:'blur(8px)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+      <div style={{ width:'100%', maxWidth:340, padding:18, borderRadius:16, background:'linear-gradient(135deg,#1a1c26 0%,#18181b 100%)', border:'1px solid rgba(59,130,246,0.22)', boxShadow:'0 16px 40px rgba(0,0,0,0.5)', backdropFilter:'blur(16px)' }}>
+        <div style={{ fontSize:13, fontWeight:800, color:'#60a5fa', marginBottom:4 }}>🕒 Время приёма</div>
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.5)', marginBottom:10 }}>ЧЧ:ММ — например 12:30</div>
+        <input type="time" value={edit.value} onChange={e=>setEdit({ ...edit, value:e.target.value })} autoFocus style={{ width:'100%', boxSizing:'border-box', padding:'10px 12px', borderRadius:10, background:'#202023', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:16, outline:'none' }} />
+        <div style={{ display:'flex', gap:8, marginTop:12 }}>
+          <button onClick={()=>setEdit(null)} style={{ flex:1, padding:'10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'rgba(255,255,255,0.7)', fontWeight:600, cursor:'pointer' }}>Отмена</button>
+          <button onClick={confirm} style={{ flex:1, padding:'10px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#3b82f6,#60a5fa)', color:'#fff', fontWeight:700, cursor:'pointer' }}>Сохранить</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+  return { open, modal };
 }
 
 export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
@@ -55,6 +69,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
   const setDayPlan = _setDayPlan as any;
   const setEditAmount = _setEditAmount as any;
+  const timeEdit = useMealTimeEdit(dayPlan, saveUndo, setDayPlan);
   return (dayData: any, editable = false, dayIdx = 0) => {
     if (!dayData) return null;
     const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0); const totalFiber = Math.round(d.totals?.fiber || 0);
@@ -150,7 +165,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:4}}>
                   <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{mealKcal} ккал</span>
-                  <span onClick={()=>shiftMealTime(dayPlan, mi, saveUndo, setDayPlan)} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
+                  <span onClick={()=>timeEdit.open(mi)} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
                   <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
                   <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
                   <span onClick={()=>{ try { const date=new Date().toISOString().slice(0,10); const data=readDiaryV2(); if(!data[date]) data[date]={meals:{}}; const label=m.label||'Приём пищи'; if(!data[date].meals[label]) data[date].meals[label]=[]; (m.items||[]).forEach((it:any)=>{(data[date].meals[label] as any).push({ name:it.name, qty:`${it.amount||100} г` as any, kcal:Math.round(it.kcal||0), p:Math.round((it.p||0)*10)/10, f:Math.round((it.f||0)*10)/10, c:Math.round((it.c||0)*10)/10, category:it.category, foodId:it.id, micros:it.micros });}); writeDiaryV2(data); if(typeof (window as any).showToast==='function') (window as any).showToast(`📒 ${label} → дневник`); } catch {} }} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a',cursor:'pointer',fontWeight:600}} title="Добавить приём в дневник">📒</span>
@@ -382,6 +397,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
             </div>
           );
         })()}
+        {timeEdit.modal}
       </div>
     );
   };
