@@ -450,48 +450,36 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
           onDrop={e => { e.preventDefault(); const from = weekDragRef.current; weekDragRef.current = null; if (from != null) moveWeek(from, wi); }}
           onDragEnd={() => { weekDragRef.current = null; }}
-          style={{ ...CARD, padding: 10, borderLeft: '3px solid var(--editor-week-border)' }}
+          style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `4px solid ${{ accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[w.phase] ?? '#22c55e'}`, background: 'linear-gradient(180deg, rgba(26,28,38,0.72), rgba(20,22,32,0.52))' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-            <span
-              title="Перетащите для изменения порядка недель"
-              style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            >☰</span>
-            <button
-              className="editor-week-toggle"
-              type="button"
-              aria-expanded={isOpen}
-              aria-label={`${isOpen ? 'Свернуть' : 'Открыть'} неделю ${w.week}`}
-              onClick={() => { if (showAllWeeks) { setShowAllWeeks(false); setExpandedWeekIdx(wi); } else setExpandedWeekIdx(expandedWeekIdx === wi ? -1 : wi); }}
-            >
-              {isOpen ? '▼' : '▶'}
-            </button>
+          {/* Header row — заголовок недели */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 10px 8px', borderBottom: isOpen ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+            <span title="Перетащите для изменения порядка недель" style={{ cursor: 'grab', fontSize: 12, color: 'rgba(255,255,255,0.35)', userSelect: 'none', padding: '4px', touchAction: 'none', minWidth: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>☰</span>
+            <button className="editor-week-toggle" type="button" aria-expanded={isOpen} aria-label={`${isOpen ? 'Свернуть' : 'Открыть'} неделю ${w.week}`} onClick={() => { if (showAllWeeks) { setShowAllWeeks(false); setExpandedWeekIdx(wi); } else setExpandedWeekIdx(expandedWeekIdx === wi ? -1 : wi); }} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: isOpen ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', color: isOpen ? '#00e68a' : 'rgba(255,255,255,0.65)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{isOpen ? '▼' : '▶'}</button>
             {(() => {
               const pc = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' }[w.phase];
               const prog = wi > 0 ? Math.round(((1.025 ** wi) - 1) * 100) : 0;
               const totalExercises = w.sessions.reduce((s, ses) => s + ses.blocks.filter(block => block.exerciseName).length, 0);
               const totalSets = w.sessions.reduce((s, ses) => s + ses.blocks.reduce((b, blk) => b + blk.sets.length, 0), 0);
               return (
-                <>
-                  <div style={{ width: 4, height: 24, borderRadius: 2, background: pc, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, fontWeight: 800, color: DIM_STRONG }}>Неделя {w.week}</span>
-                  {prog > 0 && <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>+{prog}%</span>}
-                  <span className="editor-week-summary">{w.sessions.length} дн. · {totalExercises} упр. · {totalSets} подх.</span>
-                </>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                  <div style={{ width: 3, height: 22, borderRadius: 2, background: pc, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 850, color: '#fff', letterSpacing: -0.15 }}>Неделя {w.week}</span>
+                  {prog > 0 && <span style={{ fontSize: 10, fontWeight: 800, color: '#22c55e', background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.24)', borderRadius: 6, padding: '1px 6px' }}>+{prog}%</span>}
+                  <span className="editor-week-summary" style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', fontWeight: 500 }}>{w.sessions.length} дн. · {totalExercises} упр. · {totalSets} подх.</span>
+                  {w.deload && <span style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.28)', borderRadius: 6, padding: '1px 6px' }}>deload</span>}
+                </div>
               );
             })()}
-            <PhasePicker
-              value={w.phase}
-              options={[
-                { id: 'accumulation', label: 'Накопление' },
-                { id: 'intensification', label: 'Интенсификация' },
-                { id: 'deload', label: 'Разгрузка' },
-                { id: 'peaking', label: 'Пик' },
-              ]}
-              onChange={v => updateWeek(wi, { phase: v as UserWeek['phase'] })}
-              ariaLabel={`Фаза недели ${w.week}`}
-            />
-            {/* P0-2: RIR-навигатор — целевой RIR фазы vs фактический в плане */}
+            <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <button aria-label={`Копировать неделю ${w.week}`} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.65)', cursor: 'pointer', fontSize: 12 }} onClick={() => cloneWeek(wi)} title="Клонировать — +2.5% к весу">⧉</button>
+              <button aria-label={`Заметка недели ${w.week}`} style={{ width: 32, height: 32, borderRadius: 8, border: noteWeekIdx === wi ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)', background: noteWeekIdx === wi ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', color: noteWeekIdx === wi ? '#00e68a' : 'rgba(255,255,255,0.65)', cursor: 'pointer', fontSize: 12 }} onClick={() => setNoteWeekIdx(noteWeekIdx === wi ? null : wi)} title="Заметка">💬</button>
+              <button aria-label={`Удалить неделю ${w.week}`} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(239,68,68,0.18)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 12 }} onClick={() => removeWeek(wi)}>✕</button>
+            </span>
+          </div>
+          {/* Meta row — фаза / RIR / deload / кол-во тренировок / объём */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', flexWrap: 'wrap', background: 'rgba(0,0,0,0.16)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+            <PhasePicker value={w.phase} options={[{ id: 'accumulation', label: 'Накопление' }, { id: 'intensification', label: 'Интенсификация' }, { id: 'deload', label: 'Разгрузка' }, { id: 'peaking', label: 'Пик' }]} onChange={v => updateWeek(wi, { phase: v as UserWeek['phase'] })} ariaLabel={`Фаза недели ${w.week}`} />
             {(() => {
               const phaseRir: Record<string, string> = { accumulation: '3→1', intensification: '2→0', deload: '4', peaking: '1→0' };
               const avgRir = w.sessions.reduce((s, ses) => s + ses.blocks.reduce((b, blk) => b + blk.sets.reduce((st, set) => st + (set.rir ?? 2), 0), 0), 0);
@@ -499,45 +487,18 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               const actual = totalSets > 0 ? Math.round((avgRir / totalSets) * 10) / 10 : null;
               const targetLo = { accumulation: 3, intensification: 2, deload: 4, peaking: 1 }[w.phase] ?? 2;
               const ok = actual !== null && actual >= targetLo - 1 && actual <= targetLo + 1;
-              return (
-                <span style={{ fontSize: 10, color: ok ? '#22c55e' : '#f59e0b', fontWeight: 700 }}>
-                  🎯 RIR {phaseRir[w.phase] ?? '—'}
-                  {actual !== null && <span style={{ color: '#fff', fontWeight: 400 }}> · факт {actual}</span>}
-                </span>
-              );
+              return <span style={{ fontSize: 10, fontWeight: 700, color: ok ? '#22c55e' : '#f59e0b', background: ok ? 'rgba(34,197,94,0.10)' : 'rgba(245,158,11,0.10)', border: `1px solid ${ok ? 'rgba(34,197,94,0.20)' : 'rgba(245,158,11,0.20)'}`, borderRadius: 8, padding: '3px 7px' }}>🎯 RIR {phaseRir[w.phase] ?? '—'}{actual !== null && <span style={{ color: ok ? '#86efac' : '#fcd34d', fontWeight: 500 }}> · {actual}</span>}</span>;
             })()}
-            <label style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} /> deload
-            </label>
-            <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 4 }} title="Быстро создать нужное количество тренировок в этой неделе">
-              Тренировок
-              <EditorPopupNumber
-                value={w.sessions.length}
-                min={1}
-                max={7}
-                onChange={v => resizeWeek(wi, v)}
-                ariaLabel={`Количество тренировок в неделе ${w.week}`}
-                title="Тренировок в неделе"
-                format={v => `${v}`}
-              />
-            </label>
-            <button
-              style={{ ...ICON_CARD_BTN, color: volWeekIdx === wi ? ACCENT : 'rgba(255,255,255,0.65)', borderColor: volWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.10)', background: volWeekIdx === wi ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', width: 'auto', minWidth: 44, padding: '6px 10px' }}
-               onClick={() => {
-                  setExpandedWeekIdx(wi);
-                  setVolWeekIdx(volWeekIdx === wi ? null : wi);
-                }}
-              title="Бюджет объёма — MEV/MAV/MRV по группам, чтобы не перетренировать (BB: Israetel)"
-             >{volWeekIdx === wi ? 'Скрыть объём' : '📊 Объём'}</button>
-              <button aria-label={`Копировать неделю ${w.week}`} style={{ ...ICON_CARD_BTN, width: 'auto', minWidth: 44, padding: '6px 10px' }} onClick={() => cloneWeek(wi)} title="Клонировать — +2.5% к весу, удобно для прогрессии">⧉ Копировать</button>
-              <button aria-label={`Заметка недели ${w.week}`} style={{ ...ICON_CARD_BTN, color: noteWeekIdx === wi ? ACCENT : 'rgba(255,255,255,0.65)', borderColor: noteWeekIdx === wi ? ACCENT_LINE : 'rgba(255,255,255,0.08)', background: noteWeekIdx === wi ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', width: 'auto', minWidth: 44, padding: '6px 10px' }} onClick={() => setNoteWeekIdx(noteWeekIdx === wi ? null : wi)} title="Заметка к неделе (для тренера, попадает в экспорт/PDF)">💬</button>
-              {wi > 0 && (
-                <button aria-label={`Переместить неделю ${w.week} выше`} style={{ ...ICON_CARD_BTN, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.08)', width: 36, minWidth: 36, height: 36 }} onClick={() => swapWeek(wi, wi - 1)} title="Вверх — меняет порядок мезоцикла">▲</button>
-              )}
-              {wi < body.weeks.length - 1 && (
-                <button aria-label={`Переместить неделю ${w.week} ниже`} style={{ ...ICON_CARD_BTN, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.25)', background: 'rgba(167,139,250,0.08)', width: 36, minWidth: 36, height: 36 }} onClick={() => swapWeek(wi, wi + 1)} title="Вниз">▼</button>
-              )}
-              <button aria-label={`Удалить неделю ${w.week}`} style={{ ...ICON_CARD_BTN, marginLeft: 'auto', color: '#ef4444', borderColor: 'rgba(239,68,68,0.22)', background: 'rgba(239,68,68,0.08)', width: 'auto', minWidth: 44, padding: '6px 10px' }} onClick={() => removeWeek(wi)}>✕ Удалить</button>
+            <label style={{ fontSize: 11, color: w.deload ? '#ef4444' : 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', gap: 4, background: w.deload ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.04)', border: `1px solid ${w.deload ? 'rgba(239,68,68,0.20)' : 'rgba(255,255,255,0.06)'}`, borderRadius: 8, padding: '3px 8px', cursor: 'pointer' }}><input type="checkbox" checked={w.deload} onChange={e => updateWeek(wi, { deload: e.target.checked })} style={{ accentColor: '#ef4444' }} /> deload</label>
+            <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '3px 8px' }}>Тренировок<EditorPopupNumber value={w.sessions.length} min={1} max={7} onChange={v => resizeWeek(wi, v)} ariaLabel={`Количество тренировок в неделе ${w.week}`} title="Тренировок в неделе" format={v => `${v}`} /></label>
+            <button style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 8, border: volWeekIdx === wi ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.08)', background: volWeekIdx === wi ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: volWeekIdx === wi ? '#00e68a' : 'rgba(255,255,255,0.65)', cursor: 'pointer', marginLeft: 'auto' }} onClick={() => { setExpandedWeekIdx(wi); setVolWeekIdx(volWeekIdx === wi ? null : wi); }}>{volWeekIdx === wi ? 'Скрыть объём' : '📊 Объём'}</button>
+          </div>
+          {/* Actions row — перемещение недели */}
+          <div style={{ display: 'flex', gap: 4, padding: '6px 10px', alignItems: 'center', background: 'rgba(255,255,255,0.01)' }}>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>Порядок:</span>
+            {wi > 0 ? <button aria-label={`Переместить неделю ${w.week} выше`} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(167,139,250,0.22)', background: 'rgba(167,139,250,0.08)', color: '#a78bfa', cursor: 'pointer' }} onClick={() => swapWeek(wi, wi - 1)}>▲ выше</button> : <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>— начало</span>}
+            {wi < body.weeks.length - 1 ? <button aria-label={`Переместить неделю ${w.week} ниже`} style={{ fontSize: 11, padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(167,139,250,0.22)', background: 'rgba(167,139,250,0.08)', color: '#a78bfa', cursor: 'pointer' }} onClick={() => swapWeek(wi, wi + 1)}>▼ ниже</button> : <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.22)' }}>— конец</span>}
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.30)' }}>перетащите ☰ для порядка · клик ▼/▶ для деталей</span>
           </div>
           {noteWeekIdx === wi && (
             <div style={{ marginBottom: 8 }}>
@@ -702,64 +663,41 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
         const dow = sessionDayOfWeek(s, si);
         const dc = DAY_COLORS[dow % 7] ?? '#f59e0b';
         return (
-        <div key={s.id} className="editor-session-card" style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', ...(boardMode ? { minWidth: 320, maxWidth: 360, flex: '0 0 320px' } : {}) }}>
-          <div className="editor-session-heading" style={{ alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ width: 32, height: 32, borderRadius: 10, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: dc + '1c', color: dc, border: '1px solid ' + dc + '45', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>{TRAINING_DAY_NAMES[dow]}</span>
-              <div style={{ minWidth: 0 }}>
-                <div className="editor-kicker">ТРЕНИРОВОЧНЫЙ ДЕНЬ {si + 1}</div>
-                <div className="editor-session-day" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name || 'Без названия'} · {s.blocks.length} упражн.</div>
+        <div key={s.id} className="editor-session-card" style={{ padding: 0, overflow: 'hidden', borderRadius: 12, background: 'linear-gradient(180deg, rgba(26,28,38,0.56), rgba(18,20,30,0.42))', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `3px solid ${dc}`, boxShadow: '0 4px 16px rgba(0,0,0,0.18)', ...(boardMode ? { minWidth: 324, maxWidth: 364, flex: '0 0 324px' } : {}) }}>
+          <div className="editor-session-heading" style={{ alignItems: 'center', padding: '10px 10px 8px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: dc + '08' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 850, background: dc + '22', color: dc, border: '1px solid ' + dc + '55' }}>{TRAINING_DAY_NAMES[dow]}</span>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="editor-kicker" style={{ fontSize: 9, letterSpacing: 0.35, color: dc, fontWeight: 800 }}>ДЕНЬ {si + 1} · {TRAINING_DAY_NAMES[dow]}</div>
+                <div className="editor-session-day" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12, fontWeight: 700, color: '#fff' }}>{s.name || 'Без названия'} <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.45)' }}>· {s.blocks.length} упр.</span></div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexShrink: 0, alignItems: 'center' }}>
-              <button aria-label={`Вверх тренировка ${si + 1}`} disabled={si === 0} onClick={() => moveSession(si, -1)} title="Вверх — порядок дней влияет на восстановление" style={{ ...ICON_CARD_BTN, opacity: si === 0 ? 0.35 : 1, width: 36, height: 36, minWidth: 36, minHeight: 36, fontSize: 11 }}>▲</button>
-              <button aria-label={`Вниз тренировка ${si + 1}`} disabled={si === sessions.length - 1} onClick={() => moveSession(si, 1)} title="Вниз" style={{ ...ICON_CARD_BTN, opacity: si === sessions.length - 1 ? 0.35 : 1, width: 36, height: 36, minWidth: 36, minHeight: 36, fontSize: 11 }}>▼</button>
-              <button aria-label={`Заметка тренировки ${si + 1}`} style={{ ...ICON_CARD_BTN, color: noteOpenIdx === si ? ACCENT : 'rgba(255,255,255,0.65)', borderColor: noteOpenIdx === si ? ACCENT_LINE : 'rgba(255,255,255,0.08)', background: noteOpenIdx === si ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)' }} onClick={() => setNoteOpenIdx(noteOpenIdx === si ? null : si)} title="Заметка — видна тренеру и в PDF">💬</button>
-              <button aria-label={`Клонировать тренировку ${si + 1}`} style={ICON_CARD_BTN} onClick={() => cloneSession(si)} title="Клонировать день — удобно для второй недели">⧉</button>
-              <button aria-label={`Удалить тренировку ${si + 1}`} style={{ ...ICON_CARD_BTN, color: '#ef4444', borderColor: 'rgba(239,68,68,0.22)', background: 'rgba(239,68,68,0.08)' }} onClick={() => removeSession(si)}>✕</button>
+            <div style={{ display: 'flex', gap: 3, marginLeft: 8, flexShrink: 0, alignItems: 'center' }}>
+              <button aria-label={`Вверх тренировка ${si + 1}`} disabled={si === 0} onClick={() => moveSession(si, -1)} title="Вверх" style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: si===0 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.70)', cursor: si===0 ? 'not-allowed' : 'pointer', fontSize: 10 }}>▲</button>
+              <button aria-label={`Вниз тренировка ${si + 1}`} disabled={si === sessions.length - 1} onClick={() => moveSession(si, 1)} title="Вниз" style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: si===sessions.length-1 ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.70)', cursor: si===sessions.length-1 ? 'not-allowed' : 'pointer', fontSize: 10 }}>▼</button>
+              <button aria-label={`Заметка тренировки ${si + 1}`} style={{ width: 28, height: 28, borderRadius: 8, border: noteOpenIdx === si ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.08)', background: noteOpenIdx === si ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: noteOpenIdx === si ? '#00e68a' : 'rgba(255,255,255,0.60)', cursor: 'pointer', fontSize: 11 }} onClick={() => setNoteOpenIdx(noteOpenIdx === si ? null : si)} title="Заметка">💬</button>
+              <button aria-label={`Клонировать тренировку ${si + 1}`} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer', fontSize: 11 }} onClick={() => cloneSession(si)} title="Клонировать">⧉</button>
+              <button aria-label={`Удалить тренировку ${si + 1}`} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(239,68,68,0.20)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 11 }} onClick={() => removeSession(si)}>✕</button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6, marginTop: 6 }}>
-            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="Название дня (например: Грудь / Трицепс)" aria-label={`Название тренировки ${si + 1}`} />
-            <DayOfWeekPicker
-              value={dow}
-              occupied={sessions.flatMap((other, oi) => oi === si ? [] : [sessionDayOfWeek(other, oi)])}
-              onChange={d => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(d, trainingDayForIndex(si)) })}
-              ariaLabel={`День недели тренировки ${si + 1}`}
-            />
-            <input style={{ ...IN, padding: '6px 10px', fontSize: 11, flex: 1, minHeight: 44 }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
+          <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <input style={{ ...IN, padding: '7px 10px', fontSize: 11, flex: '1 1 120px', minHeight: 38, background: 'rgba(0,0,0,0.22)', borderColor: 'rgba(255,255,255,0.08)' }} value={s.name} onChange={e => updateSession(si, { name: e.target.value })} placeholder="Название дня (например: Грудь / Трицепс)" aria-label={`Название тренировки ${si + 1}`} />
+            <DayOfWeekPicker value={dow} occupied={sessions.flatMap((other, oi) => oi === si ? [] : [sessionDayOfWeek(other, oi)])} onChange={d => updateSession(si, { dayOfWeek: normalizeProgramDayOfWeek(d, trainingDayForIndex(si)) })} ariaLabel={`День недели тренировки ${si + 1}`} />
+            <input style={{ ...IN, padding: '7px 10px', fontSize: 11, flex: '1 1 120px', minHeight: 38, background: 'rgba(0,0,0,0.22)', borderColor: 'rgba(255,255,255,0.08)' }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
           </div>
-          {noteOpenIdx === si && (
-            <textarea
-              value={s.note ?? ''}
-              onChange={e => updateSession(si, { note: e.target.value })}
-              placeholder="Заметка к тренировке (для тренера) — попадёт в экспорт и PDF"
-              rows={2}
-              style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: `1px solid ${ACCENT_LINE}`, borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 11, resize: 'vertical', minHeight: 44, marginBottom: 6 }}
-            />
-          )}
-          {/* Живой баланс объёма сессии — MEV/MAV/MRV полоски */}
+          {noteOpenIdx === si && <textarea value={s.note ?? ''} onChange={e => updateSession(si, { note: e.target.value })} placeholder="Заметка к тренировке — попадёт в экспорт и PDF" rows={2} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${ACCENT_LINE}`, borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 11, resize: 'vertical', minHeight: 44 }} />}
+          {/* Живой баланс объёма сессии — MEV/MAV/MRV полоски, компакт */}
           {s.blocks.length > 0 && (() => {
             const effLevel = levelProp || (() => { try { return loadTrainingProfile().level; } catch { return 'intermediate'; } })();
             const byMuscle: Record<string, number> = {};
-            for (const b of s.blocks) {
-              const mu = (b.muscle || '').toLowerCase();
-              if (!mu) continue;
-              byMuscle[mu] = (byMuscle[mu] || 0) + (b.sets?.length || 0);
-            }
-            const entries = Object.entries(byMuscle).slice(0, 4);
+            for (const b of s.blocks) { const mu = (b.muscle || '').toLowerCase(); if (!mu) continue; byMuscle[mu] = (byMuscle[mu] || 0) + (b.sets?.length || 0); }
+            const entries = Object.entries(byMuscle).slice(0, 3);
             if (entries.length === 0) return null;
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 6 }}>
-                {entries.map(([mu, cur]) => {
-                  const lm = getVolumeLandmarks(effLevel, mu);
-                  if (!lm) return null;
-                  return <VolumeMiniBar key={mu} cur={cur} mrv={lm.mrv} mev={lm.mev} label={GROUP_RU[mu] ?? mu} compact />;
-                })}
-              </div>
-            );
+            return <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.05)' }}>{entries.map(([mu, cur]) => { const lm = getVolumeLandmarks(effLevel, mu); if (!lm) return null; return <VolumeMiniBar key={mu} cur={cur} mrv={lm.mrv} mev={lm.mev} label={GROUP_RU[mu] ?? mu} compact />; })}</div>;
           })()}
           <BlockList blocks={s.blocks} phase={phase} sessionFocus={s.focus} sessionName={s.name} otherSessions={sessions.map((os, oi) => ({ idx: oi, name: os.name || `День ${oi + 1}` })).filter((_, oi) => oi !== si)} onMoveBlock={(bi, targetSi) => moveBlockToSession(si, bi, targetSi)} onChange={(blocks) => updateSession(si, { blocks })} />
+          </div>
         </div>
         );
        })}
@@ -1275,7 +1213,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             );
           })()}
           
-          {/* P0-3: Гид по темпу и отдыху */}
+          {/* Гид по темпу и отдыху — свернут в подсказку, не отдельный ряд */}
           {b.type === 'compound' || b.type === 'accessory' ? (() => {
             const ch = b.character || (b.type === 'compound' ? 'тяж' : 'памп');
              const spec = tempoFor(ch as 'тяж' | 'памп' | 'лёг', undefined, phase);
@@ -1283,14 +1221,10 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
             const reps = typeof b.sets[0]?.reps === 'number' ? b.sets[0].reps as number : 10;
             const tut = spec.tutPerRep * reps;
             return (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0', borderTop: '1px dashed rgba(255,255,255,0.05)' }}>
-                <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 700 }}>⏱ Рекомендация:</span>
-                <span style={{ fontSize: 10, color: DIM }}>темп <b style={{ color: DIM_STRONG }}>{spec.notation}</b></span>
-                <span style={{ fontSize: 10, color: DIM }}>· отдых <b style={{ color: DIM_STRONG }}>{rest}s</b></span>
-                <span style={{ fontSize: 10, color: DIM }}>· TUT <b style={{ color: DIM_STRONG }}>~{tut}s</b></span>
-                <button
-                  style={{ fontSize: 11, color: DIM, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                  onClick={() => updateBlock(bi, { sets: b.sets.map(st => ({ ...st, tempo: spec.notation, restSec: rest })), tempoSpec: spec.notation })}
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '4px 8px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.12)', marginTop: 2 }}>
+                <span style={{ fontSize: 10, color: '#22c55e', fontWeight: 750 }}>⏱</span>
+                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>темп <b style={{ color: '#fff' }}>{spec.notation}</b> · отдых <b style={{ color: '#fff' }}>{rest}s</b> · TUT <b style={{ color: '#fff' }}>~{tut}s</b></span>
+                <button style={{ fontSize: 10, color: '#22c55e', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.22)', borderRadius: 6, padding: '2px 7px', cursor: 'pointer', fontWeight: 700 }} onClick={() => updateBlock(bi, { sets: b.sets.map(st => ({ ...st, tempo: spec.notation, restSec: rest })), tempoSpec: spec.notation })}
                 >применить</button>
               </div>
             );
@@ -1416,13 +1350,14 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
   };
   const hasTechnique = (s: UserSet, tech: IntensityTechnique) => (s.techniques || []).includes(tech);
   return (
-    <div className="bb-set-editor" style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '0 0 auto' }}>
-      <div className="editor-sets-heading">
-        <div>
+    <div className="bb-set-editor" style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: '0 0 auto' }}>
+      <div className="editor-sets-heading" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1 }}>
           <div className="editor-kicker">СХЕМА ПОДХОДОВ</div>
-          <div className="editor-sets-help">Повторы × RIR @ вес · отдых в минутах</div>
+          <div className="editor-sets-help">Повторы × RIR @ вес · отдых · техники</div>
         </div>
-        <span>{sets.length} шт.</span>
+        {wm > 0 && <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : 'kg')} style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, border: weightMode === 'pct' ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', background: weightMode === 'pct' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: weightMode === 'pct' ? '#00e68a' : 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>{weightMode === 'kg' ? 'кг · показать %' : '% · показать кг'}</button>}
+        <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>{sets.length} шт.</span>
       </div>
       {sets.map((s, i) => (
         <div key={i} style={{ background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.14)', borderRadius: 8, padding: '6px 8px' }}>
@@ -1445,15 +1380,10 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={Math.floor((s.restSec ?? 90) / 60)} min={0} max={20} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { restSec: Math.max(0, Math.round(v)) * 60 }); }} title="отдых (мин)" placeholder="отд" aria-label="Отдых в минутах" inputMode="numeric" />
             <span style={{ fontSize: 11, color: DIM }}>м</span>
             <input type="text" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 52, minHeight: 44 }} value={s.tempo || ''} onChange={e => upd(i, { tempo: e.target.value })} placeholder="темп" title="Темп (2-1-1-0)" />
-            <button style={{ border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 44 }} onClick={() => confirmDelete(i)}>✕</button>
+            <button style={{ border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 32, borderRadius: 6, borderWidth: 0 }} onClick={() => confirmDelete(i)}>✕</button>
           </div>
-          {wm > 0 && (
-            <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : 'kg')} style={{ marginTop: 2, fontSize: 11, color: DIM, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', minHeight: 44 }}>
-              {weightMode === 'kg' ? `+ %1PM (ПМ:${wm}кг)` : '→ только кг'}
-            </button>
-          )}
-       <div className="editor-techniques" style={{ display: 'flex', gap: 3, marginTop: 4, flexWrap: 'wrap' }}>
-             <span className="editor-techniques-label">Доп. техники:</span>
+       <div className="editor-techniques" style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+             <span className="editor-techniques-label" style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Техники:</span>
             {(['drop_set', 'myo_reps', 'pause_rep', 'rest_pause', 'mechanical_drop'] as IntensityTechnique[]).map(tech => {
               const active = hasTechnique(s, tech);
               const lbl: Record<string, string> = { drop_set: '↓DRP', myo_reps: 'MYO', pause_rep: 'PRS', rest_pause: 'RP', mechanical_drop: 'MD' };

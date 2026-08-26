@@ -21,6 +21,27 @@ export const CARD: React.CSSProperties = {
   backdropFilter: 'blur(18px) saturate(150%)',
 };
 
+// ── Иерархия: неделя > день > упражнение — 3 уровня для конструктивности
+export const WEEK_CARD: React.CSSProperties = {
+  ...BASE_CARD,
+  background: 'linear-gradient(180deg, rgba(26,28,38,0.72), rgba(20,22,32,0.56))',
+  border: '1px solid rgba(255,255,255,0.10)',
+  borderRadius: 16,
+  boxShadow: '0 8px 24px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.06)',
+  backdropFilter: 'blur(16px) saturate(140%)',
+};
+export const DAY_CARD: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.03)',
+  border: '1px solid rgba(255,255,255,0.07)',
+  borderRadius: 12,
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+};
+export const EXERCISE_ROW: React.CSSProperties = {
+  background: 'rgba(0,0,0,0.18)',
+  border: '1px solid rgba(255,255,255,0.06)',
+  borderRadius: 10,
+};
+
 export const CARD_ACCENT: React.CSSProperties = {
   ...CARD,
   borderColor: ACCENT_BORDER,
@@ -139,17 +160,17 @@ export const ManualHeader: React.FC<{
 }> = ({ title, subtitle, chips, progress }) => {
   const pct = progress ? Math.round((progress.current / Math.max(1, progress.total)) * 100) : 0;
   return (
-    <div style={{ ...CARD_ACCENT, padding: '12px 14px', gap: 8 }}>
+    <div style={{ ...CARD_ACCENT, padding: '12px 14px', gap: 8, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: -0.2 }}>{title}</span>
-        {progress && <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: 'rgba(0,230,138,0.12)', border: `1px solid ${ACCENT_BORDER}`, borderRadius: 20, padding: '2px 8px' }}>Шаг {progress.current} из {progress.total}{progress.label ? ` — ${progress.label}` : ''}</span>}
-        <span style={{ flex: 1 }} />
-        {chips?.map((c, i) => <span key={i} style={{ fontSize: 10, fontWeight: 700, color: c.color ?? '#fff', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '3px 8px', whiteSpace: 'nowrap' }}>{c.label}</span>)}
+        <span style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: -0.3, lineHeight: 1.15 }}>{title}</span>
+        {progress && <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT, background: 'rgba(0,230,138,0.14)', border: `1px solid ${ACCENT_BORDER}`, borderRadius: 20, padding: '3px 9px', letterSpacing: 0.1 }}>Шаг {progress.current} из {progress.total}{progress.label ? ` · ${progress.label}` : ''}</span>}
+        <span style={{ flex: 1, minWidth: 12 }} />
+        {chips?.map((c, i) => <span key={i} style={{ fontSize: 10, fontWeight: 700, color: c.color ?? '#fff', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 20, padding: '3px 8px', whiteSpace: 'nowrap' }}>{c.label}</span>)}
       </div>
-      {subtitle && <div style={{ fontSize: 11, color: '#fff', lineHeight: 1.5 }}>{subtitle}</div>}
+      {subtitle && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5, maxWidth: 720 }}>{subtitle}</div>}
       {progress && (
-        <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-          <div style={{ height: 6, borderRadius: 3, width: pct + '%', background: 'linear-gradient(90deg,#00e68a,#00c853)', transition: 'width 0.35s ease', boxShadow: '0 0 10px rgba(0,230,138,0.35)' }} />
+        <div role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 2 }}>
+          <div style={{ height: 6, borderRadius: 3, width: pct + '%', background: 'linear-gradient(90deg,#00e68a,#00c853)', transition: 'width 0.40s cubic-bezier(0.25,0.46,0.45,0.94)', boxShadow: '0 0 10px rgba(0,230,138,0.35)' }} />
         </div>
       )}
     </div>
@@ -180,12 +201,15 @@ export const ManualStepper: React.FC<{
             style={{
               ...CHIP,
               flex: '1 0 auto',
-              minWidth: 92,
+              minWidth: 96,
               justifyContent: 'center',
               display: 'inline-flex',
               alignItems: 'center',
-              ...(isActive ? { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#06281c', border: '1px solid #00e68a', boxShadow: '0 4px 14px rgba(0,230,138,0.3)', fontWeight: 800 } : {}),
-              ...(disabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}),
+              gap: 4,
+              padding: '8px 12px',
+              fontSize: 11,
+              ...(isActive ? { background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#06281c', border: '1px solid #00e68a', boxShadow: '0 4px 14px rgba(0,230,138,0.30), inset 0 1px 0 rgba(255,255,255,0.22)', fontWeight: 800 } : isDone ? { background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.35)', fontWeight: 700 } : {}),
+              ...(disabled ? { opacity: 0.38, cursor: 'not-allowed' } : {}),
             }}
           >
             {isDone ? '✓ ' : isActive ? '● ' : ''}{s.label}
@@ -203,17 +227,18 @@ export const VolumeMiniBar: React.FC<{ cur: number; mrv: number; mev: number; la
   const status = pct > 100 ? 'перегруз' : cur < mev ? 'недобор' : pct >= 80 ? 'зона' : 'ок';
   if (compact) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
-        {label && <span style={{ fontSize: 10, color: DIM, minWidth: 52 }}>{label}</span>}
-        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', minWidth: 36 }}><div style={{ height: 6, width: Math.min(100, pct) + '%', background: color, borderRadius: 3 }} /></div>
-        <span style={{ fontSize: 10, fontWeight: 700, color }}>{cur}/{mrv}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+        {label && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', minWidth: 54, fontWeight: 600 }}>{label}</span>}
+        <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', minWidth: 40 }}><div style={{ height: 6, width: Math.min(100, pct) + '%', background: color, borderRadius: 3, transition: 'width 0.3s ease' }} /></div>
+        <span style={{ fontSize: 10, fontWeight: 800, color, minWidth: 32, textAlign: 'right' }}>{cur}/{mrv}</span>
+        <span style={{ fontSize: 9, fontWeight: 700, color, background: color + '18', border: `1px solid ${color}30`, borderRadius: 6, padding: '1px 5px' }}>{status}</span>
       </div>
     );
   }
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
       {label && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700, minWidth: 64 }}>{label}</span>}
-      <div style={{ flex: 1, height: 7, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}><div style={{ height: 7, width: Math.min(100, pct) + '%', background: color }} /></div>
+      <div style={{ flex: 1, height: 7, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}><div style={{ height: 7, width: Math.min(100, pct) + '%', background: color, transition: 'width 0.3s ease' }} /></div>
       <span style={{ fontSize: 11, fontWeight: 700, color }}>{cur}/{mrv}с</span>
       <span style={{ fontSize: 10, fontWeight: 700, color }}>{status}</span>
     </div>

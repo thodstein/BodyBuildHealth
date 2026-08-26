@@ -157,6 +157,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const [proAccAnalysis, setProAccAnalysis] = useState(false);
   const [proAccFeedback, setProAccFeedback] = useState(false);
   const [proAccTools, setProAccTools] = useState(false);
+  const [showHints, setShowHints] = useState(false);
 
   // V6: Toast with variants — replaces plain editorToast div
   const { showToast: showToastRaw, ToastNode } = useEditorToast();
@@ -263,9 +264,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     if (g === 'hypertrophy' || g === 'bodybuilding' || g === 'mass' || g === 'cut' || g === 'recomp') return 'bodybuilding';
     return 'general';
   };
-  const [showMore, setShowMore] = useState(false);
+   const [showMore, setShowMore] = useState(false);
   const [showTableView, setShowTableView] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   // Единый конструктор: все шаги доступны всем — Профиль → Параметры → Недели
   // (раньше standard не видел Профиль; теперь объединено — меньше путаницы)
   const editorSteps = PRO_EDITOR_STEPS;
@@ -695,43 +697,45 @@ for (const w of program.hybrid.bbWeeks ?? []) {
 
 return (
       <div className="manual-constructor manual-constructor--editor" ref={editorRootRef} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-       {/* Панель действий — обычная (не липкая) */}
-        <div className="editor-topbar-shell" style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(15,17,22,0.95)', borderRadius: 12, padding: '8px 10px', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 6px 18px rgba(0,0,0,0.35)' }}>
-        <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <button style={{ ...BTN_GHOST, padding: '8px 12px', fontSize: 11, minHeight: 40 }} onClick={safeBack}>← К списку</button>
-          <span style={{ fontSize: 11, fontWeight: 800, color: DIR_COLOR[dir] }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
-          <span style={{ fontSize: 10, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>
-            🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
-          </span>
-          {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b' }} title="Несохранённые изменения">●</span>}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button style={{ ...BTN, padding: '8px 14px', fontSize: 11, minHeight: 40 }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу (Ctrl+S)">
-              {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
-            </button>
+        {/* Панель действий — иерархия: акцент слева по направлению, стекло, 2 ряда */}
+         <div className="editor-topbar-shell" style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'linear-gradient(180deg, rgba(26,28,38,0.82), rgba(18,20,30,0.68))', borderRadius: 14, padding: '10px 12px', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${DIR_COLOR[dir]}`, boxShadow: '0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter: 'blur(14px)' }}>
+         <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+           <button style={{ ...BTN_GHOST, padding: '7px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)' }} onClick={safeBack}>← К списку</button>
+           <span style={{ fontSize: 11, fontWeight: 850, color: DIR_COLOR[dir], background: DIR_COLOR[dir] + '18', border: `1px solid ${DIR_COLOR[dir]}35`, borderRadius: 8, padding: '3px 8px' }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
+           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', fontWeight: 600, whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '3px 8px' }}>
+             🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
+           </span>
+           {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 20, padding: '2px 7px' }} title="Несохранённые изменения">● не сохранено</span>}
+           {!isDirty && <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.20)', borderRadius: 20, padding: '2px 7px' }}>✓ сохранено</span>}
+           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+             <button style={{ ...BTN, padding: '7px 14px', fontSize: 11, minHeight: 38, boxShadow: '0 4px 14px rgba(0,230,138,0.22)' }} onClick={() => { if (handleSave('Ручная правка')) { setSavedFlash(true); window.setTimeout(() => setSavedFlash(false), 1600); } }} title="Сохранить программу (Ctrl+S)">
+               {savedFlash ? '💾 Сохранено ✓' : '💾 Сохранить'}
+             </button>
+           </div>
+         </div>
+        {/* Быстрые действия — группировка: вид | история | экспорт | неделя → выполнение | ещё */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 8, alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 3 }}>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: showTableView ? 'rgba(0,230,138,0.14)' : 'transparent', border: showTableView ? '1px solid rgba(0,230,138,0.30)' : '1px solid transparent', color: showTableView ? '#00e68a' : 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Переключить в редактор' : 'Показать таблицу плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
+            <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.08)' }} />
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: 'rgba(255,255,255,0.75)', fontSize: 13 }} onClick={undo} title="Отменить (Ctrl+Z)">↩</button>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: 'rgba(255,255,255,0.75)', fontSize: 13 }} onClick={redo} title="Повторить (Ctrl+Shift+Z)">↪</button>
           </div>
-        </div>
-        {/* Быстрые действия — все как карточные иконки (единый стиль) */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 6, alignItems: 'center' }}>
-          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '6px 12px', borderRadius: 10, cursor: 'pointer', background: showTableView ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: showTableView ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', color: showTableView ? '#00e68a' : 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 700, minHeight: 36, boxShadow: '0 1px 6px rgba(0,0,0,0.12)' }} onClick={() => setShowTableView(v => !v)} title={showTableView ? 'Переключить в редактор' : 'Показать таблицу плана'}>{showTableView ? '✏️ Редактор' : '📋 Таблица'}</button>
-          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)', fontSize: 13 }} onClick={undo} title="Отменить (Ctrl+Z)">↩</button>
-          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.85)', fontSize: 13 }} onClick={redo} title="Повторить (Ctrl+Shift+Z)">↪</button>
-          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '6px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.22)', color: '#a78bfa', fontSize: 11, fontWeight: 700, minHeight: 36 }} onClick={printProgram} title="Печать / PDF">🖨 PDF</button>
-          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '6px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 11, fontWeight: 700, minHeight: 36 }} onClick={() => { try { const ics = buildProgramIcs(program); downloadIcs((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); showToast('📅 ICS скачан'); } catch { showToast('⚠ Не удалось собрать ICS', 'error'); } }} title="Скачать календарь (.ics) — все тренировки по неделям">📅 ICS</button>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 3 }}>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#a78bfa', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={printProgram} title="Печать / PDF">🖨 PDF</button>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#00e68a', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => { try { const ics = buildProgramIcs(program); downloadIcs((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); showToast('📅 ICS скачан'); } catch { showToast('⚠ Не удалось собрать ICS', 'error'); } }} title="Скачать календарь (.ics)">📅 ICS</button>
+          </div>
           {(dir === 'bb' || dir === 'pl') && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, marginLeft: 2 }}>
-              <label style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)', borderRadius: 10, padding: '3px 6px' }}>
+              <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
                 Нед
-                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 44, minHeight: 32, textAlign: 'center' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя для выполнения" inputMode="numeric" />
+                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 44, minHeight: 30, textAlign: 'center', background: 'rgba(0,0,0,0.25)' }} value={execWeek} min={1} max={program.meta.weeks} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) setExecWeek(Math.max(1, Math.min(program.meta.weeks, Math.round(v)))); }} aria-label="Неделя для выполнения" inputMode="numeric" />
               </label>
-              {dir === 'bb' && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(96,165,250,0.4)', color: '#60a5fa' }} onClick={sendToExecution} title="Отправить неделю к выполнению">🚚 К вып.</button>}
-              {dir === 'pl' && program.pl && <button style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11, minHeight: 36, borderColor: 'rgba(167,139,250,0.4)', color: '#a78bfa' }} onClick={sendToExecution} title="Отправить ПЛ-неделю к выполнению">🚚 К вып.</button>}
+              {dir === 'bb' && <button style={{ ...BTN_GHOST, padding: '5px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(96,165,250,0.35)', color: '#60a5fa', background: 'rgba(96,165,250,0.08)' }} onClick={sendToExecution} title="Отправить неделю к выполнению">🚚 К вып.</button>}
+              {dir === 'pl' && program.pl && <button style={{ ...BTN_GHOST, padding: '5px 10px', fontSize: 11, minHeight: 32, borderColor: 'rgba(167,139,250,0.35)', color: '#a78bfa', background: 'rgba(167,139,250,0.08)' }} onClick={sendToExecution} title="Отправить ПЛ-неделю к выполнению">🚚 К вып.</button>}
             </span>
           )}
-          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, cursor: 'pointer', background: showMore ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', border: showMore ? '1px solid rgba(0,230,138,0.28)' : '1px solid rgba(255,255,255,0.10)', color: showMore ? '#00e68a' : 'rgba(255,255,255,0.65)', fontSize: 13 }} onClick={() => setShowMore(v => !v)} title="Ещё действия" aria-expanded={showMore}>⋯</button>
-          <span style={{ fontSize: 10, color: DIM, marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-            {isDirty ? <span style={{ color: '#f59e0b', fontWeight: 700 }}>● не сохранено</span> : <span style={{ color: '#22c55e' }}>✓ сохранено</span>}
-            <span style={{ opacity: 0.6 }}>| Ctrl+Z</span>
-          </span>
+          <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 10, cursor: 'pointer', background: showMore ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', border: showMore ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.10)', color: showMore ? '#00e68a' : 'rgba(255,255,255,0.65)', fontSize: 14, marginLeft: 'auto' }} onClick={() => setShowMore(v => !v)} title="Ещё действия" aria-expanded={showMore}>⋯</button>
         </div>
         {showMore && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
@@ -793,23 +797,29 @@ return (
         </div>
       )}
 
-      {/* ═════════ ПРОФЕССИОНАЛЬНЫЙ РЕЖИМ: профиль ═════════ */}
+      {/* ═════════ ПРОФИЛЬ — сводка + редактирование в модале (не 60 полей inline) ═════════ */}
       {isPro && estep === 'profile' && (
       <>
-      <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#a78bfa' }}>👤 Профиль — основа качества</div>
-        <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.5 }}>
-          Веса (ПМ/workMax) → точные веса в подходах · Оборудование → подбор упражнений под зал · Травмы/осанка → исключения и щадящие замены · Уровень/стаж → MEV/MAV/MRV и RIR. Заполните один раз — авто-сборка и подсказки станут точными.
+      <div style={{ ...CARD, padding: 12, borderLeft: '3px solid #a78bfa', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 850, color: '#a78bfa' }}>👤 Профиль — сводка</span>
+          <span style={{ fontSize: 10, color: DIM, background: 'rgba(167,139,250,0.10)', border: '1px solid rgba(167,139,250,0.18)', borderRadius: 20, padding: '2px 8px' }}>основа точности</span>
+          <button style={{ ...BTN_GHOST, marginLeft: 'auto', padding: '6px 12px', fontSize: 11, minHeight: 34, borderColor: 'rgba(167,139,250,0.35)', color: '#a78bfa', background: 'rgba(167,139,250,0.10)' }} onClick={() => setProfileModalOpen(true)}>✏️ Редактировать профиль</button>
         </div>
-        <div style={{ fontSize: 10, color: DIM, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <span>✓ ПМ: {tprofile.pmSquat}/{tprofile.pmBench}/{tprofile.pmDead} кг</span>
-          <span>·</span>
-          <span>Оборудование: {(tprofile.equipment?.length ?? 0)} шт</span>
-          <span>·</span>
-          <span>Слабые: {(tprofile.weakPoints?.length ?? 0)} шт</span>
+        <div style={{ fontSize: 10, color: DIM_STRONG, lineHeight: 1.55, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+          ПМ/оборудование/травмы/уровень — один раз заполнили → авто-сборка и подбор упражнений становятся точными. Откройте редактирование, если меняли зал или веса.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+          <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.14)', display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>ПМ (присед/жим/тяга)</span><span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{tprofile.pmSquat ?? '—'} / {tprofile.pmBench ?? '—'} / {tprofile.pmDead ?? '—'} <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.45)' }}>кг</span></span></div>
+          <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.14)', display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Оборудование / слабые</span><span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{(tprofile.equipment?.length ?? 0)} шт · {(tprofile.weakPoints?.length ?? 0)} слабых</span></div>
+          <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.14)', display: 'flex', flexDirection: 'column', gap: 2 }}><span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>Уровень / стаж</span><span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{tprofile.level ?? '—'} {tprofile.trainingYears ? `· ${tprofile.trainingYears} г` : ''} {tprofile.onCourse ? '· 💉' : ''}</span></div>
+        </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span>💡 Совет: заполните ПМ и зал — «⚡ Авто-черновик» соберёт веса и упражнения 1 кликом.</span>
+          <span style={{ marginLeft: 'auto', fontSize: 10, color: '#a78bfa', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => setProfileModalOpen(true)}>открыть профиль →</span>
         </div>
       </div>
-      <TrainingProfileCard profile={tprofile} update={updateTProfile} compact />
+      {profileModalOpen && <TrainingModal title="👤 Профиль атлета — редактирование" onClose={() => setProfileModalOpen(false)} wide><TrainingProfileCard profile={tprofile} update={updateTProfile} compact /></TrainingModal>}
       </>
       )}
 
@@ -1329,23 +1339,32 @@ return (
         </>
       )}
 
-      {/* 💡 Интеллектуальные подсказки без калькулятора — фичи BB-авто и умных тренировок как карточки-советы */}
+      {/* 💡 Интеллектуальные подсказки — свернуты по умолчанию, не перегружают, но 1 клик — 6 правил */}
       {estep === 'weeks' && (
-        <div style={{ ...CARD, padding: 10, borderLeft: '3px solid #00e68a', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>🧠 Интеллектуальные подсказки</span>
-            <span style={{ fontSize: 10, color: DIM, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>без калькулятора · карточки-правила</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-            <MethodHint icon="📊" title="Объём по MEV/MRV" text="Держите 10-20 сетов/нед на мышцу. Недобор — добавьте фидер (2 лёгких сета в день другой группы). Перегруз (>MRV) — снимите 1 сет, не весь день." color="#22c55e" />
-            <MethodHint icon="🔥" title="Суперсеты" text="Антагонисты (грудь↔спина) без отдыха — экономят 20 мин, но снижают силу на 5%. Для памп-дня — да, для тяжёлого — нет." color="#a78bfa" />
-            <MethodHint icon="📈" title="DUP без калькулятора" text="3 тренировки/нед: тяж (5×5), сред (3×10), лёг (3×15) — одна группа получает разный стимул без расчётов." color="#3b82f6" />
-            <MethodHint icon="🔄" title="Делод и ACWR" text="Каждая 4-я неделя — −30% объёма. Если за 7 дней RIR упал на 2 — следующую неделю сделайте deload." color="#f59e0b" />
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <MethodHint icon="🎯" title="Специализация" text="Отстающую — 1.3× объёма 6 недель, за счёт других (не + сверху). Затем баланс." color="#ec4899" />
-            <MethodHint icon="⏱" title="Темп и TUT" text="3-1-1-0 для массы (5с/повт), 2-1-1-0 для силы. TUT = повторы × сек/повт." color="#06b6d4" />
-          </div>
+        <div style={{ ...CARD, padding: 0, overflow: 'hidden', borderLeft: `3px solid ${showHints ? '#00e68a' : 'rgba(255,255,255,0.06)'}` }}>
+          <button onClick={() => setShowHints(v => !v)} aria-expanded={showHints} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: showHints ? 'rgba(0,230,138,0.07)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13 }}>{showHints ? '▼' : '▶'}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: showHints ? '#00e68a' : '#fff' }}>🧠 Подсказки тренера</span>
+              <span style={{ fontSize: 10, color: DIM, fontWeight: 400, display: showHints ? 'none' : 'inline' }}>6 правил без калькулятора · нажмите чтобы развернуть</span>
+              <span style={{ fontSize: 10, color: DIM, fontWeight: 400, display: showHints ? 'inline' : 'none' }}>MEV/MRV · суперсеты · DUP · делод · специализация · TUT</span>
+            </span>
+            <span style={{ fontSize: 10, color: showHints ? '#00e68a' : DIM, border: `1px solid ${showHints ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 20, padding: '2px 8px' }}>{showHints ? 'Скрыть' : 'Показать'}</span>
+          </button>
+          {showHints && (
+            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+              <MethodHint icon="📊" title="Объём по MEV/MRV" text="10-20 сетов/нед на мышцу. Недобор — фидер 2 сета в другой день. Перегруз (>MRV) — снимите 1 сет." color="#22c55e" />
+              <MethodHint icon="🔥" title="Суперсеты" text="Антагонисты (грудь↔спина) без отдыха — экономят 20 мин, но -5% силы. Для пампа — да." color="#a78bfa" />
+              <MethodHint icon="📈" title="DUP без калькулятора" text="3 дн/нед: тяж 5×5, сред 3×10, лёг 3×15 — разный стимул без расчётов." color="#3b82f6" />
+              <MethodHint icon="🔄" title="Делод и ACWR" text="Каждая 4-я нед — −30%. Если RIR упал на 2 за 7 дн — следующая deload." color="#f59e0b" />
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <MethodHint icon="🎯" title="Специализация" text="Отстающую — 1.3× 6 нед за счёт других. Затем баланс." color="#ec4899" />
+              <MethodHint icon="⏱" title="Темп и TUT" text="3-1-1-0 масса (5с), 2-1-1-0 сила. TUT = повт × сек." color="#06b6d4" />
+            </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1464,25 +1483,11 @@ return (
            {!(program.meta.title && program.meta.title.trim().length >= 3) && <span style={{ fontSize: 10, color: '#ef4444' }}>⚠ Укажите название — без него Итог не будет качественным</span>}
            {program.meta.title && program.meta.title.trim().length >= 3 && program.meta.title.trim().length < 12 && <span style={{ fontSize: 10, color: '#f59e0b' }}>💡 Более описательное название поможет в списке (напр. «Масса 4д × 8 нед»)</span>}
          </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-           <EditorPopupSelect
-            value={program.meta.goal}
-            options={GOAL_OPTS.map(o => ({ id: o.id, label: o.label }))}
-            onChange={v => updateMeta({ goal: v })}
-            ariaLabel="Цель программы"
-            title="Цель программы"
-            buttonStyle={{ flex: 1 }}
-          />
-           <EditorPopupSelect
-            value={program.meta.level}
-            options={LEVEL_OPTS.map(o => ({ id: o.id, label: o.label }))}
-            onChange={v => updateMeta({ level: v })}
-            ariaLabel="Уровень подготовки"
-            title="Уровень подготовки"
-            buttonStyle={{ flex: 1 }}
-          />
-           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-            Дней/нед
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8 }}>
+           <EditorPopupSelect value={program.meta.goal} options={GOAL_OPTS.map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ goal: v })} ariaLabel="Цель программы" title="Цель программы" buttonStyle={{ width: '100%' }} />
+           <EditorPopupSelect value={program.meta.level} options={LEVEL_OPTS.map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ level: v })} ariaLabel="Уровень подготовки" title="Уровень подготовки" buttonStyle={{ width: '100%' }} />
+           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Дней / нед</span>
             {/* U3: meta.daysPerWeek каскад — при изменении добавляет/удаляет сессии в bb.weeks; при уменьшении с контентом — подтверждение */}
               <input aria-label="Дней тренировок в неделю" type="number" inputMode="numeric" style={IN} value={program.meta.daysPerWeek} min={1} max={7}
                 onChange={async e => {
@@ -1511,8 +1516,8 @@ return (
                 }} />
             <span style={{ fontSize: 9, color: program.meta.daysPerWeek < 2 || program.meta.daysPerWeek > 6 ? '#f59e0b' : DIM }}>{program.meta.daysPerWeek < 3 ? '💡 3д — минимум для прогрессии' : program.meta.daysPerWeek > 5 && program.meta.level !== 'advanced' && program.meta.level !== 'enhanced' ? '⚠ 6д — только для продвинутых' : '✓ ' + program.meta.daysPerWeek + 'д — оптимально'}</span>
            </label>
-           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-            Недель
+           <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Недель</span>
             {/* U3: meta.weeks каскад — при изменении добавляет/удаляет недели в bb.weeks; при уменьшении с контентом — подтверждение */}
               <input aria-label="Количество недель программы" type="number" inputMode="numeric" style={IN} value={program.meta.weeks} min={1} max={24}
                 onChange={async e => {
