@@ -584,13 +584,16 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   return (
     <div className="screen labs" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', padding: 0 }}>
 
-      {/* ─── HERO PAGE — премиальный glass + живые KPI ─── */}
+      {/* ─── HERO PAGE — фикс: скролл, видимость, нижняя часть не перекрывается ─── */}
       {mainTab === 'hero' && (
-        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', overflow:'auto' }}>
-          <img src="/lab-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top' }} />
-          <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(7,10,18,0.15) 0%, rgba(7,10,18,0.55) 45%, rgba(7,10,18,0.92) 100%)' }} />
-          <div style={{ position:'absolute', inset:0, background:'radial-gradient(520px 320px at 18% 18%, rgba(0,230,138,0.14), transparent 65%), radial-gradient(560px 360px at 92% 86%, rgba(59,130,246,0.10), transparent 62%)' }} />
-          <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'18px 16px 22px', maxWidth: 560, margin:'0 auto', width:'100%', boxSizing:'border-box' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', overflowY:'auto', WebkitOverflowScrolling:'touch', background:'#070a12' }}>
+          {/* bg layers — fixed inside hero */}
+          <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none' }}>
+            <img src="/lab-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', opacity:0.92 }} />
+            <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(7,10,18,0.22) 0%, rgba(7,10,18,0.58) 42%, rgba(7,10,18,0.94) 78%, #070a12 100%)' }} />
+            <div style={{ position:'absolute', inset:0, background:'radial-gradient(560px 380px at 18% 14%, rgba(0,230,138,0.16), transparent 68%), radial-gradient(600px 420px at 92% 88%, rgba(59,130,246,0.11), transparent 65%)' }} />
+          </div>
+          <div style={{ position:'relative', zIndex:1, flex:'0 0 auto', display:'flex', flexDirection:'column', justifyContent:'flex-start', padding:'28px 16px calc(18px + 72px + env(safe-area-inset-bottom,0px))', maxWidth: 560, margin:'0 auto', width:'100%', boxSizing:'border-box', minHeight:'100dvh' }}>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
               <span style={{ padding:'4px 9px', borderRadius:999, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.24)', color:LABS_ACCENT, fontSize:9, fontWeight:800, letterSpacing:0.6 }}>LABS • HEALTH OS</span>
               <span style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{hasLabs ? `${currentLabs.length} маркеров • ${PHASE_LABELS[selectedPhase]}` : 'Нет данных — начните с ввода'}</span>
@@ -693,9 +696,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         </div>
       )}
 
-      {/* ─── SCROLLABLE CONTENT (only when not on hero) ─── */}
+      {/* ─── SCROLLABLE CONTENT — увеличен нижний отступ чтобы дашборд не перекрывал ─── */}
       {mainTab !== 'hero' && (
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px 70px' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 12px calc(20px + 72px + env(safe-area-inset-bottom,0px))' }}>
 
       {/* ≡≡≡ LAB SUB-TABS (only when mainTab === 'lab') ≡≡≡ */}
       {mainTab === 'lab' && (
@@ -1389,49 +1392,51 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
           });
         };
         return (
-          <div style={{ padding: '10px 0' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8, flexWrap:'wrap', gap:8 }}>
-              <div>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--accent)' }}>📈 Динамика маркеров ({report.trends.length})</div>
-                <div style={{ fontSize:10, color:'var(--text-dim)' }}>{report.summary}</div>
+          <div style={{ padding: '12px 0' }}>
+            <div style={{ ...LABS_CARD, padding:12, marginBottom:10, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10 }}>
+                <div>
+                  <div style={{ fontSize:13, fontWeight:800, color:'#fff', display:'flex', alignItems:'center', gap:8 }}><span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', fontSize:13 }}>📈</span> Динамика маркеров <span style={{ fontSize:10, padding:'2px 7px', borderRadius:999, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', color:LABS_ACCENT }}>{report.trends.length}</span></div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:4, lineHeight:1.35 }}>{report.summary}</div>
+                </div>
+                {report.trends.length > 0 && <span style={{ fontSize:9, padding:'4px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.55)' }}>{filtered.length} показано</span>}
               </div>
-              {report.trends.length > 0 && (
-                <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                  {(['all','significant','critical','worsened','improved'] as const).map(f => (
-                    <button key={f} onClick={() => setTrendFilter(f)} style={{
-                      padding:'4px 10px', borderRadius:6, fontSize:9, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                       background: trendFilter === f ? 'var(--accent)' : 'var(--bg-secondary)',
-                       color: trendFilter === f ? '#000' : 'var(--text-dim)',
-                       border: `1px solid ${trendFilter === f ? 'var(--accent)' : 'var(--border)'}`,
-                    }}>
-                      {f === 'all' ? 'Все' : f === 'significant' ? 'Значимые' : f === 'critical' ? 'Критические' : f === 'worsened' ? 'Ухудшения' : 'Улучшения'}
-                    </button>
-                   ))}
-                   <button onClick={() => { setTrendSystemFilter('all'); }} style={{
-                     padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                     background: trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-                     color: trendSystemFilter === 'all' ? '#000' : 'var(--text-dim)',
-                     border: `1px solid ${trendSystemFilter === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-                   }}>Все системы</button>
-                   {Object.entries(LAB_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
-                     const info = SYSTEM_INFO_ALL[sys];
-                     return (
-                       <button key={sys} onClick={() => setTrendSystemFilter(trendSystemFilter === sys ? 'all' : sys)} style={{
-                         padding:'3px 8px', borderRadius:6, fontSize:8, fontWeight:600, cursor:'pointer', whiteSpace:'nowrap',
-                         background: trendSystemFilter === sys ? (info?.icon || '') + ' var(--accent)' : 'var(--bg-secondary)',
-                         color: trendSystemFilter === sys ? '#000' : 'var(--text-dim)',
-                         border: `1px solid ${trendSystemFilter === sys ? 'var(--accent)' : 'var(--border)'}`,
-                       }}>
-                         {info?.icon || ''} {info?.label || sys}
-                       </button>
-                     );
-                   })}
-                   <button onClick={() => {
-                    const csv = exportTrendsToCSV(report);
-                    downloadCSV(csv, `lab-trends-${new Date().toISOString().slice(0,10)}.csv`);
-                  }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--accent)', fontWeight:600, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>
-                    📥 CSV
-                  </button>
+            </div>
+            {report.trends.length > 0 && (
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:10, alignItems:'center' }}>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+                  {(['all','significant','critical','worsened','improved'] as const).map(f => {
+                    const active = trendFilter===f;
+                    return (
+                      <button key={f} onClick={() => setTrendFilter(f)} style={{
+                        padding:'6px 10px', borderRadius:999, fontSize:9, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap',
+                        background: active ? LABS_ACCENT : 'rgba(255,255,255,0.06)', color: active?'#000':'rgba(255,255,255,0.62)', border:`1px solid ${active?LABS_ACCENT:'rgba(255,255,255,0.08)'}`,
+                      }}>
+                        {f === 'all' ? 'Все' : f === 'significant' ? 'Значимые' : f === 'critical' ? 'Критические' : f === 'worsened' ? 'Ухудшения' : 'Улучшения'}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ width:1, height:18, background:'rgba(255,255,255,0.08)', flexShrink:0 }} />
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', alignItems:'center' }}>
+                  <button onClick={() => { setTrendSystemFilter('all'); }} style={{
+                    padding:'5px 10px', borderRadius:999, fontSize:9, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap',
+                    background: trendSystemFilter === 'all' ? LABS_ACCENT : 'rgba(255,255,255,0.06)', color: trendSystemFilter === 'all' ? '#000' : 'rgba(255,255,255,0.62)', border:`1px solid ${trendSystemFilter === 'all' ? LABS_ACCENT : 'rgba(255,255,255,0.08)'}`,
+                  }}>Все системы</button>
+                  {Object.entries(LAB_SYSTEM_GROUPS).slice(0, 6).map(([sys, codes]) => {
+                    const info = SYSTEM_INFO_ALL[sys];
+                    const active = trendSystemFilter===sys;
+                    const color = LABS_SYS_COLOR[sys]||'#6b7280';
+                    return (
+                      <button key={sys} onClick={() => setTrendSystemFilter(active ? 'all' : sys)} style={{
+                        padding:'5px 10px', borderRadius:999, fontSize:9, fontWeight:800, cursor:'pointer', whiteSpace:'nowrap', display:'flex', alignItems:'center', gap:4,
+                        background: active ? color+'18' : 'rgba(255,255,255,0.05)', color: active? color : 'rgba(255,255,255,0.58)', border:`1px solid ${active? color+'30' : 'rgba(255,255,255,0.06)'}`,
+                      }}>
+                        {info?.icon || ''} {info?.label || sys}
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => { const csv = exportTrendsToCSV(report); downloadCSV(csv, `lab-trends-${new Date().toISOString().slice(0,10)}.csv`); }} style={{ padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:LABS_ACCENT, fontWeight:800, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>📥 CSV</button>
                   <button onClick={() => {
                     const win = window.open('', '_blank');
                     if (!win) return;
@@ -1462,7 +1467,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       </body></html>`);
                     win.document.close();
                     win.print();
-                  }} style={{ padding:'4px 10px', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-secondary)', color:'var(--accent)', fontWeight:600, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>
+                  }} style={{ padding:'6px 12px', borderRadius:999, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.06)', color:LABS_ACCENT, fontWeight:800, fontSize:9, cursor:'pointer', whiteSpace:'nowrap' }}>
                     🖨 Print
                   </button>
                 </div>
@@ -1754,24 +1759,31 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
         const verifLabMap: Record<string, number> = tzLabValues;
         return (
           <div>
-            <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '8px 0 4px', scrollbarWidth: 'none', alignItems: 'center' }}>
-              {(['risks', 'verification'] as const).map(v => (
-                <button key={v} onClick={() => setRisksView(v)} style={{
-                  padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
-                  whiteSpace: 'nowrap', cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-                  background: risksView === v ? 'var(--accent)' : 'var(--bg-secondary)',
-                  color: risksView === v ? '#000' : 'var(--text-dim)',
-                  border: `1px solid ${risksView === v ? 'var(--accent)' : 'var(--border)'}`,
-                }}>
-                  {v === 'risks' ? '⚠️ Риски и индексы' : '🔬 Верификация рисков'}
-                </button>
-              ))}
+            <div style={{ display:'flex', gap:6, padding:'8px 4px', borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', overflowX:'auto', scrollbarWidth:'none', alignItems:'center' }}>
+              {(['risks', 'verification'] as const).map(v => {
+                const active = risksView===v;
+                return (
+                  <button key={v} onClick={() => setRisksView(v)} style={{
+                    flex:1, padding:'8px 12px', borderRadius:10, fontSize:11, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', transition:'all 0.18s', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                    background: active ? LABS_ACCENT : 'transparent', color: active?'#000':'rgba(255,255,255,0.62)', border:'none', boxShadow: active?'0 6px 16px rgba(0,230,138,0.18)':'none',
+                  }}>
+                    {v === 'risks' ? '⚠️ Риски и индексы' : '🔬 Верификация'}
+                  </button>
+                );
+              })}
             </div>
             {risksView === 'verification' ? (
-              <RiskVerificationList labMap={verifLabMap} result={tzSpecResult} />
+              <div style={{ marginTop:10 }}><RiskVerificationList labMap={verifLabMap} result={tzSpecResult} /></div>
             ) : (
             <div>
-            <div style={{ fontSize: 16, fontWeight: 700, padding: '10px 0' }}>⚠️ Риски и индексы здоровья</div>
+            <div style={{ ...LABS_CARD, padding:12, marginTop:10, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', gap:10 }}>
+              <span style={{ width:32, height:32, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(249,115,22,0.14)', border:'1px solid rgba(249,115,22,0.18)', fontSize:14 }}>⚠️</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>Риски и индексы здоровья</div>
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{hasLabs? `${deviationCount} отклонений • ${Object.values(labRisks?.systemBreakdown||{}).filter(v=>v.net>0).length} систем с риском` : 'Введите анализы для расчёта'}</div>
+              </div>
+              <LabsBadge color={hasLabs? (deviationCount?'#ef4444':LABS_ACCENT) : '#6b7280'}>{hasLabs? (deviationCount? `${deviationCount} вне` : 'в норме') : 'нет данных'}</LabsBadge>
+            </div>
 
             {/* Labs Score Card (TZ Pipeline) */}
             <LabsScoreCard
