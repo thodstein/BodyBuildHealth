@@ -351,7 +351,6 @@ export const SectionCard: React.FC<{
             border: `1px solid ${color}50`,
             boxShadow: `0 3px 10px ${color}26, inset 0 1px 0 rgba(255,255,255,0.14)`,
             flexShrink: 0,
-            transform: icon === '⚖️' ? 'scale(1.12)' : undefined,
             lineHeight: 1,
           }}
         >

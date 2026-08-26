@@ -69,7 +69,7 @@ import {
 import { loadCardioLog, saveCardioLogEntry, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { type WeightEntry } from '../../../engines/profile-store';
 
-const isWeightDiaryKey = (k: string) => k === 'weight' || k === 'measurements';
+const isWeightDiaryKey = (_k: string) => false;
 
 /* ── Типы для встроенных дневников ── */
 
@@ -1030,8 +1030,8 @@ const exportAllDiariesPdf = () => {
                       })()}
                       {(() => {
                         const w = weights.find(e => e.date === todayIso());
-                        if (w) return <span><span style={{ fontSize: 14, display: 'inline-block', transform: 'scale(1.14)', lineHeight: 1 }}>⚖️</span> {w.weight} кг{w.bodyFat ? ` · {w.bodyFat}%` : ''}</span>;
-                        return <span style={{ color: colors.textMuted }}><span style={{ fontSize: 14, display: 'inline-block', transform: 'scale(1.14)', lineHeight: 1 }}>⚖️</span> Вес: —</span>;
+                        if (w) return <span><span style={{ fontSize: 14, display: 'inline-block', lineHeight: 1 }}>⚖️</span> {w.weight} кг{w.bodyFat ? ` · {w.bodyFat}%` : ''}</span>;
+                        return <span style={{ color: colors.textMuted }}><span style={{ fontSize: 14, display: 'inline-block', lineHeight: 1 }}>⚖️</span> Вес: —</span>;
                       })()}
                       {(() => {
                         const s = sleepEntries.find(e => e.date === todayIso());

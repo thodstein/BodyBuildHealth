@@ -80,10 +80,9 @@ export const cardStyles = {
 
 /* ── Иконки-бейджи ───────────────────────────────────────────────────────── */
 
-// ⚖️ узкий глиф — компенсируем крупнее и масштабом, чтобы в центре выглядел как остальные
-export const isWeightDiaryKey = (k: string) => k === 'weight' || k === 'measurements';
+export const isWeightDiaryKey = (_k: string) => false;
 
-export const iconBadge = (color: string, diaryKey?: string) => ({
+export const iconBadge = (color: string, _diaryKey?: string) => ({
   width: 40,
   height: 40,
   borderRadius: 11,
@@ -92,7 +91,7 @@ export const iconBadge = (color: string, diaryKey?: string) => ({
   justifyContent: 'center',
   background: `${color}22`,
   border: `1px solid ${color}44`,
-  fontSize: isWeightDiaryKey(diaryKey || '') ? 26 : 20,
+  fontSize: 20,
   lineHeight: 1,
   flexShrink: 0,
   boxShadow: `0 2px 10px ${color}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
@@ -251,7 +250,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-      {icon && <span style={{ fontSize: icon === '⚖️' ? 22 : 18, display: 'inline-block', transform: icon === '⚖️' ? 'scale(1.12)' : undefined, lineHeight: 1 }}>{icon}</span>}
+      {icon && <span style={{ fontSize: 18, display: 'inline-block', lineHeight: 1 }}>{icon}</span>}
       <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</h3>
       {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 6, background: `${color}33`, color }}>{badge}</span>}
     </div>
@@ -338,11 +337,11 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
               background: `radial-gradient(120% 120% at 30% 20%, ${meta.color}22, ${meta.color}10 55%, transparent 75%)`,
               border: `1px solid ${meta.color}2a`,
               boxShadow: `0 8px 24px ${meta.color}18, inset 0 1px 0 rgba(255,255,255,0.06)`,
-              fontSize: isWeightDiaryKey(diaryKey) ? 40 : 32,
+              fontSize: 32,
               lineHeight: 1,
             }}
           >
-            <span style={isWeightDiaryKey(diaryKey) ? { transform: 'scale(1.18)', display: 'inline-block', transformOrigin: 'center' } : undefined}>{meta.icon}</span>
+            <span style={{ display: 'inline-block', lineHeight: 1 }}>{meta.icon}</span>
           </div>
           <div style={{ textAlign: 'center', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{meta.title}</div>
@@ -442,7 +441,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div aria-hidden="true" style={iconBadge(meta.color, diaryKey)}>
-              <span style={isWeightDiaryKey(diaryKey) ? { transform: 'scale(1.08)', display: 'inline-block' } : undefined}>{meta.icon}</span>
+              <span style={{ display: 'inline-block', lineHeight: 1 }}>{meta.icon}</span>
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
@@ -468,7 +467,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
               </div>
             </div>
             <div style={{ flexShrink: 0 }}>
-              <span style={{ fontSize: isWeightDiaryKey(diaryKey) ? 21 : 18, display: 'inline-block', transform: isWeightDiaryKey(diaryKey) ? 'scale(1.08)' : undefined, lineHeight: 1 }}>{meta.icon}</span>
+              <span style={{ fontSize: 18, display: 'inline-block', lineHeight: 1 }}>{meta.icon}</span>
             </div>
           </div>
 

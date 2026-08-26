@@ -994,7 +994,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     >
       <DiaryHeader
         accent="#34c759"
-        title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 22, lineHeight: 1, display: 'inline-block', transform: 'scale(1.18)' }}>⚖️</span> Вес и замеры</span>}
+        title="⚖️ Вес и замеры"
         count={rows.length}
         countLabel="записей"
         onClose={onClose}
@@ -1031,7 +1031,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         {rows.length === 0 && (
           <div style={{ ...card, marginTop: 12 }}>
             <div style={{ textAlign: 'center', padding: '30px 12px' }}>
-              <div style={{ fontSize: 42, marginBottom: 10, lineHeight: 1, transform: 'scale(1.12)', display: 'inline-block' }}>⚖️</div>
+              <div style={{ fontSize: 32, marginBottom: 10, lineHeight: 1, display: 'inline-block' }}>⚖️</div>
               <b style={{ fontSize: 15, letterSpacing: '-0.2px' }}>Пока нет записей веса</b>
               <p style={{ color: c.text3, fontSize: 12, margin: '6px 0 16px' }}>
                 Добавьте первую запись — через «+ Добавить» или быстрый ввод ниже
