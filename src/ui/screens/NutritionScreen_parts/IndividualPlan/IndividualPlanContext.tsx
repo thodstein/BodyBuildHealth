@@ -3539,16 +3539,77 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (day.totals) day.totals = day.meals.reduce((acc: any, m: any) => ({ kcal: acc.kcal + (m.totals?.kcal||0), p: acc.p + (m.totals?.p||0), f: acc.f + (m.totals?.f||0), c: acc.c + (m.totals?.c||0), fiber: acc.fiber + (m.totals?.fiber||0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
       return day;
     };
-    const d1 = snapDayMeals(buildDay(dayIdx, effIsTrainingDay(dayIdx)));
+    const _classicApplyRecipesWeekRef: { fn: ((d: any) => any) | null } = { fn: null };
+    let d1 = snapDayMeals(buildDay(dayIdx, effIsTrainingDay(dayIdx)));
     // P1-fix: строим d2/d3 только при days>=3 (раньше строились всегда, тратя CPU
     // и загрязняя usedFoodIds для 1-дневного плана).
     await maybeYield();
-    const d2 = days >= 3 ? buildDay(1, effIsTrainingDay(1)) : null;
+    let d2 = days >= 3 ? buildDay(1, effIsTrainingDay(1)) : null;
     await maybeYield();
-    const d3 = days >= 3 ? buildDay(2, effIsTrainingDay(2)) : null;
+    let d3 = days >= 3 ? buildDay(2, effIsTrainingDay(2)) : null;
+    // 🍳 Рецепты в simple/minimal/classic: чипы-подсказки + полноценный режим «по рецептам»
+    // (та же чистая assembleRecipeDay — день пересобирается из рецептов с ребалансом ±3%)
+    {
+      const _genR = generationModeRef.current === 'recipes';
+      const _poolAll = [...getRecipes(), ...(userRecipes || [])];
+      if (_poolAll.length > 0 && (useRecipesInPlan || _genR)) {
+        try {
+          const _profC = cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking });
+          const _budgetC = prepTimeBudgetPerMeal(_profC, mealsCount);
+          const _poolF = filterByCookSkill(_poolAll, _profC.skill);
+          const _classicUsed = new Set<string>();
+          const _matchFor = (m: any) => {
+            const tgt = m.target || { p: m.totals?.p ?? 30, c: m.totals?.c ?? 40, f: m.totals?.f ?? 15 };
+            return {
+              mealType: mealTypeFromLabel(m.label),
+              targetKcal: m.totals?.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300,
+              targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
+              excludedIds,
+              cookProfile: _profC, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _budgetC,
+              preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
+              goal: goal === 'cutting' || goal === 'fat_loss' ? 'cut' : goal === 'maintenance' ? 'maintenance' : 'mass',
+            } as any;
+          };
+          const applyRecipesClassic = (day: any): any => {
+            if (!day?.meals?.length) return day;
+            if (_genR) {
+              const asm = assembleRecipeDay({
+                meals: day.meals, pool: _poolF,
+                targets: {
+                  kcal: effectiveKcal > 0 ? effectiveKcal : (day.totals?.kcal || 0),
+                  p: effectiveP > 0 ? effectiveP : (day.totals?.p || 0),
+                  f: effectiveF > 0 ? effectiveF : (day.totals?.f || 0),
+                  c: effectiveC > 0 ? effectiveC : (day.totals?.c || 0),
+                },
+                excludedIds, cookProfile: _profC, maxPrepTimeMin: _budgetC,
+                isVegetarian: dietPrefs.includes('vegetarian'),
+                preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
+                usedNamesAcrossDays: _classicUsed,
+                goal: goal === 'cutting' || goal === 'fat_loss' ? 'cut' : goal === 'maintenance' ? 'maintenance' : 'mass',
+              });
+              return { ...day, meals: asm.meals as any[], totals: sumDayTotals(asm.meals as any), proNotes: [...(day.proNotes || []), ...asm.notes] };
+            }
+            // чипы-подсказки к каждому приёму
+            const meals2 = day.meals.map((m: any) => {
+              const sugg = pickRecipeOptions(_poolF, _matchFor(m), 3, new Set<string>());
+              if (sugg.length === 0) return m;
+              return { ...m, recipeSuggestions: sugg.map(r => ({ name: r.name, kcal: r.kcal, protein: r.protein, fat: r.fat, carbs: r.carbs, prepTimeMin: r.prepTimeMin, usefulness: r.usefulness, description: r.description, ingredients: r.ingredients, instructions: r.instructions, tags: r.tags })) };
+            });
+            return { ...day, meals: meals2 };
+          };
+          d1 = applyRecipesClassic(d1);
+          if (d2) d2 = applyRecipesClassic(d2);
+          if (d3) d3 = applyRecipesClassic(d3);
+          // недели обрабатываются ниже после периодизации
+          _classicApplyRecipesWeekRef.fn = applyRecipesClassic;
+        } catch (e) { try { console.warn('[Planner] classic recipes attach failed:', e); } catch {} }
+      }
+    }
     setDayPlan(d1);
     if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
     let weekDays: any[] | null = null;
+    let _classicApplyRecipesWeek: ((d: any) => any) | null = null;
+    _classicApplyRecipesWeek = _classicApplyRecipesWeekRef.fn;
     if (days >= 7) {
       // FIX train-bind: смещение месяца (см. V2-путь) — плавающий график не рвётся на границе недель
       const _weekBase = weekIndex !== undefined ? weekIndex * 7 : 0;
@@ -3566,7 +3627,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           weekDays = weekDays.map((d: any) => ({ ...d, meals: (Array.isArray(d?.meals) ? d.meals : []).map((m: any) => ({ ...m, items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({ ...it, amount: Math.round((it.amount || 0) * 0.8), kcal: Math.round((it.kcal || 0) * 0.8), p: Math.round((it.p || 0) * 0.8), f: Math.round((it.f || 0) * 0.8), c: Math.round((it.c || 0) * 0.8) })) })), totals: { kcal: Math.round((d?.totals?.kcal || 0) * 0.8), p: Math.round((d?.totals?.p || 0) * 0.8), f: Math.round((d?.totals?.f || 0) * 0.8), c: Math.round((d?.totals?.c || 0) * 0.8) } }));
         }
       }
-      const weekData = { days: weekDays, totals: { kcal: weekDays.reduce((s: any,d: any) => s + (d?.totals?.kcal || 0), 0), p: weekDays.reduce((s: any,d: any) => s + (d?.totals?.p || 0), 0), f: weekDays.reduce((s: any,d: any) => s + (d?.totals?.f || 0), 0), c: weekDays.reduce((s: any,d: any) => s + (d?.totals?.c || 0), 0), fiber: weekDays.reduce((s: any,d: any) => s + (d?.totals?.fiber||0), 0) }};
+      const weekData = (() => {
+        // 🍳 рецепты и в неделях classic-пути (+ синк weekDays для закупок)
+        try { if (weekDays && _classicApplyRecipesWeekRef.fn) { weekDays = weekDays.map((d: any) => _classicApplyRecipesWeekRef.fn!(d)); } } catch {}
+        const wd = weekDays || [];
+        return { days: wd, totals: { kcal: wd.reduce((s: any,d: any) => s + (d?.totals?.kcal || 0), 0), p: wd.reduce((s: any,d: any) => s + (d?.totals?.p || 0), 0), f: wd.reduce((s: any,d: any) => s + (d?.totals?.f || 0), 0), c: wd.reduce((s: any,d: any) => s + (d?.totals?.c || 0), 0), fiber: wd.reduce((s: any,d: any) => s + (d?.totals?.fiber||0), 0) } };
+      })();
       if (weekIndex !== undefined) { setMonthPlan(prev => { const next = [...prev]; next[weekIndex] = weekData; return next; }); }
       else setWeekPlan(weekData);
      }
@@ -3612,7 +3678,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setWaterCalc({ baseWater: Math.round(baseWater * 10) / 10, pharmaBaseMl: Math.round(pharmaBaseMl), trainBonus, fiberFactor, pharmaBonus, total: waterTotal, hasPharma, electrolytes });
     setGenerated(true);
     try { setPlanTab('plan'); } catch {}
-    setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    setTimeout(() => { try { if (resultsRef.current && typeof resultsRef.current.scrollIntoView === 'function') resultsRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {} }, 100);
     } catch (e: any) {
       const message = e?.message || String(e) || 'Ошибка генерации плана. Проверьте введённые данные.';
       console.error('[PlanGen] Error:', e);

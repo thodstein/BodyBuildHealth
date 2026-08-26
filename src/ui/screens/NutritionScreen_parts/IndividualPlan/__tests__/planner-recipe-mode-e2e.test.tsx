@@ -92,4 +92,32 @@ describe('режим «по рецептам»: E2E', () => {
       expect(bodyHas(/Выбрать/)).toBe(true);
     }
   }, 90000);
+
+  it('⚡ Быстрый режим: чипы-подсказки работают, применение из пикера пересобирает день', async () => {
+    try { localStorage.setItem('he_planner_mode', 'minimal'); localStorage.removeItem('he_planner_gen_mode'); } catch {}
+    render(<IndividualPlan profile={null} course={[]} labs={[]} labAnalysis={null} />);
+    // переключить режим на «Быстрый» если сохранение не применилось до монтирования
+    const fastBtn = Array.from(document.querySelectorAll<HTMLElement>('button')).find(b => (b.textContent || '').includes('Быстрый'));
+    if (fastBtn) fireEvent.click(fastBtn);
+    // simple/minimal имеют свой экран генерации
+    clickBtn(/Рассчитать и создать рацион/);
+    await waitFor(() => { expect(bodyHas(/Рецепты для этого приёма/)).toBe(true); }, { timeout: 30000 });
+    const openPicker = Array.from(document.querySelectorAll<HTMLElement>('button'))
+      .find(b => (b.textContent || '').includes('Заменить приём этим рецептом'));
+    if (!openPicker) throw new Error('«Заменить приём этим рецептом» not found');
+    fireEvent.click(openPicker);
+    await waitFor(() => { expect(bodyHas(/Заменить «.*» рецептом/)).toBe(true); }, { timeout: 8000 });
+    const recipeBtn = Array.from(document.querySelectorAll<HTMLElement>('button'))
+      .find(b => /Б\d+(\.\d+)?\/Ж\d+(\.\d+)?\/У\d+/.test(b.textContent || ''));
+    if (!recipeBtn) throw new Error('recipe button not found');
+    fireEvent.click(recipeBtn);
+    await waitFor(() => {
+      let applied = false;
+      try {
+        const dp = JSON.parse(localStorage.getItem('he_day_plan') || 'null');
+        applied = !!dp?.meals?.some((m: any) => m.recipeApplied);
+      } catch {}
+      expect(applied).toBe(true);
+    }, { timeout: 8000 });
+  }, 90000);
 });
