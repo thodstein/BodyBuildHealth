@@ -120,6 +120,9 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const [draft, setDraft, resetDraft] = useDiaryDraft<BPForm>('he_draft_bp_inline', defaultDraft);
   const [editing, setEditing] = useState<string | null>(null);
   const [modal, setModal] = useState(false);
+  const [sessionMode, setSessionMode] = useState(false);
+  const [s2, setS2] = useState(''); const [d2, setD2] = useState(''); const [p2, setP2] = useState('');
+  const [s3, setS3] = useState(''); const [d3, setD3] = useState(''); const [p3, setP3] = useState('');
   const [undo, setUndo] = useState<BPEntry[] | null>(null);
   const [range, setRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [query, setQuery] = useState('');
@@ -150,14 +153,36 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
     setEditing(null);
     resetDraft(defaultDraft());
     setValidationErrors([]);
+    setSessionMode(false); setS2(''); setD2(''); setP2(''); setS3(''); setD3(''); setP3('');
     setModal(true);
   };
 
   const save = () => {
-    const s = Number(draft.systolic), d = Number(draft.diastolic), p = Number(draft.pulse);
+    // Сессионное среднее: если включен режим 2-3 замера, усредняем валидные показания (ESC: 2-3 замера за раз)
+    let sRaw = Number(draft.systolic), dRaw = Number(draft.diastolic), pRaw = Number(draft.pulse);
+    let sessionNote = '';
+    if (sessionMode) {
+      const readings: { s: number; d: number; p: number }[] = [];
+      if (Number.isFinite(sRaw) && Number.isFinite(dRaw) && Number.isFinite(pRaw)) readings.push({ s: sRaw, d: dRaw, p: pRaw });
+      const s2n = Number(s2), d2n = Number(d2), p2n = Number(p2);
+      if (s2.trim() && d2.trim() && p2.trim() && Number.isFinite(s2n) && Number.isFinite(d2n) && Number.isFinite(p2n)) readings.push({ s: s2n, d: d2n, p: p2n });
+      const s3n = Number(s3), d3n = Number(d3), p3n = Number(p3);
+      if (s3.trim() && d3.trim() && p3.trim() && Number.isFinite(s3n) && Number.isFinite(d3n) && Number.isFinite(p3n)) readings.push({ s: s3n, d: d3n, p: p3n });
+      if (readings.length >= 2) {
+        sRaw = Math.round(readings.reduce((a, r) => a + r.s, 0) / readings.length);
+        dRaw = Math.round(readings.reduce((a, r) => a + r.d, 0) / readings.length);
+        pRaw = Math.round(readings.reduce((a, r) => a + r.p, 0) / readings.length);
+        sessionNote = `Сессия ${readings.length} замера: ${readings.map(r => `${r.s}/${r.d} ${r.p}уд`).join(' · ')}`;
+      } else if (readings.length === 1 && (s2.trim() || d2.trim() || p2.trim())) {
+        setValidationErrors([{ field: 'systolic', message: 'Заполните 2-й замер полностью (систола/диастола/пульс) или выключите сессию' }]);
+        return;
+      }
+    }
+    const s = sRaw, d = dRaw, p = pRaw;
     const errors = validateBpEntry(s, d, p, draft.date);
     if (errors.length) { setValidationErrors(errors); return; }
     setValidationErrors([]);
+    const noteCombined = [draft.notes?.trim(), sessionNote].filter(Boolean).join(' · ');
     const entry: BPEntry = {
       id: editing || generateEntryId(),
       date: draft.date, systolic: Math.round(s), diastolic: Math.round(d), hr: Math.round(p),
@@ -165,12 +190,13 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
       position: draft.position, arm: draft.arm, timeOfDay: draft.timeOfDay,
       medicationTaken: draft.medicationTaken,
       symptoms: draft.selectedSymptoms,
-      notes: draft.notes?.trim() || undefined,
+      notes: noteCombined || undefined,
     };
     commit(editing
       ? rows.map(x => x.id === editing ? entry : x)
       : sortEntriesByTimestamp([entry, ...rows]));
     setModal(false); setEditing(null);
+    setSessionMode(false); setS2(''); setD2(''); setP2(''); setS3(''); setD3(''); setP3('');
     resetDraft(defaultDraft());
   };
 
@@ -178,6 +204,7 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
     setEditing(x.id || '');
     resetDraft({ ...defaultDraft(), ...x, systolic: String(x.systolic), diastolic: String(x.diastolic), pulse: String(x.hr), selectedSymptoms: x.symptoms || [] });
     setValidationErrors([]);
+    setSessionMode(false); setS2(''); setD2(''); setP2(''); setS3(''); setD3(''); setP3('');
     setModal(true);
   };
 
@@ -1002,6 +1029,41 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
                 </label>
               ))}
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, cursor: 'pointer', fontSize: 13 }}>
+              <input type="checkbox" checked={sessionMode} onChange={e => setSessionMode(e.target.checked)} style={{ accentColor: ACCENT }} />
+              <span style={{ fontWeight: 700, color: sessionMode ? '#f87171' : colors.textMuted }}>Сессия 2-3 замера (усреднение)</span>
+              <span style={{ fontSize: 11, color: colors.textMuted }}>ESC: 2-3 измерения → среднее</span>
+            </label>
+            {sessionMode && (
+              <div style={{ marginTop: 8, padding: 10, borderRadius: 12, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', marginBottom: 8 }}>Дополнительные замеры (через 1-2 мин)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+                  <input style={input} placeholder="Систола 2" value={s2} onChange={e=>setS2(e.target.value)} inputMode="numeric" />
+                  <input style={input} placeholder="Диастола 2" value={d2} onChange={e=>setD2(e.target.value)} inputMode="numeric" />
+                  <input style={input} placeholder="Пульс 2" value={p2} onChange={e=>setP2(e.target.value)} inputMode="numeric" />
+                  <input style={input} placeholder="Систола 3 (опц.)" value={s3} onChange={e=>setS3(e.target.value)} inputMode="numeric" />
+                  <input style={input} placeholder="Диастола 3" value={d3} onChange={e=>setD3(e.target.value)} inputMode="numeric" />
+                  <input style={input} placeholder="Пульс 3" value={p3} onChange={e=>setP3(e.target.value)} inputMode="numeric" />
+                </div>
+                {(() => {
+                  const readings:{s:number;d:number;p:number}[]=[];
+                  const sRaw=Number(draft.systolic), dRaw=Number(draft.diastolic), pRaw=Number(draft.pulse);
+                  if (Number.isFinite(sRaw)&&Number.isFinite(dRaw)&&Number.isFinite(pRaw)) readings.push({s:sRaw,d:dRaw,p:pRaw});
+                  const s2n=Number(s2), d2n=Number(d2), p2n=Number(p2);
+                  if (s2.trim()&&d2.trim()&&p2.trim()&&Number.isFinite(s2n)&&Number.isFinite(d2n)&&Number.isFinite(p2n)) readings.push({s:s2n,d:d2n,p:p2n});
+                  const s3n=Number(s3), d3n=Number(d3), p3n=Number(p3);
+                  if (s3.trim()&&d3.trim()&&p3.trim()&&Number.isFinite(s3n)&&Number.isFinite(d3n)&&Number.isFinite(p3n)) readings.push({s:s3n,d:d3n,p:p3n});
+                  if (readings.length>=2) {
+                    const avgS=Math.round(readings.reduce((a,r)=>a+r.s,0)/readings.length);
+                    const avgD=Math.round(readings.reduce((a,r)=>a+r.d,0)/readings.length);
+                    const avgP=Math.round(readings.reduce((a,r)=>a+r.p,0)/readings.length);
+                    return <div style={{ marginTop: 8, fontSize: 12, color: '#f87171', fontWeight: 700 }}>Среднее сессии: {avgS}/{avgD} · {avgP} уд/мин · {readings.length} замера</div>;
+                  }
+                  return null;
+                })()}
+                <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>ESC/ISH: 2-3 замера подряд с интервалом 1-2 мин, в анализ идёт среднее.</div>
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
               <label>Положение
                 <select style={input} value={draft.position as string} onChange={e => setDraft({ ...draft, position: e.target.value })}>
