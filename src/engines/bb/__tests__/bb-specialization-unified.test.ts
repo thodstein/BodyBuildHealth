@@ -162,8 +162,10 @@ describe('generic buildBBPlan: единая модель', () => {
       goal: 'mass', weeks: 1, workMax: WM,
       weakPoints: ['shoulders'], specialization: true,
     });
-    // Целевой объём плеч: ×1.2 (2 зоны) > ×1.1 (1 зона).
-    expect(twoZones.rotationMuscleVolume['shoulders']).toBeGreaterThan(oneZone.rotationMuscleVolume['shoulders']);
+    // Целевой объём плеч: ×1.2 (2 зоны) > ×1.1 (1 зона). Для PPL плечи разделены на пучки.
+    const twoVol = (twoZones.rotationMuscleVolume['shoulders'] ?? ((twoZones.rotationMuscleVolume['delt_mid'] || 0) + (twoZones.rotationMuscleVolume['delt_rear'] || 0)));
+    const oneVol = (oneZone.rotationMuscleVolume['shoulders'] ?? ((oneZone.rotationMuscleVolume['delt_mid'] || 0) + (oneZone.rotationMuscleVolume['delt_rear'] || 0)));
+    expect(twoVol).toBeGreaterThan(oneVol);
     // Не-цели не меняются от выбора зон — объёмная модель стабильна.
     expect(twoZones.rotationMuscleVolume['quads']).toBe(oneZone.rotationMuscleVolume['quads']);
     expect(twoZones.rotationMuscleVolume['back']).toBe(oneZone.rotationMuscleVolume['back']);

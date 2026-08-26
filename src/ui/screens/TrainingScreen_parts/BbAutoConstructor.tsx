@@ -3073,7 +3073,7 @@ export const BbAutoConstructor: React.FC = () => {
         {(() => {
           const vol = builtPlan.rotationMuscleVolume || {};
           const lm = builtPlan.volumeLandmarks || [];
-          const MUSCLE_RU_H: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', quads: 'Квадр', hamstrings: 'Бицепс б', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предпл', abs: 'Пресс', traps: 'Трапец' };
+          const MUSCLE_RU_H: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', delt_front: 'Передняя дельта', delt_mid: 'Средняя дельта', delt_rear: 'Задняя дельта', quads: 'Квадр', hamstrings: 'Бицепс б', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предпл', abs: 'Пресс', traps: 'Трапец' };
           const muscles = Object.keys(vol).filter(m => MUSCLE_RU_H[m]);
           if (muscles.length === 0) return null;
           // Color: green (MEV) → yellow (MAV) → red (MRV)

@@ -10,9 +10,6 @@ import { trueMuscleOf } from '../movement-pattern';
 export type BBVolumeKind = 'direct' | 'effective';
 
 const ALIASES: Record<string, string> = {
-  delt_front: 'shoulders',
-  delt_mid: 'shoulders',
-  delt_rear: 'shoulders',
   delts: 'shoulders',
   arms: 'arms',
   legs: 'legs',
@@ -364,8 +361,16 @@ export function exerciseVolumeContributions(exercise: BBExerciseVolumeLike): BBV
   if ((exercise as any).warmupActivator) return [];
   const sets = setCount(exercise);
   if (!sets) return [];
-  const direct = normalizeBBMuscle(exercise.muscle || trueMuscleOf(exercise as any));
+  let direct = normalizeBBMuscle(exercise.muscle || trueMuscleOf(exercise as any));
   if (!direct) return [];
+  // PPL fix: shoulders volume per head, not summed as shoulders
+  if (direct === 'shoulders') {
+    const nm = String((exercise as any).name || '').toLowerCase();
+    if (/задн|rear|обратн|лиц.*тяга|face.*pull/i.test(nm)) direct = 'delt_rear';
+    else if (/жим|press|армей|overhead|военный/i.test(nm) && !/мах|lateral|отведен/i.test(nm)) direct = 'delt_front';
+    else if (/мах|lateral|отведен|raise|подъем/i.test(nm)) direct = 'delt_mid';
+    // else keep as shoulders (unlikely)
+  }
   const rir = Math.max(0, Math.min(5, Number(exercise.rir ?? 2)));
   const fatigueWeight = 1 + Math.max(0, 2 - rir) * 0.2;
   const result: BBVolumeContribution[] = [{

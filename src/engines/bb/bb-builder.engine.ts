@@ -464,10 +464,18 @@ export interface BBPlan {
 export function getBBVolumeLandmarks(plan: BBPlan, level: string, pedMrvMult = 1): VolumeLandmarkRow[] {
   let peakIdx = 0, peakTotal = -1;
   const weekGroups: Record<number, Record<string, number>> = {};
+  const shoulderHead = (ex: any): string => {
+    if (ex.muscle !== 'shoulders') return collapseKey(ex.muscle);
+    const nm = String(ex.name || '').toLowerCase();
+    if (/задн|rear|обратн|лиц.*тяга|face.*pull/i.test(nm)) return 'delt_rear';
+    if (/жим|press|армей|overhead|военный/i.test(nm) && !/мах|lateral|отведен/i.test(nm)) return 'delt_front';
+    if (/мах|lateral|отведен|raise|подъем/i.test(nm)) return 'delt_mid';
+    return 'delt_mid';
+  };
   plan.weeks.forEach((wk, i) => {
     const g: Record<string, number> = {};
     for (const s of wk.sessions) for (const ex of s.exercises) {
-      const ck = collapseKey(ex.muscle);
+      const ck = ex.muscle === 'shoulders' ? shoulderHead(ex) : collapseKey(ex.muscle);
       g[ck] = (g[ck] || 0) + (ex.sets || 0);
     }
     weekGroups[i] = g;
@@ -760,14 +768,15 @@ function musclesForTag(tag?: string): string[] {
   return [];
 }
 /** fix Z: ключ коллапса для дедупликации.
- *  delt_front/mid/rear — три пучка одной мышцы (shoulders), один пул упражнений →
- *  обрабатываем ОДИН раз как 'shoulders'. Остальные PRO-ключи остаются как есть
- *  (calves/glutes/forearms имеют собственные landmark-записи).
  *  P0-2 (audit 2026-08): гранулярные слабые группы (chest_upper, chest_lower,
  *  back_width, back_thickness) коллапсируются к канонической мышце, чтобы
- *  landmarksForRotation нашёл запись и объём планировался корректно. */
+ *  landmarksForRotation нашёл запись и объём планировался корректно.
+ *  ВАЖНО для PPL: delt_front/mid/rear — три пучка плеч идут раздельно:
+ *  Push → передняя+средняя, Pull → задняя. Для PPL не схлопываем их в shoulders,
+ *  считаем каждый пучок отдельно (2×/нед каждый), иначе shoulders 4× вместо 2+2. */
 function collapseKey(muscle: string): string {
-  if (muscle === 'delt_front' || muscle === 'delt_mid' || muscle === 'delt_rear') return 'shoulders';
+  // Для PPL и вообще — дельтовидные пучки считаем отдельно, у них свои landmarks и частота
+  if (muscle === 'delt_front' || muscle === 'delt_mid' || muscle === 'delt_rear') return muscle;
   // P0-2: гранулярные группы → канонические мышцы
   const canonical = WEAK_TO_MUSCLE[muscle];
   if (canonical && canonical !== muscle) return canonical;
@@ -2710,18 +2719,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     ? Math.max(14, Math.min(22, Math.round(8 + maxGroupsPerSession * 3)))
     : Math.max(10, Math.min(16, Math.round(8 + maxGroupsPerSession * 2)));
 
-  // fix Z + BUG-B5: muscleSessionCount ключом является collapseKey (delt heads→shoulders, остальные как есть).
-  // BUG-B5 РАНЬШЕ: musclesForTag('Push') = [chest, delt_front, delt_mid, triceps] →
-  //   delt_front И delt_mid оба → shoulders += 2 (вместо 1 за сессию).
-  //   PPL: 2 Push × 2 delt + 2 Pull × 1 delt_rear = shoulders = 6 (вместо реальных 2×/нед).
-  // ФИКС: подсчёт ведём по Set<collapseKey> per-session → каждая мышца считается 1 раз за сессию.
+  // fix Z + BUG-B5 + PPL shoulder split: muscleSessionCount ключом является collapseKey,
+  // но для PPL плечи идут раздельно: Push → передняя+средняя (delt_front/delt_mid), Pull → задняя (delt_rear).
+  // Поэтому для PPL не схлопываем delt_* в shoulders, считаем каждый пучок отдельно:
+  // PPL 6× (2×Push + 2×Pull) → delt_front 2×, delt_mid 2×, delt_rear 2×, а не shoulders 4×.
+  const isPPL = pattern.id.toLowerCase().includes('ppl');
+  const collapseForCount = (m: string): string => (isPPL && m.startsWith('delt_') ? m : collapseKey(m));
   const muscleSessionCount: Record<string, number> = {};
   for (const s of sessions) {
     const seenThisSession = new Set<string>();
     for (const m of musclesForTag(s.sessionTag)) {
-      const ck = collapseKey(m);
+      const ck = collapseForCount(m);
       if (excludedMuscles.has(m)) continue;
-      if (seenThisSession.has(ck)) continue; // дедуп внутри одной сессии
+      if (seenThisSession.has(ck)) continue; // дедуп внутри одной сессии (для не-PPL схлопывает фрон+мид)
       seenThisSession.add(ck);
       muscleSessionCount[ck] = (muscleSessionCount[ck] || 0) + 1;
     }
@@ -2780,8 +2790,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // без стэкинга 1.1×1.3). Цели блока: MAV × (1.0 + 0.1×зон) — одна зона
       // ×1.1, две зоны одной мышцы (delt_mid+delt_rear) ×1.2. Остальные:
       // поддерживающий объём MEV (перераспределение «volume bucket»).
+      // Для PPL дельты считаем по канонической группе (shoulders), чтобы 2 пучка дали ×1.2 каждому.
       if (res.focus && m === canonicalMuscle(res.focus)) return lm.mav;
-      const heads = res.targets.filter(t => canonicalMuscle(t) === m).length;
+      const canonicalM = canonicalMuscle(m);
+      const heads = res.targets.filter(t => canonicalMuscle(t) === canonicalM).length;
       if (heads > 0) return Math.round(lm.mav * Math.min(1.3, 1.0 + 0.1 * heads));
       return lm.mev;
     }

@@ -52,9 +52,17 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
     return ts > best.ts ? { ts, i } : best;
   }, { ts: -1, i: 0 }).i;
   const sessions = (weekIdx >= 0 ? plan.weeks[weekIdx] : plan.weeks[0])?.sessions || [];
+  const shoulderHead = (ex: any): string => {
+    if (ex.muscle !== 'shoulders') return normalizeBBMuscle(ex.muscle);
+    const nm = String(ex.name || '').toLowerCase();
+    if (/задн|rear|обратн|лиц.*тяга|face.*pull/i.test(nm)) return 'delt_rear';
+    if (/жим|press|армей|overhead|военный/i.test(nm) && !/мах|lateral|отведен/i.test(nm)) return 'delt_front';
+    if (/мах|lateral|отведен|raise|подъем/i.test(nm)) return 'delt_mid';
+    return 'delt_mid';
+  };
   for (const s of sessions) {
     for (const ex of s.exercises) {
-      const m = normalizeBBMuscle(ex.muscle);
+      const m = shoulderHead(ex);
       const a = agg[m] || (agg[m] = { total: 0, тяж: 0, памп: 0, лёг: 0, hard: 0, rirSum: 0, rirN: 0, freq: 0 });
       a.total += ex.sets;
       if (ex.character === 'тяж') a.тяж += ex.sets;
@@ -75,7 +83,7 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   const totalWeeks = plan.weeks.length || 1;
   for (const w of plan.weeks) {
     for (const s of w.sessions) {
-      const musclesInSession = new Set(s.exercises.map(ex => normalizeBBMuscle(ex.muscle)));
+      const musclesInSession = new Set(s.exercises.map(ex => shoulderHead(ex as any)));
       for (const muscle of musclesInSession) freqMapAll[muscle] = (freqMapAll[muscle] || 0) + 1;
     }
   }
