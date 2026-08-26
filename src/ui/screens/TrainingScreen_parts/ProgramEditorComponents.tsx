@@ -992,8 +992,17 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
           <div className="editor-empty-exercises__title">Шаг 3: добавьте первое упражнение</div>
           <div className="editor-empty-exercises__text">Выберите группу мышц карточкой ниже — подберём упражнения под ваш зал, уровень и травмы. Карточка подсвечивается при выборе.</div>
           <div className="editor-card-grid">
-            {Object.entries(GROUP_RU).map(([key, label]) => {
+            {(() => {
+              let weak: string[] = [];
+              try { weak = (loadTrainingProfile().weakPoints ?? []) as string[]; } catch {}
+              const entries = Object.entries(GROUP_RU).sort((a,b) => {
+                const aw = weak.includes(a[0]) ? 0 : 1;
+                const bw = weak.includes(b[0]) ? 0 : 1;
+                return aw - bw;
+              });
+              return entries.map(([key, label]) => {
               const active = quickGroup === key;
+              const isWeak = weak.includes(key);
               const iconMap: Record<string, string> = { chest: '💪', back: '🦍', legs: '🦵', shoulders: '🏋️', arms: '💥', core: '🧱', quads: '🦵', hamstrings: '🦵', glutes: '🍑', calves: '🦶', biceps: '💪', triceps: '💪', abs: '🧱', traps: '🏔️', forearms: '🤝' };
               const hintMap: Record<string, string> = { chest: 'жим + разведения', back: 'тяги верт./гориз.', legs: 'присед + тяга', shoulders: 'жимы + махи', arms: 'бицепс/трицепс', core: 'планки/скручивания' };
               return (
@@ -1003,13 +1012,14 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
                 aria-label={`Быстрое добавление: ${label}`}
                 aria-pressed={active}
                 className="editor-action-card"
-                style={active ? CARD_BTN_ACTIVE : CARD_BTN}
+                style={active ? CARD_BTN_ACTIVE : isWeak ? { ...CARD_BTN, border: '1px solid rgba(167,139,250,0.30)', background: 'linear-gradient(180deg, rgba(167,139,250,0.12), rgba(255,255,255,0.02))' } : CARD_BTN}
               >
                 <span style={{ fontSize: 16 }}>{iconMap[key] ?? '🎯'}</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: active ? '#00e68a' : '#fff' }}>{label}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: active ? '#00e68a' : isWeak ? '#a78bfa' : '#fff', display: 'flex', alignItems: 'center', gap: 4 }}>{label}{isWeak && <span style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', background: 'rgba(167,139,250,0.14)', border: '1px solid rgba(167,139,250,0.22)', borderRadius: 6, padding: '1px 5px' }}>слабое</span>}</span>
                 <span style={{ fontSize: 10, color: active ? 'rgba(0,230,138,0.85)' : 'rgba(255,255,255,0.55)', lineHeight: 1.2 }}>{hintMap[key] ?? 'изоляция + база'}</span>
               </button>
-            ); })}
+            ); });
+            })()}
           </div>
           {quickGroup && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: 8, borderRadius: 10, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.15)', alignItems: 'stretch' }}>
@@ -1045,8 +1055,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
               <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)' }}>нажмите карточку — покажем упражнения</span>
             </div>
             <div className="editor-card-grid">
-              {Object.entries(GROUP_RU).map(([key, label]) => {
+              {(() => {
+                let weak: string[] = [];
+                try { weak = (loadTrainingProfile().weakPoints ?? []) as string[]; } catch {}
+                const entries = Object.entries(GROUP_RU).sort((a,b) => (weak.includes(a[0])?0:1) - (weak.includes(b[0])?0:1));
+                return entries.map(([key, label]) => {
                 const active = quickGroup === key;
+                const isWeak = weak.includes(key);
                 const iconMap: Record<string, string> = { chest: '💪', back: '🦍', legs: '🦵', shoulders: '🏋️', arms: '💥', core: '🧱', quads: '🦵', hamstrings: '🦵', glutes: '🍑', calves: '🦶', biceps: '💪', triceps: '💪', abs: '🧱', traps: '🏔️', forearms: '🤝' };
                 return (
                 <button
@@ -1054,13 +1069,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
                   onClick={() => { const nxt = quickGroup === key ? null : key; setQuickGroup(nxt); setQuickSearch(''); }}
                   aria-label={`Быстрое добавление: ${label}`}
                   aria-pressed={active}
-                  title={`Показать упражнения для ${label}`}
+                  title={`Показать упражнения для ${label}${isWeak ? ' · слабая группа — приоритет +10% объёма' : ''}`}
                   className="editor-action-card"
-                  style={active ? { ...CARD_BTN_ACTIVE, minHeight: 48, padding: '8px 10px', flexDirection: 'row', gap: 8 } : { ...CARD_BTN, minHeight: 48, padding: '8px 10px', flexDirection: 'row', gap: 8 }}>
+                  style={active ? { ...CARD_BTN_ACTIVE, minHeight: 48, padding: '8px 10px', flexDirection: 'row', gap: 8 } : isWeak ? { ...CARD_BTN, minHeight: 48, padding: '8px 10px', flexDirection: 'row', gap: 8, border: '1px solid rgba(167,139,250,0.28)', background: 'linear-gradient(180deg, rgba(167,139,250,0.10), rgba(255,255,255,0.02))' } : { ...CARD_BTN, minHeight: 48, padding: '8px 10px', flexDirection: 'row', gap: 8 }}>
                   <span style={{ fontSize: 14, flexShrink: 0 }}>{iconMap[key] ?? '🎯'}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: active ? '#00e68a' : '#fff', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: active ? '#00e68a' : isWeak ? '#a78bfa' : '#fff', whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{label}{isWeak ? ' · ★' : ''}</span>
                 </button>
-              ); })}
+              ); }); })()}
             </div>
           </div>
           {quickGroup && (
