@@ -135,13 +135,14 @@ export const ArticlesScreen: React.FC = () => {
 
   if (page === 'hero') {
     return (
-      <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', fontFamily: FONT, background:'#050508', overflow:'hidden' }}>
-        <img src="/articles-hero.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', filter:'saturate(1.08) contrast(1.04)' }} />
-        <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.32) 28%, rgba(5,5,10,0.78) 62%, #050508 92%)' }} />
-        <div style={{ position:'absolute', inset:0, background:'radial-gradient(900px 500px at 20% -10%, rgba(0,230,138,0.18), transparent 60%), radial-gradient(700px 400px at 100% 8%, rgba(59,130,246,0.14), transparent 55%)', opacity:0.9 }} />
-        {/* soft grain */}
-        <div style={{ position:'absolute', inset:0, opacity:0.04, backgroundImage:'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize:'18px 18px' }} />
-        <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'22px 16px 24px', maxWidth: 520, width:'100%', margin:'0 auto' }}>
+      <div style={{ position:'fixed', inset:0, zIndex:100, display:'flex', flexDirection:'column', fontFamily: FONT, background:'#050508', overflowY:'auto', WebkitOverflowScrolling:'touch' }}>
+        <div style={{ position:'fixed', inset:0, zIndex:0, pointerEvents:'none' }}>
+          <img src="/articles-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', filter:'saturate(1.08) contrast(1.04)', opacity:0.96 }} />
+          <div style={{ position:'absolute', inset:0, background:'linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.36) 32%, rgba(5,5,10,0.84) 66%, #050508 94%)' }} />
+          <div style={{ position:'absolute', inset:0, background:'radial-gradient(900px 500px at 20% -10%, rgba(0,230,138,0.18), transparent 60%), radial-gradient(700px 400px at 100% 8%, rgba(59,130,246,0.14), transparent 55%)', opacity:0.9 }} />
+          <div style={{ position:'absolute', inset:0, opacity:0.04, backgroundImage:'radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)', backgroundSize:'18px 18px' }} />
+        </div>
+        <div style={{ position:'relative', zIndex:1, flex:'0 0 auto', display:'flex', flexDirection:'column', justifyContent:'flex-start', padding:'28px 16px calc(20px + 72px + env(safe-area-inset-bottom,0px))', maxWidth: 520, width:'100%', margin:'0 auto', minHeight:'100dvh' }}>
           <div style={{ display:'inline-flex', alignItems:'center', gap:6, marginBottom:10 }}>
             <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'5px 12px', borderRadius:999, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.24)', color:'#00e68a', fontSize:10, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.08em', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)', boxShadow:'0 2px 14px rgba(0,230,138,0.18)' }}>
               <span style={{ width:6, height:6, borderRadius:'50%', background:'#00e68a', boxShadow:'0 0 10px rgba(0,230,138,0.9)', display:'inline-block' }} /> База знаний
@@ -185,7 +186,7 @@ export const ArticlesScreen: React.FC = () => {
   }
 
   return (
-    <div className="screen" style={{ fontFamily: FONT, paddingBottom: 0, background:'transparent' }}>
+    <div className="screen" style={{ fontFamily: FONT, paddingBottom: 'calc(20px + 72px + env(safe-area-inset-bottom,0px))', background:'transparent' }}>
       {/* premium toolbar */}
       <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0 10px', flexShrink:0, position:'sticky', top:0, zIndex:2, backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', background:'rgba(10,10,15,0.62)', margin:'-6px -6px 0', paddingLeft:6, paddingRight:6, borderBottom:'1px solid rgba(255,255,255,0.05)' }}>
         <button onClick={() => setPage('hero')} style={{

@@ -78,12 +78,13 @@ export const RiskOverview: React.FC<{
   }, [riskResult.systemBreakdown]);
 
   const Section: React.FC<{ id: string; icon: string; title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ id, icon, title, children }) => (
-    <div style={{ padding: 0, overflow: 'hidden', marginBottom: 8, borderRadius: 14, background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
-      <button onClick={() => toggle(id)} style={{ display:'flex', alignItems:'center', gap:8, width:'100%', padding:'12px 14px', cursor:'pointer', textAlign:'left', background:'transparent', border:'none', color:'var(--text)', fontSize:13, fontWeight:700 }}>
-        <span style={{ fontSize:12, transition:'transform 0.2s', transform: showSections[id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
-        <span style={{ fontSize:18 }}>{icon}</span> {title}
+    <div style={{ padding:0, overflow:'hidden', marginBottom:10, borderRadius:16, background:'rgba(20,22,30,0.42)', border:'1px solid rgba(255,255,255,0.06)', backdropFilter:'blur(10px)' }}>
+      <button onClick={() => toggle(id)} style={{ display:'flex', alignItems:'center', gap:10, width:'100%', padding:'11px 13px', cursor:'pointer', textAlign:'left', background: showSections[id]?'rgba(255,255,255,0.03)':'transparent', border:'none', color:'#fff', fontSize:12, fontWeight:800, borderBottom: showSections[id]?'1px solid rgba(255,255,255,0.06)':'none' }}>
+        <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', fontSize:10, transition:'transform 0.2s', transform: showSections[id]?'rotate(90deg)':'rotate(0deg)' }}>▶</span>
+        <span style={{ fontSize:15 }}>{icon}</span> {title}
+        <span style={{ marginLeft:'auto', fontSize:9, padding:'3px 7px', borderRadius:999, background: showSections[id]?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.06)', border:`1px solid ${showSections[id]?'rgba(0,230,138,0.18)':'rgba(255,255,255,0.08)'}`, color: showSections[id]?'#00e68a':'rgba(255,255,255,0.45)', fontWeight:700 }}>{showSections[id]?'−':'＋'}</span>
       </button>
-      {showSections[id] && <div style={{ padding:'0 14px 14px' }}>{children}</div>}
+      {showSections[id] && <div style={{ padding:'12px 12px 12px' }}>{children}</div>}
     </div>
   );
 
