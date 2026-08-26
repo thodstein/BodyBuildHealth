@@ -224,13 +224,22 @@ const InjectionEditor: React.FC<{
     dose: value.dose.trim(),
     notes: value.notes?.trim() || undefined,
   });
-  const valid = () => !!draft.date && !!draft.substance.trim() && !!draft.dose.trim();
+  const advice = getZoneTechniqueAdvice(draft.zone);
+  const overVolume = advice ? draft.volumeMl > advice.maxVolumeMl : false;
+  const waterConflict = advice?.solutionType === 'водный' && (draft.technique === 'im' || draft.technique === 'subq_oil');
+  const valid = () => !!draft.date && !!draft.substance.trim() && !!draft.dose.trim() && !overVolume;
+  const confirmIfWaterConflict = (): boolean => {
+    if (!waterConflict) return true;
+    return window.confirm(`Зона «${advice ? zoneLabel(draft.zone) : draft.zone}» — только водные растворы. Масляный в/м не рекомендуется. Всё равно сохранить?`);
+  };
   const save = () => {
     if (!valid()) return;
+    if (!confirmIfWaterConflict()) return;
     onSave(clean(draft));
   };
   const saveAndMore = () => {
     if (!valid() || !onSaveMore) return;
+    if (!confirmIfWaterConflict()) return;
     onSaveMore(clean(draft));
     setDraft((current) => ({
       ...current,
@@ -434,17 +443,19 @@ const InjectionEditor: React.FC<{
           </button>
           {onSaveMore && (
             <button
-              style={{ ...button, background: colors.primaryDim, color: colors.primary }}
+              style={{ ...button, background: colors.primaryDim, color: colors.primary, opacity: overVolume ? 0.45 : 1 }}
               onClick={saveAndMore}
-              disabled={!draft.date || !draft.substance.trim() || !draft.dose.trim()}
+              disabled={!draft.date || !draft.substance.trim() || !draft.dose.trim() || overVolume}
+              title={overVolume ? `Объём превышает максимум ${advice?.maxVolumeMl} мл для зоны` : undefined}
             >
               ➕ Сохранить и ещё
             </button>
           )}
           <button
-            style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800 }}
+            style={{ ...button, background: colors.primary, color: '#07130e', fontWeight: 800, opacity: overVolume ? 0.45 : 1 }}
             onClick={save}
-            disabled={!draft.date || !draft.substance.trim() || !draft.dose.trim()}
+            disabled={!draft.date || !draft.substance.trim() || !draft.dose.trim() || overVolume}
+            title={overVolume ? `Объём превышает максимум ${advice?.maxVolumeMl} мл для зоны — уменьшите объём` : undefined}
           >
             💾 Сохранить
           </button>

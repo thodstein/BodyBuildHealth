@@ -475,17 +475,23 @@ export function localDateDaysAgo(days: number): string {
 
 export function parseDose(doseStr: string): { value: number; unit: string } | null {
   if (!doseStr || typeof doseStr !== 'string') return null;
-  const cleaned = doseStr.replace(',', '.').replace(/[^0-9.]/g, '').trim();
-  if (!cleaned) return null;
-  const value = parseFloat(cleaned);
+  const normalized = doseStr.replace(',', '.');
+  const m = normalized.match(/\d+(?:\.\d+)?/);
+  if (!m || m.index === undefined) return null;
+  const value = parseFloat(m[0]);
   if (!Number.isFinite(value) || value <= 0) return null;
-  const unit = doseStr.toLowerCase().includes('мл') || doseStr.toLowerCase().includes('ml')
-    ? 'мл'
-    : doseStr.toLowerCase().includes('мг') || doseStr.toLowerCase().includes('mg')
-      ? 'мг'
-      : doseStr.toLowerCase().includes('iu') || doseStr.toLowerCase().includes('МЕ')
-        ? 'IU'
-        : '';
+  const after = normalized.toLowerCase().slice(m.index + m[0].length, m.index + m[0].length + 20);
+  const lower = normalized.toLowerCase();
+  // Приоритет единицы рядом с первым числом, иначе глобальный поиск
+  const hasInAfter = (a: string, b: string) => after.includes(a) || after.includes(b);
+  const hasGlobal = (a: string, b: string) => lower.includes(a) || lower.includes(b);
+  let unit = '';
+  if (hasInAfter('мг', 'mg') || (!after.trim() && hasGlobal('мг', 'mg'))) unit = 'мг';
+  else if (hasInAfter('iu', 'ме') || (!after.trim() && hasGlobal('iu', 'ме'))) unit = 'IU';
+  else if (hasInAfter('мл', 'ml') || hasGlobal('мл', 'ml')) unit = 'мл';
+  else if (hasGlobal('мг', 'mg')) unit = 'мг';
+  else if (hasGlobal('iu', 'ме')) unit = 'IU';
+  else if (hasGlobal('мл', 'ml')) unit = 'мл';
   return { value: Math.round(value * 100) / 100, unit };
 }
 
