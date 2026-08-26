@@ -21,6 +21,8 @@ export interface BriefingArgs {
   nowTime: string;
   /** Норма воды дня, л */
   waterL?: number;
+  /** Факт из дневника питания за сегодня (что реально съедено), опционально */
+  fact?: { kcal: number; p: number } | null;
 }
 
 export interface DayBriefing {
@@ -32,10 +34,14 @@ export interface DayBriefing {
   kcalDeltaPct: number;
   /** Добор белка до цели, г (>0 если недобор ≥10 г) */
   proteinLeftG: number;
-  /** Ситуативные советы (0–3) */
+  /** Ситуативные советы (0–4) */
   tips: string[];
   /** Тип дня для заголовка */
   dayTypeLabel: string;
+  /** Факт/план по ккал, % (null — дневник пуст) */
+  factVsPlanPct: number | null;
+  /** Осталось до цели по ккал (факт учтён), может быть отрицательным */
+  remainingKcalToGoal: number | null;
 }
 
 const toMin = (hhmm?: string): number => {
@@ -47,7 +53,7 @@ const toMin = (hhmm?: string): number => {
 };
 
 export function buildDayBriefing(args: BriefingArgs): DayBriefing {
-  const { totals, goals, meals, isTrainingDay, trainTime, nowTime, waterL } = args;
+  const { totals, goals, meals, isTrainingDay, trainTime, nowTime, waterL, fact } = args;
 
   // Что готовить: применённые рецепты в порядке следования приёмов, без дублей
   const seen = new Set<string>();
@@ -88,12 +94,27 @@ export function buildDayBriefing(args: BriefingArgs): DayBriefing {
     tips.push(`⚠️ План выше цели на ${kcalDeltaPct}% — урежьте перекус или увеличьте активность`);
   }
 
+  // Факт из дневника: % от плана + остаток до цели
+  let factVsPlanPct: number | null = null;
+  let remainingKcalToGoal: number | null = null;
+  const factKcal = fact?.kcal ?? 0;
+  if (factKcal > 0) {
+    const planK = Math.max(1, totals.kcal || goalK);
+    factVsPlanPct = Math.round(factKcal / planK * 100);
+    remainingKcalToGoal = Math.round(goalK - factKcal);
+    if (factVsPlanPct >= 115) {
+      tips.push(`🍽 Факт уже ${factVsPlanPct}% плана (${Math.round(factKcal)} ккал) — остаток дня держите лёгким`);
+    }
+  }
+
   return {
     cookToday,
     nextMeal,
     kcalDeltaPct,
     proteinLeftG,
-    tips: tips.slice(0, 3),
+    tips: tips.slice(0, 4),
     dayTypeLabel: isTrainingDay ? '🏋️ Тренировочный день' : '😴 День отдыха',
+    factVsPlanPct,
+    remainingKcalToGoal,
   };
 }

@@ -13,7 +13,7 @@ import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
-import { buildDayReportPrintHtml, printDayReport, buildMealTimelinePrintHtml, printMealTimeline, buildRecipePlanPrintHtml } from "./planner-day-print";
+import { buildDayReportPrintHtml, printDayReport, buildMealTimelinePrintHtml, printMealTimeline, buildRecipePlanPrintHtml, buildCoachExportHtml, downloadCoachExport } from "./planner-day-print";
 import { buildDayBriefing } from "./planner-briefing";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
@@ -667,6 +667,16 @@ export const IndividualPlanResults: React.FC = () => {
           {(() => {
             try {
               const now = new Date();
+              // Факт из дневника питания за сегодня (что реально съедено)
+              let fact: { kcal: number; p: number } | null = null;
+              try {
+                const dateIso = now.toISOString().slice(0, 10);
+                const data = readDiaryV2();
+                const dayEntries = data?.[dateIso]?.meals || {};
+                let fk = 0, fp = 0;
+                Object.values(dayEntries).forEach((arr: any) => (Array.isArray(arr) ? arr : []).forEach((e: any) => { fk += e.kcal || 0; fp += e.p || 0; }));
+                if (fk > 0) fact = { kcal: Math.round(fk), p: Math.round(fp * 10) / 10 };
+              } catch {}
               const b = buildDayBriefing({
                 totals: dayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
                 goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
@@ -675,13 +685,19 @@ export const IndividualPlanResults: React.FC = () => {
                 trainTime: linkToTraining ? trainStart : undefined,
                 nowTime: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
                 waterL: waterCalc?.total,
+                fact,
               });
-              if (b.cookToday.length === 0 && !b.nextMeal && b.tips.length === 0) return null;
+              if (b.cookToday.length === 0 && !b.nextMeal && b.tips.length === 0 && b.factVsPlanPct === null) return null;
               return (
                 <div style={{ margin: '4px 0 8px', padding: '8px 10px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.05))', border: '1px solid rgba(59,130,246,0.18)' }}>
                   <div style={{ fontSize: 10, fontWeight: 800, color: '#60a5fa', marginBottom: 4 }}>🧭 {b.dayTypeLabel}{waterCalc?.total ? ` · 💧 ${waterCalc.total} л/день` : ''}</div>
                   {b.cookToday.length > 0 && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 3 }}>👨‍🍳 Готовить сегодня: <b>{b.cookToday.join(' · ')}</b></div>}
                   {b.nextMeal && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>⏰ Следующий приём: <b>{b.nextMeal.label}</b> в {b.nextMeal.time}</div>}
+                  {fact && b.factVsPlanPct !== null && (
+                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 3 }}>
+                      🍽 Съедено: <b>{fact.kcal} ккал</b> ({b.factVsPlanPct}% плана){b.remainingKcalToGoal !== null && <> · осталось до цели ~<b>{Math.abs(b.remainingKcalToGoal)}</b> ккал{b.remainingKcalToGoal < 0 ? ' (перебор)' : ''}</>}
+                    </div>
+                  )}
                   {b.proteinLeftG >= 10 && <div style={{ fontSize: 9, color: '#60a5fa' }}>🎯 План: Б{Math.round(dayPlan.totals?.p || 0)}/{effectiveP} · К{Math.round(dayPlan.totals?.kcal || 0)} ({b.kcalDeltaPct > 0 ? '+' : ''}{b.kcalDeltaPct}%)</div>}
                   {b.tips.map((t: string, i: number) => <div key={i} style={{ fontSize: 9, color: 'rgba(255,255,255,0.9)', marginTop: 3 }}>{t}</div>)}
                 </div>
@@ -1923,10 +1939,29 @@ export const IndividualPlanResults: React.FC = () => {
           )}
           {generated && dayPlan?.meals?.some((m: any) => m.recipeApplied) && (
             <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.06)', padding:'8px 6px', textAlign:'center' }}>
-              <button onClick={() => printDayReport(buildRecipePlanPrintHtml(dayPlan))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
-                🖨 Меню с рецептами
-              </button>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Рецепты дня на печать / PDF</div>
+              <div style={{ display:'flex', gap:4 }}>
+                <button onClick={() => printDayReport(buildRecipePlanPrintHtml(dayPlan))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" style={{ flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+                  🖨 Печать меню
+                </button>
+                <button onClick={() => {
+                  try {
+                    const html = buildCoachExportHtml({
+                      dateIso: new Date().toISOString().slice(0, 10),
+                      totals: dayPlan.totals || { kcal: 0, p: 0, f: 0, c: 0 },
+                      goals: { kcal: effectiveKcal || 0, p: effectiveP || 0, f: effectiveF || 0, c: effectiveC || 0 },
+                      isTrainingDay: !!dayPlan.isTrainingDay,
+                      meals: dayPlan.meals || [],
+                      shopping: (shoppingList as any[])?.filter((s: any) => s.id !== 'unknown_x') || [],
+                      notes: [...(dayPlan.proNotes || []), ...(dayPlanNotes ? [`💬 ${dayPlanNotes}`] : [])],
+                    });
+                    const ok = downloadCoachExport(html, `plan-coach-${new Date().toISOString().slice(0, 10)}.html`);
+                    if (typeof (window as any).showToast === 'function') (window as any).showToast(ok ? '📤 Файл для тренера скачан' : 'Не удалось скачать файл', ok ? 'success' : 'warning');
+                  } catch {}
+                }} title="План + рецепты + закупки одним HTML-файлом" style={{ flex:1, padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.3)', color:'#60a5fa', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+                  📤 Файл тренеру
+                </button>
+              </div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Рецепты дня на печать · план+закупки файлом</div>
             </div>
           )}
           {generated && plannerMode === 'pro' && (

@@ -65,6 +65,100 @@ export function printDayReport(html: string): void {
 }
 
 /**
+ * 📤 Экспорт «Файл тренеру»: план дня + выбранные рецепты (ингредиенты/шаги) +
+ * закупки + заметки — одним самодостаточным HTML-файлом. Скачивается через Blob.
+ */
+export function buildCoachExportHtml(args: {
+  dateIso: string;
+  totals: { kcal: number; p: number; f: number; c: number };
+  goals?: { kcal: number; p: number; f: number; c: number };
+  isTrainingDay?: boolean;
+  meals: any[];
+  shopping: Array<{ name: string; amount: number; category?: string; dayCount?: number }>;
+  notes?: string[];
+}): string {
+  const { dateIso, totals, goals, isTrainingDay, meals, shopping, notes } = args;
+  const t = totals || { kcal: 0, p: 0, f: 0, c: 0 };
+  const g = goals;
+
+  // Приёмы с продуктами
+  const mealRows = (Array.isArray(meals) ? meals : []).map((m: any) => {
+    const items = Array.isArray(m.items) ? m.items : [];
+    const recipeBadge = m.recipeApplied ? `<span style="font-size:11px;color:#c2620a">🍳 ${esc(m.recipeApplied)}</span>` : '';
+    return `<tr>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;white-space:nowrap">${esc(m.time || '')}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px"><b>${esc(m.label || '')}</b> ${recipeBadge}
+        <div style="color:#555">${items.map((it: any) => esc(`${it.name} ${it.amount}г`)).join(', ') || '—'}</div>
+      </td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.kcal || 0)}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.p || 0)}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.f || 0)}</td>
+      <td style="padding:6px;border:1px solid #ddd;font-size:12px;text-align:right">${Math.round(m.totals?.c || 0)}</td>
+    </tr>`;
+  }).join('');
+
+  // Рецепты: ингредиенты + шаги
+  const applied = (Array.isArray(meals) ? meals : []).filter((m: any) => m?.recipeApplied && m?.recipeAppliedData);
+  const recipeBlocks = applied.map((m: any) => {
+    const r = m.recipeAppliedData;
+    const ing = Array.isArray(r.ingredients) && r.ingredients.length > 0
+      ? `<ul style="margin:4px 0 0 18px;padding:0">${r.ingredients.map((i: string) => `<li style="font-size:12px;margin-bottom:2px">${esc(i)}</li>`).join('')}</ul>`
+      : '';
+    const steps = Array.isArray(r.instructions) && r.instructions.length > 0
+      ? `<ol style="margin:6px 0 0 18px;padding:0">${r.instructions.map((s: string) => `<li style="font-size:12px;margin-bottom:3px">${esc(s)}</li>`).join('')}</ol>`
+      : '';
+    return `<div style="page-break-inside:avoid;border:1px solid #f9731633;background:#fff8f2;border-radius:10px;padding:10px;margin-bottom:10px">
+      <b style="font-size:13px">${esc(m.label)}: ${esc(r.name)}</b>
+      <span style="float:right;font-size:11px;color:#888">⏱ ${esc(String(r.prepTimeMin ?? ''))} мин · ${Math.round(r.kcal)} ккал · Б${r.protein}/Ж${r.fat}/У${r.carbs}</span>
+      <div style="font-size:11px;font-weight:700;margin-top:6px;color:#c2620a">Ингредиенты:</div>${ing}
+      <div style="font-size:11px;font-weight:700;margin-top:6px;color:#c2620a">Приготовление:</div>${steps}
+    </div>`;
+  }).join('');
+
+  // Закупки на план
+  const shopRows = (Array.isArray(shopping) ? shopping : []).map((s: any) =>
+    `<tr><td style="padding:4px 6px;border:1px solid #eee;font-size:12px">${esc(s.name)}</td><td style="padding:4px 6px;border:1px solid #eee;font-size:12px;text-align:right">${Math.round(s.amount)} г</td></tr>`
+  ).join('');
+
+  const notesHtml = (notes && notes.length > 0)
+    ? `<h2 style="font-size:15px">📝 Заметки</h2>${notes.map(n => `<div style="font-size:12px;color:#444;margin-bottom:3px">• ${esc(n)}</div>`).join('')}`
+    : '';
+
+  const goalRow = g ? `<div style="font-size:13px;color:#666;margin-top:2px">Цель дня: <b>${Math.round(g.kcal)}</b> ккал · Б${Math.round(g.p)}/Ж${Math.round(g.f)}/У${Math.round(g.c)} · ${isTrainingDay ? '🏋️ тренировочный' : '😴 отдых'} день</div>` : '';
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>План питания — ${esc(dateIso)}</title>
+<style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:19px;border-bottom:2px solid #00c8a0;padding-bottom:8px}table{border-collapse:collapse;width:100%}@media print{body{margin:12mm}}</style></head>
+<body>
+<h1>🍽 План питания спортсмена — ${esc(dateIso)}</h1>
+<div style="font-size:14px">Итог: <b>${Math.round(t.kcal || 0)}</b> ккал · Б <b>${Math.round(t.p || 0)}</b> · Ж <b>${Math.round(t.f || 0)}</b> · У <b>${Math.round(t.c || 0)}</b></div>
+${goalRow}
+<h2 style="font-size:15px;margin-top:16px">Приёмы пищи</h2>
+<table><thead><tr><th style="padding:6px;border:1px solid #ddd;background:#f5f5f5;font-size:11px">Время</th><th style="padding:6px;border:1px solid #ddd;background:#f5f5f5;font-size:11px;text-align:left">Приём / продукты</th><th style="padding:6px;border:1px solid #ddd;background:#f5f5f5;font-size:11px">Ккал</th><th style="padding:6px;border:1px solid #ddd;background:#f5f5f5;font-size:11px">Б</th><th style="padding:6px;border:1px solid #ddd;background:#f5f5f5;font-size:11px">Ж</th><th style="padding:6px;border:1px solid #ddd;background:#f5f5f5;font-size:11px">У</th></tr></thead>
+<tbody>${mealRows}</tbody></table>
+${recipeBlocks ? `<h2 style="font-size:15px;margin-top:18px">🍳 Выбранные рецепты</h2>${recipeBlocks}` : ''}
+${shopRows ? `<h2 style="font-size:15px;margin-top:18px">🛒 Закупки на план</h2><table><tbody>${shopRows}</tbody></table>` : ''}
+${notesHtml}
+<div style="margin-top:20px;font-size:11px;color:#999">Сформировано в BioStack AI · план носит рекомендательный характер</div>
+</body></html>`;
+}
+
+/** Скачивание HTML-файла через Blob (jsdom-safe). */
+export function downloadCoachExport(html: string, filename: string): boolean {
+  try {
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    return true;
+  } catch { return false; }
+}
+
+/**
  * B6: печатная версия «Меню с рецептами» для режима «по рецептам».
  * day — план дня (формат IndividualPlanContext): приёмы с recipeApplied/recipeAppliedData
  * разворачиваются в ингредиенты и пошаговые инструкции. XSS-экранирование всех строк.

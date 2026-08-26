@@ -213,6 +213,8 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   moreRecipeOptions: (dayIdx: number, mealIdx: number) => void;
   /** 🔄 Другие рецепты: перегенерация чипов-подсказок дня, исключая уже показанные. */
   refreshRecipeSuggestions: (dayIdx?: number) => void;
+  /** ♻️ Пропуск приёма: удалить приём и пересобрать день (ребаланс ±3%), синк закупок/готовки. */
+  removeMealRebalanced: (dayIdx: number, mealIdx: number) => void;
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
   loadSavedPlan: (plan: SavedPlan) => void;
@@ -1607,8 +1609,69 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     c: days.reduce((s: number, d: any) => s + (d.totals?.c || 0), 0),
   });
 
-  const pickRecipeOption = (dayIdx: number, mealIdx: number, optionName: string) => {
+  /** ♻️ Пропуск приёма: удаляем и пересобираем день — недобор закрывается топ-апами
+   *  в гибкие слоты (ребаланс ±3%), рецепт-дни защищены. Работает во всех режимах. */
+  const removeMealRebalanced = (dayIdx: number, mealIdx: number) => {
     saveUndo();
+    const rebuildWithoutMeal = (mealsSrc: any[] | undefined): { ok: boolean; meals?: any[]; removedLabel?: string; removedKcal?: number } => {
+      if (!Array.isArray(mealsSrc) || mealIdx < 0 || mealIdx >= mealsSrc.length) return { ok: false };
+      const removed = mealsSrc[mealIdx];
+      const remaining = mealsSrc.filter((_, i) => i !== mealIdx);
+      if (remaining.length === 0) return { ok: false };
+      const pre = sumDayTotals(remaining as any);
+      const rb = rebalanceDayAfterRecipes(remaining as any, {
+        kcal: effectiveKcal > 0 ? effectiveKcal : pre.kcal,
+        p: effectiveP > 0 ? effectiveP : pre.p,
+        f: effectiveF > 0 ? effectiveF : pre.f,
+        c: effectiveC > 0 ? effectiveC : pre.c,
+      });
+      const notes = [`♻️ Приём «${removed.label || 'Приём'}» (${Math.round(removed.totals?.kcal || 0)} ккал) пропущен — день пересобран`, ...rb.notes];
+      return { ok: true, meals: rb.meals as any[], removedLabel: removed.label, removedKcal: removed.totals?.kcal || 0 };
+    };
+    const attachNotes = (day: any, notes: string[]) => ({ ...day, proNotes: [...(day.proNotes || []), ...notes] });
+
+    if (dayIdx === 0) {
+      const res = rebuildWithoutMeal(dayPlan?.meals);
+      if (!res.ok || !res.meals) return;
+      let weekDaysUpdated: any[] | null = null;
+      if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
+        const wres = rebuildWithoutMeal(weekPlan.days[weekEditDay].meals);
+        const days = [...weekPlan.days];
+        days[weekEditDay] = wres.ok && wres.meals
+          ? attachNotes({ ...days[weekEditDay], meals: wres.meals, totals: sumDayTotals(wres.meals as any) }, res.notes)
+          : attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes);
+        setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+        weekDaysUpdated = days;
+      }
+      setDayPlan(attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes));
+      const visiblePlans: any[] =
+        planDays >= 7 && weekPlan?.days?.length
+          ? (weekDaysUpdated ?? weekPlan.days)
+          : planDays >= 3 && threeDayPlan?.days?.length
+            ? threeDayPlan.days.map((d: any, i: number) => (i === selectedDayIndex ? attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes) : d))
+            : [attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes)];
+      setShoppingList(buildShoppingFromPlans(visiblePlans));
+      refreshRecipeCookingCardIfActive(attachNotes({ ...dayPlan, meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes), threeDayPlan, weekDaysUpdated ? { days: weekDaysUpdated } : weekPlan);
+    } else {
+      const resolved = _resolvePlanDay(dayIdx);
+      if (!resolved || resolved.plan === 'day') return;
+      const srcPlan: any = resolved.plan === 'three' ? threeDayPlan : weekPlan;
+      if (!srcPlan?.days?.[resolved.day]) return;
+      const days = [...srcPlan.days];
+      const res = rebuildWithoutMeal(days[resolved.day].meals);
+      if (!res.ok || !res.meals) return;
+      days[resolved.day] = attachNotes({ ...days[resolved.day], meals: res.meals, totals: sumDayTotals(res.meals as any) }, res.notes);
+      const updated = { ...srcPlan, days, totals: sumMultiTotals(days) };
+      if (resolved.plan === 'three') setThreeDayPlan(updated); else setWeekPlan(updated);
+      if (resolved.plan === 'week') setDayPlan(days[resolved.day]);
+      else if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
+      setShoppingList(buildShoppingFromPlans(days));
+      refreshRecipeCookingCardIfActive(resolved.plan === 'week' ? days[resolved.day] : dayPlan, resolved.plan === 'three' ? updated : threeDayPlan, resolved.plan === 'week' ? updated : weekPlan);
+    }
+    if (typeof (window as any).showToast === 'function') (window as any).showToast('♻️ День пересобран без пропущенного приёма', 'success');
+  };
+
+  const pickRecipeOption = (dayIdx: number, mealIdx: number, optionName: string) => {    saveUndo();
     if (dayIdx === 0) {
       const res = rebuildMealsWithRecipeOption(dayPlan?.meals || [], mealIdx, optionName);
       if (!res.ok || !res.meals) return;
@@ -3998,7 +4061,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     updateItemAmount, removeFoodItem, replaceMealWithRecipe, generatePlan,
     generationMode, setGenerationMode,
     favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe,
-    pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions,
+    pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced,
     weekEditDay, openWeekDayForEdit, switchPlanDays,
     addFoodToMeal, addSnackComboToMeal, undoLast,
     toggleAllergen, toggleHealthIssue, loadSavedPlan,
@@ -4039,6 +4102,6 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, coconutOilBoost, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, renderMealList, annualPhase]);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase]);
   return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };

@@ -57,4 +57,24 @@ describe('buildDayBriefing', () => {
     const rest = buildDayBriefing({ ...base, isTrainingDay: false, trainTime: '11:00', nowTime: '11:50' });
     expect(rest.tips.some(t => t.includes('окно открыто'))).toBe(false);
   });
+
+  it('факт дневника: % от плана, остаток до цели, предупреждение перебора', () => {
+    // факт 2400 из плана 3000 = 80%, до цели осталось 600
+    const ok = buildDayBriefing({ ...base, fact: { kcal: 2400, p: 120 } });
+    expect(ok.factVsPlanPct).toBe(80);
+    expect(ok.remainingKcalToGoal).toBe(600);
+    expect(ok.tips.some(t => t.includes('Факт уже'))).toBe(false);
+
+    // факт 3600 = 120% плана → предупреждение (совет выше цели тоже сработает: 3180? нет — totals=3000)
+    const over = buildDayBriefing({ ...base, fact: { kcal: 3600, p: 200 } });
+    expect(over.factVsPlanPct).toBe(120);
+    expect(over.remainingKcalToGoal).toBe(-600);
+    expect(over.tips.some(t => t.includes('Факт уже 120%'))).toBe(true);
+  });
+
+  it('без факта поля null и советы не добавляются', () => {
+    const b = buildDayBriefing(base);
+    expect(b.factVsPlanPct).toBeNull();
+    expect(b.remainingKcalToGoal).toBeNull();
+  });
 });
