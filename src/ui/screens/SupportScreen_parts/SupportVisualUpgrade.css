@@ -1,0 +1,71 @@
+/* SupportVisualUpgrade.css — глобальные визуальные улучшения блока БАД.
+   Подключается в SupportScreen.tsx. Не трогает файлы других агентов.
+   Цель: читаемость 12-13px, карточки со стеклом, нижний дашборд не перекрывает контент. */
+
+.support-screen {
+  --support-card-bg: rgba(24,24,27,0.55);
+  --support-card-border: rgba(255,255,255,0.07);
+  --support-radius: 16px;
+  --support-shadow: 0 4px 20px rgba(0,0,0,0.25);
+}
+
+/* Улучшенные скроллбары для каталога/дневника */
+.support-screen ::-webkit-scrollbar { width: 4px; height: 4px; }
+.support-screen ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+.support-screen ::-webkit-scrollbar-track { background: transparent; }
+
+/* Поиск в каталоге — более заметный фокус */
+.support-screen input:focus {
+  border-color: rgba(0,230,138,0.35) !important;
+  box-shadow: 0 0 0 3px rgba(0,230,138,0.12) !important;
+}
+
+/* Плавные ховеры для всех кнопок в support-screen */
+.support-screen button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+@media (hover: hover) {
+  .support-screen button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+  }
+  .support-screen button:active:not(:disabled) {
+    transform: translateY(0);
+    filter: brightness(0.96);
+  }
+}
+
+/* Карточки каталога — мягкий ховер */
+.support-screen [style*="border-radius: 10"][style*="var(--bg-secondary)"]:hover,
+.support-screen [style*="border-radius: 12"][style*="var(--bg-secondary)"]:hover {
+  border-color: rgba(255,255,255,0.12) !important;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.3) !important;
+}
+
+/* Нижний дашборд — уже стеклянный, добавляем безопасную тень сверху */
+.support-screen > div[style*="position: fixed"][style*="bottom: 0"] {
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+
+/* Заголовки секций — чуть крупнее */
+.support-screen h2 { font-size: 18px !important; letter-spacing: -0.3px; }
+.support-screen h3 { font-size: 14px !important; }
+.support-screen h4 { font-size: 13px !important; }
+
+/* Бейджи механизмов — крупнее */
+.support-screen span[style*="font-size: 7"],
+.support-screen span[style*="font-size: 8"] {
+  font-size: 11px !important;
+  padding: 3px 7px !important;
+}
+
+/* Исправление перекрытия контентом: все внутренние скролл-контейнеры каталога получают нижний паддинг */
+.support-screen [style*="max-height: 68vh"] {
+  padding-bottom: 16px !important;
+}
+
+/* Адаптив */
+@media (max-width: 480px) {
+  .support-screen { padding-left: 12px !important; padding-right: 12px !important; }
+}

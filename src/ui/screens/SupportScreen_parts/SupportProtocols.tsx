@@ -44,39 +44,51 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
   const isReferenceModule = activeCard?.kind === 'reference';
 
   return (
-    <div style={{ padding:'0 0 70px' }}>
+    <div style={{ padding:'0 0 24px' }}>
       {protocolView === 'menu' ? (
-        <div>
-          <div style={{ fontSize:14, fontWeight:800, color:'var(--text-light)', marginBottom:2 }}>📋 Выберите протокол поддержки</div>
-          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6, lineHeight:1.3 }}>Доступно протоколов: <b style={{color:'#22c55e'}}>{PROTOCOL_CARDS.length}</b> систем органов. Органные протоколы — фазовая модель (1→4) по лабораторным порогам; справочники (пептиды, инъекции, симптомы) — по показаниям.</div>
-          <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.25)', marginBottom:10 }}>
-            <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', lineHeight:1.4 }}>
-              ⚠️ Все протоколы носят ПРИМЕРНЫЙ (ознакомительный) характер. Назначение препаратов, выбор схемы и метода лечения/коррекции — <b>ТОЛЬКО ВРАЧОМ</b>. Самолечение опасно для жизни.
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div style={{ padding:'16px', borderRadius:16, background:'linear-gradient(135deg, rgba(139,92,246,0.10), rgba(59,130,246,0.08))', border:'1px solid rgba(139,92,246,0.18)', backdropFilter:'blur(14px)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
+              <span style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#8b5cf6,#6366f1)', fontSize:18, boxShadow:'0 4px 16px rgba(139,92,246,0.3)' }}>📋</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:16, fontWeight:850, color:'#fff', letterSpacing:'-0.3px' }}>Выберите протокол поддержки</div>
+                <div style={{ fontSize:11, color:'rgba(255,255,255,0.6)', marginTop:1 }}>Фазовые модели 1→4 по анализам · справочники по показаниям</div>
+              </div>
+              <span style={{ fontSize:12, fontWeight:800, color:'#a78bfa', background:'rgba(139,92,246,0.12)', border:'1px solid rgba(139,92,246,0.20)', padding:'6px 10px', borderRadius:12 }}>{PROTOCOL_CARDS.length}</span>
+            </div>
+            <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', lineHeight:1.5 }}>Органные протоколы — по лабораторным порогам. Справочники — по показаниям. Все назначения — только врачом.</div>
+          </div>
+          <div style={{ borderRadius:14, padding:'12px 14px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.22)', display:'flex', gap:10, alignItems:'flex-start' }}>
+            <span style={{ fontSize:18, flexShrink:0, marginTop:1 }}>⚠️</span>
+            <div style={{ fontSize:11, fontWeight:700, color:'#fca5a5', lineHeight:1.5 }}>
+              Все протоколы — <b style={{color:'#ef4444'}}>ознакомительные</b>. Назначение препаратов и схемы — <b style={{color:'#ef4444'}}>только врачом</b>. Самолечение опасно для жизни.
             </div>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
             {PROTOCOL_CARDS.map(p => (
               <button key={p.id} onClick={() => { setProtocolTab(p.id); setProtocolView('detail'); }}
-                style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', textAlign:'left', gap:4,
-                  padding:'10px', borderRadius:10, cursor:'pointer', border:'1px solid '+p.color+'44',
-                  background:'rgba(24,24,27,0.8)', backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
-                  transition:'all 0.15s'
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 8px 28px rgba(0,0,0,0.35), 0 0 0 1px ${p.color}22 inset`; (e.currentTarget as HTMLButtonElement).style.borderColor = p.color+'66'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.25)'; (e.currentTarget as HTMLButtonElement).style.borderColor = p.color+'33'; }}
+                style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', textAlign:'left', gap:8,
+                  padding:'14px', borderRadius:16, cursor:'pointer', border:'1px solid '+p.color+'33',
+                  background:'rgba(24,24,27,0.6)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
+                  transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', boxShadow:'0 4px 20px rgba(0,0,0,0.25)', minHeight:108
                 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:6, width:'100%' }}>
-                  <span style={{ fontSize:20 }}>{p.icon}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:'var(--text-light)' }}>{p.label}</div>
-                    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.2, marginTop:1 }}>{p.desc}</div>
+                <div style={{ display:'flex', alignItems:'center', gap:9, width:'100%' }}>
+                  <span style={{ width:36, height:36, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:`${p.color}14`, border:`1px solid ${p.color}22`, fontSize:18, flexShrink:0 }}>{p.icon}</span>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff', letterSpacing:'-0.2px', lineHeight:1.2 }}>{p.label}</div>
+                    <div style={{ fontSize:11, color:'rgba(255,255,255,0.55)', lineHeight:1.35, marginTop:2, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{p.desc}</div>
                   </div>
                 </div>
-                <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:3 }}>
+                <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:'auto' }}>
                   {p.kind === 'reference' && (
-                    <span style={{ fontSize:6, fontWeight:600, padding:'1px 5px', borderRadius:4,
-                      background:'#64748b22', color:'#94a3b8' }}>справочник</span>
+                    <span style={{ fontSize:10, fontWeight:700, padding:'3px 7px', borderRadius:20,
+                      background:'rgba(100,116,139,0.14)', color:'#94a3b8', border:'1px solid rgba(100,116,139,0.18)' }}>справочник</span>
                   )}
-                  {p.tags.map((t: any, ti: number) => (
-                    <span key={ti} style={{ fontSize:6, fontWeight:600, padding:'1px 5px', borderRadius:4,
-                      background:p.color+'18', color:p.color }}>{t}</span>
+                  {p.tags.slice(0,3).map((t: any, ti: number) => (
+                    <span key={ti} style={{ fontSize:10, fontWeight:700, padding:'3px 7px', borderRadius:20,
+                      background:p.color+'14', color:p.color, border:`1px solid ${p.color}22` }}>{t}</span>
                   ))}
                 </div>
               </button>
@@ -84,11 +96,11 @@ export const SupportProtocols: React.FC<{ s: Record<string, any> }> = ({ s }) =>
           </div>
         </div>
       ) : (
-        <div>
-          <button onClick={() => setProtocolView('menu')} style={{ display:'flex', alignItems:'center', gap:4,
-            padding:'6px 12px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', marginBottom:8,
-            background:'var(--bg-secondary)', color:'var(--text-light)', border:'1px solid var(--border)'
-          }}>← Назад к списку</button>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <button onClick={() => setProtocolView('menu')} style={{ display:'inline-flex', alignItems:'center', gap:6, alignSelf:'flex-start',
+            padding:'9px 14px', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer',
+            background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', backdropFilter:'blur(10px)'
+          }}>← К списку протоколов</button>
 
           {/* ── ГЛОБАЛЬНЫЙ БАННЕР: ПРИМЕРНЫЕ ПРОТОКОЛЫ, ТОЛЬКО ВРАЧ ── */}
           <div style={{ borderRadius:12, padding:'14px 16px', background:'rgba(239,68,68,0.08)', border:'2px solid rgba(239,68,68,0.35)', marginBottom:12 }}>

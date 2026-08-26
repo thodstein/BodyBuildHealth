@@ -30,40 +30,43 @@ export const SupportCalcToolsHub: React.FC<{ s: Record<string, any>; initialMode
   const active = MODE_DEFS.find(d=> d.m===mode)!;
 
   return (
-    <div style={{ padding: '10px 8px 80px', color: '#fff', maxWidth: 760, margin: '0 auto' }}>
-      <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(0,230,138,0.10),rgba(96,165,250,0.07))', border:'1px solid rgba(0,230,138,0.18)', position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(0,230,138,0.16),transparent 70%)', pointerEvents:'none' }} />
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-          <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:16 }}>🧮</div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Расчёты выбора препаратов — единый центр</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Биодоступность · доза · синергия · тайминг · аналоги — один расчёт без дублей</div>
+    <div style={{ padding: '8px 4px 24px', color: '#fff', maxWidth: 760, margin: '0 auto', display:'flex', flexDirection:'column', gap:12 }}>
+      <div style={{ ...CARD, padding:'16px', background:'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(96,165,250,0.08), rgba(139,92,246,0.06))', border:'1px solid rgba(255,255,255,0.08)', position:'relative', overflow:'hidden', borderRadius:18 }}>
+        <div style={{ position:'absolute', top:-20, right:-20, width:120, height:120, borderRadius:120, background:'radial-gradient(circle, rgba(0,230,138,0.18), transparent 68%)', pointerEvents:'none' }} />
+        <div style={{ position:'absolute', bottom:-30, left:-10, width:180, height:80, borderRadius:60, background:'radial-gradient(circle, rgba(96,165,250,0.12), transparent 70%)', pointerEvents:'none' }} />
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8, position:'relative' }}>
+          <div style={{ width:40, height:40, borderRadius:12, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#00e68a,#00c853)', color:'#000', fontWeight:900, fontSize:18, boxShadow:'0 4px 16px rgba(0,230,138,0.35)', flexShrink:0 }}>🧮</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:16, fontWeight:900, color:'#fff', lineHeight:1.15, letterSpacing:'-0.3px' }}>Расчёты выбора препаратов</div>
+            <div style={{ fontSize:12, color:'rgba(255,255,255,0.72)', lineHeight:1.35 }}>Единый центр — 5 калькуляторов без дублей</div>
           </div>
-          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap' }}>5 в 1</span>
+          <span style={{ fontSize:11, padding:'6px 10px', borderRadius:20, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', color:ACCENT, fontWeight:800, whiteSpace:'nowrap', flexShrink:0 }}>5 в 1</span>
         </div>
-        <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.45 }}>
-          <b style={{ color:'#fff' }}>Как работает:</b> выбери препарат один раз — все 5 расчётов (<span style={{ color:'#a78bfa' }}>био</span> → <span style={{ color:ACCENT }}>доза</span> → <span style={{ color:'#60a5fa' }}>синергия</span> → <span style={{ color:'#f59e0b' }}>тайминг</span> → <span style={{ color:'#ec4899' }}>аналоги</span>) на одних данных. ААС вынесены отдельно и не смешиваются с БАД/фармой.
+        <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.78)', background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:'10px 12px', lineHeight:1.5, position:'relative' }}>
+          <b style={{ color:'#fff' }}>Как работает:</b> выбери препарат один раз — все 5 расчётов (<span style={{ color:'#a78bfa', fontWeight:700 }}>био</span> → <span style={{ color:ACCENT, fontWeight:700 }}>доза</span> → <span style={{ color:'#60a5fa', fontWeight:700 }}>синергия</span> → <span style={{ color:'#f59e0b', fontWeight:700 }}>тайминг</span> → <span style={{ color:'#ec4899', fontWeight:700 }}>аналоги</span>) на одних данных. ААС вынесены отдельно.
         </div>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
         {MODE_DEFS.slice(0,3).map(d=> {
           const isActive = mode===d.m;
           return (
-            <div key={d.m} onClick={()=> setMode(d.m)} style={{ ...CARD, marginBottom:0, padding:10, cursor:'pointer', borderLeft:`3px solid ${d.accent}`, background: isActive ? `${d.accent}12` : 'rgba(24,24,27,0.42)', border: isActive ? `1px solid ${d.accent}55` : '1px solid rgba(255,255,255,0.07)', minHeight:72 }}>
-              <div style={{ fontSize:9, fontWeight:800, color:d.accent, letterSpacing:0.4, textTransform:'uppercase' }}>{d.icon} {d.label}</div>
-              <div style={{ fontSize:10, fontWeight:700, color:'#fff', lineHeight:1.2, marginTop:4 }}>{d.desc}</div>
+            <div key={d.m} onClick={()=> setMode(d.m)} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:84, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:d.accent, letterSpacing:0.5, textTransform:'uppercase', display:'flex', alignItems:'center', gap:4 }}>{d.icon} {d.label}</div>
+              <div style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.25, marginTop:5 }}>{d.desc}</div>
+              <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:4 }}>{d.hint}</div>
             </div>
           );
         })}
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
         {MODE_DEFS.slice(3).map(d=> {
           const isActive = mode===d.m;
           return (
-            <div key={d.m} onClick={()=> setMode(d.m)} style={{ ...CARD, marginBottom:0, padding:10, cursor:'pointer', borderLeft:`3px solid ${d.accent}`, background: isActive ? `${d.accent}12` : 'rgba(24,24,27,0.42)', border: isActive ? `1px solid ${d.accent}55` : '1px solid rgba(255,255,255,0.07)', minHeight:68 }}>
-              <div style={{ fontSize:9, fontWeight:800, color:d.accent, letterSpacing:0.4, textTransform:'uppercase' }}>{d.icon} {d.label}</div>
-              <div style={{ fontSize:10, fontWeight:700, color:'#fff', lineHeight:1.2, marginTop:4 }}>{d.desc}</div>
+            <div key={d.m} onClick={()=> setMode(d.m)} onMouseEnter={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = `${d.accent}35`; }} onMouseLeave={e => { if(!isActive) (e.currentTarget as HTMLDivElement).style.borderColor = 'rgba(255,255,255,0.07)'; }} style={{ ...CARD, marginBottom:0, padding:12, cursor:'pointer', borderLeft:`4px solid ${d.accent}`, background: isActive ? `${d.accent}14` : 'rgba(24,24,27,0.50)', border: isActive ? `1px solid ${d.accent}45` : '1px solid rgba(255,255,255,0.07)', minHeight:82, boxShadow: isActive ? `0 4px 20px ${d.accent}18` : '0 2px 12px rgba(0,0,0,0.2)', transition:'all 0.18s' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:d.accent, letterSpacing:0.5, textTransform:'uppercase', display:'flex', alignItems:'center', gap:4 }}>{d.icon} {d.label}</div>
+              <div style={{ fontSize:12, fontWeight:700, color:'#fff', lineHeight:1.25, marginTop:5 }}>{d.desc}</div>
+              <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.5)', lineHeight:1.3, marginTop:4 }}>{d.hint}</div>
             </div>
           );
         })}

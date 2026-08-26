@@ -3,6 +3,7 @@ import { SYNERGY_PAIRS, ORGAN_SYNERGIES, SUPPLEMENT_DESCRIPTIONS, SUPPLEMENT_TAR
 import type { SupportRecommendation } from '../../engines/tz-mapper-engine';
 import { decodeGarbled, cleanDesc } from '../../utils/text-sanitizer';
 import { SupportModals } from './SupportScreen_parts/SupportModals';
+import './SupportScreen_parts/SupportVisualUpgrade.css';
 import { ALL_RISK_SYSTEMS } from '../../core/constants';
 import { PHARMA_DB, getPharmaDetail } from '../../core/pharma-database';
 import { useDataLink, notifyDataChange } from '../../core/data-link';
@@ -242,8 +243,8 @@ export const SupportScreen: React.FC<{ initialTab?: SupportTab; initialSubTab?: 
     if (tab !== 'main') { setTab('main'); return; }
     if (section !== 'home') { setSection('home'); resetMain(); return; }
   };
-  const backBtnStyle: React.CSSProperties = { padding:'3px 10px', borderRadius:6, fontSize:10, cursor:'pointer', background:'var(--bg-secondary)', border:'1px solid var(--border)', color:'var(--text-dim)', fontWeight:600, whiteSpace:'nowrap' as const };
-  const BackNav = ({ homeLabel = '← На главную' }: { homeLabel?: string }) => <div style={{ display:'flex', gap:6, marginBottom:8, flexWrap:'wrap' as const }}>
+  const backBtnStyle: React.CSSProperties = { padding:'8px 12px', borderRadius:12, fontSize:12, cursor:'pointer', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.75)', fontWeight:700, whiteSpace:'nowrap' as const, minHeight:34, display:'inline-flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(10px)' };
+  const BackNav = ({ homeLabel = '← На главную' }: { homeLabel?: string }) => <div style={{ display:'flex', gap:8, marginBottom:4, flexWrap:'wrap' as const }}>
     <button onClick={goBack} style={backBtnStyle}>← Назад</button>
     <button onClick={goHome} style={backBtnStyle}>{homeLabel}</button>
   </div>;
@@ -2214,15 +2215,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
         );
       })()}
 
-      {/* ===== BOTTOM TAB BAR ===== */}
-      <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'var(--bg-primary)', borderTop:'1px solid var(--border)', padding:'6px 0 calc(env(safe-area-inset-bottom, 0px) + 6px)' }}>
+      {/* ===== BOTTOM TAB BAR — стеклянный, не перекрывает контент (паддинг у корня уже учитывает высоту) ===== */}
+      <div style={{ position:'fixed', bottom:0, left:0, right:0, zIndex:200, display:'flex', background:'rgba(10,10,10,0.82)', backdropFilter:'blur(18px) saturate(160%)', WebkitBackdropFilter:'blur(18px) saturate(160%)', borderTop:'1px solid rgba(255,255,255,0.07)', padding:'8px 6px calc(env(safe-area-inset-bottom, 0px) + 8px)', boxShadow:'0 -8px 32px rgba(0,0,0,0.45)' }}>
         {[
-          { id:'home', label:'Главная', icon:'🏠' },
-          { id:'generator', label:'Генератор', icon:'🧩' },
-          { id:'info', label:'Инфо', icon:'📚' },
-          { id:'hormonal', label:'Гормоны', icon:'⚕️' },
-          { id:'protocols', label:'Протоколы', icon:'📋' },
-        ].map(item => (
+          { id:'home', label:'Главная', icon:'🏠', accent:'#00e68a' },
+          { id:'generator', label:'Генератор', icon:'🧩', accent:'#60a5fa' },
+          { id:'info', label:'Инфо', icon:'📚', accent:'#a78bfa' },
+          { id:'hormonal', label:'Гормоны', icon:'⚕️', accent:'#f472b6' },
+          { id:'protocols', label:'Протоколы', icon:'📋', accent:'#f59e0b' },
+        ].map(item => {
+          const active = section === item.id;
+          return (
           <button key={item.id} onClick={() => {
             setSection(item.id as any);
             setCalcView('main');
@@ -2232,16 +2235,17 @@ const renderCatalogDetail = (subId: string): React.ReactNode => {
             if (item.id === 'hormonal') { setTab('fertility-pct'); setSupportView('calc'); }
             if (item.id === 'protocols') { setProtocolTab(''); setProtocolView('menu'); }
           }} style={{
-            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2,
-            padding:'4px 0', background:'transparent', border:'none', cursor:'pointer',
-            color: section === item.id ? 'var(--accent)' : 'var(--text-dim)',
-            fontSize:9, fontWeight: section === item.id ? 700 : 400,
-            transition:'color 0.15s',
+            flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+            padding:'6px 2px', background: active ? `${item.accent}14` : 'transparent', border: active ? `1px solid ${item.accent}30` : '1px solid transparent', cursor:'pointer',
+            color: active ? item.accent : 'rgba(255,255,255,0.55)',
+            fontSize:10, fontWeight: active ? 800 : 500,
+            borderRadius:12, transition:'all 0.2s cubic-bezier(0.25,0.46,0.45,0.94)', minHeight:44,
           }}>
-            <span style={{ fontSize:18 }}>{item.icon}</span>
-            <span>{item.label}</span>
+            <span style={{ fontSize:20, lineHeight:1, filter: active ? `drop-shadow(0 0 8px ${item.accent}60)` : 'none', transform: active ? 'scale(1.06)' : 'none', transition:'transform 0.2s' }}>{item.icon}</span>
+            <span style={{ letterSpacing: active ? '0.2px' : '0px' }}>{item.label}</span>
+            {active && <span style={{ width:22, height:3, borderRadius:2, background:item.accent, marginTop:1, boxShadow:`0 0 8px ${item.accent}80` }} />}
           </button>
-        ))}
+        );})}
       </div>
 
     </div>
@@ -3090,16 +3094,18 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
     weeklyPlan,
   };
 
+  // ── Нижняя навигация: высота 64 + safe-area, все скролл-контейнеры получают соответствующий паддинг чтобы контент не прятался
+  const BOTTOM_NAV_H = 64;
   return (
-    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '54px' : section === 'generator' ? '88px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '120px' : section !== 'home' ? '54px' : '10px', paddingBottom: '0px', overflowY: 'auto' }}>
+    <div className="screen support-screen" style={{ paddingTop: section === 'protocols' ? '56px' : section === 'generator' ? '92px' : (section === 'info' || calcView === 'info' || calcView === 'peptides') ? '126px' : section !== 'home' ? '56px' : '12px', paddingBottom: `calc(${BOTTOM_NAV_H}px + 16px + env(safe-area-inset-bottom, 0px))`, overflowY: 'auto', minHeight: '100%', boxSizing: 'border-box' }}>
 
-      {/* ===== GENERATOR SUB-TAB PILLS (with back/home) ===== */}
+      {/* ===== GENERATOR SUB-TAB PILLS (glass) ===== */}
       {section === 'generator' && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+          <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
-          <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
+          <div style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
             {[['calculator','🧮 Калькулятор'],['info','📖 О подборе']].map(([id,label]) => (
               <button key={id} onClick={() => { setGenTab(id as any); 
               const a: Record<string,()=>void> = {
@@ -3108,10 +3114,11 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
               };
               a[id]?.();
             }} style={{
-              padding:'6px 14px', borderRadius:22, fontSize:11, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-              background: genTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-              color: genTab === id ? '#000' : 'var(--text-dim)',
-              border: '1px solid ' + (genTab === id ? 'var(--accent)' : 'var(--border)'),
+              padding:'8px 14px', borderRadius:20, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:34,
+              background: genTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+              color: genTab === id ? '#000' : 'rgba(255,255,255,0.72)',
+              border: '1px solid ' + (genTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.08)'),
+              boxShadow: genTab === id ? '0 2px 12px rgba(0,230,138,0.3)' : 'none', transition:'all 0.2s',
             }}>{label}</button>
           ))}
 
@@ -3119,31 +3126,32 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
         </div>
       )}
 
-      {/* ===== PROTOCOLS HEADER (back/home only) ===== */}
+      {/* ===== PROTOCOLS HEADER (glass) ===== */}
       {section === 'protocols' && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+          <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
         </div>
       )}
 
-      {/* ===== INFO HEADER (back/home + pills) ===== */}
+      {/* ===== INFO HEADER (glass, readable pills) ===== */}
       {(section === 'info' || calcView === 'info' || calcView === 'peptides') && (
-        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'var(--bg-primary)', borderBottom:'1px solid var(--border)' }}>
-          <div style={{ display:'flex', gap:6, padding:'4px 12px', borderBottom:'1px solid var(--border)', alignItems:'center', overflowX:'auto' }}>
+        <div style={{ position:'fixed', top:0, left:0, right:0, zIndex:150, background:'rgba(10,10,10,0.78)', backdropFilter:'blur(16px) saturate(150%)', WebkitBackdropFilter:'blur(16px) saturate(150%)', borderBottom:'1px solid rgba(255,255,255,0.07)', boxShadow:'0 4px 20px rgba(0,0,0,0.3)' }}>
+          <div style={{ display:'flex', gap:6, padding:'6px 12px', borderBottom:'1px solid rgba(255,255,255,0.06)', alignItems:'center', overflowX:'auto' }}>
             <BackNav />
           </div>
-          <div style={{ display:'flex', gap:4, padding:'6px 12px 8px', overflowX:'auto', scrollbarWidth:'none' }}>
-            {[['peptides','Пептиды'],['catalog','Каталог'],['calc_tools','🧮 Расчёты выбора препаратов'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
+          <div style={{ display:'flex', gap:6, padding:'8px 12px 10px', overflowX:'auto', scrollbarWidth:'none' }}>
+            {[['peptides','Пептиды'],['catalog','Каталог'],['calc_tools','🧮 Расчёты'],['research','Исследования'],['favorites','⭐ Избранное · Дневник']].map(([id,label]) => (
               <button key={id} onClick={() => { setInfoTab(id as any);
                 if (id === 'peptides') { setSection('info'); setTab('main'); setSupportView('calc'); setCalcView('peptides'); setInfoTab('peptides'); }
                 else { setTab('main'); setSupportView('calc'); setCalcView('info'); setSection('home'); setInfoView(id as InfoView); }
               }} style={{
-                padding:'5px 12px', borderRadius:16, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: infoTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: infoTab === id ? '#000' : 'var(--text-dim)',
-                border: '1px solid ' + (infoTab === id ? 'var(--accent)' : 'var(--border)'),
+                padding:'8px 14px', borderRadius:20, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:34,
+                background: infoTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                color: infoTab === id ? '#000' : 'rgba(255,255,255,0.72)',
+                border: '1px solid ' + (infoTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.08)'),
+                boxShadow: infoTab === id ? '0 2px 12px rgba(0,230,138,0.3)' : 'none', transition:'all 0.2s',
               }}>{label}</button>
             ))}
           </div>
@@ -3169,13 +3177,14 @@ ${planResult.monitoring?.length ? 'МОНИТОРИНГ:\n' + planResult.monitor
       )}
       {renderView(infoView, 'favorites', () =>
         <div>
-          <div style={{ display:'flex', gap:4, marginBottom:8, overflowX:'auto', scrollbarWidth:'none' }}>
+          <div style={{ display:'flex', gap:8, marginBottom:12, overflowX:'auto', scrollbarWidth:'none', paddingBottom:2 }}>
             {[['favorites','⭐ Избранное'],['diary','📓 Дневник']].map(([id,label]:any) => (
               <button key={id} onClick={() => setCombinedFavDiaryTab(id as any)} style={{
-                padding:'6px 14px', borderRadius:20, fontSize:10, fontWeight:700, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-                background: combinedFavDiaryTab === id ? 'var(--accent)' : 'var(--bg-secondary)',
-                color: combinedFavDiaryTab === id ? '#000' : 'var(--text-dim)',
-                border: '1px solid ' + (combinedFavDiaryTab === id ? 'var(--accent)' : 'var(--border)'),
+                padding:'9px 16px', borderRadius:20, fontSize:12, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, minHeight:36,
+                background: combinedFavDiaryTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
+                color: combinedFavDiaryTab === id ? '#000' : 'rgba(255,255,255,0.7)',
+                border: '1px solid ' + (combinedFavDiaryTab === id ? 'var(--accent)' : 'rgba(255,255,255,0.08)'),
+                boxShadow: combinedFavDiaryTab === id ? '0 2px 12px rgba(0,230,138,0.3)' : 'none', transition:'all 0.2s',
               }}>{label}</button>
             ))}
           </div>

@@ -1,29 +1,67 @@
 // @ts-nocheck
 /**
- * supportProtocolsShared.tsx — shared UI helpers for protocol modules
+ * supportProtocolsShared.tsx — обновлённая визуальная система протоколов.
+ * Карточки с глубиной, чипы крупнее, типографика 12-13px, консистентные отступы.
  */
 import React from 'react';
 
-export const cardBg = { background:'var(--bg-secondary)', borderRadius:12, padding:12, border:'1px solid var(--border)' };
+const baseCard: React.CSSProperties = {
+  background: 'rgba(24,24,27,0.55)',
+  borderRadius: 16,
+  padding: 14,
+  border: '1px solid rgba(255,255,255,0.07)',
+  backdropFilter: 'blur(14px)',
+  WebkitBackdropFilter: 'blur(14px)',
+  boxShadow: '0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)',
+};
 
-export const pillActive = (c: string) => ({ padding:'5px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap' as const, cursor:'pointer', background:c, color:'#000', border:'1px solid '+c });
+export const cardBg: React.CSSProperties = { ...baseCard };
 
-export const pillInactive = () => ({ padding:'5px 12px', borderRadius:16, fontSize:9, fontWeight:700, whiteSpace:'nowrap' as const, cursor:'pointer', background:'var(--bg-secondary)', color:'var(--text-dim)', border:'1px solid var(--border)' });
+export const pillActive = (c: string): React.CSSProperties => ({
+  padding: '8px 14px',
+  borderRadius: 20,
+  fontSize: 12,
+  fontWeight: 800,
+  whiteSpace: 'nowrap' as const,
+  cursor: 'pointer',
+  background: c,
+  color: '#000',
+  border: `1px solid ${c}`,
+  boxShadow: `0 2px 12px ${c}35`,
+  minHeight: 34,
+  display: 'inline-flex',
+  alignItems: 'center',
+});
+
+export const pillInactive = (): React.CSSProperties => ({
+  padding: '8px 14px',
+  borderRadius: 20,
+  fontSize: 12,
+  fontWeight: 600,
+  whiteSpace: 'nowrap' as const,
+  cursor: 'pointer',
+  background: 'rgba(255,255,255,0.06)',
+  color: 'rgba(255,255,255,0.7)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  minHeight: 34,
+  display: 'inline-flex',
+  alignItems: 'center',
+});
 
 export const PhaseLabel: React.FC<{ label: string; color: string }> = ({ label, color }) => (
-  <span style={{ fontSize:8, fontWeight:800, padding:'1px 6px', borderRadius:4, background:color+'22', color }}>{label}</span>
+  <span style={{ fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: color + '18', color, border: `1px solid ${color}30` }}>{label}</span>
 );
 
 export const ItemRow: React.FC<{ name: string; dose: string; timing: string; note: string; color: string }> = ({ name, dose, timing, note, color }) => (
-  <div style={{ padding:'5px 8px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-      <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{name}</span>
-      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-        <span style={{ fontSize:8, fontWeight:700, color }}>{dose}</span>
-        <span style={{ fontSize:7, color:'var(--text-dim)', padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{timing}</span>
+  <div style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{name}</span>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color }}>{dose}</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>{timing}</span>
       </div>
     </div>
-    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, marginTop:1 }}>{note}</div>
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, marginTop: 4 }}>{note}</div>
   </div>
 );
 
@@ -34,63 +72,69 @@ export const triageBadge = (tier: 'ess' | 'rec' | 'opt') => {
     opt: { label: '🟢 Опционально', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
   };
   const c = cfg[tier];
-  return <span style={{ fontSize:6, fontWeight:700, padding:'1px 5px', borderRadius:3, background:c.bg, color:c.color, marginLeft:4 }}>{c.label}</span>;
+  return <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: c.bg, color: c.color, border: `1px solid ${c.color}28`, marginLeft: 6 }}>{c.label}</span>;
 };
 
 export const phaseBadge = (phase: string) => {
-  const colors: Record<string, string> = { blast:'#ef4444', cruise:'#f59e0b', pct:'#22c55e', bridge:'#6366f1', trt:'#3b82f6' };
-  return <span style={{ fontSize:6, fontWeight:700, padding:'1px 4px', borderRadius:3, background:(colors[phase]||'#888')+'22', color:colors[phase]||'#888', marginLeft:4 }}>{phase === 'blast' ? 'Курс' : phase === 'cruise' ? 'Крейсер' : phase === 'pct' ? 'ПКТ' : phase === 'bridge' ? 'Мост' : phase === 'trt' ? 'TRT' : phase}</span>;
+  const colors: Record<string, string> = { blast: '#ef4444', cruise: '#f59e0b', pct: '#22c55e', bridge: '#6366f1', trt: '#3b82f6' };
+  return <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 7px', borderRadius: 20, background: (colors[phase] || '#888') + '18', color: colors[phase] || '#888', border: `1px solid ${(colors[phase] || '#888')}25`, marginLeft: 6 }}>{phase === 'blast' ? 'Курс' : phase === 'cruise' ? 'Крейсер' : phase === 'pct' ? 'ПКТ' : phase === 'bridge' ? 'Мост' : phase === 'trt' ? 'TRT' : phase}</span>;
 };
 
 export const ItemRowTriage: React.FC<{ name: string; dose: string; timing: string; note: string; color: string; tier?: 'ess' | 'rec' | 'opt'; phase?: string }> = ({ name, dose, timing, note, color, tier, phase }) => (
-  <div style={{ padding:'5px 8px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:2 }}>
-      <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{name}{tier ? triageBadge(tier) : null}{phase ? phaseBadge(phase) : null}</span>
-      <div style={{ display:'flex', gap:6, alignItems:'center' }}>
-        <span style={{ fontSize:8, fontWeight:700, color }}>{dose}</span>
-        <span style={{ fontSize:7, color:'var(--text-dim)', padding:'1px 5px', borderRadius:4, background:'rgba(255,255,255,0.04)' }}>{timing}</span>
+  <div style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>{name}{tier ? triageBadge(tier) : null}{phase ? phaseBadge(phase) : null}</span>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span style={{ fontSize: 12, fontWeight: 800, color }}>{dose}</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>{timing}</span>
       </div>
     </div>
-    <div style={{ fontSize:7, color:'var(--text-dim)', lineHeight:1.3, marginTop:1 }}>{note}</div>
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', lineHeight: 1.4, marginTop: 4 }}>{note}</div>
   </div>
 );
 
 export const renderRow = (x: any, i: number, color: string) => (
-  <div key={i} style={{ padding:'6px 8px', borderRadius:6, marginBottom:4, background:'rgba(255,255,255,0.02)', border:'1px solid var(--border)' }}>
-    <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.n}</span>
-    {x.d ? <span style={{ fontSize:7, color, marginLeft:4 }}>{x.d}</span> : null}
-    <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.t}</span>
-    {x.o ? <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>💡 {x.o}</div> : null}
+  <div key={i} style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>{x.n}</span>
+      {x.d ? <span style={{ fontSize: 11, fontWeight: 700, color, background: `${color}14`, padding: '2px 7px', borderRadius: 20, border: `1px solid ${color}22` }}>{x.d}</span> : null}
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>· {x.t}</span>
+    </div>
+    {x.o ? <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', borderLeft: `3px solid ${color}55` }}>💡 {x.o}</div> : null}
   </div>
 );
 
 export const renderPhase = (p: any, i: number) => (
-  <div key={i} style={{ borderRadius:12, background:p.color+'08', border:'1px solid '+p.color+'22', padding:10 }}>
-    <div style={{ fontSize:10, fontWeight:700, color:p.color }}>{p.phase}</div>
-    <div style={{ fontSize:8, fontWeight:600, color:p.color+'aa', marginBottom:2 }}>{p.label}</div>
-    <div style={{ fontSize:7, color:'var(--text-dim)', marginBottom:4 }}>{p.condition}</div>
-    <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:6 }}>{p.desc}</div>
+  <div key={i} style={{ borderRadius: 16, background: p.color + '0A', border: '1px solid ' + p.color + '22', padding: 14, backdropFilter: 'blur(10px)' }}>
+    <div style={{ fontSize: 13, fontWeight: 850, color: p.color, letterSpacing: '-0.2px' }}>{p.phase}</div>
+    <div style={{ fontSize: 11, fontWeight: 700, color: p.color + 'CC', marginBottom: 4 }}>{p.label}</div>
+    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', marginBottom: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)' }}>{p.condition}</div>
+    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 10, lineHeight: 1.45 }}>{p.desc}</div>
     {p.items.map((x: any, xi: number) => (
-      <div key={xi} style={{ padding:'5px 6px', borderRadius:6, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
-        <span style={{ fontSize:8, fontWeight:700, color:'var(--text-light)' }}>{x.name}</span>
-        <span style={{ fontSize:7, color:p.color, marginLeft:4 }}>{x.dose}</span>
-        <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:4 }}>· {x.timing}</span>
-        <div style={{ fontSize:7, color:'var(--text-dim)', marginTop:1 }}>{x.note}</div>
+      <div key={xi} style={{ padding: '9px 10px', borderRadius: 10, marginBottom: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{x.name}</span>
+          <span style={{ fontSize: 11, color: p.color, fontWeight: 800, background: `${p.color}14`, padding: '2px 7px', borderRadius: 20, border: `1px solid ${p.color}22` }}>{x.dose}</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>· {x.timing}</span>
+        </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 4, lineHeight: 1.4 }}>{x.note}</div>
       </div>
     ))}
   </div>
 );
 
-export const timingBlock = (protocol: string, slots: Array<{time:string;items:Array<{n:string;why:string}>}>) => (
+export const timingBlock = (protocol: string, slots: Array<{ time: string; items: Array<{ n: string; why: string }> }>) => (
   <div style={cardBg}>
-    <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>⏰ Тайминг приёма</div>
+    <div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ width: 28, height: 28, borderRadius: 10, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>⏰</span> Тайминг приёма
+    </div>
     {slots.map((slot: any, si: number) => (
-      <div key={si} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.12)' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>{slot.time}</div>
+      <div key={si} style={{ padding: '10px 12px', borderRadius: 12, marginBottom: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', marginBottom: 6 }}>{slot.time}</div>
         {slot.items.map((x: any, xi: number) => (
-          <div key={xi} style={{ padding:'5px 6px', borderRadius:4, marginBottom:3, background:'rgba(255,255,255,0.02)' }}>
-            <span style={{ fontSize:8, fontWeight:600, color:'var(--text-light)' }}>{x.n}</span>
-            <span style={{ fontSize:7, color:'var(--text-dim)', marginLeft:6 }}>— {x.why}</span>
+          <div key={xi} style={{ padding: '8px 10px', borderRadius: 10, marginBottom: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.04)' }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{x.n}</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginLeft: 8 }}>— {x.why}</span>
           </div>
         ))}
       </div>
@@ -98,18 +142,20 @@ export const timingBlock = (protocol: string, slots: Array<{time:string;items:Ar
   </div>
 );
 
-export const monitoringBlock = (markers: Array<{marker:string;target:string;when:string;action:string}>) => (
-  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+export const monitoringBlock = (markers: Array<{ marker: string; target: string; when: string; action: string }>) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
     <div style={cardBg}>
-      <div style={{ fontSize:11, fontWeight:700, color:'#3b82f6', marginBottom:6 }}>🧪 Лабораторный мониторинг</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ width: 28, height: 28, borderRadius: 10, background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🧪</span> Лабораторный мониторинг
+      </div>
       {markers.map((m: any, i: number) => (
-        <div key={i} style={{ padding:'8px 10px', borderRadius:8, marginBottom:6, background:'rgba(59,130,246,0.04)', border:'1px solid rgba(59,130,246,0.08)' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-            <span style={{ fontSize:9, fontWeight:700, color:'#60a5fa' }}>{m.marker}</span>
-            <span style={{ fontSize:8, fontWeight:600, color:'#3b82f6' }}>{m.when}</span>
+        <div key={i} style={{ padding: '12px', borderRadius: 12, marginBottom: 8, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.10)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa' }}>{m.marker}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', background: 'rgba(59,130,246,0.12)', padding: '3px 8px', borderRadius: 20, border: '1px solid rgba(59,130,246,0.18)' }}>{m.when}</span>
           </div>
-          <div style={{ fontSize:8, color:'var(--text-dim)', marginBottom:4 }}><b style={{color:'#60a5fa'}}>Цель: {m.target}</b></div>
-          <div style={{ fontSize:7, color:'#60a5fa', lineHeight:1.3, padding:'4px 6px', borderRadius:4, background:'rgba(59,130,246,0.06)' }}>💡 {m.action}</div>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.75)', marginBottom: 6 }}><b style={{ color: '#60a5fa' }}>Цель: {m.target}</b></div>
+          <div style={{ fontSize: 11, color: '#93c5fd', lineHeight: 1.4, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.12)' }}>💡 {m.action}</div>
         </div>
       ))}
     </div>
@@ -119,29 +165,29 @@ export const monitoringBlock = (markers: Array<{marker:string;target:string;when
 export const RX_NOTE = ' 💊 рецептурно — только по назначению врача';
 
 export const StopBanner: React.FC<{ title: string; thresholds: string[] }> = ({ title, thresholds }) => (
-  <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)' }}>
-    <div style={{ fontSize:9, fontWeight:800, color:'#ef4444', marginBottom:4 }}>🛑 {title}</div>
+  <div style={{ borderRadius: 14, padding: '14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)', backdropFilter: 'blur(10px)' }}>
+    <div style={{ fontSize: 12, fontWeight: 850, color: '#ef4444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(239,68,68,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🛑</span> {title}</div>
     {thresholds.map((t: string, i: number) => (
-      <div key={i} style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:2 }}>• {t}</div>
+      <div key={i} style={{ fontSize: 11, color: '#fca5a5', lineHeight: 1.5, marginBottom: 3, paddingLeft: 8, borderLeft: '2px solid rgba(239,68,68,0.25)' }}>• {t}</div>
     ))}
   </div>
 );
 
 export const ContraBanner: React.FC<{ items: string[] }> = ({ items }) => (
-  <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.25)' }}>
-    <div style={{ fontSize:9, fontWeight:800, color:'#f59e0b', marginBottom:4 }}>⚠️ Что НЕ назначать / противопоказания</div>
+  <div style={{ borderRadius: 14, padding: '14px', background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.22)', backdropFilter: 'blur(10px)' }}>
+    <div style={{ fontSize: 12, fontWeight: 850, color: '#f59e0b', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(245,158,11,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>⚠️</span> Что НЕ назначать / противопоказания</div>
     {items.map((t: string, i: number) => (
-      <div key={i} style={{ fontSize:8, color:'#fcd34d', lineHeight:1.4, marginBottom:2 }}>• {t}</div>
+      <div key={i} style={{ fontSize: 11, color: '#fcd34d', lineHeight: 1.5, marginBottom: 3, paddingLeft: 8, borderLeft: '2px solid rgba(245,158,11,0.25)' }}>• {t}</div>
     ))}
   </div>
 );
 
 export const CrossModuleLimitBanner: React.FC<{ substance: string; limit: string; current: string; warning: string }> = ({ substance, limit, current, warning }) => (
-  <div style={{ borderRadius:10, padding:'10px 12px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
-    <div style={{ fontSize:9, fontWeight:800, color:'#ef4444', marginBottom:4 }}>🚫 Кросс-модульный лимит: {substance}</div>
-    <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:2 }}>• Текущая сумма из нескольких протоколов: {current}</div>
-    <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4, marginBottom:2 }}>• Максимум по всем модулям: {limit}</div>
-    <div style={{ fontSize:8, color:'#fca5a5', lineHeight:1.4 }}>• {warning}</div>
+  <div style={{ borderRadius: 14, padding: '14px', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.28)', backdropFilter: 'blur(10px)' }}>
+    <div style={{ fontSize: 12, fontWeight: 850, color: '#ef4444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 24, height: 24, borderRadius: 8, background: 'rgba(239,68,68,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>🚫</span> Кросс-модульный лимит: {substance}</div>
+    <div style={{ fontSize: 11, color: '#fca5a5', lineHeight: 1.5, marginBottom: 2 }}>• Текущая сумма из нескольких протоколов: <b>{current}</b></div>
+    <div style={{ fontSize: 11, color: '#fca5a5', lineHeight: 1.5, marginBottom: 2 }}>• Максимум по всем модулям: <b>{limit}</b></div>
+    <div style={{ fontSize: 11, color: '#fca5a5', lineHeight: 1.5 }}>• {warning}</div>
   </div>
 );
 
