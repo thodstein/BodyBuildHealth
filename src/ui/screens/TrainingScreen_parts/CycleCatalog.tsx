@@ -10,7 +10,7 @@ import { rankCycles } from '../../../engines/lms/lms-selector.engine';
 import { ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 
 type CatFilter = 'all' | 'strength' | 'bodybuilding';
-type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed';
+type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed' | 'speed';
 type UserLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'intermediate';
 
 interface Props {
@@ -32,6 +32,7 @@ const FOCUS_LABELS: Record<string, string> = {
 // ── Нормализация цели/уровня профиля под union движка rankCycles ──
 function normalizeGoal(g: string): UserGoal {
   const s = (g || '').toLowerCase();
+  if (/(speed|скорость|координ)/.test(s)) return 'speed';
   if (/(mass|масс|гипертроф|набор|muscle)/.test(s)) return 'mass';
   if (/(strength|сил)/.test(s)) return 'strength';
   if (/(endurance|выносл)/.test(s)) return 'endurance';

@@ -66,10 +66,36 @@ import { QualityChecklistCard } from './QualityChecklistCard';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
-const GOAL_OPTS = [
-  { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
-  { id: 'peaking', label: 'Пик/сушка' }, { id: 'recomp', label: 'Рекомпозиция' }, { id: 'rehab', label: 'Реабилитация' },
+/**
+ * ББ-цели (Schoenfeld/Helms/Israetel) vs ПЛ-цели (Verkhoshansky/Bompa/Sheiko/Zatsiorsky) — раздельные источники.
+ * ББ: гипертрофия/сушка/рекомп/поддержание/сила+масса; ПЛ: выносливость(GPP)/сила/speed/пик.
+ */
+export const GOAL_OPTS_BB: Array<{ id: string; label: string }> = [
+  { id: 'hypertrophy', label: 'Масса (гипертрофия)' },
+  { id: 'cut', label: 'Сушка' },
+  { id: 'recomp', label: 'Рекомпозиция' },
+  { id: 'maintenance', label: 'Поддержание' },
+  { id: 'strength_mass', label: 'Сила+Масса' },
+  { id: 'rehab', label: 'Реабилитация' },
 ];
+export const GOAL_OPTS_PL: Array<{ id: string; label: string }> = [
+  { id: 'pl_endurance', label: 'Выносливость (GPP)' },
+  { id: 'pl_strength', label: 'Сила' },
+  { id: 'pl_speed', label: 'Скорость/Координация' },
+  { id: 'pl_peaking', label: 'Выход на пик' },
+  { id: 'rehab', label: 'Реабилитация' },
+];
+const GOAL_OPTS: Array<{ id: string; label: string }> = [
+  ...GOAL_OPTS_BB,
+  ...GOAL_OPTS_PL.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id)),
+  { id: 'powerlifting', label: 'Сила (ПЛ, legacy)' },
+  { id: 'peaking', label: 'Пик/сушка (legacy)' },
+  { id: 'mass', label: 'Масса (legacy)' },
+  { id: 'bulk', label: 'Масса (legacy bulk)' },
+];
+function goalLabelOf(id: string): string {
+  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? id;
+}
 const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
   { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'Enhanced' },
@@ -619,7 +645,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     html.push('.phase{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px}');
     html.push('</style></head><body>');
     html.push(`<h1>${safeTitle}</h1>`);
-    html.push(`<div class="meta">Цель: ${GOAL_OPTS.find(g=>g.id===program.meta.goal)?.label ?? program.meta.goal} · Уровень: ${LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level} · ${program.meta.daysPerWeek} дн/нед × ${program.meta.weeks} нед</div>`);
+    html.push(`<div class="meta">Цель: ${goalLabelOf(program.meta.goal)} · Уровень: ${LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level} · ${program.meta.daysPerWeek} дн/нед × ${program.meta.weeks} нед</div>`);
     // F2.5: тренерские заметки в PDF
     if (program.meta.notes) {
        html.push(`<div style="white-space:pre-wrap;background:#f5f5f5;padding:10px;border-left:3px solid #60a5fa;margin:10px 0;font-size:11px;color:#333;">📝 <b>Заметки тренера:</b><br>${escapeHtml(program.meta.notes)}</div>`);
@@ -703,9 +729,9 @@ return (
          <div className="manual-constructor__header editor-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
            <button style={{ ...BTN_GHOST, padding: '7px 12px', fontSize: 11, minHeight: 38, borderColor: 'rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)' }} onClick={safeBack}>← К списку</button>
            <span style={{ fontSize: 11, fontWeight: 850, color: DIR_COLOR[dir], background: DIR_COLOR[dir] + '18', border: `1px solid ${DIR_COLOR[dir]}35`, borderRadius: 8, padding: '3px 8px' }}>{DIR_LABEL[dir]} · {SOURCE_LABEL[program.meta.source] ?? program.meta.source}</span>
-           <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', fontWeight: 600, whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '3px 8px' }}>
-             🎯 {GOAL_OPTS.find(g => g.id === program.meta.goal)?.label ?? program.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
-           </span>
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.62)', fontWeight: 600, whiteSpace: 'nowrap', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '3px 8px' }}>
+              🎯 {goalLabelOf(program.meta.goal)} · 📶 {LEVEL_OPTS.find(l => l.id === program.meta.level)?.label ?? program.meta.level} · {program.meta.daysPerWeek}д × {program.meta.weeks}н
+            </span>
            {isDirty && <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.30)', borderRadius: 20, padding: '2px 7px' }} title="Несохранённые изменения">● не сохранено</span>}
            {!isDirty && <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.20)', borderRadius: 20, padding: '2px 7px' }}>✓ сохранено</span>}
            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1576,9 +1602,9 @@ return (
            {!(program.meta.title && program.meta.title.trim().length >= 3) && <span style={{ fontSize: 10, color: '#ef4444' }}>⚠ Укажите название — без него Итог не будет качественным</span>}
            {program.meta.title && program.meta.title.trim().length >= 3 && program.meta.title.trim().length < 12 && <span style={{ fontSize: 10, color: '#f59e0b' }}>💡 Более описательное название поможет в списке (напр. «Масса 4д × 8 нед»)</span>}
          </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8 }}>
-           <EditorPopupSelect value={program.meta.goal} options={GOAL_OPTS.map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ goal: v })} ariaLabel="Цель программы" title="Цель программы" buttonStyle={{ width: '100%' }} />
-           <EditorPopupSelect value={program.meta.level} options={LEVEL_OPTS.map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ level: v })} ariaLabel="Уровень подготовки" title="Уровень подготовки" buttonStyle={{ width: '100%' }} />
+         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8 }}>
+            <EditorPopupSelect value={program.meta.goal} options={(program.meta.direction === 'pl' ? GOAL_OPTS_PL : program.meta.direction === 'bb' ? GOAL_OPTS_BB : GOAL_OPTS).map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ goal: v })} ariaLabel="Цель программы" title="Цель программы" buttonStyle={{ width: '100%' }} />
+            <EditorPopupSelect value={program.meta.level} options={LEVEL_OPTS.map(o => ({ id: o.id, label: o.label }))} onChange={v => updateMeta({ level: v })} ariaLabel="Уровень подготовки" title="Уровень подготовки" buttonStyle={{ width: '100%' }} />
            <label style={{ ...SMALL, display: 'flex', flexDirection: 'column', gap: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '8px 10px' }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Дней / нед</span>
             {/* U3: meta.daysPerWeek каскад — при изменении добавляет/удаляет сессии в bb.weeks; при уменьшении с контентом — подтверждение */}
@@ -1652,8 +1678,8 @@ return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 11, fontWeight: 850, color: '#60a5fa' }}>💡 Как цель и уровень влияют на цикл</span><span style={{ fontSize: 10, color: DIM, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.14)', borderRadius: 20, padding: '2px 7px' }}>подсказка тренера</span></div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8 }}>
           <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.07)', border: '1px solid rgba(0,230,138,0.16)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a' }}>🎯 Цель: {GOAL_OPTS.find(g=>g.id===program.meta.goal)?.label ?? program.meta.goal}</span>
-            <span style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{program.meta.goal === 'hypertrophy' ? 'Объём 65–85% MEV→MAV, RIR 2→1, делод 4н' : program.meta.goal === 'powerlifting' ? 'Интенсив 75–90% 1RM, RIR 3→1, пик+делод' : program.meta.goal === 'cut' ? 'Объём −15%, RIR 3, делод чаще' : program.meta.goal === 'recomp' ? 'Умеренный объём, RIR 2–3' : program.meta.goal === 'peaking' ? 'Объём ↓ интенс ↑ RIR 1→0' : 'Выберите ближе к задаче'}</span>
+            <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a' }}>🎯 Цель: {goalLabelOf(program.meta.goal)}</span>
+            <span style={{ fontSize: 10, color: '#fff', lineHeight: 1.45 }}>{(() => { const g = program.meta.goal; if (g === 'pl_endurance' || g === 'endurance') return 'Выносливость: 60-70% ×10-20, RIR 3-4, объём ×1.0, GPP/ОФП'; if (g === 'pl_strength' || g === 'powerlifting' || g === 'strength') return 'Сила: 75-90% ×1-6, RIR 0-2, Прилепин'; if (g === 'pl_speed') return 'Скорость: 50-75% ×2-5, RIR 4-5, взрыв, цепи/паузы'; if (g === 'pl_peaking' || g === 'peaking' || g === 'peak') return 'Пик: 90-105% ×1-3, taper ×0.45, RIR 0-1'; if (g === 'hypertrophy' || g === 'mass') return 'Масса: 65-85% 8-15, RIR 2→1, делод 4н'; if (g === 'cut') return 'Сушка: объём ×0.60-0.75 на дефиците, RIR 3-4'; if (g === 'recomp') return 'Рекомп: умеренный объём, RIR 2-3'; if (g === 'maintenance') return 'Поддержание: MEV, RIR 4, делод 6н'; if (g === 'strength_mass') return 'Сила+Масса: гибрид объём+интенс'; return 'Выберите ближе к задаче'; })()}</span>
           </div>
           <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(167,139,250,0.07)', border: '1px solid rgba(167,139,250,0.16)', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <span style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa' }}>📶 Уровень: {LEVEL_OPTS.find(l=>l.id===program.meta.level)?.label ?? program.meta.level}</span>

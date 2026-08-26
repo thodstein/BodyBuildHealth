@@ -137,11 +137,12 @@ function defaultWorkMax(): Record<string, number> {
   return { ...GROUP_WORKMAX };
 }
 
-/** Полноценная авто-сборка ББ-плана через buildBBPlan (BB-auto-движок). */
+/** Полноценная авто-сборка ББ-плана через buildBBPlan (BB-auto-движок). BB-цели Schoenfeld/Helms: mass/hypertrophy/cut/recomp/maintenance/strength_mass */
 export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
-  const goal = (['mass', 'strength', 'cut', 'recomp', 'hypertrophy', 'bodybuilding', 'athletic'].includes(opts.goal)
-    ? opts.goal as BBGoal
-    : 'hypertrophy') as BBGoal;
+  const BB_GOALS = ['mass','strength','cut','recomp','maintenance','strength_mass','hypertrophy','bodybuilding','athletic'] as const;
+  const raw = (BB_GOALS as readonly string[]).includes(opts.goal) ? opts.goal : 'hypertrophy';
+  // hypertrophy ↔ mass — синонимы (BB, Schoenfeld 2017), нормализуем к mass для движка
+  const goal = (raw === 'hypertrophy' ? 'mass' : raw === 'strength' ? 'strength_mass' : raw) as BBGoal;
   const patternId = opts.splitPattern ?? (
     (() => {
       try {

@@ -91,10 +91,43 @@ import { buildBBUserProgramFromProfile } from './auto-fill-draft';
 import { sessionDayOfWeek } from './program-editor-logic';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 
-const GOAL_OPTS = [
-  { id: 'hypertrophy', label: 'Масса' }, { id: 'powerlifting', label: 'Сила (ПЛ)' },
-  { id: 'peaking', label: 'Пик/сушка' }, { id: 'recomp', label: 'Рекомпозиция' }, { id: 'rehab', label: 'Реабилитация' },
+/**
+ * ББ-цели ручного конструктора (Schoenfeld 2017 / Helms 2016 / Israetel):
+ *  Масса — гипертрофия ×65-85% 8-15, recomposition, maintenance, сила+масса.
+ *  Источник: Helms evidence-based, Schoenfeld meta. Отличаются от ПЛ-целей (Sir/Verk/Bompa GPP/Speed/Peak).
+ */
+export const GOAL_OPTS_BB: Array<{ id: string; label: string }> = [
+  { id: 'hypertrophy', label: 'Масса (гипертрофия)' },
+  { id: 'cut', label: 'Сушка' },
+  { id: 'recomp', label: 'Рекомпозиция' },
+  { id: 'maintenance', label: 'Поддержание' },
+  { id: 'strength_mass', label: 'Сила+Масса' },
+  { id: 'rehab', label: 'Реабилитация' },
 ];
+/**
+ * ПЛ-цели ручного конструктора и ПЛ-авто (Verkhoshansky/Bompa/Sheiko/Zatsiorsky):
+ *  выносливость (GPP, 60-70% ×10-20), сила (70-90% ×1-6, Прилепин),
+ *  скорость/координация (50-75% ×2-5, dynamic effort, цепи/паузы), пик (Bosquet taper singles 90-105%).
+ */
+export const GOAL_OPTS_PL: Array<{ id: string; label: string }> = [
+  { id: 'pl_endurance', label: 'Выносливость (GPP)' },
+  { id: 'pl_strength', label: 'Сила' },
+  { id: 'pl_speed', label: 'Скорость/Координация' },
+  { id: 'pl_peaking', label: 'Выход на пик' },
+  { id: 'rehab', label: 'Реабилитация' },
+];
+// Legacy combined для отображения старых программ (powerlifting→pl_strength, peaking→pl_peaking / cut)
+const GOAL_OPTS: Array<{ id: string; label: string }> = [
+  ...GOAL_OPTS_BB,
+  ...GOAL_OPTS_PL.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id)),
+  { id: 'powerlifting', label: 'Сила (ПЛ, legacy)' },
+  { id: 'peaking', label: 'Пик/сушка (legacy)' },
+  { id: 'mass', label: 'Масса (legacy)' },
+  { id: 'bulk', label: 'Масса (legacy bulk)' },
+];
+function goalLabelOf(id: string): string {
+  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? id;
+}
 const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
   { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'Enhanced' },
@@ -327,7 +360,7 @@ export const ProgramManagerPanel: React.FC = () => {
     // стандартному режиму терять trainingFocus и recovery-метрики профиля.
     const p = createBlank(dir);
     p.meta.title = dir === 'bb' ? 'Новая ББ-программа' : dir === 'pl' ? 'Новая ПЛ-программа' : 'Новый Powerbuilder-план';
-    p.meta.goal = dir === 'pl' ? 'powerlifting' : dir === 'hybrid' ? 'strength_mass' : 'hypertrophy';
+    p.meta.goal = dir === 'pl' ? 'pl_strength' : dir === 'hybrid' ? 'strength_mass' : 'hypertrophy';
     p.meta.level = 'intermediate';
     p.meta.daysPerWeek = 4;
     p.meta.weeks = 8;
@@ -351,7 +384,7 @@ export const ProgramManagerPanel: React.FC = () => {
   const finishWizard = (autoFill = false) => {
     const p = createBlank(wizardDir);
     p.meta.title = wizardDir === 'bb' ? 'Моя ББ-программа' : wizardDir === 'pl' ? 'Моя ПЛ-программа' : 'Мой Powerbuilder-план';
-    p.meta.goal = wizardDir === 'pl' ? 'powerlifting' : wizardGoal;
+    p.meta.goal = wizardDir === 'pl' ? (wizardGoal || 'pl_strength') : wizardGoal;
     p.meta.level = wizardLevel;
     p.meta.daysPerWeek = wizardDays;
     p.meta.weeks = wizardWeeks;
@@ -360,17 +393,24 @@ export const ProgramManagerPanel: React.FC = () => {
       if (wizardDir === 'bb' && p.bb) {
         p.bb.weeks = buildBBSkeleton(wizardDays, wizardWeeks);
       } else if (wizardDir === 'pl' && p.pl) {
-        // PL-скелет: wizardWeeks недель, каждая с wizardDays днями (присед/жим/тяга по очереди)
+        // PL-скелет goal-aware: выносливость 65%×10, сила 75%×5, скорость 60%×3, пик 85%×3
         const lifts: Array<'squat'|'bench'|'dead'> = ['squat','bench','dead'];
         const dayNames = ['Присед','Жим','Тяга','Подсобка','Подсобка 2','Подсобка 3','Подсобка 4'];
+        const plTpl = (() => {
+          const g = (wizardGoal || '').toLowerCase();
+          if (g === 'pl_endurance' || g === 'endurance') return { pct: 0.65, reps: 10, sets: 3, rir: 3, phase: 'accumulation' };
+          if (g === 'pl_speed' || g === 'speed') return { pct: 0.60, reps: 3, sets: 5, rir: 4, phase: 'accumulation' };
+          if (g === 'pl_peaking' || g === 'peaking' || g === 'peak') return { pct: 0.82, reps: 3, sets: 3, rir: 1, phase: 'peaking' };
+          return { pct: 0.75, reps: 5, sets: 3, rir: 2, phase: 'accumulation' }; // strength default
+        })();
         p.pl.customWeeks = Array.from({ length: wizardWeeks }, (_, wi) => ({
           week: wi + 1,
-          phase: (wi % 4 === 3 ? 'deload' : 'accumulation') as 'deload' | 'accumulation',
+          phase: (wi % 4 === 3 ? 'deload' : plTpl.phase) as 'deload' | 'accumulation' | 'peaking',
           deload: wi % 4 === 3,
           days: Array.from({ length: wizardDays }, (_, di) => ({
             name: dayNames[di % dayNames.length] + (wizardDays > 3 && di >= 3 ? ` ${di+1}` : ''),
             dayOfWeek: di % 7,
-            exercises: [{ name: '', lift: lifts[di % lifts.length], muscle: lifts[di % lifts.length] === 'squat' ? 'legs' : lifts[di % lifts.length] === 'bench' ? 'chest' : 'back', sets: [{ pct: 0.7, reps: 5, sets: 3, rir: 2 }] }],
+            exercises: [{ name: '', lift: lifts[di % lifts.length], muscle: lifts[di % lifts.length] === 'squat' ? 'legs' : lifts[di % lifts.length] === 'bench' ? 'chest' : 'back', sets: [{ pct: plTpl.pct, reps: plTpl.reps, sets: plTpl.sets, rir: plTpl.rir }] }],
           })),
         }));
         p.pl.schedule = Array.from({ length: wizardDays }, (_, i) => ({ sessionIdx: i, dayOfWeek: i % 7 }));
@@ -571,7 +611,7 @@ export const ProgramManagerPanel: React.FC = () => {
             </span>
           </div>
           <div style={{ fontSize: 11, color: DIM, marginTop: 4, lineHeight: 1.5 }}>
-            🎯 {GOAL_OPTS.find(g => g.id === p.meta.goal)?.label ?? p.meta.goal} · 📶 {LEVEL_OPTS.find(l => l.id === p.meta.level)?.label ?? p.meta.level} · 🗓 {p.meta.daysPerWeek} дн/нед × {p.meta.weeks} нед
+            🎯 {goalLabelOf(p.meta.goal)} · 📶 {LEVEL_OPTS.find(l => l.id === p.meta.level)?.label ?? p.meta.level} · 🗓 {p.meta.daysPerWeek} дн/нед × {p.meta.weeks} нед
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
             {dir === 'bb' && bbMetrics && (
@@ -721,7 +761,7 @@ export const ProgramManagerPanel: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <ManualHeader
             title={`✋ Ручной конструктор — ${editing.meta.title || 'Программа'}`}
-            subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${GOAL_OPTS.find(g=>g.id===editing.meta.goal)?.label ?? editing.meta.goal} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
+            subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${goalLabelOf(editing.meta.goal)} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
             progress={{ current: _mstepIdx + 1, total: MSTEP_LIST.length, label: _mstepLabel }}
             chips={[
               { label: DIR_LABEL[editing.meta.direction] ?? editing.meta.direction, color: DIR_COLOR[editing.meta.direction] },
@@ -737,7 +777,7 @@ export const ProgramManagerPanel: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <ManualHeader
           title={`✋ Ручной конструктор — ${editing.meta.title || 'Программа'}`}
-          subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${GOAL_OPTS.find(g=>g.id===editing.meta.goal)?.label ?? editing.meta.goal} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
+          subtitle={`${DIR_LABEL[editing.meta.direction] ?? editing.meta.direction} · ${goalLabelOf(editing.meta.goal)} · ${LEVEL_OPTS.find(l=>l.id===editing.meta.level)?.label ?? editing.meta.level} · ${editing.meta.daysPerWeek} дн/нед × ${editing.meta.weeks} нед`}
           progress={{ current: _mstepIdx + 1, total: MSTEP_LIST.length, label: _mstepLabel }}
           chips={[
             { label: DIR_LABEL[editing.meta.direction] ?? editing.meta.direction, color: DIR_COLOR[editing.meta.direction] },
@@ -1141,7 +1181,7 @@ export const ProgramManagerPanel: React.FC = () => {
         )}
         {filteredPrograms().map(p => {
           const dc = DIR_COLOR[p.meta.direction];
-          const goalLabel = GOAL_OPTS.find(g => g.id === p.meta.goal)?.label ?? p.meta.goal;
+          const goalLabel = goalLabelOf(p.meta.goal);
           const levelLabel = LEVEL_OPTS.find(l => l.id === p.meta.level)?.label ?? p.meta.level;
           const chip: React.CSSProperties = { padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 600, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)', color: '#fff', whiteSpace: 'nowrap' };
           const iconBtn: React.CSSProperties = { ...BTN_GHOST, padding: '3px 6px', fontSize: 10, minWidth: 36, minHeight: 36, lineHeight: 1 };

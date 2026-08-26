@@ -9,7 +9,18 @@ import { LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-c
 import type { SRCycleTemplate } from '../../data/lms-cycles/lms-types';
 import { periodLabelRu, directionLabelRu } from '../../data/lms-cycles/period-labels';
 
-export type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed';
+/**
+ * UserGoal — цель подбора цикла.
+ * Ручной ПЛ и ПЛ-авто: 4 каноничные цели (Verkhoshansky/Bompa/Sheiko)
+ *  - endurance = Выносливость (GPP, work capacity, ОФП) — 60-70% ×10-20, RIR 3-4
+ *  - strength  = Сила (max strength, Прилепин 70-85% ×1-6)
+ *  - speed     = Скорость/Координация (speed-strength, dynamic effort, техника)
+ *               — 50-75% ×2-5 с акцентом на скорость штанги, паузы/цепи/дефициты
+ *               — Zatsiorsky 2009: зона мощности, Siff/Verkhoshansky 2009 SPP speed
+ *  - peak      = Выход на пик (peaking/taper, Bosquet 2007 ×0.4-0.65, синглы 90-105%)
+ *  mass/mixed — легаси-синонимы (ББ-масса и смешанный); конвертируются в ПЛ-логику.
+ */
+export type UserGoal = 'strength' | 'mass' | 'endurance' | 'peak' | 'mixed' | 'speed';
 export type UserLevel = 'novice' | 'II-KMS' | 'KMS-MS' | 'MS-MSMK' | 'II-MS' | 'intermediate';
 
 export interface LMSSelectorInput {
@@ -52,6 +63,9 @@ const GOAL_TO_PERIOD: Record<UserGoal, string[]> = {
   endurance: ['endurance'],
   peak: ['peak'],
   mixed: ['mixed', 'strength'],
+  // speed/координация — отдельного периода 'speed' в БД нет; наследует strength/mixed
+  // но допускается endurance как подготовительный скоростной блок (Verkhoshansky: preparatory speed block)
+  speed: ['strength', 'mixed', 'endurance'],
 };
 
 const LEVEL_ORDER = ['novice', 'II-KMS', 'II-MS', 'KMS-MS', 'intermediate', 'KMS-MSMK', 'MS-MSMK'];

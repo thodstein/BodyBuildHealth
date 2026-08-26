@@ -9,6 +9,7 @@ import { newId } from '../../../engines/user-program/user-program.types';
 import { autodraftBBPlan, applyPhaseModulation } from '../../../engines/manual-constructor';
 import { createFromBuild } from '../../../engines/user-program/program-store';
 import { LMS_CYCLES } from '../../../data/lms-cycles/lms-cycle-index';
+import { rankCycles } from '../../../engines/lms/lms-selector.engine';
 import type { TrainingProfile } from './training-profile';
 
 export interface AutoFillCtx {
@@ -137,15 +138,34 @@ export function autoFillBBDraft(ctx: AutoFillCtx): boolean {
   }
 }
 
-/** PL direction: auto-select LMS cycle by level and days. */
+/** Map PL manual goal → UserGoal for LMS selector (speed/new). */
+function plGoalToUserGoal(goal: string): import('../../../engines/lms/lms-selector.engine').UserGoal {
+  const g = (goal||'').toLowerCase();
+  if (g === 'pl_endurance' || g === 'endurance') return 'endurance';
+  if (g === 'pl_speed' || g === 'speed') return 'speed';
+  if (g === 'pl_peaking' || g === 'peaking' || g === 'peak') return 'peak';
+  if (g === 'pl_strength' || g === 'strength' || g === 'powerlifting') return 'strength';
+  return 'strength';
+}
+
+/** PL direction: auto-select LMS cycle by level, days и цели (speed/coordin). */
 export function autoFillPLDraft(ctx: AutoFillCtx): boolean {
   const { program, prof, days, update, showToast } = ctx;
   if (!program.pl) return false;
   const sessCount = Math.max(2, Math.min(6, days));
-  let foundCycle = LMS_CYCLES.find(c =>
-    c.meta.level === program.meta.level &&
-    Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1
-  );
+  // rankCycles с учётом цели — speed получит strength/mixed/endurance блок (Verkhoshansky speed block)
+  let foundCycle: typeof LMS_CYCLES[0] | undefined;
+  try {
+    const goal = plGoalToUserGoal(program.meta.goal);
+    const ranked = rankCycles({ goal, level: program.meta.level as any, daysPerWeek: sessCount, direction: 'powerlifting', mode: 'natural' });
+    foundCycle = ranked[0]?.cycle;
+  } catch { /* fallback */ }
+  if (!foundCycle) {
+    foundCycle = LMS_CYCLES.find(c =>
+      c.meta.level === program.meta.level &&
+      Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1
+    );
+  }
   if (!foundCycle) {
     foundCycle = LMS_CYCLES.find(c =>
       Math.abs(c.meta.sessionsPerWeek - sessCount) <= 1

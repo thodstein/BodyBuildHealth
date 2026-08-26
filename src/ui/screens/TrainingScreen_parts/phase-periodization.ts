@@ -109,6 +109,87 @@ export interface PhaseDistribution {
 }
 
 /**
+ * ПЛ-цели ручного конструктора и ПЛ-авто (4 канонические):
+ *  - pl_endurance (Выносливость: GPP, work capacity, ОФП) — Verkhoshansky 1985 GPP block,
+ *    Bompa 2019 anatomical adaptation: 60-70% ×10-20, RIR 3-5, rest 60-90, tempo 3-1-1-0,
+ *    высокий объём (×1.0), низкая интенсивность (×0.65), частый делод (каждые 3 нед),
+ *    подготовка сухожилий/техники перед тяжёлым блоком.
+ *  - pl_strength (Сила: max strength) — Zatsiorsky 2021, Прилепин: 75-90% ×1-6, RIR 0-2,
+ *    rest 180-300, tempo 2-0-1-0, volume ×0.85 в интенсификации, пик 1-3 повт.
+ *  - pl_speed (Скорость/Координация: speed-strength, dynamic effort, RFD) —
+ *    Zatsiorsky power zone 50-75% ×2-5 с акцентом на скорость, Siff/Verkhoshansky 2009
+ *    speed-strength method, Simmons 2000 dynamic effort: RIR 4-5 (далеко от отказа),
+ *    rest 120-180, tempo X (взрыв), включения: паузы/цепи/дефициты, техника.
+ *  - pl_peaking (Выход на пик: taper + competition) — Bosquet 2007 taper meta:
+ *    объём ×0.45-0.65, интенс ×0.97, RIR 0-1, rest 240+, singles 90-105%, mock meet,
+ *    минимум аксессуаров, последние 2-3 нед — пик/тапер.
+ *
+ * ББ-цели (отличаются по источнику):
+ *  - hypertrophy/mass (Масса) — Schoenfeld 2017 6-30 повт, Roberts 2022 RIR 0-3,
+ *    Helms 2016: 10-20 сет/нед, deficit/surplus via nutrition, volume ×1.0, интенс ×0.75.
+ *  - cut (Сушка) — Helms 2014: объём ×0.60-0.75 на дефиците, RIR 3-4, deload чаще.
+ *  - recomp (Рекомпозиция) — умеренный объём, RIR 2-3, 60/40 accum/intens.
+ *  - maintenance (Поддержание) — MEV 0.5×, редкий делод (6 нед), RIR 4.
+ *  - strength_mass (Сила+масса, powerbuilding) — гибрид: объём как масса, интенс как сила, пик 2 нед.
+ *  Различие источников: ПЛ-логика — SR cycles/periodization (Sir/Verk/Bompa), ББ-логика — Schoenfeld/Israetel/Helms.
+ */
+
+/** ПЛ-оверрайды фаз по 4 целям (источники выше). Применяются поверх PHASE_CONFIGS. */
+export const PL_GOAL_PHASE_OVERRIDES: Record<string, Partial<Record<BBPhase, Partial<PhaseConfig>>>> = {
+  pl_endurance: {
+    accumulation:    { repRange: [12, 20], intensityMultiplier: 0.65, volumeMultiplier: 1.00, rirRange: [4, 3] as [number, number], restBase: 70, tempo: '3-1-1-0', description: 'Выносливость: GPP — высокий объём, 60-65% ×10-20, RIR 3-4, пауза 60-90с' },
+    intensification: { repRange: [10, 15], intensityMultiplier: 0.70, volumeMultiplier: 0.90, rirRange: [3, 2] as [number, number], restBase: 90,  tempo: '3-1-1-0' },
+    peaking:         { repRange: [6, 10],  intensityMultiplier: 0.75, volumeMultiplier: 0.75, rirRange: [2, 1] as [number, number], restBase: 120 },
+    deload:          { repRange: [12, 20], intensityMultiplier: 0.55, volumeMultiplier: 0.50, restBase: 60 },
+  },
+  pl_strength: {
+    accumulation:    { repRange: [6, 10], intensityMultiplier: 0.75, volumeMultiplier: 1.00, rirRange: [3, 1] as [number, number], restBase: 120, tempo: '2-1-1-0' },
+    intensification: { repRange: [3, 6],  intensityMultiplier: 0.85, volumeMultiplier: 0.85, rirRange: [2, 0] as [number, number], restBase: 180, tempo: '2-0-1-0' },
+    peaking:         { repRange: [1, 3],  intensityMultiplier: 0.95, volumeMultiplier: 0.55, rirRange: [1, 0] as [number, number], restBase: 240, tempo: '2-0-1-0' },
+    deload:          { repRange: [5, 8],  intensityMultiplier: 0.60, volumeMultiplier: 0.40, restBase: 90 },
+  },
+  pl_speed: {
+    accumulation:    { repRange: [5, 8], intensityMultiplier: 0.65, volumeMultiplier: 0.80, rirRange: [5, 4] as [number, number], restBase: 90,  tempo: '1-0-X-0', description: 'Скорость: 50-65% ×5-8 с акцентом на скорость, паузы/цепи/дефициты, RIR 4-5' },
+    intensification: { repRange: [2, 5], intensityMultiplier: 0.68, volumeMultiplier: 0.75, rirRange: [5, 4] as [number, number], restBase: 120, tempo: '1-0-X-0' },
+    peaking:         { repRange: [1, 3], intensityMultiplier: 0.75, volumeMultiplier: 0.60, rirRange: [4, 3] as [number, number], restBase: 150, tempo: '1-0-X-0' },
+    deload:          { repRange: [8, 12], intensityMultiplier: 0.55, volumeMultiplier: 0.50, restBase: 90 },
+  },
+  pl_peaking: {
+    accumulation:    { repRange: [5, 8], intensityMultiplier: 0.75, volumeMultiplier: 0.90, rirRange: [3, 1] as [number, number], restBase: 120 },
+    intensification: { repRange: [3, 6], intensityMultiplier: 0.85, volumeMultiplier: 0.70, rirRange: [2, 0] as [number, number], restBase: 180 },
+    peaking:         { repRange: [1, 3], intensityMultiplier: 0.97, volumeMultiplier: 0.45, rirRange: [1, 0] as [number, number], restBase: 240, tempo: '2-0-1-0', description: 'Пик: Bosquet taper — объём ×0.45, интенс ×0.97, RIR 0-1, singles 90-105%' },
+    deload:          { repRange: [3, 5], intensityMultiplier: 0.60, volumeMultiplier: 0.35, restBase: 120 },
+  },
+};
+
+/** ББ-цели (отличаются источником: Schoenfeld/Helms/Israetel, не Sir/Verk). Для документации — используются в BB-builder, тут только сводка. */
+export const BB_MANUAL_GOALS = ['hypertrophy', 'mass', 'cut', 'recomp', 'maintenance', 'strength_mass', 'rehab'] as const;
+export const PL_MANUAL_GOALS = ['pl_endurance', 'pl_strength', 'pl_speed', 'pl_peaking', 'rehab'] as const;
+
+/** Нормализовать legacy/alias goal → канонический id (ПЛ 4 + ББ). */
+export function normalizeManualGoal(goal: string): string {
+  const g = (goal || '').toLowerCase().trim();
+  if (['pl_endurance','endurance','выносливость','gpp','офп'].includes(g)) return 'pl_endurance';
+  if (['pl_strength','strength','max_strength','powerlifting','сила','силовая'].includes(g)) return 'pl_strength';
+  if (['pl_speed','speed','speed_coordination','скорость','координация','скорость/координация'].includes(g)) return 'pl_speed';
+  if (['pl_peaking','peaking','peak','пик','выход на пик'].includes(g)) return 'pl_peaking';
+  // ББ-алиасы
+  if (['hypertrophy','mass','масса','гипертрофия','бб_масса'].includes(g)) return 'hypertrophy';
+  if (['cut','cutting','сушка','дефицит'].includes(g)) return 'cut';
+  if (['recomp','рекомпозиция'].includes(g)) return 'recomp';
+  if (['maintenance','поддержание'].includes(g)) return 'maintenance';
+  if (['strength_mass','powerbuilding','bb_strength','сила+масса'].includes(g)) return 'strength_mass';
+  if (['rehab','реабилитация'].includes(g)) return 'rehab';
+  return g;
+}
+export function isPLManualGoal(goal: string): boolean {
+  return ['pl_endurance','pl_strength','pl_speed','pl_peaking'].includes(normalizeManualGoal(goal));
+}
+export function isBBManualGoal(goal: string): boolean {
+  return ['hypertrophy','mass','cut','recomp','maintenance','strength_mass'].includes(normalizeManualGoal(goal));
+}
+
+/**
  * Распределить N недель мезоцикла по фазам.
  * Правила распределения (тренерские): 
  * - accumulation: первая половина (кроме последней части)
@@ -120,10 +201,23 @@ export interface PhaseDistribution {
  * @param goal — цель (strength/powerlifting → peaking)
  * @param trainingFocus — фокус силы/гипертрофии/выносливости (оверрайд repRange/intensity)
  */
+export function getPhaseConfigForGoal(phase: BBPhase, goal: string, focus?: BBTrainingFocus): PhaseConfig {
+  const base = getPhaseConfig(phase, focus);
+  const norm = normalizeManualGoal(goal);
+  const plOverride = (PL_GOAL_PHASE_OVERRIDES as Record<string, Record<string, Partial<PhaseConfig>>>)[norm]?.[phase];
+  if (plOverride) return { ...base, ...plOverride } as PhaseConfig;
+  return base;
+}
+
 export function distributePhases(mesoLength: number, deloadFreq: number, goal: string, trainingFocus?: BBTrainingFocus): PhaseDistribution[] {
   const dist: PhaseDistribution[] = [];
+  const normGoal = normalizeManualGoal(goal);
   // maintenance: редкий deload (6 нед), не 4 — MV-поддержка не требует частой разгрузки
-  if (goal === 'maintenance' && deloadFreq === 4) deloadFreq = 6;
+  if (normGoal === 'maintenance' && deloadFreq === 4) deloadFreq = 6;
+  // ПЛ-выносливость: частый делод каждые 3 нед (GPP высокий объём, восстановление)
+  if (normGoal === 'pl_endurance' && deloadFreq === 4) deloadFreq = 3;
+  // ПЛ-пик: делод каждые 3 нед (интенсивный стресс)
+  if (normGoal === 'pl_peaking' && deloadFreq === 4) deloadFreq = 3;
   const deloadWeeks = new Set<number>();
   
   if (deloadFreq > 0) {
@@ -132,8 +226,14 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
     }
   }
 
-  const hasPeak = goal === 'strength' || goal === 'powerlifting' || goal === 'strength_mass';
-  const peakWeeks = hasPeak ? Math.min(2, Math.floor(mesoLength * 0.15)) : 0;
+  // Пик только для силы/пика (ПЛ и ББ). Выносливость и скорость — без пика (подготовительный блок, Verkhoshansky)
+  const hasPeak = normGoal === 'pl_strength' || normGoal === 'pl_peaking' || goal === 'strength' || goal === 'powerlifting' || goal === 'strength_mass' || normGoal === 'strength_mass';
+  // ПЛ-пик: 3 недели пика при цикле >=8 нед (Bosquet 2007 extended taper), остальные 1-2
+  let peakWeeks = 0;
+  if (hasPeak) {
+    if (normGoal === 'pl_peaking') peakWeeks = mesoLength >= 8 ? 3 : Math.min(2, Math.floor(mesoLength * 0.20));
+    else peakWeeks = Math.min(2, Math.floor(mesoLength * 0.15));
+  }
 
   // Активные недели (без делода)
   const activeWeeks: number[] = [];
@@ -142,28 +242,33 @@ export function distributePhases(mesoLength: number, deloadFreq: number, goal: s
   }
   const totalActive = activeWeeks.length;
 
-  // recomp 60/40 (accum/intens), остальные 50/50 — различаем recomp vs maintenance
-  const accumRatio = goal === 'recomp' ? 0.6 : 0.5;
+  // recomp 60/40 (accum/intens), выносливость 65/35 (больше GPP), скорость 55/45, остальные 50/50
+  let accumRatio = 0.5;
+  if (normGoal === 'recomp') accumRatio = 0.6;
+  else if (normGoal === 'pl_endurance') accumRatio = 0.65;
+  else if (normGoal === 'pl_speed') accumRatio = 0.55;
+  else if (normGoal === 'pl_strength') accumRatio = 0.5;
+  else if (normGoal === 'pl_peaking') accumRatio = 0.45; // пик: короче accumulation, дольше intens
   const accumEnd = totalActive > 1 ? Math.ceil(totalActive * accumRatio) : 1;
 
   for (let w = 1; w <= mesoLength; w++) {
     // P1-2: peaking проверяется ПЕРЕД deload — финальные недели peaking
     // не должны перекрываться регулярным deload (taper → peak, не deload → peak).
     if (w > mesoLength - peakWeeks) {
-      dist.push({ phase: 'peaking', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('peaking', trainingFocus) });
+      dist.push({ phase: 'peaking', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfigForGoal('peaking', goal, trainingFocus) });
       continue;
     }
     if (deloadWeeks.has(w)) {
-      dist.push({ phase: 'deload', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('deload', trainingFocus) });
+      dist.push({ phase: 'deload', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfigForGoal('deload', goal, trainingFocus) });
       continue;
     }
     // Определяем позицию среди активных недель
     const activeIdx = activeWeeks.indexOf(w);
     if (activeIdx < 0) continue;
     if (activeIdx < accumEnd) {
-      dist.push({ phase: 'accumulation', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('accumulation', trainingFocus) });
+      dist.push({ phase: 'accumulation', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfigForGoal('accumulation', goal, trainingFocus) });
     } else {
-      dist.push({ phase: 'intensification', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfig('intensification', trainingFocus) });
+      dist.push({ phase: 'intensification', startWeek: w, endWeek: w, weeks: [w], config: getPhaseConfigForGoal('intensification', goal, trainingFocus) });
     }
   }
 
@@ -294,13 +399,27 @@ interface DeloadOverride {
 }
 
 export function getDeloadOverride(goal: string): DeloadOverride {
-  if (goal === 'strength' || goal === 'powerlifting') {
+  const norm = normalizeManualGoal(goal);
+  // ПЛ 4 цели — раздельные протоколы делода (Verkhoshansky/Bompa)
+  if (norm === 'pl_strength') {
+    return { volumeMultiplier: 0.30, intensityMultiplier: 0.85, repRange: [1, 3], label: 'интенсивный (сила ПЛ, тяж. делод)' };
+  }
+  if (norm === 'pl_endurance') {
+    return { volumeMultiplier: 0.45, intensityMultiplier: 0.55, repRange: [10, 15], label: 'восстановительный (выносливость, GPP)' };
+  }
+  if (norm === 'pl_speed') {
+    return { volumeMultiplier: 0.50, intensityMultiplier: 0.60, repRange: [3, 5], label: 'технический (скорость, паузы/цепи)' };
+  }
+  if (norm === 'pl_peaking') {
+    return { volumeMultiplier: 0.25, intensityMultiplier: 0.65, repRange: [1, 2], label: 'тапер (пик, Bosquet ×0.25)' };
+  }
+  if (norm === 'strength' || goal === 'powerlifting') {
     return { volumeMultiplier: 0.30, intensityMultiplier: 0.85, repRange: [1, 3], label: 'интенсивный (сила)' };
   }
-  if (goal === 'mass' || goal === 'bulk') {
+  if (norm === 'hypertrophy' || goal === 'mass' || goal === 'bulk') {
     return { volumeMultiplier: 0.40, intensityMultiplier: 0.50, repRange: [12, 20], label: 'объёмный (масса)' };
   }
-  if (goal === 'cut') {
+  if (norm === 'cut') {
     return { volumeMultiplier: 0.35, intensityMultiplier: 0.40, repRange: [15, 25], label: 'активный (сушка)' };
   }
   return { volumeMultiplier: 0.50, intensityMultiplier: 0.55, repRange: [12, 20], label: 'стандартный' };
