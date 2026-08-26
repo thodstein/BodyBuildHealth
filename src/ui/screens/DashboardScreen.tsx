@@ -31,12 +31,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
 
   return (
     <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
-      {/* полный фон без пустот — размытый cover */}
-      <img src="/hero-main.png" alt="" aria-hidden style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center bottom', filter:'blur(22px) brightness(0.55) saturate(1.15)', transform:'scale(1.06)', opacity:0.95 }} />
-      <div style={{ position:'absolute', inset:0, background:'rgba(7,7,10,0.18)' }} />
-      {/* полностью видимый херо без обрезки, до низа экрана */}
-      <img src="/hero-main.png" alt="" className="hero-fullscreen-img" style={{ position:'absolute', inset:0, top:0, bottom:'calc(var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))', width:'100%', height:'auto', minHeight:'calc(100dvh - var(--nav-height, 68px) - env(safe-area-inset-bottom, 0px))', maxHeight:'calc(100dvh - var(--nav-height, 68px) - env(safe-area-inset-bottom, 0px))', objectFit:'contain', objectPosition:'center bottom', background:'transparent', filter:'saturate(1.05) contrast(1.04) brightness(1.06)' }} />
-      <div style={{ position:'absolute', inset:0, bottom:'calc(var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))', background:'linear-gradient(transparent 78%, rgba(0,0,0,0.10) 88%, rgba(0,0,0,0.22) 100%)', pointerEvents:'none' }} />
+      <img src="/hero-main.png" alt="" className="hero-fullscreen-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center bottom', filter:'saturate(1.05) contrast(1.04) brightness(1.06)' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 70%, rgba(0,0,0,0.18) 85%, rgba(0,0,0,0.32) 100%)' }} />
       <div style={{ position:'absolute', bottom:70, left:16, right:16, zIndex:2 }}>
 
         {/* 🩺 Сводка симптомов */}

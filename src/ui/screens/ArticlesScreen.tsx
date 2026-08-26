@@ -136,12 +136,8 @@ export const ArticlesScreen: React.FC = () => {
   if (page === 'hero') {
     return (
       <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', zIndex:100, display:'flex', flexDirection:'column', fontFamily: FONT, overflow:'hidden', background:'#07070a' }}>
-        {/* полный фон — размытый cover, без пустот */}
-        <img src="/articles-hero.png" alt="" aria-hidden onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center bottom', filter:'blur(22px) brightness(0.55) saturate(1.12)', transform:'scale(1.06)', opacity:0.95 }} />
-        <div style={{ position:'absolute', inset:0, background:'rgba(7,7,10,0.18)' }} />
-        {/* полностью видимый херо без обрезки, до низа */}
-        <img src="/articles-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} className="hero-fullscreen-img" style={{ position:'absolute', inset:0, top:0, bottom:'calc(var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))', width:'100%', height:'auto', minHeight:'calc(100dvh - var(--nav-height, 68px) - env(safe-area-inset-bottom, 0px))', maxHeight:'calc(100dvh - var(--nav-height, 68px) - env(safe-area-inset-bottom, 0px))', objectFit:'contain', objectPosition:'center bottom', background:'transparent' }} />
-        <div style={{ position:'absolute', inset:0, bottom:'calc(var(--nav-height, 68px) + env(safe-area-inset-bottom, 0px))', background:'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)', pointerEvents:'none' }} />
+        <img src="/articles-hero.png" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} className="hero-fullscreen-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center bottom' }} />
+        <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)' }} />
         <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'12px 12px calc(64px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
           <div>
             <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.22)', color:'#00e68a', fontSize:9, fontWeight:800, letterSpacing:'0.4px' }}>
