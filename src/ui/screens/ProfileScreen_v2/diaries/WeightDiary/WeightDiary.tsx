@@ -1605,7 +1605,20 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
             </div>
           </div>
           {showCols && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: 10, borderRadius: 12, background: c.row, border: `1px solid ${c.cardBorder}`, marginBottom: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 10, borderRadius: 12, background: c.row, border: `1px solid ${c.cardBorder}`, marginBottom: 10 }}>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {([
+                  { label: 'Вес+состав', cols: ['weight', 'bodyFat', 'muscleMass', 'waterMass', 'waistCm'] as Field[] },
+                  { label: 'Обхваты', cols: ['weight', 'chestCm', 'waistCm', 'hipCm', 'shoulderCm', 'bicepCm', 'thighCm', 'calfCm', 'neckCm'] as Field[] },
+                  { label: 'Все', cols: [...FIELDS] as Field[] },
+                  { label: 'Сброс', cols: [...DEFAULT_VISIBLE] as Field[] },
+                ] as const).map(p => (
+                  <button key={p.label} style={{ ...btn, minHeight: 30, padding: '4px 10px', fontSize: 11 }} onClick={() => setVisibleCols([...p.cols])}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {FIELDS.map(f => {
                 const on = visibleCols.includes(f);
                 return (
@@ -1619,6 +1632,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
                   </button>
                 );
               })}
+              </div>
             </div>
           )}
           <div className="wd-table-wrap" style={{ overflowX: 'auto' }}>
