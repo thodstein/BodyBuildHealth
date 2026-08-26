@@ -5,7 +5,7 @@
  * план vs факт активного кардио-цикла (adherence текущей недели).
  * Единый источник с кардио-конструктором — записи видны и там, и здесь.
  */
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { colors, glassCard, inputStyle, labelStyle, selectStyle } from '../../ui';
 import { btnBase, btnPrimary, chip, chipActive, diaryShell, header as diaryHeaderStyle, glassSection, heroCard, main as pageMain, sectionTitle, statCard, tableTh, tableTd } from '../diary-page-styles';
 import { DiaryHeader } from '../DiaryHeader';
@@ -19,6 +19,7 @@ import { loadActiveCardioCycle, cardioWeekForDate, cardioCoachHints, cardioLegDa
 import { getWeightLog } from '../../../../../engines/profile-store';
 import { buildWeeklyHistogram, computeDistribution, computeExtremes, computeStreak, escapeHtml } from '../../diary-helpers';
 import type { DiaryWindowProps } from '../../DiaryWindow';
+import { parseCardioImport, CARDIO_IMPORT_INSTRUCTIONS } from '../../../../../engines/cardio-import.engine';
 
 const ACCENT = '#4ade80';
 
@@ -56,10 +57,56 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
   const [range, setRange] = useState<'all' | '7' | '30' | '90'>('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [importPreview, setImportPreview] = useState<{ entries: CardioLogEntry[]; warnings: string[]; format: string; fileName: string } | null>(null);
+  const [importBusy, setImportBusy] = useState(false);
+  const [showImportHelp, setShowImportHelp] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
   const reload = useCallback(() => { setLog(loadCardioLog()); onDataChange?.(); }, [onDataChange]);
+
+  const handleImportFile = async (file: File) => {
+    const lowName = file.name.toLowerCase();
+    if (lowName.endsWith('.zip')) {
+      flashMsg('⚠️ Распакуйте ZIP (Apple export.zip) и загрузите export.xml / CSV / TCX внутри');
+      setImportPreview({ entries: [], warnings: ['ZIP-архив: распакуйте и выберите export.xml (Apple) или CSV/TCX/GPX'], format: 'zip', fileName: file.name });
+      return;
+    }
+    setImportBusy(true);
+    try {
+      const isFit = lowName.endsWith('.fit');
+      let parsed: ReturnType<typeof parseCardioImport>;
+      if (isFit) {
+        const buf = await file.arrayBuffer();
+        parsed = parseCardioImport(file.name, buf);
+      } else {
+        const text = await file.text();
+        parsed = parseCardioImport(file.name, text);
+      }
+      if (parsed.entries.length === 0) {
+        flashMsg(`⚠️ Импорт не удался: ${parsed.warnings[0] || 'нет записей'}`);
+        setImportPreview({ entries: [], warnings: parsed.warnings, format: parsed.format, fileName: file.name });
+      } else {
+        setImportPreview({ entries: parsed.entries, warnings: parsed.warnings, format: parsed.format, fileName: file.name });
+        flashMsg(`📥 Распознано ${parsed.entries.length} тренировок (${parsed.format}) — проверьте превью`);
+      }
+    } catch (e) {
+      flashMsg(`⚠️ Ошибка чтения файла: ${(e as Error).message}`);
+    } finally {
+      setImportBusy(false);
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
+  const confirmImport = () => {
+    if (!importPreview || importPreview.entries.length === 0) return;
+    const prev = loadCardioLog();
+    setUndo(prev);
+    for (const e of importPreview.entries) saveCardioLogEntry(e);
+    reload();
+    flashMsg(`✅ Импортировано ${importPreview.entries.length} тренировок`);
+    setImportPreview(null);
+  };
 
   // Загрузить запись в форму для редактирования (та же id — save заменяет).
   const startEdit = (e: CardioLogEntry) => {
@@ -446,6 +493,74 @@ export const CardioDiary: React.FC<DiaryWindowProps> = ({ open, onClose, onDataC
         {todayLegDay?.isLegDay && (
           <div role="status" style={{ marginTop: 10, padding: '8px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)', color: '#fcd34d', fontSize: 12 }}>
             🦵 Сегодня день тяжёлых ног — интенсивное кардио лучше перенести (recovery — можно)
+          </div>
+        )}
+      </div>
+
+      {/* Импорт с часов — Apple / Huawei / Samsung / Garmin / Polar / Xiaomi */}
+      <div className="diary-card" style={{ ...glassCard, padding: 15, marginBottom: 14, border: `1px solid ${ACCENT}18`, background: `linear-gradient(135deg, ${ACCENT}08, transparent 70%), rgba(28,28,32,0.74)` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div style={{ ...sectionTitle, color: ACCENT, marginBottom: 0 }}>⌚ Импорт с часов</div>
+          <span style={{ fontSize: 11, color: colors.textMuted }}>Apple Watch · Huawei · Samsung · Garmin · Polar · Suunto · Fitbit · Xiaomi</span>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: colors.textMuted }}>CSV · TCX · GPX · Apple export.xml · JSON · FIT</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input ref={importInputRef} type="file" accept=".csv,.tcx,.gpx,.xml,.json,.fit,.zip" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); }} />
+          <button style={btnPrimary(ACCENT)} disabled={importBusy} onClick={() => importInputRef.current?.click()}>
+            {importBusy ? '⏳ Чтение…' : '📥 Выбрать файл'}
+          </button>
+          <button style={btnBase(ACCENT)} onClick={() => setShowImportHelp(v => !v)}>{showImportHelp ? 'Скрыть справку' : 'ℹ️ Как экспортировать'}</button>
+          {importPreview && importPreview.entries.length > 0 && (
+            <button style={{ ...btnBase(ACCENT), background: ACCENT, color: '#07130e', fontWeight: 800 }} onClick={confirmImport}>
+              ✅ Импортировать {importPreview.entries.length} тренировок
+            </button>
+          )}
+          {importPreview && (
+            <button style={btnBase(ACCENT)} onClick={() => setImportPreview(null)}>✕ Очистить превью</button>
+          )}
+        </div>
+        {importPreview && (
+          <div style={{ marginTop: 12, padding: 10, borderRadius: 10, background: importPreview.entries.length ? 'rgba(74,222,128,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${importPreview.entries.length ? 'rgba(74,222,128,0.25)' : 'rgba(239,68,68,0.25)'}` }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: importPreview.entries.length ? '#4ade80' : '#f87171', marginBottom: 6 }}>
+              {importPreview.fileName} → {importPreview.format} · найдено {importPreview.entries.length} тренировок
+            </div>
+            {importPreview.warnings.length > 0 && (
+              <div style={{ fontSize: 11, color: '#fbbf24', marginBottom: 6 }}>
+                {importPreview.warnings.slice(0, 4).map((w, i) => <div key={i}>⚠ {w}</div>)}
+                {importPreview.warnings.length > 4 && <div>… и ещё {importPreview.warnings.length - 4}</div>}
+              </div>
+            )}
+            {importPreview.entries.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflowY: 'auto' }}>
+                {importPreview.entries.slice(0, 5).map(e => (
+                  <div key={e.id} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ color: colors.textMuted }}>{e.date}</span>
+                    <span style={{ fontWeight: 700, color: TYPES.find(t=>t.id===e.type)?.color || ACCENT }}>{TYPES.find(t=>t.id===e.type)?.label || e.type}</span>
+                    <span>{e.durationMin} мин</span>
+                    {e.distanceKm && <span>{e.distanceKm} км</span>}
+                    {e.avgHr && <span>{e.avgHr} уд</span>}
+                    {e.calories && <span>{e.calories} ккал</span>}
+                    {e.notes && <span style={{ color: colors.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>{e.notes}</span>}
+                  </div>
+                ))}
+                {importPreview.entries.length > 5 && <div style={{ fontSize: 11, color: colors.textMuted }}>… и ещё {importPreview.entries.length - 5} тренировок</div>}
+              </div>
+            )}
+          </div>
+        )}
+        {showImportHelp && (
+          <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+            {CARDIO_IMPORT_INSTRUCTIONS.map(b => (
+              <details key={b.brand} style={{ padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 700, fontSize: 13, color: ACCENT }}>{b.brand} — {b.formats.join(', ')}</summary>
+                <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 12, color: colors.textMuted, lineHeight: 1.5 }}>
+                  {b.steps.map((s, i) => <li key={i}>{s}</li>)}
+                </ul>
+              </details>
+            ))}
+            <div style={{ fontSize: 11, color: colors.textMuted, padding: 8, borderRadius: 8, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.2)' }}>
+              💡 CSV — самый надёжный: экспортируйте таблицу из приложения часов (Huawei Health / Samsung Health / Fitbit / Zepp) и загрузите её. TCX/GPX — для треков с GPS, Apple export.xml — весь архив Здоровья.
+            </div>
           </div>
         )}
       </div>
