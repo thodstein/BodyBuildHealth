@@ -309,8 +309,36 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
     if (has('пп')) score += 3;
   }
 
+  // Непрерывный тай-брейк: средняя дистанция макросов от цели слегка понижает скор,
+  // чтобы среди «насыщенных» 100-балльников побеждал ближайший по КБЖУ, а не первый в БД.
+  const parts: Array<[number, number]> = [
+    [recipe.kcal, opts.targetKcal], [recipe.protein, opts.targetProteinG],
+    [recipe.fat, opts.targetFatG], [recipe.carbs, opts.targetCarbsG],
+  ];
+  let distSum = 0; let distN = 0;
+  for (const [val, tgt] of parts) {
+    if (tgt > 0) { distSum += Math.abs(val - tgt) / tgt; distN++; }
+  }
+  if (distN > 0) score -= Math.min(8, (distSum / distN) * 100 / 12);
+
   if (hardReject) score = Math.min(score, 35);  // жёсткий reject — не выше 35
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * Средняя относительная дистанция макросов рецепта от цели (0..∞, меньше = ближе).
+ * Используется как тай-брейк при равном скоринге.
+ */
+export function recipeMacroDistance(recipe: Recipe, opts: Pick<RecipeMatchOptions, 'targetKcal' | 'targetProteinG' | 'targetCarbsG' | 'targetFatG'>): number {
+  const parts: Array<[number, number]> = [
+    [recipe.kcal, opts.targetKcal], [recipe.protein, opts.targetProteinG],
+    [recipe.fat, opts.targetFatG], [recipe.carbs, opts.targetCarbsG],
+  ];
+  let sum = 0; let n = 0;
+  for (const [val, tgt] of parts) {
+    if (tgt > 0) { sum += Math.abs(val - tgt) / tgt; n++; }
+  }
+  return n > 0 ? sum / n : 999;
 }
 
 /**
@@ -322,9 +350,10 @@ export function pickRecipeForMeal(
   opts: RecipeMatchOptions,
 ): Recipe | null {
   const scored = recipes
-    .map(r => ({ recipe: r, score: scoreRecipeForMeal(r, opts) }))
+    .map(r => ({ recipe: r, score: scoreRecipeForMeal(r, opts), dist: recipeMacroDistance(r, opts) }))
     .filter(x => x.score >= 40) // минимальный порог
-    .sort((a, b) => b.score - a.score);
+    // Ранг: бонусно-«накрученные» рецепты могут быть сбиты дистанцией до цели полностью
+    .sort((a, b) => (b.score - Math.min(b.score, b.dist * 100 / 4)) - (a.score - Math.min(a.score, a.dist * 100 / 4)));
   return scored.length > 0 ? scored[0].recipe : null;
 }
 
@@ -337,9 +366,9 @@ export function pickRecipesForMeal(
   count: number = 3,
 ): Recipe[] {
   return recipes
-    .map(r => ({ recipe: r, score: scoreRecipeForMeal(r, opts) }))
+    .map(r => ({ recipe: r, score: scoreRecipeForMeal(r, opts), dist: recipeMacroDistance(r, opts) }))
     .filter(x => x.score >= 35)
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => (b.score - Math.min(b.score, b.dist * 100 / 4)) - (a.score - Math.min(a.score, a.dist * 100 / 4)))
     .slice(0, count)
     .map(x => x.recipe);
 }

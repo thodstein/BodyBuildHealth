@@ -25,7 +25,7 @@ import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplac
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
 import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
-import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes } from "./planner-recipe-mode";
+import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay } from "./planner-recipe-mode";
 import type { FlatRecipeOption } from "./planner-recipe-mode";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -205,6 +205,8 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean; overrides?: { mealsCount?: number } }) => void;
   /** Режим генерации: продукты (классика) или рецепты (основные приёмы из готовых рецептов). */
   generationMode: 'products' | 'recipes'; setGenerationMode: (v: 'products' | 'recipes') => void;
+  /** ⭐ Избранные рецепты: имена + тумблер + проверка (бейдж в чипах, бонус скоринга). */
+  favoriteRecipes: Set<string>; toggleFavoriteRecipe: (name: string) => void; isFavoriteRecipe: (name: string) => boolean;
   /** Выбрать один из 2–3 вариантов рецепта для приёма (режим «по рецептам») — приём пересобирается с авторскими порциями, день ребалансится до ±3%. */
   pickRecipeOption: (dayIdx: number, mealIdx: number, optionName: string) => void;
   /** «🔄 Другие варианты»: перегенерация пула кандидатов рецепта, исключая показанные. */
@@ -1170,7 +1172,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   const generationModeRef = useRef<'products' | 'recipes'>(generationMode);
   useEffect(() => { generationModeRef.current = generationMode; }, [generationMode]);
-  useEffect(() => { try { localStorage.setItem('he_planner_gen_mode', generationMode); } catch {} }, [generationMode]);
+   useEffect(() => { try { localStorage.setItem('he_planner_gen_mode', generationMode); } catch {} }, [generationMode]);
+  // ⭐ Избранные рецепты (B5): имена рецептов, бейдж в чипах/вариантах + бонус к скорингу
+  const [favoriteRecipes, setFavoriteRecipes] = useState<Set<string>>(() => {
+    try { const v = JSON.parse(localStorage.getItem('he_recipe_fav') || '[]'); return new Set<string>(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set(); }
+  });
+  const toggleFavoriteRecipe = (name: string) => {
+    setFavoriteRecipes(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      try { localStorage.setItem('he_recipe_fav', JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+  const isFavoriteRecipe = (name: string) => favoriteRecipes.has(name);
+  // A4: карточка «👨‍🍳 План готовки» сейчас показывает рецептурный вариант? — тогда при
+  // смене варианта рецепта она тихо пересобирается из обновлённых планов.
+  const recipeCookingActiveRef = useRef(false);
   // Быстрый режим: только 3 цели (масса/сушка/поддержание) — нормализуем цель при входе,
   // чтобы выбранная ранее цель (сила/реабилитация и т.п.) не давала расчёт вне интерфейса.
   useEffect(() => {
@@ -1610,6 +1628,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             ? threeDayPlan.days.map((d: any, i: number) => (i === selectedDayIndex ? newDay : d))
             : [newDay];
       setShoppingList(buildShoppingFromPlans(visiblePlans));
+      // A4: открытая карточка готовки следует за выбранным рецептом
+      refreshRecipeCookingCardIfActive(newDay, threeDayPlan, weekDaysUpdated ? { days: weekDaysUpdated } : weekPlan);
     } else {
       const resolved = _resolvePlanDay(dayIdx);
       if (!resolved || resolved.plan === 'day') return;
@@ -1624,6 +1644,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (resolved.plan === 'week') setDayPlan(days[resolved.day]);
       else if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
       setShoppingList(buildShoppingFromPlans(days));
+      // A4: открытая карточка готовки следует за выбранным рецептом
+      refreshRecipeCookingCardIfActive(resolved.plan === 'week' ? days[resolved.day] : dayPlan, resolved.plan === 'three' ? updated : threeDayPlan, resolved.plan === 'week' ? updated : weekPlan);
     }
     if (typeof (window as any).showToast === 'function') (window as any).showToast('🍳 Рацион перестроен под рецепт', 'success');
     setRecipePickerMeal(null);
@@ -1646,8 +1668,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const excludeNames = new Set<string>(m.recipeOptionNames || []);
     const cands = pickRecipeOptions(filtered, {
       mealType: mealTypeFromLabel(m.label),
-      targetKcal: m.totals.kcal || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
+      targetKcal: m.totals.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
       excludedIds: new Set<string>(excludedFoods || []), cookProfile: prof, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: budget,
+      preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
     }, 3, excludeNames);
     if (cands.length === 0) {
       if (typeof (window as any).showToast === 'function') (window as any).showToast('Других подходящих рецептов для этого приёма нет', 'warning');
@@ -1705,15 +1728,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     };
     const budget = prepTimeBudgetPerMeal(cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }), mealsCount);
     const nextMeals = source.meals.map((m: any) => {
-      const excludeNames = new Set<string>((m.recipeSuggestions || []).map((r: any) => r?.name).filter(Boolean));
+      // B7: копим показанные имена между обновлениями — «🔄» не крутит одни и те же рецепты
+      const seen = new Set<string>([...((m.recipeSuggestions || []).map((r: any) => r?.name).filter(Boolean)), ...((m as any).suggestionSeenNames || [])]);
       const tgt = m.target || { p: m.totals.p, c: m.totals.c, f: m.totals.f };
       const sugg = pickRecipeOptions(poolAll, {
         mealType: (labelMap[m.label] || 'lunch'),
-        targetKcal: m.totals.kcal || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
+        targetKcal: m.totals.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
         excludedIds: new Set<string>(excludedFoods || []),
         isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: budget,
-      }, 3, excludeNames);
-      return { ...m, recipeSuggestions: sugg.map(r => ({ name: r.name, kcal: r.kcal, protein: r.protein, fat: r.fat, carbs: r.carbs, prepTimeMin: r.prepTimeMin, usefulness: r.usefulness, description: r.description, ingredients: r.ingredients, instructions: r.instructions, tags: r.tags })) };
+        preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
+      }, 3, seen);
+      return { ...m,
+        recipeSuggestions: sugg.map(r => ({ name: r.name, kcal: r.kcal, protein: r.protein, fat: r.fat, carbs: r.carbs, prepTimeMin: r.prepTimeMin, usefulness: r.usefulness, description: r.description, ingredients: r.ingredients, instructions: r.instructions, tags: r.tags })),
+        suggestionSeenNames: Array.from(new Set([...seen, ...sugg.map(r => r.name)])),
+      };
     });
     applyTo(nextMeals);
     if (typeof (window as any).showToast === 'function') (window as any).showToast('🔄 Подобраны другие рецепты', 'success');
@@ -2425,7 +2453,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // 🍳 Режим генерации: 'recipes' → основные приёмы (Завтрак/Обед/Ужин) собираются
         // из готовых рецептов, перекусы остаются продуктами. 'products' → классика.
         const _genRecipes = generationModeRef.current === 'recipes';
-        const _dayUsedNames = new Set<string>();
         // 🍲 Рецепты-подсказки: к каждому приёму подбираем 1-3 подходящих рецепта (если useRecipesInPlan)
         const _cookProf: CookProfile | undefined = useRecipesInPlan || _genRecipes ? cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }) : undefined;
         const _allRecipes = useRecipesInPlan || _genRecipes ? [...getRecipes(), ...(userRecipes||[])] : [];
@@ -2443,7 +2470,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             const tgt = m.target || { p: m.totals.p, c: m.totals.c, f: m.totals.f };
             const _currentItemIds = new Set((Array.isArray(m.items) ? m.items : []).map((it: any) => it.id));
             const suggestions = pickRecipesForMeal(_filteredRecipes, {
-              mealType: mt, targetKcal: m.totals.kcal || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
+              mealType: mt, targetKcal: m.totals.kcal || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9) || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
               excludedIds: new Set<string>([...(excludedIds as Set<string>)]), cookProfile: _cookProf, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _recipeBudget,
             }, 3);
             if (suggestions.length > 0) {
@@ -2452,41 +2479,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           });
         }
         if (_genRecipes && _filteredRecipes.length > 0) {
-          meals.forEach((m: any) => {
-            if (!isMainMealLabel(m.label)) return;
-            const tgt = m.target || { p: m.totals.p, c: m.totals.c, f: m.totals.f };
-            const excludeNames = new Set<string>([...(m.recipeOptionNames || []), ..._dayUsedNames, ..._usedRecipeNames]);
-            const cands = pickRecipeOptions(_filteredRecipes, {
-              mealType: mealTypeFromLabel(m.label),
-              targetKcal: m.totals.kcal || 300, targetProteinG: tgt.p || 30, targetCarbsG: tgt.c || 40, targetFatG: tgt.f || 15,
-              excludedIds: new Set<string>([...(excludedIds as Set<string>)]), cookProfile: _cookProf, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: _recipeBudget,
-              goal: goal === 'cutting' || goal === 'fat_loss' ? 'cut' : goal === 'maintenance' ? 'maintenance' : 'mass',
-            }, 3, excludeNames);
-            if (cands.length === 0) return;
-            const flats: FlatRecipeOption[] = cands.map(flattenRecipeOption);
-            m.recipeOptions = flats;
-            m.recipeOptionNames = flats.map(f => f.name);
-            // Автовыбор лучшего кандидата — авторские порции рецепта (не равный сплит)
-            const chosenFlat = flats[0];
-            const items = buildRecipeMealItems(rebuildRecipeFromFlat(chosenFlat));
-            if (!items || items.length === 0) return;
-            m.items = items as any;
-            m.totals = sumMealTotals(items);
-            m.recipeApplied = chosenFlat.name;
-            m.recipeAppliedData = chosenFlat;
-            _dayUsedNames.add(chosenFlat.name);
-            _usedRecipeNames.add(chosenFlat.name);
+          // A1: сборка рецептурного дня — чистая функция planner-recipe-mode
+          const _asm = assembleRecipeDay({
+            meals: meals as any,
+            pool: _filteredRecipes,
+            targets: { kcal: input.goalKcal, p: input.goalProteinG, f: input.goalFatG, c: input.goalCarbsG },
+            excludedIds,
+            cookProfile: _cookProf ?? undefined,
+            maxPrepTimeMin: _recipeBudget,
+            isVegetarian: dietPrefs.includes('vegetarian'),
+            preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
+            usedNamesAcrossDays: _usedRecipeNames,
+            goal: goal === 'cutting' || goal === 'fat_loss' ? 'cut' : goal === 'maintenance' ? 'maintenance' : 'mass',
           });
-          // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
-          // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%.
-          const _rb = rebalanceDayAfterRecipes(meals as any, {
-            kcal: input.goalKcal, p: input.goalProteinG, f: input.goalFatG, c: input.goalCarbsG,
-          }, { excludedIds });
-          meals.splice(0, meals.length, ...(_rb.meals as any[]));
-          if (_rb.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._rb.notes];
-          if (!_rb.withinTolerance) {
-            v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), `⚠ Режим «по рецептам»: дневное отклонение от целей ${_rb.deviationPct}% (>3%) — попробуйте выбрать другие варианты рецептов.`];
-          }
+          meals.splice(0, meals.length, ...(_asm.meals as any[]));
+          if (_asm.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._asm.notes];
         }
         // 🍳 Режим «по рецептам»: итоги дня пересчитываются из фактических приёмов
         // (после замены основных приёмов и ребаланса), а не из V2-тоталов.
@@ -3690,10 +3697,26 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
       })();
       if (applied.length > 0) {
         const rp = buildRecipeCookingPlan(applied, mealPrepDays);
-        if (rp) { setMealPrepPlan(rp as any); return; }
+        if (rp) { setMealPrepPlan(rp as any); recipeCookingActiveRef.current = true; return; }
       }
     } catch {}
+    recipeCookingActiveRef.current = false;
     const _r = buildMealPrep({ mealPrepDays, dayPlan, threeDayPlan, weekPlan }); if (!_r) { generatePlan(mealPrepDays as 1|3|7); return; } setMealPrepPlan(_r);
+  };
+
+  /** A4: тихая пересборка открытой рецептурной карточки готовки из обновлённых планов. */
+  const refreshRecipeCookingCardIfActive = (dayP: any, threeP: any, weekP: any) => {
+    if (!recipeCookingActiveRef.current) return;
+    try {
+      const applied = (() => {
+        if (mealPrepDays === 1) return collectAppliedRecipes(dayP);
+        if (mealPrepDays === 3) return (threeP?.days || []).flatMap((d: any) => collectAppliedRecipes(d));
+        return (weekP?.days || []).flatMap((d: any) => collectAppliedRecipes(d));
+      })();
+      if (applied.length === 0) { recipeCookingActiveRef.current = false; return; }
+      const rp = buildRecipeCookingPlan(applied, mealPrepDays);
+      if (rp) setMealPrepPlan(rp as any);
+    } catch {}
   };
 
   // FatSecret-уровень: 1-клик в дневник — берёт видимый план (1 день / выбранный день 3/7) и пишет в nutrition_diary_v2
@@ -3849,6 +3872,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     quickAddMealIdx, setQuickAddMealIdx, quickAddSearch, setQuickAddSearch,
     updateItemAmount, removeFoodItem, replaceMealWithRecipe, generatePlan,
     generationMode, setGenerationMode,
+    favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe,
     pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions,
     weekEditDay, openWeekDayForEdit, switchPlanDays,
     addFoodToMeal, addSnackComboToMeal, undoLast,
@@ -3890,6 +3914,6 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, coconutOilBoost, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, renderMealList, annualPhase]);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, renderMealList, annualPhase]);
   return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };

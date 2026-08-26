@@ -13,6 +13,7 @@ import type { PlanCtx } from "./IndividualPlanContext";
 import { NUTRITION_LEVELS } from "./types";
 import { OrganLoadBadgeGroup } from "./OrganLoadBadges";
 import { readDiaryV2, writeDiaryV2 } from "../diary-storage-v2";
+import { kbjuFormulaDeviationPct } from "./planner-recipe-mode";
 
 // FIX week-perf: кэш тяжёлых метрик приёма (DIAAS/GL/II) по объекту приёма.
 // Объекты приёмов иммутабельны (заменяются при правках), поэтому WeakMap-кэш всегда валиден
@@ -65,7 +66,7 @@ function useMealTimeEdit(plan: any, saveUndo: () => void, setDayPlan: (v:any)=>v
 }
 
 export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
-  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, nutrLevel, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal, addSnackComboToMeal, generationMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions } = ctx;
+  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, nutrLevel, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal, addSnackComboToMeal, generationMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe } = ctx;
   const _nutrMult = NUTRITION_LEVELS.find(l => l.id === nutrLevel)?.mult || 1.0;
   const setDayPlan = _setDayPlan as any;
   const setEditAmount = _setEditAmount as any;
@@ -110,6 +111,10 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                   <span style={{color:'#f59e0b',fontWeight:600}}>🧈 Ж {fmt(totalF, effectiveF||0, 'г')}</span>
                   <span style={{color:'#f97316',fontWeight:600}}>🌾 У {fmt(totalC, effectiveC||0, 'г')}</span>
                   {totalFiber > 0 && <span style={{color:'#22c55e',fontSize:8,fontWeight:600}}>🌱 {totalFiber}г</span>}
+                  {/* A3: консистентность КБЖУ — расхождение калорийности с формулой 4Б+9Ж+4У ≤3% */}
+                  {totalKcal > 0 && (() => { const dev = Math.round(kbjuFormulaDeviationPct(totalKcal, totalP, totalF, totalC) * 10) / 10; const ok = dev <= 3; return (
+                    <span title={`Расхождение ккал с формулой 4×Б + 9×Ж + 4×У (норма ≤3%): формула ≈ ${Math.round((totalP*4+totalF*9+totalC*4))} ккал`} style={{fontSize:8,fontWeight:700,padding:'1px 6px',borderRadius:5,border:`1px solid ${ok?'rgba(34,197,94,0.35)':'rgba(245,158,11,0.4)'}`,background:ok?'rgba(34,197,94,0.08)':'rgba(245,158,11,0.1)',color:ok?'#22c55e':'#f59e0b'}}>⚖️ формула ±{dev}%</span>
+                  ); })()}
                   <span style={{marginLeft:'auto',color:'rgba(255,255,255,0.85)'}}>{weight>0?`${Math.round(totalP/weight)}г/кг`:''}</span>
                 </>;
               })()}
@@ -191,6 +196,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                         <details key={ri} style={{borderRadius:8,background:selected?'rgba(34,197,94,0.08)':'rgba(249,115,22,0.06)',border:`1px solid ${selected?'rgba(34,197,94,0.35)':'rgba(249,115,22,0.12)'}`,overflow:'hidden'}}>
                           <summary style={{cursor:'pointer',padding:'3px 6px',fontSize:8,listStyle:'none',display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
                             <span role="button" aria-label={`Выбрать рецепт ${r.name}`} onClick={(e)=>{e.preventDefault();e.stopPropagation();pickRecipeOption(dayIdx,mi,r.name);}} style={{padding:'2px 7px',borderRadius:6,border:`1px solid ${selected?'rgba(34,197,94,0.5)':'rgba(249,115,22,0.35)'}`,background:selected?'rgba(34,197,94,0.18)':'rgba(249,115,22,0.12)',color:selected?'#22c55e':'#f97316',fontWeight:800,cursor:'pointer'}}>{selected?'✅ Выбрано':'Выбрать'}</span>
+                            <span role="button" aria-label={isFavoriteRecipe(r.name)?`Убрать ${r.name} из избранного`:`Добавить ${r.name} в избранное`} title="В избранное (⭐ — приоритет в подборе)" onClick={(e)=>{e.preventDefault();e.stopPropagation();toggleFavoriteRecipe(r.name);}} style={{cursor:'pointer',fontSize:10,color:isFavoriteRecipe(r.name)?'#f59e0b':'rgba(255,255,255,0.35)'}}>{isFavoriteRecipe(r.name)?'⭐':'☆'}</span>
                             <span style={{fontWeight:600,color:'#fff'}}>{r.name}</span>
                             <span style={{color:'rgba(255,255,255,0.65)'}}>{r.kcal}ккал · Б{r.protein}г Ж{r.fat}г У{r.carbs}г · ⏱{r.prepTimeMin}мин</span>
                           </summary>
@@ -235,9 +241,10 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                         </div>
                       );
                     })()}
-                    {(m.recipeSuggestions as any[]).filter((r:any)=>!recipeTagFilter||((r.tags||[])as string[]).includes(recipeTagFilter)).slice(0, 3).map((r: any, ri: number) => (
+                      {(m.recipeSuggestions as any[]).filter((r:any)=>!recipeTagFilter||((r.tags||[])as string[]).includes(recipeTagFilter)).slice(0, 3).map((r: any, ri: number) => (
                       <details key={ri} style={{borderRadius:8,background:'rgba(249,115,22,0.06)',border:'1px solid rgba(249,115,22,0.12)',overflow:'hidden'}}>
                         <summary style={{cursor:'pointer',padding:'3px 6px',fontSize:8,color:'#f97316',fontWeight:600,listStyle:'none'}}>
+                          <span onClick={(e)=>{e.preventDefault();e.stopPropagation();toggleFavoriteRecipe(r.name);}} title="В избранное (⭐ — приоритет в подборе)" style={{cursor:'pointer',fontSize:10,color:isFavoriteRecipe(r.name)?'#f59e0b':'rgba(255,255,255,0.3)',marginRight:4}}>{isFavoriteRecipe(r.name)?'⭐':'☆'}</span>
                           {r.name} · {r.kcal}ккал · Б{r.protein}г Ж{r.fat}г У{r.carbs}г · ⏱{r.prepTimeMin}мин{r.usefulness?` · ⭐${r.usefulness}`:''}
                         </summary>
                         <div style={{padding:'4px 6px',fontSize:7,color:'rgba(255,255,255,0.8)',lineHeight:1.5}}>

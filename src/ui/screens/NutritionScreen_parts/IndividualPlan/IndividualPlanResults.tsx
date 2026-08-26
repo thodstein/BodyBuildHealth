@@ -13,7 +13,7 @@ import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
 import { MealQuickControls } from "./MealQuickControls";
 import { readDiaryV2 } from "../diary-storage-v2";
-import { buildDayReportPrintHtml, printDayReport, buildMealTimelinePrintHtml, printMealTimeline } from "./planner-day-print";
+import { buildDayReportPrintHtml, printDayReport, buildMealTimelinePrintHtml, printMealTimeline, buildRecipePlanPrintHtml } from "./planner-day-print";
 
 const getDiaryEntriesForDate = (date: string): any[] => {
   try {
@@ -1893,6 +1893,14 @@ export const IndividualPlanResults: React.FC = () => {
                 👨‍🍳 Meal Prep
               </button>
               <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>План приготовления на несколько дней</div>
+            </div>
+          )}
+          {generated && dayPlan?.meals?.some((m: any) => m.recipeApplied) && (
+            <div style={{ background:'rgba(24,24,27,0.5)', borderRadius:12, border:'1px solid rgba(249,115,22,0.06)', padding:'8px 6px', textAlign:'center' }}>
+              <button onClick={() => printDayReport(buildRecipePlanPrintHtml(dayPlan))} title="Ингредиенты и пошаговые инструкции выбранных рецептов" style={{ width:'100%', padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', background:'rgba(249,115,22,0.1)', border:'1px solid rgba(249,115,22,0.3)', color:'#fb923c', fontWeight:700, fontSize:10, transition:'all 0.15s' }}>
+                🖨 Меню с рецептами
+              </button>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:4, lineHeight:1.2 }}>Рецепты дня на печать / PDF</div>
             </div>
           )}
           {generated && plannerMode === 'pro' && (

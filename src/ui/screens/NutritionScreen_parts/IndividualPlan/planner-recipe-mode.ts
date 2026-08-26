@@ -18,7 +18,7 @@ import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { decomposeRecipe, pickRecipesForMeal } from './recipe-engine';
-import type { RecipeMatchOptions } from './recipe-engine';
+import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
 
 // ─── Типы формы плана (совместимо с форматом IndividualPlanContext) ────
 
@@ -234,7 +234,7 @@ export function rebalanceDayAfterRecipes(
   opts?: { excludedIds?: Set<string>; maxIter?: number },
 ): RebalanceResult {
   const notes: string[] = [];
-  const maxIter = opts?.maxIter ?? 8;
+  const maxIter = opts?.maxIter ?? 16;
   const work: PlanMealLike[] = meals.map(m => ({ ...m, items: [...(m.items || [])], totals: { ...(m.totals || { kcal: 0, p: 0, f: 0, c: 0 }) } }));
 
   const validTargets: DayMacroTargets = {
@@ -254,49 +254,68 @@ export function rebalanceDayAfterRecipes(
     const dF = validTargets.f - totals.f;
     const dC = validTargets.c - totals.c;
 
-    if (dKcal > 0 || dP > 0 || dF > 0 || dC > 0) {
+    const dKcalEquiv = Math.max(
+      dKcal > 0 ? dKcal : 0,
+      dP > 0 ? dP * 4 : 0,
+      dF > 0 ? dF * 9 : 0,
+      dC > 0 ? dC * 4 : 0,
+    );
+    // Недобор «осмысленный», только если он ≥ ~120 ккал в эквиваленте любого макроса —
+    // иначе микро-хвосты (например +7 г углеводов при переборе жиров на 80 г) не должны
+    // блокировать резку перебора.
+    if (dKcalEquiv >= 120) {
       // ── Недобор: добавляем топ-ап в гибкий слот ──
       const fi = flexMealIndex(work);
       if (fi < 0 || !work[fi]) break;
       const relP = dP / Math.max(1, validTargets.p);
       const relF = dF / Math.max(1, validTargets.f);
       const relC = dC / Math.max(1, validTargets.c);
-      const headroomKcal = Math.max(60, dKcal);
-      const pick = (pool: FoodItem[]): FoodItem | null => {
-        const usable = pool.filter(f => (f.kcal || 0) > 0);
-        if (usable.length === 0) return null;
-        // максимум белка/макро на ккал + бонус качества
-        return usable.sort((a, b) => (b.bb_quality_score || 0) - (a.bb_quality_score || 0))[0] || null;
-      };
-      let chosen: FoodItem | null = null;
-      let chosenRole = '';
       const dominant = Math.max(relP, relC, relF);
-      if (dominant <= 0) break;
-      if (relP >= relC && relP >= relF) { chosen = pick(topupFoods(TOPUP_PROTEIN_IDS, opts?.excludedIds)); chosenRole = 'protein'; }
-      else if (relC >= relF) { chosen = pick(topupFoods(TOPUP_CARB_IDS, opts?.excludedIds)); chosenRole = 'carbs'; }
-      else { chosen = pick(topupFoods(TOPUP_FAT_IDS, opts?.excludedIds)); chosenRole = 'fat'; }
-      if (!chosen) break;
-      const per100 = chosenRole === 'protein' ? (chosen.protein || 0) : chosenRole === 'carbs' ? (chosen.carbs || 0) : (chosen.fat || 0);
-      if (per100 <= 0) break;
-      // граммовка под дефицит макроса, кап по свободным ккал дня (не допускаем перелёт)
-      let grams = Math.min(
-        Math.round(dominant === relP ? dP / per100 * 100 : dominant === relC ? dC / per100 * 100 : dF / per100 * 100),
-        Math.round(headroomKcal / Math.max(1, chosen.kcal || 1) * 100),
-      );
-      grams = Math.max(10, Math.round(grams / 10) * 10);
-      if (grams < 10) break;
-      const item = scaleItem({
-        name: chosen.name, id: chosen.id, amount: 100,
-        kcal: Math.round(chosen.kcal || 0), p: chosen.protein || 0, f: chosen.fat || 0, c: chosen.carbs || 0,
-        fiber: chosen.fiber || 0,
-      }, grams);
-      work[fi] = { ...work[fi], items: [...work[fi].items, item], totals: sumMealTotals([...work[fi].items, item]) };
-      notes.push(`➕ Недобор закрыт: ${chosen.name} ${grams} г → «${work[fi].label || 'Приём'}»`);
-      continue;
+      if (dominant <= 0) break; // все дефициты закрыты — дальше резаем перебор
+      // Выбор роли доминирующего дефицита
+      let rolePool: FoodItem[]; let chosenRole: 'p' | 'c' | 'f';
+      if (relP >= relC && relP >= relF) { rolePool = topupFoods(TOPUP_PROTEIN_IDS, opts?.excludedIds); chosenRole = 'p'; }
+      else if (relC >= relF) { rolePool = topupFoods(TOPUP_CARB_IDS, opts?.excludedIds); chosenRole = 'c'; }
+      else { rolePool = topupFoods(TOPUP_FAT_IDS, opts?.excludedIds); chosenRole = 'f'; }
+      if (rolePool.length === 0) break;
+      const macroOf = (f: FoodItem) => chosenRole === 'p' ? (f.protein || 0) : chosenRole === 'c' ? (f.carbs || 0) : (f.fat || 0);
+      const dMacro = chosenRole === 'p' ? dP : chosenRole === 'c' ? dC : dF;
+      // Кандидат: максимум «макрос на ккал» (влезает больше дефицита при ограниченной
+      // ккал-комнате), tie-break по качеству. Без ккал-комнаты — просто максимум макро.
+      const kcalRoomOk = dKcal > Math.max(80, dMacro * 2);
+      const usable = rolePool.filter(f => macroOf(f) > 0);
+      if (usable.length === 0) break;
+      const chosen = [...usable].sort((a, b) => {
+        if (kcalRoomOk) {
+          const ra = macroOf(a) / Math.max(1, a.kcal || 1);
+          const rb = macroOf(b) / Math.max(1, b.kcal || 1);
+          if (Math.abs(ra - rb) > 0.01) return rb - ra;
+        }
+        return (b.bb_quality_score || 0) - (a.bb_quality_score || 0);
+      })[0];
+      const per100 = macroOf(chosen);
+      // Граммовка ровно под дефицит макроса; ккал-кап применяется только если он реально жмёт
+      const gramsForMacroG = dMacro / per100 * 100;
+      const gramsForKcalG = dKcal > 0 ? dKcal / Math.max(1, chosen.kcal || 1) * 100 : gramsForMacroG;
+      let grams = Math.min(gramsForMacroG, gramsForKcalG);
+      grams = Math.floor(Math.min(grams, 500) / 10) * 10;
+      if (grams < 30) {
+        // этот дефицит не пролезает без перебора ккал — переходим к резке перебора
+      } else {
+        const item = scaleItem({
+          name: chosen.name, id: chosen.id, amount: 100,
+          kcal: Math.round(chosen.kcal || 0), p: chosen.protein || 0, f: chosen.fat || 0, c: chosen.carbs || 0,
+          fiber: chosen.fiber || 0,
+        }, grams);
+        work[fi] = { ...work[fi], items: [...work[fi].items, item], totals: sumMealTotals([...work[fi].items, item]) };
+        notes.push(`➕ Недобор закрыт: ${chosen.name} ${grams} г → «${work[fi].label || 'Приём'}»`);
+        continue;
+      }
     }
 
     // ── Перебор калорий при недоборе белка → замена худшего продукта перекуса
-    // на белковый источник (иначе резка только усугубила бы дефицит белка) ──
+    // на белковый источник (иначе резка только усугубила бы дефицит белка).
+    // A2-гейт: замена принимается только при снижении max-dev дня (монотонность). ──
     if (dP > 0 && dKcal < 0) {
       const fi = flexMealIndex(work);
       const items = fi >= 0 ? work[fi].items : [];
@@ -315,58 +334,103 @@ export function rebalanceDayAfterRecipes(
           g = Math.min(g, 400);
           const swapped = scaleItem({ name: pf.name, id: pf.id, amount: 100, kcal: Math.round(pf.kcal || 0), p: pf.protein || 0, f: pf.fat || 0, c: pf.carbs || 0, fiber: pf.fiber || 0 }, g);
           const nextItems = items.map((x, k) => (k === wi ? swapped : x));
-          work[fi] = { ...work[fi], items: nextItems, totals: sumMealTotals(nextItems) };
-          notes.push(`🔁 ${items[wi].name} → ${pf.name} ${g} г (белок вверх при переборе калорий)`);
-          continue;
+          const ntTotals = sumMealTotals(nextItems);
+          const ntDay = { ...totals, kcal: totals.kcal - items[wi].kcal + ntTotals.kcal, p: totals.p - items[wi].p + ntTotals.p, f: totals.f - items[wi].f + ntTotals.f, c: totals.c - items[wi].c + ntTotals.c };
+          if (maxDeviationPct(ntDay as any, validTargets) < dev - 0.0005) {
+            work[fi] = { ...work[fi], items: nextItems, totals: ntTotals };
+            notes.push(`🔁 ${items[wi].name} → ${pf.name} ${g} г (белок вверх при переборе калорий)`);
+            continue;
+          }
         }
       }
     }
 
-    // ── Перебор: урезаем порции не-рецептурных приёмов. Резать можно только в пределах
-    // «комнаты» до цели по каждому макросу — иначе режем один макрос ниже цели,
-    // пытаясь закрыть перебор калорий. Выбираем продукт с максимальной реальной
-    // экономией ккал среди допустимых ступеней лестницы. ──
-    type Cut = { mi: number; ii: number; newAmount: number; label: string };
+    // ── Перебор ккал/макроса при недоборе другого макроса → замена худшего по
+    // «пригодности» продукта перекуса на источник дефицитного макроса того же
+    // ккал-достоинства (резка тут только углубила бы дефицит) ──
+    {
+      const underEquiv = Math.max(dP > 0 ? dP * 4 : 0, dF > 0 ? dF * 9 : 0, dC > 0 ? dC * 4 : 0);
+      const overKcal = -dKcal;
+      if (underEquiv >= 120 && overKcal >= 120) {
+        const role: 'p' | 'c' | 'f' = (dP > 0 && dP * 4 >= Math.max(dF > 0 ? dF * 9 : 0, dC > 0 ? dC * 4 : 0)) ? 'p'
+          : (dC > 0 && dC * 4 >= (dF > 0 ? dF * 9 : 0)) ? 'c' : 'f';
+        const dMacro = role === 'p' ? dP : role === 'c' ? dC : dF;
+        const ids = role === 'p' ? TOPUP_PROTEIN_IDS : role === 'c' ? TOPUP_CARB_IDS : TOPUP_FAT_IDS;
+        const poolFit = topupFoods(ids, opts?.excludedIds);
+        const macroOf = (f: FoodItem) => role === 'p' ? (f.protein || 0) : role === 'c' ? (f.carbs || 0) : (f.fat || 0);
+        const fitPool = poolFit.filter(f => macroOf(f) > 0 && (f.kcal || 0) > 0);
+        const bestFood = fitPool.sort((a, b) =>
+          macroOf(b) / (b.kcal || 1) - macroOf(a) / (a.kcal || 1) || (b.bb_quality_score || 0) - (a.bb_quality_score || 0))[0];
+        // худший продукт: минимум целевого макро на ккал среди гибких не-рецептурных приёмов
+        const fi = flexMealIndex(work);
+        let wi = -1; let worstFit = Infinity;
+        if (fi >= 0 && bestFood) {
+          work[fi].items.forEach((it, ii) => {
+            if ((it.amount || 0) < 30) return;
+            const itMacro = role === 'p' ? (it.p || 0) : role === 'c' ? (it.c || 0) : (it.f || 0);
+            const fit = itMacro / Math.max(1, it.kcal || 1);
+            if (fit < worstFit) { worstFit = fit; wi = ii; }
+          });
+          const bestFitRatio = macroOf(bestFood) / Math.max(1, bestFood.kcal || 1);
+          if (wi >= 0 && worstFit < bestFitRatio * 0.6) { // заметно хуже лучшего источника — меняем
+            const victim = work[fi].items[wi];
+            const freed = victim.kcal || 0;
+            let g = Math.min(dMacro / macroOf(bestFood) * 100, freed / Math.max(1, bestFood.kcal || 1) * 100);
+            g = Math.floor(Math.min(g, 400) / 10) * 10;
+            if (g >= 30) {
+              const swapped = scaleItem({
+                name: bestFood.name, id: bestFood.id, amount: 100,
+                kcal: Math.round(bestFood.kcal || 0), p: bestFood.protein || 0, f: bestFood.fat || 0, c: bestFood.carbs || 0,
+                fiber: bestFood.fiber || 0,
+              }, g);
+              const nextItems = work[fi].items.map((x, k) => (k === wi ? swapped : x));
+              const ntTotals = sumMealTotals(nextItems);
+              const ntDay = { ...totals, kcal: totals.kcal - victim.kcal + ntTotals.kcal, p: totals.p - victim.p + ntTotals.p, f: totals.f - victim.f + ntTotals.f, c: totals.c - victim.c + ntTotals.c };
+              // A2-гейт: замена обязана снижать max-dev дня (иначе жёём итерации во вред)
+              if (maxDeviationPct(ntDay as any, validTargets) < dev - 0.0005) {
+                work[fi] = { ...work[fi], items: nextItems, totals: ntTotals };
+                notes.push(`🔁 ${victim.name} → ${bestFood.name} ${g} г (${role === 'p' ? 'белок' : role === 'c' ? 'углеводы' : 'жиры'} вверх при переборе калорий)`);
+                continue;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ── Перебор: жадный спуск по лестнице порций не-рецептурных приёмов.
+    // Кандидат принимается ТОЛЬКО если снижает максимальное отклонение дня от целей
+    // (монотонность → нет осцилляций и «блокирующих комнат»); приоритет перекусам
+    // и большему шагу вниз. ──
+    type Cut = { mi: number; ii: number; newAmount: number; label: string; score: number };
     let bestCut: Cut | null = null;
-    let bestScore = Infinity;
+    let bestDev = maxDeviationPct(totals, validTargets);
     work.forEach((m, mi) => {
       if (m.recipeApplied) return; // авторские порции рецепта не трогаем
       const isSnackish = /Перекус|Полдник|Второй завтрак|Перед сном/i.test(m.label || '');
       (m.items || []).forEach((it, ii) => {
         const a = it.amount || 0;
         if (a < 20) return;
-        // МИНИМАЛЬНО допустимая доля остатка по каждому макросу (иначе уйдём ниже цели):
-        // newAm ≥ a × (1 − room_m / im_m)
-        let loFrac = 0;
-        const chk = (im: number, tot: number, tg: number) => { if (im > 0.5) loFrac = Math.max(loFrac, 1 - Math.max(0, (tot || 0) - (tg || 0)) / im); };
-        chk(it.kcal || 0, totals.kcal, validTargets.kcal);
-        chk(it.p || 0, totals.p, validTargets.p);
-        chk(it.f || 0, totals.f, validTargets.f);
-        chk(it.c || 0, totals.c, validTargets.c);
-        const lo = a * loFrac;
-        const hi = a * 0.85; // реальная резка — минимум 15%
-        if (lo > hi + 0.001) return; // окно пусто — этот продукт резать нельзя
-        let newAmount = 0;
-        for (let i = SHRINK_LADDER.length - 1; i >= 0; i--) {
-          const v = SHRINK_LADDER[i];
-          if (v <= hi + 0.001 && v >= lo - 0.001) { newAmount = v; break; }
+        const steps = [...SHRINK_LADDER.filter(v => v < a && v >= 20), 0];
+        for (const v of steps) {
+          const ratio = v / a;
+          const nt = {
+            kcal: totals.kcal - (it.kcal || 0) * (1 - ratio),
+            p: totals.p - (it.p || 0) * (1 - ratio),
+            f: totals.f - (it.f || 0) * (1 - ratio),
+            c: totals.c - (it.c || 0) * (1 - ratio),
+          };
+          const dv = maxDeviationPct(nt as any, validTargets);
+          if (dv >= bestDev - 0.0005) continue; // строгое улучшение — иначе осцилляции
+          const score = (isSnackish ? 0 : 1e6) + (1000 - Math.min(999, a - v));
+          if (!bestCut || score < bestCut.score || (score === bestCut.score && v < bestCut.newAmount)) {
+            bestDev = dv;
+            bestCut = { mi, ii, newAmount: v, label: m.label || '', score };
+          }
         }
-        if (newAmount === 0) {
-          // ступени в окне нет — допустимо ли полное удаление (весь продукт влезает в комнаты)?
-          const fullOk = (it.kcal || 0) <= Math.max(0, totals.kcal - validTargets.kcal) + 0.5
-            && (it.p || 0) <= Math.max(0, totals.p - validTargets.p) + 0.5
-            && (it.f || 0) <= Math.max(0, totals.f - validTargets.f) + 0.5
-            && (it.c || 0) <= Math.max(0, totals.c - validTargets.c) + 0.5;
-          if (!fullOk) return;
-          newAmount = 0;
-        }
-        if (newAmount >= a) return;
-        const saved = (it.kcal || 0) * (a - newAmount) / a;
-        const score = (isSnackish ? 0 : 1e6) + (1000 - Math.min(999, saved));
-        if (score < bestScore) { bestScore = score; bestCut = { mi, ii, newAmount, label: m.label || '' }; }
       });
     });
-    if (!bestCut) break; // резать больше некуда без нарушения целей — выходим
+    if (!bestCut) break; // улучшений больше нет — локальный оптимум достигнут
     {
       const bc = bestCut as any as Cut;
       const it = work[bc.mi].items[bc.ii];
@@ -385,8 +449,56 @@ export function rebalanceDayAfterRecipes(
   }
 
   const finalTotals = sumDayTotals(work);
-  const devFinal = maxDeviationPct(finalTotals, validTargets);
-  return { meals: work, notes, deviationPct: Math.round(devFinal * 10) / 10, withinTolerance: devFinal <= 3 };
+  let devFinal = maxDeviationPct(finalTotals, validTargets);
+
+  // Финальная точная посадка: если после всех ходов всё ещё >3%, равномерно масштабируем
+  // items применённых рецептов в КУМУЛЯТИВНОМ коридоре ±8% (пропорции/вкус не меняются —
+  // это компенсация дрейфа декомпозиции, а не правка авторских пропорций).
+  if (devFinal > 3) {
+    const cumScale = new Map<number, number>();
+    for (let iter = 0; iter < 8 && devFinal > 3; iter++) {
+      let improved = false;
+      for (let mi = 0; mi < work.length; mi++) {
+        const m = work[mi];
+        if (!m.recipeApplied || !m.items?.length) continue;
+        const used = cumScale.get(mi) ?? 1;
+        let bestS = 1; let bestDev = devFinal;
+        for (let sPct = -10; sPct <= 10; sPct += 1) {
+          const s = 1 + sPct / 100;
+          if (s === 1) continue;
+          const nextCum = used * s;
+          if (nextCum < 0.9 || nextCum > 1.1) continue; // общий коридор посадки
+          const ntMealTotals = {
+            kcal: m.totals.kcal * s, p: m.totals.p * s, f: m.totals.f * s, c: m.totals.c * s,
+          };
+          const ntDay = {
+            kcal: finalTotals.kcal - m.totals.kcal + ntMealTotals.kcal,
+            p: finalTotals.p - m.totals.p + ntMealTotals.p,
+            f: finalTotals.f - m.totals.f + ntMealTotals.f,
+            c: finalTotals.c - m.totals.c + ntMealTotals.c,
+          };
+          const dv = maxDeviationPct(ntDay as any, validTargets);
+          if (dv < bestDev - 0.0005) { bestDev = dv; bestS = s; }
+        }
+        if (bestS !== 1) {
+          const scaledItems = m.items.map(it => scaleItem(it, Math.max(5, Math.round((it.amount || 0) * bestS))));
+          work[mi] = { ...m, items: scaledItems, totals: sumMealTotals(scaledItems) };
+          cumScale.set(mi, (cumScale.get(mi) ?? 1) * bestS);
+          notes.push(`⚖️ Порция «${m.recipeApplied}» ×${Math.round(bestS * 100)}% для сходимости КБЖУ дня`);
+          improved = true;
+          break; // пересчитать тоталы и попробовать ещё
+        }
+      }
+      if (!improved) break;
+      const t2 = sumDayTotals(work);
+      devFinal = maxDeviationPct(t2, validTargets);
+    }
+    void finalTotals;
+  }
+
+  const totalsOut = sumDayTotals(work);
+  const devOut = maxDeviationPct(totalsOut, validTargets);
+  return { meals: work, notes, deviationPct: Math.round(devOut * 10) / 10, withinTolerance: devOut <= 3 };
 }
 
 // ─── Закупки из фактических планов (в т.ч. из рецептов) ────────────────
@@ -467,4 +579,125 @@ export function collectAppliedRecipes(plan: any): { label: string; recipe: FlatR
     if (m.recipeApplied && m.recipeAppliedData) out.push({ label: m.label || 'Приём', recipe: m.recipeAppliedData });
   });
   return out;
+}
+
+// ─── Сборка рецептурного дня (чистая функция, экстракция из generatePlan) ──
+
+export interface AssembleRecipeDayArgs {
+  meals: PlanMealLike[];
+  /** Отфильтрованный пул рецептов (по навыку/бюджету — как его готовит контекст) */
+  pool: Recipe[];
+  targets: DayMacroTargets;
+  excludedIds: Set<string>;
+  cookProfile?: CookProfile;
+  maxPrepTimeMin?: number;
+  isVegetarian?: boolean;
+  /** ⭐ Избранные рецепты — бонус к скорингу подбора */
+  preferredRecipeNames?: Set<string>;
+  goal?: RecipeMatchOptions['goal'];
+  /** Имена, уже использованные в других днях генерации (разнообразие) */
+  usedNamesAcrossDays?: Set<string>;
+}
+
+export interface AssembleRecipeDayResult {
+  meals: PlanMealLike[];
+  notes: string[];
+  withinTolerance: boolean;
+  deviationPct: number;
+  appliedCount: number;
+}
+
+/**
+ * Собирает основные приёмы дня из рецептов: топ-3 варианта на приём, автовыбор
+ * лучшего с авторскими порциями, ребаланс дня до ±3%. Перекусы не трогаются.
+ *
+ * Важно: финальное ранжирование кандидатов идёт по ФАКТИЧЕСКОЙ декомпозиции
+ * (ingredientIds/portions → FOOD_DB), а не по авторским макросам карточки —
+ * у легаси-рецептов разбор может отличаться от заявленного КБЖУ.
+ */
+
+// Кэш декомпозиции: разбор детерминирован по объекту рецепта
+const decompCache = new WeakMap<object, { items: ReturnType<typeof buildRecipeMealItems>; totals: ReturnType<typeof sumMealTotals> | null }>();
+
+function decomposedFacts(r: Recipe): { totals: ReturnType<typeof sumMealTotals> | null } {
+  const hit = decompCache.get(r as any);
+  if (hit) return { totals: hit.totals };
+  const items = buildRecipeMealItems(r);
+  const totals = items && items.length > 0 ? sumMealTotals(items) : null;
+  decompCache.set(r as any, { items, totals });
+  return { totals };
+}
+
+function distOf(totals: { kcal: number; p: number; f: number; c: number } | null, tgtKcal: number, tp: number, tf: number, tc: number): number {
+  if (!totals) return 999;
+  const parts: Array<[number, number]> = [
+    [totals.kcal, tgtKcal], [totals.p, tp], [totals.f, tf], [totals.c, tc],
+  ];
+  let sum = 0; let n = 0;
+  for (const [val, tgt] of parts) {
+    if (tgt > 0) { sum += Math.abs(val - tgt) / tgt; n++; }
+  }
+  return n > 0 ? sum / n : 999;
+}
+
+export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDayResult {
+  const { meals, pool, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
+  const dayUsedNames = new Set<string>();
+  let appliedCount = 0;
+
+  meals.forEach(m => {
+    if (!isMainMealLabel((m as any).label)) return;
+    const mealAny = m as any;
+    const tgt = mealAny.target || { p: mealAny.totals?.p ?? 30, c: mealAny.totals?.c ?? 40, f: mealAny.totals?.f ?? 15 };
+    // Ккал-цель приёма: фактические тоталы, а для пустого приёма — формула из макро-цели
+    // (раньше пустой приём скорился против дефолтных 300 ккал и ломал выбор рецепта).
+    const targetKcal = mealAny.totals?.kcal
+      || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9)
+      || 300;
+    const excludeNames = new Set<string>([...(mealAny.recipeOptionNames || []), ...dayUsedNames, ...(usedNamesAcrossDays || [])]);
+    const matchOpts: RecipeMatchOptions = {
+      mealType: mealTypeFromLabel(mealAny.label),
+      targetKcal,
+      targetProteinG: tgt.p || 30,
+      targetCarbsG: tgt.c || 40,
+      targetFatG: tgt.f || 15,
+      excludedIds,
+      cookProfile,
+      isVegetarian: args.isVegetarian,
+      maxPrepTimeMin: args.maxPrepTimeMin ?? 60,
+      preferredRecipeNames: args.preferredRecipeNames,
+      goal: args.goal,
+    };
+    // Шире сеть кандидатов — финальный отбор по фактической декомпозиции ниже
+    const cands = pickRecipeOptions(pool, matchOpts, 6, excludeNames);
+    if (cands.length === 0) return;
+    // Переранжирование по декомпозированным фактам (что реально окажется в приёме)
+    const ranked = cands
+      .map(r => ({ r, d: distOf(decomposedFacts(r).totals, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40) }))
+      .sort((a, b) => a.d - b.d)
+      .map(x => x.r);
+    const flats: FlatRecipeOption[] = ranked.slice(0, 3).map(flattenRecipeOption);
+    mealAny.recipeOptions = flats;
+    mealAny.recipeOptionNames = flats.map(f => f.name);
+    // Автовыбор лучшего кандидата — авторские порции рецепта (не равный сплит)
+    const chosenFlat = flats[0];
+    const items = buildRecipeMealItems(rebuildRecipeFromFlat(chosenFlat));
+    if (!items || items.length === 0) return;
+    mealAny.items = items;
+    mealAny.totals = sumMealTotals(items);
+    mealAny.recipeApplied = chosenFlat.name;
+    mealAny.recipeAppliedData = chosenFlat;
+    dayUsedNames.add(chosenFlat.name);
+    usedNamesAcrossDays?.add(chosenFlat.name);
+    appliedCount++;
+  });
+
+  // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
+  // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%.
+  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds });
+  const notes = [...rb.notes];
+  if (!rb.withinTolerance) {
+    notes.push(`⚠ Режим «по рецептам»: дневное отклонение от целей ${rb.deviationPct}% (>3%) — попробуйте выбрать другие варианты рецептов.`);
+  }
+  return { meals: rb.meals, notes, withinTolerance: rb.withinTolerance, deviationPct: rb.deviationPct, appliedCount };
 }

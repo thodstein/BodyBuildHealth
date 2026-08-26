@@ -64,6 +64,55 @@ export function printDayReport(html: string): void {
   }
 }
 
+/**
+ * B6: печатная версия «Меню с рецептами» для режима «по рецептам».
+ * day — план дня (формат IndividualPlanContext): приёмы с recipeApplied/recipeAppliedData
+ * разворачиваются в ингредиенты и пошаговые инструкции. XSS-экранирование всех строк.
+ */
+export function buildRecipePlanPrintHtml(day: any): string {
+  const meals = Array.isArray(day?.meals) ? day.meals : [];
+  const applied = meals.filter((m: any) => m?.recipeApplied && m?.recipeAppliedData);
+  const t = day?.totals || { kcal: 0, p: 0, f: 0, c: 0 };
+  const recipeBlocks = applied.map((m: any) => {
+    const r = m.recipeAppliedData;
+    const ing = Array.isArray(r.ingredients) && r.ingredients.length > 0
+      ? `<ul style="margin:4px 0 0 18px;padding:0">${r.ingredients.map((i: string) => `<li style="font-size:13px;margin-bottom:2px">${esc(i)}</li>`).join('')}</ul>`
+      : '';
+    const steps = Array.isArray(r.instructions) && r.instructions.length > 0
+      ? `<ol style="margin:6px 0 0 18px;padding:0">${r.instructions.map((s: string) => `<li style="font-size:13px;margin-bottom:3px">${esc(s)}</li>`).join('')}</ol>`
+      : '';
+    return `<div style="page-break-inside:avoid;border:1px solid #ddd;border-radius:10px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <h2 style="font-size:16px;margin:0">${esc(m.label || 'Приём')}: ${esc(r.name)}</h2>
+        <span style="font-size:12px;color:#666;white-space:nowrap">⏱ ${esc(String(r.prepTimeMin ?? ''))} мин</span>
+      </div>
+      <div style="font-size:13px;color:#333;margin-top:4px"><b>${Math.round(r.kcal)}</b> ккал · Б <b>${r.protein}</b> · Ж <b>${r.fat}</b> · У <b>${r.carbs}</b></div>
+      ${r.description ? `<div style="font-size:12px;color:#777;margin-top:3px;font-style:italic">${esc(r.description)}</div>` : ''}
+      <div style="font-size:12px;font-weight:700;margin-top:8px;color:#c2620a">Ингредиенты:</div>${ing}
+      <div style="font-size:12px;font-weight:700;margin-top:8px;color:#c2620a">Как готовить:</div>${steps}
+    </div>`;
+  }).join('');
+
+  const otherMeals = meals.filter((m: any) => !(m?.recipeApplied && m?.recipeAppliedData))
+    .map((m: any) => {
+      const items = Array.isArray(m.items) ? m.items : [];
+      if (items.length === 0) return '';
+      return `<div style="margin-bottom:8px;page-break-inside:avoid">
+        <b style="font-size:13px">${esc(m.label || 'Приём')}</b> <span style="font-size:12px;color:#888">(продукты)</span>
+        <div style="font-size:12px;color:#444">${items.map((it: any) => esc(`${it.name} ${it.amount}г`)).join(' · ')}</div>
+      </div>`;
+    }).join('');
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Меню с рецептами</title>
+<style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:19px;border-bottom:2px solid #f97316;padding-bottom:8px}@media print{body{margin:12mm}}</style></head>
+<body>
+<h1>🍳 Меню дня по рецептам</h1>
+<div style="font-size:14px;margin:10px 0">Итог дня: <b>${Math.round(t.kcal || 0)}</b> ккал · Б <b>${Math.round(t.p || 0)}</b> · Ж <b>${Math.round(t.f || 0)}</b> · У <b>${Math.round(t.c || 0)}</b></div>
+${recipeBlocks || '<p style="color:#999">Выбранных рецептов нет</p>'}
+${otherMeals ? `<h2 style="font-size:15px;border-top:1px solid #eee;padding-top:12px">Остальные приёмы</h2>${otherMeals}` : ''}
+</body></html>`;
+}
+
 export interface WeekDayReportRow {
   date: string;
   report: DailyDietReport;
