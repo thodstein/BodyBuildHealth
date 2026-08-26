@@ -30,8 +30,8 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   }, []);
 
   return (
-    <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'transparent' }}>
-      <img src="/hero-main.png" alt="" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center', filter:'saturate(1.05) contrast(1.04) brightness(1.06)' }} />
+    <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
+      <img src="/hero-main.png" alt="" className="hero-fullscreen-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center bottom', background:'#07070a', filter:'saturate(1.05) contrast(1.04) brightness(1.06)' }} />
       <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 85%, rgba(0,0,0,0.06) 92%, rgba(0,0,0,0.12) 100%)' }} />
       <div style={{ position:'absolute', bottom:70, left:16, right:16, zIndex:2 }}>
 

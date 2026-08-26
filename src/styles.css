@@ -3152,7 +3152,9 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
 /* ═══ GLOBAL MOBILE ADAPTATION (all screens, phone) ═══ */
 @media (max-width: 480px) {
   html, body { overflow-x: hidden !important; max-width: 100% !important; }
-  img, video { max-width: 100% !important; height: auto !important; object-fit: contain !important; }
+  img:not(.hero-fullscreen-img), video:not(.hero-fullscreen-img) { max-width: 100% !important; height: auto !important; object-fit: contain !important; }
+  /* Hero fullscreen — полностью на экране без обрезки, до низа, без кропа */
+  .hero-fullscreen-img { width:100% !important; height:100% !important; max-width:none !important; max-height:none !important; object-fit:contain !important; object-position:center bottom !important; }
   input, select, textarea { font-size: 16px !important; }
   button { min-height: 38px; min-width: 38px; }
   /* collapse dense 3/4-col hardcoded grids to 2-col for phone readability */
@@ -3382,4 +3384,14 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   word-break: normal !important;
   overflow-wrap: anywhere !important;
   white-space: normal !important;
+}
+/* ═══ HERO FULLSCREEN — без обрезки, на весь экран, до низа ═══ */
+.hero-fullscreen-img {
+  width:100% !important;
+  height:100% !important;
+  max-width:none !important;
+  max-height:none !important;
+  object-fit:contain !important;
+  object-position:center bottom !important;
+  background:#07070a !important;
 }
