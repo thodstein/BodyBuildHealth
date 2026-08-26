@@ -3,6 +3,7 @@ import { UCUM_MAP } from '../../../core/constants';
 import type { LabPoint } from '../../../core/types';
 import { db } from '../../../core/db';
 import { notifyDataChange } from '../../../core/data-link';
+import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT, LABS_SYS_COLOR, LABS_SYS_LABEL, LABS_SYS_ICON, LabsBadge } from './LabsUI';
 
 const uid = () => { try { return crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`; } catch { return `${Date.now()}_${Math.random().toString(36).slice(2)}`; } };
 
@@ -316,32 +317,25 @@ export default function LabsCatalogTab({
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0' }}>
-        <span style={{ fontSize: 18 }}>{catalogMode === 'markers' ? '📖' : '🩺'}</span>
-        <span style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>
-          {catalogMode === 'markers' ? 'Каталог маркеров' : 'Обследования'}
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-          {catalogMode === 'markers' ? `${catalogEntries.length} маркеров` : `${INVESTIGATIONS.length} панелей`}
-        </span>
+      {/* Header — premium */}
+      <div style={{ ...LABS_CARD, padding:12, marginBottom:10, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)', display:'flex', alignItems:'center', gap:10 }}>
+        <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background: catalogMode==='markers'? 'rgba(0,230,138,0.14)' : 'rgba(168,85,247,0.14)', border:`1px solid ${catalogMode==='markers'?'rgba(0,230,138,0.18)':'rgba(168,85,247,0.18)'}`, fontSize:16 }}>{catalogMode === 'markers' ? '📖' : '🩺'}</div>
+        <div style={{ flex:1 }}>
+          <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>{catalogMode === 'markers' ? 'Каталог маркеров' : 'Обследования'}</div>
+          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{catalogMode === 'markers' ? `${catalogEntries.length} маркеров • ${filledCount} заполнено для «${PHASE_LABELS[selectedPhase]}»` : `${INVESTIGATIONS.length} панелей • группировка по типу исследования`}</div>
+        </div>
+        <LabsBadge color={catalogMode==='markers'? LABS_ACCENT : '#a855f7'}>{catalogMode === 'markers' ? `${catalogEntries.length}` : `${INVESTIGATIONS.length}`}</LabsBadge>
       </div>
 
-      {/* Mode toggle */}
-      <div style={{ display: 'flex', marginBottom: 8 }}>
+      {/* Mode toggle — segmented glass */}
+      <div style={{ display:'flex', gap:4, padding:4, borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', marginBottom:10 }}>
         <button onClick={() => setCatalogMode('markers')} style={{
-          flex: 1, padding: '7px 0', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: '10px 0 0 10px',
-          background: catalogMode === 'markers' ? 'var(--accent)' : 'var(--bg-secondary)',
-          color: catalogMode === 'markers' ? '#000' : 'var(--text-dim)',
-          border: `1px solid ${catalogMode === 'markers' ? 'var(--accent)' : 'var(--border)'}`,
-          transition: 'all 0.15s',
+          flex:1, padding:'8px 0', fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+          background: catalogMode === 'markers' ? LABS_ACCENT : 'transparent', color: catalogMode === 'markers' ? '#000' : 'rgba(255,255,255,0.62)', border:'none', boxShadow: catalogMode==='markers'?'0 6px 16px rgba(0,230,138,0.22)':'none'
         }}>📊 Маркеры</button>
         <button onClick={() => setCatalogMode('investigations')} style={{
-          flex: 1, padding: '7px 0', fontSize: 11, fontWeight: 700, cursor: 'pointer', borderRadius: '0 10px 10px 0',
-          background: catalogMode === 'investigations' ? 'var(--accent)' : 'var(--bg-secondary)',
-          color: catalogMode === 'investigations' ? '#000' : 'var(--text-dim)',
-          border: `1px solid ${catalogMode === 'investigations' ? 'var(--accent)' : 'var(--border)'}`,
-          transition: 'all 0.15s',
+          flex:1, padding:'8px 0', fontSize:11, fontWeight:800, cursor:'pointer', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+          background: catalogMode === 'investigations' ? '#a855f7' : 'transparent', color: catalogMode === 'investigations' ? '#fff' : 'rgba(255,255,255,0.62)', border:'none', boxShadow: catalogMode==='investigations'?'0 6px 16px rgba(168,85,247,0.22)':'none'
         }}>📋 Обследования</button>
       </div>
 
@@ -455,65 +449,69 @@ export default function LabsCatalogTab({
       {/* ── MARKERS MODE ── */}
       {catalogMode === 'markers' && (<>
       {/* Phase selector */}
-      <div style={{ display: 'flex', gap: 3, overflowX: 'auto', marginBottom: 8, scrollbarWidth: 'none' }}>
-        {Object.entries(PHASE_LABELS).map(([key, label]) => (
-          <button key={key} onClick={() => onPhaseChange(key)} style={{
-            padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 600,
-            whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-            background: selectedPhase === key ? 'var(--accent)' : 'var(--bg-secondary)',
-            color: selectedPhase === key ? '#000' : 'var(--text-dim)',
-            border: `1px solid ${selectedPhase === key ? 'var(--accent)' : 'var(--border)'}`,
-          }}>
-            {label}
-          </button>
-        ))}
+      <div style={{ display:'flex', gap:4, padding:4, borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', overflowX:'auto', marginBottom:10, scrollbarWidth:'none' }}>
+        {Object.entries(PHASE_LABELS).map(([key, label]) => {
+          const active = selectedPhase===key;
+          return (
+            <button key={key} onClick={() => onPhaseChange(key)} style={{
+              padding:'7px 10px', borderRadius:10, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+              background: active? LABS_ACCENT : 'transparent', color: active?'#000':'rgba(255,255,255,0.62)', border:'none', boxShadow: active?'0 4px 12px rgba(0,230,138,0.18)':'none'
+            }}>{label}</button>
+          );
+        })}
       </div>
 
-      {/* Search */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-        <input
-          type="text"
-          placeholder="Поиск по маркеру..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{
-            flex: 1, padding: '6px 10px', background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-            borderRadius: 8, color: 'var(--text)', fontSize: 11,
-          }}
-        />
+      {/* Search — premium */}
+      <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+        <div style={{ flex:1, position:'relative' }}>
+          <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)', fontSize:12, opacity:0.6 }}>🔍</span>
+          <input
+            type="text"
+            placeholder="Поиск по маркеру, коду..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              width:'100%', padding:'9px 10px 9px 30px', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)',
+              borderRadius:12, color:'#fff', fontSize:11, boxSizing:'border-box', outline:'none',
+            }}
+          />
+          {search && <button onClick={()=>setSearch('')} style={{ position:'absolute', right:8, top:'50%', transform:'translateY(-50%)', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.6)', borderRadius:999, width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, cursor:'pointer' }}>✕</button>}
+        </div>
         <button onClick={handleSave} disabled={saving || filledCount === 0} style={{
-          padding: '6px 14px', borderRadius: 10, border: 'none', cursor: (saving || filledCount === 0) ? 'not-allowed' : 'pointer',
-          background: saved ? '#22c55e' : filledCount > 0 ? 'var(--accent)' : 'var(--bg-secondary)',
-          color: saved ? '#fff' : filledCount > 0 ? '#000' : 'var(--text-dim)',
-          fontWeight: 700, fontSize: 11, transition: 'all 0.2s', whiteSpace: 'nowrap',
+          padding:'9px 14px', borderRadius:12, border:'none', cursor: (saving || filledCount === 0) ? 'not-allowed' : 'pointer',
+          background: saved ? '#22c55e' : filledCount > 0 ? LABS_ACCENT : 'rgba(255,255,255,0.06)',
+          color: saved ? '#fff' : filledCount > 0 ? '#000' : 'rgba(255,255,255,0.45)',
+          fontWeight:800, fontSize:11, transition:'all 0.2s', whiteSpace:'nowrap', boxShadow: filledCount>0? '0 6px 16px rgba(0,230,138,0.18)' : 'none',
         }}>
-          {saving ? '⏳' : saved ? '✓ Сохранено' : `💾 (${filledCount})`}
+          {saving ? '⏳' : saved ? '✓ Сохранено' : `💾 ${filledCount}`}
         </button>
       </div>
 
-      {/* System filter chips */}
-      <div style={{ display: 'flex', gap: 4, overflowX: 'auto', marginBottom: 10, scrollbarWidth: 'none', paddingBottom: 4 }}>
+      {/* System filter chips — premium */}
+      <div style={{ display:'flex', gap:6, overflowX:'auto', marginBottom:10, scrollbarWidth:'none', paddingBottom:4 }}>
         <button onClick={() => { setFilterSys('all'); }} style={{
-          padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-          background: filterSys === 'all' ? 'var(--accent)' : 'var(--bg-secondary)',
-          color: filterSys === 'all' ? '#000' : 'var(--text-dim)',
-          border: `1px solid ${filterSys === 'all' ? 'var(--accent)' : 'var(--border)'}`,
-        }}>Все</button>
-        {systemOrder.map(sys => (
-          <button key={sys} onClick={() => setFilterSys(sys === filterSys ? 'all' : sys)} style={{
-            padding: '6px 12px', borderRadius: 16, fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', flexShrink: 0,
-            background: filterSys === sys ? sysColors[sys] + '22' : 'var(--bg-secondary)',
-            color: filterSys === sys ? sysColors[sys] : 'var(--text-dim)',
-            border: `1px solid ${filterSys === sys ? sysColors[sys] : 'var(--border)'}`,
-          }}>
-            {sysIcons[sys] || ''} {sysLabels[sys] || sys}
-          </button>
-        ))}
+          padding:'7px 12px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+          background: filterSys === 'all' ? LABS_ACCENT : 'rgba(255,255,255,0.06)',
+          color: filterSys === 'all' ? '#000' : 'rgba(255,255,255,0.62)',
+          border:`1px solid ${filterSys === 'all' ? LABS_ACCENT : 'rgba(255,255,255,0.08)'}`,
+        }}>Все {filterSys==='all' && `• ${filtered.length}`}</button>
+        {systemOrder.map(sys => {
+          const active = filterSys===sys;
+          return (
+            <button key={sys} onClick={() => setFilterSys(sys === filterSys ? 'all' : sys)} style={{
+              padding:'7px 12px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:4,
+              background: active? sysColors[sys]+'18' : 'rgba(255,255,255,0.05)', color: active? sysColors[sys] : 'rgba(255,255,255,0.58)', border:`1px solid ${active? sysColors[sys]+'30' : 'rgba(255,255,255,0.06)'}`,
+            }}>
+              <span>{sysIcons[sys] || ''}</span> {sysLabels[sys] || sys}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Filled count */}
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
-        {filledCount} / {catalogEntries.length} заполнено для фазы «{PHASE_LABELS[selectedPhase] || selectedPhase}»
+      {/* Filled count — premium */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+        <div style={{ flex:1, height:4, background:'rgba(255,255,255,0.06)', borderRadius:999, overflow:'hidden' }}><div style={{ width:`${catalogEntries.length? Math.round(filledCount/catalogEntries.length*100):0}%`, height:'100%', background: filledCount===catalogEntries.length? LABS_ACCENT : '#eab308', transition:'width 0.4s' }} /></div>
+        <span style={{ fontSize:10, fontWeight:700, color:'rgba(255,255,255,0.55)', whiteSpace:'nowrap' }}>{filledCount} / {catalogEntries.length} • фаза «{PHASE_LABELS[selectedPhase] || selectedPhase}»</span>
       </div>
 
       {/* System groups */}
@@ -523,15 +521,15 @@ export default function LabsCatalogTab({
         const isOpen = openSystems[sys] !== false;
         const sysFilled = entries.filter(e => values[e.code] && values[e.code].trim() !== '').length;
         return (
-          <div key={sys} style={{ marginBottom: 8, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg)' }}>
+          <div key={sys} style={{ marginBottom:8, borderRadius:14, overflow:'hidden', border:`1px solid ${sysColors[sys]}16`, background:'rgba(255,255,255,0.02)' }}>
             <button onClick={() => setOpenSystems(prev => ({ ...prev, [sys]: !prev[sys] }))} style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 12px', cursor: 'pointer',
-              background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 12, fontWeight: 700, textAlign: 'left',
+              display:'flex', alignItems:'center', gap:8, width:'100%', padding:'10px 12px', cursor:'pointer',
+              background: isOpen? sysColors[sys]+'10' : 'transparent', border:'none', color:'#fff', fontSize:12, fontWeight:800, textAlign:'left', borderBottom: isOpen? `1px solid ${sysColors[sys]}12` : 'none',
             }}>
-              <span style={{ fontSize: 10, transition: 'transform 0.2s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', flexShrink: 0 }}>▶</span>
-              <span style={{ fontSize: 18, flexShrink: 0 }}>{sysIcons[sys] || '📋'}</span>
-              <span style={{ flex: 1 }}>{sysLabels[sys] || sys}</span>
-              <span style={{ fontSize: 9, color: sysFilled === entries.length ? 'var(--accent)' : 'var(--text-dim)' }}>
+              <span style={{ width:22, height:22, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', background: sysColors[sys]+'16', border:`1px solid ${sysColors[sys]}22`, fontSize:9, transition:'transform 0.2s', transform: isOpen?'rotate(90deg)':'rotate(0deg)', flexShrink:0 }}>▶</span>
+              <span style={{ fontSize:15, flexShrink:0 }}>{sysIcons[sys] || '📋'}</span>
+              <span style={{ flex:1 }}>{sysLabels[sys] || sys}</span>
+              <span style={{ fontSize:9, fontWeight:800, padding:'3px 8px', borderRadius:999, background: sysFilled===entries.length? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)', border:`1px solid ${sysFilled===entries.length? 'rgba(0,230,138,0.18)' : 'rgba(255,255,255,0.08)'}`, color: sysFilled===entries.length? LABS_ACCENT : 'rgba(255,255,255,0.55)' }}>
                 {sysFilled}/{entries.length}
               </span>
             </button>
@@ -547,10 +545,11 @@ export default function LabsCatalogTab({
                     const hasVal = val.trim() !== '' && !isNaN(numVal);
                     return (
                       <div key={entry.code} style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 8,
-                        background: hasVal ? 'rgba(0,230,138,0.06)' : existing ? 'rgba(59,130,246,0.06)' : 'var(--bg-secondary)',
-                        border: `1px solid ${hasVal ? 'rgba(0,230,138,0.15)' : existing ? 'rgba(59,130,246,0.12)' : 'var(--border)'}`,
-                        cursor: 'pointer',
+                        display:'flex', alignItems:'center', gap:8, padding:'8px 9px', borderRadius:11,
+                        background: hasVal? 'rgba(0,230,138,0.08)' : existing? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)',
+                        border:`1px solid ${hasVal? 'rgba(0,230,138,0.16)' : existing? 'rgba(59,130,246,0.14)' : 'rgba(255,255,255,0.06)'}`,
+                        borderLeft:`3px solid ${hasVal? deviationColor(numVal, {uln:entry.uln,lln:entry.lln}) : sysColors[sys]+'AA'}`,
+                        cursor:'pointer', transition:'transform 0.12s',
                       }} onClick={() => setDetailEntry(entry)}>
                         {/* Code chip */}
                         <div style={{

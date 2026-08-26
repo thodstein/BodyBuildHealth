@@ -7,10 +7,11 @@ import {
   addLabDiaryDay, removeLabDiaryDay,
   LabDiaryEntry, LabDiaryMarker,
 } from '../../../engines/lab-diary.engine';
+import { LABS_ACCENT, LABS_CARD, LABS_CARD_FLAT } from './LabsUI';
 
 const GLASS: React.CSSProperties = {
-  background: 'rgba(24,24,27,0.6)', borderRadius: 12,
-  border: '1px solid rgba(255,255,255,0.06)', padding: '12px 14px',
+  ...LABS_CARD,
+  background: 'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)',
 };
 
 const normColor = (v: number, lln?: number, uln?: number): string => {
@@ -107,41 +108,41 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 80 }}>
-      {/* Header stats */}
-      <div style={GLASS}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 6 }}>
-          📓 Дневник анализов
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
-          <MiniStat label="Дней с анализами" value={`${stats.totalDays}`} color="#3b82f6" />
-          <MiniStat label="Уникальных маркеров" value={`${stats.totalMarkers}`} color="#00e68a" />
-          <MiniStat label="Аномалий" value={`${abnormalMarkers.length}`} color={abnormalMarkers.length > 0 ? '#ef4444' : '#94a3b8'} />
-        </div>
-        {stats.firstDate && (
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>
-            📅 {stats.firstDate} — {stats.lastDate} · всего {stats.totalDays} записей
+    <div style={{ display:'flex', flexDirection:'column', gap:10, paddingBottom:80 }}>
+      {/* Header stats — premium */}
+      <div style={{ ...GLASS, padding:14 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+          <div style={{ width:36, height:36, borderRadius:11, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.14)', border:'1px solid rgba(0,230,138,0.18)', fontSize:16 }}>📓</div>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:14, fontWeight:800, color:'#fff' }}>Дневник анализов</div>
+            <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{stats.totalDays} дней • {stats.totalMarkers} маркеров • {abnormalMarkers.length} аномалий</div>
           </div>
-        )}
+          {stats.firstDate && <span style={{ fontSize:9, padding:'4px 8px', borderRadius:999, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.55)' }}>📅 {stats.firstDate} → {stats.lastDate}</span>}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+          <MiniStat label="Дней" value={`${stats.totalDays}`} color="#3b82f6" />
+          <MiniStat label="Маркеров" value={`${stats.totalMarkers}`} color={LABS_ACCENT} />
+          <MiniStat label="Аномалий" value={`${abnormalMarkers.length}`} color={abnormalMarkers.length>0? '#ef4444':'#94a3b8'} />
+        </div>
       </div>
 
-      {/* Mode pills */}
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+      {/* Mode pills — premium */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
         {[
           ['overview', '📊 Обзор'],
           ['chart', '📈 Графики'],
           ['abnormal', '⚠ Аномалии'],
           ['timeline', '📋 История'],
-        ].map(([id, label]) => (
-          <button key={id} onClick={() => setMode(id as any)}
-            style={{
-              padding: '6px 14px', borderRadius: 20, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
-              cursor: 'pointer', flexShrink: 0,
-              background: mode === id ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.03)',
-              color: mode === id ? '#00e68a' : 'rgba(255,255,255,0.5)',
-              border: mode === id ? '1px solid rgba(0,230,138,0.3)' : '1px solid rgba(255,255,255,0.06)',
-            }}>{label}</button>
-        ))}
+        ].map(([id, label]) => {
+          const active = mode===id;
+          return (
+            <button key={id} onClick={() => setMode(id as any)}
+              style={{
+                padding:'7px 13px', borderRadius:999, fontSize:10, fontWeight:800, whiteSpace:'nowrap', cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', gap:6,
+                background: active? LABS_ACCENT : 'rgba(255,255,255,0.06)', color: active?'#000':'rgba(255,255,255,0.68)', border:`1px solid ${active?LABS_ACCENT:'rgba(255,255,255,0.08)'}`, boxShadow: active?'0 6px 16px rgba(0,230,138,0.22)':'none',
+              }}>{label} {id==='abnormal' && abnormalMarkers.length>0 && <span style={{ fontSize:9, padding:'1px 6px', borderRadius:999, background: active?'#000':'#ef4444', color:'#fff' }}>{abnormalMarkers.length}</span>}</button>
+          );
+        })}
       </div>
 
       {/* ═══ OVERVIEW ═══ */}
@@ -428,11 +429,11 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[] }> = ({ labs }) => {
 function MiniStat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '8px 4px', textAlign: 'center',
-      borderLeft: `3px solid ${color}`,
+      background: color+'10', border:`1px solid ${color}18`, borderRadius:12, padding:'10px 6px', textAlign:'center', position:'relative', overflow:'hidden',
     }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color }}>{value}</div>
-      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 1 }}>{label}</div>
+      <div style={{ position:'absolute', top:-8, right:-8, width:28, height:28, borderRadius:'50%', background: color+'12' }} />
+      <div style={{ fontSize:18, fontWeight:900, color, lineHeight:1 }}>{value}</div>
+      <div style={{ fontSize:9, color, fontWeight:700, letterSpacing:0.3, marginTop:2 }}>{label}</div>
     </div>
   );
 }

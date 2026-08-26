@@ -1,5 +1,6 @@
 import React from 'react';
 import { REQUIRED_LABS_PER_PHASE } from '../../../core/constants';
+import { LABS_ACCENT, LABS_CARD, LabsSectionHeader, LabsBadge } from './LabsUI';
 
 const PHASE_LABELS: Record<string, string> = {
   baseline: 'Базовый',
@@ -15,6 +16,10 @@ const PHASE_DESCRIPTIONS: Record<string, string> = {
   bridge: 'Контроль восстановления между курсами',
   pct: 'Мониторинг восстановления оси HPTA',
   post_pct: 'Финальная проверка после завершения ПКТ',
+};
+
+const PHASE_ACCENT: Record<string, string> = {
+  baseline: '#3b82f6', on_cycle: LABS_ACCENT, bridge: '#a855f7', pct: '#f97316', post_pct: '#ec4899',
 };
 
 const LAB_DESCRIPTIONS: Record<string, string> = {
@@ -46,58 +51,53 @@ const LAB_DESCRIPTIONS: Record<string, string> = {
   'HOMA': 'HOMA-IR — индекс инсулинорезистентности',
   'CREATININE': 'Маркёр функции почек',
   'UA': 'Мочевая кислота — пуриновый обмен',
-  'CORTISOL': '',
-  'IGF1': '',
-  'ALP': '',
-  'BILIRUBIN_TOTAL': '',
-  'BIL_T': '',
-  'PROTEIN_TOTAL': '',
-  'BUN': '',
-  'EGFR': '',
 };
 
 export const LabsSchedule: React.FC = () => {
   return (
-    <div className="labs-schedule">
-      <div className="card">
-        <h3>📅 График сдачи анализов</h3>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-          Рекомендуемый график сдачи анализов по фазам курса. Каждая фаза требует определённый набор маркеров.
-        </p>
-
-        {Object.entries(REQUIRED_LABS_PER_PHASE).map(([phase, labs]) => {
-          const phaseLabel = PHASE_LABELS[phase] || phase;
-          const phaseDesc = PHASE_DESCRIPTIONS[phase] || '';
-
-          return (
-            <div key={phase} style={{ marginBottom: 16, background: 'var(--bg-secondary)', padding: 12, borderRadius: 8 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--accent)', marginBottom: 4 }}>
-                {phaseLabel}
+    <div>
+      <div style={{ ...LABS_CARD, background:'rgba(20,22,30,0.42)', backdropFilter:'blur(10px)' }}>
+        <LabsSectionHeader icon="📅" title="График сдачи анализов" subtitle="Рекомендуемый график по фазам курса — каждая фаза требует свой набор маркеров" />
+        <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginBottom:12, lineHeight:1.4, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+          Совет: сдавайте базовый скрининг до курса и каждые 4 недели на курсе. Маркеры с ℹ️ — наведите для подсказки.
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          {Object.entries(REQUIRED_LABS_PER_PHASE).map(([phase, labs]) => {
+            const phaseLabel = PHASE_LABELS[phase] || phase;
+            const phaseDesc = PHASE_DESCRIPTIONS[phase] || '';
+            const accent = PHASE_ACCENT[phase] || LABS_ACCENT;
+            return (
+              <div key={phase} style={{ borderRadius:14, overflow:'hidden', border:`1px solid ${accent}18`, background:'rgba(255,255,255,0.02)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 12px', background: accent+'10', borderBottom:`1px solid ${accent}14` }}>
+                  <span style={{ width:28, height:28, borderRadius:9, display:'flex', alignItems:'center', justifyContent:'center', background: accent+'18', border:`1px solid ${accent}22`, fontSize:12, fontWeight:800, color:accent }}>{phaseLabel.slice(0,1)}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:800, fontSize:12, color:'#fff' }}>{phaseLabel}</div>
+                    {phaseDesc && <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', marginTop:1 }}>{phaseDesc}</div>}
+                  </div>
+                  <LabsBadge color={accent}>{labs.length} маркеров</LabsBadge>
+                </div>
+                <div style={{ padding:'10px 10px 8px' }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    {labs.map((code: string) => (
+                      <span key={code} style={{
+                        background: accent+'10',
+                        border: `1px solid ${accent}22`,
+                        padding:'4px 8px',
+                        borderRadius:999,
+                        fontSize:10, fontWeight:700,
+                        color: 'rgba(255,255,255,0.82)',
+                        display:'inline-flex', alignItems:'center', gap:4,
+                      }}>
+                        {code}
+                        {LAB_DESCRIPTIONS[code] && <span style={{ fontSize:8, opacity:0.7 }} title={LAB_DESCRIPTIONS[code]}>ℹ️</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-              {phaseDesc && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{phaseDesc}</div>}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                {labs.map((code: string) => (
-                  <span key={code} style={{
-                    background: 'rgba(0,230,138,0.1)',
-                    border: '1px solid rgba(0,230,138,0.3)',
-                    padding: '3px 8px',
-                    borderRadius: 4,
-                    fontSize: 11,
-                    color: 'var(--text)',
-                  }}>
-                    {code}
-                    {LAB_DESCRIPTIONS[code] && (
-                      <span style={{ fontSize: 9, color: 'var(--text-dim)', marginLeft: 4 }} title={LAB_DESCRIPTIONS[code]}>ℹ️</span>
-                    )}
-                  </span>
-                ))}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-                Всего маркеров: {labs.length}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
