@@ -62,9 +62,9 @@ export const DiaryHeader: React.FC<{
         gap: 8,
         flexWrap: 'wrap',
         alignItems: 'center',
-        background: 'rgba(16,16,20,0.78)',
-        backdropFilter: 'blur(22px) saturate(160%)',
-        WebkitBackdropFilter: 'blur(22px) saturate(160%)',
+        background: 'rgba(16,16,20,0.86)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
         boxShadow: '0 8px 28px rgba(0,0,0,0.32)',
       }}

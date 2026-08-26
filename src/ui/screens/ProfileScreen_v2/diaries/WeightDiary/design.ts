@@ -76,29 +76,31 @@ export const staggerDelay = (index: number, base = 0.08): React.CSSProperties =>
 
 /* ── Glassmorphism Cards ────────────────────────────────────────────── */
 
-/** Glass card: frosted glass with subtle border and highlight. */
+/** Glass card: frosted glass with subtle border and highlight. — облегчён для производительности */
 export const glassCard: React.CSSProperties = {
   background: c.glass,
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   borderRadius: 18,
   border: `1px solid ${c.glassBorder}`,
-  boxShadow: `0 8px 32px rgba(0,0,0,0.32), inset 0 1px 0 ${c.glassHighlight}`,
+  boxShadow: `0 6px 20px rgba(0,0,0,0.24), inset 0 1px 0 ${c.glassHighlight}`,
   padding: 20,
   marginBottom: 14,
   animation: animations.slideUp,
+  contain: 'layout paint',
 };
 
 /** Glass tile for metrics grid. */
 export const glassTile: React.CSSProperties = {
   background: c.glass,
-  backdropFilter: 'blur(16px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+  backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)',
   borderRadius: 16,
   border: `1px solid ${c.glassBorder}`,
-  boxShadow: `0 4px 20px rgba(0,0,0,0.24), inset 0 1px 0 ${c.glassHighlight}`,
+  boxShadow: `0 4px 16px rgba(0,0,0,0.20), inset 0 1px 0 ${c.glassHighlight}`,
   padding: '14px 16px',
-  transition: 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.2s',
+  transition: 'transform 0.14s ease, box-shadow 0.14s ease',
+  contain: 'layout paint',
 } as React.CSSProperties & { ':hover'?: React.CSSProperties };
 
 /** Elevated glass card with stronger shadow. */
@@ -208,10 +210,10 @@ export const btnSecondary: React.CSSProperties = {
   ...btnPrimary,
   background: c.glass,
   border: `1px solid ${c.glassBorder}`,
-  boxShadow: `0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 ${c.glassHighlight}`,
+  boxShadow: `0 4px 16px rgba(0,0,0,0.16), inset 0 1px 0 ${c.glassHighlight}`,
   color: c.text,
-  backdropFilter: 'blur(16px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+  backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)',
 };
 
 export const btnGlass: (color?: string) => React.CSSProperties = (color = c.blue) => ({
@@ -220,10 +222,10 @@ export const btnGlass: (color?: string) => React.CSSProperties = (color = c.blue
   borderRadius: 12,
   cursor: 'pointer',
   background: 'rgba(255,255,255,0.08)',
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   border: `1px solid ${c.glassBorder}`,
-  boxShadow: `0 4px 20px rgba(0,0,0,0.24), inset 0 1px 0 ${c.glassHighlight}`,
+  boxShadow: `0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 ${c.glassHighlight}`,
   color: c.text,
   fontSize: 13,
   fontWeight: 600,
@@ -256,8 +258,8 @@ export const iconBtn: React.CSSProperties = {
 export const iconBtnGlass: React.CSSProperties = {
   ...iconBtn,
   background: 'rgba(255,255,255,0.06)',
-  backdropFilter: 'blur(16px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+  backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)',
   border: `1px solid ${c.glassBorder}`,
   boxShadow: `inset 0 1px 0 ${c.glassHighlight}`,
 };

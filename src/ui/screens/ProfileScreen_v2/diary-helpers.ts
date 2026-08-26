@@ -94,13 +94,14 @@ export const computeStreak = (
   if (entries.length === 0) return { current: 0, best: 0, totalDays: 0 };
   const sorted = [...entries].map(e => e.date).sort();
   const unique = Array.from(new Set(sorted));
+  const uniqSet = new Set(unique);
   const todayMs = Date.now();
   const dayMs = 86400000;
   let current = 0;
   const startCursor = new Date(todayMs);
   startCursor.setHours(0, 0, 0, 0);
   let cursor: Date = new Date(startCursor);
-  while (unique.includes(localDateKey(cursor))) {
+  while (uniqSet.has(localDateKey(cursor))) {
     current += 1;
     cursor = new Date(cursor.getTime() - dayMs);
   }
@@ -114,7 +115,7 @@ export const computeStreak = (
         lastDate.setHours(0, 0, 0, 0);
         cursor = new Date(lastDate);
         current = 0;
-        while (unique.includes(localDateKey(cursor))) {
+        while (uniqSet.has(localDateKey(cursor))) {
           current += 1;
           cursor = new Date(cursor.getTime() - dayMs);
         }

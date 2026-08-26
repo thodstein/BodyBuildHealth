@@ -33,8 +33,9 @@ export const btnBase = (accent: string): React.CSSProperties => ({
   borderRadius: 12,
   border: `1px solid rgba(255,255,255,0.10)`,
   background: 'rgba(255,255,255,0.06)',
-  backdropFilter: 'blur(12px) saturate(140%)',
-  WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+  // средний blur — дешевле для GPU, на мобилках отключится через CSS
+  backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)',
   color: colors.text,
   cursor: 'pointer',
   fontSize: 13,
@@ -46,7 +47,7 @@ export const btnBase = (accent: string): React.CSSProperties => ({
   alignItems: 'center',
   justifyContent: 'center',
   gap: 7,
-  boxShadow: '0 2px 10px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)',
+  boxShadow: '0 2px 10px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.05)',
   letterSpacing: '-0.1px',
 });
 
@@ -106,8 +107,7 @@ export const chip = (accent: string): React.CSSProperties => ({
   cursor: 'pointer',
   border: `1px solid rgba(255,255,255,0.10)`,
   background: 'rgba(255,255,255,0.05)',
-  backdropFilter: 'blur(10px)',
-  WebkitBackdropFilter: 'blur(10px)',
+  // без blur — чип без стекла быстрее рендерится
   color: colors.textMuted,
   fontFamily: FONT,
   transition: 'all 0.18s ease',
@@ -129,8 +129,6 @@ export const segWrap: React.CSSProperties = {
   gap: 3,
   padding: 3,
   background: 'rgba(255,255,255,0.06)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
   borderRadius: 12,
   border: '1px solid rgba(255,255,255,0.07)',
 };
@@ -171,12 +169,13 @@ export const sectionTitleAccent = (accent: string): React.CSSProperties => ({
 // ── Карточки ───────────────────────────────────────────────────────────
 
 export const statCard: React.CSSProperties = {
-  background: 'rgba(28,28,32,0.72)',
-  backdropFilter: 'blur(18px) saturate(160%)',
-  WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+  background: 'rgba(28,28,32,0.82)',
+  // лёгкий blur — тяжёлый 18px сильно тормозит на Telegram WebView
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
   borderRadius: 16,
   border: `1px solid rgba(255,255,255,0.08)`,
-  boxShadow: '0 8px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06)',
+  boxShadow: '0 6px 20px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.05)',
   padding: 14,
   display: 'flex',
   flexDirection: 'column',
@@ -184,6 +183,7 @@ export const statCard: React.CSSProperties = {
   minWidth: 0,
   position: 'relative',
   overflow: 'hidden',
+  contain: 'layout paint',
 };
 
 // карточка с акцентной левой полосой
@@ -220,11 +220,11 @@ export const header: React.CSSProperties = {
   gap: 8,
   flexWrap: 'wrap',
   alignItems: 'center',
-  background: 'rgba(16,16,20,0.78)',
-  backdropFilter: 'blur(20px) saturate(160%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+  background: 'rgba(16,16,20,0.86)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
   borderBottom: `1px solid rgba(255,255,255,0.07)`,
-  boxShadow: '0 6px 24px rgba(0,0,0,0.28)',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.22)',
 };
 
 export const main: React.CSSProperties = {
@@ -368,10 +368,16 @@ export const diaryScrollbarCss = (accent: string) => `
   .diary-scrollbar::-webkit-scrollbar-track { background: transparent; }
   .diary-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
   .diary-scrollbar::-webkit-scrollbar-thumb:hover { background: ${rgba(accent, 0.40)}; background-clip: content-box; }
-  .diary-card { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
-  .diary-card:hover { transform: translateY(-1px); box-shadow: 0 12px 36px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.07); }
+  .diary-card { transition: transform 0.14s ease, box-shadow 0.14s ease; contain: layout paint; }
+  .diary-card:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.05); }
+  @media (max-width: 768px) {
+    .diary-card, .diary-scrollbar, [style*="backdrop-filter"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  }
   @media (hover: none) and (pointer: coarse) {
     .diary-header-btn { min-height: 44px; }
     .diary-input, .diary-select { font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .diary-card, .diary-card:hover { transition: none !important; transform: none !important; }
   }
 `;

@@ -209,17 +209,22 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
     return sortEntries(x, sort);
   }, [entries, range, query, sort]);
 
-  const pageData = paginate(visible, page, 8);
+  const pageData = useMemo(() => paginate(visible, page, 8), [visible, page]);
   // Статистика, графики и аномалии зависят ТОЛЬКО от диапазона (не от поиска).
   const rangeEntries = useMemo(() => filterByRange(entries, range), [entries, range]);
-  const points = rangeEntries.map(e => ({ date: e.date, value: Number(e.fields[0].value) })).filter(x => Number.isFinite(x.value));
-  const dist = computeDistribution(points.map(x => x.value));
-  const extremes = computeExtremes('bp', rangeEntries);
-  const streak = computeStreak(rangeEntries);
-  const anomalies = detectAnomalies('bp', rangeEntries);
-  const comparison = compareWithLastWeek(points);
-  const weekly = buildWeeklyHistogram(points);
-  const normal = getNormalRange('bp');
+  const { points, dist, extremes, streak, anomalies, comparison, weekly, normal } = useMemo(() => {
+    const pts = rangeEntries.map(e => ({ date: e.date, value: Number(e.fields[0].value) })).filter(x => Number.isFinite(x.value));
+    return {
+      points: pts,
+      dist: computeDistribution(pts.map(x => x.value)),
+      extremes: computeExtremes('bp', rangeEntries),
+      streak: computeStreak(rangeEntries),
+      anomalies: detectAnomalies('bp', rangeEntries),
+      comparison: compareWithLastWeek(pts),
+      weekly: buildWeeklyHistogram(pts),
+      normal: getNormalRange('bp'),
+    };
+  }, [rangeEntries]);
 
   const latest = rows.length > 0 ? sortEntriesByTimestamp(rows)[0] : undefined;
   // Статистика зависит ТОЛЬКО от диапазона (7/30/90); поиск влияет лишь на таблицу.
@@ -230,23 +235,26 @@ export const BPDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, onDa
   const bpColor = getBpClassificationColor(bpClass);
   const bpLabel = getBpClassificationLabel(bpClass);
 
-  // Averages
-  const avgS = recentRows.length ? Math.round(recentRows.reduce((n, x) => n + x.systolic, 0) / recentRows.length) : 0;
-  const avgD = recentRows.length ? Math.round(recentRows.reduce((n, x) => n + x.diastolic, 0) / recentRows.length) : 0;
-  const avgP = recentRows.length ? Math.round(recentRows.reduce((n, x) => n + x.hr, 0) / recentRows.length) : 0;
-  const normalPct = recentRows.length
-    ? Math.round(recentRows.filter(x => x.systolic < 130 && x.diastolic < 80).length / recentRows.length * 100) : 0;
+  // Averages — memo
+  const { avgS, avgD, avgP, normalPct } = useMemo(() => ({
+    avgS: recentRows.length ? Math.round(recentRows.reduce((n, x) => n + x.systolic, 0) / recentRows.length) : 0,
+    avgD: recentRows.length ? Math.round(recentRows.reduce((n, x) => n + x.diastolic, 0) / recentRows.length) : 0,
+    avgP: recentRows.length ? Math.round(recentRows.reduce((n, x) => n + x.hr, 0) / recentRows.length) : 0,
+    normalPct: recentRows.length ? Math.round(recentRows.filter(x => x.systolic < 130 && x.diastolic < 80).length / recentRows.length * 100) : 0,
+  }), [recentRows]);
 
-  // Advanced metrics from bp-hr-data.ts
-  const bpLoad = calcBPLoad(recentRows);
-  const variability = calcVariability(recentRows);
-  const mapAvg = recentRows.length ? Math.round(recentRows.reduce((n, x) => n + calcMAP(x.systolic, x.diastolic), 0) / recentRows.length) : 0;
-  const ppAvg = recentRows.length ? Math.round(recentRows.reduce((n, x) => n + calcPulsePressure(x.systolic, x.diastolic), 0) / recentRows.length) : 0;
-  const orthostatic = checkOrthostatic(recentRows);
-  const circadian = getCircadianPattern(recentRows);
-  const medsCompare = compareMedsVsNoMeds(recentRows);
-  const goalAchievement = calculateGoalAchievement(recentRows, { systolicTarget: bpGoal, diastolicTarget: 80, hrTarget: 72 });
-  const defaultGoals = getDefaultGoals(bpClass);
+  // Advanced metrics — memo
+  const { bpLoad, variability, mapAvg, ppAvg, orthostatic, circadian, medsCompare, goalAchievement, defaultGoals } = useMemo(() => ({
+    bpLoad: calcBPLoad(recentRows),
+    variability: calcVariability(recentRows),
+    mapAvg: recentRows.length ? Math.round(recentRows.reduce((n, x) => n + calcMAP(x.systolic, x.diastolic), 0) / recentRows.length) : 0,
+    ppAvg: recentRows.length ? Math.round(recentRows.reduce((n, x) => n + calcPulsePressure(x.systolic, x.diastolic), 0) / recentRows.length) : 0,
+    orthostatic: checkOrthostatic(recentRows),
+    circadian: getCircadianPattern(recentRows),
+    medsCompare: compareMedsVsNoMeds(recentRows),
+    goalAchievement: calculateGoalAchievement(recentRows, { systolicTarget: bpGoal, diastolicTarget: 80, hrTarget: 72 }),
+    defaultGoals: getDefaultGoals(bpClass),
+  }), [recentRows, bpGoal, bpClass]);
   const trendSystolic = useMemo(() => calculateTrend(recentRows, 'systolic'), [recentRows]);
   const trendDiastolic = useMemo(() => calculateTrend(recentRows, 'diastolic'), [recentRows]);
 

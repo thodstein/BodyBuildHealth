@@ -592,13 +592,13 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
     const max = Math.max(...rightValues);
     return { min, max, label: '% / FFMI', ticks: 5 };
   }, [chartRows, activeChartFields, profileHeight]);
-  const weightPoints = pointsFor(rows, 'weight');
-  const distribution = computeDistribution(weightPoints.map((x) => x.value));
-  const extremes = computeExtremes('weight', entries);
-  const weekly = buildWeeklyHistogram(weightPoints);
-  const comparison = compareWithLastWeek(weightPoints);
-  const anomalies = detectAnomalies('weight', entries);
-  const streak = computeStreak(entries);
+  const weightPoints = useMemo(() => pointsFor(rows, 'weight'), [rows]);
+  const distribution = useMemo(() => computeDistribution(weightPoints.map((x) => x.value)), [weightPoints]);
+  const extremes = useMemo(() => computeExtremes('weight', entries), [entries]);
+  const weekly = useMemo(() => buildWeeklyHistogram(weightPoints), [weightPoints]);
+  const comparison = useMemo(() => compareWithLastWeek(weightPoints), [weightPoints]);
+  const anomalies = useMemo(() => detectAnomalies('weight', entries), [entries]);
+  const streak = useMemo(() => computeStreak(entries), [entries]);
   const body = useMemo(() => {
     const latest = rows[0];
     if (!latest) return null;

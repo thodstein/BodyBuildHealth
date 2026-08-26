@@ -651,23 +651,23 @@ export const SleepDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals: p
       .slice(0, 6);
   }, [points]);
 
-  const recent = rows.slice(0, 7);
-  const debtCalc = cumulativeSleepDebt(rows, goals.targetHours, 7);
+  const recent = useMemo(() => rows.slice(0, 7), [rows]);
+  const debtCalc = useMemo(() => cumulativeSleepDebt(rows, goals.targetHours, 7), [rows, goals.targetHours]);
   const debt = debtCalc.debt;
-  const avgQuality = recent.length ? recent.reduce((n, r) => n + r.quality, 0) / recent.length : 0;
-  const efficiency = avgSleepEfficiency(rows, 30);
-  const regularity = computeSleepRegularity(rows, 14);
+  const avgQuality = useMemo(() => recent.length ? recent.reduce((n, r) => n + r.quality, 0) / recent.length : 0, [recent]);
+  const efficiency = useMemo(() => avgSleepEfficiency(rows, 30), [rows]);
+  const regularity = useMemo(() => computeSleepRegularity(rows, 14), [rows]);
   const lastWake = rows[0]?.wakeTime;
-  const bedtimeRec = lastWake ? recommendedBedtime(lastWake, goals.targetHours) : null;
+  const bedtimeRec = useMemo(() => lastWake ? recommendedBedtime(lastWake, goals.targetHours) : null, [lastWake, goals.targetHours]);
 
-  const correlations = analyzeAllSleepCorrelations({
+  const correlations = useMemo(() => analyzeAllSleepCorrelations({
     sleepDiary: rows,
     trainingDates: getTrainingDatesFromStorage(90),
     supplementIntake: getSupplementIntakeFromStorage(90),
-  });
-  const recommendations = generateCorrelationRecommendations(correlations);
-  const hygiene = generateSleepHygieneNotifications(rows);
-  const ped = analyzePEDImpactOnSleep(rows, getSupplementIntakeFromStorage(90));
+  }), [rows]);
+  const recommendations = useMemo(() => generateCorrelationRecommendations(correlations), [correlations]);
+  const hygiene = useMemo(() => generateSleepHygieneNotifications(rows), [rows]);
+  const ped = useMemo(() => analyzePEDImpactOnSleep(rows, getSupplementIntakeFromStorage(90)), [rows]);
 
   const exportCsv = () => {
     const headers = [
