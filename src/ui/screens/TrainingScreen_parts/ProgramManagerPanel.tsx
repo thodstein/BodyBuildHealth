@@ -894,8 +894,8 @@ export const ProgramManagerPanel: React.FC = () => {
               <span>БВ</span>
             </button>
           </div>
-          {/* P2-3: Wizard как альтернатива прямому созданию */}
-          <button style={{ ...BTN_GHOST, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}>🪄 Визард (пошагово)</button>
+          {/* P2-3: Wizard как альтернатива прямому созданию — карточка */}
+          <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(167,139,250,0.12), rgba(167,139,250,0.04))', border: '1px solid rgba(167,139,250,0.28)', color: '#a78bfa', fontWeight: 800, fontSize: 11, minHeight: 44, boxShadow: '0 2px 10px rgba(167,139,250,0.12)' }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}><span style={{ fontSize: 14 }}>🪄</span> Визард (пошагово) <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.75)', fontWeight: 400, marginLeft: 4 }}>— проведёт за 30 сек</span></button>
         </div>
 
         {/* P15: Шаблоны быстрого старта — в обоих режимах + подсветка по профилю */}
@@ -925,13 +925,13 @@ export const ProgramManagerPanel: React.FC = () => {
         })()}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>📥 Загрузить для правки</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48 }} onClick={() => setPickerOpen('bb')}>
-              <span style={{ fontSize: 13 }}>🔍 Библиотека</span>
+          <div style={{ fontSize: 10, color: DIM, textTransform: 'uppercase', letterSpacing: 0.3, fontWeight: 700 }}>📥 Загрузить для правки — карточки</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+            <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: '12px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(0,230,138,0.10), rgba(255,255,255,0.02))', border: '1px solid rgba(0,230,138,0.22)', color: '#fff', minHeight: 64, boxShadow: '0 2px 10px rgba(0,0,0,0.12)', textAlign: 'left' }} onClick={() => setPickerOpen('bb')}>
+              <span style={{ fontSize: 16 }}>🔍</span><span style={{ fontSize: 12, fontWeight: 800, color: '#00e68a' }}>Библиотека</span><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>29 программ · клон</span>
             </button>
-            <button style={{ ...BTN_GHOST, flex: 1, minHeight: 48, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.2)' }} onClick={() => setPickerOpen('pl')}>
-              <span style={{ fontSize: 13 }}>📥 LMS-цикл</span>
+            <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, padding: '12px 12px', borderRadius: 12, cursor: 'pointer', background: 'linear-gradient(180deg, rgba(167,139,250,0.10), rgba(255,255,255,0.02))', border: '1px solid rgba(167,139,250,0.22)', color: '#fff', minHeight: 64, boxShadow: '0 2px 10px rgba(0,0,0,0.12)', textAlign: 'left' }} onClick={() => setPickerOpen('pl')}>
+              <span style={{ fontSize: 16 }}>📥</span><span style={{ fontSize: 12, fontWeight: 800, color: '#a78bfa' }}>LMS-цикл</span><span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>66 циклов · immutable</span>
             </button>
           </div>
         </div>
