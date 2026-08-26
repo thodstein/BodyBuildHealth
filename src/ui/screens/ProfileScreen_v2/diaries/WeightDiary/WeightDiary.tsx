@@ -753,6 +753,96 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
       })),
     }]);
   };
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const handleImportCsv = async (file: File) => {
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) {
+        (window as any).showToast?.('⚠️ CSV пуст или без заголовка');
+        return;
+      }
+      const parseLine = (line: string): string[] => {
+        const out: string[] = [];
+        let cur = '';
+        let inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+            else inQ = !inQ;
+          } else if (ch === ',' && !inQ) { out.push(cur); cur = ''; }
+          else cur += ch;
+        }
+        out.push(cur);
+        return out.map((s) => s.trim().replace(/^'?(.*?)'?$/, '$1'));
+      };
+      const header = parseLine(lines[0]).map((h) => h.toLowerCase().replace(/^\uFEFF/, '').trim());
+      const idx: Record<string, number> = {};
+      header.forEach((h, i) => { idx[h] = i; });
+      const findIdx = (...names: string[]) => {
+        for (const n of names) if (idx[n] !== undefined) return idx[n];
+        return -1;
+      };
+      const colDate = findIdx('date', 'дата');
+      const colWeight = findIdx('weight', 'вес', 'вес, кг', 'weight, kg');
+      if (colDate < 0 || colWeight < 0) {
+        (window as any).showToast?.('⚠️ Нужны колонки date/дата и weight/вес');
+        return;
+      }
+      const colMap: Record<string, number> = {
+        bodyFat: findIdx('bodyfat', '% жира', 'жир', 'body_fat', 'fat'),
+        waistCm: findIdx('waistcm', 'waist', 'талия', 'waist_cm'),
+        chestCm: findIdx('chestcm', 'chest', 'грудь', 'chest_cm'),
+        hipCm: findIdx('hipcm', 'hip', 'бедра', 'hip_cm'),
+        shoulderCm: findIdx('shouldercm', 'shoulder', 'плечи', 'shoulder_cm'),
+        bicepCm: findIdx('bicepcm', 'bicep', 'бицепс', 'bicep_cm'),
+        bicepLeftCm: findIdx('bicepleftcm', 'bicep_left', 'бицепс л'),
+        bicepRightCm: findIdx('biceprightcm', 'bicep_right', 'бицепс п'),
+        thighCm: findIdx('thighcm', 'thigh', 'бедро', 'thigh_cm'),
+        calfCm: findIdx('calfcm', 'calf', 'икры', 'calf_cm'),
+        neckCm: findIdx('neckcm', 'neck', 'шея', 'neck_cm'),
+        forearmCm: findIdx('forearmcm', 'forearm', 'предплечье', 'forearm_cm'),
+        muscleMass: findIdx('musclemass', 'мышцы', 'muscle', 'muscle_mass'),
+        waterMass: findIdx('watermass', 'вода', 'water', 'water_mass'),
+        notes: findIdx('notes', 'заметка', 'note', 'заметки'),
+        timeOfDay: findIdx('timeofday', 'время суток', 'tod', 'time_of_day'),
+      };
+      const imported: WeightEntry[] = [];
+      for (let li = 1; li < lines.length; li++) {
+        const cols = parseLine(lines[li]);
+        if (!cols[colDate] || !cols[colWeight]) continue;
+        const date = cols[colDate].trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        const w = Number(String(cols[colWeight]).replace(',', '.'));
+        if (!Number.isFinite(w) || w <= 0) continue;
+        const e: WeightEntry = { date, weight: w } as WeightEntry;
+        for (const [field, cIdx] of Object.entries(colMap)) {
+          if (cIdx < 0 || !cols[cIdx]) continue;
+          const raw = cols[cIdx].trim();
+          if (!raw) continue;
+          if (field === 'notes' || field === 'timeOfDay') (e as any)[field] = raw.slice(0, 500);
+          else {
+            const n = Number(raw.replace(',', '.'));
+            if (Number.isFinite(n)) (e as any)[field] = n;
+          }
+        }
+        const n = normalizeWeightEntry(e);
+        if (n) imported.push(n);
+      }
+      if (imported.length === 0) {
+        (window as any).showToast?.('⚠️ Нет валидных строк для импорта');
+        return;
+      }
+      const merged = [...rows, ...imported];
+      await commit(merged);
+      (window as any).showToast?.(`📥 Импортировано ${imported.length} записей`);
+    } catch {
+      (window as any).showToast?.('⚠️ Ошибка чтения CSV');
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = '';
+    }
+  };
   const beginEdit = (row: WeightEntry) => {
     setEditing(row.date);
     setDraft({ ...row });
@@ -915,6 +1005,7 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
         onUndo={() => { if (undo) { commit(undo, false); setUndo(null); } }}
         exportActions={[
           { label: '📥 CSV-файл', onClick: doExportCsv },
+          { label: '📤 Импорт CSV', onClick: () => importInputRef.current?.click() },
           { label: '🖨 Печать / PDF (вес)', onClick: doPrint },
           { label: '📄 PDF: все дневники', onClick: exportAllDiaries },
           { label: '🗄 Архив', onClick: () => setShowArchive((v: boolean) => !v), danger: false },
@@ -924,6 +1015,16 @@ export const WeightDiary: React.FC<DiaryWindowProps> = ({ open, onClose, goals, 
           { label: '💾 В профиль', onClick: syncToProfile },
           { label: '🗑 Очистить дневник', onClick: () => { if (rows.length && confirm('Очистить весь дневник?')) commit([]); }, danger: true },
         ]}
+      />
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleImportCsv(f);
+        }}
       />
 
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '8px 14px 72px' }}>
