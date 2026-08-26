@@ -21,12 +21,12 @@ export const SupportHomeView: React.FC<{ s: Record<string, any> }> = ({ s }) => 
   // контейнер hero занимает доступную высоту с учётом нижнего бара (64px + safe-area), внутренний паддинг тоже с запасом.
   const CARD_BASE: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
-    border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-    boxShadow: '0 3px 12px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.05)',
+    border: '1px solid rgba(255,255,255,0.12)',
+    boxShadow: '0 3px 12px rgba(0,0,0,0.30)',
     transition: 'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
   };
   const cardGlow = (accent: string): React.CSSProperties => ({
-    background: `linear-gradient(135deg, ${accent}06, rgba(24,24,27,0.10))`,
+    background: `rgba(18,18,20,0.62)`,
   });
 
   const renderCard = (onClick: () => void, icon: string, bg: string, title: string, titleColor: string, desc: string, accent: string) => (
@@ -50,24 +50,23 @@ export const SupportHomeView: React.FC<{ s: Record<string, any> }> = ({ s }) => 
 
   return (
     <InfoErrorBoundary label="Главная бады">
-      {/* ХЕРО — на весь экран, фиксирован. Верх 68% прозрачен — картинка полностью видна. Весь серый текст → белый */}
+      {/* ХЕРО — на весь экран, без стекла. Картинка полностью видна: градиент только снизу 30% */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', flexDirection: 'column' }}>
         <img src="/support-hero.jpg" alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 68%, rgba(0,0,0,0.28) 78%, rgba(0,0,0,0.74) 92%, rgba(0,0,0,0.84) 100%)' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(380px 220px at 16% 12%, rgba(0,230,138,0.05), transparent 68%), radial-gradient(360px 220px at 84% 14%, rgba(139,92,246,0.04), transparent 68%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 62%, rgba(0,0,0,0.18) 76%, rgba(0,0,0,0.58) 88%, rgba(0,0,0,0.78) 100%)' }} />
         <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px calc(64px + env(safe-area-inset-bottom, 0px))', gap: 10, overflowY: 'auto' }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.20)', color: '#00e68a', fontSize: 9, fontWeight: 800, letterSpacing: '0.4px', backdropFilter: 'blur(6px)' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 8px', borderRadius: 20, background: 'rgba(0,230,138,0.14)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontSize: 9, fontWeight: 800, letterSpacing: '0.4px' }}>
               <span style={{ width: 5, height: 5, borderRadius: 5, background: '#00e68a', boxShadow: '0 0 8px rgba(0,230,138,0.6)', display: 'inline-block' }} /> БЛОК БАД · ПОДДЕРЖКА
             </div>
-            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: '8px 0 4px', textShadow: '0 2px 14px rgba(0,0,0,0.85)', letterSpacing: '-0.6px', lineHeight: 1 }}>Поддержка</h1>
-            <p style={{ fontSize: 11, color: '#fff', margin: 0, lineHeight: 1.4, textShadow: '0 1px 8px rgba(0,0,0,0.7)', maxWidth: 480 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: '8px 0 4px', textShadow: '0 2px 12px rgba(0,0,0,0.9)', letterSpacing: '-0.6px', lineHeight: 1 }}>Поддержка</h1>
+            <p style={{ fontSize: 11, color: '#fff', margin: 0, lineHeight: 1.4, textShadow: '0 1px 6px rgba(0,0,0,0.8)', maxWidth: 480 }}>
               Фарм-поддержка, пептиды и препараты для снижения рисков
             </p>
             <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
-              <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', backdropFilter: 'blur(6px)' }}>28 механизмов</span>
-              <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', backdropFilter: 'blur(6px)' }}>435 веществ</span>
-              <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.18)', color: '#00e68a', backdropFilter: 'blur(6px)' }}>ТЗ-модель</span>
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(18,18,20,0.55)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff' }}>28 механизмов</span>
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(18,18,20,0.55)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff' }}>435 веществ</span>
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(18,18,20,0.55)', border: '1px solid rgba(0,230,138,0.16)', color: '#00e68a' }}>ТЗ-модель</span>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
