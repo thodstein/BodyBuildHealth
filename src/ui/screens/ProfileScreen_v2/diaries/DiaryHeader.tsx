@@ -16,7 +16,7 @@ export interface DiaryHeaderAction {
 
 export const DiaryHeader: React.FC<{
   accent: string;
-  title: string;
+  title: React.ReactNode;
   count: number | string;
   countLabel?: string;
   onClose: () => void;

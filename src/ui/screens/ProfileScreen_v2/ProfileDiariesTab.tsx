@@ -66,6 +66,8 @@ import {
 import { loadCardioLog, saveCardioLogEntry, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { type WeightEntry } from '../../../engines/profile-store';
 
+const isWeightDiaryKey = (k: string) => k === 'weight' || k === 'measurements';
+
 /* ── Типы для встроенных дневников ── */
 
 const SLEEP_DIARY_KEY = 'he_sleep_diary';
@@ -1025,8 +1027,8 @@ const exportAllDiariesPdf = () => {
                       })()}
                       {(() => {
                         const w = weights.find(e => e.date === todayIso());
-                        if (w) return <span>⚖️ {w.weight} кг{w.bodyFat ? ` · {w.bodyFat}%` : ''}</span>;
-                        return <span style={{ color: colors.textMuted }}>⚖️ Вес: —</span>;
+                        if (w) return <span><span style={{ fontSize: 14, display: 'inline-block', transform: 'scale(1.14)', lineHeight: 1 }}>⚖️</span> {w.weight} кг{w.bodyFat ? ` · {w.bodyFat}%` : ''}</span>;
+                        return <span style={{ color: colors.textMuted }}><span style={{ fontSize: 14, display: 'inline-block', transform: 'scale(1.14)', lineHeight: 1 }}>⚖️</span> Вес: —</span>;
                       })()}
                       {(() => {
                         const s = sleepEntries.find(e => e.date === todayIso());
@@ -1072,10 +1074,11 @@ const exportAllDiariesPdf = () => {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 14,
+                          fontSize: isWeightDiaryKey(k.key) ? 18 : 14,
+                          lineHeight: 1,
                         }}
                       >
-                        {DIARY_META[k.key].icon}
+                        <span style={isWeightDiaryKey(k.key) ? { transform: 'scale(1.18)', display: 'inline-block' } : undefined}>{DIARY_META[k.key].icon}</span>
                       </div>
                     );
                   })}
@@ -1264,7 +1267,7 @@ const exportAllDiariesPdf = () => {
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 12 }}>{it.icon}</span>
+                          <span style={{ fontSize: isWeightDiaryKey(it.key) ? 15 : 12, display: 'inline-block', transform: isWeightDiaryKey(it.key) ? 'scale(1.15)' : undefined, lineHeight: 1 }}>{it.icon}</span>
                           <span
                             style={{
                               fontSize: 9,
@@ -1424,7 +1427,7 @@ const exportAllDiariesPdf = () => {
                     gap: 4,
                   }}
                 >
-                  <span style={{ fontSize: 12 }}>{DIARY_META[d.key].icon}</span>
+                  <span style={{ fontSize: isWeightDiaryKey(d.key) ? 15 : 12, display: 'inline-block', transform: isWeightDiaryKey(d.key) ? 'scale(1.15)' : undefined, lineHeight: 1 }}>{DIARY_META[d.key].icon}</span>
                   <span>{DIARY_META[d.key].title}</span>
                 </button>
               ))}
