@@ -3048,7 +3048,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
   }
 
-  // Строгая 4-осевая посадка ≤3% по каждому параметру (ккал,Б,Ж,У) и общему КБЖУ.
+  // Строгая 4-осевая посадка ≤3% по каждому параметру (ккал,Б,Ж,У) и общему КБЖУ — 2026-08-27.
   // preSleep — опционально (если уже хватает белка, не форсируем), intra — только при
   // привязке к тренировке (allowIntraWorkout). Белок режется только если он сам worst-over.
   {
