@@ -115,6 +115,24 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 90 }}>
             {series.map((s, i) => {
+              if (metric === 'ctl') {
+                const ctl = (s as unknown as Record<string, number>).ctl ?? 0;
+                const atl = (s as unknown as Record<string, number>).atl ?? 0;
+                const tsb = (s as unknown as Record<string, number>).tsb ?? 0;
+                const hCtl = Math.max(2, Math.round((ctl / max) * 70));
+                const hAtl = Math.max(2, Math.round((atl / max) * 70));
+                const hTsb = Math.max(1, Math.round((Math.abs(tsb) / max) * 40));
+                const tsbPos = tsb >= 0 ? 'top' : 'bottom';
+                return (
+                  <div key={s.week} title={`Нед ${s.week}: CTL ${ctl} · ATL ${atl} · TSB ${tsb}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <div style={{ width: '100%', display: 'flex', gap: 1, alignItems: 'flex-end', justifyContent: 'center', height: 82 }}>
+                      <div style={{ flex: 1, borderRadius: '2px 2px 0 0', height: hCtl, background: '#60a5fa', opacity: 0.9 }} title={`CTL ${ctl}`} />
+                      <div style={{ flex: 1, borderRadius: '2px 2px 0 0', height: hAtl, background: '#f87171', opacity: 0.9 }} title={`ATL ${atl}`} />
+                      <div style={{ flex: 1, borderRadius: 2, height: hTsb, background: tsb >= 0 ? '#4ade80' : '#fbbf24', opacity: 0.9, alignSelf: tsbPos === 'top' ? 'flex-start' : 'flex-end' }} title={`TSB ${tsb}`} />
+                    </div>
+                  </div>
+                );
+              }
               const val = (s as unknown as Record<string, number>)[metric] ?? 0;
               const h = Math.max(2, Math.round((val / max) * 78));
               const phaseLabel = CARDIO_PHASE_LABELS[s.phase] ?? s.phase;

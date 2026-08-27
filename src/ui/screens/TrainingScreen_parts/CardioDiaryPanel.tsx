@@ -319,6 +319,11 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
         >
           💾 Сохранить wellness
         </button>
+        {wellnessReadiness(wellness) < 4 && (
+          <div style={{ fontSize: 11, color: '#f87171', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.28)', borderRadius: 8, padding: '6px 8px' }} role="alert">
+            ⚠ Готовность {wellnessReadiness(wellness)}/10 — низкая: автотюн снизит объём/уберёт HIIT, восстановитесь (сон/стресс).
+          </div>
+        )}
         <div style={HINT_SM}>1=плохо, 5=отлично. Готовность влияет на автотюн (как в diary-autoreg).</div>
       </div>
 
