@@ -12,6 +12,7 @@ import { GROUP_RU } from './program-types';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { ACCENT, DIM } from './training-ui';
 import { loadTrainingProfile } from './training-profile';
+import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 type Tab = 'bb' | 'pl';
 
@@ -60,23 +61,23 @@ export const ManualLibraryGallery: React.FC<Props> = ({ bbPrograms, plCycles, on
   const [compareIds, setCompareIds] = useState<string[]>([]);
 
   const [bbFavs, setBbFavs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_program_fav') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEYS.PROGRAM_FAV) || '[]'); } catch { return []; }
   });
   const [plFavs, setPlFavs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_cycle_fav') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEYS.CYCLE_FAV) || '[]'); } catch { return []; }
   });
 
   const toggleBbFav = (id: string) => {
     setBbFavs(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      try { localStorage.setItem('he_program_fav', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem(MANUAL_STORAGE_KEYS.PROGRAM_FAV, JSON.stringify(next)); } catch {}
       return next;
     });
   };
   const togglePlFav = (id: string) => {
     setPlFavs(prev => {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
-      try { localStorage.setItem('he_cycle_fav', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem(MANUAL_STORAGE_KEYS.CYCLE_FAV, JSON.stringify(next)); } catch {}
       return next;
     });
   };

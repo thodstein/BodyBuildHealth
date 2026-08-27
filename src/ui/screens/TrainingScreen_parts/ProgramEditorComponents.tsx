@@ -216,7 +216,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   const [volWeekIdx, setVolWeekIdx] = useState<number | null>(null);
   const [expandedWeekIdx, setExpandedWeekIdx] = useState(0);
   const [noteWeekIdx, setNoteWeekIdx] = useState<number | null>(null);
-  const [howCollapsed, setHowCollapsed] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_how_collapsed') === '1'; } catch { return false; } });
+  const [howCollapsed, setHowCollapsed] = useState<boolean>(() => { try { return localStorage.getItem(MANUAL_STORAGE_KEYS.BB_HOW_COLLAPSED) === '1'; } catch { return false; } });
   const [showAllWeeks, setShowAllWeeks] = useState(false);
   const [boardMode, setBoardMode] = useState<boolean>(() => { try { return localStorage.getItem(MANUAL_STORAGE_KEYS.BB_BOARD_MODE) === '1'; } catch { return false; } });
   const [showHeatmap, setShowHeatmap] = useState(false);
@@ -353,7 +353,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: howCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #60a5fa' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', flex: 1 }}>Как собрать программу</div>
-          <button onClick={() => { const v = !howCollapsed; setHowCollapsed(v); try { localStorage.setItem('he_bb_how_collapsed', v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{howCollapsed ? 'Показать' : 'Скрыть'}</button>
+          <button onClick={() => { const v = !howCollapsed; setHowCollapsed(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_HOW_COLLAPSED, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{howCollapsed ? 'Показать' : 'Скрыть'}</button>
         </div>
         {!howCollapsed && (
           <>
@@ -1039,6 +1039,29 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
     onChange(arr);
   };
 
+  // Keyboard: Ctrl+C/V — копировать/вставить блок, Delete — удалить раскрытый, Enter — свернуть/развернуть
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (expandedBlock == null) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        e.preventDefault();
+        copyBlock(expandedBlock);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        pasteBlock();
+      } else if (e.key === 'Delete') {
+        e.preventDefault();
+        removeBlock(expandedBlock);
+      } else if (e.key === 'Enter' && expandedBlock != null) {
+        // Enter на раскрытом — ничего, уже раскрыт; на закрытом — раскрыть (обрабатывается в другом месте)
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expandedBlock, blocks]);
+
   // HTML5 drag-and-drop: desktop работает «из коробки», мобильный (iOS 13+/Chrome) — через draggable.
   // Touch fallback (long-press → перетаскивание через touch events) для старых мобильных WebView.
   const dragSrcRef = React.useRef<number | null>(null);
@@ -1532,6 +1555,17 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
     upd(i, { techniques: updated });
   };
   const hasTechnique = (s: UserSet, tech: IntensityTechnique) => (s.techniques || []).includes(tech);
+  // Enter → next input (Excel-like)
+  const handleEnterNext = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const form = (e.target as HTMLElement).closest('.bb-set-editor');
+      if (!form) return;
+      const inputs = Array.from(form.querySelectorAll('input, button')) as HTMLElement[];
+      const idx = inputs.indexOf(e.target as HTMLElement);
+      if (idx >= 0 && idx + 1 < inputs.length) inputs[idx + 1].focus();
+    }
+  };
   return (
     <div className="bb-set-editor" style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: '0 0 auto' }}>
       <div className="editor-sets-heading" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1562,7 +1596,7 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
       )}
       {sets.map((s, i) => (
         <div key={i} style={{ background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.14)', borderRadius: 8, padding: '6px 8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+          <div onKeyDown={handleEnterNext} style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
              <span className="editor-set-index" style={{ minWidth: 18, textAlign: 'center', fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{i + 1}</span>
              <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
                <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 42, minHeight: 44, textAlign:'center' }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" placeholder="повт" aria-label={`Повторения подхода ${i + 1}`} inputMode="numeric" />

@@ -116,6 +116,7 @@ export function deleteRevision(id: string, revIdx: number): UserProgram | null {
 
 /* ───────────────────────── P2.8: Валидация программы ───────────────────────── */
 import { getVolumeLandmarks, normLevel } from '../volume-landmarks.engine';
+import { computePlanQualityFor } from '../manual-constructor/manual-quality.engine';
 
 const ADULT_MEVS: Record<string, number> = {
   chest: 8, back: 8, quads: 6, hamstrings: 6, glutes: 4, shoulders: 6, biceps: 6, triceps: 6, calves: 4, abs: 0, forearms: 0, traps: 0,
@@ -170,14 +171,16 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
     if (totalExercises === 0) {
       issues.push({ level: 'warning', code: 'NO_EXERCISES', message: 'Программа пуста — добавьте упражнения' });
     }
-    // Проверка MRV-превышения — по пиковой неделе (паритет с manual-quality)
-    const lvl = normLevel(meta.level);
-    for (const [muscle, peak] of Object.entries(peakByMuscle)) {
-      if (peak < 1) continue;
-      const lm = getVolumeLandmarks(lvl, muscle);
-      if (lm && peak > lm.mrv * 1.2) {
-        issues.push({ level: 'warning', code: 'MRV_EXCEED', message: `${muscle}: ${peak} сетов/нед (пик) превышает MRV (${lm.mrv}) на 20%+`, muscle });
+    // Проверка MRV-превышения — единый источник с manual-quality (computePlanQualityFor)
+    try {
+      const q = computePlanQualityFor(program, meta.level);
+      for (const pm of q.perMuscle) {
+        if (pm.status === 'over') {
+          issues.push({ level: 'warning', code: 'MRV_EXCEED', message: `${pm.muscle}: ${pm.peakSets} сетов/нед (пик) превышает MRV (${pm.mrv})`, muscle: pm.muscle });
+        }
       }
+    } catch {
+      // fallback: без quality-оценки MRV не проверяем
     }
     // P2: проверка делода и дней — ВНЕ цикла мышц (раньше дублировались N раз)
     if (meta.weeks >= 6 && !wHasDeload(bb)) {
@@ -216,6 +219,13 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
         issues.push({ level: 'error', code: 'HYBRID_BAD_BB_WEEKS', message: 'Hybrid ББ-недели имеют неверный формат' });
       } else if (program.hybrid.bbWeeks.length === 0) {
       issues.push({ level: 'info', code: 'HYBRID_NO_BB', message: 'Hybrid без ББ-недель — добавьте ББ-аксессуары' });
+      } else {
+        if (typeof program.hybrid.weeksOverride === 'number' && program.hybrid.weeksOverride !== program.hybrid.bbWeeks.length) {
+          issues.push({ level: 'info', code: 'HYBRID_WEEKS_MISMATCH', message: `Hybrid weeksOverride=${program.hybrid.weeksOverride}, но bbWeeks ${program.hybrid.bbWeeks.length} — синхронизируйте` });
+        }
+        if (program.hybrid.bbWeeks.length !== meta.weeks) {
+          issues.push({ level: 'info', code: 'HYBRID_META_MISMATCH', message: `meta.weeks=${meta.weeks}, но hybrid bbWeeks ${program.hybrid.bbWeeks.length} — проверьте` });
+        }
       }
     }
   }

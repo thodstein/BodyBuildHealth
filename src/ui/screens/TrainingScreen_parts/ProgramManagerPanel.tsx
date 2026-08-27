@@ -90,6 +90,7 @@ import { ManualProgramWizard, type WizardStep, type WizardDirection } from './Ma
 import { buildBBUserProgramFromProfile } from './auto-fill-draft';
 import { sessionDayOfWeek } from './program-editor-logic';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
+import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 import { GOAL_OPTS_BB as CENTRAL_GOAL_BB, GOAL_OPTS_PL as CENTRAL_GOAL_PL, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID, goalLabelOf as centralGoalLabelOf } from '../../../engines/goals';
 // Центральный реестр целей — реэкспорт для совместимости
@@ -217,29 +218,31 @@ export const ProgramManagerPanel: React.FC = () => {
   // Legacy ключ he_manual_mode читается для миграции, но новый UI не показывает переключатель.
   const [manualMode, setManualMode] = useState<ManualMode>(() => {
     try {
-      const stored = localStorage.getItem('he_manual_mode') as ManualMode | null;
+      const stored = localStorage.getItem(MANUAL_STORAGE_KEYS.MANUAL_MODE) as ManualMode | null;
       if (stored === 'pro' || stored === 'standard') return 'pro';
       return 'pro';
     } catch { return 'pro'; }
   });
   // совместимость: пишем 'pro' чтобы старые проверки не ломались
-  useEffect(() => { try { localStorage.setItem('he_manual_mode', 'pro'); } catch {} }, [manualMode]);
+  useEffect(() => { try { localStorage.setItem(MANUAL_STORAGE_KEYS.MANUAL_MODE, 'pro'); } catch {} }, [manualMode]);
   // Онбординг конструктора — показывается при первом запуске, скрывается кнопкой
   const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
-    try { return localStorage.getItem('he_manual_onboarding_done') !== '1'; } catch { return true; }
+    try { return localStorage.getItem(MANUAL_STORAGE_KEYS.MANUAL_ONBOARDING_DONE) !== '1'; } catch { return true; }
   });
   const [quickTplCollapsed, setQuickTplCollapsed] = useState<boolean>(() => {
     try {
-      const v = localStorage.getItem('he_manual_quick_collapsed');
+      const v = localStorage.getItem(MANUAL_STORAGE_KEYS.MANUAL_QUICK_COLLAPSED);
       if (v === '1') return true;
       if (v === '0') return false;
       // По умолчанию свёрнут в списке с программами, развёрнут в пустом
-      const hasStoredPrograms = (() => { try { const raw = localStorage.getItem('he_user_programs'); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) && arr.length > 0; } catch { return false; } })();
+      const hasStoredPrograms = (() => { try { const raw = localStorage.getItem(MANUAL_STORAGE_KEYS.USER_PROGRAMS); const arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) && arr.length > 0; } catch { return false; } })();
       return hasStoredPrograms;
     } catch { return false; }
   });
-  useEffect(() => { try { localStorage.setItem('he_manual_quick_collapsed', quickTplCollapsed ? '1' : '0'); } catch {} }, [quickTplCollapsed]);
+  useEffect(() => { try { localStorage.setItem(MANUAL_STORAGE_KEYS.MANUAL_QUICK_COLLAPSED, quickTplCollapsed ? '1' : '0'); } catch {} }, [quickTplCollapsed]);
   const [emptyQuickExpanded, setEmptyQuickExpanded] = useState(false);
+  const [icsHour, setIcsHour] = useState(9);
+  const [icsDur, setIcsDur] = useState(75);
 
   // Последовательные шаги конструктора. Создание/открытие программы
   // автоматически переводит на шаг «Редактор», сохранение на «Итог» — обратно в выбор.
@@ -911,7 +914,7 @@ export const ProgramManagerPanel: React.FC = () => {
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800 }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch {} }}>Понятно, поехали →</button>
+              <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800 }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem(MANUAL_STORAGE_KEYS.MANUAL_ONBOARDING_DONE, '1'); } catch {} }}>Понятно, поехали →</button>
               <span style={{ fontSize: 10, color: DIM }}>Подсказка: в PRO — анализ, тепловая карта и прогноз</span>
             </div>
           </div>
@@ -1037,7 +1040,7 @@ export const ProgramManagerPanel: React.FC = () => {
               </div>
             ))}
           </div>
-          <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, alignSelf: 'flex-start', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800 }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem('he_manual_onboarding_done', '1'); } catch {} }}>Понятно, поехали →</button>
+          <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44, alignSelf: 'flex-start', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#06281c', fontWeight: 800 }} onClick={() => { setOnboardingOpen(false); try { localStorage.setItem(MANUAL_STORAGE_KEYS.MANUAL_ONBOARDING_DONE, '1'); } catch {} }}>Понятно, поехали →</button>
         </div>
       )}
 

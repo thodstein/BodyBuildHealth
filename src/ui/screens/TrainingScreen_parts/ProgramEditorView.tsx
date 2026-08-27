@@ -67,6 +67,7 @@ import { QualityChecklistCard } from './QualityChecklistCard';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 import { ManualLibraryDrawer } from './ManualLibraryDrawer';
+import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 import { GOAL_OPTS_BB as CENTRAL_GOAL_BB2, GOAL_OPTS_PL as CENTRAL_GOAL_PL2, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID2, goalLabelOf as centralGoalLabelOf2 } from '../../../engines/goals';
 export const GOAL_OPTS_BB = CENTRAL_GOAL_BB2;
@@ -244,13 +245,13 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | 'macro' | 'library' | null>(null);
   // Кардио внутри редактора: 'card' — интеграционная карточка, 'constructor' — конструктор в модале
   const [cardioView, setCardioView] = useState<'card' | 'constructor' | null>(null);
-  // ⭐ Избранные программы (he_program_fav)
+  // ⭐ Избранные программы (central registry)
   const [progFavs, setProgFavs] = useState<string[]>(() => {
-    try { return JSON.parse(localStorage.getItem('he_program_fav') || '[]'); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem(MANUAL_STORAGE_KEYS.PROGRAM_FAV) || '[]'); } catch { return []; }
   });
   const [progFavOnly, setProgFavOnly] = useState(false);
   useEffect(() => {
-    try { localStorage.setItem('he_program_fav', JSON.stringify(progFavs)); } catch { /* ignore */ }
+    try { localStorage.setItem(MANUAL_STORAGE_KEYS.PROGRAM_FAV, JSON.stringify(progFavs)); } catch { /* ignore */ }
   }, [progFavs]);
   const toggleProgFav = (id: string) => setProgFavs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   // State для MacrocyclePanel (редактируемые level/goal макроцикла)
@@ -274,10 +275,10 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   // Единый конструктор: все шаги доступны всем — Профиль → Параметры → Недели
   // (раньше standard не видел Профиль; теперь объединено — меньше путаницы)
   const editorSteps = PRO_EDITOR_STEPS;
-  // Шаг восстанавливается из sessionStorage (he_editor_step). Legacy analysis/feedback/tools → weeks + аккордеон.
+  // Шаг восстанавливается из sessionStorage (central registry). Legacy analysis/feedback/tools → weeks + аккордеон.
   const [estep, setEstep] = useState<EditorStep>(() => {
     try {
-      const raw = sessionStorage.getItem('he_editor_step');
+      const raw = sessionStorage.getItem(MANUAL_STORAGE_KEYS.EDITOR_STEP);
       if (raw) {
         const stored = JSON.parse(raw) as { id?: string; step?: EditorStep };
         if (stored.id === program.meta.id && stored.step) {
@@ -295,7 +296,7 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     setEstep('profile');
   }, [program.meta.id]);
   useEffect(() => {
-    try { sessionStorage.setItem('he_editor_step', JSON.stringify({ id: program.meta.id, step: estep })); } catch { /* ignore */ }
+    try { sessionStorage.setItem(MANUAL_STORAGE_KEYS.EDITOR_STEP, JSON.stringify({ id: program.meta.id, step: estep })); } catch { /* ignore */ }
   }, [estep, program.meta.id]);
   const estepIdx = editorSteps.indexOf(estep);
   const isLastEditorStep = estepIdx >= editorSteps.length - 1;
