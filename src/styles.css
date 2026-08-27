@@ -3153,8 +3153,8 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
 @media (max-width: 480px) {
   html, body { overflow-x: hidden !important; max-width: 100% !important; }
   img:not(.hero-fullscreen-img), video:not(.hero-fullscreen-img) { max-width: 100% !important; height: auto !important; object-fit: contain !important; }
-  /* Hero fullscreen — ОДНА картинка полностью видна без обрезки/растяжения, по центру */
-  .hero-fullscreen-img { width:100% !important; height:100% !important; max-width:none !important; max-height:none !important; object-fit:contain !important; object-position:center center !important; background:#07070a !important; }
+  /* Hero fullscreen — ОДНА картинка на весь экран */
+  .hero-fullscreen-img { width:100% !important; height:100% !important; max-width:none !important; max-height:none !important; object-fit:cover !important; object-position:center center !important; }
   input, select, textarea { font-size: 16px !important; }
   button { min-height: 38px; min-width: 38px; }
   /* collapse dense 3/4-col hardcoded grids to 2-col for phone readability */
@@ -3385,13 +3385,12 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   overflow-wrap: anywhere !important;
   white-space: normal !important;
 }
-/* ═══ HERO FULLSCREEN — ОДНА картинка полностью видна без обрезки/растяжения, по центру ═══ */
+/* ═══ HERO FULLSCREEN — ОДНА картинка на весь экран ═══ */
 .hero-fullscreen-img {
   width:100% !important;
   height:100% !important;
   max-width:none !important;
   max-height:none !important;
-  object-fit:contain !important;
+  object-fit:cover !important;
   object-position:center center !important;
-  background:#07070a !important;
 }
