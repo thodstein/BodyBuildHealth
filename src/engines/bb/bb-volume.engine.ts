@@ -175,6 +175,12 @@ export function sessionLimitsFor(
     maxWorkingSets = Math.round(maxWorkingSets * (isMaxExp ? 1.3 : 1.2));
     maxExercises = Math.min(24, maxExercises + (isMaxExp ? 3 : 2));
   }
+  const isPPL = String(split?.id || (input as any).patternId || '').toLowerCase().includes('ppl');
+  if (isPPL && level !== 'enhanced') {
+    // intermediate/advanced PPL needs 32/12 to hold spec (rear 6 + biceps 10 + back 8 + traps 5 =29)
+    maxWorkingSets = Math.max(maxWorkingSets, 32);
+    maxExercises = Math.max(maxExercises, 12);
+  }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };
 }
 

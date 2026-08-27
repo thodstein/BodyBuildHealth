@@ -3740,14 +3740,14 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
                 <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Суставы — детально в инструменте ниже</div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 =80 · Суставы 20 — в инструменте ниже</div>
               </div>
             </div>
             {/* Factor breakdown with calculations */}
             {safetyScore.details?.factorBreakdown && (
               <div style={{ padding:'8px 12px', display:'grid', gridTemplateColumns:'1fr', gap:6, background:'rgba(0,0,0,0.08)' }}>
                 <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, letterSpacing:0.3, textTransform:'uppercase' }}>Расчёт по факторам — откуда баллы</div>
-                {safetyScore.details.factorBreakdown.map(f=> (
+                {safetyScore.details.factorBreakdown.filter(f=> f.key!=='jointStress').map(f=> (
                   <div key={f.key} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <span style={{ fontSize:11, fontWeight:700, color: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444' }}>{f.label}</span>
@@ -4177,18 +4177,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* RIR drift chart */}
-        {(() => {
-          const rdata: RirRecord[] = [];
-          W.forEach(w => w.sessions.forEach(s => s.exercises.forEach(e => rdata.push({ week: w.week, exercise: e.name || e.muscle || '', rir: e.rir || 0 }))));
-          if (rdata.length < 2) return null;
-          return (
-            <div style={{ ...CARD, marginTop:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📉 Динамика RIR по неделям</div>
-              <RirDriftChart data={rdata} />
-            </div>
-          );
-        })()}
+        {/* RIR drift — в Шаге 4, дубль убран */}
         {/* Load assessment и доп. сценарии убраны — ACWR в блоке фазы, детали в «Суставы и ортопедия» */}
         {/* Экспорт — фактические параметры плана */}
         {quality && (
