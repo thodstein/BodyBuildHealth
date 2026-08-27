@@ -30,9 +30,9 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
   }, []);
 
   return (
-    <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a', paddingTop:'env(safe-area-inset-top, 0px)', boxSizing:'border-box' }}>
-      <img src="/hero-main.png?v=20250827k" alt="" className="hero-fullscreen-img dashboard-hero-img" style={{ position:'absolute', inset:0, top:'env(safe-area-inset-top, 0px)', width:'100%', height:'calc(100% - env(safe-area-inset-top, 0px))', objectFit:'contain', objectPosition:'center center', background:'#07070a', filter:'saturate(1.05) contrast(1.04) brightness(1.06)', transform:'translateY(-160px)' }} />
-      <div style={{ position:'absolute', inset:0, top:'env(safe-area-inset-top, 0px)', background:'linear-gradient(transparent 78%, rgba(0,0,0,0.06) 88%, rgba(0,0,0,0.18) 100%)' }} />
+    <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
+      <img src="/hero-main.png?v=20250827j" alt="" className="hero-fullscreen-img dashboard-hero-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center top', background:'#07070a', filter:'saturate(1.05) contrast(1.04) brightness(1.06)' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 78%, rgba(0,0,0,0.06) 88%, rgba(0,0,0,0.18) 100%)' }} />
       <div style={{ position:'absolute', bottom:70, left:16, right:16, zIndex:2 }}>
 
         {/* 🩺 Сводка симптомов */}
