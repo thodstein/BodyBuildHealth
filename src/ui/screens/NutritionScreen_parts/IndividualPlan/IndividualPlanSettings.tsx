@@ -358,8 +358,9 @@ export const IndividualPlanSettings: React.FC = () => {
           background: generationMode === 'recipes' ? 'linear-gradient(135deg,#f97316,#ea580c)' : 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#fff',
           boxShadow: generationMode === 'recipes' ? '0 4px 16px rgba(249,115,22,0.25)' : '0 4px 16px rgba(0,230,138,0.2)',
         }}>{generationMode === 'recipes' ? '🍳 Сгенерировать план по рецептам →' : '✨ Сгенерировать план питания →'}</button>
+        <div style={{fontSize:7, color:'rgba(255,255,255,0.35)', textAlign:'center', marginTop:6, letterSpacing:0.2}}>4-осевой кламп ≤3% (ккал/Б/Ж/У) • preSleep опц. • intra по кнопке • 2026-08-27</div>
       </GlassCard>
-      )}
+       )}
 
       {true && (
       <GlassCard title="Пользователь" icon="👤" color="#a78bfa">
