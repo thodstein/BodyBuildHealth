@@ -3767,9 +3767,6 @@ export const BbAutoConstructor: React.FC = () => {
     const W = builtPlan.weeks;
     const ratio = acwrData;
     const q: any = quality;
-    const safetyChip = safetyScore ? (
-      <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background: safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.12)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.12)':'rgba(239,68,68,0.12)', border:`1px solid ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.18)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`, color: safetyScore.riskLevel==='safe'?'#22c55e': safetyScore.riskLevel==='caution'?'#f59e0b':'#ef4444', fontWeight:700 }}>🛡 {safetyScore.riskLevel==='safe'?'Безопасный': safetyScore.riskLevel==='caution'?'Требует внимания':'Опасный'} · {safetyScore.score}/100</span>
-    ) : null;
     const baseScore = q.baseScore ?? q.score;
     const hasPenalties = (q.acwrPenalty || 0) > 0 || (q.hardPenalty || 0) > 0;
     return (
@@ -3789,7 +3786,6 @@ export const BbAutoConstructor: React.FC = () => {
             <div style={SMALL}>RIR: <b style={{ color:'#f59e0b' }}>{metrics.avgRir.toFixed(1)}</b></div>
             <div style={SMALL}>Фаз: <b style={{ color:'#a855f7' }}>{Array.from(new Set(W.map((w:any) => (w as any).phase || 'accumulation'))).length}</b></div>
             {pedAdapt.combinedMrvMultiplier > 1 && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b', fontWeight:700 }}>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span>}
-            {safetyChip}
           </div>
           {hasPenalties && <div style={{ marginTop:6, fontSize:10, color:'#f59e0b' }}>{[q.acwrNote, q.hardNote].filter(Boolean).join(' · ')}</div>}
           {q.proResult && q.proResult.scoreDelta!==0 && <div style={{ marginTop:4, fontSize:10, color: q.proResult.scoreDelta>=0?'#22c55e':'#f59e0b' }}>PRO: {q.proResult.scoreDelta>0?'+':''}{q.proResult.scoreDelta} (паттерны/углы/растяжка уже учтены)</div>}
@@ -3925,23 +3921,7 @@ export const BbAutoConstructor: React.FC = () => {
             {q.recommendations.length>6 && <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>…и ещё {q.recommendations.length-6}</div>}
           </div>
         )}
-        {/* Безопасность — компактно (без дубля объёма), свёрнуто */}
-        {safetyScore && (
-          <ExpandableCard
-            title={`🛡 Безопасность · ${safetyScore.riskLevel==='safe'?'🟢': safetyScore.riskLevel==='caution'?'🟡':'🔴'} ${safetyScore.score}/100`}
-            icon="🛡"
-            short={`${safetyScore.issues.length} сигналов · ${safetyScore.recommendations[0]?.slice(0,60) || ''}`}
-            full={
-              <div style={{ fontSize:11, lineHeight:1.4 }}>
-                <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginBottom:6 }}>
-                  {safetyScore.details?.factorBreakdown.filter((f:any)=> f.key!=='jointStress').slice(0,6).map((f:any)=> <span key={f.key} style={{ fontSize:10, padding:'3px 7px', borderRadius:12, background: f.status==='ok'?'rgba(34,197,94,0.10)': f.status==='warn'?'rgba(245,158,11,0.10)':'rgba(239,68,68,0.10)', border:`1px solid ${f.status==='ok'?'rgba(34,197,94,0.18)': f.status==='warn'?'rgba(245,158,11,0.18)':'rgba(239,68,68,0.18)'}`, color: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444' }}>{f.label} {f.score}/{f.max}</span>)}
-                </div>
-                {safetyScore.issues.slice(0,4).map((iss:string,i:number)=><div key={i} style={{ color:'#f59e0b', marginBottom:2 }}>⚠ {iss}</div>)}
-                <div style={{ marginTop:6, fontSize:10, color:'#22c55e' }}>{safetyScore.recommendations.slice(0,3).map((r:string,i:number)=><div key={i}>→ {r}</div>)}</div>
-              </div>
-            }
-          />
-        )}
+        {/* Суставы — только в JSI блоке выше (инструмент «Суставы и ортопедия»), дубль безопасности убран */}
         {/* Volume chart */}
         {(() => {
           const vdata: WeekVolume[] = W.map(w => {
