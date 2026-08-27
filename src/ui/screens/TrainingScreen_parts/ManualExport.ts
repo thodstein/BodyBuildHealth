@@ -46,25 +46,35 @@ export function buildProgramIcs(program: UserProgram, startDateIso?: string): st
   startRef.setUTCHours(9, 0, 0, 0);
   const uidBase = (program.meta.id || 'manual').replace(/[^a-zA-Z0-9]/g, '').slice(0, 12) || 'manual';
 
-  const addWeek = (weekNum: number, sessions: Array<{ name: string; dayOfWeek?: number; focus?: string; blocks: Array<{ exerciseName: string; sets: Array<{ reps: string | number; rir: number; weight?: number }> }> }>, phase: string) => {
+  const addWeek = (weekNum: number, sessions: Array<{ name: string; dayOfWeek?: number; focus?: string; blocks: Array<{ exerciseName: string; muscle?: string; sets: Array<{ reps: string | number; rir: number; weight?: number; tempo?: string; restSec?: number }>; supersetWith?: string; tempoSpec?: string }> }>, phase: string) => {
     sessions.forEach((s, si) => {
       const dow = typeof s.dayOfWeek === 'number' ? s.dayOfWeek : si % 7; // 0 Mon
       const sessionDate = new Date(startRef);
       sessionDate.setDate(startRef.getDate() + (weekNum - 1) * 7 + dow);
       const endDate = new Date(sessionDate);
-      endDate.setHours(sessionDate.getHours() + 1, 15);
-      const exList = s.blocks.filter(b => b.exerciseName).slice(0, 5).map(b => b.exerciseName).join(', ');
+      endDate.setMinutes(sessionDate.getMinutes() + durationMin);
+      // 8 упражнений с деталями: вес, tempo, суперсет
+      const exDetails = s.blocks.filter(b => b.exerciseName).slice(0, 8).map(b => {
+        const sets = b.sets?.length ? `${b.sets.length}×${b.sets[0]?.reps ?? ''} RIR${b.sets[0]?.rir ?? ''}${b.sets[0]?.weight ? ` @${b.sets[0].weight}кг` : ''}${(b as any).tempoSpec ? ` ${(b as any).tempoSpec}` : ''}` : '';
+        const sup = (b as any).supersetWith ? ' ⊕' : '';
+        return `${b.exerciseName}${sets ? ` (${sets})` : ''}${sup}`;
+      }).join('; ');
       const summary = `Нед ${weekNum} · ${s.name || 'Тренировка ' + (si + 1)}${s.focus ? ' (' + s.focus + ')' : ''}`;
-      const desc = `Фаза: ${phase}${exList ? '\\nУпражнения: ' + exList : ''}${s.blocks.length ? '\\nСетов: ' + s.blocks.reduce((sum, b) => sum + (b.sets?.length ?? 0), 0) : ''}`;
+      const totalSets = s.blocks.reduce((sum, b) => sum + (b.sets?.length ?? 0), 0);
+      const descParts = [`Фаза: ${phase}`];
+      if (exDetails) descParts.push(`Упражнения: ${exDetails}`);
+      if (totalSets) descParts.push(`Сетов: ${totalSets}`);
+      if (s.blocks.some(b=> (b as any).supersetWith)) descParts.push('Суперсеты: есть');
+      const desc = descParts.join('\\n');
       const uid = `${uidBase}-w${weekNum}-d${si}-${Date.now().toString(36)}@bodybuildhealth.local`;
-      lines.push('BEGIN:VEVENT');
-      lines.push(`UID:${uid}`);
-      lines.push(`DTSTAMP:${formatIcsDate(new Date())}`);
-      lines.push(`DTSTART:${formatIcsDate(sessionDate)}`);
-      lines.push(`DTEND:${formatIcsDate(endDate)}`);
-      lines.push(`SUMMARY:${escapeIcs(summary)}`);
-      lines.push(`DESCRIPTION:${escapeIcs(desc)}`);
-      lines.push('END:VEVENT');
+      pushFolded(lines, 'BEGIN:VEVENT');
+      pushFolded(lines, `UID:${uid}`);
+      pushFolded(lines, `DTSTAMP:${formatIcsDate(new Date())}`);
+      pushFolded(lines, `DTSTART:${formatIcsDate(sessionDate)}`);
+      pushFolded(lines, `DTEND:${formatIcsDate(endDate)}`);
+      pushFolded(lines, `SUMMARY:${escapeIcs(summary)}`);
+      pushFolded(lines, `DESCRIPTION:${escapeIcs(desc)}`);
+      pushFolded(lines, 'END:VEVENT');
     });
   };
 
@@ -90,7 +100,7 @@ export function buildProgramIcs(program: UserProgram, startDateIso?: string): st
     }
   }
 
-  lines.push('END:VCALENDAR');
+  pushFolded(lines, 'END:VCALENDAR');
   return lines.join('\r\n');
 }
 

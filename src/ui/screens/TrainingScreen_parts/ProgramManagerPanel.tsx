@@ -489,6 +489,36 @@ export const ProgramManagerPanel: React.FC = () => {
     flash('🗑 Удалено');
   };
 
+  const handleImportJson = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async () => {
+      const file = (input.files as FileList | null)?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const candidate: unknown = Array.isArray(data) ? (data as unknown[])[0] : data;
+        if (!isUserProgramShape(candidate)) {
+          flash('⚠ Неверный формат JSON — не похоже на программу');
+          return;
+        }
+        const prog = candidate as import('../../../engines/user-program/user-program.types').UserProgram;
+        if (programs.some(p => p.meta.id === prog.meta.id)) {
+          prog.meta.id = prog.meta.id + '_' + Date.now().toString(36);
+        }
+        saveUserProgram(prog as any, 'Импорт JSON');
+        refresh();
+        flash('📥 Импортировано: ' + prog.meta.title);
+        setEditing(prog as any);
+      } catch (err) {
+        flash('⚠ Ошибка импорта: ' + (err as Error)?.message);
+      }
+    };
+    input.click();
+  };
+
   const commit = (note?: string): boolean => {
     if (!editing) return false;
     const blockingIssue = getProgramBlockingIssue(editing);
@@ -914,7 +944,10 @@ export const ProgramManagerPanel: React.FC = () => {
               <span style={{ fontSize: 9, color: 'rgba(30,60,140,0.75)', fontWeight: 600 }}>сила+масса</span>
             </button>
           </div>
-          <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(167,139,250,0.28)', color: '#a78bfa', fontWeight: 700, fontSize: 11, minHeight: 38 }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}><span style={{ fontSize: 13 }}>🪄</span> Визард — пошагово за 30 сек <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.60)', fontWeight: 400 }}>· проведёт по цели/уровню/дням</span></button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button style={{ flex:1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(167,139,250,0.28)', color: '#a78bfa', fontWeight: 700, fontSize: 11, minHeight: 38 }} onClick={() => { setWizardOpen(true); setWizardStep(1); }}><span style={{ fontSize: 13 }}>🪄</span> Визард — 30 сек <span style={{ fontSize: 10, color: 'rgba(167,139,250,0.60)', fontWeight: 400 }}>по цели/уровню</span></button>
+            <button style={{ flex:'0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', borderRadius: 10, cursor: 'pointer', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', fontWeight: 700, fontSize: 11, minHeight: 38 }} onClick={handleImportJson} title="Импортировать программу из JSON файла">📥 Импорт JSON</button>
+          </div>
         </div>
 
         {/* P15: Шаблоны быстрого старта — в обоих режимах + подсветка по профилю */}

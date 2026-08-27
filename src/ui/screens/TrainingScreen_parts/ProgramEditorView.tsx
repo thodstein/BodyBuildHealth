@@ -391,9 +391,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   const lastSavedRef = useRef<string>(JSON.stringify(program));
   const programRef = useRef(program);
   programRef.current = program;
+  // Debounced isDirty — избегаем JSON.stringify на каждый keystroke для 52-нед программ (~80KB)
   useEffect(() => {
-    const current = JSON.stringify(program);
-    setIsDirty(current !== lastSavedRef.current);
+    const t = setTimeout(() => {
+      try {
+        const current = JSON.stringify(program);
+        setIsDirty(current !== lastSavedRef.current);
+      } catch { setIsDirty(true); }
+    }, 300);
+    return () => clearTimeout(t);
   }, [program]);
   useEffect(() => {
     const timer = setInterval(() => {
@@ -632,13 +638,15 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload?'#f59e0b20':'#00e68a20'};color:${w.deload?'#f59e0b':'#00e68a'}">${w.phase}${w.deload?' · делод':''}</span></h2>`);
         if (w.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#f0fdf4;border-left:3px solid #00e68a;font-size:11px;color:#166534;white-space:pre-wrap">🗓 Неделя: ${escapeHtml(w.note)}</p>`);
         for (const s of w.sessions) {
-           html.push(`<table><thead><tr><th colspan="5">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
+            html.push(`<table><thead><tr><th colspan="7">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th><th>Темп</th><th>Суперсет</th></tr></thead><tbody>`);
           for (const b of s.blocks) {
             if (!b.exerciseName) continue;
             const setsStr = b.sets.map(st => `${st.reps}×`).join(', ');
             const rir = b.sets[0]?.rir ?? '-';
             const wt = b.sets[0]?.weight ?? 0;
-             html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(setsStr)}</td><td>${escapeHtml(rir)}</td><td>${escapeHtml(wt)} кг</td></tr>`);
+            const tempo = b.tempoSpec || b.sets[0]?.tempo || '-';
+            const sup = (b as any).supersetWith ? '⊕' : '-';
+             html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(setsStr)}</td><td>${escapeHtml(rir)}</td><td>${escapeHtml(wt)} кг</td><td>${escapeHtml(tempo)}</td><td>${escapeHtml(sup)}</td></tr>`);
           }
           html.push('</tbody></table>');
           if (s.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#f0fdf4;border-left:3px solid #00e68a;font-size:11px;color:#166534;white-space:pre-wrap">💬 ${escapeHtml(s.note)}</p>`);
@@ -680,11 +688,13 @@ for (const w of program.hybrid.bbWeeks ?? []) {
         html.push(`<h2>Неделя ${w.week} <span class="phase" style="background:${w.deload ? '#f59e0b20' : '#3b82f620'};color:${w.deload ? '#f59e0b' : '#3b82f6'}">${escapeHtml(w.phase)}${w.deload ? ' · делод' : ''}</span></h2>`);
         if (w.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#eff6ff;border-left:3px solid #3b82f6;font-size:11px;color:#1e40af;white-space:pre-wrap">🗓 Неделя: ${escapeHtml(w.note)}</p>`);
         for (const s of w.sessions ?? []) {
-          html.push(`<table><thead><tr><th colspan="5">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th></tr></thead><tbody>`);
+          html.push(`<table><thead><tr><th colspan="7">${escapeHtml(s.name || 'День')} ${s.focus ? '· ' + escapeHtml(s.focus) : ''}</th></tr><tr><th>Упражнение</th><th>Группа</th><th>Сеты</th><th>RIR</th><th>Вес</th><th>Темп</th><th>Суперсет</th></tr></thead><tbody>`);
           for (const b of s.blocks ?? []) {
             if (!b.exerciseName) continue;
             const sets = b.sets ?? [];
-            html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(sets.map(st => `${st.reps}×`).join(', '))}</td><td>${escapeHtml(sets[0]?.rir ?? '-')}</td><td>${escapeHtml(sets[0]?.weight ?? 0)} кг</td></tr>`);
+            const tempoH = (b as any).tempoSpec || sets[0]?.tempo || '-';
+            const supH = (b as any).supersetWith ? '⊕' : '-';
+            html.push(`<tr><td>${escapeHtml(b.exerciseName)}</td><td>${escapeHtml(GROUP_RU[b.muscle] ?? b.muscle)}</td><td>${escapeHtml(sets.map(st => `${st.reps}×`).join(', '))}</td><td>${escapeHtml(sets[0]?.rir ?? '-')}</td><td>${escapeHtml(sets[0]?.weight ?? 0)} кг</td><td>${escapeHtml(tempoH)}</td><td>${escapeHtml(supH)}</td></tr>`);
           }
           html.push('</tbody></table>');
           if (s.note) html.push(`<p style="margin:2px 0 8px;padding:6px 10px;background:#eff6ff;border-left:3px solid #3b82f6;font-size:11px;color:#1e40af;white-space:pre-wrap">💬 ${escapeHtml(s.note)}</p>`);
