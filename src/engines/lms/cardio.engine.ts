@@ -34,6 +34,15 @@ export type CardioLevel = 'beginner' | 'intermediate' | 'advanced';
 export const CARDIO_LEVEL_MULT: Record<CardioLevel, number> = { beginner: 0.8, intermediate: 1, advanced: 1.15 };
 export const CARDIO_LEVEL_LABELS: Record<CardioLevel, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый' };
 
+export interface CardioStructuredBlock {
+  workSec: number;
+  restSec: number;
+  reps: number;
+  target?: 'hr' | 'pace' | 'power' | 'rpe';
+  targetHr?: { min?: number; max?: number };
+  note?: string;
+}
+
 export interface CardioSession {
   id?: string;
   type: CardioType;
@@ -47,6 +56,10 @@ export interface CardioSession {
   restrictions?: string[];
   /** Предпочтительное оборудование для сессии (персонализация подбора). */
   equipment?: CardioEquipment;
+  /** Структурированные интервалы (если есть — сессия выполняется по интервалам, а не равномерно). */
+  structured?: CardioStructuredBlock[];
+  /** Мощность (Вт) для вело/гребли, если задана. */
+  powerWatts?: number;
 }
 
 export interface CardioPlan {
@@ -251,15 +264,17 @@ export const CARDIO_PRESETS: CardioPreset[] = [
 /** Оценка расхода ккал/мин по типу (для ~80кг атлета, поправка через вес). */
 const KCAL_PER_MIN: Record<CardioType, number> = { zone2: 7, miss: 10, hiit: 14, recovery: 5 };
 
-/** MET-множитель по оборудованию (относительно бега = 1.0). Низкоударные
- *  виды сжигают меньше за минуту при той же продолжительности. */
+/** MET-множитель по оборудованию (относительно бега zone2 8.3 MET, Compendium 2024).
+ *  Низкоударные виды сжигают меньше за минуту при той же продолжительности;
+ *  swimming 6.0/8.3=0.72, cycling 7.5/8.3=0.90, rowing 6.0/8.3=0.72,
+ *  elliptical 5.0/8.3=0.60, walking 3.8/8.3=0.46 — калибровано по compendium. */
 const EQUIPMENT_MET: Record<CardioEquipment, number> = {
   running: 1.0,
-  swimming: 0.82,
-  cycling: 0.77,
-  rowing: 0.71,
-  elliptical: 0.51,
-  walking: 0.44,
+  swimming: 0.72,
+  cycling: 0.90,
+  rowing: 0.72,
+  elliptical: 0.60,
+  walking: 0.46,
 };
 
 export const MAX_CYCLE_WEEKS = 104;
@@ -1739,6 +1754,31 @@ export function bumpCardioZone2Volume(cycle: CardioCycle, addMin = 15): CardioCy
   return { ...cycle, weeks, source: cycle.source };
 }
 
+/** Безопасный бамп с правилом 10% (PRO): недельный объём не растёт >10%, иначе кап. Монотонность >2 — бамп запрещён. */
+export function bumpCardioZone2VolumeGuarded(cycle: CardioCycle, addMin = 10, dailyTrimp?: number[]): { cycle: CardioCycle; capped: boolean; reason: string } {
+  const mono = dailyTrimp && dailyTrimp.length > 0 ? cardioMonotonyStrain(dailyTrimp) : null;
+  if (mono && mono.monotony > 2) {
+    return { cycle, capped: true, reason: `Monotony ${mono.monotony} >2 — объём не повышаем (риск).` };
+  }
+  const bw = cycleBodyWeight(cycle);
+  const sex = cycle.config?.sex;
+  const weeks = cycle.weeks.map(w => {
+    if (w.deload || w.taper || w.phase === 'peak' || w.phase === 'transition') return w;
+    const oldTotal = w.totalMinutes;
+    const capTotal = Math.round(oldTotal * 1.10);
+    let sessions = w.sessions.map(s => s.type === 'zone2' ? recalcSessionKcal({ ...s, durationMin: s.durationMin + addMin }, bw, sex) : s);
+    let newTotal = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+    if (newTotal > capTotal) {
+      const scale = capTotal / newTotal;
+      sessions = sessions.map(s => s.type === 'zone2' ? recalcSessionKcal({ ...s, durationMin: Math.max(10, Math.round(s.durationMin * scale)) }, bw, sex) : s);
+      newTotal = sessions.reduce((s, x) => s + x.durationMin * x.weeklyFrequency, 0);
+    }
+    const capped = newTotal < oldTotal + addMin * w.sessions.filter(s => s.type === 'zone2').reduce((a, x) => a + x.weeklyFrequency, 0);
+    return rebuildWeek(w, sessions, [capped ? `⚖️ Zone 2 +${addMin} мин (кап 10%: ${oldTotal}→${newTotal})` : `⚖️ Zone 2 +${addMin} мин (10% rule ok)`]);
+  });
+  return { cycle: { ...cycle, weeks, source: cycle.source }, capped: false, reason: 'Бамп применён в рамках 10% правила.' };
+}
+
 // ─── История версий цикла (undo авто-подстройки/правок) ───
 
 export const CARDIO_HISTORY_KEY = 'he_cardio_cycle_history';
@@ -2060,7 +2100,7 @@ function escXml(value: string): string {
 }
 
 /** Экспорт цикла в .tcx (Garmin Training Center): одна «деятельность» на
- *  сессию дня с длительностью, типом и примечанием. */
+ *  сессию дня с длительностью, типом и примечанием. Если session.structured заданы интервалы — пишет Lap на каждый блок. */
 export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): string {
   const lines: string[] = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -2072,18 +2112,41 @@ export function buildCardioTcx(cycle: CardioCycle, referenceIso?: string): strin
       if (s.weeklyFrequency <= 0) continue;
       const dateIso = s.dayOfWeek != null ? dayOfWeekIso(w.week, s.dayOfWeek, referenceIso) : dayStartIso(w.week, referenceIso);
       const start = dateIso + 'T' + '06:00:00Z';
-      const durMs = s.durationMin * 60 * 1000;
-      const endMs = new Date(dateIso + 'T06:00:00Z').getTime() + durMs;
-      const end = new Date(endMs).toISOString().replace(/\.\d+Z$/, 'Z');
       act++;
       lines.push('  <Activities><Activity Sport="Biking" ActivityType="Manual">');
       lines.push(`    <Id>${start}</Id>`);
-      lines.push(`    <Lap StartTime="${start}">`);
-      lines.push(`      <TotalTimeSeconds>${s.durationMin * 60}</TotalTimeSeconds>`);
-      lines.push(`      <DistanceMeters>0</DistanceMeters>`);
-      lines.push(`      <Calories>${s.kcalPerSession}</Calories>`);
-      lines.push(`      <Intensity>${s.type === 'hiit' ? 'Active' : 'Resting'}</Intensity>`);
-      lines.push('    </Lap>');
+      if (s.structured && s.structured.length > 0) {
+        let t = new Date(start).getTime();
+        for (const blk of s.structured) {
+          for (let r = 0; r < blk.reps; r++) {
+            const lapStart = new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
+            t += blk.workSec * 1000;
+            lines.push(`    <Lap StartTime="${lapStart}">`);
+            lines.push(`      <TotalTimeSeconds>${blk.workSec}</TotalTimeSeconds>`);
+            lines.push(`      <DistanceMeters>0</DistanceMeters>`);
+            lines.push(`      <Calories>${Math.round(s.kcalPerSession * blk.workSec / (s.durationMin * 60))}</Calories>`);
+            lines.push(`      <Intensity>Active</Intensity>`);
+            lines.push('    </Lap>');
+            if (blk.restSec > 0) {
+              const restStart = new Date(t).toISOString().replace(/\.\d+Z$/, 'Z');
+              t += blk.restSec * 1000;
+              lines.push(`    <Lap StartTime="${restStart}">`);
+              lines.push(`      <TotalTimeSeconds>${blk.restSec}</TotalTimeSeconds>`);
+              lines.push(`      <DistanceMeters>0</DistanceMeters>`);
+              lines.push(`      <Calories>0</Calories>`);
+              lines.push(`      <Intensity>Resting</Intensity>`);
+              lines.push('    </Lap>');
+            }
+          }
+        }
+      } else {
+        lines.push(`    <Lap StartTime="${start}">`);
+        lines.push(`      <TotalTimeSeconds>${s.durationMin * 60}</TotalTimeSeconds>`);
+        lines.push(`      <DistanceMeters>0</DistanceMeters>`);
+        lines.push(`      <Calories>${s.kcalPerSession}</Calories>`);
+        lines.push(`      <Intensity>${s.type === 'hiit' ? 'Active' : 'Resting'}</Intensity>`);
+        lines.push('    </Lap>');
+      }
       lines.push(`    <Notes>${escXml(`Кардио ${s.type.toUpperCase()} · ${CARDIO_PHASE_LABELS[w.phase]} · нед ${w.week}${s.equipment ? ' · ' + cardioEquipmentLabel(s.equipment) : ''}`)}</Notes>`);
       lines.push('  </Activity></Activities>');
     }
@@ -2524,25 +2587,80 @@ export interface VdotResult {
 }
 
 /**
- * VDOT по результату теста (бег, км за минуты, Daniels 2013).
- * Таблица упрощена к ключевым точкам; темпы в мин/км.
+ * VDOT по результату теста (бег, км за минуты, Daniels 2013 — точная формула).
+ * VO2 = -4.6 + 0.182258·v + 0.000104·v² (v в м/мин), VDOT = VO2 / (0.8+0.1894393·e^-0.012778·t +0.2989558·e^-0.1932605·t)
+ * Темпы — через обратную VO2-формулу при %VDOT: Easy 70%, Marathon 81%, Threshold 88%, Interval 97.5%, Repetition 105%.
  */
 export function runningVdot(testKm: number, testMin: number): VdotResult | null {
   if (!(testKm > 0) || !(testMin > 0)) return null;
-  const paceMinPerKm = testMin / testKm;
-  // O2-оценка: VO2 = 120.8 - 1.54·V (м/мин) — упрощённая модель Дэниелса.
-  const v = testKm * 1000 / (testMin * 60);
-  const vo2 = Math.max(25, Math.min(85, 120.8 - 1.54 * v));
-  const vdot = Math.round(vo2 * 10) / 10;
-  const paces: { label: string; mult: number }[] = [
-    { label: 'Лёгкий', mult: 1.35 },
-    { label: 'Марафон', mult: 1.15 },
-    { label: 'Порог', mult: 1.03 },
-    { label: 'Интервал', mult: 0.94 },
-    { label: 'Повтор', mult: 0.88 },
+  const vel = (testKm * 1000) / testMin; // м/мин
+  const vo2 = -4.6 + 0.182258 * vel + 0.000104 * vel * vel;
+  const t = testMin;
+  const denom = 0.8 + 0.1894393 * Math.exp(-0.012778 * t) + 0.2989558 * Math.exp(-0.1932605 * t);
+  const rawVdot = vo2 / denom;
+  const vdot = Math.round(Math.max(20, Math.min(85, rawVdot)) * 10) / 10;
+  const velFromVo2 = (targetVo2: number): number => {
+    const a = 0.000104, b = 0.182258, c = -(targetVo2 + 4.6);
+    const disc = b * b - 4 * a * c;
+    return (-b + Math.sqrt(Math.max(0, disc))) / (2 * a);
+  };
+  const paceFromVel = (vMpm: number): number => {
+    if (!(vMpm > 0)) return 0;
+    const minPerKm = 1000 / vMpm;
+    return Math.round(minPerKm * 10) / 10;
+  };
+  const intensities: { label: string; pct: number }[] = [
+    { label: 'Лёгкий', pct: 0.70 },
+    { label: 'Марафон', pct: 0.81 },
+    { label: 'Порог', pct: 0.88 },
+    { label: 'Интервал', pct: 0.975 },
+    { label: 'Повтор', pct: 1.05 },
   ];
-  const pacesKm = paces.map(p => ({ label: p.label, minPerKm: Math.round(paceMinPerKm * p.mult * 10) / 10 }));
+  const pacesKm = intensities.map(p => {
+    const vo2t = vdot * p.pct;
+    const v = velFromVo2(vo2t * 1.05);
+    const pace = paceFromVel(v);
+    if (!(pace > 0)) {
+      const paceMinPerKm = testMin / testKm;
+      const mult = p.label === 'Лёгкий' ? 1.35 : p.label === 'Марафон' ? 1.15 : p.label === 'Порог' ? 1.03 : p.label === 'Интервал' ? 0.94 : 0.88;
+      return { label: p.label, minPerKm: Math.round(paceMinPerKm * mult * 10) / 10 };
+    }
+    return { label: p.label, minPerKm: pace };
+  });
+  for (let i = 1; i < pacesKm.length; i++) {
+    if (pacesKm[i].minPerKm >= pacesKm[i - 1].minPerKm) {
+      pacesKm[i].minPerKm = Math.max(0.5, Math.round((pacesKm[i - 1].minPerKm - 0.2) * 10) / 10);
+    }
+  }
   return { vdot, pacesKm };
+}
+
+/** TRIMP Banister: длительность × HRr × 0.64·e^(1.92·HRr) (муж), 0.86·e^(1.67·HRr) (жен), HRr = (HRavg-HRrest)/(HRmax-HRrest). */
+export function banisterTrimp(durationMin: number, avgHr: number, restHr: number, maxHr: number, sex: 'male' | 'female' = 'male'): number {
+  if (!(durationMin > 0) || !(avgHr > 0) || !(restHr > 0) || !(maxHr > restHr)) return 0;
+  const hrr = Math.max(0, Math.min(1, (avgHr - restHr) / (maxHr - restHr)));
+  const k = sex === 'female' ? 0.86 : 0.64;
+  const b = sex === 'female' ? 1.67 : 1.92;
+  const trimp = durationMin * hrr * k * Math.exp(b * hrr);
+  return Math.round(trimp * 10) / 10;
+}
+/** Упрощённый TRIMP по типу сессии (когда нет HR): zone2×2, miss×3, hiit×5, recovery×1 — как ранее, но с весами Banister. */
+export const CARDIO_TRIMP_FACTOR: Record<CardioType, number> = { zone2: 2, miss: 3, hiit: 5, recovery: 1 };
+export function sessionTrimpEstimate(type: CardioType, durationMin: number, avgHr?: number, restHr?: number, maxHr?: number, sex: 'male' | 'female' = 'male'): number {
+  if (avgHr && restHr && maxHr) {
+    const t = banisterTrimp(durationMin, avgHr, restHr, maxHr, sex);
+    if (t > 0) return t;
+  }
+  return Math.round(durationMin * (CARDIO_TRIMP_FACTOR[type] ?? 2));
+}
+/** Недельный TRIMP по сессиям (с HR где есть, иначе фактор). */
+export function weeklyTrimp(sessions: { type: CardioType; durationMin: number; weeklyFrequency: number; avgHr?: number }[], restHr?: number, maxHr?: number, sex: 'male' | 'female' = 'male'): number {
+  let sum = 0;
+  for (const s of sessions) {
+    const per = sessionTrimpEstimate(s.type, s.durationMin, (s as unknown as Record<string, unknown>).avgHr as number | undefined, restHr, maxHr, sex);
+    sum += per * s.weeklyFrequency;
+  }
+  return Math.round(sum);
 }
 
 /** Серии объёма по неделям для графика (мин/ккал/фаза). */
@@ -2790,6 +2908,18 @@ export function cardioQualityReport(cycle: CardioCycle, daysAvailable = 7): Card
     add('info', `Максимальная частота недели (${maxFreq}) больше доступных дней (${daysAvailable}) — часть сессий сгруппируется.`, 0);
   }
 
+  // 8. Polarized 80/20 (Seiler): доля интенсивных (HIIT+MISS) не должна превышать 25% от всех минут
+  {
+    const totalMin = cycle.weeks.reduce((s, w) => s + w.totalMinutes, 0);
+    const intenseMin = cycle.weeks.reduce((s, w) => s + w.sessions.filter(x => x.type === 'hiit' || x.type === 'miss').reduce((a, x) => a + x.durationMin * x.weeklyFrequency, 0), 0);
+    if (totalMin > 0) {
+      const pct = (intenseMin / totalMin) * 100;
+      if (pct > 25) add('warn', `Интенсивное кардио (HIIT+MISS) ${pct.toFixed(0)}% от объёма — выше 80/20 (Seiler): снизьте HIIT или добавьте Zone 2.`, 10);
+      else if (pct > 20) add('info', `Интенсивное кардио ${pct.toFixed(0)}% — близко к лимиту 80/20 (рекомендуется ≤20% HIIT/MISS).`, 0);
+      else if (intenseMin > 0) add('ok', `Распределение ${Math.round(100 - pct)}/${Math.round(pct)} (Zone2 vs HIIT/MISS) — соответствует polarized 80/20.`, 0);
+    }
+  }
+
   return { score: Math.max(0, Math.min(100, 100 - penalty)), findings };
 }
 
@@ -2813,6 +2943,49 @@ export function cardioSafetyReport(cycle: CardioCycle): { warnings: string[] } {
     }
   }
   return { warnings };
+}
+
+/** CTL/ATL/TSB по TRIMP (Allen & Coggan): CTL 42д, ATL 7д, TSB = CTL-ATL. EWMA alpha=2/(N+1). */
+export interface CardioCtlPoint { week: number; ctl: number; atl: number; tsb: number; trimp: number }
+export function cardioCtlSeries(cycle: CardioCycle, restHr?: number, maxHr?: number, sex: 'male' | 'female' = 'male'): CardioCtlPoint[] {
+  const trimpPerWeek = cycle.weeks.map(w => weeklyTrimp(w.sessions, restHr, maxHr, sex));
+  const alphaCtl = 2 / (42 + 1);
+  const alphaAtl = 2 / (7 + 1);
+  let ctl = 0, atl = 0;
+  return cycle.weeks.map((w, i) => {
+    const load = trimpPerWeek[i];
+    ctl = ctl + alphaCtl * (load - ctl);
+    atl = atl + alphaAtl * (load - atl);
+    const tsb = Math.round((ctl - atl) * 10) / 10;
+    return { week: w.week, ctl: Math.round(ctl), atl: Math.round(atl), tsb, trimp: load };
+  });
+}
+/** Monotony / Strain по Foster: monotony = mean/std, strain = monotony×sumLoad за 7д окно. */
+export function cardioMonotonyStrain(trimpPerDay: number[]): { monotony: number; strain: number; mean: number; stdev: number } {
+  if (trimpPerDay.length === 0) return { monotony: 0, strain: 0, mean: 0, stdev: 0 };
+  const mean = trimpPerDay.reduce((a, b) => a + b, 0) / trimpPerDay.length;
+  const variance = trimpPerDay.reduce((s, v) => s + (v - mean) ** 2, 0) / trimpPerDay.length;
+  const stdev = Math.sqrt(variance);
+  const monotony = stdev > 0 ? mean / stdev : (mean > 0 ? 2 : 0);
+  const sum = trimpPerDay.reduce((a, b) => a + b, 0);
+  return { monotony: Math.round(monotony * 100) / 100, strain: Math.round(monotony * sum), mean: Math.round(mean * 10) / 10, stdev: Math.round(stdev * 10) / 10 };
+}
+/** EWMA ACWR для кардио TRIMP: acute 7д / chronic 28д, зоны как в training-load. */
+export function cardioAcwrEwma(dailyTrimp: { date: string; load: number }[], referenceDate?: string): { ratio: number; zone: 'undertrained' | 'optimal' | 'caution' | 'dangerous'; acute: number; chronic: number } {
+  if (dailyTrimp.length === 0) return { ratio: 0, zone: 'undertrained', acute: 0, chronic: 0 };
+  const sorted = [...dailyTrimp].sort((a, b) => a.date < b.date ? -1 : 1);
+  const ref = referenceDate || sorted[sorted.length - 1].date;
+  const addDays = (d: string, n: number): string => { const dd = new Date(d); dd.setDate(dd.getDate() + n); return `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`; };
+  const ewma = (vals: number[], alpha: number): number => { if (vals.length === 0) return 0; let e = vals[0]; for (let i = 1; i < vals.length; i++) e = alpha * vals[i] + (1 - alpha) * e; return e; };
+  const alphaA = 2 / (7 + 1), alphaC = 2 / (28 + 1);
+  const acuteVals: number[] = [], chronicVals: number[] = [];
+  for (let i = 0; i < 7; i++) { const d = addDays(ref, -6 + i); const found = sorted.find(x => x.date === d); acuteVals.push(found ? found.load : 0); }
+  for (let i = 0; i < 28; i++) { const d = addDays(ref, -27 + i); const found = sorted.find(x => x.date === d); chronicVals.push(found ? found.load : 0); }
+  const acute = ewma(acuteVals, alphaA);
+  const chronic = ewma(chronicVals, alphaC);
+  const ratio = chronic > 0 ? acute / chronic : (acute > 0 ? 2 : 0);
+  const zone = ratio < 0.8 ? 'undertrained' : ratio <= 1.3 ? 'optimal' : ratio <= 1.5 ? 'caution' : 'dangerous';
+  return { ratio: Math.round(ratio * 100) / 100, zone, acute: Math.round(acute), chronic: Math.round(chronic) };
 }
 
 /** Обратный снапшот параметров сборки для «⚙️ Изменить параметры». */
@@ -2976,6 +3149,37 @@ export function cardioSessionProtocol(session: Pick<CardioSession, 'type' | 'dur
       ];
     }
   }
+}
+
+/** Построить структурированные интервалы для сессии (HR/pace/power clamp). */
+export function buildStructuredIntervals(session: CardioSession, zones?: HeartZone[]): CardioStructuredBlock[] {
+  const dur = session.durationMin;
+  if (session.type === 'hiit') {
+    const work = 60;
+    const rest = 90;
+    const reps = Math.max(4, Math.round((dur - 10) * 60 / (work + rest)));
+    const targetHr = zones?.[3] ? { min: zones[3].bpmMin, max: zones[3].bpmMax } : undefined;
+    return [{ workSec: work, restSec: rest, reps, target: 'hr', targetHr, note: 'HIIT Z4 60/90' }];
+  }
+  if (session.type === 'miss') {
+    const work = 600;
+    const rest = 180;
+    const reps = Math.max(1, Math.round((dur - 10) * 60 / (work + rest)));
+    const targetHr = zones?.[2] ? { min: zones[2].bpmMin, max: zones[2].bpmMax } : undefined;
+    return [{ workSec: work, restSec: rest, reps, target: 'hr', targetHr, note: 'MISS Z3 10/3' }];
+  }
+  return [];
+}
+/** Проверка интерференции (Wilson 2012): HIIT <48ч до тяжёлых ног = penalty, Zone2 после ног = ok. */
+export function interferenceScore(legDays: number[], cardioDay: number): 'ok' | 'caution' | 'avoid' {
+  if (!legDays || legDays.length === 0) return 'ok';
+  const diff = Math.min(...legDays.map(d => {
+    const delta = (cardioDay - d + 7) % 7;
+    return Math.min(delta, 7 - delta);
+  }));
+  if (diff === 0) return 'avoid';
+  if (diff === 1) return 'caution';
+  return 'ok';
 }
 
 // ─── Год кардио: последовательность циклов (этап 6) ───

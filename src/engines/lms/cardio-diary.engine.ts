@@ -471,3 +471,62 @@ export function cardioHrCompliance(
   }
   return { checks, inZonePct, avgDelta, advice };
 }
+
+// ─── Wellness (POMS кратко) + транзакционный импорт ───
+
+export interface CardioWellness {
+  date: string; // YYYY-MM-DD
+  sleep: number; // 1-5
+  stress: number; // 1-5 (1=мин stress)
+  soreness: number; // 1-5
+  mood: number; // 1-5
+  readiness: number; // 1-10 вычисляется
+}
+
+export function wellnessReadiness(w: Pick<CardioWellness, 'sleep' | 'stress' | 'soreness' | 'mood'>): number {
+  // stress инвертируем: 1=высокий стресс=1 балл, 5=низкий=5 баллов
+  const stressInv = 6 - w.stress;
+  const sum = w.sleep + stressInv + (6 - w.soreness) + w.mood; // 4-20
+  return Math.max(1, Math.min(10, Math.round((sum / 20) * 10)));
+}
+
+export function saveCardioWellness(entry: CardioWellness): void {
+  const key = 'he_cardio_wellness';
+  try {
+    const arr = JSON.parse(localStorage.getItem(key) ?? '[]');
+    const list: CardioWellness[] = Array.isArray(arr) ? arr : [];
+    const next = [entry, ...list.filter(x => x.date !== entry.date)].slice(0, 90);
+    localStorage.setItem(key, JSON.stringify(next));
+  } catch { /* ignore */ }
+}
+
+export function loadCardioWellness(): CardioWellness[] {
+  try {
+    const v = JSON.parse(localStorage.getItem('he_cardio_wellness') ?? '[]');
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
+/** Транзакционный импорт: все записи за один localStorage write (атомарно). */
+export function importCardioEntries(entries: CardioLogEntry[]): CardioLogEntry[] {
+  const existing = loadCardioLog();
+  const seen = new Set(existing.map(e => `${e.date}|${e.type}|${e.durationMin}|${e.distanceKm ?? ''}`));
+  const toAdd: CardioLogEntry[] = [];
+  for (const e of entries) {
+    const k = `${e.date}|${e.type}|${e.durationMin}|${e.distanceKm ?? ''}`;
+    if (!seen.has(k)) {
+      seen.add(k);
+      toAdd.push(e);
+    }
+  }
+  const merged = [...toAdd, ...existing].slice(0, CARDIO_LOG_CAP).sort((a, b) => (a.date < b.date ? 1 : -1));
+  try { localStorage.setItem(CARDIO_LOG_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
+  return merged;
+}
+
+/** Cutoff today: статистика только до сегодня включительно (будущие записи игнор). */
+export function cardioLogStatsCutoff(log: CardioLogEntry[], days: number, referenceIso?: string): ReturnType<typeof cardioLogStats> {
+  const ref = referenceIso ?? new Date().toISOString().slice(0, 10);
+  const filtered = log.filter(e => e.date <= ref);
+  return cardioLogStats(filtered, days, referenceIso);
+}

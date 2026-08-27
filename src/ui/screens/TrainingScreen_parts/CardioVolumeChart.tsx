@@ -4,7 +4,7 @@
  * выполнения прошедших недель. Inline, без внешних библиотек.
  */
 import React, { useMemo, useState } from 'react';
-import { cardioVolumeSeries, CARDIO_PHASE_LABELS, cardioWeekForDate, type CardioCycle } from '../../../engines/lms/cardio.engine';
+import { cardioVolumeSeries, CARDIO_PHASE_LABELS, cardioWeekForDate, cardioCtlSeries, type CardioCycle } from '../../../engines/lms/cardio.engine';
 import { cardioWeekFact, type CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, BTN, BTN_SMALL, PHASE_COLOR, HINT_SM } from './CardioUI';
 
@@ -17,18 +17,27 @@ const TRIMP_FACTOR: Record<string, number> = { zone2: 2, miss: 3, hiit: 5, recov
 
 export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: CardioLogEntry[]; defaultOpen?: boolean }> = ({ cycle, log = [], defaultOpen = false }) => {
   const [open, setOpen] = useState(defaultOpen);
-  const [metric, setMetric] = useState<'minutes' | 'kcal' | 'trimp'>('minutes');
+  const [metric, setMetric] = useState<'minutes' | 'kcal' | 'trimp' | 'ctl'>('minutes');
 
   const series = useMemo(() => {
     if (!cycle) return [];
     const base = cardioVolumeSeries(cycle);
-    if (metric !== 'trimp') return base;
-    // TRIMP overlay: per week sum(duration*freq*factor)
-    return cycle.weeks.map(w => {
-      const trimp = w.sessions.reduce((s, sess) => s + sess.durationMin * sess.weeklyFrequency * (TRIMP_FACTOR[sess.type] ?? 2), 0);
-      const row = base.find(r => r.week === w.week);
-      return { ...row!, trimp } as typeof row & { trimp: number };
-    });
+    if (metric === 'trimp') {
+      return cycle.weeks.map(w => {
+        const trimp = w.sessions.reduce((s, sess) => s + sess.durationMin * sess.weeklyFrequency * (TRIMP_FACTOR[sess.type] ?? 2), 0);
+        const row = base.find(r => r.week === w.week);
+        return { ...row!, trimp } as typeof row & { trimp: number };
+      });
+    }
+    if (metric === 'ctl') {
+      const ctlSeries = cardioCtlSeries(cycle, cycle.config?.restingHr ?? undefined, cycle.config?.age ? (cycle.config.sex === 'female' ? 226 - cycle.config.age : 220 - cycle.config.age) : undefined, cycle.config?.sex);
+      return cycle.weeks.map(w => {
+        const ctl = ctlSeries.find(x => x.week === w.week);
+        const row = base.find(r => r.week === w.week);
+        return { ...row!, ctl: ctl?.ctl ?? 0, atl: ctl?.atl ?? 0, tsb: ctl?.tsb ?? 0 } as typeof row & { ctl: number; atl: number; tsb: number };
+      });
+    }
+    return base;
   }, [cycle, metric]);
 
   // Факт по неделям цикла (только прошедшие недели — будущее не штрафуется).
@@ -82,7 +91,7 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
       })
     : [];
   const max = Math.max(1, ...values, ...factValues);
-  const label = metric === 'minutes' ? 'мин' : metric === 'kcal' ? 'ккал' : 'TRIMP';
+  const label = metric === 'minutes' ? 'мин' : metric === 'kcal' ? 'ккал' : metric === 'trimp' ? 'TRIMP' : 'CTL';
   const peak = Math.max(...values);
   const peakWeek = values.indexOf(peak) + 1;
   const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
@@ -93,7 +102,8 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
         <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>📈 Объём по неделям</span>
         <button style={metric === 'minutes' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' } : BTN_SMALL} onClick={() => setMetric('minutes')}>мин</button>
         <button style={metric === 'kcal' ? { ...BTN_SMALL, borderColor: 'rgba(0,230,138,0.45)', color: '#00e68a' } : BTN_SMALL} onClick={() => setMetric('kcal')}>ккал</button>
-        <button style={metric === 'trimp' ? { ...BTN_SMALL, borderColor: 'rgba(139,92,246,0.45)', color: '#a78bfa' } : BTN_SMALL} onClick={() => setMetric('trimp')} title="TRIMP = нагрузка (мин × интенсивность)">TRIMP</button>
+        <button style={metric === 'trimp' ? { ...BTN_SMALL, borderColor: 'rgba(139,92,246,0.45)', color: '#a78bfa' } : BTN_SMALL} onClick={() => setMetric('trimp')} title="TRIMP = нагрузка (Banister)">TRIMP</button>
+        <button style={metric === 'ctl' ? { ...BTN_SMALL, borderColor: 'rgba(59,130,246,0.45)', color: '#60a5fa' } : BTN_SMALL} onClick={() => setMetric('ctl')} title="CTL/ATL/TSB (Fitness-Fatigue)">CTL</button>
         {fact && (
           <span style={{ fontSize: 10, fontWeight: 700, color: fact.pct != null && fact.pct >= 80 ? '#4ade80' : fact.pct != null && fact.pct >= 50 ? '#fbbf24' : '#f87171' }}>
             план vs факт: {fact.pct ?? 0}% · {fact.doneS}/{fact.plannedS} сесс
@@ -137,7 +147,8 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
             <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#3b82f6', marginRight: 4 }} />план</span>
             {fact && <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#f8fafc', marginRight: 4 }} />факт (дневник)</span>}
           </div>
-          {metric === 'trimp' && <div style={HINT_SM}>TRIMP — нагрузка (мин×интенсивность): zone2×2, miss×3, hiit×5. Отслеживайте монотонность — резкий рост TRIMP = риск перегруза.</div>}
+          {metric === 'trimp' && <div style={HINT_SM}>TRIMP Banister (HRr) где есть HR, иначе фактор zone2×2/miss×3/hiit×5. Резкий рост {'>'}15% — риск.</div>}
+          {metric === 'ctl' && <div style={HINT_SM}>CTL 42д (фитнес) — синяя линия, ATL 7д (усталость) — красная, TSB = CTL-ATL: +5..+15 пик, &lt;-10 перегруз.</div>}
         </div>
       )}
     </div>

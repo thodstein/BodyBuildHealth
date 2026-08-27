@@ -52,10 +52,23 @@ export const CardioManageStep: React.FC<{
   const [nutriFlash, setNutriFlash] = useState(false);
   const [yearFlash, setYearFlash] = useState(false);
 
-  const yearPlan = cardioYearPlan(library.slice(0, 4));
+  const yearPlan = (() => {
+    const mapped = annualCardioMap && Object.keys(annualCardioMap).length > 0
+      ? library.filter(c => Object.values(annualCardioMap).includes(c.id))
+      : null;
+    if (mapped && mapped.length > 0) {
+      // порядок по startDate если есть, иначе как в library (совпадает с блоками года)
+      const ordered = [...mapped].sort((a, b) => String(a.startDate ?? '').localeCompare(String(b.startDate ?? '')));
+      return cardioYearPlan(ordered);
+    }
+    return cardioYearPlan(library.slice(0, 4));
+  })();
 
   const copyYear = () => {
-    const cycles = loadCardioCycles().slice(0, 4);
+    const mappedIds = annualCardioMap ? Object.values(annualCardioMap) : [];
+    const cycles = mappedIds.length > 0
+      ? loadCardioCycles().filter(c => mappedIds.includes(c.id)).sort((a, b) => String(a.startDate ?? '').localeCompare(String(b.startDate ?? '')))
+      : loadCardioCycles().slice(0, 4);
     const plan = cardioYearPlan(cycles);
     if (!plan) { setYearFlash(true); window.setTimeout(() => setYearFlash(false), 2500); return; }
     const text = buildCardioYearText(plan);
