@@ -40,6 +40,7 @@ import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { VolumeMiniBar, ScoreBadge, Badge, ProgressBar, CARD_BTN, CARD_BTN_ACTIVE, CARD_BTN_GRID, CARD_ACTION, ICON_CARD_BTN, MethodHint } from './ManualUI';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { MesoHeatmap } from './MesoHeatmap';
+import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
 
 export const TRAINING_DAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'] as const;
 const DAY_COLORS = ['#f59e0b', '#3b82f6', '#22c55e', '#a78bfa', '#ef4444', '#06b6d4', '#ec4899'];
@@ -217,7 +218,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
   const [noteWeekIdx, setNoteWeekIdx] = useState<number | null>(null);
   const [howCollapsed, setHowCollapsed] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_how_collapsed') === '1'; } catch { return false; } });
   const [showAllWeeks, setShowAllWeeks] = useState(false);
-  const [boardMode, setBoardMode] = useState<boolean>(() => { try { return localStorage.getItem('he_bb_board_mode') === '1'; } catch { return false; } });
+  const [boardMode, setBoardMode] = useState<boolean>(() => { try { return localStorage.getItem(MANUAL_STORAGE_KEYS.BB_BOARD_MODE) === '1'; } catch { return false; } });
   const [showHeatmap, setShowHeatmap] = useState(false);
   const { confirm } = useConfirmDialog();
   React.useEffect(() => {
@@ -367,7 +368,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>Структура: {body.weeks.length} нед. · тренировочные дни внутри каждой недели</span>
         <span style={{ fontSize: 10, color: DIM }}>{body.weeks.length > 0 ? '— редактируйте расписание и упражнения ниже' : '— добавьте первую неделю'}</span>
         {body.weeks.length > 0 && (
-          <button aria-pressed={boardMode} aria-label={boardMode ? 'Переключить в список' : 'Переключить в доску'} onClick={() => { const v = !boardMode; setBoardMode(v); try { localStorage.setItem('he_bb_board_mode', v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: boardMode ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: boardMode ? '#00e68a' : DIM }}>
+          <button aria-pressed={boardMode} aria-label={boardMode ? 'Переключить в список' : 'Переключить в доску'} onClick={() => { const v = !boardMode; setBoardMode(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_BOARD_MODE, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10, minHeight: 28, marginLeft: 'auto', borderColor: boardMode ? 'rgba(0,230,138,0.4)' : 'rgba(255,255,255,0.12)', color: boardMode ? '#00e68a' : DIM }}>
             {boardMode ? '📋 Список' : '🗂 Доска'}
           </button>
         )}
