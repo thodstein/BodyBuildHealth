@@ -19,6 +19,22 @@ function escapeIcs(text: string): string {
   return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
+/** RFC5545 folding: 75 octets per line, continuation with CRLF+SPACE. */
+function foldIcsLine(line: string): string {
+  if (line.length <= 75) return line;
+  let out = '';
+  let pos = 0;
+  while (pos < line.length) {
+    const chunk = line.slice(pos, pos + 75);
+    out += (pos === 0 ? '' : '\r\n ') + chunk;
+    pos += 75;
+  }
+  return out;
+}
+function pushFolded(lines: string[], line: string) {
+  lines.push(foldIcsLine(line));
+}
+
 function mondayOfWeek(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay(); // 0 Sun .. 6 Sat
@@ -33,17 +49,18 @@ function mondayOfWeek(date: Date): Date {
  * Каждая сессия — отдельное событие VEVENT.
  * startDate — ISO дата начала недели 1 (по умолчанию следующий понедельник 09:00 UTC).
  */
-export function buildProgramIcs(program: UserProgram, startDateIso?: string): string {
+export function buildProgramIcs(program: UserProgram, startDateIso?: string, opts?: { startHour?: number; durationMin?: number }): string {
   const lines: string[] = [];
-  lines.push('BEGIN:VCALENDAR');
-  lines.push('VERSION:2.0');
-  lines.push('PRODID:-//BodyBuildHealth//ManualProgram//RU');
-  lines.push('CALSCALE:GREGORIAN');
-  lines.push('METHOD:PUBLISH');
-  lines.push(`X-WR-CALNAME:${escapeIcs(program.meta.title || 'Программа')}`);
+  pushFolded(lines, 'BEGIN:VCALENDAR');
+  pushFolded(lines, 'VERSION:2.0');
+  pushFolded(lines, 'PRODID:-//BodyBuildHealth//ManualProgram//RU');
+  pushFolded(lines, 'CALSCALE:GREGORIAN');
+  pushFolded(lines, 'METHOD:PUBLISH');
+  pushFolded(lines, `X-WR-CALNAME:${escapeIcs(program.meta.title || 'Программа')}`);
   const startRef = startDateIso ? new Date(startDateIso) : mondayOfWeek(new Date());
-  // normalize to 09:00 UTC
-  startRef.setUTCHours(9, 0, 0, 0);
+  const startHour = opts?.startHour ?? 9;
+  const durationMin = opts?.durationMin ?? 75;
+  startRef.setUTCHours(startHour, 0, 0, 0);
   const uidBase = (program.meta.id || 'manual').replace(/[^a-zA-Z0-9]/g, '').slice(0, 12) || 'manual';
 
   const addWeek = (weekNum: number, sessions: Array<{ name: string; dayOfWeek?: number; focus?: string; blocks: Array<{ exerciseName: string; muscle?: string; sets: Array<{ reps: string | number; rir: number; weight?: number; tempo?: string; restSec?: number }>; supersetWith?: string; tempoSpec?: string }> }>, phase: string) => {
