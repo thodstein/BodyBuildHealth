@@ -83,11 +83,17 @@ export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onCha
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
                   {exs.slice(0, 3).map((ex, i) => (
                     <button key={i} onClick={() => {
-                      if (!program.bb?.weeks[0]?.sessions[0]) return;
+                      if (!program.bb?.weeks[0]?.sessions?.length) return;
+                      const sessions = program.bb.weeks[0].sessions;
+                      let targetIdx = 0; let minSets = Infinity;
+                      for (let si = 0; si < sessions.length; si++) {
+                        const cnt = sessions[si].blocks.filter(b => b.muscle === w.muscle).reduce((s, b) => s + (b.sets?.length || 0), 0);
+                        if (cnt < minSets) { minSets = cnt; targetIdx = si; }
+                      }
                       const nb: UserBlock = { id: newId('blk'), type: 'accessory' as const, exerciseName: ex.name, muscle: w.muscle, role: 'accessory' as const, sets: makeSetsFromTemplate(muscleAwareSets(w.muscle, program.meta.level), (prof.workMax ?? {})[w.muscle] ?? 40) };
-                      const upd = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((wk, wi) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s, si) => si === 0 ? { ...s, blocks: [...s.blocks, nb] } : s) } : wk) } };
+                      const upd = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((wk, wi) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s, si) => si === targetIdx ? { ...s, blocks: [...s.blocks, nb] } : s) } : wk) } };
                       onChange(upd);
-                      showToast('✅ ' + ex.name + ' → ' + (GROUP_RU[w.muscle] ?? w.muscle));
+                      showToast('✅ ' + ex.name + ' → ' + (GROUP_RU[w.muscle] ?? w.muscle) + ` · день ${targetIdx + 1}`);
                     }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.25)', color: '#3b82f6', fontWeight: 700, minHeight: 34 }}>+ {ex.name}</button>
                   ))}
                 </div>
@@ -379,44 +385,66 @@ export const InteractiveVolumePanel: React.FC<PanelProps> = ({ program, dir, onC
   }
   if (Object.keys(peakByMuscle).length === 0) return null;
 
-  // Добавить 1 сет к мышце в week1/session0 (добавляет сет к последнему блоку этой мышцы, или создаёт новый блок)
+  // Добавить 1 сет к мышце — в наименее загруженную сессию недели 1 (баланс PPL/5-day)
   const addSetToMuscle = (muscle: string) => {
-    if (dir !== 'bb' || !program.bb?.weeks[0]?.sessions[0] || !onChange) return;
+    if (dir !== 'bb' || !program.bb?.weeks[0]?.sessions?.length || !onChange) return;
     const w0 = program.bb.weeks[0];
-    const s0 = w0.sessions[0];
-    // Найти последний блок этой мышцы в день 1
-    const blockIdx = [...s0.blocks].map((b, i) => ({ b, i })).filter(x => x.b.muscle === muscle).pop();
+    const sessions = w0.sessions;
+    // Находим сессию с минимальным объёмом этой мышцы (для равномерного распределения)
+    let targetIdx = 0;
+    let minSets = Infinity;
+    for (let i = 0; i < sessions.length; i++) {
+      const cnt = sessions[i].blocks.filter(b => b.muscle === muscle).reduce((s, b) => s + (b.sets?.length || 0), 0);
+      if (cnt < minSets) { minSets = cnt; targetIdx = i; }
+    }
+    // Если мышца уже есть везде одинаково — берём сессию с наименьшим общим объёмом
+    if (minSets > 0 && sessions.every(s => s.blocks.filter(b => b.muscle === muscle).length > 0)) {
+      let minTotal = Infinity;
+      for (let i = 0; i < sessions.length; i++) {
+        const c = sessions[i].blocks.filter(b => b.muscle === muscle).reduce((s, b) => s + (b.sets?.length || 0), 0);
+        if (c === minSets) {
+          const tot = sessions[i].blocks.reduce((s, b) => s + (b.sets?.length || 0), 0);
+          if (tot < minTotal) { minTotal = tot; targetIdx = i; }
+        }
+      }
+    }
+    const sTarget = sessions[targetIdx];
+    const blockIdx = [...sTarget.blocks].map((b, i) => ({ b, i })).filter(x => x.b.muscle === muscle).pop();
     let newBlocks;
     if (blockIdx) {
-      // Добавить сет к существующему блоку
-      newBlocks = s0.blocks.map((b, i) => i === blockIdx.i ? { ...b, sets: [...b.sets, { ...b.sets[b.sets.length - 1] ?? { reps: 10, rir: 2, weight: 0, restSec: 90 } }] } : b);
+      newBlocks = sTarget.blocks.map((b, i) => i === blockIdx.i ? { ...b, sets: [...b.sets, { ...b.sets[b.sets.length - 1] ?? { reps: 10, rir: 2, weight: 0, restSec: 90 } }] } : b);
     } else {
-      // Создать новый блок-аксессуар
       const exs = suggestExercisesForGroup(muscle, program.meta.level, 1, (prof.equipment ?? []) as string[], [], [], prof.avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as string[], (prof.excludedExercises ?? []) as string[]);
       const nb: UserBlock = { id: newId('blk'), type: 'accessory' as const, exerciseName: exs[0]?.name ?? '', muscle, role: 'accessory' as const, sets: makeSetsFromTemplate(muscleAwareSets(muscle, program.meta.level), (prof.workMax ?? {})[muscle] ?? 40) };
-      newBlocks = [...s0.blocks, nb];
+      newBlocks = [...sTarget.blocks, nb];
     }
-    onChange({ ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: newBlocks } : s) } : w) } });
-    showToast?.('➕ +1 сет: ' + (GROUP_RU[muscle] ?? muscle));
+    onChange({ ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === targetIdx ? { ...s, blocks: newBlocks } : s) } : w) } });
+    showToast?.('➕ +1 сет: ' + (GROUP_RU[muscle] ?? muscle) + ` → день ${targetIdx + 1}`);
   };
 
-  // Убрать 1 сет у мышцы (удаляет последний сет последнего блока этой мышцы в week1/session0)
+  // Убрать 1 сет у мышцы — из наиболее загруженной сессии недели 1
   const removeSetFromMuscle = (muscle: string) => {
-    if (dir !== 'bb' || !program.bb?.weeks[0]?.sessions[0] || !onChange) return;
+    if (dir !== 'bb' || !program.bb?.weeks[0]?.sessions?.length || !onChange) return;
     const w0 = program.bb.weeks[0];
-    const s0 = w0.sessions[0];
-    const blockIdx = [...s0.blocks].map((b, i) => ({ b, i })).filter(x => x.b.muscle === muscle).pop();
+    const sessions = w0.sessions;
+    let targetIdx = -1;
+    let maxSets = 0;
+    for (let i = 0; i < sessions.length; i++) {
+      const cnt = sessions[i].blocks.filter(b => b.muscle === muscle).reduce((s, b) => s + (b.sets?.length || 0), 0);
+      if (cnt > maxSets) { maxSets = cnt; targetIdx = i; }
+    }
+    if (targetIdx < 0 || maxSets === 0) return;
+    const sTarget = sessions[targetIdx];
+    const blockIdx = [...sTarget.blocks].map((b, i) => ({ b, i })).filter(x => x.b.muscle === muscle).pop();
     if (!blockIdx) return;
     let newBlocks;
     if (blockIdx.b.sets.length > 1) {
-      // Убрать последний сет
-      newBlocks = s0.blocks.map((b, i) => i === blockIdx.i ? { ...b, sets: b.sets.slice(0, -1) } : b);
+      newBlocks = sTarget.blocks.map((b, i) => i === blockIdx.i ? { ...b, sets: b.sets.slice(0, -1) } : b);
     } else {
-      // Удалить блок целиком (1 сет = удалить)
-      newBlocks = s0.blocks.filter((_, i) => i !== blockIdx.i);
+      newBlocks = sTarget.blocks.filter((_, i) => i !== blockIdx.i);
     }
-    onChange({ ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === 0 ? { ...s, blocks: newBlocks } : s) } : w) } });
-    showToast?.('➖ −1 сет: ' + (GROUP_RU[muscle] ?? muscle));
+    onChange({ ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((w, wi) => wi === 0 ? { ...w, sessions: w.sessions.map((s, si) => si === targetIdx ? { ...s, blocks: newBlocks } : s) } : w) } });
+    showToast?.('➖ −1 сет: ' + (GROUP_RU[muscle] ?? muscle) + ` → день ${targetIdx + 1}`);
   };
 
   const canEdit = dir === 'bb' && !!onChange;
@@ -424,7 +452,7 @@ export const InteractiveVolumePanel: React.FC<PanelProps> = ({ program, dir, onC
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '2px solid #22c55e' }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: '#22c55e', marginBottom: 6 }}>📊 Объём и MRV (интерактивно)</div>
-      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Сравнение с MEV/MAV/MRV для уровня <b>{program.meta.level}</b>{labMrvMult < 1 && <span> (лаб ×{labMrvMult.toFixed(2)})</span>}{(prof.onCourse ?? false) && <span style={{ color: '#f59e0b' }}> · курс</span>}{canEdit && <span> · кнопки ± изменяют неделю 1</span>}</div>
+      <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>Сравнение с MEV/MAV/MRV для уровня <b>{program.meta.level}</b>{labMrvMult < 1 && <span> (лаб ×{labMrvMult.toFixed(2)})</span>}{(prof.onCourse ?? false) && <span style={{ color: '#f59e0b' }}> · курс</span>}{canEdit && <span> · ± в наим. загруженный день</span>}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {MUSCLES.filter(m => peakByMuscle[m] > 0 || canEdit).map(m => {
           const cur = peakByMuscle[m] || 0;
@@ -452,7 +480,7 @@ export const InteractiveVolumePanel: React.FC<PanelProps> = ({ program, dir, onC
       </div>
       {canEdit && (
         <div style={{ fontSize: 10, color: DIM, marginTop: 6, fontStyle: 'italic' }}>
-          «+» — добавить сет к последнему блоку мышцы в день 1 (или создать аксессуар). «−» — убрать последний сет. Блок с 1 сетом удаляется.
+          «+» — в наименее загруженный день этой мышцы (баланс сплита). «−» — из наиболее загруженного. Блок с 1 сетом удаляется.
         </div>
       )}
     </div>

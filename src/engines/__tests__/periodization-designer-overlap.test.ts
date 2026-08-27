@@ -1,7 +1,7 @@
 /**
  * Tests for P0-2 (overlap detection) + P1-2 (gap warnings) in periodization-designer.engine.ts.
  * Verifies getDesignStats reports overlaps and gaps, and addBlockToDesign/moveBlockInDesign
- * mark overlapping blocks in notes.
+ * mark overlapping blocks via overlapping flag (notes stay clean).
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -16,7 +16,7 @@ import {
 } from '../periodization-designer.engine';
 
 describe('P0-2: Periodization Designer overlap detection', () => {
-  it('addBlockToDesign marks overlapping block in notes', () => {
+  it('addBlockToDesign marks overlapping block via flag (notes clean)', () => {
     const design = createEmptyDesign('test');
     design.totalWeeks = 20;
     const d1 = addBlockToDesign(design, 'accumulation_hypertrophy', 1);
@@ -27,10 +27,12 @@ describe('P0-2: Periodization Designer overlap detection', () => {
     const d2 = addBlockToDesign(d1, 'intensification', 3);
     const overlapBlock = d2.blocks.find((b) => b.phaseKey === 'intensification');
     expect(overlapBlock).toBeDefined();
-    expect(overlapBlock!.notes).toContain('accumulation_hypertrophy');
+    expect(overlapBlock!.overlapping).toBe(true);
+    expect(overlapBlock!.notes).not.toContain('OVERLAP');
+    expect(overlapBlock!.notes).not.toContain('accumulation_hypertrophy');
   });
 
-  it('moveBlockInDesign marks overlaps when moved onto existing block', () => {
+  it('moveBlockInDesign marks overlaps via flag when moved onto existing block', () => {
     const design = createEmptyDesign('test');
     design.totalWeeks = 30;
     const d1 = addBlockToDesign(design, 'accumulation_hypertrophy', 1); // weeks 1-4
@@ -40,8 +42,8 @@ describe('P0-2: Periodization Designer overlap detection', () => {
     const d3 = moveBlockInDesign(d2, block2Id, 3);
     const moved = d3.blocks.find((b) => b.id === block2Id);
     expect(moved).toBeDefined();
-    expect(moved!.notes).toContain('OVERLAP');
-    expect(moved!.notes).toContain('accumulation_hypertrophy');
+    expect(moved!.overlapping).toBe(true);
+    expect(moved!.notes).not.toContain('OVERLAP');
   });
 
   it('non-overlapping blocks do not get overlap notes', () => {

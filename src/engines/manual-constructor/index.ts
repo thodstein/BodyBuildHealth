@@ -7,3 +7,4 @@ export * from './manual-quality.engine';
 export * from './manual-templates.engine';
 export * from './manual-pl.engine';
 export * from './manual-phase.engine';
+export * from './manual-storage';

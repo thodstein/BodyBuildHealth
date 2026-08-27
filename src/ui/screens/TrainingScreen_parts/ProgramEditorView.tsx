@@ -66,44 +66,11 @@ import { QualityChecklistCard } from './QualityChecklistCard';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
 
-/**
- * ББ-цели (Schoenfeld/Helms/Israetel) vs ПЛ-цели (Verkhoshansky/Bompa/Sheiko/Zatsiorsky) — раздельные источники.
- * ББ: гипертрофия/сушка/рекомп/поддержание/сила+масса; ПЛ: выносливость(GPP)/сила/speed/пик.
- */
-export const GOAL_OPTS_BB: Array<{ id: string; label: string }> = [
-  { id: 'hypertrophy', label: 'Масса (гипертрофия)' },
-  { id: 'cut', label: 'Сушка' },
-  { id: 'recomp', label: 'Рекомпозиция' },
-  { id: 'maintenance', label: 'Поддержание' },
-  { id: 'strength_mass', label: 'Сила+Масса' },
-  { id: 'rehab', label: 'Реабилитация' },
-];
-export const GOAL_OPTS_PL: Array<{ id: string; label: string }> = [
-  { id: 'pl_endurance', label: 'Выносливость (GPP)' },
-  { id: 'pl_strength', label: 'Сила' },
-  { id: 'pl_speed', label: 'Скорость/Координация' },
-  { id: 'pl_peaking', label: 'Выход на пик' },
-  { id: 'rehab', label: 'Реабилитация' },
-];
-export const GOAL_OPTS_HYBRID: Array<{ id: string; label: string }> = [
-  { id: 'pb_endurance', label: 'Выносливость (функц.)' },
-  { id: 'pb_strength', label: 'Сила (ПЛ+ББ)' },
-  { id: 'pb_mass', label: 'Масса (гипертрофия+база)' },
-  { id: 'pb_peaking', label: 'Пик (сила+сушка)' },
-  { id: 'rehab', label: 'Реабилитация' },
-];
-const GOAL_OPTS: Array<{ id: string; label: string }> = [
-  ...GOAL_OPTS_BB,
-  ...GOAL_OPTS_PL.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id)),
-  ...GOAL_OPTS_HYBRID.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id) && !GOAL_OPTS_PL.some(b => b.id === o.id)),
-  { id: 'powerlifting', label: 'Сила (ПЛ, legacy)' },
-  { id: 'peaking', label: 'Пик/сушка (legacy)' },
-  { id: 'mass', label: 'Масса (legacy)' },
-  { id: 'bulk', label: 'Масса (legacy bulk)' },
-];
-function goalLabelOf(id: string): string {
-  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? GOAL_OPTS_HYBRID.find(g => g.id === id)?.label ?? id;
-}
+import { GOAL_OPTS_BB as CENTRAL_GOAL_BB2, GOAL_OPTS_PL as CENTRAL_GOAL_PL2, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID2, goalLabelOf as centralGoalLabelOf2 } from '../../../engines/goals';
+export const GOAL_OPTS_BB = CENTRAL_GOAL_BB2;
+export const GOAL_OPTS_PL = CENTRAL_GOAL_PL2;
+export const GOAL_OPTS_HYBRID = CENTRAL_GOAL_HYBRID2;
+function goalLabelOf(id: string): string { return centralGoalLabelOf2(id); }
 const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
   { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'Enhanced' },
@@ -1295,28 +1262,40 @@ return (
             if (lows.length === 0 && overs.length === 0) return null;
             const prof = loadTrainingProfile();
             const addFor = (muscle: string) => {
-              if (!program.bb?.weeks[0]?.sessions[0]) return;
+              if (!program.bb?.weeks[0]?.sessions?.length) return;
+              const w0 = program.bb.weeks[0] as any;
+              let targetIdx = 0; let minSets = Infinity;
+              for (let i = 0; i < w0.sessions.length; i++) {
+                const cnt = (w0.sessions[i].blocks as any[]).filter((b:any)=> b.muscle===muscle).reduce((s:number,b:any)=> s + (b.sets?.length||0),0);
+                if (cnt < minSets) { minSets = cnt; targetIdx = i; }
+              }
               const exs = suggestExercisesForGroup(muscle, program.meta.level, 1, (prof.equipment ?? []) as any, [], [], (prof as any).avoidAxialLoad ?? false, (prof.favoriteExercises ?? []) as any, (prof.excludedExercises ?? []) as any);
               const w = (prof.workMax ?? {} as any)[muscle] ?? 40;
               const sets = makeSetsFromTemplate(muscleAwareSets(muscle, program.meta.level) as any, w);
               const nb: any = { id: newId('blk'), type: 'accessory' as const, exerciseName: exs[0]?.name ?? '', muscle, role: 'accessory' as const, sets: sets.length ? sets : [{ reps: 10, rir: 2, weight: w, restSec: 90 }] };
-              const updated: any = { ...program, bb: { ...program.bb!, weeks: (program.bb!.weeks as any).map((wk: any, wi: number) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s: any, si: number) => si === 0 ? { ...s, blocks: [...s.blocks, nb] } : s) } : wk) } };
+              const updated: any = { ...program, bb: { ...program.bb!, weeks: (program.bb!.weeks as any).map((wk: any, wi: number) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s: any, si: number) => si === targetIdx ? { ...s, blocks: [...s.blocks, nb] } : s) } : wk) } };
               onChange(updated);
-              showToast('➕ ' + (GROUP_RU[muscle] ?? muscle) + ' → ' + (exs[0]?.name ?? 'упражнение'));
+              showToast('➕ ' + (GROUP_RU[muscle] ?? muscle) + ` → день ${targetIdx+1} · ` + (exs[0]?.name ?? 'упражнение'));
             };
             const removeFor = (muscle: string) => {
-              if (!program.bb?.weeks[0]?.sessions[0]) return;
-              const w0 = program.bb.weeks[0];
-              const s0 = w0.sessions[0];
-              const idx = [...s0.blocks].map((b, i) => ({ b, i })).filter(x => x.b.muscle === muscle).pop()?.i;
+              if (!program.bb?.weeks[0]?.sessions?.length) return;
+              const w0 = program.bb.weeks[0] as any;
+              let targetIdx = -1; let maxSets = 0;
+              for (let i = 0; i < w0.sessions.length; i++) {
+                const cnt = (w0.sessions[i].blocks as any[]).filter((b:any)=> b.muscle===muscle).reduce((s:number,b:any)=> s + (b.sets?.length||0),0);
+                if (cnt > maxSets) { maxSets = cnt; targetIdx = i; }
+              }
+              if (targetIdx < 0 || maxSets===0) return;
+              const s0 = w0.sessions[targetIdx];
+              const idx = [...s0.blocks].map((b:any,i:number)=> ({ b, i })).filter((x:any)=> x.b.muscle===muscle).pop()?.i;
               if (idx == null) return;
               const blk = s0.blocks[idx];
               let newBlocks;
-              if (blk.sets.length > 1) newBlocks = s0.blocks.map((b, i) => i === idx ? { ...b, sets: b.sets.slice(0, -1) } : b);
-              else newBlocks = s0.blocks.filter((_, i) => i !== idx);
-              const updated: any = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((wk, wi) => wi === 0 ? { ...wk, sessions: wk.sessions.map((s, si) => si === 0 ? { ...s, blocks: newBlocks } : s) } : wk) } };
+              if (blk.sets.length > 1) newBlocks = s0.blocks.map((b:any,i:number)=> i===idx ? { ...b, sets: b.sets.slice(0,-1)} : b);
+              else newBlocks = s0.blocks.filter((_:any,i:number)=> i!==idx);
+              const updated: any = { ...program, bb: { ...program.bb!, weeks: program.bb!.weeks.map((wk:any, wi:number)=> wi===0 ? { ...wk, sessions: wk.sessions.map((s:any, si:number)=> si===targetIdx ? { ...s, blocks: newBlocks} : s)} : wk) } };
               onChange(updated);
-              showToast('➖ ' + (GROUP_RU[muscle] ?? muscle) + ' −1 сет');
+              showToast('➖ ' + (GROUP_RU[muscle] ?? muscle) + ` → день ${targetIdx+1} · −1 сет`);
             };
             return (
               <div style={{ ...CARD, padding: 10, borderLeft: `3px solid ${overs.length ? '#ef4444' : '#3b82f6'}`, display: 'flex', flexDirection: 'column', gap: 6 }}>

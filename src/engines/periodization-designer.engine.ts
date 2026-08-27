@@ -114,6 +114,8 @@ export interface DesignerPhaseBlock {
   startWeek: number;  // 1-based
   endWeek: number;    // inclusive
   notes: string;
+  /** Флаг перекрытия с соседним блоком — транзитный, не пачкает notes. */
+  overlapping?: boolean;
 }
 
 export interface MacrocycleDesign {
@@ -234,7 +236,7 @@ export function loadDesigns(): MacrocycleDesign[] {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((value): value is MacrocycleDesign => {
+    const filtered = parsed.filter((value): value is MacrocycleDesign => {
       if (!value || typeof value !== 'object') return false;
       const design = value as Partial<MacrocycleDesign>;
       return typeof design.id === 'string'
@@ -250,7 +252,18 @@ export function loadDesigns(): MacrocycleDesign[] {
           && Number.isInteger(block.endWeek)
           && block.startWeek >= 1
           && block.endWeek >= block.startWeek);
-    });
+    }) as MacrocycleDesign[];
+    // Миграция: чистим легаси [OVERLAP:...] из notes, приводим overlapping к boolean
+    return filtered.map(d => ({
+      ...d,
+      blocks: d.blocks.map(b => {
+        const cleanNotes = (b.notes || '').replace(/\s*\[OVERLAP:[^\]]*\]/g, '').trim();
+        const overlapping = typeof b.overlapping === 'boolean' ? b.overlapping : undefined;
+        // Пересчитывать флаг не нужно — он транзитный, оставляем чистые notes
+        if (cleanNotes === b.notes && overlapping === b.overlapping) return b;
+        return { ...b, notes: cleanNotes, ...(overlapping !== undefined ? { overlapping } : {}) } as DesignerPhaseBlock;
+      }),
+    }));
   } catch { return []; }
 }
 
@@ -282,12 +295,13 @@ function checkBlockOverlap(
   );
 }
 
+function setOverlapFlag(block: DesignerPhaseBlock, overlaps: DesignerPhaseBlock[]): DesignerPhaseBlock {
+  const cleanNotes = block.notes.replace(/\s*\[OVERLAP:[^\]]*\]/g, '').trim();
+  return { ...block, notes: cleanNotes, overlapping: overlaps.length > 0 };
+}
+/** Alias для обратной совместимости тестов — теперь не пачкает notes. */
 function setOverlapNotes(block: DesignerPhaseBlock, overlaps: DesignerPhaseBlock[]): DesignerPhaseBlock {
-  const userNotes = block.notes.replace(/\s*\[OVERLAP:[^\]]*\]/g, '').trim();
-  const overlapNotes = overlaps.length > 0
-    ? `[OVERLAP: ${overlaps.map((b) => b.phaseKey + ' ' + b.startWeek + '-' + b.endWeek).join(', ')}]`
-    : '';
-  return { ...block, notes: [userNotes, overlapNotes].filter(Boolean).join(' ') };
+  return setOverlapFlag(block, overlaps);
 }
 
 export function addBlockToDesign(design: MacrocycleDesign, phaseKey: PhaseKey, startWeek: number): MacrocycleDesign {
@@ -332,7 +346,8 @@ export function resolveDesignOverlaps(design: MacrocycleDesign): MacrocycleDesig
     const duration = Math.max(1, block.endWeek - block.startWeek + 1);
     const startWeek = Math.max(1, previousEnd + 1, block.startWeek);
     const endWeek = Math.min(design.totalWeeks, startWeek + duration - 1);
-    const next = setOverlapNotes({ ...block, startWeek, endWeek }, resolved);
+    const overlaps = checkBlockOverlap(resolved, startWeek, endWeek);
+    const next = setOverlapFlag({ ...block, startWeek, endWeek }, overlaps);
     resolved.push(next);
     previousEnd = endWeek;
   }

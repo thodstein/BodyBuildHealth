@@ -138,34 +138,45 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
     issues.push({ level: 'error', code: 'BAD_WEEKS', message: `Недель должно быть от 1 до 52 (сейчас ${meta.weeks})` });
   }
 
-  // 2. Проверка ББ
+  // 2. Проверка ББ — пик по неделям (не сумма всех недель)
   if (dir === 'bb' && program.bb) {
     const bb = program.bb;
     if (bb.weeks.length === 0) {
       issues.push({ level: 'warning', code: 'NO_WEEKS', message: 'Программа без недель — добавьте хотя бы одну' });
     }
     let totalExercises = 0;
-    const allMuscleVolume: Record<string, number> = {};
+    const weeklyByMuscle: Record<string, number[]> = {};
     for (const w of bb.weeks) {
+      const weekSets: Record<string, number> = {};
       for (const s of w.sessions) {
         for (const b of s.blocks) {
           totalExercises++;
-          const m = b.muscle || 'other';
-          // P2: считаем сеты по количеству, не по rep-флагу (AMRAP ≠ 0)
-          allMuscleVolume[m] = (allMuscleVolume[m] || 0) + (b.sets?.length || 0);
+          const m = (b.muscle || 'other').toLowerCase();
+          if (!m) continue;
+          weekSets[m] = (weekSets[m] || 0) + (b.sets?.length || 0);
         }
       }
+      for (const [m, v] of Object.entries(weekSets)) {
+        if (!weeklyByMuscle[m]) weeklyByMuscle[m] = [];
+        weeklyByMuscle[m].push(v);
+      }
     }
+    // Для мышц, встречающихся не каждую неделю — добить нулями до общего числа недель (корректный пик)
+    for (const arr of Object.values(weeklyByMuscle)) {
+      while (arr.length < bb.weeks.length) arr.push(0);
+    }
+    const peakByMuscle: Record<string, number> = {};
+    for (const [m, arr] of Object.entries(weeklyByMuscle)) peakByMuscle[m] = Math.max(...arr, 0);
     if (totalExercises === 0) {
       issues.push({ level: 'warning', code: 'NO_EXERCISES', message: 'Программа пуста — добавьте упражнения' });
     }
-    // Проверка MRV-превышения (только для известных мышц)
+    // Проверка MRV-превышения — по пиковой неделе (паритет с manual-quality)
     const lvl = normLevel(meta.level);
-    for (const [muscle, sets] of Object.entries(allMuscleVolume)) {
-      if (sets < 1) continue;
+    for (const [muscle, peak] of Object.entries(peakByMuscle)) {
+      if (peak < 1) continue;
       const lm = getVolumeLandmarks(lvl, muscle);
-      if (lm && sets > lm.mrv * 1.2) {
-        issues.push({ level: 'warning', code: 'MRV_EXCEED', message: `${muscle}: ${sets} сетов/нед превышает MRV (${lm.mrv}) на 20%+`, muscle });
+      if (lm && peak > lm.mrv * 1.2) {
+        issues.push({ level: 'warning', code: 'MRV_EXCEED', message: `${muscle}: ${peak} сетов/нед (пик) превышает MRV (${lm.mrv}) на 20%+`, muscle });
       }
     }
     // P2: проверка делода и дней — ВНЕ цикла мышц (раньше дублировались N раз)

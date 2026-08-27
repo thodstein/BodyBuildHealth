@@ -91,55 +91,12 @@ import { buildBBUserProgramFromProfile } from './auto-fill-draft';
 import { sessionDayOfWeek } from './program-editor-logic';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 
-/**
- * ББ-цели ручного конструктора (Schoenfeld 2017 / Helms 2016 / Israetel):
- *  Масса — гипертрофия ×65-85% 8-15, recomposition, maintenance, сила+масса.
- *  Источник: Helms evidence-based, Schoenfeld meta. Отличаются от ПЛ-целей (Sir/Verk/Bompa GPP/Speed/Peak).
- */
-export const GOAL_OPTS_BB: Array<{ id: string; label: string }> = [
-  { id: 'hypertrophy', label: 'Масса (гипертрофия)' },
-  { id: 'cut', label: 'Сушка' },
-  { id: 'recomp', label: 'Рекомпозиция' },
-  { id: 'maintenance', label: 'Поддержание' },
-  { id: 'strength_mass', label: 'Сила+Масса' },
-  { id: 'rehab', label: 'Реабилитация' },
-];
-/**
- * ПЛ-цели ручного конструктора и ПЛ-авто (Verkhoshansky/Bompa/Sheiko/Zatsiorsky):
- *  выносливость (GPP, 60-70% ×10-20), сила (70-90% ×1-6, Прилепин),
- *  скорость/координация (50-75% ×2-5, dynamic effort, цепи/паузы), пик (Bosquet taper singles 90-105%).
- */
-export const GOAL_OPTS_PL: Array<{ id: string; label: string }> = [
-  { id: 'pl_endurance', label: 'Выносливость (GPP)' },
-  { id: 'pl_strength', label: 'Сила' },
-  { id: 'pl_speed', label: 'Скорость/Координация' },
-  { id: 'pl_peaking', label: 'Выход на пик' },
-  { id: 'rehab', label: 'Реабилитация' },
-];
-/**
- * Гибрид/повербилдер — третий ручной конструктор (PL+BB blend, PHUL/PHAT, Helms+Israetel+Zatsiorsky):
- *  endurance — функционал ОФП, strength — тяж+памп, mass — гипертрофия с базой 5×5, peaking — taper.
- */
-export const GOAL_OPTS_HYBRID: Array<{ id: string; label: string }> = [
-  { id: 'pb_endurance', label: 'Выносливость (функц.)' },
-  { id: 'pb_strength', label: 'Сила (ПЛ+ББ)' },
-  { id: 'pb_mass', label: 'Масса (гипертрофия+база)' },
-  { id: 'pb_peaking', label: 'Пик (сила+сушка)' },
-  { id: 'rehab', label: 'Реабилитация' },
-];
-// Legacy combined для отображения старых программ (powerlifting→pl_strength, peaking→pl_peaking / cut)
-const GOAL_OPTS: Array<{ id: string; label: string }> = [
-  ...GOAL_OPTS_BB,
-  ...GOAL_OPTS_PL.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id)),
-  ...GOAL_OPTS_HYBRID.filter(o => !GOAL_OPTS_BB.some(b => b.id === o.id) && !GOAL_OPTS_PL.some(b => b.id === o.id)),
-  { id: 'powerlifting', label: 'Сила (ПЛ, legacy)' },
-  { id: 'peaking', label: 'Пик/сушка (legacy)' },
-  { id: 'mass', label: 'Масса (legacy)' },
-  { id: 'bulk', label: 'Масса (legacy bulk)' },
-];
-function goalLabelOf(id: string): string {
-  return GOAL_OPTS.find(g => g.id === id)?.label ?? GOAL_OPTS_BB.find(g => g.id === id)?.label ?? GOAL_OPTS_PL.find(g => g.id === id)?.label ?? GOAL_OPTS_HYBRID.find(g => g.id === id)?.label ?? id;
-}
+import { GOAL_OPTS_BB as CENTRAL_GOAL_BB, GOAL_OPTS_PL as CENTRAL_GOAL_PL, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID, goalLabelOf as centralGoalLabelOf } from '../../../engines/goals';
+// Центральный реестр целей — реэкспорт для совместимости
+export const GOAL_OPTS_BB = CENTRAL_GOAL_BB;
+export const GOAL_OPTS_PL = CENTRAL_GOAL_PL;
+export const GOAL_OPTS_HYBRID = CENTRAL_GOAL_HYBRID;
+function goalLabelOf(id: string): string { return centralGoalLabelOf(id); }
 const LEVEL_OPTS = [
   { id: 'beginner', label: 'Новичок' }, { id: 'intermediate', label: 'Средний' },
   { id: 'advanced', label: 'Опытный' }, { id: 'enhanced', label: 'Enhanced' },

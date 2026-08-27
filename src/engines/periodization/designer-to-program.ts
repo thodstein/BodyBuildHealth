@@ -223,11 +223,14 @@ export function applyDesignPhasesToWeeks(
  *  - isProgramDesignStale — «дизайн изменён после привязки» (UI-бейдж).
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/** FNV-1a хэш содержимого дизайна. Меняется при любой правке блоков/заметок. */
+/** FNV-1a хэш содержимого дизайна. Меняется при любой правке блоков/заметок (overlapping игнорируется, легаси [OVERLAP] чистится). */
 export function designFingerprint(design: MacrocycleDesign): string {
   const parts = [...design.blocks]
     .sort((a, b) => a.startWeek - b.startWeek || a.endWeek - b.endWeek || (a.id < b.id ? -1 : 1))
-    .map(b => `${b.id}|${b.phaseKey}|${b.startWeek}|${b.endWeek}|${b.notes || ''}`);
+    .map(b => {
+      const cleanNotes = (b.notes || '').replace(/\s*\[OVERLAP:[^\]]*\]/g, '').trim();
+      return `${b.id}|${b.phaseKey}|${b.startWeek}|${b.endWeek}|${cleanNotes}`;
+    });
   const s = `v1:${design.totalWeeks}:${parts.join(';')}`;
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {

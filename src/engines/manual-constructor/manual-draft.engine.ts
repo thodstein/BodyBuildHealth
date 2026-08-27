@@ -12,6 +12,7 @@ import { selectBestBBSplit } from '../bb/bb-selector.engine';
 import { createFromBuild } from '../user-program/program-store';
 import type { Injury } from '../manual-plan-builder';
 import type { BBTrainingFocus } from '../bb/bb-goal-types';
+import { toBBGoal, BB_GOALS_CANON } from '../goals';
 
 export interface MuscleGroupPlan {
   muscle: string;
@@ -139,10 +140,8 @@ function defaultWorkMax(): Record<string, number> {
 
 /** Полноценная авто-сборка ББ-плана через buildBBPlan (BB-auto-движок). BB-цели Schoenfeld/Helms: mass/hypertrophy/cut/recomp/maintenance/strength_mass */
 export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
-  const BB_GOALS = ['mass','strength','cut','recomp','maintenance','strength_mass','hypertrophy','bodybuilding','athletic'] as const;
-  const raw = (BB_GOALS as readonly string[]).includes(opts.goal) ? opts.goal : 'hypertrophy';
-  // hypertrophy ↔ mass — синонимы (BB, Schoenfeld 2017), нормализуем к mass для движка
-  const goal = (raw === 'hypertrophy' ? 'mass' : raw === 'strength' ? 'strength_mass' : raw) as BBGoal;
+  const raw = (BB_GOALS_CANON as readonly string[]).includes(opts.goal as any) ? opts.goal : 'hypertrophy';
+  const goal = toBBGoal(raw) as BBGoal;
   const patternId = opts.splitPattern ?? (
     (() => {
       try {
@@ -162,11 +161,13 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     })()
   );
   const injuries: Injury[] = (opts.injuries ?? []).map((inj) => ({ muscle: inj.muscle, from: inj.from ?? new Date().toISOString().split('T')[0], to: inj.to, weightPct: inj.weightPct, volumePct: inj.volumePct, repsCap: inj.repsCap, exclude: inj.exclude }));
+  const requestedWeeks = Math.max(1, Math.min(opts.weeks, 52));
+  const buildWeeks = Math.min(requestedWeeks, 16);
   const input: BBBuilderInput = {
     patternId,
     level: opts.level,
     goal,
-    weeks: Math.max(1, Math.min(opts.weeks, 16)),
+    weeks: buildWeeks,
     workMax: opts.workMax ?? defaultWorkMax(),
     weakPoints: opts.weakPoints ?? [],
     focusGroup: opts.focusGroup,
@@ -201,7 +202,37 @@ export function autodraftBBPlan(opts: AutoDraftOptions): BBPlan {
     pedAdapt = adaptForPEDs(peds, defaultWorkMax(), undefined, (opts.courseIntensity ?? 'moderate') as CourseIntensity);
   }
   try {
-    return buildBBPlan(input, pedAdapt);
+    const plan = buildBBPlan(input, pedAdapt);
+    // Циклическое расширение для >16 нед (без молчаливой обрезки) — +0.5%/нед прогрессия, deload без прогрессии
+    if (requestedWeeks > buildWeeks && plan.weeks && plan.weeks.length === buildWeeks) {
+      const base = plan.weeks;
+      for (let w = buildWeeks + 1; w <= requestedWeeks; w++) {
+        const src = base[(w - 1) % base.length];
+        if (!src) continue;
+        const isDeload = !!(src as any).deload || (src as any).phase === 'deload';
+        const factor = isDeload ? 1 : Math.pow(1.005, w - 1);
+        const cloned: any = {
+          ...src,
+          week: w,
+          sessions: (src.sessions as any[]).map((s: any) => ({
+            ...s,
+            exercises: (s.exercises as any[]).map((e: any) => ({
+              ...e,
+              workSets: (e.workSets as any[])?.map((ws: any) => ({
+                ...ws,
+                weight: typeof ws.weight === 'number' ? Math.round(ws.weight * factor * 10) / 10 : ws.weight,
+              })),
+              warmupSets: (e.warmupSets as any[])?.map((ws: any) => ({
+                ...ws,
+                weight: typeof ws.weight === 'number' ? Math.round(ws.weight * factor * 10) / 10 : ws.weight,
+              })),
+            })),
+          })),
+        };
+        plan.weeks.push(cloned);
+      }
+    }
+    return plan;
   } catch (e) {
     throw new Error(`autodraftBBPlan: не удалось собрать план (${opts.level}/${opts.daysPerWeek}d/${opts.weeks}w): ${(e as Error)?.message ?? e}`);
   }
