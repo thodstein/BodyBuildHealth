@@ -128,7 +128,7 @@ const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps
 function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: string[] = [], optionsHighVolumeBack = false, isPPL = false): void {
   const priority = new Set(priorityMuscles);
   const counts = new Map<string, number>();
-  const ranked = session.exercises.map((exercise, index) => ({ exercise, index })).sort((a, b) => {
+  const ranked = session.exercises.map((exercise, index) => ({ exercise, index })).sort((a: any, b: any) => {
     const primary = (b.exercise.role === 'primary' ? 1 : 0) - (a.exercise.role === 'primary' ? 1 : 0);
     if (primary) return primary;
     const priorityDiff = (priority.has(a.exercise.muscle) ? 1 : 0) - (priority.has(b.exercise.muscle) ? 1 : 0);
@@ -1324,7 +1324,7 @@ function findCatalogCandidate(muscle: string, pattern: RegExp, options: BBFinali
   });
 }
 
-function ensurePPLTraps(session, week, options) {
+function ensurePPLTraps(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Pull|Back/i.test(session.sessionTag || '')) return;
   const excluded = new Set(options.excludedMuscles || []);
@@ -1333,9 +1333,9 @@ function ensurePPLTraps(session, week, options) {
   if (donors.has('traps')) return;
   // PPL-gated by applyPPLRules; ensure helpers are PPL-only -> maxEx 14 (18 for enhanced 3+)
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
-  const working = session.exercises.filter((e) => !e.warmupActivator);
+  const working = session.exercises.filter((e: any) => !e.warmupActivator);
   if (working.length >= maxEx) return;
-  let shrug = working.find((e) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
+  let shrug = working.find((e: any) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
   const targetSets = 5;
   if (shrug) {
     const need = targetSets - shrug.sets;
@@ -1351,7 +1351,7 @@ function ensurePPLTraps(session, week, options) {
     shrug.repsRange = [10, 15];
   } else {
     if (working.length >= maxEx) return;
-    let cand: any = findCatalogCandidate('traps', /шраг|shrug/i, options, new Set(working.map((e) => e.name)));
+    let cand: any = findCatalogCandidate('traps', /шраг|shrug/i, options, new Set(working.map((e: any) => e.name)));
     let candName: string | undefined = cand?.name || cand?.exerciseName;
     if (!candName) {
       candName = 'Шраги со штангой';
@@ -1367,7 +1367,7 @@ function ensurePPLTraps(session, week, options) {
     });
   }
 }
-function ensurePPLRearDelts(session, week, options) {
+function ensurePPLRearDelts(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Pull|Back/i.test(session.sessionTag || '')) return;
   const excluded = new Set(options.excludedMuscles || []);
@@ -1375,9 +1375,9 @@ function ensurePPLRearDelts(session, week, options) {
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('shoulders')) return;
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
-  const working = session.exercises.filter((e) => !e.warmupActivator);
+  const working = session.exercises.filter((e: any) => !e.warmupActivator);
   if (working.length >= maxEx) return;
-  const rear = working.filter((e) => e.muscle === 'shoulders' && /задн.*дельт|rear|обратн.*разведен|reverse.*fly|лиц.*тяга|face.?pull|махи.*наклон/i.test(e.name || ''));
+  const rear = working.filter((e: any) => e.muscle === 'shoulders' && /задн.*дельт|rear|обратн.*разведен|reverse.*fly|лиц.*тяга|face.?pull|махи.*наклон/i.test(e.name || ''));
   if (rear.length === 0) {
     const heavy = { name: 'Тяга к лицу (face pull)', id: 'face_pull' };
     const fly = { name: 'Махи в наклоне на заднюю дельту', id: 'rear_delt_fly' };
@@ -1415,7 +1415,7 @@ function ensurePPLRearDelts(session, week, options) {
     }
     const w = (options.workMax && options.workMax.shoulders) || 40;
     const fbName = existing.name === 'Махи в наклоне на заднюю дельту' ? 'Тяга к лицу (face pull)' : 'Махи в наклоне на заднюю дельту';
-    if (!working.some((e)=> e.name===fbName) && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!working.some((e: any) => e.name===fbName) && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'shoulders', name: fbName, exerciseName: fbName, role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
@@ -1425,7 +1425,7 @@ function ensurePPLRearDelts(session, week, options) {
     }
     return;
   }
-  let total = rear.reduce((s, x) => s + (x.sets || 0), 0);
+  let total = rear.reduce((s: any, x: any) => s + (x.sets || 0), 0);
   if (total < 5) {
     const need = 5 - total;
     const first = rear[0];
@@ -1434,13 +1434,13 @@ function ensurePPLRearDelts(session, week, options) {
     first.sets += need;
   } else if (total > 7) {
     let over = total - 7;
-    for (const ex of rear.sort((a, b) => (b.sets || 0) - (a.sets || 0))) {
+    for (const ex of rear.sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))) {
       while (over > 0 && ex.sets > 2) { ex.sets--; ex.workSets.pop(); over--; }
       if (over <= 0) break;
     }
   }
 }
-function ensurePPLBiceps(session, week, options) {
+function ensurePPLBiceps(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Pull|Back/i.test(session.sessionTag || '')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
@@ -1448,7 +1448,7 @@ function ensurePPLBiceps(session, week, options) {
   if ((options.excludedMuscles || []).includes('biceps')) return;
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
-  const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'biceps');
+  const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'biceps');
   const w = (options.workMax && options.workMax.biceps) || 40;
   if (working.length === 0) {
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
@@ -1477,9 +1477,9 @@ function ensurePPLBiceps(session, week, options) {
       for (let i = 0; i < need; i++) existing.workSets.push({ ...sample });
       existing.sets = 5;
     }
-    const pumpExists = working.some((e) => /блок|cable/i.test(e.name));
+    const pumpExists = working.some((e: any) => /блок|cable/i.test(e.name));
     const fbName = pumpExists ? 'Подъём штанги на бицепс стоя' : 'Сгибание рук на блоке (бицепс)';
-    if (!session.exercises.some((e)=> e.name===fbName) && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.name===fbName) && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'biceps', name: fbName, exerciseName: fbName, role: 'accessory', character: pumpExists ? 'тяж' : 'памп',
         sets: 5, repsRange: pumpExists ? [8, 12] : [12, 18], rir: pumpExists ? 2 : 3, restSeconds: pumpExists ? 90 : 60, warmupSets: [],
@@ -1489,7 +1489,7 @@ function ensurePPLBiceps(session, week, options) {
     }
     return;
   }
-  let total = working.reduce((s, x) => s + (x.sets || 0), 0);
+  let total = working.reduce((s: any, x: any) => s + (x.sets || 0), 0);
   if (total < 10) {
     const need = 10 - total;
     const target = working[0];
@@ -1498,13 +1498,13 @@ function ensurePPLBiceps(session, week, options) {
     target.sets += need;
   } else if (total > 10) {
     let over = total - 10;
-    for (const ex of working.sort((a, b) => (b.sets || 0) - (a.sets || 0))) {
+    for (const ex of working.sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))) {
       while (over > 0 && ex.sets > 3) { ex.sets--; ex.workSets.pop(); over--; }
       if (over <= 0) break;
     }
   }
 }
-function ensurePPLTriceps(session, week, options) {
+function ensurePPLTriceps(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Push|Chest/i.test(session.sessionTag || '')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
@@ -1512,7 +1512,7 @@ function ensurePPLTriceps(session, week, options) {
   if ((options.excludedMuscles || []).includes('triceps')) return;
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
-  const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'triceps');
+  const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'triceps');
   const w = (options.workMax && options.workMax.triceps) || 50;
   if (working.length === 0) {
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
@@ -1533,7 +1533,7 @@ function ensurePPLTriceps(session, week, options) {
     }
     return;
   }
-  const hasOverhead = working.some((e) => /из.?за.*голов|overhead|француз|french/i.test(e.name || ''));
+  const hasOverhead = working.some((e: any) => /из.?за.*голов|overhead|француз|french/i.test(e.name || ''));
   if (!hasOverhead && working.length < 3 && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
     session.exercises.push({
       muscle: 'triceps', name: 'Французский жим лёжа (EZ-гриф)', exerciseName: 'Французский жим лёжа (EZ-гриф)', role: 'accessory', character: 'тяж',
@@ -1542,7 +1542,7 @@ function ensurePPLTriceps(session, week, options) {
       rationale: 'PPL Push: overhead добавлен',
     });
   }
-  const hasPump = working.some((e) => /блок|pushdown|канат/i.test(e.name || ''));
+  const hasPump = working.some((e: any) => /блок|pushdown|канат/i.test(e.name || ''));
   if (!hasPump && working.length < 3 && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
     session.exercises.push({
       muscle: 'triceps', name: 'Разгибание рук на блоке (канат)', exerciseName: 'Разгибание рук на блоке (канат)', role: 'accessory', character: 'памп',
@@ -1551,7 +1551,7 @@ function ensurePPLTriceps(session, week, options) {
       rationale: 'PPL Push: памп добавлен',
     });
   }
-  let total = session.exercises.filter((e) => e.muscle === 'triceps' && !e.warmupActivator).reduce((s, x) => s + (x.sets || 0), 0);
+  let total = session.exercises.filter((e: any) => e.muscle === 'triceps' && !e.warmupActivator).reduce((s: any, x: any) => s + (x.sets || 0), 0);
   if (total < 10) {
     const need = 10 - total;
     const target = working[0];
@@ -1560,13 +1560,13 @@ function ensurePPLTriceps(session, week, options) {
     target.sets += need;
   } else if (total > 12) {
     let over = total - 12;
-    for (const ex of working.sort((a, b) => (b.sets || 0) - (a.sets || 0))) {
+    for (const ex of working.sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0))) {
       while (over > 0 && ex.sets > 3) { ex.sets--; ex.workSets.pop(); over--; }
       if (over <= 0) break;
     }
   }
 }
-function ensurePPLCalves(session, week, options) {
+function ensurePPLCalves(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Legs|Lower/i.test(session.sessionTag || '')) return;
   const excluded = new Set(options.excludedMuscles || []);
@@ -1575,12 +1575,12 @@ function ensurePPLCalves(session, week, options) {
   if (donors.has('calves')) return;
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
-  const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'calves');
+  const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'calves');
   const w = (options.workMax && options.workMax.calves) || 60;
   // hardcoded fallback ensures spec even if catalog filtered (equipment/mobility)
   // standing/seated already use hardcoded names, no findCatalogCandidate needed
-  let standing = working.find((e) => /подъём.*носк.*стоя|подъем.*носк.*стоя|standing.*calf|жим.*ног.*носк|leg.?press.*calf|ослик/i.test(e.name || ''));
-  let seated = working.find((e) => /подъём.*носк.*сидя|подъем.*носк.*сидя|seated.*calf|сидя/i.test(e.name || ''));
+  let standing = working.find((e: any) => /подъём.*носк.*стоя|подъем.*носк.*стоя|standing.*calf|жим.*ног.*носк|leg.?press.*calf|ослик/i.test(e.name || ''));
+  let seated = working.find((e: any) => /подъём.*носк.*сидя|подъем.*носк.*сидя|seated.*calf|сидя/i.test(e.name || ''));
   if (!standing) {
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
@@ -1608,7 +1608,7 @@ function ensurePPLCalves(session, week, options) {
     while(seated.workSets.length<4) seated.workSets.push({...seated.workSets[0]});
   }
 }
-function ensurePPLChest(session, week, options) {
+function ensurePPLChest(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Push|Chest/i.test(session.sessionTag || '')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
@@ -1616,8 +1616,8 @@ function ensurePPLChest(session, week, options) {
   if ((options.excludedMuscles || []).includes('chest')) return;
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
-  const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'chest');
-  const hasIncline = working.some((e) => /наклон|incline/i.test(e.name || ''));
+  const working = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'chest');
+  const hasIncline = working.some((e: any) => /наклон|incline/i.test(e.name || ''));
   if (!hasIncline) {
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       const w = (options.workMax && options.workMax.chest) || 80;
@@ -1630,7 +1630,7 @@ function ensurePPLChest(session, week, options) {
       });
     }
   }
-  const hasHorizontal = session.exercises.filter((e) => e.muscle === 'chest' && !e.warmupActivator).some((e) => /жим.*(лёжа|лежа|гориз)|bench.*press/i.test(e.name || '') && !/наклон|incline/i.test(e.name || ''));
+  const hasHorizontal = session.exercises.filter((e: any) => e.muscle === 'chest' && !e.warmupActivator).some((e: any) => /жим.*(лёжа|лежа|гориз)|bench.*press/i.test(e.name || '') && !/наклон|incline/i.test(e.name || ''));
   if (!hasHorizontal) {
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       const w = (options.workMax && options.workMax.chest) || 80;
@@ -1642,7 +1642,7 @@ function ensurePPLChest(session, week, options) {
       });
     }
   }
-  const flyCount = session.exercises.filter((e) => e.muscle === 'chest' && !e.warmupActivator && /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч/i.test(e.name || '')).length;
+  const flyCount = session.exercises.filter((e: any) => e.muscle === 'chest' && !e.warmupActivator && /развод|fly|crossover|кроссов|сведен|пек.?дек|бабоч/i.test(e.name || '')).length;
   if (flyCount < 1) {
     if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       const w = (options.workMax && options.workMax.chest) || 80;
@@ -1655,7 +1655,7 @@ function ensurePPLChest(session, week, options) {
     }
   }
 }
-function ensurePPLBack(session, week, options) {
+function ensurePPLBack(session: any, week: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!/Pull|Back/i.test(session.sessionTag || '')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
@@ -1663,14 +1663,14 @@ function ensurePPLBack(session, week, options) {
   if ((options.excludedMuscles || []).includes('back')) return;
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
-  const workingPullovers = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'back' && /пулловер|pullover|прям.*рук/i.test(e.name || ''));
+  const workingPullovers = session.exercises.filter((e: any) => !e.warmupActivator && e.muscle === 'back' && /пулловер|pullover|прям.*рук/i.test(e.name || ''));
   if (workingPullovers.length > 0) {
     for (const ex of workingPullovers) {
       ex.name = 'Тяга верхнего блока широким хватом'; ex.exerciseName = 'Тяга верхнего блока широким хватом';
       ex.rationale = 'PPL Pull: пулловер только разминка, заменён на тягу';
     }
   }
-  if (!session.exercises.some((e) => e.warmupActivator)) {
+  if (!session.exercises.some((e: any) => e.warmupActivator)) {
     const w = (options.workMax && options.workMax.back) || 60;
     session.exercises.unshift({
       muscle: 'back', name: 'Пуловер на блоке с верёвкой', exerciseName: 'Пуловер на блоке с верёвкой', role: 'accessory', character: 'памп',
@@ -1679,9 +1679,9 @@ function ensurePPLBack(session, week, options) {
       rationale: 'PPL Pull: разминка канат-пулловер в кроссовере',
     });
   }
-  const hasWideOrParallel = session.exercises.filter((e) => e.muscle === 'back' && !e.warmupActivator).some((e) => /широк|wide|параллел|parallel|v.?bar/i.test(e.name || ''));
+  const hasWideOrParallel = session.exercises.filter((e: any) => e.muscle === 'back' && !e.warmupActivator).some((e: any) => /широк|wide|параллел|parallel|v.?bar/i.test(e.name || ''));
   if (!hasWideOrParallel) {
-    const target = session.exercises.find((e) => e.muscle === 'back' && !e.warmupActivator);
+    const target = session.exercises.find((e: any) => e.muscle === 'back' && !e.warmupActivator);
     if (target) {
       target.name = 'Тяга верхнего блока широким хватом'; target.exerciseName = 'Тяга верхнего блока широким хватом'; target.rationale = 'PPL Pull: широкий/параллельный хват обязателен';
     } else if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
@@ -1696,22 +1696,22 @@ function ensurePPLBack(session, week, options) {
     }
   }
 }
-function ensurePPLLegs(session, week, options, heavyQuads) {
+function ensurePPLLegs(session: any, week: any, options: BBFinalizeOptions, heavyQuads: any) {
   if (options.preserveSource) return;
   if (!/Legs|Lower/i.test(session.sessionTag || '')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   const excluded = new Set(options.excludedMuscles || []);
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
-  const hasRomanian = session.exercises.some((e) => /румын|rdl/i.test(e.name || ''));
-  const hasDead = session.exercises.some((e) => /мёртв|мертв/i.test(e.name || '') && !/румын|rdl/i.test(e.name || ''));
+  const hasRomanian = session.exercises.some((e: any) => /румын|rdl/i.test(e.name || ''));
+  const hasDead = session.exercises.some((e: any) => /мёртв|мертв/i.test(e.name || '') && !/румын|rdl/i.test(e.name || ''));
   if (hasRomanian && hasDead) {
-    const deadEx = session.exercises.find((e) => /мёртв|мертв|deadlift/i.test(e.name || '') && !/румын|rdl/i.test(e.name || ''));
+    const deadEx = session.exercises.find((e: any) => /мёртв|мертв|deadlift/i.test(e.name || '') && !/румын|rdl/i.test(e.name || ''));
     if (deadEx) { deadEx.name = 'Сгибания ног в тренажёре лёжа'; deadEx.exerciseName = 'Сгибания ног в тренажёре лёжа'; deadEx.muscle = 'hamstrings'; }
   }
   if (heavyQuads) {
     const wHam = (options.workMax && options.workMax.hamstrings) || 60;
-    if (!session.exercises.some((e)=> e.muscle==='hamstrings' && /румын|rdl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='hamstrings' && /румын|rdl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'hamstrings', name: 'Румынская тяга', exerciseName: 'Румынская тяга', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 75, warmupSets: [],
@@ -1719,7 +1719,7 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
         rationale: 'PPL Legs (квадр-день): румынская тяга лёгкая 3×12-18',
       });
     }
-    if (!session.exercises.some((e)=> e.muscle==='hamstrings' && /сгибан.*ног|leg.?curl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='hamstrings' && /сгибан.*ног|leg.?curl/i.test(e.name||'')) && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'hamstrings', name: 'Сгибания ног в тренажёре лёжа', exerciseName: 'Сгибания ног в тренажёре лёжа', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
@@ -1727,7 +1727,7 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
         rationale: 'PPL Legs (квадр-день): сгибания ног обязательны 3×12-18',
       });
     }
-    if (session.exercises.filter((e) => e.muscle === 'hamstrings' && !e.warmupActivator).length < 3 && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator).length < 3 && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'hamstrings', name: 'Гиперэкстензия (45°)', exerciseName: 'Гиперэкстензия (45°)', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 18], rir: 3, restSeconds: 60, warmupSets: [],
@@ -1735,12 +1735,12 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
         rationale: 'PPL Legs (квадр-день): третье сведение/гиперэкстензия',
       });
     }
-    for (const ex of session.exercises.filter((e) => e.muscle === 'hamstrings' && !e.warmupActivator)) {
+    for (const ex of session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator)) {
       ex.character = 'памп'; ex.rir = 3; if (ex.repsRange && ex.repsRange[0] < 10) ex.repsRange = [12, 18];
     }
   } else {
     const wQuad = (options.workMax && options.workMax.quads) || 80;
-    if (!session.exercises.some((e)=> e.muscle==='quads' && /жим.*ног|leg.?press/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='quads' && /жим.*ног|leg.?press/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'quads', name: 'Жим ногами (45°)', exerciseName: 'Жим ногами (45°)', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 20], rir: 3, restSeconds: 75, warmupSets: [],
@@ -1748,7 +1748,7 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
         rationale: 'PPL Legs (хам-день): квадры жим ногами лёгкий памп',
       });
     }
-    if (!session.exercises.some((e)=> e.muscle==='quads' && /разгибан.*ног|leg.?extension/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (!session.exercises.some((e: any) => e.muscle==='quads' && /разгибан.*ног|leg.?extension/i.test(e.name||'')) && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'quads', name: 'Разгибания ног в тренажёре', exerciseName: 'Разгибания ног в тренажёре', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 20], rir: 3, restSeconds: 60, warmupSets: [],
@@ -1756,7 +1756,7 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
         rationale: 'PPL Legs (хам-день): квадры разгибания лёгкие',
       });
     }
-    if (session.exercises.filter((e) => e.muscle === 'quads' && !e.warmupActivator).length < 3 && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
+    if (session.exercises.filter((e: any) => e.muscle === 'quads' && !e.warmupActivator).length < 3 && !excluded.has('quads') && !donors.has('quads') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       session.exercises.push({
         muscle: 'quads', name: 'Выпады с гантелями', exerciseName: 'Выпады с гантелями', role: 'accessory', character: 'памп',
         sets: 3, repsRange: [12, 20], rir: 3, restSeconds: 60, warmupSets: [],
@@ -1764,10 +1764,10 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
         rationale: 'PPL Legs (хам-день): квадры третье лёгкое',
       });
     }
-    for (const ex of session.exercises.filter((e) => e.muscle === 'quads' && !e.warmupActivator)) {
+    for (const ex of session.exercises.filter((e: any) => e.muscle === 'quads' && !e.warmupActivator)) {
       ex.character = 'памп'; ex.rir = 3;
     }
-    const hasWell = session.exercises.filter((e) => e.muscle === 'hamstrings' && !e.warmupActivator).some((e) => /колодец|well.?squat|гакк.*бицепс|hack.*ham/i.test(e.name || ''));
+    const hasWell = session.exercises.filter((e: any) => e.muscle === 'hamstrings' && !e.warmupActivator).some((e: any) => /колодец|well.?squat|гакк.*бицепс|hack.*ham/i.test(e.name || ''));
     if (!hasWell && !excluded.has('hamstrings') && !donors.has('hamstrings') && session.exercises.filter((e: any) => !(e as any).warmupActivator).length < maxEx) {
       const wHam = (options.workMax && options.workMax.hamstrings) || 60;
       session.exercises.unshift({
@@ -1779,12 +1779,12 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
     }
   }
 }
-function applyPPLRules(plan, options) {
+function applyPPLRules(plan: any, options: BBFinalizeOptions) {
   if (options.preserveSource) return;
   if (!isPPLPattern(options, plan)) return;
   for (const week of plan.weeks) {
     if ((week && week.phase) === 'deload' || (week && week.deload)) continue;
-    const weekLegs = (week.sessions || []).filter((s) => /Legs|Lower/i.test(s.sessionTag || ''));
+    const weekLegs = (week.sessions || []).filter((s: any) => /Legs|Lower/i.test(s.sessionTag || ''));
     for (const session of week.sessions) {
       const tag = session.sessionTag || '';
       if (/Push|Chest/i.test(tag)) {
@@ -1797,7 +1797,7 @@ function applyPPLRules(plan, options) {
         ensurePPLBiceps(session, week, options);
       } else if (/Legs|Lower/i.test(tag)) {
         ensurePPLCalves(session, week, options);
-        const legIndex = weekLegs.findIndex((s) => s === session);
+        const legIndex = weekLegs.findIndex((s: any) => s === session);
         const heavyQuads = legIndex >= 0 ? legIndex % 2 === 0 : (session.day || 1) % 2 === 1;
         ensurePPLLegs(session, week, options, heavyQuads);
       }
@@ -2032,6 +2032,7 @@ export interface BBFinalizeOptions {
   maxWorkingSets?: number;
   maxExercises?: number;
   trainingYears?: number;
+  patternId?: string;
   /** Способность к bodyweight-упражнениям — фильтр подтягиваний при allocation. */
   bodyweightCapability?: {
     pullUpsStrict?: number;
@@ -2470,7 +2471,7 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
       const mevDeficit = Math.max(0, mev - effectiveSets);
       return { muscle, landmarks, effectiveSets, target, targetSets, deficit, mevDeficit };
     }).filter(item => item.landmarks && item.mevDeficit > 0)
-      .sort((a, b) => b.deficit - a.deficit || b.mevDeficit - a.mevDeficit);
+      .sort((a: any, b: any) => b.deficit - a.deficit || b.mevDeficit - a.mevDeficit);
 
     for (const { muscle, landmarks, effectiveSets, target } of deficitByMuscle) {
       if (!landmarks || effectiveSets >= landmarks.mev) continue;
@@ -2569,7 +2570,7 @@ function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalize
             if (derivePattern(candidate) === pattern && equipmentOf(candidate.name) === equipmentOf(exercise.name)) return false;
             return candidate.type === 'isolation' || (exercise as any).type === 'compound' || (exercise as any).exerciseType === 'compound';
             })
-            .sort((a, b) => replacementScore(b) - replacementScore(a))[0];
+            .sort((a: any, b: any) => replacementScore(b) - replacementScore(a))[0];
           if (replacement) {
             const oldName = exercise.name;
             const oldEquipment = equipmentOf(oldName);
@@ -2623,7 +2624,7 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
     if (!unsafe) continue;
     const replacement = EXERCISE_CATALOG
       .filter(candidate => bbExerciseTier(candidate) <= 2 && trueMuscleOf(candidate) === exercise.muscle && !excludedExercises.has(candidate.id) && !excludedExercises.has(candidate.name) && !excludedMuscles.has(candidate.group) && !isAxialLoadExercise(candidate as any) && !isMobilityRestricted(candidate, options.mobilityRestrictions) && equipmentAllowed(candidate))
-      .sort((a, b) => (exercise.role === 'primary' ? (bbExerciseTier(a) - bbExerciseTier(b)) : ((a.type === 'isolation' ? 0 : 1) - (b.type === 'isolation' ? 0 : 1))))[0];
+      .sort((a: any, b: any) => (exercise.role === 'primary' ? (bbExerciseTier(a) - bbExerciseTier(b)) : ((a.type === 'isolation' ? 0 : 1) - (b.type === 'isolation' ? 0 : 1))))[0];
     if (!replacement) continue;
     const oldName = exercise.name;
     exercise.name = replacement.name;
@@ -3423,8 +3424,8 @@ for (const week of next.weeks) {
         if (need <= 0) continue;
         // Изоляции в первую очередь (памп-сеты ценности ниже), по всем сессиям.
         const candidates = week.sessions.flatMap(s => s.exercises.filter((e: any) => !(e as any).warmupActivator && e.muscle === muscle && e.sets > 2));
-        const isolations = candidates.filter(e => isIsolationName(e.name || '')).sort((a, b) => (a.sets || 0) - (b.sets || 0));
-        const others = candidates.filter(e => !isIsolationName(e.name || '')).sort((a, b) => (a.sets || 0) - (b.sets || 0));
+        const isolations = candidates.filter(e => isIsolationName(e.name || '')).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        const others = candidates.filter(e => !isIsolationName(e.name || '')).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         for (const e of [...isolations, ...others]) {
           if (need <= 0) break;
           while (need > 0 && e.sets > 2) {

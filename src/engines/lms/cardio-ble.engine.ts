@@ -25,8 +25,7 @@ export async function connectBleHr(onHr: (hr: number) => void, onState: (s: BleH
     const server = await (device as unknown as { gatt?: { connect: () => Promise<BluetoothRemoteGATTServer> } }).gatt?.connect();
     if (!server) throw new Error('GATT connect failed');
     const service = await (server as unknown as { getPrimaryService: (uuid: string) => Promise<BluetoothRemoteGATTService> }).getPrimaryService('heart_rate');
-    const char = await (service as unknown as { getCharacteristic: (uuid: string) => Promise<BluetoothRemoteGATTCharacteristic> }).getCharacteristic('heart_rate_measurement');
-    // @ts-ignore
+    const char = await (service as unknown as { getCharacteristic: (uuid: string) => Promise<BluetoothRemoteGATTCharacteristic> }).getCharacteristic('heart_rate_measurement') as unknown as { startNotifications: () => Promise<void>; addEventListener: (t: string, h: (ev: Event) => void) => void; removeEventListener: (t: string, h: (ev: Event) => void) => void };
     await char.startNotifications();
     const handler = (ev: Event) => {
       const v = (ev.target as unknown as { value: DataView }).value;
@@ -38,7 +37,6 @@ export async function connectBleHr(onHr: (hr: number) => void, onState: (s: BleH
         onState({ connected: true, deviceName: device.name ?? 'HR sensor', hr });
       }
     };
-    // @ts-ignore
     char.addEventListener('characteristicvaluechanged', handler);
     onState({ connected: true, deviceName: device.name ?? 'HR sensor' });
     const disconnect = () => {
