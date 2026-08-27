@@ -1782,7 +1782,13 @@ export function bumpCardioZone2VolumeGuarded(cycle: CardioCycle, addMin = 10, da
 // ─── История версий цикла (undo авто-подстройки/правок) ───
 
 export const CARDIO_HISTORY_KEY = 'he_cardio_cycle_history';
-const CARDIO_HISTORY_CAP = 5;
+const CARDIO_HISTORY_CAP = 20;
+export const CARDIO_UI_PREFS_KEY = 'he_cardio_ui_prefs';
+export interface CardioUiPrefs { filters?: Record<string, string>; lastTab?: string }
+export function loadCardioUiPrefs(): CardioUiPrefs {
+  try { const v = JSON.parse(localStorage.getItem(CARDIO_UI_PREFS_KEY) ?? 'null'); return v && typeof v === 'object' ? v as CardioUiPrefs : {}; } catch { return {}; }
+}
+export function saveCardioUiPrefs(p: CardioUiPrefs): void { try { localStorage.setItem(CARDIO_UI_PREFS_KEY, JSON.stringify(p)); } catch { /* ignore */ } }
 
 export interface CardioCycleVersion {
   id: string;
