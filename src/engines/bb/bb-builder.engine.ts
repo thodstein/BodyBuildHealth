@@ -17,6 +17,7 @@ import { SPLIT_PATTERNS, getPattern, sessionsOf, type SplitPattern, type Schedul
 import { FORCE_HEAVY_GROUPS, resolveCharacter, TAG_MUSCLES, type DayCharacter, type MuscleSlot } from './bb-day-types';
 import { getAllVolumeLandmarks, landmarksForRotation, getVolumeLandmarks, normLevel, type TrainingLevel, type MuscleVolumeLandmarks } from '../volume-landmarks.engine';
 import { tempoFor, REST_BY_CHARACTER, type TempoSpec } from './bb-tempo-rest';
+import { aggregateBBVolume, computeMuscleBalance } from './bb-volume.engine';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { selectExercisesSmart, isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern';
@@ -3314,6 +3315,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   ];
 
   const basePlan: BBPlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale, volumeTargets };
+  // Баланс мышц — проф-отчёт (не меняет объём, только rationale)
+  try {
+    const weeklyAgg = aggregateBBVolume(weeks[0]?.sessions || []);
+    const effMap: Record<string, { effectiveSets: number }> = {};
+    for (const [k, v] of Object.entries(weeklyAgg)) effMap[k] = { effectiveSets: (v as any).effectiveSets };
+    const bal = computeMuscleBalance(effMap);
+    if (bal.issues.length) rationale.push(...bal.issues.map(s => `⚖️ Баланс: ${s} (ratio ${Object.entries(bal.ratios).map(([kk, vv]) => `${kk}=${vv}`).join(', ')})`));
+  } catch {}
   if (pedAdapt) {
     basePlan.pedAdaptation = {
       combinedMrvMultiplier: pedAdapt.combinedMrvMultiplier,

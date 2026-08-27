@@ -3740,7 +3740,7 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
                 <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Формула каждого фактора — ниже</div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Суставы — детально в инструменте ниже</div>
               </div>
             </div>
             {/* Factor breakdown with calculations */}
@@ -4058,13 +4058,25 @@ export const BbAutoConstructor: React.FC = () => {
             return s;
           };
           const shown = rationale.map(clean).filter(Boolean);
+          const keyPoints = shown.slice(0, 5);
+          const rest = shown.slice(5);
           return (
-            <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой (все пункты)</div>
-              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                {shown.map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
-              </div>
-            </div>
+            <ExpandableCard
+              title={`🧠 Логика построения — ${shown.length} пунктов`}
+              icon="🧠"
+              short={keyPoints.slice(0,3).join(' · ') || '—'}
+              full={
+                <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                  {shown.map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
+                  <div style={{ marginTop:6, fontSize:9, color:'#fff', opacity:0.6, display:'flex', flexWrap:'wrap', gap:4 }}>
+                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{bbLevel}</span>
+                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{bbGoal}</span>
+                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{bbTrainingFocus}</span>
+                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{builtPlan.pattern?.name}</span>
+                  </div>
+                </div>
+              }
+            />
           );
         })()}
         {/* Прогноз по фазам — факт из плана */}
@@ -4143,124 +4155,8 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* Прогрессия весов по неделям (основные упражнения) — факт из плана */}
-        {(() => {
-          const totalW = W.length;
-          const cols = Math.min(8, totalW);
-          const primaryExs = new Map<string, { name: string; muscle: string; weights: number[] }>();
-          for (const w of W) {
-            for (const s of w.sessions) {
-              for (const e of s.exercises) {
-                if (e.role !== 'primary') continue;
-                const key = e.name;
-                if (!primaryExs.has(key)) primaryExs.set(key, { name: e.name, muscle: e.muscle, weights: new Array(totalW).fill(0) });
-                const rec = primaryExs.get(key)!;
-                rec.weights[w.week - 1] = e.workSets[0]?.weight || 0;
-              }
-            }
-          }
-          if (primaryExs.size === 0) return null;
-          const top = [...primaryExs.values()].filter(e => e.weights.some(w => w > 0)).slice(0, 6);
-          if (top.length === 0) return null;
-          return (
-            <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>📈 Прогрессия весов (кг) по неделям — факт плана</div>
-              <div style={{ overflowX:'auto' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, minWidth: cols*40+120 }}>
-                  <span style={{ fontWeight:700, color:'#fff' }}>Упражнение</span>
-                  {Array.from({ length: cols }, (_, i) => (
-                    <span key={i} style={{ fontWeight:700, color:'#fff', textAlign:'center' }}>{i+1}</span>
-                  ))}
-                </div>
-                {top.map(ex => {
-                  const weights = ex.weights.slice(0, cols);
-                  const first = weights.find(w => w > 0) || 0;
-                  const last = weights.filter(w => w > 0).pop() || first;
-                  const delta = last > first ? '+' + (last - first) : '';
-                  return (
-                    <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, padding:'2px 0', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
-                      <span style={{ fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={ex.name}>{ex.name.substring(0, 18)}</span>
-                      {weights.map((w, wi) => {
-                        const prev = wi > 0 ? weights[wi-1] : 0;
-                        const up = prev > 0 && w > prev;
-                        const down = prev > 0 && w < prev;
-                        return (
-                          <span key={wi} style={{
-                            textAlign:'center', fontWeight: w > 0 ? 700 : 400,
-                            color: w > 0 ? (up ? '#22c55e' : down ? '#ef4444' : '#f59e0b') : 'rgba(255,255,255,0.2)',
-                          }}>{w > 0 ? w : '—'}</span>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop:4, fontSize:10, color:'#fff', display:'flex', gap:12 }}>
-                <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span>
-              </div>
-              {totalW > 8 && <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Показаны первые 8 нед из {totalW}</div>}
-            </div>
-          );
-        })()}
-        {/* Мусорный объём — полностью на русском, проверка с учётом всех выбранных параметров и плана */}
-        {(() => {
-          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears, focusGroup: '', specialization: specializationMode, specializationTargets: specTargets });
-          const ruMuscleG = (m: string) => (MUSCLE_LABEL_RU as any)[m] || m;
-          const ruReason = (r: string) => r
-            .replace(/Дублирование паттерна (\S+) для (\S+)/, 'Дубль изоляции «$1» для «$2» — в одной сессии достаточно одной')
-            .replace(/Мышца (\S+) не входит в тег сессии (\S+)/, 'Мышца «$1» не входит в день «$2» — проверьте совместимость сплита с выбранными группами');
-          const paramChips: string[] = [];
-          paramChips.push(`уровень ${bbLevel}`);
-          if (bbTrainingYears!==undefined) paramChips.push(`стаж ${bbTrainingYears}л`);
-          paramChips.push(`цель ${bbGoal}`);
-          paramChips.push(`фокус ${bbTrainingFocus}`);
-          paramChips.push(`методика ${bbMethodology}`);
-          paramChips.push(`сплит ${builtPlan.pattern?.name || builtPlan.pattern?.id || '—'}`);
-          paramChips.push(`объём ${bbVolGoal}${trainingVolumeMode==='high'?' (объёмный)':''}`);
-          if (weakPoints.length) paramChips.push(`слабые: ${weakPoints.join(', ')}`);
-          if (specializationMode) paramChips.push(`специализация ${specTargets.join('+')}`);
-          if (bbEquipment.length) paramChips.push(`оборудование ${bbEquipment.slice(0,3).join(', ')}${bbEquipment.length>3?'…':''}`);
-          if (injuries.length) paramChips.push(`травмы ${injuries.length}`);
-          if (garbage.length === 0) {
-            return (
-              <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(16,185,129,0.04))', border:'1px solid rgba(34,197,94,0.18)', position:'relative', overflow:'hidden' }}>
-                <div style={{ position:'absolute', top:-12, right:-12, width:80, height:80, borderRadius:80, background:'radial-gradient(circle, rgba(34,197,94,0.12), transparent 70%)' }} />
-                <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', display:'flex', alignItems:'center', gap:6 }}>🗑 Мусорный объём: чисто ✅ <span style={{ fontSize:10, fontWeight:600, color:'#22c55e', background:'rgba(34,197,94,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(34,197,94,0.22)' }}>соответствует параметрам</span></div>
-                <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>Дублей изоляций не найдено. Для слабых/фокусных групп повтор паттерна допустим — учтена каноника <span style={{ fontFamily:'ui-monospace, monospace', background:'rgba(255,255,255,0.06)', padding:'1px 4px', borderRadius:4 }}>chest_upper→chest, delt_mid→shoulders</span>. Икры «стоя+сидя» — по дизайну 2 разных упражнения, не дубль. Проверка: compound-паттерны (жим/тяга/присед) — не считаются мусором (разные углы — норма).</div>
-                <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
-                  {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
-                </div>
-                <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>{`Логика: detectGarbageVolume(weeks, weakPoints, {level, trainingYears, focusGroup: '', specialization}) → warmup исключён, back по classifyBackExercise, compound исключён, seenPatterns per session, слабые/фокус — скип.`}</div>
-              </div>
-            );
-          }
-          return (
-            <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.04))', border:'1px solid rgba(239,68,68,0.18)', position:'relative', overflow:'hidden' }}>
-              <div style={{ position:'absolute', top:-10, right:-10, width:90, height:90, borderRadius:90, background:'radial-gradient(circle, rgba(239,68,68,0.12), transparent 70%)' }} />
-              <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', display:'flex', alignItems:'center', gap:8 }}>🗑 Мусорный объём: найдено {garbage.length} <span style={{ fontSize:10, fontWeight:600, color:'#ef4444', background:'rgba(239,68,68,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(239,68,68,0.22)' }}>несоответствие параметрам</span></div>
-              <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>
-                Дублирование изоляций: план содержит повторы одного паттерна для одной мышцы в одной сессии — при выбранных параметрах это избыточно. Для слабых/фокусных групп дубль <b>допустим</b> (учтена каноника), для остальных — мусор. Проверено по: {paramChips.slice(0,6).join(' · ')}{paramChips.length>6?' …':''}.
-              </div>
-              <div style={{ marginTop:8, display:'grid', gap:6 }}>
-                {garbage.slice(0, 6).map((g, i) => (
-                  <div key={i} style={{ display:'flex', gap:8, alignItems:'flex-start', padding:'7px 9px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)' }}>
-                    <span style={{ flexShrink:0, width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', color:'#ef4444', fontWeight:800, fontSize:11 }}>{i+1}</span>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{g.exerciseName} <span style={{ fontWeight:400, opacity:0.7 }}>· {ruMuscleG(g.muscle)} · {g.sessionTag || 'день'}</span></div>
-                      <div style={{ fontSize:10, color:'#fbbf24', marginTop:2 }}>{ruReason(g.reason)}</div>
-                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>Исправление: заменить на другой угол/хват или убрать (для слабых — оставить, если цель — специализация).</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {garbage.length > 6 && <div style={{ marginTop:6, fontSize:11, color:'#fff', textAlign:'center', opacity:0.7 }}>…и ещё {garbage.length - 6} — откройте план, проверьте сессии</div>}
-              <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
-                {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
-              </div>
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Формула: per session seenPatterns[day-muscle-pattern] → если дубль && !isWeak && !calvesByDesign → мусор. isWeak учитывает weakPoints+focusGroup+specializationTargets.</div>
-            </div>
-          );
-        })()}
+        {/* Прогрессия весов — доступна в Шаге 4 (календарь и график тоннажа), дубль убран */}
+        {/* Мусорный объём — проверка дублей — компактно в Рекомендациях (дубль убран) */}
         {/* Рекомендации — единственные, детали уже в них (quality.details убраны как дубль) */}
         {quality.recommendations && quality.recommendations.length > 0 && (
           <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
@@ -4297,31 +4193,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Load assessment */}
-        <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 Оценка тренировочной нагрузки</div>
-          {!ratio ? <div style={SMALL}>Недостаточно данных sRPE для расчёта ACWR. Ведите дневник тренировок.</div> : (
-            <div>
-              <div style={{ display:'flex', gap:12, alignItems:'center' }}>
-                <span style={SMALL}>ACWR: <b style={{ color:ratio.ratio>1.5?'#ef4444':ratio.ratio>1.3?'#eab308':'#22c55e', fontSize:14 }}>{ratio.ratio.toFixed(2)}</b></span>
-                <span style={{ padding:'3px 8px', borderRadius:8, fontSize:11, fontWeight:700, background:ratio.zone==='dangerous'?'rgba(239,68,68,0.15)':ratio.zone==='caution'?'rgba(234,179,8,0.15)':'rgba(34,197,94,0.15)', color:ratio.zone==='dangerous'?'#ef4444':ratio.zone==='caution'?'#eab308':'#22c55e' }}>{ratio.zone === 'dangerous' ? '⛔ Опасно' : ratio.zone === 'caution' ? '⚠ Осторожно' : ratio.zone === 'optimal' ? '✅ Оптимум' : '⬇ Недотрен'}</span>
-              </div>
-              <div style={{ marginTop:6, ...SMALL }}>Хроническая нагрузка (28д) vs острая (7д). Цель: 0.8-1.3. Разгрузка при {`>`}1.5.</div>
-            </div>
-          )}
-        </div>
-        {/* Дополнительно: прогрессия мезоцикла + сценарии — свернуто по умолчанию */}
-        <ExpandableCard
-          title="🔧 Дополнительно: прогноз прогрессии и сценарии"
-          icon="🔧"
-          short="Прогрессия мезоцикла · сценарии «что если» (калории/сон/курс)"
-          full={
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
-              <WhatIfCard baseRisk={quality?.score ? 100 - quality.score : 20} baseReadiness={Math.round((linked.readiness?.recovery ?? 80))} />
-            </div>
-          }
-        />
+        {/* Load assessment и доп. сценарии убраны — ACWR в блоке фазы, детали в «Суставы и ортопедия» */}
         {/* Экспорт — фактические параметры плана */}
         {quality && (
           <div style={{ marginTop:8 }}>
