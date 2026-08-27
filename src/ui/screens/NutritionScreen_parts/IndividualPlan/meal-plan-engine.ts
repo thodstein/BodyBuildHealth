@@ -675,7 +675,8 @@ function snackCarbPool(pool: ReturnType<typeof buildFoodPools>): { carbs: FoodIt
   const fruits = pool.carbFruit.filter((f) => match(f, SNACK_FRUIT_KEYWORDS));
   return {
     carbs: carbs.length > 0 ? carbs : [...source],
-    fruits: fruits.length > 0 ? fruits : [...pool.carbFruit],
+    // No fallback to full carbFruit — prevents artichoke/potato as snack fruit (user report: "артишок + псиллиум" not nutritious)
+    fruits: fruits,
   };
 }
 function snackNutPool(pool: ReturnType<typeof buildFoodPools>): FoodItem[] {
