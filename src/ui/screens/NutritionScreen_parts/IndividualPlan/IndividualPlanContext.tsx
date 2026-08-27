@@ -3097,8 +3097,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (effectiveMealsCount >= 4) mealDefs.push({ label: 'Полдник' });
       mealDefs.push({ label: 'Ужин', anchor: Math.min(effectiveDinner, 1380) });
       if (effectiveMealsCount >= 6) mealDefs.push({ label: 'Перекус' });
-      const anchored = mealDefs.map((m, i) => {
-        if (m.anchor) return { ...m, time: m.anchor, fixed: true };
+// Training-aware: ужин и другие приёмы не ставятся во время тренировки ±60 мин
+  if (linkToTraining && isTrainingDay && trainMin > 0) {
+    const trainEnd = trainMin + 90;
+    const buffer = 60;
+    for (const m of mealDefs) {
+      if (!m.anchor) continue;
+      if (m.anchor >= trainMin - buffer && m.anchor <= trainEnd + buffer) {
+        const before = trainMin - 90;
+        const after = trainEnd + 90;
+        (m as any).anchor = m.anchor < trainMin ? Math.max(effectiveWake + 15, before) : Math.min(effectiveBed - 15, after);
+      }
+    }
+  }
+  const anchored = mealDefs.map((m, i) => {
+  if (m.anchor) return { ...m, time: m.anchor, fixed: true };
         let leftAnchorIdx = i; let leftTime = effectiveWake; while (leftAnchorIdx >= 0 && !mealDefs[leftAnchorIdx].anchor) leftAnchorIdx--; if (leftAnchorIdx >= 0) leftTime = mealDefs[leftAnchorIdx].anchor!;
         let rightAnchorIdx = i; let rightTime = effectiveBed - 30; while (rightAnchorIdx < mealDefs.length && !mealDefs[rightAnchorIdx].anchor) rightAnchorIdx++; if (rightAnchorIdx < mealDefs.length) rightTime = mealDefs[rightAnchorIdx].anchor!;
         const totalSlots = rightAnchorIdx - leftAnchorIdx; const thisSlot = i - leftAnchorIdx; let interp = totalSlots > 0 ? thisSlot / totalSlots : 0.5;
@@ -3699,6 +3712,76 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         } catch (e) { try { console.warn('[Planner] classic recipes attach failed:', e); } catch {} }
       }
     }
+    // Финальный строгий кламп ≤3% по каждому параметру и общему КБЖУ — для всех режимов
+    // (исправляет +57% в быстром и +30% жиров в про). Работает поверх V2 и classic.
+    const clampDayStrict = (day: any): any => {
+      if (!day?.meals?.length) return day;
+      const goals = { kcal: effectiveKcal||0, p: effectiveP||0, f: effectiveF||0, c: effectiveC||0 };
+      if (!goals.kcal || !goals.p) return day;
+      const maxDev = () => Math.max(
+        goals.kcal ? Math.abs(day.totals.kcal - goals.kcal)/goals.kcal : 0,
+        goals.p ? Math.abs(day.totals.p - goals.p)/goals.p : 0,
+        goals.f ? Math.abs(day.totals.f - goals.f)/goals.f : 0,
+        goals.c ? Math.abs(day.totals.c - goals.c)/goals.c : 0
+      );
+      let guard = 40;
+      while (maxDev() > 0.0301 && guard-- > 0) {
+        const totals: any = day.totals;
+        const devK = goals.kcal ? (totals.kcal - goals.kcal)/goals.kcal : 0;
+        const devP = goals.p ? (totals.p - goals.p)/goals.p : 0;
+        const devF = goals.f ? (totals.f - goals.f)/goals.f : 0;
+        const devC = goals.c ? (totals.c - goals.c)/goals.c : 0;
+        const abs: any = {k: Math.abs(devK), p: Math.abs(devP), f: Math.abs(devF), c: Math.abs(devC)};
+        let worst: 'k'|'p'|'f'|'c' = 'k'; if (abs.p > abs[worst]) worst='p'; if (abs.f > abs[worst]) worst='f'; if (abs.c > abs[worst]) worst='c';
+        let effWorst: 'p'|'f'|'c' = worst==='k' ? (abs.p>=abs.c && abs.p>=abs.f ? 'p' : abs.c>=abs.f ? 'c' : 'f') : worst as any;
+        const target = effWorst==='p'?goals.p:effWorst==='f'?goals.f:goals.c;
+        const cur = effWorst==='p'?totals.p:effWorst==='f'?totals.f:totals.c;
+        const need = target - cur;
+        if (Math.abs(need) < 0.5) break;
+        if (need < 0) {
+          let bMi=-1,bIi=-1,bScore=-1;
+          day.meals.forEach((m:any,mi:number)=> (m.items||[]).forEach((it:any,ii:number)=>{
+            const f:any = FOOD_DB.find((x:any)=>x.id===it.id);
+            const per100 = effWorst==='p' ? (f?.protein||0) : effWorst==='c' ? (f?.carbs||0) : (f?.fat||0);
+            if (per100<=0) return;
+            const score = per100 * (it.amount||0)/100;
+            if (score > bScore) {bScore=score; bMi=mi; bIi=ii;}
+          }));
+          if (bIi<0) break;
+          const it = day.meals[bMi].items[bIi];
+          const na = Math.max(10, Math.round(it.amount * 0.88));
+          if (na >= it.amount) break;
+          const r2 = na/(it.amount||1);
+          it.p = +(it.p*r2).toFixed(1); it.f = +(it.f*r2).toFixed(1); it.c = +(it.c*r2).toFixed(1);
+          it.kcal = Math.round(4*it.p + 9*it.f + 4*it.c); it.amount = na;
+          day.meals[bMi].totals = day.meals[bMi].items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
+        } else {
+          const pool = FOOD_DB.filter((f:any)=>{
+            if (f.category==='supplement' && !['whey_isolate','whey_protein','casein'].includes(f.id)) return false;
+            const v = effWorst==='p' ? (f.protein||0) : effWorst==='c' ? (f.carbs||0) : (f.fat||0);
+            return v>8;
+          }).sort((a:any,b:any)=>{
+            const av = effWorst==='p' ? (a.protein||0)/(a.kcal||1) : effWorst==='c' ? (a.carbs||0)/(a.kcal||1) : (a.fat||0)/(a.kcal||1);
+            const bv = effWorst==='p' ? (b.protein||0)/(b.kcal||1) : effWorst==='c' ? (b.carbs||0)/(b.kcal||1) : (b.fat||0)/(b.kcal||1);
+            return bv-av;
+          });
+          const best = pool[0]; if (!best) break;
+          const per100 = effWorst==='p' ? (best.protein||0) : effWorst==='c' ? (best.carbs||0) : (best.fat||0);
+          const grams = Math.min(120, Math.max(15, Math.round(need/per100*100/10)*10));
+          const r = grams/100; const p2=Math.round((best.protein||0)*r), f2=Math.round((best.fat||0)*r), c2=Math.round((best.carbs||0)*r);
+          const it:any = {id: best.id, name: best.name, amount: grams, kcal: Math.round(4*p2+9*f2+4*c2), p:p2, f:f2, c:c2, fiber: Math.round((best.fiber||0)*r)};
+          let tm = day.meals.find((m:any)=> m.label==='Перекус' || m.label==='Полдник') || day.meals[day.meals.length-1];
+          tm.items.push(it); tm.totals = tm.items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
+        }
+        day.totals = day.meals.reduce((a:any,m:any)=>({kcal:a.kcal+m.totals.kcal,p:a.p+m.totals.p,f:a.f+m.totals.f,c:a.c+m.totals.c}),{kcal:0,p:0,f:0,c:0});
+        day.totals.kcal = Math.round(day.totals.p*4 + day.totals.f*9 + day.totals.c*4);
+        day.meals.forEach((m:any)=>{ m.totals.kcal = Math.round(m.totals.p*4 + m.totals.f*9 + m.totals.c*4); });
+      }
+      return day;
+    };
+    d1 = clampDayStrict(d1);
+    if (d2) d2 = clampDayStrict(d2);
+    if (d3) d3 = clampDayStrict(d3);
     setDayPlan(d1);
     if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
     let weekDays: any[] | null = null;
