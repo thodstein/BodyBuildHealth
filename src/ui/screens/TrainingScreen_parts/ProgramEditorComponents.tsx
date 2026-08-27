@@ -334,23 +334,41 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
         } catch { return null; }
       })()}
       {body.weeks.length > 1 && (
-        <div className="editor-week-bulk-actions">
-          <span>Навигация по неделям:</span>
-          <label className="editor-week-jump">Перейти к
-            <EditorPopupSelect
-              value={expandedWeekIdx < 0 ? '' : String(expandedWeekIdx)}
-              options={[{ id: '', label: 'Выбрать' }, ...body.weeks.map((week, index) => ({ id: String(index), label: `Неделя ${week.week}` }))]}
-              onChange={v => { setShowAllWeeks(false); setExpandedWeekIdx(v === '' ? -1 : Number(v)); }}
-              ariaLabel="Перейти к неделе"
-              title="Неделя для редактирования"
-              placeholder="Выбрать"
-            />
-          </label>
-          <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(current => Math.max(0, current - 1)); }} disabled={expandedWeekIdx <= 0}>← Предыдущая</button>
-          <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(current => Math.min(body.weeks.length - 1, Math.max(0, current + 1))); }} disabled={expandedWeekIdx < 0 || expandedWeekIdx >= body.weeks.length - 1}>Следующая →</button>
-          <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(0); }}>Открыть первую</button>
-          <button type="button" onClick={() => { setShowAllWeeks(showAllWeeks ? false : true); if (!showAllWeeks) setExpandedWeekIdx(-1); }}>{showAllWeeks ? 'Свернуть все' : 'Развернуть все'}</button>
-        </div>
+        <>
+          {/* WeekStrip — липкая лента пилюль недель с цветами фаз, скроллом и MesoHeatmap-мини */}
+          <div style={{ display: 'flex', gap: 4, overflowX: 'auto', padding: '6px 2px', scrollbarWidth: 'thin', alignItems: 'center' }} role="tablist" aria-label="Навигация по неделям">
+            {body.weeks.map((w, wi) => {
+              const col: Record<string,string> = { accumulation: '#22c55e', intensification: '#f59e0b', deload: '#ef4444', peaking: '#a78bfa' };
+              const c = col[w.phase] ?? '#666';
+              const active = !showAllWeeks && expandedWeekIdx === wi;
+              const sets = w.sessions.reduce((s,ses)=> s+ses.blocks.reduce((b,blk)=> b+blk.sets.length,0),0);
+              return (
+                <button key={wi} role="tab" aria-selected={active} onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(wi); }} style={{ flex:'0 0 auto', minWidth: 64, padding: '6px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor:'pointer', background: active ? c+'20' : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${c}` : '1px solid rgba(255,255,255,0.08)', color: active ? c : 'rgba(255,255,255,0.7)', display:'flex', flexDirection:'column', alignItems:'center', gap: 2 }}>
+                  <span>Н{w.week}{w.deload ? ' · deload' : ''}</span>
+                  <span style={{ fontSize: 10, fontWeight:400, color: active ? c : 'rgba(255,255,255,0.45)' }}>{w.phase} · {sets}с</span>
+                  <span style={{ width: '100%', height: 3, borderRadius: 2, background: c, opacity: active ? 1 : 0.6 }} />
+                </button>
+              );
+            })}
+          </div>
+          <div className="editor-week-bulk-actions">
+            <span>Навигация по неделям:</span>
+            <label className="editor-week-jump">Перейти к
+              <EditorPopupSelect
+                value={expandedWeekIdx < 0 ? '' : String(expandedWeekIdx)}
+                options={[{ id: '', label: 'Выбрать' }, ...body.weeks.map((week, index) => ({ id: String(index), label: `Неделя ${week.week}` }))]}
+                onChange={v => { setShowAllWeeks(false); setExpandedWeekIdx(v === '' ? -1 : Number(v)); }}
+                ariaLabel="Перейти к неделе"
+                title="Неделя для редактирования"
+                placeholder="Выбрать"
+              />
+            </label>
+            <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(current => Math.max(0, current - 1)); }} disabled={expandedWeekIdx <= 0}>← Предыдущая</button>
+            <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(current => Math.min(body.weeks.length - 1, Math.max(0, current + 1))); }} disabled={expandedWeekIdx < 0 || expandedWeekIdx >= body.weeks.length - 1}>Следующая →</button>
+            <button type="button" onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(0); }}>Открыть первую</button>
+            <button type="button" onClick={() => { setShowAllWeeks(showAllWeeks ? false : true); if (!showAllWeeks) setExpandedWeekIdx(-1); }}>{showAllWeeks ? 'Свернуть все' : 'Развернуть все'}</button>
+          </div>
+        </>
       )}
       {/* 🎯 Быстрое добавление упражнений для слабых групп из профиля */}
       {(() => {
@@ -1154,13 +1172,13 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
           onDragEnd={() => { dragSrcRef.current = null; setOverIdx(null); }}
           onTouchStart={onTouchStart(bi)}
           onTouchMove={onTouchMove}
-           className={`bb-block-row editor-exercise-card${expandedBlock === bi ? ' is-expanded' : ''}${!b.exerciseName ? ' is-empty' : ''}`}
+           className={`bb-block-row editor-exercise-card${expandedBlock === bi ? ' is-expanded' : ''}${!b.exerciseName ? ' is-empty' : ''}${b.supersetWith ? ' is-superset' : ''}`}
            style={{
             display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px',
-            borderTop: overIdx === bi ? '2px solid #00e68a' : (!b.exerciseName ? '2px solid rgba(245,158,11,0.35)' : '2px solid transparent'),
-            borderLeft: !b.exerciseName ? '2px solid rgba(245,158,11,0.25)' : '2px solid transparent',
+            borderTop: overIdx === bi ? '2px solid #00e68a' : (!b.exerciseName ? '2px solid rgba(245,158,11,0.35)' : b.supersetWith ? '2px solid rgba(167,139,250,0.35)' : '2px solid transparent'),
+            borderLeft: !b.exerciseName ? '2px solid rgba(245,158,11,0.25)' : b.supersetWith ? '3px solid #a78bfa' : '2px solid transparent',
             transition: 'border-color 0.1s',
-            background: !b.exerciseName ? 'rgba(245,158,11,0.04)' : touchArmedRef.current === bi ? 'rgba(0,230,138,0.06)' : 'transparent',
+            background: !b.exerciseName ? 'rgba(245,158,11,0.04)' : b.supersetWith ? 'rgba(167,139,250,0.06)' : touchArmedRef.current === bi ? 'rgba(0,230,138,0.06)' : 'transparent',
             borderRadius: 8,
           }}
         >
@@ -1173,6 +1191,11 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
               {b.exerciseName && b.sets.length > 0 ? `${b.sets.length} подход${b.sets.length === 1 ? '' : 'а'}` : 'Нужно заполнить'}
             </div>
           </div>
+          {b.supersetWith && (
+            <div style={{ fontSize:10, color:'#a78bfa', background:'rgba(167,139,250,0.10)', border:'1px solid rgba(167,139,250,0.22)', borderRadius:6, padding:'2px 6px', display:'inline-flex', gap:4, alignItems:'center', alignSelf:'flex-start' }}>
+              <span>⊕ Суперсет</span><span style={{ color:'rgba(255,255,255,0.65)' }}>с {blocks.find(bl=>bl.id===b.supersetWith)?.exerciseName || '—'}</span><span style={{ fontSize:9, color:'rgba(255,255,255,0.45)' }}>без отдыха</span>
+            </div>
+          )}
           {/* Ряд 1: drag + тип + упражнение + мышца + сеты */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span
