@@ -356,6 +356,14 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               );
             })}
           </div>
+          {/* PhaseBar — мини-полоска периодизации по всем неделям */}
+          <div style={{ display:'flex', height: 6, borderRadius: 4, overflow:'hidden', margin:'0 2px' }} title="Периодизация: накопление→интенсификация→пик→делоад">
+            {body.weeks.map((w,wi)=> {
+              const col: Record<string,string> = { accumulation:'#22c55e', intensification:'#f59e0b', deload:'#ef4444', peaking:'#a78bfa' };
+              const c = col[w.phase]||'#666';
+              return <div key={wi} style={{ flex:1, background:c, opacity: w.deload?0.55:1 }} title={`Н${w.week} ${w.phase}${w.deload?' · deload':''}`} />;
+            })}
+          </div>
           <div className="editor-week-bulk-actions">
             <span>Навигация по неделям:</span>
             <label className="editor-week-jump">Перейти к
