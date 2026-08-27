@@ -867,7 +867,7 @@ export const RiskScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       {/* ─── HERO PAGE — на весь экран, без стекла, как в БАД/Статьи/Профиль ─── */}
       {mainTab === 'hero' && (
         <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', zIndex:100, display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
-          <img src="/risk-hero.png?v=20250827d" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} className="hero-fullscreen-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center center', background:'#07070a', filter:'brightness(1.06) saturate(1.04)' }} />
+          <img src="/risk-hero.png?v=20250827e" alt="" onError={e=>{ (e.currentTarget as HTMLImageElement).style.display='none'; }} className="hero-fullscreen-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'contain', objectPosition:'center center', background:'#07070a', filter:'brightness(1.06) saturate(1.04)' }} />
           <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 78%, rgba(0,0,0,0.06) 88%, rgba(0,0,0,0.18) 100%)' }} />
           <div style={{ position:'relative', zIndex:2, flex:1, display:'flex', flexDirection:'column', justifyContent:'flex-end', padding:'12px 12px calc(64px + env(safe-area-inset-bottom,0px))', gap:10, overflowY:'auto' }}>
             <div>
