@@ -2314,7 +2314,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // 7. Pre-sleep — казеин + Mg + мелатонин — равномерно (evenRegularP), не 0.7*mps
   const preSleepSeed = seedBase + 7 + randomSalt * 13;
-  const preSleep = (_keep.has('preSleep') && wantPreSleep) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, evenRegularP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags }) : null;
+  const preSleep = (_keep.has('preSleep') && wantPreSleep && Math.max(residualP, evenRegularP) > 10) ? buildPreSleep(tPreSleep, preSleepSeed, pool, Math.max(residualP, evenRegularP), { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // ─── Этап 4: синхронизация приёмов с инъекциями (инсулин/ГР/ИГФ) ─────
@@ -3048,40 +3048,91 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
   }
 
-  // KBЖУ-посадка дня по ккал (≤3% консистентность + сходимость к цели): формула-нормализация
-  // item'ов подняла kcal у части профилей (FOOD_DB-дрейф) — жадно ужаем самые калорийные
-  // НЕ-белковые порции на 15% за шаг, пока день не войдёт в ±6% от цели.
+  // Строгая 4-осевая посадка ≤3% по каждому параметру (ккал,Б,Ж,У) и общему КБЖУ.
+  // preSleep — опционально (если уже хватает белка, не форсируем), intra — только при
+  // привязке к тренировке (allowIntraWorkout). Белок режется только если он сам worst-over.
   {
-    const goalK = input.goalKcal || 0;
-    let guard = 50;
-    const dayK = () => meals.reduce((s, m) => s + m.totals.kcal, 0);
-    while (goalK > 0 && dayK() > goalK * 1.04 && guard-- > 0) {
-      let bMi = -1, bIi = -1, bSaved = 0;
-      meals.forEach((m, mi) => (m.items || []).forEach((it, ii) => {
-        const role = (it as any).role || '';
-        if (role === 'protein' || role === 'slow_protein' || role === 'fast_protein') return;
-        if ((it.amount || 0) < 30) return;
-        const saved = (it.kcal || 0) * 0.12;
-        if (saved > bSaved) { bSaved = saved; bMi = mi; bIi = ii; }
-      }));
-      if (bIi < 0 || bSaved < 20) break;
-      const meal = meals[bMi];
-      const it = meal.items[bIi];
-      const na = Math.max(20, Math.round(it.amount * 0.88));
-      const r2 = na / (it.amount || 1);
-      it.p = +(it.p * r2).toFixed(1); it.f = +(it.f * r2).toFixed(1); it.c = +(it.c * r2).toFixed(1);
-      it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
-      it.amount = na;
-      it.fiber = Math.round((it.fiber || 0) * r2 * 10) / 10;
-      it.leucine_mg = Math.round((it.leucine_mg || 0) * r2);
-      meal.totals = meal.items.reduce((acc, x) => ({ kcal: acc.kcal + x.kcal, p: acc.p + x.p, f: acc.f + x.f, c: acc.c + x.c, fiber: acc.fiber + (x.fiber || 0), leucine_mg: acc.leucine_mg + (x.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-    }
-    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+    const goals = { kcal: input.goalKcal||0, p: input.goalProteinG||0, f: input.goalFatG||0, c: input.goalCarbsG||0 };
+    const maxDev = () => Math.max(
+      goals.kcal ? Math.abs(totals.kcal - goals.kcal)/goals.kcal : 0,
+      goals.p ? Math.abs(totals.p - goals.p)/goals.p : 0,
+      goals.f ? Math.abs(totals.f - goals.f)/goals.f : 0,
+      goals.c ? Math.abs(totals.c - goals.c)/goals.c : 0
+    );
+    let guard = 60;
+    while (maxDev() > 0.0301 && guard-- > 0) {
+      const devK = goals.kcal ? (totals.kcal - goals.kcal)/goals.kcal : 0;
+      const devP = goals.p ? (totals.p - goals.p)/goals.p : 0;
+      const devF = goals.f ? (totals.f - goals.f)/goals.f : 0;
+      const devC = goals.c ? (totals.c - goals.c)/goals.c : 0;
+      const abs = { k: Math.abs(devK), p: Math.abs(devP), f: Math.abs(devF), c: Math.abs(devC) };
+      let worst: 'k'|'p'|'f'|'c' = 'k';
+      if (abs.p > abs[worst]) worst = 'p';
+      if (abs.f > abs[worst]) worst = 'f';
+      if (abs.c > abs[worst]) worst = 'c';
+      // k → мапим на доминирующий макро для точечной коррекции
+      let effWorst: 'p'|'f'|'c' = worst === 'k'
+        ? (abs.p >= abs.c && abs.p >= abs.f ? 'p' : abs.c >= abs.f ? 'c' : 'f')
+        : worst as any;
+      const target = effWorst === 'p' ? goals.p : effWorst === 'f' ? goals.f : goals.c;
+      const cur = effWorst === 'p' ? totals.p : effWorst === 'f' ? totals.f : totals.c;
+      const need = target - cur; // >0 недобор, <0 перебор
+      if (Math.abs(need) < 0.5) break;
+      if (need < 0) {
+        // Перебор: урезать самый калорийный НЕ-белковый (кроме случая когда белок сам worst)
+        let bMi=-1,bIi=-1,bSaved=0;
+        meals.forEach((m,mi)=> (m.items||[]).forEach((it:any,ii:number)=>{
+          const role=(it as any).role||'';
+          const isProtein = role==='protein'||role==='slow_protein'||role==='fast_protein';
+          if (isProtein && effWorst!=='p' && devP <= 0.03) return;
+          if ((it.amount||0) < 20) return;
+          const per100 = effWorst==='p' ? (FOOD_DB.find((f:any)=>f.id===it.id)?.protein||0) : effWorst==='c' ? (FOOD_DB.find((f:any)=>f.id===it.id)?.carbs||0) : (FOOD_DB.find((f:any)=>f.id===it.id)?.fat||0);
+          if (per100<=0) return;
+          const saved = (it.kcal||0) * 0.12;
+          if (saved > bSaved) { bSaved=saved; bMi=mi; bIi=ii; }
+        }));
+        if (bIi<0 || bSaved < 10) break;
+        const meal = meals[bMi]; const it = meal.items[bIi];
+        const na = Math.max(15, Math.round(it.amount * 0.85));
+        const r2 = na/(it.amount||1);
+        it.p = +(it.p * r2).toFixed(1); it.f = +(it.f * r2).toFixed(1); it.c = +(it.c * r2).toFixed(1);
+        it.kcal = Math.round(4*it.p + 9*it.f + 4*it.c);
+        it.amount = na;
+        it.fiber = Math.round((it.fiber||0)*r2*10)/10;
+        it.leucine_mg = Math.round((it.leucine_mg||0)*r2);
+        meal.totals = meal.items.reduce((acc:any,x:any)=>({kcal:acc.kcal+x.kcal,p:acc.p+x.p,f:acc.f+x.f,c:acc.c+x.c,fiber:acc.fiber+(x.fiber||0),leucine_mg:acc.leucine_mg+(x.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+      } else {
+        // Недобор: добавить лучший продукт по effWorst из FOOD_DB (не excluded)
+        const pool = FOOD_DB.filter((f:any)=>{
+          if (input.excludedIds?.has(f.id)) return false;
+          if (f.category==='supplement' && !['whey_isolate','whey_protein','casein','supp_pea_protein'].includes(f.id)) return false;
+          const v = effWorst==='p' ? (f.protein||0) : effWorst==='c' ? (f.carbs||0) : (f.fat||0);
+          return v>8;
+        }).sort((a:any,b:any)=>{
+          const av = effWorst==='p' ? (a.protein||0)/(a.kcal||1) : effWorst==='c' ? (a.carbs||0)/(a.kcal||1) : (a.fat||0)/(a.kcal||1);
+          const bv = effWorst==='p' ? (b.protein||0)/(b.kcal||1) : effWorst==='c' ? (b.carbs||0)/(b.kcal||1) : (b.fat||0)/(b.kcal||1);
+          return bv - av;
+        });
+        const best = pool[0];
+        if (!best) break;
+        const per100 = effWorst==='p' ? (best.protein||0) : effWorst==='c' ? (best.carbs||0) : (best.fat||0);
+        const grams = Math.min(150, Math.max(15, Math.round(need/per100*100/10)*10));
+        const r = grams/100;
+        const p2=Math.round((best.protein||0)*r), f2=Math.round((best.fat||0)*r), c2=Math.round((best.carbs||0)*r);
+        const it:any = { id: best.id, name: best.name, amount: grams, role: effWorst==='p'?'protein':effWorst==='c'?'carb_slow':'fat', kcal: Math.round(4*p2+9*f2+4*c2), p:p2, f:f2, c:c2, fiber: Math.round((best.fiber||0)*r), leucine_mg: 0 };
+        // Кладём в самый лёгкий приём (перекус/ужин), кроме preSleep/intra если они опциональны
+        let targetMeal = meals.find((m:any)=> m.label==='Перекус' || m.label==='Полдник') || meals[meals.length-1];
+        if (!targetMeal) targetMeal = meals[0];
+        targetMeal.items.push(it);
+        targetMeal.totals = targetMeal.items.reduce((acc:any,x:any)=>({kcal:acc.kcal+x.kcal,p:acc.p+x.p,f:acc.f+x.f,c:acc.c+x.c,fiber:acc.fiber+(x.fiber||0),leucine_mg:acc.leucine_mg+(x.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+      }
+      totals.kcal = meals.reduce((s:any,m:any)=>s+m.totals.kcal,0);
     totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
     totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
     totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+  }
   }
 
   return {
