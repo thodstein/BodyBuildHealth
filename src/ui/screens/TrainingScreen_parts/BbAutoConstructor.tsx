@@ -3740,7 +3740,7 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
                 <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Суставы — детально в инструменте ниже</div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Формула каждого фактора — ниже</div>
               </div>
             </div>
             {/* Factor breakdown with calculations */}
@@ -3761,15 +3761,106 @@ export const BbAutoConstructor: React.FC = () => {
                 ))}
               </div>
             )}
-            {/* Joint stress убран — полный анализ в инструменте Суставы и ортопедия */}
-            <div style={{ padding:'10px 12px', background:'rgba(96,165,250,0.06)', borderTop:'1px solid rgba(96,165,250,0.12)', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-              <div style={{ flex:1, minWidth:180 }}>
-                <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>🦴 Суставы и ортопедия — детальный анализ</div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.75, marginTop:2, lineHeight:1.4 }}>Полная диагностика каждого сустава, теплокарта нагрузки, геометрия движения и недельный план прехаба — в инструменте «Суставы и ортопедия».</div>
+            {/* Joint stress detailed */}
+            {safetyScore.details?.jointStressDetails && (
+              <div style={{ padding:'8px 12px' }}>
+                <ExpandableCard
+                  title="🦴 Суставная нагрузка — детально (расчёт)"
+                  icon="🦴"
+                  short={`${safetyScore.details.jointStressDetails.overallRisk==='high'?'Высокий': safetyScore.details.jointStressDetails.overallRisk==='moderate'?'Умеренный':'Низкий'} стресс · пик нед ${safetyScore.details.jointStressDetails.peakWeek || '—'} · средний ${Math.round(safetyScore.details.jointStressDetails.avgWeeklyStress)} · самый нагруженный: ${safetyScore.details.jointStressDetails.mostLoadedJoint ? `${safetyScore.details.jointStressDetails.mostLoadedJoint.joint} ${Math.round(safetyScore.details.jointStressDetails.mostLoadedJoint.stress)}` : '—'}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', marginBottom:8, fontSize:10, color:'#fff' }}>
+                        <b>Формула стресса упражнения:</b> base(jointStress low=3 / med=6 / high=10 из EXERCISE_CATALOG) × sets × proximity(1+max(0,2−RIR)×0.15) × intensity(1+min(0.5,(weight−60)/200)) → сумма по упражнениям → <b>byJoint</b>. Пороги сессии: low&lt;15 moderate&lt;25 high≥40; неделя low&lt;45 moderate&lt;75 high≥120 (×3). Пиковая неделя и средний — для оценки перегруза.
+                      </div>
+                      {Object.keys(safetyScore.details.jointStressDetails.byJointPeak).length===0 ? (
+                        <div style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Нет суставной нагрузки — план пустой или только deload.</div>
+                      ) : (
+                        <div style={{ display:'grid', gap:6 }}>
+                          {Object.entries(safetyScore.details.jointStressDetails.byJointPeak).sort((a,b)=> (b[1] as number)-(a[1] as number)).map(([joint, peak])=>{
+                            const avg = (safetyScore.details!.jointStressDetails.byJointAvg as any)[joint] || 0;
+                            const thresh = safetyScore.details!.jointStressDetails.thresholds;
+                            const lvl = (peak as number) > thresh.high ? 'high' : (peak as number) > thresh.moderate ? 'moderate' : (peak as number) > thresh.low ? 'low' : 'none';
+                            const color = lvl==='high'?'#ef4444': lvl==='moderate'?'#f59e0b': lvl==='low'?'#eab308':'#22c55e';
+                            const pct = Math.min(100, ((peak as number)/ (thresh.high*1.5))*100);
+                            return (
+                              <div key={joint} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:`1px solid ${color}22` }}>
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                  <span style={{ fontWeight:700, color:'#fff' }}>{joint}</span>
+                                  <span style={{ fontWeight:800, color }}>{Math.round(peak as number)} пик · {Math.round(avg)} средн.</span>
+                                </div>
+                                <div style={{ height:5, borderRadius:5, background:'rgba(255,255,255,0.08)', marginTop:4, overflow:'hidden' }}>
+                                  <div style={{ width:`${pct}%`, height:'100%', background: color }} />
+                                </div>
+                                <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>пороги: {thresh.low}/{thresh.moderate}/{thresh.high} · {lvl==='high'?'высокий':lvl==='moderate'?'умеренный':lvl==='low'?'низкий':'минимальный'}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {safetyScore.details.jointStressDetails.weeklyReports.length>0 && (
+                        <div style={{ marginTop:8, fontSize:10, color:'#fff', opacity:0.7 }}>
+                          Пиковая неделя: {safetyScore.details.jointStressDetails.peakWeek} · средний недельный стресс: {Math.round(safetyScore.details.jointStressDetails.avgWeeklyStress)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
               </div>
-              <button onClick={() => { try { const fn = (window as any).__navigateToTrainingTab; if (fn) fn('joints_ortho'); else { localStorage.setItem('he_training_tab','joints_ortho'); window.dispatchEvent(new StorageEvent('storage',{key:'he_training_tab'} as any)); } } catch {} }} style={{ padding:'8px 14px', borderRadius:10, fontSize:11, fontWeight:800, cursor:'pointer', background:'#60a5fa', color:'#000', border:'none', whiteSpace:'nowrap' }}>🦴 Открыть Суставы</button>
-            </div>
-
+            )}
+            {/* Orthopedic constraints */}
+            {safetyScore.details?.orthopedic && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🦿 Ортопедика: ${safetyScore.details.orthopedic.phase==='acute'?'острая': safetyScore.details.orthopedic.phase==='subacute'?'подострая': safetyScore.details.orthopedic.phase==='chronic'?'хроническая':'поддержание'} фаза`}
+                  icon="🦿"
+                  short={`${safetyScore.details.orthopedic.blockedPatterns.length ? `заблокировано ${safetyScore.details.orthopedic.blockedPatterns.length} паттернов` : 'паттерны без блоков'} · лимиты суставов: ${Object.keys(safetyScore.details.orthopedic.jointStressLimits).length}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                        <div style={{ padding:'7px 9px', borderRadius:8, background: safetyScore.details!.orthopedic.blockedPatterns.length ? 'rgba(239,68,68,0.07)' : 'rgba(34,197,94,0.07)', border:`1px solid ${safetyScore.details!.orthopedic.blockedPatterns.length ? 'rgba(239,68,68,0.14)' : 'rgba(34,197,94,0.14)'}` }}>
+                          <div style={{ fontSize:10, fontWeight:800, color: safetyScore.details!.orthopedic.blockedPatterns.length ? '#ef4444' : '#22c55e' }}>Заблокированные паттерны</div>
+                          <div style={{ fontSize:11, marginTop:3, color:'#fff' }}>{safetyScore.details!.orthopedic.blockedPatterns.length ? safetyScore.details!.orthopedic.blockedPatterns.join(', ') : '— нет блоков'}</div>
+                          <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>Источник: INJURY_PATTERN_BLACKLIST + ROM_LIMITS (orthopedic-load-engines) · травмы/ограничения → чёрный список движений (hinge/squat/lunge/carry/vertical_push и т.д.)</div>
+                        </div>
+                        <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(96,165,250,0.07)', border:'1px solid rgba(96,165,250,0.14)' }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa' }}>Разрешённые паттерны</div>
+                          <div style={{ fontSize:11, marginTop:3, color:'#fff' }}>{safetyScore.details!.orthopedic.allowedPatterns.join(', ') || '—'}</div>
+                        </div>
+                      </div>
+                      {Object.keys(safetyScore.details.orthopedic.romLimits).length>0 && (
+                        <div style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#a855f7', marginBottom:4 }}>ROM лимиты (градусы)</div>
+                          {Object.entries(safetyScore.details.orthopedic.romLimits).map(([j, lim]:any)=> (
+                            <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', marginBottom:3, fontSize:11 }}>
+                              <span style={{ color:'#fff' }}>{j}</span><span style={{ fontWeight:700, color:'#fff' }}>{lim.min}° – {lim.max}°</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {Object.keys(safetyScore.details.orthopedic.jointStressLimits).length>0 && (
+                        <div style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', marginBottom:4 }}>Лимиты стресса по суставам (1–4, ниже = строже)</div>
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                            {Object.entries(safetyScore.details.orthopedic.jointStressLimits).map(([j, lim]:any)=> (
+                              <div key={j} style={{ padding:'5px 7px', borderRadius:8, background: (lim as number)<=1?'rgba(239,68,68,0.1)': (lim as number)<=2?'rgba(245,158,11,0.1)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                                <div style={{ fontSize:9, color:'#fff', opacity:0.7 }}>{j}</div><div style={{ fontSize:12, fontWeight:800, color: (lim as number)<=1?'#ef4444': (lim as number)<=2?'#f59e0b':'#fff' }}>{String(lim)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {safetyScore.details.orthopedic.recommendations.length>0 && (
+                        <div>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#00e68a', marginBottom:4 }}>Рекомендации ортопедии</div>
+                          {safetyScore.details.orthopedic.recommendations.map((r,i)=> <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:6, borderLeft:'2px solid rgba(0,230,138,0.5)' }}>{r}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </div>
+            )}
             {/* Load distribution */}
             {safetyScore.details?.loadDistribution && (
               <div style={{ padding:'0 12px 8px' }}>
@@ -3804,7 +3895,50 @@ export const BbAutoConstructor: React.FC = () => {
                 />
               </div>
             )}
-            {/* Joint diagnoses — перенесено в инструмент Суставы и ортопедия (см. карточку выше) */}
+            {/* Joint diagnoses */}
+            {safetyScore.details?.jointDiagnoses && safetyScore.details.jointDiagnoses.length>0 && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🧬 Диагностика суставов — ${safetyScore.details.jointDiagnoses.length} зоны (интеллект)`}
+                  icon="🧬"
+                  short={safetyScore.details.jointDiagnoses.map(j=> `${j.joint.icon} ${j.joint.label} (${j.phase})`).join(' · ')}
+                  full={
+                    <div style={{ display:'grid', gap:8 }}>
+                      {safetyScore.details!.jointDiagnoses.map((jd:any)=> (
+                        <div key={jd.joint.id} style={{ padding:'9px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
+                            <span style={{ fontSize:14 }}>{jd.joint.icon}</span>
+                            <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{jd.joint.label}</span>
+                            <span style={{ fontSize:10, padding:'2px 6px', borderRadius:6, background: jd.phase==='acute'?'rgba(239,68,68,0.14)': jd.phase==='subacute'?'rgba(245,158,11,0.14)': jd.phase==='chronic'?'rgba(96,165,250,0.14)':'rgba(34,197,94,0.10)', color: jd.phase==='acute'?'#ef4444': jd.phase==='subacute'?'#f59e0b': jd.phase==='chronic'?'#60a5fa':'#22c55e', fontWeight:700 }}>{jd.phase}</span>
+                            <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', opacity:0.6 }}>{jd.joint.dangerous.slice(0,2).join(', ')}</span>
+                          </div>
+                          <div style={{ fontSize:10, color:'#fff', opacity:0.75, lineHeight:1.4, marginBottom:6 }}>{jd.joint.description}</div>
+                          {(jd.blockedPatterns?.length || jd.allowedPatterns?.length) && (
+                            <div style={{ fontSize:10, color:'#fff', marginBottom:6 }}>
+                              <span style={{ color:'#ef4444' }}>блок: {jd.blockedPatterns?.join(', ') || '—'}</span> · <span style={{ color:'#22c55e' }}>разрешено: {jd.allowedPatterns?.slice(0,6).join(', ')}</span>
+                            </div>
+                          )}
+                          {jd.options?.length>0 && (
+                            <div style={{ display:'grid', gap:6 }}>
+                              {jd.options.slice(0,2).map((opt:any)=> (
+                                <div key={opt.id} style={{ padding:'7px 8px', borderRadius:8, background: opt.level==='critical'?'rgba(239,68,68,0.08)': opt.level==='high'?'rgba(245,158,11,0.08)': opt.level==='moderate'?'rgba(96,165,250,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${opt.level==='critical'?'rgba(239,68,68,0.14)': opt.level==='high'?'rgba(245,158,11,0.14)': 'rgba(255,255,255,0.06)'}` }}>
+                                  <div style={{ fontSize:11, fontWeight:700, color: opt.level==='critical'?'#ef4444': opt.level==='high'?'#f59e0b':'#fff' }}>{opt.label} · {opt.level}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.8, marginTop:2 }}>{opt.description}</div>
+                                  <div style={{ fontSize:10, color:'#00e68a', marginTop:3 }}><b>Метод:</b> {opt.method}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}><b>Ассисты:</b> {opt.assistance?.join(', ')}</div>
+                                  <div style={{ fontSize:10, color:'#fff', marginTop:2, padding:'3px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', display:'inline-block' }}>Протокол: {opt.protocol.sets}×{opt.protocol.reps} RIR{opt.protocol.rir}{opt.protocol.tempo?` ${opt.protocol.tempo}`:''}{opt.protocol.rest?` · ${opt.protocol.rest}`:''}{opt.protocol.note?` · ${opt.protocol.note}`:''}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>{opt.rationale}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  }
+                />
+              </div>
+            )}
             {/* Volume & Frequency details */}
             {safetyScore.details?.volumeDetails && (
               <div style={{ padding:'0 12px 8px' }}>
@@ -3993,21 +4127,52 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
         {/* Бюджет объёма — единственный источник perMuscle (пиковая неделя) */}
         {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
-        {/* Параметры генерации — актуально для текущего плана */}
-        <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize:11, fontWeight:800, color:'#fff', marginBottom:6 }}>⚙️ Параметры генерации</div>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-            <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.18)', color:'#00e68a' }}>{bbLevel}</span>
-            <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.18)', color:'#60a5fa' }}>{bbGoal}</span>
-            <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(168,85,247,0.10)', border:'1px solid rgba(168,85,247,0.18)', color:'#a855f7' }}>{bbTrainingFocus}</span>
-            <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b' }}>{bbMethodology}</span>
-            <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{bbDays}×/нед · {builtPlan.weeks.length} нед</span>
-            <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{builtPlan.pattern?.name}</span>
-            {peds.length>0 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', color:'#ef4444' }}>PED×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span>}
-            {bbEquipment.length>0 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{bbEquipment.join(', ')}</span>}
-            {injuries.length>0 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b' }}>травм {injuries.length}</span>}
-            {weakPoints.length>0 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(250,204,21,0.10)', border:'1px solid rgba(250,204,21,0.18)', color:'#facc15' }}>слабые {weakPoints.join(', ')}</span>}
-          </div>
+        {/* === Детальный анализ — перенесено из Step4, оптимизировано === */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {freqOptResult && freqOptResult.totalAdjustments > 0 && (
+            <ExpandableCard title={`🔧 Частота ${freqOptResult.totalAdjustments}`} icon="🔧" short={`${freqOptResult.totalAdjustments} рекомендаций`} full={
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {freqOptResult.recommendations.slice(0,3).map((rec:any,i:number)=> {
+                  const up = rec.recommendedFrequency > rec.currentFrequency;
+                  return <div key={i} style={{ fontSize:10, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', color:'#fff' }}>{up?'↑':'↓'} {(MUSCLE_LABEL_RU as any)[rec.muscle]||rec.muscle}: {rec.currentFrequency}→{rec.recommendedFrequency}× {rec.reason}</div>
+                })}
+              </div>
+            } />
+          )}
+          {(() => {
+            const summary = summarizeAutoRegulation(builtPlan);
+            if (summary.adjustedExercises === 0) return null;
+            return <ExpandableCard title={`↻ Авто ${summary.adjustedExercises}`} icon="↻" short={`${summary.adjustedExercises} скоррект.`} full={
+              <div style={{ fontSize:10, color:'#fff', display:'flex', flexDirection:'column', gap:2 }}>{summary.details.slice(0,3).map((d,i)=><div key={i}>{d.exercise}: {d.from}→{d.to}</div>)} </div>
+            } />
+          })()}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {builtPlan.rotationReport && (
+            <ExpandableCard title="🔁 Ротация" icon="🔁" short={`${Object.keys(builtPlan.rotationReport.primaryByMuscle).length} групп`} full={
+              <div style={{ fontSize:10, color:'#fff' }}>{Object.entries(builtPlan.rotationReport.primaryByMuscle).slice(0,3).map(([m,names])=><div key={m}><b>{(MUSCLE_LABEL_RU as any)[m]||m}:</b> {(names as string[]).slice(0,2).join(', ')}</div>)}</div>
+            } />
+          )}
+          {builtPlan.fatigueReport && (
+            <ExpandableCard title="⚙️ Усталость" icon="⚙️" short={`${Math.round(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.timeSeconds,0)/60)} мин`} full={
+              <div style={{ fontSize:10, color:'#fff' }}>Системная {(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.systemic,0) || 0).toFixed(1)} · Осевая {(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.axial,0) || 0).toFixed(1)}</div>
+            } />
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {builtPlan.report && (
+            <ExpandableCard title="📋 Отчёт" icon="📋" short={`${builtPlan.report.weeks}нед · ${builtPlan.report.peakWeek} пик`} full={
+              <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>
+                <div><b>Сплит:</b> {builtPlan.pattern.name} · <b>Объём:</b> {builtPlan.report.totalDirectSets} сетов</div>
+                <div><b>Фазы:</b> {Array.from(new Set(builtPlan.weeks.map((w:any)=>w.phase))).join(', ')}</div>
+              </div>
+            } />
+          )}
+          {builtPlan.balanceReport && (
+            <ExpandableCard title="⚖️ Баланс" icon="⚖️" short={`${builtPlan.balanceReport.press}ж/${builtPlan.balanceReport.pull}т`} full={
+              <div style={{ fontSize:10, color:'#fff' }}>Тяги {builtPlan.balanceReport.pull} · Жимы {builtPlan.balanceReport.press} · Растянутая {builtPlan.balanceReport.lengthened}</div>
+            } />
+          )}
         </div>
                 {/* Логика построения — ВСЕ пункты, без обрезки и EN-мусора */}
         {(() => {
@@ -4058,25 +4223,13 @@ export const BbAutoConstructor: React.FC = () => {
             return s;
           };
           const shown = rationale.map(clean).filter(Boolean);
-          const keyPoints = shown.slice(0, 5);
-          const rest = shown.slice(5);
           return (
-            <ExpandableCard
-              title={`🧠 Логика построения — ${shown.length} пунктов`}
-              icon="🧠"
-              short={keyPoints.slice(0,3).join(' · ') || '—'}
-              full={
-                <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                  {shown.map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
-                  <div style={{ marginTop:6, fontSize:9, color:'#fff', opacity:0.6, display:'flex', flexWrap:'wrap', gap:4 }}>
-                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{bbLevel}</span>
-                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{bbGoal}</span>
-                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{bbTrainingFocus}</span>
-                    <span style={{ padding:'2px 6px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>{builtPlan.pattern?.name}</span>
-                  </div>
-                </div>
-              }
-            />
+            <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой (все пункты)</div>
+              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                {shown.map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
+              </div>
+            </div>
           );
         })()}
         {/* Прогноз по фазам — факт из плана */}
@@ -4155,8 +4308,124 @@ export const BbAutoConstructor: React.FC = () => {
           );
         })()}
 
-        {/* Прогрессия весов — доступна в Шаге 4 (календарь и график тоннажа), дубль убран */}
-        {/* Мусорный объём — проверка дублей — компактно в Рекомендациях (дубль убран) */}
+        {/* Прогрессия весов по неделям (основные упражнения) — факт из плана */}
+        {(() => {
+          const totalW = W.length;
+          const cols = Math.min(8, totalW);
+          const primaryExs = new Map<string, { name: string; muscle: string; weights: number[] }>();
+          for (const w of W) {
+            for (const s of w.sessions) {
+              for (const e of s.exercises) {
+                if (e.role !== 'primary') continue;
+                const key = e.name;
+                if (!primaryExs.has(key)) primaryExs.set(key, { name: e.name, muscle: e.muscle, weights: new Array(totalW).fill(0) });
+                const rec = primaryExs.get(key)!;
+                rec.weights[w.week - 1] = e.workSets[0]?.weight || 0;
+              }
+            }
+          }
+          if (primaryExs.size === 0) return null;
+          const top = [...primaryExs.values()].filter(e => e.weights.some(w => w > 0)).slice(0, 6);
+          if (top.length === 0) return null;
+          return (
+            <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>📈 Прогрессия весов (кг) по неделям — факт плана</div>
+              <div style={{ overflowX:'auto' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, minWidth: cols*40+120 }}>
+                  <span style={{ fontWeight:700, color:'#fff' }}>Упражнение</span>
+                  {Array.from({ length: cols }, (_, i) => (
+                    <span key={i} style={{ fontWeight:700, color:'#fff', textAlign:'center' }}>{i+1}</span>
+                  ))}
+                </div>
+                {top.map(ex => {
+                  const weights = ex.weights.slice(0, cols);
+                  const first = weights.find(w => w > 0) || 0;
+                  const last = weights.filter(w => w > 0).pop() || first;
+                  const delta = last > first ? '+' + (last - first) : '';
+                  return (
+                    <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, padding:'2px 0', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
+                      <span style={{ fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={ex.name}>{ex.name.substring(0, 18)}</span>
+                      {weights.map((w, wi) => {
+                        const prev = wi > 0 ? weights[wi-1] : 0;
+                        const up = prev > 0 && w > prev;
+                        const down = prev > 0 && w < prev;
+                        return (
+                          <span key={wi} style={{
+                            textAlign:'center', fontWeight: w > 0 ? 700 : 400,
+                            color: w > 0 ? (up ? '#22c55e' : down ? '#ef4444' : '#f59e0b') : 'rgba(255,255,255,0.2)',
+                          }}>{w > 0 ? w : '—'}</span>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:4, fontSize:10, color:'#fff', display:'flex', gap:12 }}>
+                <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span>
+              </div>
+              {totalW > 8 && <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Показаны первые 8 нед из {totalW}</div>}
+            </div>
+          );
+        })()}
+        {/* Мусорный объём — полностью на русском, проверка с учётом всех выбранных параметров и плана */}
+        {(() => {
+          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears, focusGroup: '', specialization: specializationMode, specializationTargets: specTargets });
+          const ruMuscleG = (m: string) => (MUSCLE_LABEL_RU as any)[m] || m;
+          const ruReason = (r: string) => r
+            .replace(/Дублирование паттерна (\S+) для (\S+)/, 'Дубль изоляции «$1» для «$2» — в одной сессии достаточно одной')
+            .replace(/Мышца (\S+) не входит в тег сессии (\S+)/, 'Мышца «$1» не входит в день «$2» — проверьте совместимость сплита с выбранными группами');
+          const paramChips: string[] = [];
+          paramChips.push(`уровень ${bbLevel}`);
+          if (bbTrainingYears!==undefined) paramChips.push(`стаж ${bbTrainingYears}л`);
+          paramChips.push(`цель ${bbGoal}`);
+          paramChips.push(`фокус ${bbTrainingFocus}`);
+          paramChips.push(`методика ${bbMethodology}`);
+          paramChips.push(`сплит ${builtPlan.pattern?.name || builtPlan.pattern?.id || '—'}`);
+          paramChips.push(`объём ${bbVolGoal}${trainingVolumeMode==='high'?' (объёмный)':''}`);
+          if (weakPoints.length) paramChips.push(`слабые: ${weakPoints.join(', ')}`);
+          if (specializationMode) paramChips.push(`специализация ${specTargets.join('+')}`);
+          if (bbEquipment.length) paramChips.push(`оборудование ${bbEquipment.slice(0,3).join(', ')}${bbEquipment.length>3?'…':''}`);
+          if (injuries.length) paramChips.push(`травмы ${injuries.length}`);
+          if (garbage.length === 0) {
+            return (
+              <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(16,185,129,0.04))', border:'1px solid rgba(34,197,94,0.18)', position:'relative', overflow:'hidden' }}>
+                <div style={{ position:'absolute', top:-12, right:-12, width:80, height:80, borderRadius:80, background:'radial-gradient(circle, rgba(34,197,94,0.12), transparent 70%)' }} />
+                <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', display:'flex', alignItems:'center', gap:6 }}>🗑 Мусорный объём: чисто ✅ <span style={{ fontSize:10, fontWeight:600, color:'#22c55e', background:'rgba(34,197,94,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(34,197,94,0.22)' }}>соответствует параметрам</span></div>
+                <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>Дублей изоляций не найдено. Для слабых/фокусных групп повтор паттерна допустим — учтена каноника <span style={{ fontFamily:'ui-monospace, monospace', background:'rgba(255,255,255,0.06)', padding:'1px 4px', borderRadius:4 }}>chest_upper→chest, delt_mid→shoulders</span>. Икры «стоя+сидя» — по дизайну 2 разных упражнения, не дубль. Проверка: compound-паттерны (жим/тяга/присед) — не считаются мусором (разные углы — норма).</div>
+                <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
+                  {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
+                </div>
+                <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>{`Логика: detectGarbageVolume(weeks, weakPoints, {level, trainingYears, focusGroup: '', specialization}) → warmup исключён, back по classifyBackExercise, compound исключён, seenPatterns per session, слабые/фокус — скип.`}</div>
+              </div>
+            );
+          }
+          return (
+            <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.04))', border:'1px solid rgba(239,68,68,0.18)', position:'relative', overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:-10, right:-10, width:90, height:90, borderRadius:90, background:'radial-gradient(circle, rgba(239,68,68,0.12), transparent 70%)' }} />
+              <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', display:'flex', alignItems:'center', gap:8 }}>🗑 Мусорный объём: найдено {garbage.length} <span style={{ fontSize:10, fontWeight:600, color:'#ef4444', background:'rgba(239,68,68,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(239,68,68,0.22)' }}>несоответствие параметрам</span></div>
+              <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>
+                Дублирование изоляций: план содержит повторы одного паттерна для одной мышцы в одной сессии — при выбранных параметрах это избыточно. Для слабых/фокусных групп дубль <b>допустим</b> (учтена каноника), для остальных — мусор. Проверено по: {paramChips.slice(0,6).join(' · ')}{paramChips.length>6?' …':''}.
+              </div>
+              <div style={{ marginTop:8, display:'grid', gap:6 }}>
+                {garbage.slice(0, 6).map((g, i) => (
+                  <div key={i} style={{ display:'flex', gap:8, alignItems:'flex-start', padding:'7px 9px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)' }}>
+                    <span style={{ flexShrink:0, width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', color:'#ef4444', fontWeight:800, fontSize:11 }}>{i+1}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{g.exerciseName} <span style={{ fontWeight:400, opacity:0.7 }}>· {ruMuscleG(g.muscle)} · {g.sessionTag || 'день'}</span></div>
+                      <div style={{ fontSize:10, color:'#fbbf24', marginTop:2 }}>{ruReason(g.reason)}</div>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>Исправление: заменить на другой угол/хват или убрать (для слабых — оставить, если цель — специализация).</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {garbage.length > 6 && <div style={{ marginTop:6, fontSize:11, color:'#fff', textAlign:'center', opacity:0.7 }}>…и ещё {garbage.length - 6} — откройте план, проверьте сессии</div>}
+              <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
+                {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
+              </div>
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Формула: per session seenPatterns[day-muscle-pattern] → если дубль && !isWeak && !calvesByDesign → мусор. isWeak учитывает weakPoints+focusGroup+specializationTargets.</div>
+            </div>
+          );
+        })()}
         {/* Рекомендации — единственные, детали уже в них (quality.details убраны как дубль) */}
         {quality.recommendations && quality.recommendations.length > 0 && (
           <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
@@ -4193,7 +4462,31 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Load assessment и доп. сценарии убраны — ACWR в блоке фазы, детали в «Суставы и ортопедия» */}
+        {/* Load assessment */}
+        <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 Оценка тренировочной нагрузки</div>
+          {!ratio ? <div style={SMALL}>Недостаточно данных sRPE для расчёта ACWR. Ведите дневник тренировок.</div> : (
+            <div>
+              <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                <span style={SMALL}>ACWR: <b style={{ color:ratio.ratio>1.5?'#ef4444':ratio.ratio>1.3?'#eab308':'#22c55e', fontSize:14 }}>{ratio.ratio.toFixed(2)}</b></span>
+                <span style={{ padding:'3px 8px', borderRadius:8, fontSize:11, fontWeight:700, background:ratio.zone==='dangerous'?'rgba(239,68,68,0.15)':ratio.zone==='caution'?'rgba(234,179,8,0.15)':'rgba(34,197,94,0.15)', color:ratio.zone==='dangerous'?'#ef4444':ratio.zone==='caution'?'#eab308':'#22c55e' }}>{ratio.zone === 'dangerous' ? '⛔ Опасно' : ratio.zone === 'caution' ? '⚠ Осторожно' : ratio.zone === 'optimal' ? '✅ Оптимум' : '⬇ Недотрен'}</span>
+              </div>
+              <div style={{ marginTop:6, ...SMALL }}>Хроническая нагрузка (28д) vs острая (7д). Цель: 0.8-1.3. Разгрузка при {`>`}1.5.</div>
+            </div>
+          )}
+        </div>
+        {/* Дополнительно: прогрессия мезоцикла + сценарии — свернуто по умолчанию */}
+        <ExpandableCard
+          title="🔧 Дополнительно: прогноз прогрессии и сценарии"
+          icon="🔧"
+          short="Прогрессия мезоцикла · сценарии «что если» (калории/сон/курс)"
+          full={
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
+              <WhatIfCard baseRisk={quality?.score ? 100 - quality.score : 20} baseReadiness={Math.round((linked.readiness?.recovery ?? 80))} />
+            </div>
+          }
+        />
         {/* Экспорт — фактические параметры плана */}
         {quality && (
           <div style={{ marginTop:8 }}>

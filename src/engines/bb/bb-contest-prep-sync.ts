@@ -72,10 +72,6 @@ export function saveContestPrepEverywhere(
     next.goals.bbPeakConfig = serializeBBPrepConfig(rawCfg);
     next.goals.peakWeek = true;
     next.goals.peakShowDay = rawCfg.showDate;
-    // prepWeeks выносится в профиль для синхронизации ББ-авто ↔ питание
-    const usedPrepWeeks = (plan as any)?.preparation?.weeks ?? (rawCfg as any)?.prepWeeks ?? opts.prepWeeks;
-    if (usedPrepWeeks) next.goals.prepWeeks = usedPrepWeeks;
-    next.goals.prepEnabled = true;
     updateProfile({ settings: next });
   } catch { /* silent */ }
   try {
@@ -134,7 +130,6 @@ export function clearContestPrepEverywhere(): void {
     delete next.goals.bbContestPrepPlan;
     delete next.goals.bbPeakConfig;
     next.goals.peakWeek = false;
-    next.goals.prepEnabled = false;
     updateProfile({ settings: next });
   } catch { /* silent */ }
   try {
