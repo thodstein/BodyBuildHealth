@@ -335,6 +335,12 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           e.preventDefault();
           cloneWeek(expandedWeekIdx);
         }
+      } else if (e.key === 'Delete' && expandedWeekIdx >= 0 && body.weeks.length > 1) {
+        // Delete — удалить раскрытую неделю (с подтверждением внутри removeWeek)
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          removeWeek(expandedWeekIdx);
+        }
       }
     };
     window.addEventListener('keydown', onKey);
@@ -378,7 +384,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           const over = q.perMuscle.filter(m => m.status === 'over');
           const col = q.score >=75 ? '#22c55e' : q.score >=50 ? '#f59e0b' : '#ef4444';
           return (
-            <div style={{ ...CARD, padding: 10, borderLeft: `3px solid ${col}`, display:'flex', flexDirection:'column', gap:6 }}>
+            <div aria-live="polite" aria-atomic="true" style={{ ...CARD, padding: 10, borderLeft: `3px solid ${col}`, display:'flex', flexDirection:'column', gap:6 }}>
               <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                 <span style={{ fontSize:11, fontWeight:800, color: col }}>📊 Качество</span>
                 <ScoreBadge score={q.score} grade={q.grade} />
