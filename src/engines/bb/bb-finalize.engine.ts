@@ -1377,7 +1377,8 @@ function ensurePPLRearDelts(session: any, week: any, options: BBFinalizeOptions)
   const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   const working = session.exercises.filter((e: any) => !e.warmupActivator);
   if (working.length >= maxEx) return;
-  const rear = working.filter((e: any) => e.muscle === 'shoulders' && /задн.*дельт|rear|обратн.*разведен|reverse.*fly|лиц.*тяга|face.?pull|махи.*наклон/i.test(e.name || ''));
+  const isRearDelt = (e: any) => (e.muscle === 'shoulders' || e.muscle === 'delt_rear' || e.muscle === 'delt_mid') && /задн.*дельт|rear|обратн.*разведен|reverse.*fly|лиц.*тяга|face.?pull|махи.*наклон/i.test(e.name || '');
+  const rear = working.filter(isRearDelt);
   if (rear.length === 0) {
     const heavy = { name: 'Тяга к лицу (face pull)', id: 'face_pull' };
     const fly = { name: 'Махи в наклоне на заднюю дельту', id: 'rear_delt_fly' };
@@ -3358,8 +3359,9 @@ for (const week of next.weeks) {
   }
   // Финальная страховка лимита сессии (после всех проходов): ни одна сессия
   // не превышает maxWorkingSets (вторичные accessory сеты срезаются, мин. 2).
+  // PPL: тяжёлый Pull 41 сет (спина 12 + задняя 6 + трапы 5 + бицепс 10 + предплечья), лифт до 42/46.
   // Optional-добивки («при наличии сил») в кап не входят.
-  const finMaxSets = isPPLPattern(options, next) ? Math.max(options.maxWorkingSets ?? 24, options.level === 'enhanced' ? (options.maxWorkingSets ?? 24) : 32) : (options.maxWorkingSets ?? 24);
+  const finMaxSets = isPPLPattern(options, next) ? Math.max(options.maxWorkingSets ?? 24, options.level === 'enhanced' ? 46 : 42) : (options.maxWorkingSets ?? 24);
   for (const week of next.weeks) {
     for (const session of week.sessions) {
       const workingEx = session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
@@ -3375,6 +3377,7 @@ for (const week of next.weeks) {
       }
     }
   }
+
   // Проф-методики (по выбору пользователя): суперсеты-антагонисты и схемы
   // объёма памп-дней (GVT 10×10 / FST-7 / 8×8). Применяются ПОСЛЕ всех
   // проходов — cap 5 и лимиты сессий сохраняются.
@@ -3419,6 +3422,14 @@ for (const week of next.weeks) {
           for (const c of indirectMuscleContributions(e)) if (c.muscle === muscle) indirectTotal += (e.sets || 0) * c.coefficient;
         }
         const directTotal = volume[muscle]?.directSets || 0;
+        if (isPPLPattern(options, next)) {
+          const pullCnt = (week as any).sessions.filter((s: any) => /Pull|Back/i.test(s.sessionTag || '')).length || 1;
+          const pushCnt = (week as any).sessions.filter((s: any) => /Push|Chest/i.test(s.sessionTag || '')).length || 1;
+          const legsCnt = (week as any).sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1;
+          const pplMin: Record<string, number> = { traps: 5 * pullCnt, biceps: 10 * pullCnt, triceps: 10 * pushCnt, calves: 9 * legsCnt, shoulders: 6 * pullCnt, delt_rear: 6 * pullCnt, delt_mid: 3 * pushCnt } as any;
+          const minWeekly2 = (pplMin as any)[muscle];
+          if (minWeekly2 != null && directTotal <= minWeekly2) { /*console.log(`[DBG cap skip] ${muscle} direct ${directTotal} <= min ${minWeekly2}`);*/ continue; }
+        }
         const targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
         let need = Math.max(0, directTotal - targetDirect);
         if (need <= 0) continue;
@@ -3486,10 +3497,12 @@ for (const week of next.weeks) {
 
 
   }
+
   // Лимит упражнений сессии пост-фактум (слабые группы могут дать перебор в buildSession).
   if (!options.preserveSource && (next as any).pattern?.id) {
     enforceSessionExerciseLimit(next, options);
   }
+
   // Cleanup dangling supersetWith после всех удалений (fit/cap/donor/superset)
   // Per-session: партнёр должен быть в той же сессии, global check ложно считал
   // существующим, если имя есть в другой неделе.
