@@ -580,7 +580,12 @@ export function parseCardioJson(text: string): CardioImportResult {
   return { entries, warnings, format: 'json' };
 }
 
-// ── ZIP (Apple export.zip → export.xml + routes) ──────────────────────────
+// ── ZIP (Apple export.zip → export.xml + routes) — синхронный, для PRO async см. parseCardioZipAsync ──
+export async function parseCardioZipAsync(buffer: ArrayBuffer): Promise<CardioImportResult> {
+  // off-main-thread: yield event loop чтобы UI не фризил на 50Мб export.zip
+  await new Promise<void>(r => setTimeout(r, 0));
+  return parseCardioZip(buffer);
+}
 export function parseCardioZip(buffer: ArrayBuffer): CardioImportResult {
   const warnings: string[] = [];
   const entries: CardioLogEntry[] = [];
@@ -621,7 +626,11 @@ export function parseCardioZip(buffer: ArrayBuffer): CardioImportResult {
   return { entries, warnings, format: 'zip' };
 }
 
-// ── FIT (Garmin) — попытка парсинга через fit-file-parser ─────────────────
+// ── FIT (Garmin) — попытка парсинга через fit-file-parser, PRO async wrapper ──
+export async function parseCardioFitAsync(buffer: ArrayBuffer): Promise<CardioImportResult> {
+  await new Promise<void>(r => setTimeout(r, 0));
+  return parseCardioFit(buffer);
+}
 export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
   const warnings: string[] = [];
   // пробуем реальный парсинг, fallback — инструкция
