@@ -14,8 +14,9 @@
 import React, { useMemo, useState } from 'react';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, isoToday, isoAddDays, isoDiffDays,
-  CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS,
+  CONTEST_CATEGORY_LABELS, PHASE_LABELS_RU, PEAK_PHASE_COLORS, resolveMainCompetition,
   type BBContestPrepConfig, type BBContestCategory, type PeakDayPhase,
+  type ContestSpecialization, type ContestEventEntry,
 } from '../../../../engines/bb/bb-contest-prep.engine';
 import { GlassCard } from './ui';
 import { usePlanCtx } from './IndividualPlanContext';
