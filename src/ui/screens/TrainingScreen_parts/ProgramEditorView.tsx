@@ -52,7 +52,8 @@ import { getReferencedCycle, userWeekToBBPlan, validateProgram, cloneFromCycle, 
 import { autodraftBBPlan, applyPhaseModulation, plLmsScheduleDays, computePlanQualityFor, muscleAwareSets, makeSetsFromTemplate, suggestExercisesForGroup } from '../../../engines/manual-constructor';
 import { GROUP_RU } from './program-types';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
-import { resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex, moveWeekScheduleDay, resetScheduleToRecommended, sessionUsesRecommendedDay } from './program-editor-logic';
+import { resizeTrainingSessions, sessionDayOfWeek, trainingDayForIndex, moveWeekScheduleDay, resetScheduleToRecommended, sessionUsesRecommendedDay, firstFreeTrainingDay } from './program-editor-logic';
+import { DAY_TEMPLATES } from './ProgramEditorComponents';
 import { BulkApplyCard } from './BulkApplyCard';
 import { useEditorToast } from './EditorToast';
 import { TrainingModal } from './TrainingModal';
@@ -65,6 +66,7 @@ import { CycleTemplatesPanel } from './CycleTemplatesPanel';
 import { QualityChecklistCard } from './QualityChecklistCard';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
 import { PlDeadpointsBarPathCard } from './PlDeadpointsBarPathCard';
+import { ManualLibraryDrawer } from './ManualLibraryDrawer';
 
 import { GOAL_OPTS_BB as CENTRAL_GOAL_BB2, GOAL_OPTS_PL as CENTRAL_GOAL_PL2, GOAL_OPTS_HYBRID as CENTRAL_GOAL_HYBRID2, goalLabelOf as centralGoalLabelOf2 } from '../../../engines/goals';
 export const GOAL_OPTS_BB = CENTRAL_GOAL_BB2;
@@ -238,8 +240,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
   }, [program, dir, onChange, update, showToast, tprofile, linked.profile, labAdjust.mrvMultiplier]);
 
 
-  // Библиотека внутри редактора
-  const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | 'macro' | null>(null);
+  // Библиотека внутри редактора — unified drawer (bb/pl/templates/fav) + legacy bb/pl
+  const [editorLibOpen, setEditorLibOpen] = useState<'bb' | 'pl' | 'methods' | 'macro' | 'library' | null>(null);
   // Кардио внутри редактора: 'card' — интеграционная карточка, 'constructor' — конструктор в модале
   const [cardioView, setCardioView] = useState<'card' | 'constructor' | null>(null);
   // ⭐ Избранные программы (he_program_fav)
@@ -742,7 +744,7 @@ return (
         {showMore && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))', gap: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <button disabled={isAutoFilling} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 11px', borderRadius: 12, cursor: isAutoFilling ? 'not-allowed' : 'pointer', background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.22)', color: '#00e68a', opacity: isAutoFilling ? 0.65 : 1, minHeight: 56, textAlign: 'left' }} onClick={autoFillDraft} title="Авто-черновик из профиля — соберёт недели и упражнения под ваш уровень"><span style={{ fontSize: 13 }}>⚡</span><span style={{ fontSize: 11, fontWeight: 800 }}>Авто-черновик</span><span style={{ fontSize: 10, color: 'rgba(0,230,138,0.70)' }}>из профиля</span></button>
-            <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 11px', borderRadius: 12, cursor: 'pointer', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', color: '#f59e0b', minHeight: 56, textAlign: 'left' }} onClick={() => { if (dir === 'bb') setEditorLibOpen('bb'); else if (dir === 'pl') setEditorLibOpen('pl'); }}><span style={{ fontSize: 13 }}>📥</span><span style={{ fontSize: 11, fontWeight: 700 }}>Загрузить</span><span style={{ fontSize: 10, color: 'rgba(245,158,11,0.70)' }}>из библиотеки</span></button>
+            <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 11px', borderRadius: 12, cursor: 'pointer', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)', color: '#f59e0b', minHeight: 56, textAlign: 'left' }} onClick={() => setEditorLibOpen('library')}><span style={{ fontSize: 13 }}>📥</span><span style={{ fontSize: 11, fontWeight: 700 }}>Загрузить</span><span style={{ fontSize: 10, color: 'rgba(245,158,11,0.70)' }}>из библиотеки</span></button>
             {isPro && dir === 'bb' && program.bb && (program.bb.weeks?.length ?? 0) >= 4 && (
               <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2, padding: '10px 11px', borderRadius: 12, cursor: 'pointer', background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.18)', color: '#60a5fa', minHeight: 56, textAlign: 'left' }}
                 onClick={() => { const updated = { ...program.bb!, weeks: applyPhaseModulation(program.bb!.weeks!, { goal: program.meta.goal, level: program.meta.level, weeksTotal: program.meta.weeks || 4 }) }; update({ bb: updated }); showToast('📈 Фазы применены'); }}><span style={{ fontSize: 13 }}>📈</span><span style={{ fontSize: 11, fontWeight: 700 }}>Фазы</span><span style={{ fontSize: 10, color: 'rgba(96,165,250,0.70)' }}>периодизация</span></button>
@@ -782,7 +784,7 @@ return (
             <button style={{ ...BTN, padding: '8px 16px', fontSize: 12, minHeight: 44 }} onClick={() => autoFillDraft()} title="Автоматическая сборка на основе цели/уровня/дней">
               {isAutoFilling ? '⏳ Создание...' : '⚡ Создать автоматически'}
             </button>
-            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen(emptyDir)}>
+            <button style={{ ...BTN_GHOST, padding: '8px 16px', fontSize: 12, minHeight: 44, color: '#a78bfa', borderColor: 'rgba(167,139,250,0.3)' }} onClick={() => setEditorLibOpen('library')}>
               📥 Загрузить из библиотеки
             </button>
           </div>
@@ -1724,8 +1726,44 @@ return (
       {/* Локальный toast для сообщений внутри редактора (авто-черновик, к выполнению и т.п.) */}
       {ToastNode}
 
+      {/* Unified Library Drawer — BB+PL+Templates+Fav */}
+      {editorLibOpen === 'library' && (
+        <TrainingModal title="📚 Библиотека — программы, циклы, шаблоны" onClose={() => setEditorLibOpen(null)} wide>
+          <ManualLibraryDrawer
+            onSelectBB={(pr) => { loadIntoEditor(cloneFromLibrary(pr)); setEditorLibOpen(null); }}
+            onSelectPL={(cycleId) => { loadCycleIntoEditor(cycleId); setEditorLibOpen(null); }}
+            onAddTemplate={(idx) => {
+              try {
+                const tmpl = DAY_TEMPLATES[idx];
+                if (!tmpl) { setEditorLibOpen(null); return; }
+                if (program.bb) {
+                  const weeks = [...program.bb.weeks];
+                  if (weeks.length===0) weeks.push({ week:1, phase:'accumulation', deload:false, sessions:[] });
+                  const w0 = weeks[0];
+                  const newSession = {
+                    id: newId('ses'),
+                    name: tmpl.name,
+                    dayOfWeek: firstFreeTrainingDay(w0.sessions as any),
+                    focus: tmpl.focus,
+                    blocks: tmpl.blocks.map(b=> ({ id: newId('blk'), type: b.type, exerciseName: b.exerciseName, muscle: b.muscle, role: b.type==='compound'?'primary':'accessory', sets: b.sets.map(s=> ({ ...s })) })),
+                  } as any;
+                  weeks[0] = { ...w0, sessions: [...w0.sessions, newSession] };
+                  update({ bb: { ...program.bb, weeks } as any });
+                  showToast(`📥 Шаблон «${tmpl.label}» добавлен в неделю 1`);
+                } else if (program.pl) {
+                  showToast(`📥 Шаблон «${tmpl.label}» — для ПЛ используйте «ПЛ Циклы»`);
+                } else {
+                  showToast(`📥 Шаблон «${tmpl.label}»`);
+                }
+              } catch {}
+              setEditorLibOpen(null);
+            }}
+            favIds={progFavs}
+          />
+        </TrainingModal>
+      )}
       {/* Библиотека — модальное окно внутри редактора (только bb/pl; methods/macro имеют отдельные модалы) */}
-      {editorLibOpen && editorLibOpen !== 'macro' && editorLibOpen !== 'methods' && (
+      {editorLibOpen && editorLibOpen !== 'macro' && editorLibOpen !== 'methods' && editorLibOpen !== 'library' && (
         <TrainingModal title={`📚 ${editorLibOpen === 'bb' ? 'Библиотека программ' : 'Проф. ПЛ-циклы'}`} onClose={() => setEditorLibOpen(null)}>
             {editorLibOpen === 'bb' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: '60vh', overflow: 'auto' }}>

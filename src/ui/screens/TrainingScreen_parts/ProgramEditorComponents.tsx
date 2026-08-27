@@ -87,8 +87,8 @@ const PhasePicker: React.FC<{
   />
 );
 
-/** Быстрые шаблоны тренировочных дней — день с готовыми упражнениями из каталога. */
-const DAY_TEMPLATES: Array<{
+/** Быстрые шаблоны тренировочных дней — день с готовыми упражнениями из каталога (10×, покрывают Upper/Lower/Push/Pull/FullBody + специализации). */
+export const DAY_TEMPLATES: Array<{
   label: string; icon: string; name: string; focus: string;
   blocks: Array<{ exerciseName: string; muscle: string; type: UserBlock['type']; sets: Array<{ reps: number; rir: number; restSec: number }> }>;
 }> = [
@@ -97,6 +97,7 @@ const DAY_TEMPLATES: Array<{
     blocks: [
       { exerciseName: 'Жим штанги лёжа', muscle: 'chest', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 120 }, { reps: 8, rir: 2, restSec: 120 }, { reps: 6, rir: 1, restSec: 120 }] },
       { exerciseName: 'Жим гантелей лёжа', muscle: 'chest', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }, { reps: 10, rir: 2, restSec: 90 }, { reps: 8, rir: 1, restSec: 90 }] },
+      { exerciseName: 'Разгибания на трицепс в блоке', muscle: 'arms', type: 'isolation', sets: [{ reps: 12, rir: 2, restSec: 60 }, { reps: 12, rir: 2, restSec: 60 }] },
     ],
   },
   {
@@ -114,6 +115,67 @@ const DAY_TEMPLATES: Array<{
       { exerciseName: 'Жим ногами', muscle: 'legs', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 120 }, { reps: 10, rir: 2, restSec: 120 }, { reps: 8, rir: 1, restSec: 120 }] },
       { exerciseName: 'Сгибания ног в тренажёре лёжа', muscle: 'legs', type: 'isolation', sets: [{ reps: 12, rir: 2, restSec: 60 }, { reps: 12, rir: 2, restSec: 60 }, { reps: 10, rir: 1, restSec: 60 }] },
       { exerciseName: 'Жим гантелей сидя', muscle: 'shoulders', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }, { reps: 10, rir: 2, restSec: 90 }, { reps: 8, rir: 1, restSec: 90 }] },
+    ],
+  },
+  {
+    label: 'Верх (Upper)', icon: '🔝', name: 'Верх', focus: 'грудь, спина, плечи',
+    blocks: [
+      { exerciseName: 'Жим штанги лёжа', muscle: 'chest', type: 'compound', sets: [{ reps: 6, rir: 2, restSec: 120 }, { reps: 6, rir: 2, restSec: 120 }] },
+      { exerciseName: 'Тяга штанги в наклоне', muscle: 'back', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 120 }, { reps: 8, rir: 2, restSec: 120 }] },
+      { exerciseName: 'Жим гантелей сидя', muscle: 'shoulders', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }] },
+      { exerciseName: 'Тяга к лицу (face pull)', muscle: 'shoulders', type: 'isolation', sets: [{ reps: 15, rir: 2, restSec: 60 }] },
+    ],
+  },
+  {
+    label: 'Низ (Lower)', icon: '🦶', name: 'Низ', focus: 'ноги, ягодицы',
+    blocks: [
+      { exerciseName: 'Приседания со штангой', muscle: 'legs', type: 'compound', sets: [{ reps: 6, rir: 2, restSec: 150 }, { reps: 6, rir: 2, restSec: 150 }] },
+      { exerciseName: 'Румынская тяга', muscle: 'legs', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 120 }, { reps: 8, rir: 2, restSec: 120 }] },
+      { exerciseName: 'Ягодичный мост со штангой', muscle: 'legs', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }] },
+      { exerciseName: 'Подъёмы на носки стоя', muscle: 'legs', type: 'isolation', sets: [{ reps: 15, rir: 2, restSec: 60 }] },
+    ],
+  },
+  {
+    label: 'Толкай (Push)', icon: '🚀', name: 'Толкай', focus: 'грудь, плечи, трицепс',
+    blocks: [
+      { exerciseName: 'Жим штанги лёжа', muscle: 'chest', type: 'compound', sets: [{ reps: 6, rir: 2, restSec: 120 }] },
+      { exerciseName: 'Жим штанги на наклонной (30°)', muscle: 'chest', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 90 }] },
+      { exerciseName: 'Армейский жим стоя', muscle: 'shoulders', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 90 }] },
+      { exerciseName: 'Разгибания на трицепс в блоке', muscle: 'arms', type: 'isolation', sets: [{ reps: 12, rir: 2, restSec: 60 }] },
+    ],
+  },
+  {
+    label: 'Тяни (Pull)', icon: '🪢', name: 'Тяни', focus: 'спина, бицепс, задняя дельта',
+    blocks: [
+      { exerciseName: 'Подтягивания (прямой хват)', muscle: 'back', type: 'compound', sets: [{ reps: 6, rir: 2, restSec: 120 }] },
+      { exerciseName: 'Тяга горизонтального блока', muscle: 'back', type: 'compound', sets: [{ reps: 10, rir: 2, restSec: 90 }] },
+      { exerciseName: 'Махи в наклоне на заднюю дельту', muscle: 'shoulders', type: 'isolation', sets: [{ reps: 15, rir: 2, restSec: 60 }] },
+      { exerciseName: 'Подъём штанги на бицепс стоя', muscle: 'arms', type: 'isolation', sets: [{ reps: 10, rir: 2, restSec: 60 }] },
+    ],
+  },
+  {
+    label: 'FullBody', icon: '⚡', name: 'FullBody', focus: 'грудь, спина, ноги',
+    blocks: [
+      { exerciseName: 'Приседания со штангой', muscle: 'legs', type: 'compound', sets: [{ reps: 6, rir: 2, restSec: 120 }] },
+      { exerciseName: 'Жим штанги лёжа', muscle: 'chest', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 90 }] },
+      { exerciseName: 'Тяга штанги в наклоне', muscle: 'back', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 90 }] },
+    ],
+  },
+  {
+    label: 'Руки (Arms)', icon: '💥', name: 'Руки', focus: 'бицепс, трицепс',
+    blocks: [
+      { exerciseName: 'Подъём штанги на бицепс стоя', muscle: 'arms', type: 'isolation', sets: [{ reps: 10, rir: 2, restSec: 60 }, { reps: 10, rir: 2, restSec: 60 }] },
+      { exerciseName: 'Молотки (нейтральный хват)', muscle: 'arms', type: 'isolation', sets: [{ reps: 12, rir: 2, restSec: 60 }] },
+      { exerciseName: 'Жим узким хватом', muscle: 'arms', type: 'compound', sets: [{ reps: 8, rir: 2, restSec: 90 }] },
+      { exerciseName: 'Разгибания на трицепс в блоке', muscle: 'arms', type: 'isolation', sets: [{ reps: 12, rir: 2, restSec: 60 }] },
+    ],
+  },
+  {
+    label: 'Кор + Пресс', icon: '🧱', name: 'Кор', focus: 'пресс, кор',
+    blocks: [
+      { exerciseName: 'Скручивания на полу', muscle: 'core', type: 'isolation', sets: [{ reps: 15, rir: 2, restSec: 60 }, { reps: 15, rir: 2, restSec: 60 }] },
+      { exerciseName: 'Планка', muscle: 'core', type: 'isolation', sets: [{ reps: 1, rir: 3, restSec: 60 }] },
+      { exerciseName: 'Подъём ног в висе', muscle: 'core', type: 'isolation', sets: [{ reps: 12, rir: 2, restSec: 60 }] },
     ],
   },
 ];
