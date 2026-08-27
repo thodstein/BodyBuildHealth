@@ -2740,6 +2740,64 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (days >= 7 && weekDays.length > 0) { allDayPlans = weekDays; }
       else if (days >= 3 && d2 && d3) { allDayPlans = [d1, d2, d3]; }
       else { allDayPlans = [d1]; }
+      // Финальный строгий кламп ≤3% — V2 (исправляет +30% жиров в про)
+      for (const day of allDayPlans) {
+        let guard3 = 25;
+        while (guard3-- > 0) {
+          const g = {kcal: effectiveKcal||0, p: effectiveP||0, f: effectiveF||0, c: effectiveC||0};
+          if (!g.kcal || !g.p) break;
+          const devK = Math.abs(day.totals.kcal - g.kcal)/g.kcal;
+          const devP = Math.abs(day.totals.p - g.p)/g.p;
+          const devF = Math.abs(day.totals.f - g.f)/g.f;
+          const devC = Math.abs(day.totals.c - g.c)/g.c;
+          if (Math.max(devK,devP,devF,devC) <= 0.0301) break;
+          // reuse same worst logic as classic final clamp
+          const devs:any={k:devK,p:devP,f:devF,c:devC};
+          let worst:'k'|'p'|'f'|'c'='k'; if(devs.p>devs[worst]) worst='p'; if(devs.f>devs[worst]) worst='f'; if(devs.c>devs[worst]) worst='c';
+          let effWorst:'p'|'f'|'c'= worst==='k' ? (devs.p>=devs.c && devs.p>=devs.f ? 'p' : devs.c>=devs.f ? 'c':'f') : worst as any;
+          const target = effWorst==='p'?g.p:effWorst==='f'?g.f:g.c;
+          const cur = effWorst==='p'?day.totals.p:effWorst==='f'?day.totals.f:day.totals.c;
+          const need = target - cur;
+          if (Math.abs(need) < 0.5) break;
+          if (need < 0) {
+            let bMi=-1,bIi=-1,bScore=-1;
+            day.meals.forEach((m:any,mi:number)=> (m.items||[]).forEach((it:any,ii:number)=>{
+              const f:any=FOOD_DB.find((x:any)=>x.id===it.id);
+              const per100=effWorst==='p'?(f?.protein||0):effWorst==='c'?(f?.carbs||0):(f?.fat||0);
+              if(per100<=0) return;
+              const score=per100*(it.amount||0)/100;
+              if(score>bScore){bScore=score;bMi=mi;bIi=ii;}
+            }));
+            if(bIi<0) break;
+            const it=day.meals[bMi].items[bIi];
+            const na=Math.max(10,Math.round(it.amount*0.88));
+            if(na>=it.amount) break;
+            const r2=na/(it.amount||1);
+            it.p=+(it.p*r2).toFixed(1); it.f=+(it.f*r2).toFixed(1); it.c=+(it.c*r2).toFixed(1);
+            it.kcal=Math.round(4*it.p+9*it.f+4*it.c); it.amount=na;
+            day.meals[bMi].totals=day.meals[bMi].items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
+          } else {
+            const pool=FOOD_DB.filter((f:any)=>{
+              const v=effWorst==='p'?(f.protein||0):effWorst==='c'?(f.carbs||0):(f.fat||0);
+              return v>8;
+            }).sort((a:any,b:any)=>{
+              const av=effWorst==='p'?(a.protein||0)/(a.kcal||1):effWorst==='c'?(a.carbs||0)/(a.kcal||1):(a.fat||0)/(a.kcal||1);
+              const bv=effWorst==='p'?(b.protein||0)/(b.kcal||1):effWorst==='c'?(b.carbs||0)/(b.kcal||1):(b.fat||0)/(b.kcal||1);
+              return bv-av;
+            });
+            const best=pool[0]; if(!best) break;
+            const per100=effWorst==='p'?(best.protein||0):effWorst==='c'?(best.carbs||0):(best.fat||0);
+            const grams=Math.min(120,Math.max(15,Math.round(need/per100*100/10)*10));
+            const r=grams/100; const p2=Math.round((best.protein||0)*r),f2=Math.round((best.fat||0)*r),c2=Math.round((best.carbs||0)*r);
+            const it:any={id:best.id,name:best.name,amount:grams,kcal:Math.round(4*p2+9*f2+4*c2),p:p2,f:f2,c:c2,fiber:Math.round((best.fiber||0)*r)};
+            let tm=day.meals.find((m:any)=> m.label==='Перекус'||m.label==='Полдник')||day.meals[day.meals.length-1];
+            tm.items.push(it); tm.totals=tm.items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
+          }
+          day.totals=day.meals.reduce((a:any,m:any)=>({kcal:a.kcal+m.totals.kcal,p:a.p+m.totals.p,f:a.f+m.totals.f,c:a.c+m.totals.c}),{kcal:0,p:0,f:0,c:0});
+          day.totals.kcal=Math.round(day.totals.p*4+day.totals.f*9+day.totals.c*4);
+          day.meals.forEach((m:any)=>{m.totals.kcal=Math.round(m.totals.p*4+m.totals.f*9+m.totals.c*4);});
+        }
+      }
       const shoppingArr = buildShoppingFromPlans(allDayPlans);
       setShoppingList(shoppingArr);
       // Water
@@ -3731,7 +3789,70 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       else setWeekPlan(weekData);
      }
      try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations failed (classic):', e); } catch {} }
-     const allDayPlans = days >= 7 ? weekDays! : days >= 3 ? [d1, d2, d3] : [d1];
+      const allDayPlans = days >= 7 ? weekDays! : days >= 3 ? [d1, d2, d3] : [d1];
+    // Финальный строгий кламп ≤3% по каждому параметру и общему КБЖУ — для всех режимов (исправляет +57% в быстром)
+    for (const day of allDayPlans) {
+      if (!day?.meals?.length) continue;
+      const g = {kcal: effectiveKcal||0, p: effectiveP||0, f: effectiveF||0, c: effectiveC||0};
+      if (!g.kcal || !g.p) continue;
+      let guard2 = 25;
+      const maxDevDay = () => Math.max(
+        g.kcal ? Math.abs(day.totals.kcal - g.kcal)/g.kcal : 0,
+        g.p ? Math.abs(day.totals.p - g.p)/g.p : 0,
+        g.f ? Math.abs(day.totals.f - g.f)/g.f : 0,
+        g.c ? Math.abs(day.totals.c - g.c)/g.c : 0
+      );
+      while (maxDevDay() > 0.0301 && guard2-- > 0) {
+        const devK = g.kcal ? (day.totals.kcal - g.kcal)/g.kcal : 0;
+        const devP = g.p ? (day.totals.p - g.p)/g.p : 0;
+        const devF = g.f ? (day.totals.f - g.f)/g.f : 0;
+        const devC = g.c ? (day.totals.c - g.c)/g.c : 0;
+        const abs:any = {k: Math.abs(devK), p: Math.abs(devP), f: Math.abs(devF), c: Math.abs(devC)};
+        let worst: 'k'|'p'|'f'|'c'='k'; if (abs.p>abs[worst]) worst='p'; if (abs.f>abs[worst]) worst='f'; if (abs.c>abs[worst]) worst='c';
+        let effWorst: 'p'|'f'|'c' = worst==='k' ? (abs.p>=abs.c && abs.p>=abs.f ? 'p' : abs.c>=abs.f ? 'c' : 'f') : worst as any;
+        const target = effWorst==='p'?g.p:effWorst==='f'?g.f:g.c;
+        const cur = effWorst==='p'?day.totals.p:effWorst==='f'?day.totals.f:day.totals.c;
+        const need = target - cur;
+        if (Math.abs(need) < 0.5) break;
+        if (need < 0) {
+          let bMi=-1,bIi=-1,bScore=-1;
+          day.meals.forEach((m:any,mi:number)=> (m.items||[]).forEach((it:any,ii:number)=>{
+            const f:any = FOOD_DB.find((x:any)=>x.id===it.id);
+            const per100 = effWorst==='p' ? (f?.protein||0) : effWorst==='c' ? (f?.carbs||0) : (f?.fat||0);
+            if (per100<=0) return;
+            const score = per100 * (it.amount||0)/100;
+            if (score > bScore) {bScore=score; bMi=mi; bIi=ii;}
+          }));
+          if (bIi<0) break;
+          const it = day.meals[bMi].items[bIi];
+          const na = Math.max(10, Math.round(it.amount * 0.85));
+          if (na >= it.amount) break;
+          const r2 = na/(it.amount||1);
+          it.p = +(it.p*r2).toFixed(1); it.f = +(it.f*r2).toFixed(1); it.c = +(it.c*r2).toFixed(1);
+          it.kcal = Math.round(4*it.p + 9*it.f + 4*it.c); it.amount = na;
+          day.meals[bMi].totals = day.meals[bMi].items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
+        } else {
+          const pool = FOOD_DB.filter((f:any)=>{
+            const v = effWorst==='p' ? (f.protein||0) : effWorst==='c' ? (f.carbs||0) : (f.fat||0);
+            return v>8;
+          }).sort((a:any,b:any)=>{
+            const av = effWorst==='p' ? (a.protein||0)/(a.kcal||1) : effWorst==='c' ? (a.carbs||0)/(a.kcal||1) : (a.fat||0)/(a.kcal||1);
+            const bv = effWorst==='p' ? (b.protein||0)/(b.kcal||1) : effWorst==='c' ? (b.carbs||0)/(b.kcal||1) : (b.fat||0)/(b.kcal||1);
+            return bv-av;
+          });
+          const best = pool[0]; if (!best) break;
+          const per100 = effWorst==='p' ? (best.protein||0) : effWorst==='c' ? (best.carbs||0) : (best.fat||0);
+          const grams = Math.min(120, Math.max(15, Math.round(need/per100*100/10)*10));
+          const r = grams/100; const p2=Math.round((best.protein||0)*r), f2=Math.round((best.fat||0)*r), c2=Math.round((best.carbs||0)*r);
+          const it:any = {id: best.id, name: best.name, amount: grams, kcal: Math.round(4*p2+9*f2+4*c2), p:p2, f:f2, c:c2, fiber: Math.round((best.fiber||0)*r)};
+          let tm = day.meals.find((m:any)=> m.label==='Перекус' || m.label==='Полдник') || day.meals[day.meals.length-1];
+          tm.items.push(it); tm.totals = tm.items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
+        }
+        day.totals = day.meals.reduce((a:any,m:any)=>({kcal:a.kcal+m.totals.kcal,p:a.p+m.totals.p,f:a.f+m.totals.f,c:a.c+m.totals.c}),{kcal:0,p:0,f:0,c:0});
+        day.totals.kcal = Math.round(day.totals.p*4 + day.totals.f*9 + day.totals.c*4);
+        day.meals.forEach((m:any)=>{ m.totals.kcal = Math.round(m.totals.p*4 + m.totals.f*9 + m.totals.c*4); });
+      }
+    }
     // T4.5 — Weekly diversity score
     const allWeekFoodIds: string[] = [];
     allDayPlans.forEach((dp: any) => { (dp.meals || []).forEach((m: any) => { (m.items || []).forEach((it: any) => { allWeekFoodIds.push(it.id); }); }); });
