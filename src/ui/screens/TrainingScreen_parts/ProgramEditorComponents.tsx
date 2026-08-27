@@ -280,6 +280,11 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           </button>
         )}
       </div>
+      {body.weeks.length > 0 && (
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.50)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'5px 8px', lineHeight:1.4 }}>
+          <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.65)' }}>Канон расписания:</span> 3д → Пн·Ср·Пт · 4д → Пн·Вт·Чт·Пт · 5д → Пн·Вт·Ср·Пт·Сб · 6д → Пн-Сб · <span style={{ color:'#f59e0b' }}>⭐</span> — рекомендовано, можно любой день 0-6.
+        </div>
+      )}
       {/* Live качество — score + баланс, прямо в редакторе недель */}
       {body.weeks.length > 0 && (() => {
         try {
@@ -1431,29 +1436,67 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
         {wm > 0 && <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : 'kg')} style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, border: weightMode === 'pct' ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', background: weightMode === 'pct' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: weightMode === 'pct' ? '#00e68a' : 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>{weightMode === 'kg' ? 'кг · показать %' : '% · показать кг'}</button>}
         <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>{sets.length} шт.</span>
       </div>
+      {/* Header таблицы подходов — Excel-like */}
+      {sets.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.45)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <span style={{ width: 22, textAlign: 'center' }}>#</span>
+          <span style={{ width: 56, textAlign: 'center' }}>Повт</span>
+          <span style={{ width: 50, textAlign: 'center' }}>RIR</span>
+          <span style={{ width: 60, textAlign: 'center' }}>Вес кг</span>
+          <span style={{ width: 46, textAlign: 'center' }}>Отдых</span>
+          <span style={{ width: 56, textAlign: 'center' }}>Темп</span>
+          <span style={{ flex: 1 }} />
+        </div>
+      )}
+      {sets.length > 1 && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <button type="button" onClick={() => { const f=sets[0]; if(f) onChange(sets.map(s=> ({ ...s, tempo: f.tempo, restSec: f.restSec })) ); }} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>↕ Копировать RIR/темп/отдых с 1-го</button>
+          <button type="button" onClick={() => { const f=sets[0]; if(f?.weight!=null) onChange(sets.map(s=> ({ ...s, weight: f.weight })) ); }} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>↕ Вес с 1-го</button>
+        </div>
+      )}
       {sets.map((s, i) => (
         <div key={i} style={{ background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.14)', borderRadius: 8, padding: '6px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-             <span className="editor-set-index">{i + 1}</span>
-             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 40, minHeight: 44 }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" placeholder="повт" aria-label={`Повторения подхода ${i + 1}`} inputMode="numeric" />
+             <span className="editor-set-index" style={{ minWidth: 18, textAlign: 'center', fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)' }}>{i + 1}</span>
+             <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
+               <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 42, minHeight: 44, textAlign:'center' }} value={typeof s.reps === 'number' ? s.reps : 0} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { reps: Math.max(0, Math.round(v)) }); }} title="повторения" placeholder="повт" aria-label={`Повторения подхода ${i + 1}`} inputMode="numeric" />
+               <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                 <button type="button" onClick={() => { const cur = typeof s.reps==='number'?s.reps:10; upd(i,{ reps: cur+1 }); }} style={{ width:18, height:14, fontSize:8, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>▲</button>
+                 <button type="button" onClick={() => { const cur = typeof s.reps==='number'?s.reps:10; upd(i,{ reps: Math.max(1, cur-1) }); }} style={{ width:18, height:14, fontSize:8, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>▼</button>
+               </div>
+             </div>
             <span style={{ fontSize: 11, color: DIM }}>×</span>
-             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={s.rir} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} title="RIR: повторения в запасе" placeholder="RIR" aria-label={`RIR подхода ${i + 1}`} inputMode="numeric" />
+             <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
+               <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 38, minHeight: 44, textAlign:'center' }} value={s.rir} min={0} max={5} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { rir: Math.max(0, Math.min(5, Math.round(v))) }); }} title="RIR: повторения в запасе" placeholder="RIR" aria-label={`RIR подхода ${i + 1}`} inputMode="numeric" />
+               <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                 <button type="button" onClick={() => upd(i,{ rir: Math.min(5,(s.rir??2)+1) })} style={{ width:16, height:14, fontSize:8, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>▲</button>
+                 <button type="button" onClick={() => upd(i,{ rir: Math.max(0,(s.rir??2)-1) })} style={{ width:16, height:14, fontSize:8, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>▼</button>
+               </div>
+             </div>
             <span style={{ fontSize: 11, color: DIM }}>@</span>
             {weightMode === 'pct' ? (
               <>
-                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 44 }} value={s.pctOf1RM != null ? Math.round(s.pctOf1RM * 100) : ''} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { pctOf1RM: v / 100, weight: Math.round((wm * v / 100) / 2.5) * 2.5 }); }} title="% от 1ПМ" placeholder="%" />
+                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 44, textAlign:'center' }} value={s.pctOf1RM != null ? Math.round(s.pctOf1RM * 100) : ''} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { pctOf1RM: v / 100, weight: Math.round((wm * v / 100) / 2.5) * 2.5 }); }} title="% от 1ПМ" placeholder="%" />
                 <span style={{ fontSize: 11, color: DIM }}>%→</span>
               </>
             ) : null}
-             <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 44, minHeight: 44 }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" aria-label={`Вес подхода ${i + 1} в килограммах`} placeholder="кг" />
+             <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
+               <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 46, minHeight: 44, textAlign:'center' }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" aria-label={`Вес подхода ${i + 1} в килограммах`} placeholder="кг" />
+               <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                 <button type="button" onClick={() => upd(i,{ weight: Math.round(((s.weight??0)+2.5)/2.5)*2.5 })} style={{ width:16, height:14, fontSize:7, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>+2.5</button>
+                 <button type="button" onClick={() => upd(i,{ weight: Math.max(0, Math.round(((s.weight??0)-2.5)/2.5)*2.5) })} style={{ width:16, height:14, fontSize:8, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>−2.5</button>
+               </div>
+             </div>
             {wm > 0 && typeof s.reps === 'number' && (
               <button style={{ border: 'none', background: 'rgba(0,230,138,0.12)', color: ACCENT, cursor: 'pointer', fontSize: 11, padding: '4px 6px', borderRadius: 4, fontWeight: 700, minHeight: 44 }} onClick={() => autoCalcWeight(i, s.rir, s.reps as number)} title="Рассчитать вес из %1RM" aria-label="calc">🧮</button>
             )}
-            <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44 }} value={Math.floor((s.restSec ?? 90) / 60)} min={0} max={20} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { restSec: Math.max(0, Math.round(v)) * 60 }); }} title="отдых (мин)" placeholder="отд" aria-label="Отдых в минутах" inputMode="numeric" />
-            <span style={{ fontSize: 11, color: DIM }}>м</span>
-            <input type="text" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 52, minHeight: 44 }} value={s.tempo || ''} onChange={e => upd(i, { tempo: e.target.value })} placeholder="темп" title="Темп (2-1-1-0)" />
-            <button style={{ border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 32, borderRadius: 6, borderWidth: 0 }} onClick={() => confirmDelete(i)}>✕</button>
-          </div>
+            <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
+              <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44, textAlign:'center' }} value={Math.floor((s.restSec ?? 90) / 60)} min={0} max={20} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { restSec: Math.max(0, Math.round(v)) * 60 }); }} title="отдых (мин)" placeholder="отд" aria-label="Отдых в минутах" inputMode="numeric" />
+              <span style={{ fontSize: 11, color: DIM }}>м</span>
+            </div>
+            <input type="text" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 56, minHeight: 44 }} value={s.tempo || ''} onChange={e => upd(i, { tempo: e.target.value })} placeholder="2-1-1-0" title="Темп (2-1-1-0)" />
+            <button style={{ border: 'none', background: 'rgba(239,68,68,0.08)', color: '#ef4444', cursor: 'pointer', fontSize: 11, padding: '4px 8px', minHeight: 32, borderRadius: 6, borderWidth: 0 }} onClick={() => confirmDelete(i)} title="Удалить подход">✕</button>
+           </div>
        <div className="editor-techniques" style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
              <span className="editor-techniques-label" style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.45)' }}>Техники:</span>
             {(['drop_set', 'myo_reps', 'pause_rep', 'rest_pause', 'mechanical_drop'] as IntensityTechnique[]).map(tech => {
