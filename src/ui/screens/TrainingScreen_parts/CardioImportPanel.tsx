@@ -158,11 +158,16 @@ export const CardioImportPanel: React.FC<{ onImported?: () => void }> = ({ onImp
     window.setTimeout(() => setFlash(null), 3000);
   };
 
+  const stravaSync = () => {
+    setFlash('🔜 Strava/Garmin OAuth — скоро (supabase/functions/strava-sync по паттерну retail-search). Пока — файл GPX/TCX.');
+    window.setTimeout(() => setFlash(null), 4000);
+  };
   return (
     <div style={CARD}>
       <div style={ROW}>
         <span style={LABEL}>📥 Импорт GPX/TCX</span>
         <span style={HINT_SM}>часы / Strava → факт в дневник</span>
+        <button style={BTN_SMALL} onClick={stravaSync} title="Скоро: OAuth Strava/Garmin">🔗 Strava sync (скоро)</button>
       </div>
       {flash && <div style={{ fontSize: 11, color: '#4ade80', fontWeight: 700 }} role="status">{flash}</div>}
       <div style={ROW}>

@@ -7,7 +7,7 @@ import React from 'react';
 import type { CardioCompetitionRef } from '../../../engines/lms/cardio.engine';
 import { SectionCard, GroupHeading, HINT, HINT_SM, BTN_PRIMARY, BTN_DANGER, NumberInput, InfoBanner, Badge } from './CardioUI';
 
-export interface CompDraft { name: string; week: string }
+export interface CompDraft { name: string; week: string; date?: string }
 
 export const CardioCompsStep: React.FC<{
   comps: CardioCompetitionRef[];
@@ -21,11 +21,17 @@ export const CardioCompsStep: React.FC<{
 }> = ({ comps, setComps, draft, setDraft, totalWeeks, taperWeeks, taperEnabled, peakWeek }) => {
   const [dragIdx, setDragIdx] = React.useState<number | null>(null);
   const add = () => {
-    const wNum = Number(draft.week);
+    let wNum = Number(draft.week);
+    if (draft.date) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const d = new Date(draft.date); d.setHours(0, 0, 0, 0);
+      const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+      wNum = Math.floor(diff / 7) + 1;
+    }
     if (!draft.name.trim() || !Number.isFinite(wNum) || wNum < 1) return;
     const week = Math.min(Math.max(1, Math.round(wNum)), totalWeeks);
     setComps([...comps, { id: `comp-${Date.now()}`, name: draft.name.trim(), week }]);
-    setDraft({ name: '', week: '' });
+    setDraft({ name: '', week: '', date: '' });
   };
 
   return (
@@ -89,6 +95,22 @@ export const CardioCompsStep: React.FC<{
             placeholder="Название (например, Шоу)"
             style={{ flex: 1, minWidth: 140, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '9px 12px', color: '#fff', fontSize: 13 }}
           />
+          <input
+            type="date"
+            value={draft.date ?? ''}
+            onChange={e => {
+              const v = e.target.value;
+              if (v) {
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const d = new Date(v); d.setHours(0, 0, 0, 0);
+                const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+                const w = Math.floor(diff / 7) + 1;
+                setDraft({ ...draft, date: v, week: String(Math.min(Math.max(1, w), totalWeeks)) });
+              } else setDraft({ ...draft, date: '' });
+            }}
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '9px 10px', color: '#fff', fontSize: 13 }}
+            aria-label="Дата старта"
+          />
           <NumberInput
             value={draft.week}
             onChange={v => setDraft({ ...draft, week: v })}
@@ -97,11 +119,12 @@ export const CardioCompsStep: React.FC<{
             step={1}
             placeholder="1"
             ariaLabel="Неделя старта"
-            width={90}
+            width={70}
             suffix="нед"
           />
           <button style={BTN_PRIMARY} onClick={add}>+ Добавить старт</button>
         </div>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>Укажи дату — неделя посчитается от сегодня (неделя 1 = сегодня), или введи неделю вручную.</div>
         {comps.length > 0 && <InfoBanner tone="ok">Добавлено стартов: {comps.length} — taper/пик будут построены по режиму шага «Параметры».</InfoBanner>}
       </SectionCard>
     </div>
