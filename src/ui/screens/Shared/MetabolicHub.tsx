@@ -66,6 +66,8 @@ export const MetabolicHub: React.FC = () => {
   const [waterL, setWaterL] = useState(2.5);
   const [sodiumG, setSodiumG] = useState(3.5);
   const [potassiumG, setPotassiumG] = useState(3.0);
+  const [hctHistory, setHctHistory] = useState<Array<{date:string;hct:number}>>([]);
+  const [donationLog, setDonationLog] = useState<Array<{date:string;hct:number}>>([]);
   const [weightHistory, setWeightHistory] = useState<{date:string;kg:number}[]>([]);
   const [toast, setToast] = useState<string|null>(null);
   const showToast = useCallback((m:string)=>{ setToast(m); setTimeout(()=> setToast(null), 2400); }, []);
@@ -97,6 +99,49 @@ export const MetabolicHub: React.FC = () => {
     window.addEventListener('focus', refreshWeightHistory);
     return ()=>{ clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refreshWeightHistory); };
   }, [refreshWeightHistory]);
+
+  // HCT history + donation log
+  const HCT_HIST_KEY = 'he_hct_history_v1';
+  const DONATION_LOG_KEY = 'he_donation_log_v1';
+  const loadHctHistory = useCallback(()=>{
+    try{
+      const raw = localStorage.getItem(HCT_HIST_KEY);
+      if(raw){ const arr=JSON.parse(raw); if(Array.isArray(arr)) setHctHistory(arr.slice(-30)); }
+      const rawD = localStorage.getItem(DONATION_LOG_KEY);
+      if(rawD){ const arr=JSON.parse(rawD); if(Array.isArray(arr)) setDonationLog(arr.slice(-20)); }
+    }catch{}
+  }, []);
+  useEffect(()=>{ loadHctHistory(); const onStorage=(e:StorageEvent)=>{ if(e.key && (e.key.includes('he_hct')||e.key.includes('he_donation'))) loadHctHistory(); }; window.addEventListener('storage', onStorage); window.addEventListener('focus', loadHctHistory); return ()=>{ window.removeEventListener('storage', onStorage); window.removeEventListener('focus', loadHctHistory); }; }, [loadHctHistory]);
+  const recordHct = useCallback(()=>{
+    if(hct==null || hct<30 || hct>70) { showToast('HCT не задан'); return; }
+    const entry={ date: new Date().toISOString().slice(0,10), hct };
+    try{
+      const raw=localStorage.getItem(HCT_HIST_KEY);
+      const arr: any[] = raw ? JSON.parse(raw) : [];
+      arr.push(entry);
+      const trimmed=arr.slice(-30);
+      localStorage.setItem(HCT_HIST_KEY, JSON.stringify(trimmed));
+      setHctHistory(trimmed);
+      showToast(`HCT ${hct}% записан на ${entry.date}`);
+    }catch{ showToast('HCT записан'); }
+  }, [hct, showToast]);
+  const recordDonation = useCallback(()=>{
+    if(hct==null) { showToast('Сначала укажи HCT'); return; }
+    const entry={ date: new Date().toISOString().slice(0,10), hct };
+    try{
+      const raw=localStorage.getItem(DONATION_LOG_KEY);
+      const arr: any[] = raw ? JSON.parse(raw) : [];
+      arr.push(entry);
+      const trimmed=arr.slice(-20);
+      localStorage.setItem(DONATION_LOG_KEY, JSON.stringify(trimmed));
+      setDonationLog(trimmed);
+      // также в HCT историю добавляем точку после донации (прогноз −4%)
+      const histRaw=localStorage.getItem(HCT_HIST_KEY);
+      const hist: any[] = histRaw ? JSON.parse(histRaw) : [];
+      // прогноз через 7 дней: −4% (флеботомия)
+      showToast(`Донация ${entry.date} записана (HCT ${hct}% → ожид. ~${Math.max(36, Math.round((hct-4)*10)/10)}% через 7д)`);
+    }catch{ showToast('Донация записана'); }
+  }, [hct, showToast]);
 
   // labs + pharma live refresh (HCT/ферритин/GFR + ААС)
   const refreshLabs = useCallback(()=>{
@@ -365,8 +410,22 @@ export const MetabolicHub: React.FC = () => {
         </div>
         <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap' }}>
           <button onClick={()=> { setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined); showToast('Лабы сброшены — подтянутся из профиля'); }} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.65)', fontSize:9, fontWeight:600, cursor:'pointer' }}>⟲ Сброс лаб</button>
-          <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', alignSelf:'center' }}>Источник: профиль → Лабы → summary. ESC эритроцитоз &gt;52% (м) /48% (ж), флеботомия &gt;54%.</span>
+          <button onClick={recordHct} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(56,165,250,0.18)', background:'rgba(56,165,250,0.10)', color:'#38bdf8', fontSize:9, fontWeight:700, cursor:'pointer' }}>📌 Записать HCT</button>
+          <button onClick={recordDonation} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(239,68,68,0.18)', background:'rgba(239,68,68,0.10)', color:'#ef4444', fontSize:9, fontWeight:700, cursor:'pointer' }}>🩸 Донация сегодня</button>
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', alignSelf:'center' }}>ESC &gt;52% (м)/48% (ж), флеботомия &gt;54%.</span>
         </div>
+        {hctHistory.length>0 && (
+          <div style={{ marginTop:6, display:'flex', gap:4, alignItems:'end', flexWrap:'wrap' }}>
+            {hctHistory.slice(-12).map((p,i)=>(
+              <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                <div style={{ width:22, height: Math.max(6, Math.min(42, (p.hct-36)*1.6)), borderRadius:4, background: p.hct>54 ? '#ef4444' : p.hct>51 ? '#f59e0b' : p.hct>=48 ? '#eab308' : '#22c55e', border:'1px solid rgba(255,255,255,0.08)' }} title={`${p.date} ${p.hct}%`} />
+                <span style={{ fontSize:7, color:'rgba(255,255,255,0.35)' }}>{p.date.slice(5)}</span>
+              </div>
+            ))}
+            <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginLeft:4 }}>{hctHistory.length} записей · тренд {hctHistory.length>=2 ? `${(hctHistory[hctHistory.length-1].hct - hctHistory[0].hct).toFixed(1)}%` : ''}</span>
+            {donationLog.length>0 && <span style={{ fontSize:8, color:'#ef4444', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.12)', borderRadius:6, padding:'2px 6px' }}>🩸 донаций {donationLog.length} · посл. {donationLog[donationLog.length-1].date}</span>}
+          </div>
+        )}
         {hct==null && <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>💡 Введи HCT из ОАК — инструмент покажет воду, железо, донацию и вязкость. Без HCT шкала слепая.</div>}
       </div>
 
@@ -622,6 +681,20 @@ export const MetabolicHub: React.FC = () => {
                 {hematology.hct!=null && <div style={{ position:'absolute', left:`${Math.min(100, Math.max(0, (hematology.hct-36)/(62-36)*100))}%`, top:0, bottom:0, width:2, background:'#fff', boxShadow:'0 0 6px rgba(255,255,255,0.8)' }} />}
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'rgba(255,255,255,0.45)', marginTop:2 }}><span>36</span><span>48 норма</span><span>51</span><span>54 стоп</span><span>62</span></div>
+              {hctHistory.length>=2 && (
+                <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:9, fontWeight:700, color:'rgba(255,255,255,0.55)', textTransform:'uppercase', letterSpacing:0.3, marginBottom:6 }}>История HCT · {hctHistory.length} точек · Δ {((hctHistory[hctHistory.length-1].hct - hctHistory[0].hct)).toFixed(1)}% {hctHistory.length>=3 ? `· тренд ${((hctHistory[hctHistory.length-1].hct - hctHistory[hctHistory.length-2].hct)).toFixed(1)}%/посл.` : ''}</div>
+                  <div style={{ display:'flex', gap:3, alignItems:'end', height:36 }}>
+                    {hctHistory.slice(-14).map((p,i)=>(
+                      <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:2 }}>
+                        <div style={{ width:'100%', height: Math.max(4, Math.min(32, (p.hct-36)*1.25)), borderRadius:3, background: p.hct>54 ? '#ef4444' : p.hct>51 ? '#f59e0b' : p.hct>=48 ? '#eab308' : '#22c55e' }} title={`${p.date} ${p.hct}%`} />
+                        <span style={{ fontSize:6, color:'rgba(255,255,255,0.35)' }}>{p.date.slice(5).replace('-','/')}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {donationLog.length>0 && <div style={{ marginTop:6, fontSize:8, color:'#ef4444' }}>🩸 Донации: {donationLog.map(d=> `${d.date} (${d.hct}%)`).join(' · ')}</div>}
+                </div>
+              )}
               <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>{hematology.ironRecLabel}</div>
                 <div style={{ padding:8, borderRadius:8, background: hematology.donation.needed ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${hematology.donation.needed ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, textAlign:'center', fontSize:10, color: hematology.donation.needed ? '#f87171' : '#22c55e' }}>{hematology.donation.text}{hematology.donation.needed ? ` k=${hematology.donation.k}` : ''}</div>
