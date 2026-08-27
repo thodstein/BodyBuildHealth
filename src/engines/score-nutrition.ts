@@ -1,4 +1,6 @@
 // ── Score Nutrition Engine — оценка качества питания по ТЗ-логике ──
+// @deprecated — дубль. Используйте nutrition-report.engine + nutrition-quality.engine
+// Оставлен для обратной совместимости (тесты). TDEE фикс 175/165 — неточный, hydration=mealCount.
 // Risk_total = Σ(Factor_i * Weight_i)
 
 import type { ModuleSystemScore, ModuleResult } from './score-engine';

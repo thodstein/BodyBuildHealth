@@ -4,7 +4,7 @@
  *  Канон — Питание, алиас — Тренировки/Интеллект (один файл, без дубля).
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcHematology, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
@@ -15,13 +15,14 @@ import { ModernHero } from '../NutritionScreen_parts/nutrition-modern-kit';
 const GLASS: React.CSSProperties = { background: 'rgba(24,24,27,0.42)', border: '1px solid rgba(255,255,255,0.07)', backdropFilter: 'blur(12px)', transition:'all 0.18s ease' } as any;
 const CARD: React.CSSProperties = { ...GLASS, borderRadius: 14, padding: 12, marginBottom: 10, transition:'all 0.18s ease' } as any;
 
-type Mode = 'water'|'steps'|'kbju'|'fat'|'cortisol';
+type Mode = 'water'|'steps'|'kbju'|'fat'|'cortisol'|'hematology';
 const MODE_DEFS: Array<{m:Mode; label:string; icon:string; desc:string; accent:string; hint:string}> = [
   {m:'water', label:'Вода', icon:'💧', desc:'Суточная норма', accent:'#38bdf8', hint:'EFSA lean40/жир20 + пот 600мл/ч · ААС дозозависимо'},
   {m:'steps', label:'Шаги', icon:'👟', desc:'Бытовая активность', accent:'#22c55e', hint:'PAL 1.40-1.75 + train/cardio → TDEE'},
   {m:'kbju', label:'КБЖУ', icon:'🍽', desc:'Калории и макро', accent:'#f59e0b', hint:'Helms/ISSN + потолок 5г/кг У'},
   {m:'fat', label:'Жир', icon:'🧬', desc:'% жира, FFMI', accent:'#a78bfa', hint:'Navy см→in + FFMI_norm'},
   {m:'cortisol', label:'HPA', icon:'🧠', desc:'Индекс перегруза', accent:'#f43f5e', hint:'Стресс/сон/ACWR → 0-100'},
+  {m:'hematology', label:'Кровь', icon:'🩸', desc:'Гематокрит / вязкость', accent:'#ef4444', hint:'HCT 48/51/54 — вода, железо, донация'},
 ];
 
 const SNAP_KEY = 'he_metabolic_snapshot_v2';
@@ -53,11 +54,18 @@ export const MetabolicHub: React.FC = () => {
   const [cardioMin, setCardioMin] = useState(90);
   const [trainingDays, setTrainingDays] = useState(4);
   const [activityLevel, setActivityLevel] = useState<'low'|'medium'|'high'>('medium');
-  const [goal, setGoal] = useState<'cut'|'maintain'|'bulk'>('maintain');
+  const [goal, setGoal] = useState<'cut'|'maintain'|'bulk'|'health'>('maintain');
   const [stress, setStress] = useState(5);
   const [sleepHours, setSleepHours] = useState(7);
   const [sleepQuality, setSleepQuality] = useState(3);
   const [climate, setClimate] = useState<'temperate'|'hot'|'cold'>('temperate');
+  const [hct, setHct] = useState<number|undefined>(undefined);
+  const [hgb, setHgb] = useState<number|undefined>(undefined);
+  const [ferritin, setFerritin] = useState<number|undefined>(undefined);
+  const [gfr, setGfr] = useState<number|undefined>(undefined);
+  const [waterL, setWaterL] = useState(2.5);
+  const [sodiumG, setSodiumG] = useState(3.5);
+  const [potassiumG, setPotassiumG] = useState(3.0);
   const [weightHistory, setWeightHistory] = useState<{date:string;kg:number}[]>([]);
   const [toast, setToast] = useState<string|null>(null);
   const showToast = useCallback((m:string)=>{ setToast(m); setTimeout(()=> setToast(null), 2400); }, []);
@@ -90,6 +98,40 @@ export const MetabolicHub: React.FC = () => {
     return ()=>{ clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refreshWeightHistory); };
   }, [refreshWeightHistory]);
 
+  // labs + pharma live refresh (HCT/ферритин/GFR + ААС)
+  const refreshLabs = useCallback(()=>{
+    try{
+      const p:any = getProfile()?.settings || {};
+      const labs = p.labs?.summary || {};
+      const hctLab = labs['HCT'] || labs['Hct'] || labs['hematocrit'];
+      if(hctLab?.value && typeof hctLab.value==='number'){ /* не перезатираем ручной ввод если он уже есть, только если undefined */ }
+      // live только если пользователь не ввёл руками: обновляем только когда снапшот пустой
+      // но для простоты — если в профиле есть значение и локально undefined, заполняем
+      const trySet = (setter:(v:any)=>void, cur:any, labVal:any)=>{
+        if((cur===undefined || cur===null) && labVal?.value!=null) setter(Number(labVal.value));
+      };
+      trySet(setHct, hct, hctLab);
+      const hgbLab = labs['HGB'] || labs['Hgb'] || labs['hemoglobin'];
+      trySet(setHgb, hgb, hgbLab);
+      const ferrLab = labs['FERRITIN'] || labs['Ferritin'];
+      trySet(setFerritin, ferritin, ferrLab);
+      const gfrLab = labs['eGFR'] || labs['GFR'];
+      trySet(setGfr, gfr, gfrLab);
+      const ph = p.pharma;
+      if(Array.isArray(ph?.currentSubstances) && ph.currentSubstances.length>0){
+        // если в профиле есть курс, а тумблер выключен — включаем (не наоборот)
+        // setOnAAS true only, false оставляем ручному контролю
+      }
+    }catch{}
+  }, [hct,hgb,ferritin,gfr]);
+  useEffect(()=>{
+    const id=setInterval(refreshLabs, 8000);
+    const onStorage=(e:StorageEvent)=>{ if(e.key && (e.key.includes('he_profile')||e.key.includes('he_labs')||e.key.includes('profile'))) refreshLabs(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', refreshLabs);
+    return ()=>{ clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refreshLabs); };
+  }, [refreshLabs]);
+
   // init from snapshot v2 → v1 → profile v2 (расширенный)
   useEffect(()=>{
     let loaded=false;
@@ -116,6 +158,13 @@ export const MetabolicHub: React.FC = () => {
         if(typeof s.onAAS==='boolean') setOnAAS(s.onAAS);
         if(typeof s.aasDose==='number') setAasDose(s.aasDose);
         if(s.climate) setClimate(s.climate);
+        if(typeof s.hct==='number') setHct(s.hct);
+        if(typeof s.hgb==='number') setHgb(s.hgb);
+        if(typeof s.ferritin==='number') setFerritin(s.ferritin);
+        if(typeof s.gfr==='number') setGfr(s.gfr);
+        if(typeof s.waterL==='number') setWaterL(s.waterL);
+        if(typeof s.sodiumG==='number') setSodiumG(s.sodiumG);
+        if(typeof s.potassiumG==='number') setPotassiumG(s.potassiumG);
         loaded=true;
       }
     }catch{}
@@ -125,6 +174,8 @@ export const MetabolicHub: React.FC = () => {
       const pers = p.personal || {};
       const life = p.lifestyle || {};
       const train = p.training || {};
+      const labs = p.labs?.summary || {};
+      const pharma = p.pharma || {};
       if(pers.weight) setWeight(Number(pers.weight));
       if(pers.height) setHeight(Number(pers.height));
       if(pers.age) setAge(Number(pers.age));
@@ -143,19 +194,38 @@ export const MetabolicHub: React.FC = () => {
       if(typeof life.stressLevel==='number') setStress(Math.round(Number(life.stressLevel)));
       const sleepQMap:Record<string,number>={good:4, fair:3, poor:2};
       if(life.sleepQuality && sleepQMap[life.sleepQuality]) setSleepQuality(sleepQMap[life.sleepQuality]);
+      // labs live (HCT/HGB/ферритин/GFR)
+      const hctLab = labs['HCT'] || labs['Hct'] || labs['hematocrit'] || labs['Гематокрит'];
+      if(hctLab?.value) setHct(Number(hctLab.value));
+      const hgbLab = labs['HGB'] || labs['Hgb'] || labs['hemoglobin'];
+      if(hgbLab?.value) setHgb(Number(hgbLab.value));
+      const ferrLab = labs['FERRITIN'] || labs['Ferritin'] || labs['ферритин'];
+      if(ferrLab?.value) setFerritin(Number(ferrLab.value));
+      const gfrLab = labs['eGFR'] || labs['GFR'] || labs['gfr'];
+      if(gfrLab?.value) setGfr(Number(gfrLab.value));
+      if(typeof life.dailyWaterLiters==='number') setWaterL(Number(life.dailyWaterLiters));
+      if(typeof p.nutrition?.sodiumG==='number') setSodiumG(Number(p.nutrition.sodiumG));
+      if(typeof p.nutrition?.potassiumG==='number') setPotassiumG(Number(p.nutrition.potassiumG));
+      // pharma sync
+      if(Array.isArray(pharma.currentSubstances) && pharma.currentSubstances.length>0){
+        setOnAAS(true);
+        const sumDose = pharma.currentSubstances.reduce((s:any,sub:any)=> s + (Number(sub.doseMg)||Number(sub.doseValue)||0),0);
+        if(sumDose>0) setAasDose(Math.min(3000, Math.round(sumDose)));
+      }
     }catch{}
   },[]);
   useEffect(()=>{
-    try{ localStorage.setItem(SNAP_KEY, JSON.stringify({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate})); }catch{}
-  }, [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate]);
+    try{ localStorage.setItem(SNAP_KEY, JSON.stringify({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG})); }catch{}
+  }, [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG]);
 
-  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, weightHistory: weightHistory.length>=3 ? weightHistory : undefined }), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,weightHistory]);
+  const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined }), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,weightHistory,hct,hgb,ferritin,gfr,waterL]);
 
   const water = useMemo(()=> calcWater(input), [input]);
   const stepsCalc = useMemo(()=> calcSteps(input), [input]);
   const kbju = useMemo(()=> calcKBJU(input), [input]);
   const fat = useMemo(()=> calcBodyFat(input), [input]);
   const cortisol = useMemo(()=> calcCortisol(input), [input]);
+  const hematology = useMemo(()=> calcHematology({ weight, hct, hgb, ferritin, gfr, waterL, sodiumG, potassiumG, ironIntakeMg: undefined, onAAS, aasDose, sex }), [weight,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,onAAS,aasDose,sex]);
 
   const active = MODE_DEFS.find(d=> d.m===mode)!;
   const waistErr = waist && neck && waist <= neck ? 'Талия ≤ шеи — Navy невалиден' : null;
@@ -184,19 +254,19 @@ export const MetabolicHub: React.FC = () => {
   return (
     <div style={{ padding:'10px 8px 18px', color:'#fff', maxWidth:780, margin:'0 auto' }}>
       {toast && <div style={{ position:'fixed', left:'50%', bottom:18, transform:'translateX(-50%)', zIndex:60, maxWidth:520, padding:'10px 14px', borderRadius:12, background:'#18181b', border:'1px solid rgba(255,255,255,0.10)', boxShadow:'0 8px 24px rgba(0,0,0,0.35)', fontSize:11, fontWeight:600, color:'#fff', textAlign:'center' }}>{toast}</div>}
-      <ModernHero icon="⚖️" title="Метаболика" subtitle="TDEE · NEAT · КБЖУ · Navy · HPA — один снапшот, без дубля. Источники: EFSA, Mifflin/Katch, Helms/ISSN, Navy, Gabbett." />
+      <ModernHero icon="⚖️" title="Метаболика" subtitle="TDEE · NEAT · КБЖУ · Navy · HPA · Кровь — один снапшот, без дубля. Источники: EFSA, Mifflin/Katch, Helms/ISSN, Navy, Gabbett, ESC/ASA HCT." />
       <div style={{ ...CARD, padding:'14px 14px 12px', background:'linear-gradient(135deg,rgba(96,165,250,0.10),rgba(0,230,138,0.07))', border:'1px solid rgba(96,165,250,0.18)', position:'relative', overflow:'hidden' }}>
         <div style={{ position:'absolute', top:-18, right:-18, width:110, height:110, borderRadius:110, background:'radial-gradient(circle,rgba(96,165,250,0.14),transparent 70%)', pointerEvents:'none' }} />
         <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
           <div style={{ width:34, height:34, borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', background:'linear-gradient(135deg,#60a5fa,#00e68a)', color:'#000', fontWeight:900, fontSize:16 }}>⚖️</div>
           <div style={{ flex:1 }}>
-            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Метаболика — Вода · Шаги · КБЖУ · Жир · HPA</div>
-            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Один снапшот → 5 движков. PAL без дубля, Navy см→in, ААС дозозависимо, ACWR live {acwr.toFixed(2)}.</div>
+            <div style={{ fontSize:15, fontWeight:900, color:'#fff', lineHeight:1 }}>Метаболика — Вода · Шаги · КБЖУ · Жир · HPA · Кровь</div>
+            <div style={{ fontSize:10, color:'#fff', lineHeight:1.3 }}>Один снапшот → 6 движков. PAL без дубля, Navy см→in, ААС дозозависимо, ACWR live {acwr.toFixed(2)} · HCT {hematology.hct ?? '—'}%.</div>
           </div>
           <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background: onAAS ? 'rgba(239,68,68,0.12)' : 'rgba(34,197,94,0.12)', border: `1px solid ${onAAS ? 'rgba(239,68,68,0.22)' : 'rgba(34,197,94,0.22)'}`, color: onAAS ? '#f87171' : '#22c55e', fontWeight:800, whiteSpace:'nowrap' }}>{onAAS ? `💉 ${aasDose}мг/нед` : '🌿 Натурал'}</span>
         </div>
         <div style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', lineHeight:1.5 }}>
-          <b style={{ color:'#fff' }}>Формулы:</b> <span style={{ color:'#38bdf8' }}>вода</span> EFSA 35мл/кг (lean 40/жир 20) + пот, <span style={{ color:'#22c55e' }}>шаги</span> PAL 1.40/1.55/1.75+train/cardio → TDEE, <span style={{ color:'#f59e0b' }}>КБЖУ</span> Helms/ISSN + потолок 5г/кг У, <span style={{ color:'#a78bfa' }}>жир</span> Navy (дюймы) + FFMI_norm Kouri, <span style={{ color:'#f43f5e' }}>HPA</span> 0-100 (стресс/сон/ACWR).
+          <b style={{ color:'#fff' }}>Формулы:</b> <span style={{ color:'#38bdf8' }}>вода</span> EFSA 35мл/кг (lean 40/жир 20) + пот, <span style={{ color:'#22c55e' }}>шаги</span> PAL 1.40/1.55/1.75+train/cardio → TDEE, <span style={{ color:'#f59e0b' }}>КБЖУ</span> Helms/ISSN + потолок 5г/кг У, <span style={{ color:'#a78bfa' }}>жир</span> Navy (дюймы) + FFMI_norm Kouri, <span style={{ color:'#f43f5e' }}>HPA</span> 0-100 (стресс/сон/ACWR), <span style={{ color:'#ef4444' }}>кровь</span> ESC HCT&gt;52/54.
         </div>
       </div>
 
@@ -228,7 +298,7 @@ export const MetabolicHub: React.FC = () => {
           <PopupNumber label="Возраст" value={age} min={14} max={80} onChange={setAge} />
           <PopupSelect label="Пол" value={sex} options={[{id:'male',label:'♂ Мужчина'},{id:'female',label:'♀ Женщина'}]} onChange={v=> setSex(v as any)} />
           <PopupNumber label="Жир, % (если знаешь)" value={bodyFat} min={3} max={55} onChange={setBodyFat} />
-          <PopupSelect label="Цель" value={goal} options={[{id:'cut',label:'Сушка −18% TDEE'},{id:'maintain',label:'Поддержание'},{id:'bulk',label:'Масса +10%'}]} onChange={v=> setGoal(v as any)} />
+          <PopupSelect label="Цель" value={goal} options={[{id:'cut',label:'Сушка −18% TDEE'},{id:'maintain',label:'Поддержание'},{id:'bulk',label:'Масса +10%'},{id:'health',label:'🩸 Здоровье (1.8г Б · 30г клетч.)'}]} onChange={v=> setGoal(v as any)} />
         </div>
         <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, lineHeight:1.35 }}>BMR: {kbju.nat.method==='katch_mcardle'?'Katch-McArdle (по lean)':'Mifflin-St Jeor'} · {kbju.nat.bmr}ккал · PAL {kbju.nat.pal.toFixed(2)}</div>
       </div>
@@ -270,6 +340,36 @@ export const MetabolicHub: React.FC = () => {
         </div>
       </div>
 
+      <div style={{ ...CARD, border:'1px solid rgba(239,68,68,0.12)', padding:10, background:'rgba(239,68,68,0.04)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+          <span style={{ fontSize:14 }}>🩸</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'#f87171' }}>Гематокрит / вязкость — лабы (опционально)</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)', lineHeight:1.35 }}>HCT — главный маркер на ААС. &gt;52% → донация. Подтянется из Профиля → Лабы.</div>
+          </div>
+          <span style={{ fontSize:8, padding:'3px 7px', borderRadius:20, background: hematology.zone==='unknown' ? 'rgba(255,255,255,0.06)' : `${hematology.color}18`, border:`1px solid ${hematology.color}33`, color: hematology.zone==='unknown' ? 'rgba(255,255,255,0.55)' : hematology.color, fontWeight:800 }}>{hematology.zone==='unknown' ? 'нет HCT' : hematology.zoneLabel}</span>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+          <PopupNumber label="HCT, % (гематокрит)" value={hct ?? 45} min={36} max={62} onChange={v=> setHct(v)} />
+          <PopupNumber label="HGB, г/л (опц.)" value={hgb ?? (hct? Math.round(hct*3.4): 150)} min={110} max={200} onChange={v=> setHgb(v)} />
+          <PopupNumber label="Ферритин, нг/мл" value={ferritin ?? 120} min={5} max={800} onChange={v=> setFerritin(v)} />
+          <PopupNumber label="GFR, мл/мин" value={gfr ?? 95} min={15} max={130} onChange={v=> setGfr(v)} />
+          <PopupNumber label="Вода факт, л/сут" value={waterL} min={1} max={6} step={0.1} onChange={setWaterL} />
+          <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+            <PopupNumber label="Na, г/сут" value={sodiumG} min={1} max={8} step={0.1} onChange={setSodiumG} />
+            <div style={{ display:'flex', gap:4 }}>
+              <span style={{ flex:1, fontSize:8, color: hematology.viscosityFlag ? '#ef4444' : 'rgba(255,255,255,0.45)', background: hematology.viscosityFlag ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.03)', border:`1px solid ${hematology.viscosityFlag?'rgba(239,68,68,0.18)':'rgba(255,255,255,0.06)'}`, borderRadius:8, padding:'5px 6px', textAlign:'center' }}>{hematology.viscosityFlag ? '⚠ вязкость' : 'вязкость OK'}</span>
+              <span style={{ flex:1, fontSize:8, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'5px 6px', textAlign:'center' }}>K {potassiumG}г</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap' }}>
+          <button onClick={()=> { setHct(undefined); setHgb(undefined); setFerritin(undefined); setGfr(undefined); showToast('Лабы сброшены — подтянутся из профиля'); }} style={{ padding:'6px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.65)', fontSize:9, fontWeight:600, cursor:'pointer' }}>⟲ Сброс лаб</button>
+          <span style={{ fontSize:8, color:'rgba(255,255,255,0.45)', alignSelf:'center' }}>Источник: профиль → Лабы → summary. ESC эритроцитоз &gt;52% (м) /48% (ж), флеботомия &gt;54%.</span>
+        </div>
+        {hct==null && <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>💡 Введи HCT из ОАК — инструмент покажет воду, железо, донацию и вязкость. Без HCT шкала слепая.</div>}
+      </div>
+
       {/* KPI — 5 карточек без slice-бага */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6, marginBottom:6 }}>
         {[
@@ -284,7 +384,7 @@ export const MetabolicHub: React.FC = () => {
           </div>
         ))}
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:10 }}>
         <div style={{ ...CARD, marginBottom:0, padding:10, borderLeft:'3px solid #a78bfa', minHeight:72 }}>
           <div style={{ fontSize:9, fontWeight:800, color:'#a78bfa', letterSpacing:0.4, textTransform:'uppercase' }}>Жир · FFMI</div>
           <div style={{ fontSize:16, fontWeight:900, color:'#fff' }}>{fat.current}%<span style={{ fontSize:10 }}> · FFMI {onAAS? fat.ffmiNormAdj:fat.ffmiNorm}</span></div>
@@ -294,6 +394,11 @@ export const MetabolicHub: React.FC = () => {
           <div style={{ fontSize:9, fontWeight:800, color:'#f43f5e', letterSpacing:0.4, textTransform:'uppercase' }}>HPA индекс</div>
           <div style={{ fontSize:16, fontWeight:900, color: (onAAS? cortisol.zoneAAS:cortisol.zoneNat)==='high' || (onAAS? cortisol.zoneAAS:cortisol.zoneNat)==='very_high' ? '#ef4444' : '#fff' }}>{onAAS? cortisol.aas: cortisol.nat}<span style={{ fontSize:10 }}> /100 · {onAAS? cortisol.zoneLabelAAS: cortisol.zoneLabelNat}</span></div>
           <div style={{ fontSize:9, color:'#fff' }}>{cortisol.scaleNote}</div>
+        </div>
+        <div style={{ ...CARD, marginBottom:0, padding:10, borderLeft:`3px solid ${hematology.color}`, minHeight:72 }}>
+          <div style={{ fontSize:9, fontWeight:800, color: hematology.color, letterSpacing:0.4, textTransform:'uppercase' }}>Кровь · HCT</div>
+          <div style={{ fontSize:16, fontWeight:900, color: hematology.zone==='unknown' ? '#fff' : hematology.color }}>{hematology.hct != null ? `${hematology.hct}%` : '—'}<span style={{ fontSize:10 }}> · {hematology.zoneLabel}</span></div>
+          <div style={{ fontSize:9, color: hematology.zone==='unknown' ? 'rgba(255,255,255,0.55)' : hematology.color }}>{hematology.hct==null ? 'введи HCT' : `${hematology.waterTargetMl}мл · ${hematology.ironRecLabel.split(' —')[0]}`}</div>
         </div>
       </div>
 
@@ -337,6 +442,7 @@ export const MetabolicHub: React.FC = () => {
                 {water.breakdown.climate!==0 && <Bar v={Math.abs(water.breakdown.climate)} max={water.nat} color="#22c55e" label={`${water.breakdown.climate>0?'+':''}${water.breakdown.climate} климат`} />}
               </div>
               <div style={{ marginTop:8, fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'8px 10px', lineHeight:1.45 }}>{water.note} · LBM {water.breakdown.lean}кг / жир {water.breakdown.fatMass}кг</div>
+              {hematology.hct!=null && hematology.waterAdjMl>0 && <div style={{ marginTop:6, fontSize:9, color:'#38bdf8', background:'rgba(56,165,250,0.08)', border:'1px solid rgba(56,165,250,0.18)', borderRadius:8, padding:'7px 10px' }}>🩸 HCT {hematology.hct}% → вода с гематокритом {hematology.waterTargetMl}мл ({hematology.mlPerKg}мл/кг) +{hematology.waterAdjMl} к базе — см. вкладку Кровь</div>}
             </div>
           )}
           {mode==='steps' && (
@@ -494,11 +600,57 @@ export const MetabolicHub: React.FC = () => {
               </div>
             </div>
           )}
+          {mode==='hematology' && (
+            <div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div style={{ padding:10, borderRadius:10, background: hematology.zone==='unknown' ? 'rgba(255,255,255,0.03)' : `${hematology.color}14`, border:`1px solid ${hematology.zone==='unknown' ? 'rgba(255,255,255,0.06)' : hematology.color+'33'}`, textAlign:'center' }}>
+                  <div style={{ fontSize:10, color: hematology.zone==='unknown' ? 'rgba(255,255,255,0.55)' : hematology.color }}>HCT {hematology.hct ?? '—'}% — {hematology.zoneLabel}</div>
+                  <div style={{ fontSize:22, fontWeight:900, color: hematology.zone==='unknown' ? '#fff' : hematology.color }}>{hematology.hct ?? '—'}<span style={{ fontSize:11, color:'#fff' }}>%</span></div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{hematology.hgbEstimated ? `HGB ~${hematology.hgbEstimated} г/л` : 'введи HCT/HGB'} · {hematology.viscosityFlag ? '⚠ гипервязкость' : 'вязкость OK'} · GFR {gfr ?? '—'}</div>
+                </div>
+                <div style={{ padding:10, borderRadius:10, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', textAlign:'center' }}>
+                  <div style={{ fontSize:10, color:'#f87171' }}>Вода с HCT</div>
+                  <div style={{ fontSize:18, fontWeight:900, color:'#38bdf8' }}>{hematology.waterTargetMl}<span style={{ fontSize:10, color:'#fff' }}>мл</span></div>
+                  <div style={{ fontSize:9, color:'#fff' }}>{hematology.mlPerKg}мл/кг · {hematology.waterAdjMl>0 ? `+${hematology.waterAdjMl} к базе` : 'база 35мл/кг'} · факт {waterL}л</div>
+                </div>
+              </div>
+              <div style={{ marginTop:8, height:10, borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.06)', overflow:'hidden', position:'relative', display:'flex' }}>
+                <div style={{ width:'40%', background:'rgba(34,197,94,0.45)' }} />
+                <div style={{ width:'15%', background:'rgba(234,179,8,0.55)' }} />
+                <div style={{ width:'15%', background:'rgba(245,158,11,0.55)' }} />
+                <div style={{ flex:1, background:'rgba(239,68,68,0.55)' }} />
+                {hematology.hct!=null && <div style={{ position:'absolute', left:`${Math.min(100, Math.max(0, (hematology.hct-36)/(62-36)*100))}%`, top:0, bottom:0, width:2, background:'#fff', boxShadow:'0 0 6px rgba(255,255,255,0.8)' }} />}
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'rgba(255,255,255,0.45)', marginTop:2 }}><span>36</span><span>48 норма</span><span>51</span><span>54 стоп</span><span>62</span></div>
+              <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:10, color:'#fff' }}>{hematology.ironRecLabel}</div>
+                <div style={{ padding:8, borderRadius:8, background: hematology.donation.needed ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border:`1px solid ${hematology.donation.needed ? 'rgba(239,68,68,0.18)' : 'rgba(34,197,94,0.18)'}`, textAlign:'center', fontSize:10, color: hematology.donation.needed ? '#f87171' : '#22c55e' }}>{hematology.donation.text}{hematology.donation.needed ? ` k=${hematology.donation.k}` : ''}</div>
+              </div>
+              <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:9, padding:'5px 8px', borderRadius:8, background: hematology.ferritinFlag ? 'rgba(245,158,11,0.10)' : 'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color: hematology.ferritinFlag ? '#fbbf24' : '#fff' }}>ферритин {ferritin ?? '—'} {hematology.ferritinFlag ? '⚠ &lt;30' : 'OK'}</span>
+                <span style={{ fontSize:9, padding:'5px 8px', borderRadius:8, background: hematology.gfrFlag ? 'rgba(239,68,68,0.10)' : 'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color: hematology.gfrFlag ? '#f87171' : '#fff' }}>GFR {gfr ?? '—'} {hematology.gfrFlag ? '⚠ &lt;60' : ''}</span>
+                <span style={{ fontSize:9, padding:'5px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>PRAL {hematology.pralNote}</span>
+                <span style={{ fontSize:9, padding:'5px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>питание × гематология ×{hematology.nutritionMult}</span>
+              </div>
+              <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.04)', border:'1px solid rgba(239,68,68,0.08)', fontSize:10, color:'#fff', lineHeight:1.4 }}>
+                <b style={{ color: hematology.color }}>Рекомендации:</b><br/>
+                {hematology.recommendations.map((r,i)=>(<span key={i}>• {r}<br/></span>))}
+              </div>
+              <div style={{ marginTop:6, display:'flex', gap:6 }}>
+                <button onClick={()=> { const txt=`HCT ${hematology.hct}% — ${hematology.zoneLabel}. Вода ${hematology.waterTargetMl}мл (${hematology.mlPerKg}мл/кг), ${hematology.ironRecLabel}, ${hematology.donation.text}`; navigator.clipboard?.writeText(txt).then(()=> showToast('Скопировано: '+txt)).catch(()=> showToast(txt)); }} style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:10, cursor:'pointer' }}>⎘ Копировать сводку</button>
+                <button onClick={()=> {
+                  const payload={ hct: hematology.hct, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, ts: Date.now(), source:'metabolic-hub-hematology' };
+                  try{ localStorage.setItem('he_hematology_advice', JSON.stringify(payload)); window.dispatchEvent(new CustomEvent('he-hematology-advice', {detail: payload})); showToast(`Сохранено he_hematology_advice: HCT ${hematology.hct}% → ${hematology.zoneLabel}`); }catch{ showToast('Сохранено'); }
+                }} style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:800, fontSize:10, cursor:'pointer' }}>💾 В планировщик (he_hematology_advice)</button>
+              </div>
+              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>Зоны: &lt;48 норма · 48-51 внимание · 51-54 донация · &gt;54 стоп ААС · &gt;60 критично. Источник: ESC 2023, ASA флеботомия, lab-tier-recommendations. Дисклеймер: не назначение — к гематологу + JAK2 при HCT&gt;52%.</div>
+            </div>
+          )}
         </div>
       </div>
 
       <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', textAlign:'center', marginTop:10, lineHeight:1.5 }}>
-        Источники: Mifflin-St Jeor 1990 · Katch-McArdle 1991 · EFSA 2010 · ISSN Helms 2014 · Navy Hodgdon 1984 · Kouri FFMI 1995 · Gabbett ACWR 2016.<br/>HPA — скрининг, не диагноз. Для лабы — кортизол 08:00 + ACTH.
+        Источники: Mifflin-St Jeor 1990 · Katch-McArdle 1991 · EFSA 2010 · ISSN Helms 2014 · Navy Hodgdon 1984 · Kouri FFMI 1995 · Gabbett ACWR 2016 · ESC 2023 эритроцитоз · ASA флеботомия.<br/>HPA — скрининг, не диагноз. Для лабы — кортизол 08:00 + ACTH. Кровь — скрининг вязкости, не назначение: HCT&gt;52% → гематолог + JAK2.
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import { calcTrendFromHistory as calcTrendCentral } from './metabolic-constants';
+
 const STORAGE_KEY = 'he_nutrition_v2';
 
 export interface NutritionV2Data {
@@ -111,15 +113,7 @@ export function addWeightEntry(kg: number) {
 }
 
 export function calcTrend(data: NutritionV2Data): number {
-  const h = data.weightHistory;
-  if (h.length < 3) return 0;
-  const recent = h.slice(-7);
-  if (recent.length < 2) return 0;
-  const first = recent[0].kg;
-  const last = recent[recent.length - 1].kg;
-  const days = (new Date(last ? recent[recent.length - 1].date : '').getTime() - new Date(first ? recent[0].date : '').getTime()) / 86400000;
-  if (days < 3) return 0;
-  return (last - first) / (days / 7);
+  return calcTrendCentral(data.weightHistory as any);
 }
 
 export function calcAdherence(diaryData: any): number {

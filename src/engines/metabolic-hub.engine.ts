@@ -4,13 +4,24 @@
  * Формулы: EFSA/Mifflin-St Jeor + Katch-McArdle, ISSN/Helms, US Navy, Gabbett ACWR.
  * Pro-уровень: инвалидация дубль-PAL, cm→in, дозозависимый ААС, HPA-индекс.
  */
-export interface WeightPoint { date: string; kg: number }
+import {
+  computeBMR as computeBMRBase,
+  computePalSimple,
+  clamp,
+  toIn,
+  log10,
+  calcTrendFromHistory as calcTrendBase,
+  calcAdaptiveAdjustment as calcAdaptiveBase,
+  type WeightPoint as WeightPointBase,
+} from '../core/metabolic-constants';
+
+export type WeightPoint = WeightPointBase;
 export interface MetabolicInput {
   weight: number; height: number; age: number; sex: 'male'|'female';
   bodyFat?: number; neck?: number; waist?: number; hip?: number;
   steps?: number; cardioMin?: number; trainingDays?: number; trainingHours?: number;
   activityLevel?: 'low'|'medium'|'high'; // бытовая NEAT
-  goal?: 'cut'|'maintain'|'bulk';
+  goal?: 'cut'|'maintain'|'bulk'|'health';
   onAAS?: boolean; aasDose?: number; // мг/нед тест-экв (опционально, для дозозависимости)
   stress?: number; sleepHours?: number; sleepQuality?: number; // 1-5
   acwr?: number; // для кортизола
@@ -18,58 +29,22 @@ export interface MetabolicInput {
   climate?: 'temperate'|'hot'|'cold';
   sweatRate?: number; // мл/ч 400-800, если известен
   weightHistory?: WeightPoint[]; // для адаптивного TDEE по тренду
+  // hematology labs (Fаза 1)
+  hct?: number; // гематокрит %
+  hgb?: number; // гемоглобин г/л
+  ferritin?: number; // нг/мл
+  gfr?: number; // мл/мин
+  waterL?: number; // факт воды л/сут (для вязкости)
+  ironIntakeMg?: number; // мг/сут
 }
 
-const clamp = (v:number, lo:number, hi:number)=> Math.max(lo, Math.min(hi, v));
-const toIn = (cm:number)=> cm * 0.393701;
-const log10 = (x:number)=> Math.log(x)/Math.log(10);
-
-// ——— адаптивный тренд как в nutrition-v2-data.ts:113 ———
-export function calcTrendFromHistory(history: WeightPoint[]): number {
-  if(!history || history.length < 3) return 0;
-  const recent = history.slice(-7);
-  if(recent.length < 2) return 0;
-  const first = recent[0].kg, last = recent[recent.length-1].kg;
-  const days = (new Date(recent[recent.length-1].date).getTime() - new Date(recent[0].date).getTime()) / 86400000;
-  if(days < 3) return 0;
-  return (last - first) / (days / 7);
-}
-export function calcAdaptiveAdjustment(trendKgPerWeek:number, goal: 'cut'|'maintain'|'bulk'|undefined, baseTdee:number): { adjustment:number; expected:number; trend:number; suggest:string } {
-  const isCut = goal==='cut';
-  const isBulk = goal==='bulk';
-  let expected = 0;
-  if(isCut) expected = -0.5; // кг/нед целевая сушка
-  else if(isBulk) expected = 0.25;
-  let adjustment = 0;
-  if((isCut || isBulk) && Math.abs(trendKgPerWeek - expected) > 0.05){
-    const diff = trendKgPerWeek - expected;
-    adjustment = Math.round(diff * 770); // 7700ккал/кг → 770/0.1кг
-    adjustment = isCut ? clamp(adjustment, -500, 500) : clamp(adjustment, -300, 300);
-  }
-  let suggest = 'Тренд в норме';
-  if(isCut && trendKgPerWeek > -0.1 && trendKgPerWeek > expected*0.5) suggest = 'Плато сушки — проверь дефицит или добавь 1000 шагов';
-  else if(isBulk && trendKgPerWeek < 0.08) suggest = 'Набор стоит — +200ккал';
-  else if(Math.abs(trendKgPerWeek - expected) < 0.12) suggest = 'Тренд совпадает с целью';
-  void baseTdee;
-  return { adjustment, expected, trend: trendKgPerWeek, suggest };
+export const calcTrendFromHistory = calcTrendBase;
+export function calcAdaptiveAdjustment(trendKgPerWeek:number, goal: 'cut'|'maintain'|'bulk'|'health'|undefined, baseTdee:number): { adjustment:number; expected:number; trend:number; suggest:string } {
+  return calcAdaptiveBase(trendKgPerWeek, goal as any, baseTdee);
 }
 
-// ——— общий BMR ———
-function bmrKatchMcArdle(lean:number){ return 370 + 21.6 * lean; }
-function bmrMifflin(w:number,h:number,a:number,sex:'male'|'female'){
-  return sex==='male' ? 10*w + 6.25*h - 5*a + 5 : 10*w + 6.25*h - 5*a - 161;
-}
 function computeBMR(input: MetabolicInput){
-  const bf = input.bodyFat;
-  const hasBF = typeof bf==='number' && bf>3 && bf<70;
-  if(hasBF){
-    const lean = input.weight * (1 - bf!/100);
-    const bmr = Math.max(800, bmrKatchMcArdle(lean));
-    return { bmr, lean, method:'katch_mcardle' as const };
-  }
-  const bmr = Math.max(800, bmrMifflin(input.weight, input.height, input.age, input.sex));
-  const leanDef = input.weight * (1 - (input.sex==='male'?0.15:0.22));
-  return { bmr, lean: leanDef, method:'mifflin' as const };
+  return computeBMRBase(input as any);
 }
 function aasMult(input: MetabolicInput, maxBoost:number){
   if(!input.onAAS) return 1;
@@ -111,12 +86,10 @@ export function calcWater(input: MetabolicInput) {
 // ——— Шаги ———
 export function calcSteps(input: MetabolicInput) {
   const { bmr } = computeBMR(input);
-  const palBaseMap = { low: 1.40, medium: 1.55, high: 1.75 } as const;
-  const palBase = palBaseMap[input.activityLevel ?? 'medium'];
-  // тренировочная надбавка к PAL раздельно (EAT), не дубль BMR*PAL+training
+  const palEff = computePalSimple({ activityLevel: input.activityLevel, trainingDays: input.trainingDays, cardioMin: input.cardioMin });
+  const palBase = ({ low: 1.40, medium: 1.55, high: 1.75 } as const)[input.activityLevel ?? 'medium'];
   const trainAdd = clamp((input.trainingDays ?? 3) * 0.022, 0, 0.14);
   const cardioAdd = clamp((input.cardioMin ?? 0) / 60 * 0.025, 0, 0.10);
-  const palEff = clamp(palBase + trainAdd + cardioAdd, 1.25, 2.25);
   const tdeeNat = Math.round(bmr * palEff);
   const mult = aasMult(input, 0.08);
   const tdeeAAS = Math.round(tdeeNat * mult);
@@ -161,11 +134,10 @@ export function calcSteps(input: MetabolicInput) {
 // ——— КБЖУ ———
 export function calcKBJU(input: MetabolicInput) {
   const { bmr, lean, method } = computeBMR(input);
-  const palBaseMap = { low: 1.40, medium: 1.55, high: 1.75 } as const;
-  const palBase = palBaseMap[input.activityLevel ?? 'medium'];
+  const palEff = computePalSimple({ activityLevel: input.activityLevel, trainingDays: input.trainingDays, cardioMin: input.cardioMin });
+  const palBase = ({ low: 1.40, medium: 1.55, high: 1.75 } as const)[input.activityLevel ?? 'medium'];
   const trainAdd = clamp((input.trainingDays ?? 3) * 0.022, 0, 0.14);
   const cardioAdd = clamp((input.cardioMin ?? 0) / 60 * 0.025, 0, 0.10);
-  const palEff = clamp(palBase + trainAdd + cardioAdd, 1.25, 2.25);
   let tdeeNat = Math.round(bmr * palEff);
   const mult = aasMult(input, 0.10);
   let tdeeAAS = Math.round(tdeeNat * mult);
@@ -177,13 +149,15 @@ export function calcKBJU(input: MetabolicInput) {
   const tefAAS = Math.round(tdeeAAS * 0.10);
   const neat = Math.round(bmr * (palBase - 1));
   const eat = Math.round(bmr * (trainAdd + cardioAdd));
-  // Белок ISSN/Helms: натурал 1.8-2.2 maintain/bulk, 2.3-3.1 cut по сухости
+  // Белок ISSN/Helms: натурал 1.8-2.2 maintain/bulk, 2.3-3.1 cut по сухости; health 1.8 (EAT-Lancet)
   const bf = input.bodyFat ?? (input.sex==='male'?15:22);
   let protNat: number;
   if(input.goal==='cut'){
     protNat = bf < 12 ? 2.6 : bf < 18 ? 2.4 : 2.2;
   } else if(input.goal==='bulk'){
     protNat = 1.9;
+  } else if(input.goal==='health'){
+    protNat = 1.8;
   } else {
     protNat = 2.0;
   }
@@ -328,5 +302,122 @@ export function calcCortisol(input: MetabolicInput) {
     acwrZone: acwr<0.8?'undertrained': acwr<=1.3?'optimal': acwr<=1.5?'caution':'dangerous',
     note: input.onAAS ? 'ААС: HPA −14% (дозозависимо). После отмены — мониторинг усталости/сна 2-4нед' : 'Индекс из стресс/сон/качество/ACWR. Не лаба — скрининг перегруза',
     scaleNote: 'Шкала 0-100: <38 низкий, 38-62 норма, 63-78 повышен, >78 высокий'
+  };
+}
+
+// ——— Гематокрит / эритроцитоз — 6-й калькулятор (ESC/ASA, Kouri, Remer-Manz) ———
+// Источники: ESC 2023 эритроцитоз HCT>52% (м) /48% (ж), ASA флеботомия >54%,
+// Kouri FFMI, Remer-Manz PRAL, lab-tier-recommendations tier1-3, PROCEDURE_DB k0.30/0.45
+export interface HematologyInput {
+  weight: number;
+  hct?: number; // % 36-62
+  hgb?: number; // г/л 110-200
+  ferritin?: number; // нг/мл
+  gfr?: number; // мл/мин
+  waterL?: number; // факт л/сут
+  sodiumG?: number;
+  potassiumG?: number;
+  ironIntakeMg?: number;
+  onAAS?: boolean;
+  aasDose?: number;
+  sex?: 'male' | 'female';
+}
+export interface HematologyResult {
+  hct: number | null; // входной или null если нет данных
+  zone: 'unknown' | 'normal' | 'attention' | 'phlebotomy' | 'stop' | 'critical';
+  zoneLabel: string;
+  color: string;
+  waterAdjMl: number;
+  waterTargetMl: number;
+  mlPerKg: number;
+  ironRec: 'normal' | 'cap_15' | 'zero';
+  ironRecLabel: string;
+  donation: { needed: boolean; urgency: 'none' | 'elective' | 'soon' | 'urgent'; text: string; k: number };
+  viscosityFlag: boolean;
+  hgbEstimated: number | null;
+  gfrFlag: boolean;
+  ferritinFlag: boolean;
+  recommendations: string[];
+  pralNote: string;
+  nutritionMult: number; // как в risk-engine 1.0-1.25 (для плашки)
+}
+export function calcHematology(input: HematologyInput): HematologyResult {
+  const hct = typeof input.hct === 'number' && input.hct > 20 && input.hct < 70 ? input.hct : null;
+  const hgb = typeof input.hgb === 'number' && input.hgb > 80 && input.hgb < 250 ? input.hgb : null;
+  const weight = input.weight || 80;
+  const waterL = typeof input.waterL === 'number' ? input.waterL : 2.5;
+  const gfr = input.gfr;
+  const ferritin = input.ferritin;
+  // hgb estimate: HCT*3.4 (если нет лаба)
+  const hgbEstimated = hgb ?? (hct != null ? Math.round(hct * 3.4) : null);
+  // zone по ESC/ASA + clinicalFloorsForLabs (risk-engine:200)
+  let zone: HematologyResult['zone'] = 'unknown';
+  let zoneLabel = 'Нет данных HCT — сдайте ОАК';
+  let color = 'rgba(255,255,255,0.35)';
+  if (hct != null) {
+    if (hct > 60) { zone = 'critical'; zoneLabel = 'Критический — госпитализация, СТОП ААС'; color = '#7f1d1d'; }
+    else if (hct > 54) { zone = 'stop'; zoneLabel = 'СТОП ААС — флеботомия 450мл обязательна'; color = '#ef4444'; }
+    else if (hct > 51) { zone = 'phlebotomy'; zoneLabel = 'Порог флеботомии — донация 300-450мл'; color = '#f59e0b'; }
+    else if (hct >= 48) { zone = 'attention'; zoneLabel = 'Внимание — контроль, +вода, стоп железо'; color = '#eab308'; }
+    else { zone = 'normal'; zoneLabel = 'Норма'; color = '#22c55e'; }
+  }
+  // waterAdj + target (lab-tier-recommendations:266)
+  let waterAdj = 0;
+  if (hct != null) {
+    if (hct > 54) waterAdj = 750;
+    else if (hct > 51) waterAdj = 500;
+    else if (hct >= 48) waterAdj = 300;
+  }
+  // target 35мл/кг база + adj, но при HCT>51 цель 40-45мл/кг
+  const baseNeed = Math.round(weight * 35);
+  const hctTargetPerKg = hct != null && hct > 51 ? 42 : hct != null && hct >= 48 ? 40 : 35;
+  const waterTargetMl = Math.round(Math.max(baseNeed + waterAdj, weight * hctTargetPerKg));
+  const mlPerKg = Math.round((waterTargetMl / weight) * 10) / 10;
+  // iron
+  let ironRec: HematologyResult['ironRec'] = 'normal';
+  let ironRecLabel = 'Железо — норма (15-18мг/сут)';
+  if (hct != null) {
+    if (hct > 51) { ironRec = 'zero'; ironRecLabel = '⛔ Стоп железо — ZERO (печень/говядина), HCT>51'; }
+    else if (hct >= 48) { ironRec = 'cap_15'; ironRecLabel = '⚠ Кап железо ≤15мг/сут (HCT 48-51)'; }
+  }
+  if (ferritin != null && ferritin < 30 && ironRec === 'zero') {
+    ironRecLabel += ' · ферритин <30 — дефицит, но HCT приоритет (консультация гематолога)';
+  }
+  // donation
+  let donation: HematologyResult['donation'] = { needed: false, urgency: 'none', text: 'Донация не требуется', k: 0 };
+  if (hct != null) {
+    if (hct > 54) donation = { needed: true, urgency: 'urgent', text: 'Срочная флеботомия 450мл / эритроцитаферез k0.45 (1-я линия)', k: 0.45 };
+    else if (hct > 52) donation = { needed: true, urgency: 'soon', text: 'Флеботомия 300-450мл в ближайшие дни', k: 0.30 };
+    else if (hct > 51) donation = { needed: true, urgency: 'elective', text: 'Плановая донация 300-450мл', k: 0.30 };
+  }
+  // viscosity: HCT>51 && water<1.5 или HCT>54
+  const viscosityFlag = hct != null && ((hct > 51 && waterL < 1.8) || hct > 53);
+  const gfrFlag = typeof gfr === 'number' && gfr < 60;
+  const ferritinFlag = typeof ferritin === 'number' && ferritin < 30;
+  // nutritionMult как в risk-engine:663 (1.0-1.25)
+  let nutritionMult = 1.0;
+  if (typeof input.sodiumG === 'number' && input.sodiumG > 4) nutritionMult += 0.03;
+  if (typeof input.potassiumG === 'number' && input.potassiumG < 2.5) nutritionMult += 0.03;
+  if (waterL < 1.5) nutritionMult += 0.04;
+  // если есть данные по белку/клетчатке из профиля — можно расширить, пока по воде/Na/K
+  nutritionMult = Math.min(1.25, Math.round(nutritionMult * 100) / 100);
+  const recommendations: string[] = [];
+  if (hct == null) {
+    recommendations.push('Сдайте ОАК (HCT, HGB, ферритин, GFR) — без HCT инструмент слепой');
+  } else {
+    if (zone === 'normal') recommendations.push('Гидратация 35мл/кг + кардио 3×/нед достаточно');
+    if (zone === 'attention') recommendations.push('Вода 40мл/кг, стоп железо 15мг, омега-3 2г, контроль HCT через 2-4 нед');
+    if (zone === 'phlebotomy') recommendations.push('Донация 300-450мл, вода 42мл/кг, ZERO железо, омега-3 + аспирин только при ≥2 факторов риска');
+    if (zone === 'stop' || zone === 'critical') recommendations.push('СТОП ААС, эритроцитаферез k0.45 — 1-я линия, госпитализация при HCT>60');
+    if (viscosityFlag) recommendations.push('Гипервязкость: увеличьте воду до ' + waterTargetMl + 'мл (' + mlPerKg + 'мл/кг)');
+    if (gfrFlag) recommendations.push('GFR <60 — белок и PRAL под контролем (почки)');
+    if (ferritinFlag && ironRec !== 'zero') recommendations.push('Ферритин <30 — гемовое железо (говядина/печень) + vit C');
+  }
+  if (input.onAAS) recommendations.push('ААС гонит HCT (болденон ×5, тест ×3) — контроль каждые 4 нед');
+  const pralNote = ironRec === 'zero' ? 'PRAL цель −5..+5 · защелачивание (овощи/фрукты 400г)' : 'PRAL <100 mEq/сут';
+  return {
+    hct, zone, zoneLabel, color, waterAdjMl: waterAdj, waterTargetMl, mlPerKg,
+    ironRec, ironRecLabel, donation, viscosityFlag, hgbEstimated, gfrFlag, ferritinFlag,
+    recommendations, pralNote, nutritionMult,
   };
 }

@@ -1,4 +1,5 @@
 import { getNutritionV2Data, calcTrend, type NutritionV2Data } from '../core/nutrition-v2-data';
+import { computeBMR } from '../core/metabolic-constants';
 
 export interface NutritionV2Input {
   weightKg: number;
@@ -7,7 +8,7 @@ export interface NutritionV2Input {
   sex: 'male' | 'female';
   bodyFatPercent?: number;
   pal: number;
-  goal: 'deficit' | 'maintenance' | 'bulk' | 'mini_cut' | 'cut' | 'strength' | 'recomp' | 'rehab';
+  goal: 'deficit' | 'maintenance' | 'bulk' | 'mini_cut' | 'cut' | 'strength' | 'recomp' | 'rehab' | 'health';
   trainingDaysPerWeek?: number;
   avgTrainingMinutes?: number;
 }
@@ -37,25 +38,12 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   // адаптивные фичи учитывали его, а goalMult/proteinFactor/carbMinFromVolume — нет.
   const isDeficit = input.goal === 'deficit' || input.goal === 'mini_cut' || input.goal === 'cut';
 
-  // 1. Calculate LBM (lean body mass) — athletic default BF% (B8 fix)
+  // 1. LBM + 2. BMR — via centralized metabolic-constants (унификация с хабом)
   const bfPct = (input.bodyFatPercent && input.bodyFatPercent > 3) ? input.bodyFatPercent : (input.sex === 'male' ? 12 : 22);
   const lbm = input.weightKg * (1 - bfPct / 100);
-
-  // 2. BMR — Katch-McArdle when BF known (>3%), Mifflin-St Jeor as fallback (B1+B4 fix)
-  let bmr: number;
-  let bmrMethod: 'mifflin' | 'katch_mcardle';
-  if (input.bodyFatPercent && input.bodyFatPercent > 3) {
-    bmr = 370 + 21.6 * lbm;  // Katch-McArdle formula (B1: was mislabeled Cunningham)
-    bmrMethod = 'katch_mcardle';
-  } else {
-    if (input.sex === 'male') {
-      bmr = 10 * input.weightKg + 6.25 * input.heightCm - 5 * input.age + 5;
-    } else {
-      bmr = 10 * input.weightKg + 6.25 * input.heightCm - 5 * input.age - 161;
-    }
-    bmrMethod = 'mifflin';
-  }
-  bmr = Math.max(800, bmr);  // Safety floor (B11: prevent negative/absurd BMR)
+  const bmrRes = computeBMR({ weight: input.weightKg, height: input.heightCm, age: input.age, sex: input.sex, bodyFat: input.bodyFatPercent });
+  let bmr = bmrRes.bmr;
+  let bmrMethod: 'mifflin' | 'katch_mcardle' = bmrRes.method;
 
   // 3. Base TDEE — validated PAL (B11 fix)
   const pal = Math.max(1.15, Math.min(2.4, input.pal || 1.55));
@@ -100,9 +88,11 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   let targetKcal = Math.round(tdee * goalMult);
 
   // 7. Macros — sport dietology standard: LBM-based protein, weight-based fat, residual carbs (B2+B3 fix)
+  const isHealth = input.goal === 'health';
   const profileGPerKg = v2.proteinGPerKg || 0;
   const proteinFactor = profileGPerKg > 0 ? profileGPerKg
     : isDeficit ? 2.5
+    : isHealth ? 1.8
     : input.goal === 'bulk' ? 2.0
     : 2.0;
   const proteinG = Math.round(lbm * proteinFactor);
@@ -131,6 +121,7 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   else if (input.goal === 'mini_cut') carbMinFromVolume *= 0.6;
   else if (input.goal === 'cut') carbMinFromVolume *= 0.7;
   else if (input.goal === 'bulk') carbMinFromVolume *= 1.2;
+  else if (input.goal === 'health') carbMinFromVolume *= 0.9;
   const trainingCarbFloor = Math.round(input.weightKg * carbMinFromVolume);
   // Raise carb floor if training demands more (but don't exceed calorie budget)
   carbsG = Math.max(carbsG, Math.min(trainingCarbFloor, Math.max(carbFloorG, Math.round((targetKcal - proteinKcal - fatKcal) / 3.5))));

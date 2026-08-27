@@ -12,7 +12,7 @@ import { getMicro } from "../core/nutrition-micros";
 // 1. TYPES
 // ═══════════════════════════════════════════════════════════════════
 
-export type Phase = 'LEAN_MASS' | 'EXTREME_CUT' | 'PEAK_WEEK' | 'POST_CYCLE' | 'MOST';
+export type Phase = 'LEAN_MASS' | 'EXTREME_CUT' | 'PEAK_WEEK' | 'POST_CYCLE' | 'MOST' | 'HEALTH';
 export type MealTiming = 'regular' | 'pre_workout' | 'intra_workout' | 'post_workout' | 'before_bed' | 'detox' | 'cheat_meal' | 'balanced' | 'carb_load';
 
 export interface UserDietProfile {
@@ -201,6 +201,14 @@ function applyPhaseModifiers(score: number, f: FoodItem, p: UserDietProfile): { 
       if (f.metabolic_flags?.cns_impact === 'STIMULANT') { score -= 1.0; ff.push({ text: 'Стимуляция ЦНС на ПКТ', impact: -1.0, icon: '⚠️' }); }
       if (getMicro(f, 'VitD') > 5) { score += 1.0; ff.push({ text: 'Витамин D для гормонов', impact: 1.0, icon: '✅' }); }
       break;
+    case 'HEALTH':
+      if (fiber > 4) { score += 1.2; ff.push({ text: 'Клетчатка >4г — здоровье', impact: 1.2, icon: '✅' }); }
+      if (f.category === 'veg_fruit') { score += 1.5; ff.push({ text: 'Овощи/фрукты — здоровье', impact: 1.5, icon: '✅' }); }
+      if (f.category === 'protein' && animalP > 20 && (f.trace_elements_100g?.iron_heme_mg ?? 0) > 2) { score -= 0.8; ff.push({ text: 'Красное мясо умеренно — здоровье', impact: -0.8, icon: '⚠️' }); }
+      if (satFat > 5) { score -= 1.5; ff.push({ text: 'Насыщ. жиры — здоровье', impact: -1.5, icon: '⚠️' }); }
+      if (getMicro(f, 'Omega3') > 300) { score += 1.0; ff.push({ text: 'Омега-3 — здоровье', impact: 1.0, icon: '✅' }); }
+      if (sugar > 5) { score -= 1.8; ff.push({ text: 'Сахар — здоровье', impact: -1.8, icon: '⚠️' }); }
+      break;
   }
   return { score, factors: ff };
 }
@@ -277,10 +285,16 @@ function applyLabModifiers(score: number, f: FoodItem, p: UserDietProfile): { sc
   const glycation = f.metabolic_flags?.glycation_potential ?? 'LOW';
   const thyroid = f.metabolic_flags?.thyroid_support_level ?? 'LOW';
 
-  // HCT/HGB
+  // HCT/HGB — гематокрит + инверсия железа
   if ((L.hematocrit ?? 0) > 51 || (L.hemoglobin ?? 0) > 170) {
     if (gi > 65) score -= 3.0;
     if (o3 > 300) { score += 2.0; ff.push({ text: 'Омега-3 при высоком HCT', impact: 2.0, icon: '✅' }); }
+    // Инверсия: при эритроцитозе гемовое железо — враг вязкости (lab-tier ZERO iron)
+    if (ironHeme > 2) { score -= 3.5; ff.push({ text: 'Гемовое железо при HCT>51 — вязкость', impact: -3.5, icon: '🚨' }); }
+    else if (ironHeme > 0.8) { score -= 1.5; ff.push({ text: 'Железо при высоком HCT', impact: -1.5, icon: '⚠️' }); }
+  } else if ((L.hematocrit ?? 0) >= 48) {
+    // 48-51 внимание — мягкий штраф за гемовое железо
+    if (ironHeme > 3) { score -= 1.5; ff.push({ text: 'Железо при HCT 48-51', impact: -1.5, icon: '⚠️' }); }
   }
   // Lipids
   if ((L.ldl ?? 0) > 4.2 || (L.hdl ?? 0) < 0.8) {
@@ -313,9 +327,11 @@ function applyLabModifiers(score: number, f: FoodItem, p: UserDietProfile): { sc
     if (o6 > 1000) score -= 2.0;
     if ((f.specific_compounds_100g?.polyphenols_mg ?? 0) > 100 || (f.specific_compounds_100g?.flavonoids_mg ?? 0) > 50) { score += 2.0; ff.push({ text: 'Полифенолы/флавоноиды против воспаления', impact: 2.0, icon: '✅' }); }
   }
-  // Ferritin
+  // Ferritin — анемия, но HCT приоритет
   if ((L.ferritin ?? 999) < 30) {
-    if ((category === 'protein' || f.id.includes('liver') || f.id.includes('beef')) && ironHeme > 5) { score += 3.5; ff.push({ text: 'Гемовое железо при анемии', impact: 3.5, icon: '✅' }); }
+    const highHct = (L.hematocrit ?? 0) > 51 || (L.hemoglobin ?? 0) > 170;
+    if (!highHct && (category === 'protein' || f.id.includes('liver') || f.id.includes('beef')) && ironHeme > 5) { score += 3.5; ff.push({ text: 'Гемовое железо при анемии', impact: 3.5, icon: '✅' }); }
+    else if (highHct && ironHeme > 5) { /* HCT >51 — железо не бонусим, гематокрит выше */ }
   }
   // Low T on PCT
   if ((L.testosterone ?? 999) < 12 && (p.phase === 'POST_CYCLE' || p.phase === 'MOST')) {

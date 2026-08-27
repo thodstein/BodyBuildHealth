@@ -22,6 +22,7 @@
 
 import { calcNutrition } from "../../../../engines/nutrition.engine";
 import { calcNutritionV2 } from "../../../../engines/nutrition-v2.engine";
+import { computePalFull } from "../../../../core/metabolic-constants";
 
 export interface PlannerTargetInput {
   weightKg: number;
@@ -101,6 +102,7 @@ const PHASE_MULT: Record<string, { kcalMod: number; pAdd: number }> = {
 const GOAL_MAP: Record<string, string> = {
   mass: 'bulk', strength: 'strength', fat_loss: 'cut', cutting: 'cut',
   post_cut: 'maintenance', maintenance: 'maintenance', recomposition: 'recomp', rehab: 'rehab',
+  health: 'health',
 };
 
 export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets {
@@ -118,19 +120,15 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   const metabolicAdaptPct = Math.max(0, Math.min(50, Number(_metabolicAdaptPct) || 0));
   const manualGPerKg = _manualGPerKg && typeof _manualGPerKg === 'object' ? _manualGPerKg : { protein: 0, fat: 0, carbs: 0 };
 
-  // 1. PAL + TDEE
-  let pal = 1.2 + wpw * 0.075;
-  if (awm > 60) pal += 0.1;
-  if (awm > 90) pal += 0.05;
-  if (wpw >= 6) pal += 0.05;
-  if (dailySteps >= 15000) pal += 0.15; else if (dailySteps >= 10000) pal += 0.1; else if (dailySteps >= 7500) pal += 0.05;
-  const _ha = String(householdActivity || '').toLowerCase();
-  if (_ha === 'active') pal += 0.15; else if (_ha === 'moderate') pal += 0.1; else if (_ha === 'light') pal += 0.05;
-  const _tt = String(trainType || '').toLowerCase();
-  if (_tt === 'hiit') pal += 0.1; else if (_tt === 'cardio') pal += 0.05; else if (_tt === 'mixed') pal += 0.03;
-  const _ti = String(trainIntensity || '').toLowerCase();
-  if (_ti === 'high') pal += 0.1; else if (_ti === 'medium') pal += 0.05;
-  pal = Math.min(1.9, Math.max(1.2, Math.round(pal * 1000) / 1000));
+  // 1. PAL + TDEE — via centralized computePalFull (унификация с хабом)
+  const pal = computePalFull({
+    workoutsPerWeek: wpw,
+    avgWorkoutMinutes: awm,
+    dailySteps: Number(dailySteps) || 0,
+    householdActivity: String(householdActivity || ''),
+    trainType: String(trainType || ''),
+    trainIntensity: String(trainIntensity || ''),
+  });
 
   const engineGoal = GOAL_MAP[goal] || 'maintenance';
 
