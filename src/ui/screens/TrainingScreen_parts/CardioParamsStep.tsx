@@ -114,6 +114,15 @@ export const CardioParamsStep: React.FC<{
     for (const c of comps) {
       if (taperEnabled && c.week < taperWeeks + 1) warnings.push(`Старт «${c.name}» на неделе ${c.week} — taper (${taperWeeks} нед) не влезает.`);
     }
+    if (taperEnabled && comps.length > 1) {
+      const sorted = [...comps].sort((a, b) => a.week - b.week);
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].week - sorted[i - 1].week < taperWeeks + 1) {
+          warnings.push(`Старты «${sorted[i - 1].name}» (нед ${sorted[i - 1].week}) и «${sorted[i].name}» (нед ${sorted[i].week}) слишком близко — окна taper/пик пересекаются.`);
+          break;
+        }
+      }
+    }
     if (lowImpact && equipment.includes('running')) {
       warnings.push('«Щадить суставы» включено, но выбран бег — бег заменяется низкоударным видом.');
     }
@@ -269,7 +278,13 @@ export const CardioParamsStep: React.FC<{
             ))}
             {(() => {
               const sum = phaseSplit.base + phaseSplit.build + phaseSplit.maintenance;
-              const compWeeks = comps.reduce((s, c) => s + Math.max(0, taperWeeks), 0);
+              const taperSet = new Set<number>();
+              if (taperEnabled) {
+                for (const c of comps) {
+                  for (let w = c.week - taperWeeks; w <= c.week; w++) if (w >= 1 && w <= totalWeeks) taperSet.add(w);
+                }
+              }
+              const compWeeks = taperSet.size;
               const available = Math.max(0, totalWeeks - compWeeks);
               if (sum > available) {
                 return (
