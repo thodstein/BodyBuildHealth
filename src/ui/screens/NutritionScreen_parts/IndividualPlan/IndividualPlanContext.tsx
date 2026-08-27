@@ -3155,7 +3155,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (effectiveMealsCount >= 4) mealDefs.push({ label: 'Полдник' });
       mealDefs.push({ label: 'Ужин', anchor: Math.min(effectiveDinner, 1380) });
       if (effectiveMealsCount >= 6) mealDefs.push({ label: 'Перекус' });
-      const anchored = mealDefs.map((m, i) => {
+      // Training-aware: ужин и другие приёмы не ставятся во время тренировки ±60 мин
+  if (linkToTraining && isTrainingDay && trainMin > 0) {
+    const trainEnd = trainMin + 90;
+    const buffer = 60;
+    for (const m of mealDefs) {
+      if (!m.anchor) continue;
+      if (m.anchor >= trainMin - buffer && m.anchor <= trainEnd + buffer) {
+        const before = trainMin - 90;
+        const after = trainEnd + 90;
+        (m as any).anchor = m.anchor < trainMin ? Math.max(effectiveWake + 15, before) : Math.min(effectiveBed - 15, after);
+      }
+    }
+  }
+  const anchored = mealDefs.map((m, i) => {
         if (m.anchor) return { ...m, time: m.anchor, fixed: true };
         let leftAnchorIdx = i; let leftTime = effectiveWake; while (leftAnchorIdx >= 0 && !mealDefs[leftAnchorIdx].anchor) leftAnchorIdx--; if (leftAnchorIdx >= 0) leftTime = mealDefs[leftAnchorIdx].anchor!;
         let rightAnchorIdx = i; let rightTime = effectiveBed - 30; while (rightAnchorIdx < mealDefs.length && !mealDefs[rightAnchorIdx].anchor) rightAnchorIdx++; if (rightAnchorIdx < mealDefs.length) rightTime = mealDefs[rightAnchorIdx].anchor!;

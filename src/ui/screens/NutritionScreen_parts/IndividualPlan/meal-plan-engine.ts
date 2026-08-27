@@ -1765,7 +1765,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
-  const tBreakfast = input.wakeTime || '07:30';
+  let tBreakfast = input.wakeTime || '07:30';
   let tLunch = input.lunchTime || '12:30';
   let tDinner = input.dinnerTime || '19:00';
   const tBed = input.bedTime || '22:00';
@@ -1787,7 +1787,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   // Pre-sleep 30 min before bed
   // P2-fix: try/catch на time parsing — malformed tBed давал "NaN:NaN" в таймах
-  const tPreSleep = (() => {
+  let tPreSleep = (() => {
     try {
       const [h, m] = tBed.split(':').map(Number);
       if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) return '21:30';
@@ -1802,7 +1802,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const wantPreSleep = input.mealsCount >= 3 && _dinnerToBedGap >= 60;
   // Snack time: midpoint between lunch and dinner
   // P2-fix: try/catch на time parsing
-  const tSnack = (() => {
+  let tSnack = (() => {
     try {
       const [lh, lm] = tLunch.split(':').map(Number);
       const [dh, dm] = tDinner.split(':').map(Number);
@@ -1906,6 +1906,36 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _sessionMin = input.trainDurationMin && input.trainDurationMin > 0 ? input.trainDurationMin : 60;
   const prewMin = trainWindow ? (input.trainStartMin || 0) - 90 : NaN;
   const postwMin = trainWindow ? (input.trainStartMin || 0) + _sessionMin + 30 : NaN;
+  // Training-aware: ужин и другие приёмы (завтрак/обед/ужин/перекус/preSleep) не ставятся
+  // во время тренировки ±60 мин (пери-приёмы pre/intra/post уже вокруг тренировки)
+  if (trainWindow) {
+    const trainStart = input.trainStartMin || 0;
+    const trainEnd = trainStart + _sessionMin;
+    const buffer = 60;
+    const isConflict = (t: number) => {
+      if (isNaN(t)) return false;
+      if (trainEnd <= 1440) return t >= trainStart - buffer && t <= trainEnd + buffer;
+      const endMod = trainEnd % 1440;
+      return t >= trainStart - buffer || t <= endMod + buffer;
+    };
+    const shiftAway = (t: number) => {
+      if (!isConflict(t)) return t;
+      const after = (trainEnd + 90) % 1440;
+      const before = (trainStart - 90 + 1440) % 1440;
+      return t < trainStart ? before : after;
+    };
+    const fmtM = (m: number) => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+    const adjustStr = (s: string) => {
+      const mm = timeStrToMinutes(s);
+      if (mm === null || !isConflict(mm)) return s;
+      return fmtM(shiftAway(mm));
+    };
+    tBreakfast = adjustStr(tBreakfast);
+    tLunch = adjustStr(tLunch);
+    tDinner = adjustStr(tDinner);
+    tPreSleep = adjustStr(tPreSleep);
+    tSnack = adjustStr(tSnack);
+  }
   // Carb periodization: тренировка → 25% pre+30% post+15% lunch; отдых → 30/30/20
   // planType теперь только фильтр пулов (не множитель КБЖУ) — карточка = план; labAdj остаётся
   const labC = labAdj.macroAdjustments.carbMult || 1.0;
