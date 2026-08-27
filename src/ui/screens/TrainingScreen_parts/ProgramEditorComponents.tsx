@@ -353,7 +353,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       <div className="constructor-surface constructor-surface--info" style={{ ...CARD, padding: howCollapsed ? '8px 10px' : 10, borderLeft: '3px solid #60a5fa' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: '#60a5fa', flex: 1 }}>Как собрать программу</div>
-          <button onClick={() => { const v = !howCollapsed; setHowCollapsed(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_HOW_COLLAPSED, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{howCollapsed ? 'Показать' : 'Скрыть'}</button>
+          <button aria-expanded={!howCollapsed} aria-label={howCollapsed ? 'Показать подсказку' : 'Скрыть подсказку'} onClick={() => { const v = !howCollapsed; setHowCollapsed(v); try { localStorage.setItem(MANUAL_STORAGE_KEYS.BB_HOW_COLLAPSED, v ? '1' : '0'); } catch {} }} style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, minHeight: 28 }}>{howCollapsed ? 'Показать' : 'Скрыть'}</button>
         </div>
         {!howCollapsed && (
           <>
@@ -425,7 +425,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
       {showHeatmap && body.weeks.length > 1 && (() => {
         try {
           const tmpProg = { meta: { id: 'tmp', title: 'tmp', author: '', goal: 'hypertrophy', level, daysPerWeek: body.weeks[0]?.sessions.length ?? 3, weeks: body.weeks.length, direction: 'bb' as const, createdAt: '', updatedAt: '', source: 'custom' as const }, bb: body } as any;
-          return <MesoHeatmap program={tmpProg} dir="bb" />;
+          return <div role="img" aria-label={`Тепловая карта объёма: ${body.weeks.length} недель`}><MesoHeatmap program={tmpProg} dir="bb" /></div>;
         } catch { return null; }
       })()}
       {body.weeks.length > 1 && (

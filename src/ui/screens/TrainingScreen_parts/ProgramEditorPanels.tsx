@@ -2,7 +2,7 @@
  * ProgramEditorPanels.tsx — извлечённые панели инструментов для ProgramEditor.
  * Вынесено из ProgramManagerPanel.tsx для соблюдения лимита 1500 строк.
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { CARD, DIM, DIM_STRONG, ACCENT, IN, BTN_GHOST } from './training-ui';
 import { GROUP_RU } from './program-types';
 import type { UserProgram, UserBlock, BBProgramBody } from '../../../engines/user-program/user-program.types';
@@ -31,10 +31,11 @@ const PHASE_LABELS: Record<string, string> = { accumulation: 'Накоплени
 export const PlanDiagnosticsPanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
   const prof = loadTrainingProfile();
-  let q: ReturnType<typeof computePlanQualityFor> | null = null;
-  try {
-    q = computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
-  } catch { return null; }
+  const q = useMemo(() => {
+    try {
+      return computePlanQualityFor(program, program.meta.level, { onCourse: prof.onCourse ?? false, courseIntensity: prof.courseIntensity ?? 'moderate', labMult: labMrvMult });
+    } catch { return null; }
+  }, [program, prof.onCourse, prof.courseIntensity, labMrvMult]);
   if (!q || q.perMuscle.length === 0) return null;
 
   const weak = q.perMuscle.filter(m => m.status === 'low');

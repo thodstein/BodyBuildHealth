@@ -254,6 +254,8 @@ export const ProgramEditor: React.FC<ProgramEditorProps> = ({ program, onChange,
     try { localStorage.setItem(MANUAL_STORAGE_KEYS.PROGRAM_FAV, JSON.stringify(progFavs)); } catch { /* ignore */ }
   }, [progFavs]);
   const toggleProgFav = (id: string) => setProgFavs(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const [icsHour, setIcsHour] = useState(9);
+  const [icsDur, setIcsDur] = useState(75);
   // State для MacrocyclePanel (редактируемые level/goal макроцикла)
   const [macroLevel, setMacroLevel] = useState<string>(program.meta.level);
   const [macroGoal, setMacroGoal] = useState<'powerlifting' | 'bodybuilding' | 'general'>(
@@ -738,7 +740,9 @@ return (
           </div>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 3 }}>
             <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#a78bfa', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={printProgram} title="Печать / PDF">🖨 PDF</button>
-            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#00e68a', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => { try { const ics = buildProgramIcs(program); downloadIcs((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); showToast('📅 ICS скачан'); } catch { showToast('⚠ Не удалось собрать ICS', 'error'); } }} title="Скачать календарь (.ics)">📅 ICS</button>
+            <input type="number" value={icsHour} min={6} max={22} onChange={e=> setIcsHour(Math.max(6,Math.min(22,Number(e.target.value)||9)))} title="Час начала" aria-label="Час начала тренировки" style={{ width: 44, padding: '4px 4px', fontSize: 11, minHeight: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.25)', color: '#fff', textAlign: 'center' }} />
+            <input type="number" value={icsDur} min={30} max={180} step={15} onChange={e=> setIcsDur(Math.max(30,Math.min(180,Number(e.target.value)||75)))} title="Длительность мин" aria-label="Длительность мин" style={{ width: 50, padding: '4px 4px', fontSize: 11, minHeight: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.25)', color: '#fff', textAlign: 'center' }} />
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#00e68a', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => { try { const ics = buildProgramIcs(program, undefined, { startHour: icsHour, durationMin: icsDur }); downloadIcs((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); showToast('📅 ICS скачан'); } catch { showToast('⚠ Не удалось собрать ICS', 'error'); } }} title="Скачать календарь (.ics)">📅 ICS</button>
           </div>
           {(dir === 'bb' || dir === 'pl') && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)', borderRadius: 10, padding: '3px 6px' }}>
