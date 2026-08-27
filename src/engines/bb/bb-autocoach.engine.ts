@@ -492,7 +492,7 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
   }));
   const isWeak = (muscle: string) => weakCanonical.has(String(muscle).toLowerCase()) || weakPoints.includes(muscle) || (opts?.focusGroup && String(muscle).toLowerCase()===String(opts.focusGroup).toLowerCase()) || (opts?.specializationTargets || []).includes(muscle);
   for (const w of weeks) {
-    const seenPatterns: Set<string> = new Set();
+    const seenPatterns: Map<string, number> = new Map();
     for (const s of w.sessions) {
       // Разминочные упражнения — не мусор (не входят в объём).
       for (const e of s.exercises) {
@@ -509,7 +509,7 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
               return true; // default: разрешить
             })()
           : true;
-        if (!tagRelevant) {
+        if (!tagRelevant && !isWeak(e.muscle)) {
           garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Мышца ${e.muscle} не входит в тег сессии ${s.sessionTag}` });
         }
         // Дублирование механического паттерна: два жима/тяги в одной сессии (кроме слабых групп).
@@ -527,9 +527,10 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
           pattern = (catalogEx?.movementPattern as string) || null;
           subGroup = (catalogEx as any)?.substitutionGroup || null;
         }
-        // Для мелких мышц (руки/икры/пресс/трапы) изоляция с разным subGroup —
-        // не дубль (французский жим overhead vs разгибание на блоке pushdown).
-        if (['biceps','triceps','forearms','calves','abs','traps'].includes(e.muscle) && subGroup) {
+        // Для изоляций разный subGroup — не дубль (французский overhead vs блок pushdown,
+        // разводка гантелей chest_iso vs кроссовер chest_iso_upper, YTЛ vs lateral raise).
+        // Иначе broad isolation_chest/isolation_shoulders ложно считали все изоляции одной мышцы дублем.
+        if (subGroup && pattern && pattern.startsWith('isolation')) {
           pattern = `${pattern}:${subGroup}`;
         }
         // Compound-паттерны (horizontal_push, heavy_row, squat...) НЕ считаются
@@ -544,10 +545,13 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
           // Икры — исключение: стоя (икроножная) + сидя (камбаловидная) — это ДВА разных
           // упражнения по ТЗ, оба обязательны в день ног. Не считаем дублем.
           const calvesByDesign = e.muscle === 'calves' && /носк|calf/i.test(e.name || '');
-          if (seenPatterns.has(key) && !isWeak(e.muscle) && !calvesByDesign) {
-            garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Дублирование паттерна ${pattern} для ${e.muscle} — одна изоляция на сессию` });
+          const cnt = seenPatterns.get(key) || 0;
+          // Разрешаем 2 изоляции одной мышцы/паттерна в сессии (разные углы/односторонние),
+          // только 3-я считается мусором. Слабые группы — скип.
+          if (cnt >= 2 && !isWeak(e.muscle) && !calvesByDesign) {
+            garbage.push({ exerciseName: e.name, muscle: e.muscle, sessionTag: s.sessionTag || '', reason: `Дублирование паттерна ${pattern} для ${e.muscle} — 2 изоляции на сессию достаточно` });
           }
-          seenPatterns.add(key);
+          seenPatterns.set(key, cnt + 1);
         }
       }
     }

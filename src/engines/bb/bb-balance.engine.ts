@@ -90,7 +90,7 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
       report.issues.push(`${ru}: доминирует один паттерн «${PATTERN_RU[pat] || pat}» (${Object.values(coverage.patterns)[0]} сетов) — добавьте второй угол/хват для разнообразия стимула.`);
     }
     const totalMuscleSets = coverage.compound + coverage.isolation;
-    const isolationDominantByDesign = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs']).has(muscle);
+    const isolationDominantByDesign = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs', 'shoulders', 'delt_front', 'delt_mid', 'delt_rear', 'traps', 'glutes']).has(muscle);
     if (!isolationDominantByDesign && totalMuscleSets >= 6 && coverage.compound < totalMuscleSets * 0.4) {
       report.issues.push(`${ru}: только ${coverage.compound}/${totalMuscleSets} сетов базовых (менее 40%) — слишком много изоляции («мусорный объём»). Добавьте базу: жим/тяга/присед.`);
     }
