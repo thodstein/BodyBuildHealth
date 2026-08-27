@@ -721,6 +721,10 @@ export interface UnifiedSettings {
     bbPeakConfig?: string;
     /** JSON единого версионированного плана contest prep (BBContestPrepPlan). */
     bbContestPrepPlan?: string;
+    /** Недель подготовки (вынесено из хардкода 12, для синхронизации ББ-авто ↔ питание). */
+    prepWeeks?: number;
+    /** Флаг изоляции обычного режима ББ-авто (false = обычный план без тапера). */
+    prepEnabled?: boolean;
     /** Этап жизни (детокс/набор/поддержание/сушка) */
     lifeStage?: string;
   };

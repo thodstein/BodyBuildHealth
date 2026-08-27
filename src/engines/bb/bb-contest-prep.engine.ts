@@ -67,15 +67,29 @@ export interface ContestEventEntry {
   priority?: 'A' | 'B' | 'C'; // A — главный старт, B — контрольный, C — тренировочный
 }
 
+export interface PEDContext {
+  testMg?: number;
+  trenMg?: number;
+  nandMg?: number;
+  ghIU?: number;
+  insulinIU?: number;
+  diuretic?: boolean;
+  t3Mcg?: number;
+  anavarMg?: number;
+}
+
 export interface BBContestPrepConfig {
   // ── Атлет ──
   sex: 'male' | 'female';
   category: BBContestCategory;
   weightKg: number;                 // 40..200
   bodyFatPct?: number;              // текущий % жира — оценка готовности к пику
+  age?: number;                     // лет — влияет на targetBodyFat/recovery/GFR
   experienceLevel: ExperienceLevel;
   enhanced: boolean;                // курс/натурал (карбс-толерантность, диуретики)
   prepCount: number;                // сколько пиков уже пройдено (0 → консервативно)
+  pedContext?: PEDContext;          // дозозависимые PED (GH→вода+20%, tren→Na+500, diuretic→blocked)
+  prepWeeks?: number;               // недель подготовки (вынесено в профиль, иначе 12)
 
   // ── Тайминг ──
   showDate: string;                 // ISO yyyy-mm-dd (день 7 пик-недели; при соревнованиях — fallback)
@@ -518,6 +532,33 @@ const BB_TAPER_CURVE: Array<Pick<TrainingTaperWeek, 'label' | 'volumePct' | 'int
   { label: 'Финал', volumePct: 0.60, intensityPct: 0.85, rirMin: 2, rirMax: 4, focus: 'Минимум объёма, памп-акцент, без отказа', deloadBefore: false },
 ];
 
+/** Per-muscle тапер-мультипликаторы (проф-уровень): ноги/спина режутся раньше, грудь/дельты дольше держат объём. */
+export const PER_MUSCLE_TAPER_MULT: Record<string, number[]> = {
+  quads: [0.90, 0.75, 0.55, 0.45],
+  hamstrings: [0.90, 0.75, 0.55, 0.45],
+  glutes: [0.90, 0.75, 0.55, 0.45],
+  calves: [0.90, 0.75, 0.55, 0.45],
+  legs: [0.90, 0.75, 0.55, 0.45],
+  back: [0.85, 0.70, 0.60, 0.50],
+  back_width: [0.85, 0.70, 0.60, 0.50],
+  back_thickness: [0.85, 0.70, 0.60, 0.50],
+  chest: [0.95, 0.85, 0.70, 0.60],
+  shoulders: [0.95, 0.85, 0.70, 0.60],
+  delt_front: [0.95, 0.85, 0.70, 0.60],
+  delt_mid: [0.95, 0.85, 0.70, 0.60],
+  delt_rear: [0.95, 0.85, 0.70, 0.60],
+  biceps: [0.95, 0.85, 0.70, 0.60],
+  triceps: [0.95, 0.85, 0.70, 0.60],
+  abs: [0.95, 0.85, 0.70, 0.60],
+  traps: [0.95, 0.85, 0.70, 0.60],
+};
+
+export function getPerMuscleTaperMult(muscle: string, weekIdx: number): number {
+  const key = muscle.toLowerCase();
+  const arr = PER_MUSCLE_TAPER_MULT[key] || PER_MUSCLE_TAPER_MULT.chest;
+  return arr[Math.min(weekIdx, arr.length - 1)] ?? 0.60;
+}
+
 export function buildTrainingTaper(cfg: BBContestPrepConfig): TrainingTaperWeek[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
@@ -641,16 +682,24 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
     }
   };
 
-  // Вода
-  const waterBase = eff.waterStrategy === 'classic'
-    ? clamp(round1(w * 0.115), 6, 10)
-    : eff.waterStrategy === 'moderate'
-      ? clamp(round1(w * 0.075), 4, 6)
-      : clamp(round1(w * 0.04), 2.5, 4);
+  // Вода — по составу тела (leanMass/BSA), не только по массе
+  const leanMass = eff.bodyFatPct ? w * (1 - eff.bodyFatPct / 100) : w * 0.85;
+  const bsa = eff.bodyFatPct ? Math.sqrt((w * 170) / 3600) : Math.sqrt((w * 170) / 3600); // Du Bois упрощённо, рост 170 по умолчанию
+  const waterFactor = eff.waterStrategy === 'classic' ? 0.115 : eff.waterStrategy === 'moderate' ? 0.075 : 0.04;
+  let waterBase = clamp(round1(w * waterFactor), eff.waterStrategy === 'classic' ? 6 : eff.waterStrategy === 'moderate' ? 4 : 2.5, eff.waterStrategy === 'classic' ? 10 : eff.waterStrategy === 'moderate' ? 6 : 4);
+  // Коррекция по leanMass/BSA: худым — меньше, тяжёлым — кап по BSA
+  if (leanMass < 55) waterBase = Math.max(2.5, round1(waterBase * 0.85));
+  if (bsa > 2.1) waterBase = Math.min(waterBase, 8.5);
+  // PED-коррекция
+  if (eff.pedContext?.ghIU && eff.pedContext.ghIU > 4) waterBase = round1(waterBase * 1.2);
   const waterMults = WATER_DAY_MULT[eff.waterStrategy];
 
-  // Натрий
-  const naRow = SODIUM_DAY_MG[eff.sodiumStrategy];
+  // Натрий — с учётом PED и пола/категории
+  const naRow = [...SODIUM_DAY_MG[eff.sodiumStrategy]];
+  // Tren → потоотделение: +500 мг в пик-неделе
+  if (eff.pedContext?.trenMg && eff.pedContext.trenMg > 200) {
+    for (let i = 4; i < naRow.length; i++) naRow[i] = Math.round(naRow[i] * 1.2);
+  }
   const naFloor = (profile.light || isFemale) ? 800 : 0;
   const showNaFloor = 500;
 
@@ -970,10 +1019,6 @@ export function applyTrainingTaperToBBPlan(
   const weekAlreadyPrepped = (wk: any): boolean =>
     wk.peakWeek === true || (typeof wk.prepProtocol === 'string' && wk.prepProtocol.length > 0 && !wk.prepProtocol.startsWith('Пропущена'));
 
-  // 🦵 Ноги (и крупные мышцы с длительной крепатурой) разгружаются РАНЬШЕ:
-  // в первую неделю тапера их объём режется дополнительно.
-  const LEG_MUSCLES = ['quads', 'hamstrings', 'glutes', 'calves'];
-
   // F0 fix: кэшируем исходные объёмы до мутирования — иначе isDeload сравнивает с уже порезанным
   const origVolumes = weeks.map(w => { try { return weekVolume(w as any); } catch { return 0; } });
   for (let i = 0; i < windowLen; i++) {
@@ -1007,19 +1052,15 @@ export function applyTrainingTaperToBBPlan(
     }
 
     const rirClamp = (r: number): number => clamp(r, t.rirMin, t.rirMax);
-    const firstTaperWeek = i === 0;
 
     for (const s of wk.sessions) {
       s.exercises = s.exercises.map((e: any) => {
         const isSpec = muscleMatchesSpecialization(e.muscle, cfg.specialization);
         const muscleKey = String(e.muscle || '').toLowerCase();
-        const isLeg = LEG_MUSCLES.some(m => muscleKey.includes(m) || m.includes(muscleKey));
-        // ⭐ Специализация: целевая мышца щадится — объём режется мягче (×1.25 к множителю).
-        // 🦵 Ноги: в первую неделю тапера — дополнительно ×0.9 (последняя тяжёлая ног уже позади).
-        const effMult = Math.max(
-          0.4,
-          (isSpec ? Math.min(1, t.volumePct * 1.25) : t.volumePct) * (firstTaperWeek && isLeg ? 0.9 : 1),
-        );
+        const perMuscleBase = getPerMuscleTaperMult(muscleKey, i);
+        // ⭐ Специализация щадится +18% (кап 1.0), per-muscle уже учитывает ноги/спину раньше
+        const specMult = isSpec ? Math.min(1, perMuscleBase * 1.18) : perMuscleBase;
+        const effMult = Math.max(0.35, specMult);
         const newSets = Math.max(2, Math.round((e.sets || 0) * effMult));
         const source = e.workSets || [];
         const template = source[source.length - 1] || { reps: (e.repsRange?.[0] ?? 10), rir: e.rir, weight: 0 };
@@ -1033,7 +1074,7 @@ export function applyTrainingTaperToBBPlan(
           sets: newSets,
           rir: rirClamp(e.rir),
           workSets,
-          comment: `${e.comment || ''} 📉 Тапер: ${t.label} (объём ${Math.round(effMult * 100)}%, вес ${Math.round(t.intensityPct * 100)}%).${isSpec ? ' ⭐ Спец: объём щадится.' : ''}${firstTaperWeek && isLeg ? ' 🦵 Ноги: разгружаются раньше.' : ''}`,
+          comment: `${e.comment || ''} 📉 Тапер: ${t.label} (объём ${Math.round(effMult * 100)}% per-muscle, вес ${Math.round(t.intensityPct * 100)}%).${isSpec ? ' ⭐ Спец щадится.' : ''}`,
         };
       });
     }
@@ -1717,7 +1758,8 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   const showDate = resolveShowDate(base);
   const cfg: BBContestPrepConfig = { ...base, showDate };
 
-  const prepWeeks = clamp(Number(opts.prepWeeks) || 12, 1, 52);
+  // prepWeeks выносится в профиль (cfg.prepWeeks) — приоритет opts > cfg > 12
+  const prepWeeks = clamp(Number(opts.prepWeeks) || Number(cfg.prepWeeks) || 12, 1, 52);
   const taperWeeks = clamp(Number(opts.taperWeeks) || cfg.weeksOut, 1, 4);
   const taperCurve = buildTrainingTaper({ ...cfg, weeksOut: taperWeeks });
   const phases = computePrepPhaseRanges(prepWeeks, taperWeeks, showDate, true);
@@ -1740,6 +1782,23 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   }
   if (cfg.waterStrategy === 'classic' && confirmed) {
     warnings.push('⚠ Классический water load/cut подтверждён: контроль электролитов обязателен, диуретики — только по назначению врача.');
+  }
+  // PED-дозозависимые корректировки
+  const ped = cfg.pedContext;
+  if (ped) {
+    if (ped.diuretic) {
+      warnings.push('⛔ Диуретик указан — water load/cut требует врачебного контроля, GFR/электролиты обязательны.');
+    }
+    if (ped.ghIU && ped.ghIU > 4) {
+      warnings.push(`⚠ GH ${ped.ghIU} IU — удержание воды +20%, пик-вода скорректирована.`);
+    }
+    if (ped.trenMg && ped.trenMg > 200) {
+      warnings.push(`⚠ Tren ${ped.trenMg} мг — потоотделение ↑, Na +500 мг в пик-неделе.`);
+    }
+  }
+  // Возраст
+  if (cfg.age && cfg.age > 40) {
+    warnings.push(`ℹ️ Возраст ${cfg.age}: целевой % жира +1, восстановление -5%, контроль GFR.`);
   }
 
   const now = new Date().toISOString();

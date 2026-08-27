@@ -624,6 +624,14 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepCreatineStop, setPrepCreatineStop] = useState(false);
   const [prepCompetitions, setPrepCompetitions] = useState<ContestEventEntry[] | undefined>(undefined);
   const [prepMainCompetitionId, setPrepMainCompetitionId] = useState<string | undefined>(undefined);
+  // Флаг изоляции обычного режима
+  const [prepEnabled, setPrepEnabled] = useState<boolean>(() => {
+    try {
+      const g: any = (getProfile().settings as any)?.goals;
+      if (typeof g?.prepEnabled === 'boolean') return g.prepEnabled;
+      return !!g?.bbContestPrepPlan;
+    } catch { return false; }
+  });
   // 🏁 Режим подготовки (тренировочная логика недель подготовки): 1.0 = сохранение
   // (RIR 1–3, без отказа, объём как в плане), 0.85 = поддерживающий объём при дефиците.
   const [prepVolumeMode, setPrepVolumeMode] = useState<number>(1.0);
@@ -4497,6 +4505,34 @@ export const BbAutoConstructor: React.FC = () => {
           Опциональный цикл: <b>подготовка → taper → peak week → show day</b>. План тренировок строится как
           обычный; этот шаг накладывает фазы поверх него (копию) и генерирует дневные цели питания.
           Можно пропустить — план останется обычным.
+        </div>
+        {/* Флаг изоляции */}
+        <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8, padding:10, borderRadius:10, background: prepEnabled ? 'rgba(236,72,153,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${prepEnabled ? 'rgba(236,72,153,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+          <label style={{ display:'flex', gap:8, alignItems:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: prepEnabled ? '#f472b6' : '#fff' }}>
+            <input type="checkbox" checked={prepEnabled} onChange={e => {
+              const v = e.target.checked;
+              setPrepEnabled(v);
+              try {
+                const cur = getProfile();
+                const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
+                if (!next.goals) next.goals = {};
+                next.goals.prepEnabled = v;
+                if (!v) {
+                  delete next.goals.bbContestPrepPlan;
+                  delete next.goals.bbPeakConfig;
+                  next.goals.peakWeek = false;
+                }
+                updateProfile({ settings: next });
+                if (!v) {
+                  setPrepPlan(null);
+                  setPrepApplied(false);
+                  window.dispatchEvent(new CustomEvent(CONTEST_PREP_UPDATED_EVENT, { detail: { source: 'clear' } }));
+                }
+              } catch {}
+            }} />
+            {prepEnabled ? '✅ Подготовка включена' : '⬜ Включить подготовку'}
+          </label>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginLeft:'auto' }}>{prepEnabled ? 'Тапер активен' : 'Обычный режим'}</span>
         </div>
 
         {/* Параметры */}

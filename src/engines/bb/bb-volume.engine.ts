@@ -412,3 +412,46 @@ export function aggregateBBVolume(
   }
   return totals;
 }
+
+export function computeMuscleBalance(
+  weekly: Record<string, { effectiveSets: number }>,
+): { issues: string[]; ratios: Record<string, number> } {
+  const get = (m: string) => weekly[m]?.effectiveSets || 0;
+  const issues: string[] = [];
+  const ratios: Record<string, number> = {};
+  // chest/back
+  const chest = get('chest');
+  const back = get('back');
+  if (chest > 0 && back > 0) {
+    const r = chest / back;
+    ratios['chest/back'] = Math.round(r * 100) / 100;
+    if (r > 1.3) issues.push(`Дисбаланс грудь/спина ${Math.round(r * 100) / 100} — грудь перегружена, добавьте тяг`);
+    if (r < 0.7) issues.push(`Дисбаланс грудь/спина ${Math.round(r * 100) / 100} — спина перегружена, добавьте жимов`);
+  }
+  // quad/ham
+  const quad = get('quads');
+  const ham = get('hamstrings');
+  if (quad > 0 && ham > 0) {
+    const r = quad / ham;
+    ratios['quad/ham'] = Math.round(r * 100) / 100;
+    if (r > 1.5 || r < 0.66) issues.push(`Квадр/бицепс бедра ${Math.round(r * 100) / 100} — риск дисбаланса колена`);
+  }
+  // push/pull per-week
+  const push = chest + get('triceps') + get('shoulders') + get('delt_front') + get('delt_mid');
+  const pull = back + get('biceps') + get('delt_rear') + ham + get('glutes');
+  if (push > 0 && pull > 0) {
+    const r = push / pull;
+    ratios['push/pull'] = Math.round(r * 100) / 100;
+    if (r > 1.3) issues.push(`Push/pull ${Math.round(r * 100) / 100} — тяг мало`);
+    if (r < 0.77) issues.push(`Push/pull ${Math.round(r * 100) / 100} — жимов мало`);
+  }
+  // front/rear delt
+  const front = get('delt_front') + get('shoulders') * 0.3;
+  const rear = get('delt_rear');
+  if (front > 0 && rear > 0) {
+    const r = front / rear;
+    ratios['front/rear'] = Math.round(r * 100) / 100;
+    if (r > 1.5) issues.push(`Передняя/задняя дельта ${Math.round(r * 100) / 100} — добавьте тяг на заднюю дельту`);
+  }
+  return { issues, ratios };
+}
