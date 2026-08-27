@@ -370,20 +370,23 @@ export const SplitConsultant: React.FC<PanelProps> = ({ program, dir, onChange, 
 export const InteractiveVolumePanel: React.FC<PanelProps> = ({ program, dir, onChange, showToast, labMrvMult }) => {
   const MUSCLES = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'] as const;
   const prof = loadTrainingProfile();
-  const peakByMuscle: Record<string, number> = {};
-  if (dir === 'bb' && program.bb) {
-    for (const w of program.bb.weeks) {
-      const ws: Record<string, number> = {};
-      for (const s of w.sessions) for (const b of s.blocks) if (b.muscle) ws[b.muscle] = (ws[b.muscle] || 0) + (b.sets?.length || 0);
-      for (const [m, sets] of Object.entries(ws)) peakByMuscle[m] = Math.max(peakByMuscle[m] || 0, sets);
+  const peakByMuscle = useMemo<Record<string, number>>(() => {
+    const m: Record<string, number> = {};
+    if (dir === 'bb' && program.bb) {
+      for (const w of program.bb.weeks) {
+        const ws: Record<string, number> = {};
+        for (const s of w.sessions) for (const b of s.blocks) if (b.muscle) ws[b.muscle] = (ws[b.muscle] || 0) + (b.sets?.length || 0);
+        for (const [mem, sets] of Object.entries(ws)) m[mem] = Math.max(m[mem] || 0, sets);
+      }
+    } else if (dir === 'pl' && program.pl?.customWeeks) {
+      for (const w of program.pl.customWeeks) {
+        const ws: Record<string, number> = {};
+        for (const d of w.days) for (const ex of d.exercises) if (ex.muscle) ws[ex.muscle] = (ws[ex.muscle] || 0) + ex.sets.reduce((s, st) => s + st.sets, 0);
+        for (const [mem, sets] of Object.entries(ws)) m[mem] = Math.max(m[mem] || 0, sets);
+      }
     }
-  } else if (dir === 'pl' && program.pl?.customWeeks) {
-    for (const w of program.pl.customWeeks) {
-      const ws: Record<string, number> = {};
-      for (const d of w.days) for (const ex of d.exercises) if (ex.muscle) ws[ex.muscle] = (ws[ex.muscle] || 0) + ex.sets.reduce((s, st) => s + st.sets, 0);
-      for (const [m, sets] of Object.entries(ws)) peakByMuscle[m] = Math.max(peakByMuscle[m] || 0, sets);
-    }
-  }
+    return m;
+  }, [program, dir]);
   if (Object.keys(peakByMuscle).length === 0) return null;
 
   // Добавить 1 сет к мышце — в наименее загруженную сессию недели 1 (баланс PPL/5-day)

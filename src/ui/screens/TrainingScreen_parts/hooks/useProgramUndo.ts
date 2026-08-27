@@ -7,8 +7,9 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import type { UserProgram } from '../../../../engines/user-program/user-program.types';
+import { MANUAL_STORAGE_KEYS } from '../../../../engines/manual-constructor/manual-storage';
 
-const STORAGE_KEY = 'he_editor_history';
+const STORAGE_KEY = MANUAL_STORAGE_KEYS.EDITOR_HISTORY;
 const MAX_HISTORY = 50;
 const MAX_STORAGE_BYTES = 2_000_000;
 

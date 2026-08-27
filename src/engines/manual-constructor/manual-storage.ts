@@ -12,6 +12,7 @@ export const MANUAL_STORAGE_KEYS = {
   CYCLE_FAV: 'he_cycle_fav',
   BB_BOARD_MODE: 'he_bb_board_mode',
   BB_HOW_COLLAPSED: 'he_bb_how_collapsed',
+  EDITOR_HISTORY: 'he_editor_history',
   PL_RUNTIME: 'he_pl_runtime',
   ANNUAL_BLOCK_PENDING: 'he_annual_block_pending',
   ANNUAL_TRAINING_PLAN: 'he_annual_training_plan_v1',
