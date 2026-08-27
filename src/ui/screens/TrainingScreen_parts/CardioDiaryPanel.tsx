@@ -7,6 +7,7 @@ import {
   loadCardioLog, saveCardioLogEntry, removeCardioLogEntry, replaceCardioLog,
   cardioLogStats, computeCardioAdvice, cardioWeekFact, estimateCardioEntryKcal,
   cardioPaceMinPerKm, validateCardioLogFields, clampCardioLogNumber,
+  saveCardioWellness, loadCardioWellness, wellnessReadiness,
   type CardioLogEntry, type CardioLogFieldWarnings,
 } from '../../../engines/lms/cardio-diary.engine';
 import { cardioWeekAdherence } from '../../../engines/lms/cardio-diary.engine';
@@ -50,6 +51,10 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
   const [warnings, setWarnings] = useState<CardioLogFieldWarnings | null>(null);
   // Undo: снимок журнала до последней операции (добавление/обновление/удаление).
   const [undoPrev, setUndoPrev] = useState<CardioLogEntry[] | null>(null);
+  const [wellness, setWellness] = useState(() => {
+    const w = loadCardioWellness().find(x => x.date === todayIso());
+    return w ?? { sleep: 3, stress: 3, soreness: 3, mood: 3 };
+  });
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -285,6 +290,37 @@ export const CardioDiaryPanel: React.FC<{ cycle: CardioCycle | null; acwr?: numb
           );
         } catch { return null; }
       })()}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: 10 }}>
+        <div style={LABEL}>🧘 Wellness (POMS) — готовность {wellnessReadiness(wellness)}/10</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px,1fr))', gap: 6 }}>
+          {[
+            { k: 'sleep' as const, label: 'Сон 1-5' },
+            { k: 'stress' as const, label: 'Стресс 1-5' },
+            { k: 'soreness' as const, label: 'Боль 1-5' },
+            { k: 'mood' as const, label: 'Настроение 1-5' },
+          ].map(f => (
+            <div key={f.k} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 10, color: '#fff' }}>{f.label}</span>
+              <div style={ROW}>
+                <button style={BTN_SMALL} onClick={() => setWellness(v => ({ ...v, [f.k]: Math.max(1, (v as unknown as Record<string, number>)[f.k] - 1) }))}>−</button>
+                <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700 }}>{(wellness as unknown as Record<string, number>)[f.k]}</span>
+                <button style={BTN_SMALL} onClick={() => setWellness(v => ({ ...v, [f.k]: Math.min(5, (v as unknown as Record<string, number>)[f.k] + 1) }))}>+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          style={{ ...BTN_SMALL, alignSelf: 'flex-start' }}
+          onClick={() => {
+            const entry = { date: todayIso(), ...wellness, readiness: wellnessReadiness(wellness) };
+            saveCardioWellness(entry as unknown as Parameters<typeof saveCardioWellness>[0]);
+            flashMsg(`🧘 Wellness сохранён — готовность ${entry.readiness}/10`);
+          }}
+        >
+          💾 Сохранить wellness
+        </button>
+        <div style={HINT_SM}>1=плохо, 5=отлично. Готовность влияет на автотюн (как в diary-autoreg).</div>
+      </div>
 
       {log.length === 0 && (
         <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px 10px' }}>

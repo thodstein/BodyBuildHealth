@@ -148,7 +148,26 @@ export const CardioVolumeChart: React.FC<{ cycle: CardioCycle | null; log?: Card
             {fact && <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#f8fafc', marginRight: 4 }} />факт (дневник)</span>}
           </div>
           {metric === 'trimp' && <div style={HINT_SM}>TRIMP Banister (HRr) где есть HR, иначе фактор zone2×2/miss×3/hiit×5. Резкий рост {'>'}15% — риск.</div>}
-          {metric === 'ctl' && <div style={HINT_SM}>CTL 42д (фитнес) — синяя линия, ATL 7д (усталость) — красная, TSB = CTL-ATL: +5..+15 пик, &lt;-10 перегруз.</div>}
+          {metric === 'ctl' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={HINT_SM}>CTL 42д (фитнес) — синий, ATL 7д (усталость) — красный, TSB = CTL-ATL: +5..+15 пик, &lt;-10 перегруз.</div>
+              <div style={{ display: 'flex', gap: 6, fontSize: 10, color: '#fff', flexWrap: 'wrap' }}>
+                {(() => {
+                  const ctlS = cardioCtlSeries(cycle, cycle.config?.restingHr ?? undefined, cycle.config?.age ? (cycle.config.sex === 'female' ? 226 - cycle.config.age : 220 - cycle.config.age) : undefined, cycle.config?.sex);
+                  const last = ctlS[ctlS.length - 1];
+                  if (!last) return null;
+                  const tsbColor = last.tsb > 5 && last.tsb < 15 ? '#4ade80' : last.tsb < -10 ? '#f87171' : '#fbbf24';
+                  return (
+                    <>
+                      <span style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.28)', borderRadius: 20, padding: '2px 8px', color: '#60a5fa' }}>CTL {last.ctl}</span>
+                      <span style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.28)', borderRadius: 20, padding: '2px 8px', color: '#f87171' }}>ATL {last.atl}</span>
+                      <span style={{ background: `${tsbColor}18`, border: `1px solid ${tsbColor}40`, borderRadius: 20, padding: '2px 8px', color: tsbColor }}>TSB {last.tsb > 0 ? '+' + last.tsb : last.tsb}</span>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
