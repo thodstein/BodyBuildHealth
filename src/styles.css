@@ -3154,8 +3154,9 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   html, body { overflow-x: hidden !important; max-width: 100% !important; }
   img:not(.hero-fullscreen-img), video:not(.hero-fullscreen-img) { max-width: 100% !important; height: auto !important; object-fit: contain !important; }
   /* Hero fullscreen — ОДНА картинка на весь экран без черных полей */
-  .hero-fullscreen-img { width:100% !important; height:100% !important; max-width:none !important; max-height:none !important; object-fit:cover !important; object-position:center center !important; }
-  .dashboard-hero-img { object-fit:cover !important; object-position:center top !important; }
+  .hero-fullscreen-img { width:100% !important; height:100% !important; max-width:none !important; max-height:none !important; object-fit:cover !important; object-position:center center !important; transform:translateZ(0); backface-visibility:hidden; }
+  /* Дашборд: на телефоне — без обрезки по бокам/сверху/снизу (contain + центр), без фильтров для скорости */
+  .dashboard-hero-img { object-fit:contain !important; object-position:center center !important; background:#07070a !important; filter:none !important; transform:translateZ(0) !important; backface-visibility:hidden !important; }
   input, select, textarea { font-size: 16px !important; }
   button { min-height: 38px; min-width: 38px; }
   /* collapse dense 3/4-col hardcoded grids to 2-col for phone readability */
@@ -3394,5 +3395,18 @@ div[style*="background"][style*="rgba(0, 230, 138,"] {
   max-height:none !important;
   object-fit:cover !important;
   object-position:center center !important;
+  transform:translateZ(0);
+  backface-visibility:hidden;
+  will-change:auto;
+  filter:none !important;
 }
 .dashboard-hero-img { object-fit:cover !important; object-position:center top !important; }
+/* Дашборд: мобильный портрет — строго без обрезки (переопределяет глобальный cover, стоит последним) */
+@media (max-width: 480px) {
+  .dashboard-hero-img {
+    object-fit:contain !important;
+    object-position:center center !important;
+    background:#07070a !important;
+    filter:none !important;
+  }
+}

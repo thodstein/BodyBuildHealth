@@ -29,11 +29,30 @@ export const DashboardScreen: React.FC<Props> = ({ onNavigate }) => {
     try { const d = localStorage.getItem('he_drug_warnings'); setDrugWarnings(d ? JSON.parse(d) : null); } catch {}
   }, []);
 
+  // Telegram Mini App: высота вьюпорта + safe-area, чтобы херо был ровно на весь экран без обрезки сверху/снизу
+  useEffect(() => {
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      if (!tg) return;
+      const setH = () => {
+        const h = tg.viewportHeight || tg.viewportStableHeight;
+        if (h && h > 0) document.documentElement.style.setProperty('--tg-viewport-height', h + 'px');
+        const st = (tg.safeAreaInsetTop ?? tg.safeAreaInset?.top ?? 0);
+        const sb = (tg.safeAreaInsetBottom ?? tg.safeAreaInset?.bottom ?? 0);
+        document.documentElement.style.setProperty('--tg-safe-top', st + 'px');
+        document.documentElement.style.setProperty('--tg-safe-bottom', sb + 'px');
+      };
+      setH();
+      tg.onEvent?.('viewportChanged', setH);
+      return () => { try { tg.offEvent?.('viewportChanged', setH); } catch {} };
+    } catch {}
+  }, []);
+
   return (
-    <div style={{ position:'fixed', inset:0, width:'100%', height:'100dvh', minHeight:'100dvh', display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a' }}>
-      <img src="/hero-main.png?v=20250827k" alt="" className="hero-fullscreen-img dashboard-hero-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', background:'#07070a', filter:'saturate(1.05) contrast(1.04) brightness(1.06)' }} />
-      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 78%, rgba(0,0,0,0.06) 88%, rgba(0,0,0,0.18) 100%)' }} />
-      <div style={{ position:'absolute', bottom:70, left:16, right:16, zIndex:2 }}>
+    <div style={{ position:'fixed', inset:0, width:'100%', height:'var(--tg-viewport-height, 100dvh)', minHeight:'var(--tg-viewport-height, 100dvh)', maxHeight:'var(--tg-viewport-height, 100dvh)', display:'flex', flexDirection:'column', overflow:'hidden', background:'#07070a', isolation:'isolate', contain:'paint' as any }}>
+      <img src="/hero-main.png?v=20250827k" alt="" decoding="async" fetchPriority={'high' as any} draggable={false} className="hero-fullscreen-img dashboard-hero-img" style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', objectPosition:'center top', background:'#07070a', transform:'translateZ(0)', willChange:'auto', backfaceVisibility:'hidden' as any, pointerEvents:'none' }} />
+      <div style={{ position:'absolute', inset:0, background:'linear-gradient(transparent 62%, rgba(0,0,0,0.04) 78%, rgba(0,0,0,0.14) 100%)', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', bottom:'calc(70px + env(safe-area-inset-bottom, 0px) + var(--tg-safe-bottom, 0px))', left:'max(16px, env(safe-area-inset-left, 0px))', right:'max(16px, env(safe-area-inset-right, 0px))', zIndex:2, paddingBottom:'env(safe-area-inset-bottom, 0px)' }}>
 
         {/* 🩺 Сводка симптомов */}
         {symptomStats.activeSymptoms > 0 && (
