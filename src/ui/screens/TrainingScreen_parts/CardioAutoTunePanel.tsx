@@ -14,6 +14,7 @@ import {
 import { loadCardioLog, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
 import { CARD, ROW, LABEL, HINT_SM, BTN, BTN_SMALL, BTN_PRIMARY, BTN_DANGER, NumberInput, Badge, Accordion } from './CardioUI';
 import { getProfile, updateSection } from '../../../core/profile-manager';
+import { connectBleHr, type BleHrState } from '../../../engines/lms/cardio-ble.engine';
 
 export const CARDIO_AUTO_TUNE_KEY = 'he_cardio_auto_tune';
 export const CARDIO_AUTO_APPLY_KEY = 'he_cardio_auto_apply';
@@ -50,6 +51,9 @@ export const CardioAutoTunePanel: React.FC<{
   const [periodLen, setPeriodLen] = useState(() => {
     try { return String(getProfile()?.settings?.lifestyle?.cycleLengthDays ?? 28); } catch { return '28'; }
   });
+  const [ble, setBle] = useState<BleHrState>({ connected: false });
+  const [bleHr, setBleHr] = useState<number | null>(null);
+  const bleDisconnectRef = useRef<{ disconnect: () => void } | null>(null);
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
@@ -92,6 +96,20 @@ export const CardioAutoTunePanel: React.FC<{
     setActiveCardioCycle(r.cycle);
     onChanged?.();
     flashMsg(`🌸 Применено ${r.changes.length} коррекций: ${r.changes.map(c => `нед ${c.week} ${c.label}`).join(', ')}`);
+  };
+
+  const handleBleConnect = async () => {
+    if (ble.connected && bleDisconnectRef.current) {
+      bleDisconnectRef.current.disconnect();
+      bleDisconnectRef.current = null;
+      setBle({ connected: false });
+      setBleHr(null);
+      flashMsg('📡 BLE отключён');
+      return;
+    }
+    flashMsg('📡 Поиск HR-датчика…');
+    const res = await connectBleHr(hr => setBleHr(hr), s => setBle(s));
+    if (res) bleDisconnectRef.current = res;
   };
 
   // Факт-ЧСС против целевых зон плана (28 дней).
@@ -217,6 +235,16 @@ export const CardioAutoTunePanel: React.FC<{
         </div>
       )}
 
+      <div style={{ ...CARD, display: 'flex', flexDirection: 'column', gap: 8, background: ble.connected ? 'rgba(0,230,138,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${ble.connected ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'}`, borderRadius: 10, padding: 10 }}>
+        <div style={ROW}>
+          <span style={LABEL}>📡 BLE HR</span>
+          <button style={ble.connected ? BTN_PRIMARY : BTN} onClick={handleBleConnect} title="Подключить Polar H10 / Garmin HRM через Web Bluetooth">{ble.connected ? `🟢 ${ble.deviceName ?? 'HR'} ${bleHr ? bleHr + ' уд/мин' : ''} — Отключить` : '📡 Подключить HR-датчик'}</button>
+          {ble.error && <span style={{ fontSize: 11, color: '#f87171' }}>{ble.error}</span>}
+          {bleHr && !ble.connected && <Badge bg="rgba(0,230,138,0.12)" border="rgba(0,230,138,0.24)" color="#4ade80">{bleHr} уд/мин live</Badge>}
+        </div>
+        <div style={HINT_SM}>Polar H10 / Garmin HRM — live HR в таймере + подсветка зоны (Web Bluetooth, Chrome/Edge).</div>
+      </div>
+
       <Accordion title={`Пульс-зоны ${lthr ? '(LTHR)' : '(Karvonen)'}`} icon="🎯" defaultOpen>
         <div style={ROW}>
           <NumberInput value={age} onChange={setAge} min={12} max={90} step={1} placeholder="30" ariaLabel="Возраст" width={80} suffix="лет" />
@@ -239,8 +267,18 @@ export const CardioAutoTunePanel: React.FC<{
           <NumberInput value={vdotMin} onChange={setVdotMin} min={1} max={120} step={1} placeholder="20" ariaLabel="Время теста мин" width={70} suffix="мин" />
           {vdot && <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.26)" color="#60a5fa">VDOT {vdot.vdot}</Badge>}
         </div>
+        <div style={ROW}>
+          {[
+            { l: '5K 20′', km: '5', min: '20' },
+            { l: '5K 25′', km: '5', min: '25' },
+            { l: '10K 45′', km: '10', min: '45' },
+            { l: 'HM 1:40', km: '21.1', min: '100' },
+          ].map(p => (
+            <button key={p.l} style={BTN_SMALL} onClick={() => { setVdotKm(p.km); setVdotMin(p.min); }} title={`Пресет ${p.l}`}>{p.l}</button>
+          ))}
+        </div>
         {vdot && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>Темпы: {vdot.pacesKm.map(p => `${p.label} ${p.minPerKm}`).join(' · ')}</div>}
-        <div style={HINT_SM}>Любая дистанция/время → VDOT → темпы Daniels.</div>
+        <div style={HINT_SM}>Любая дистанция/время → VDOT → темпы Daniels (70/81/88/97.5/105% VDOT).</div>
       </Accordion>
 
       <Accordion title="Cooper 12′" icon="🏃" defaultOpen={false}>

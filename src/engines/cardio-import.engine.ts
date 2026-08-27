@@ -582,9 +582,48 @@ export function parseCardioJson(text: string): CardioImportResult {
 
 // ── ZIP (Apple export.zip → export.xml + routes) — синхронный, для PRO async см. parseCardioZipAsync ──
 export async function parseCardioZipAsync(buffer: ArrayBuffer): Promise<CardioImportResult> {
-  // off-main-thread: yield event loop чтобы UI не фризил на 50Мб export.zip
-  await new Promise<void>(r => setTimeout(r, 0));
-  return parseCardioZip(buffer);
+  // PRO: async unzip через fflate unzip (не блокирует main thread на 50Мб export.zip)
+  const { unzip } = await import('fflate');
+  return new Promise<CardioImportResult>(resolve => {
+    unzip(new Uint8Array(buffer), (err, unzipped) => {
+      if (err) {
+        resolve({ entries: [], warnings: ['ZIP: ошибка распаковки — ' + (err as Error).message + ' — распакуйте вручную и загрузите export.xml'], format: 'zip' });
+        return;
+      }
+      const warnings: string[] = [];
+      const entries: CardioLogEntry[] = [];
+      let found = false;
+      for (const [name, data] of Object.entries(unzipped as Record<string, Uint8Array>)) {
+        const lower = name.toLowerCase();
+        const isXml = lower.endsWith('.xml') || lower.endsWith('export.xml');
+        const isTcx = lower.endsWith('.tcx');
+        const isGpx = lower.endsWith('.gpx');
+        const isCsv = lower.endsWith('.csv');
+        const isJson = lower.endsWith('.json');
+        if (!isXml && !isTcx && !isGpx && !isCsv && !isJson) continue;
+        found = true;
+        try {
+          const text = strFromU8(data as Uint8Array);
+          let res: CardioImportResult | null = null;
+          if (isXml && text.toLowerCase().includes('<healthdata')) res = parseAppleHealthXml(text);
+          else if (isTcx) res = parseCardioTcx(text);
+          else if (isGpx) res = parseCardioGpx(text);
+          else if (isCsv) res = parseCardioCsv(text, name);
+          else if (isJson) res = parseCardioJson(text);
+          else if (isXml) res = parseAppleHealthXml(text);
+          if (res) {
+            entries.push(...res.entries);
+            warnings.push(...res.warnings.map(w => `${name}: ${w}`));
+          }
+        } catch (e) {
+          warnings.push(`${name}: ошибка — ${(e as Error).message}`);
+        }
+      }
+      if (!found) warnings.push('ZIP: внутри не найдено export.xml / TCX / GPX / CSV / JSON');
+      if (entries.length === 0 && warnings.length === 0) warnings.push('ZIP: не найдено тренировок');
+      resolve({ entries, warnings, format: 'zip' });
+    });
+  });
 }
 export function parseCardioZip(buffer: ArrayBuffer): CardioImportResult {
   const warnings: string[] = [];
