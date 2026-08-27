@@ -92,6 +92,7 @@ import {
 } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded } from '../../../engines/bb/bb-contest-prep-sync';
 import type { PeakingProtocol } from '../../../engines/peaking-protocols.engine';
+import { ContestPrepConfigEditor } from '../../components/contest-prep/ContestPrepConfigEditor';
 import { buildPrepCycle, buildPrepSeason, recommendMinimalMode, prepCutProjection, posingPlanForCategory, savePosingCheckin, getPosingCheckins, posingWeekStats, prepCardioPlan, buildPrepNutritionPlan, type PrepCycleConfig, type PrepCycleResult, type PrepSeasonConfig } from '../../../engines/bb/bb-prep-cycle.engine';
 import {
   PREP_SPLIT_PROFILES, prepSplitProfile, PREP_MINIMAL_MODE_LABELS,
@@ -621,6 +622,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepTrainingProtocol, setPrepTrainingProtocol] = useState<PeakingProtocol>('bb');
   const [prepPreferLowFiber, setPrepPreferLowFiber] = useState(false);
   const [prepCreatineStop, setPrepCreatineStop] = useState(false);
+  const [prepCompetitions, setPrepCompetitions] = useState<ContestEventEntry[] | undefined>(undefined);
+  const [prepMainCompetitionId, setPrepMainCompetitionId] = useState<string | undefined>(undefined);
   // 🏁 Режим подготовки (тренировочная логика недель подготовки): 1.0 = сохранение
   // (RIR 1–3, без отказа, объём как в плане), 0.85 = поддерживающий объём при дефиците.
   const [prepVolumeMode, setPrepVolumeMode] = useState<number>(1.0);
@@ -686,6 +689,8 @@ export const BbAutoConstructor: React.FC = () => {
       confirmedManipulation: prepConfirmedManip || undefined,
       contraindications: allPrepContra.length > 0 ? allPrepContra : undefined,
       specialization: peakSpec === 'none' ? undefined : peakSpec,
+      competitions: prepCompetitions,
+      mainCompetitionId: prepMainCompetitionId,
       schedule: { wake: '07:00', stage: '12:00' },
     };
     return base;
@@ -924,6 +929,17 @@ export const BbAutoConstructor: React.FC = () => {
         setPrepCarbMode(migrated.peakWeek.carbMode === 'conservative' ? 'back' : migrated.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
         if (migrated.preparation.volumeMult != null) setPrepVolumeMode(migrated.preparation.volumeMult);
         setLastTest(migrated.testPeakWeekId ? latestTestPeakWeek(migrated.id) : null);
+        // Доп. поля из конфига
+        try {
+          const cfg = (migrated as any).__cfg as BBContestPrepConfig | undefined;
+          if (cfg) {
+            if (cfg.trainingProtocol) setPrepTrainingProtocol(cfg.trainingProtocol);
+            setPrepPreferLowFiber(!!cfg.preferLowFiberCarbs);
+            setPrepCreatineStop(cfg.creatineStrategy === 'stop');
+            setPrepCompetitions(cfg.competitions);
+            setPrepMainCompetitionId(cfg.mainCompetitionId);
+          }
+        } catch {}
         return;
       }
     } catch {}
@@ -941,6 +957,19 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepCarbMode(stored.peakWeek.carbMode === 'conservative' ? 'back' : stored.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
       if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
       setLastTest(stored.testPeakWeekId ? latestTestPeakWeek(stored.id) : null);
+      // Доп. поля из сохранённого конфига
+      try {
+        const raw = prof?.goals?.bbPeakConfig as string | undefined;
+        const cfg = raw ? deserializeBBPrepConfig(raw) : null;
+        if (cfg) {
+          if (cfg.trainingProtocol) setPrepTrainingProtocol(cfg.trainingProtocol);
+          setPrepPreferLowFiber(!!cfg.preferLowFiberCarbs);
+          setPrepCreatineStop(cfg.creatineStrategy === 'stop');
+          setPrepCompetitions(cfg.competitions);
+          setPrepMainCompetitionId(cfg.mainCompetitionId);
+          if (cfg.specialization) setPeakSpec(cfg.specialization);
+        }
+      } catch {}
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -964,6 +993,18 @@ export const BbAutoConstructor: React.FC = () => {
         setPrepSodiumMode(stored.peakWeek.sodiumMode === 'stable' ? 'constant' : 'cut_2d' as SodiumStrategy);
         setPrepCarbMode(stored.peakWeek.carbMode === 'conservative' ? 'back' : stored.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
         if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
+        try {
+          const raw = prof?.goals?.bbPeakConfig as string | undefined;
+          const cfg = raw ? deserializeBBPrepConfig(raw) : null;
+          if (cfg) {
+            if (cfg.trainingProtocol) setPrepTrainingProtocol(cfg.trainingProtocol);
+            setPrepPreferLowFiber(!!cfg.preferLowFiberCarbs);
+            setPrepCreatineStop(cfg.creatineStrategy === 'stop');
+            setPrepCompetitions(cfg.competitions);
+            setPrepMainCompetitionId(cfg.mainCompetitionId);
+            if (cfg.specialization) setPeakSpec(cfg.specialization);
+          }
+        } catch {}
       } catch {}
     };
     window.addEventListener(CONTEST_PREP_UPDATED_EVENT as any, handler);
@@ -4769,6 +4810,26 @@ export const BbAutoConstructor: React.FC = () => {
                 style={{ ...IN, width:'100%' }}
               />
             </div>
+          </div>
+          {/* Соревнования — единый словарь A/B/C */}
+          <div style={{ marginBottom:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+            <div style={{ ...SMALL, marginBottom:4, color:'#f87171', fontWeight:700 }}>🏁 Соревнования (необязательно)</div>
+            {(prepCompetitions && prepCompetitions.length > 0) ? (
+              <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:6 }}>
+                {prepCompetitions.map(c => (
+                  <div key={c.id} style={{ display:'flex', gap:6, alignItems:'center', padding:'4px 6px', borderRadius:6, background:'rgba(255,255,255,0.04)', border: c.id===prepMainCompetitionId ? '1px solid rgba(251,191,36,0.4)' : '1px solid rgba(255,255,255,0.06)' }}>
+                    <button onClick={() => setPrepMainCompetitionId(c.id===prepMainCompetitionId ? undefined : c.id)} style={{ fontSize:11, padding:'2px 6px', borderRadius:4, background: c.id===prepMainCompetitionId ? 'rgba(251,191,36,0.2)' : 'transparent', color: c.id===prepMainCompetitionId ? '#fbbf24' : 'rgba(255,255,255,0.5)', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer' }}>{c.id===prepMainCompetitionId ? '★' : '☆'}</button>
+                    <input value={c.name} onChange={e => setPrepCompetitions(prev => (prev||[]).map(x => x.id===c.id ? {...x, name:e.target.value} : x))} style={{ flex:1, background:'transparent', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, padding:'2px 6px', fontSize:11 }} />
+                    <select value={c.priority || 'B'} onChange={e => setPrepCompetitions(prev => (prev||[]).map(x => x.id===c.id ? {...x, priority:e.target.value as any} : x))} style={{ background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, fontSize:10 }}>
+                      <option value="A">A главный</option><option value="B">B контроль</option><option value="C">C тренир.</option>
+                    </select>
+                    <input type="date" value={c.date || ''} onChange={e => setPrepCompetitions(prev => (prev||[]).map(x => x.id===c.id ? {...x, date:e.target.value || undefined} : x))} style={{ background:'transparent', color:'#fbbf24', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4, fontSize:10 }} />
+                    <button onClick={() => setPrepCompetitions(prev => (prev||[]).filter(x => x.id!==c.id))} style={{ color:'#f87171', background:'transparent', border:'none', cursor:'pointer', fontSize:12 }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            ) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginBottom:6 }}>Одно шоу — дата выше. Добавьте старты для мульти-пика A/B/C.</div>}
+            <button onClick={() => setPrepCompetitions(prev => [...(prev||[]), { id:`comp_${Date.now().toString(36)}`, name:`Старт ${((prev||[]).length)+1}`, priority:'B' }])} style={{ fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.1)', color:'#f87171', border:'1px dashed rgba(239,68,68,0.3)', cursor:'pointer' }}>＋ Добавить соревнование</button>
           </div>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
             <span style={{ ...SMALL }}>Недели подготовки:</span>

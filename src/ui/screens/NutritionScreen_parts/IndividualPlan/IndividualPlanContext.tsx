@@ -398,30 +398,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return 'none';
   });
   useEffect(() => { try { updateSection('goals', { bbCategory }); } catch {} }, [bbCategory]);
-  const [peakWeekEnabled, setPeakWeekEnabled] = useState<boolean>(() => {
-    try {
-      const v = (s as any)?.goals?.peakWeek;
-      if (typeof v === 'boolean') return v;
-    } catch {}
-    try { return localStorage.getItem('he_peak_week') === 'true'; } catch {}
-    return false;
-  });
-  useEffect(() => { try { updateSection('goals', { peakWeek: peakWeekEnabled }); } catch {} if (!peakWeekEnabled) setBBPrepPlan(null); }, [peakWeekEnabled]);
-  const [peakWeekShowDay, setPeakWeekShowDay] = useState<number>(() => {
-    try {
-      const v = (s as any)?.goals?.peakShowDay;
-      if (typeof v === 'string') {
-        const d = new Date(v);
-        if (!isNaN(d.getTime())) return d.getDay();
-      }
-    } catch {}
-    try {
-      const n = parseInt(localStorage.getItem('he_peak_show_day') || '6');
-      return isNaN(n) ? 6 : Math.max(0, Math.min(6, n));
-    } catch {}
-    return 6;
-  });
-  useEffect(() => { try { updateSection('goals', { peakShowDay: new Date(Date.now() + peakWeekShowDay * 86400000).toISOString().slice(0, 10) }); } catch {} }, [peakWeekShowDay]);
   // ── Единая система тапера ББ: гидрация из профиля (bbPeakConfig) с legacy-fallback ──
   const [bbPrepConfig, setBBPrepConfigState] = useState<BBContestPrepConfig | null>(() => {
     try {
@@ -466,6 +442,33 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setBBPrepPlan(null);
     try {
       updateSection('goals', { bbPeakConfig: serializeBBPrepConfig(cfg), peakWeek: true, peakShowDay: cfg.showDate });
+    } catch {}
+  };
+  // legacy peakWeekEnabled/peakShowDay — теперь производные от bbPrepConfig (единый план)
+  const peakWeekEnabled = !!bbPrepConfig;
+  const setPeakWeekEnabled = (v: boolean) => { if (!v) setBBPrepConfig(null); };
+  const peakWeekShowDay = (() => {
+    try {
+      if (bbPrepConfig?.showDate) {
+        const d = new Date(bbPrepConfig.showDate);
+        if (!isNaN(d.getTime())) return d.getDay();
+      }
+      const v = (s as any)?.goals?.peakShowDay;
+      if (typeof v === 'string') {
+        const d2 = new Date(v);
+        if (!isNaN(d2.getTime())) return d2.getDay();
+      }
+    } catch {}
+    return 6;
+  })();
+  const setPeakWeekShowDay = (n: number) => {
+    try {
+      const base = bbPrepConfig || legacyConfigFromProfile((s as any)?.goals, (s as any)?.personal);
+      if (!base) return;
+      const d = new Date();
+      d.setDate(d.getDate() + (n - d.getDay() + 7) % 7);
+      const iso = d.toISOString().slice(0, 10);
+      setBBPrepConfig({ ...base, showDate: iso });
     } catch {}
   };
   // 🏁 Живая синхронизация: событие he-bb-contest-prep-updated из BB Auto / питания

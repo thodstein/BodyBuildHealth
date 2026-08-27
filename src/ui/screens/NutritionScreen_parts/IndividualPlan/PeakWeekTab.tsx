@@ -250,6 +250,18 @@ export const PeakWeekTab: React.FC = () => {
     return isoDiffDays(isoToday(), result.config.showDate);
   }, [result]);
 
+  const trainingStatus = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('he_bb_plan_saved');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      const plan = parsed?.plan || parsed;
+      if (!plan || !Array.isArray(plan.weeks)) return null;
+      const hasTaper = plan.weeks.some((w: any) => w?.contestPhase === 'taper' || w?.contestPhase === 'peak_week' || (w as any)?.taper);
+      return hasTaper ? 'applied' : 'not_applied';
+    } catch { return null; }
+  }, [bbPrepConfig]);
+
   const autofillFromProfile = () => {
     try {
       const p = getProfile();
@@ -384,9 +396,9 @@ export const PeakWeekTab: React.FC = () => {
             : 'Настройте параметры выше и нажмите «Применить тапер-план ББ» — создастся версионированный план для питания (все фазы) и тренировок.'}
         </div>
         {bbPrepConfig && (
-          <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+          <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <span style={{ ...chip, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>● Питание: все фазы</span>
-            <span style={{ ...chip, background: 'rgba(236,72,153,0.1)', color: '#f472b6', border: '1px solid rgba(236,72,153,0.3)' }}>🏋️ Тренировки: в ББ-авто</span>
+            <span style={{ ...chip, background: trainingStatus === 'applied' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: trainingStatus === 'applied' ? '#4ade80' : '#fbbf24', border: `1px solid ${trainingStatus === 'applied' ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}` }}>{trainingStatus === 'applied' ? '🏋️ Тренировки: тапер применён' : '🏋️ Тренировки: соберите в ББ-авто'}</span>
           </div>
         )}
       </div>
