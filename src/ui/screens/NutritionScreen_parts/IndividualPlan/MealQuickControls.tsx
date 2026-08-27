@@ -13,14 +13,15 @@ import type { ComposerMode } from "./MealComposerMode";
 
 const btnCard: React.CSSProperties = {
   flex: 1, minWidth: 0,
-  padding: '10px 6px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-  background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.06)',
-  color: '#fff', fontWeight: 600, fontSize: 9,
-  transition: 'all 0.15s', lineHeight: 1.3,
-  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+  padding: '12px 8px', borderRadius: 14, cursor: 'pointer', textAlign: 'center',
+  background: 'linear-gradient(180deg, rgba(32,32,38,0.92), rgba(24,24,27,0.88))', border: '1px solid rgba(255,255,255,0.07)',
+  color: '#fff', fontWeight: 700, fontSize: 11, letterSpacing:'-0.15px',
+  transition: 'all 0.20s cubic-bezier(0.16,1,0.3,1)', lineHeight: 1.3,
+  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+  boxShadow: '0 4px 14px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 
-const iconStyle: React.CSSProperties = { fontSize: 16, lineHeight: 1 };
+const iconStyle: React.CSSProperties = { fontSize: 18, lineHeight: 1, filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.25))' };
 
 const popupOverlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 100,

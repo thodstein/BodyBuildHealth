@@ -70,22 +70,30 @@ const IndividualPlanInner: React.FC = () => {
   return (
     <>
       {!disclaimerDismissed && <MedicalDisclaimer onDismiss={() => { setDisclaimerDismissed(true); try { localStorage.setItem('he_disclaimer_dismissed', 'true'); } catch {} }} />}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80, maxWidth: 540, margin: '0 auto' }}>
-        <div style={{ display:'flex', gap:6, padding:'6px 2px', overflowX:'auto', scrollbarWidth:'none' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 84, maxWidth: 560, margin: '0 auto', paddingLeft: 2, paddingRight: 2 }}>
+        <div style={{
+          display:'flex', gap:4, padding:4, overflowX:'auto', scrollbarWidth:'none',
+          background:'linear-gradient(180deg, rgba(32,32,36,0.92), rgba(18,18,20,0.96))',
+          border:'1px solid rgba(255,255,255,0.07)', borderRadius:16,
+          boxShadow:'0 8px 28px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
+          backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)',
+          position:'sticky', top: 6, zIndex: 5,
+        }}>
           {visibleTabs.map(t => {
             const active = activeTab === t.key;
             return (
               <button key={t.key} onClick={() => setTab(t.key)} style={{
-                flexShrink:0, padding:'8px 13px', borderRadius:999, cursor:'pointer', minHeight: 36,
-                fontSize:10.5, fontWeight: active ? 800 : 500,
-                border: active ? '1px solid transparent' : '1px solid rgba(255,255,255,0.08)',
-                background: active ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
-                color: active ? '#000' : 'rgba(255,255,255,0.65)',
-                boxShadow: active ? '0 4px 16px rgba(0,230,138,0.35)' : '0 1px 6px rgba(0,0,0,0.25)',
-                transform: active ? 'scale(1.04)' : 'scale(1)',
-                transition:'all 0.18s ease',
+                flexShrink:0, padding:'9px 14px', borderRadius:12, cursor:'pointer', minHeight: 38,
+                fontSize: 12, fontWeight: active ? 800 : 600, letterSpacing:'-0.2px',
+                border: active ? '1px solid rgba(0,230,138,0.38)' : '1px solid transparent',
+                background: active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 46%, #00b894 100%)' : 'transparent',
+                color: active ? '#0A0A0A' : 'rgba(255,255,255,0.68)',
+                boxShadow: active ? '0 4px 16px rgba(0,230,138,0.32), inset 0 1px 0 rgba(255,255,255,0.22)' : 'none',
+                transform: active ? 'translateY(-0.5px)' : 'none',
+                transition:'all 0.22s cubic-bezier(0.16,1,0.3,1)',
+                display:'inline-flex', alignItems:'center', gap:6,
               }}>
-                <span style={{ marginRight: 3 }}>{t.icon}</span>{t.label}
+                <span style={{ fontSize: 13, lineHeight: 1, filter: active ? 'none' : 'grayscale(0.12)' }}>{t.icon}</span>{t.label}
               </button>
             );
           })}
@@ -112,15 +120,24 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
 };
 
 const MedicalDisclaimer: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) => (
-  <div style={{margin:8,padding:12,borderRadius:12,background:'rgba(239,68,68,0.06)',border:'1px solid rgba(239,68,68,0.2)',fontSize:9}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-      <span style={{fontWeight:800,color:'#ef4444',fontSize:11}}>⚠️ Медицинская информация</span>
-      <button onClick={onDismiss} style={{padding:'4px 10px',borderRadius:8,background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)',color:'#ef4444',cursor:'pointer',fontSize:9,fontWeight:700}}>Понятно</button>
+  <div style={{
+    margin:8, padding:'14px 16px', borderRadius:16,
+    background:'linear-gradient(180deg, rgba(239,68,68,0.09), rgba(239,68,68,0.04))',
+    border:'1px solid rgba(239,68,68,0.18)', fontSize:10, lineHeight:1.55,
+    boxShadow:'0 8px 24px rgba(239,68,68,0.08), inset 0 1px 0 rgba(255,255,255,0.04)',
+    backdropFilter:'blur(12px)',
+  }}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10, gap:12}}>
+      <span style={{display:'inline-flex', alignItems:'center', gap:8, fontWeight:800,color:'#fca5a5',fontSize:12, letterSpacing:'-0.2px'}}>
+        <span style={{width:28,height:28,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(239,68,68,0.14)',border:'1px solid rgba(239,68,68,0.22)',fontSize:14}}>⚠️</span>
+        Медицинская информация
+      </span>
+      <button onClick={onDismiss} style={{padding:'7px 12px',borderRadius:999,background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.22)',color:'#fca5a5',cursor:'pointer',fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>Понятно</button>
     </div>
-    <div style={{color:'rgba(255,255,255,0.75)',lineHeight:1.6}}>
-      <p style={{margin:'0 0 6px'}}>Данный планировщик питания <b>не является медицинским прибором</b>. Перед началом любой диеты или приёма добавок проконсультируйтесь с врачом.</p>
+    <div style={{color:'rgba(255,255,255,0.78)', lineHeight:1.6, fontSize:10}}>
+      <p style={{margin:'0 0 6px'}}>Данный планировщик питания <b style={{color:'#fff'}}>не является медицинским прибором</b>. Перед началом любой диеты или приёма добавок проконсультируйтесь с врачом.</p>
       <p style={{margin:'0 0 6px'}}>Информация о добавках (NAC, TUDCA, берберин, омега-3 и др.) носит ознакомительный характер. Дозировки ориентировочные и должны уточняться с лечащим врачом.</p>
-      <p style={{margin:0}}><b>Анаболические стероиды — рецептурные препараты.</b> Их применение без назначения врача незаконно и сопряжено с рисками: гепатотоксичность, кардиомиопатия, тромбоз, бесплодие. Приложение не поощряет использование ААС и предоставляет информацию исключительно для снижения вреда.</p>
+      <p style={{margin:0}}><b style={{color:'#fecaca'}}>Анаболические стероиды — рецептурные препараты.</b> Их применение без назначения врача незаконно и сопряжено с рисками: гепатотоксичность, кардиомиопатия, тромбоз, бесплодие. Приложение не поощряет использование ААС и предоставляет информацию исключительно для снижения вреда.</p>
     </div>
   </div>
 );

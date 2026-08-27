@@ -337,18 +337,30 @@ export const IndividualPlanResults: React.FC = () => {
     <>
       <div ref={resultsRef as any} />
       {!generated && (
-        <div style={{ padding: '24px 16px', textAlign: 'center', borderRadius: 14, background: '#18181b', border: '1px solid rgba(0,230,138,0.15)' }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>🥗</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>План ещё не создан</div>
-          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginBottom: 14, lineHeight: 1.5 }}>
-            Задайте параметры во вкладке «Настройки»<br />или нажмите кнопку ниже для быстрой генерации.
+        <div style={{
+          padding: '28px 18px 24px', textAlign: 'center', borderRadius: 20,
+          background: 'linear-gradient(180deg, rgba(24,24,28,0.96) 0%, rgba(18,18,20,0.98) 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          boxShadow: '0 12px 36px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
+          position:'relative', overflow:'hidden',
+        }}>
+          <div style={{position:'absolute', top:-24, left:'50%', transform:'translateX(-50%)', width:220, height:120, background:'radial-gradient(220px 120px at 50% 100%, rgba(0,230,138,0.18), transparent 72%)', pointerEvents:'none'}} />
+          <div style={{
+            width:64, height:64, borderRadius:18, margin:'0 auto 12px', display:'flex', alignItems:'center', justifyContent:'center',
+            background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,200,160,0.08))', border:'1px solid rgba(0,230,138,0.18)',
+            boxShadow:'0 6px 20px rgba(0,230,138,0.14)', fontSize:30,
+          }}>🥗</div>
+          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 5, letterSpacing:'-0.3px' }}>План ещё не создан</div>
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.62)', marginBottom: 16, lineHeight: 1.5, maxWidth: 320, marginLeft:'auto', marginRight:'auto' }}>
+            Задайте параметры во вкладке «Настройки» или сгенерируйте рацион в один клик — КБЖУ, время приёмов и закупки соберутся автоматически.
           </div>
           <button onClick={() => { setErrorMsg(null); generatePlan(1); }} style={{
-            padding: '12px 24px', borderRadius: 10, cursor: 'pointer',
-            fontSize: 12, fontWeight: 700,
-            background: 'linear-gradient(135deg,#00e68a,#00c8a0)', border: 'none', color: '#000',
-            boxShadow: '0 4px 16px rgba(0,230,138,0.2)',
-          }}>✨ Создать план</button>
+            padding: '12px 22px', borderRadius: 999, cursor: 'pointer',
+            fontSize: 13, fontWeight: 800, letterSpacing:'-0.2px',
+            background: 'linear-gradient(135deg,#00e68a 0%, #00c8a0 48%, #00b894 100%)', border: '1px solid rgba(0,230,138,0.5)', color: '#0A0A0A',
+            boxShadow: '0 6px 22px rgba(0,230,138,0.28), inset 0 1px 0 rgba(255,255,255,0.22)',
+          }}>✨ Создать план за 2 сек</button>
+          <div style={{marginTop:10, fontSize:10, color:'rgba(255,255,255,0.32)'}}>Pro-движок · per100 · ±3% к цели</div>
         </div>
       )}
       {generated && (<>
@@ -363,48 +375,56 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
         )}
         <GlassCard title="Выбор дней" icon="📅" color="#00e68a">
-          <div style={{ color:'rgba(255,255,255,0.7)', fontSize:10, marginBottom:6, textAlign:'center' }}>Нажмите на день для плана на 1 день</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
+          <div style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 8px', borderRadius:999, background:'rgba(0,230,138,0.08)', border:'1px solid rgba(0,230,138,0.14)', color:'rgba(255,255,255,0.68)', fontSize:10, margin:'0 auto 8px', fontWeight:600, textAlign:'center' }}>👆 Нажмите на день — откроется план на 1 день</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:5, marginBottom:10 }}>
             {DAY_LABELS.map((label, idx) => {
               const isTrain = trainingDays[idx];
               const isSelected = planDays === 1 && selectedDayIndex === idx;
               return (
                 <button key={idx} onClick={() => { setPlanDays(1); setSelectedDayIndex(idx); generatePlan(1, undefined, idx); }} style={{
-                  display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-                  padding:'8px 4px', borderRadius:10, cursor:'pointer', minHeight: 44,
-                  background: isSelected ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : isTrain ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
-                  border: isSelected ? 'none' : isTrain ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                  color: isSelected ? '#000' : isTrain ? '#22c55e' : 'rgba(255,255,255,0.7)',
-                  fontWeight: isSelected ? 800 : isTrain ? 600 : 400,
-                  fontSize:10, transition:'all 0.15s',
+                  display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+                  padding:'9px 4px 8px', borderRadius:14, cursor:'pointer', minHeight: 56, position:'relative', overflow:'hidden',
+                  background: isSelected ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 52%, #00b894 100%)' : isTrain ? 'linear-gradient(180deg, rgba(34,197,94,0.16), rgba(34,197,94,0.06))' : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
+                  border: isSelected ? '1px solid rgba(0,230,138,0.55)' : isTrain ? '1px solid rgba(34,197,94,0.22)' : '1px solid rgba(255,255,255,0.07)',
+                  color: isSelected ? '#0A0A0A' : isTrain ? '#86efac' : 'rgba(255,255,255,0.72)',
+                  fontWeight: isSelected ? 800 : isTrain ? 700 : 600,
+                  fontSize:11, transition:'all 0.2s cubic-bezier(0.16,1,0.3,1)',
+                  boxShadow: isSelected ? '0 6px 18px rgba(0,230,138,0.30), inset 0 1px 0 rgba(255,255,255,0.22)' : isTrain ? '0 2px 10px rgba(34,197,94,0.10)' : '0 1px 6px rgba(0,0,0,0.18)',
+                  transform: isSelected ? 'translateY(-1px)' : 'none',
                 }}>
-                  <span style={{ fontSize:9, opacity:0.7 }}>{label}</span>
-                  <span style={{ fontSize:13 }}>{isTrain ? '🏋️' : '🛌'}</span>
+                  {isTrain && !isSelected && <span style={{position:'absolute', top:5, right:5, width:6, height:6, borderRadius:'50%', background:'#22c55e', boxShadow:'0 0 6px rgba(34,197,94,0.6)'}} />}
+                  {isSelected && <span style={{position:'absolute', top:0, left:0, right:0, height:2, background:'linear-gradient(90deg, #fff 0%, rgba(255,255,255,0) 100%)', opacity:0.45}} />}
+                  <span style={{ fontSize:10, opacity: isSelected ? 0.9 : 0.66, fontWeight:700, letterSpacing:'0.2px' }}>{label}</span>
+                  <span style={{ fontSize:15, lineHeight:1, filter: isSelected ? 'none' : isTrain ? 'none' : 'grayscale(0.25) saturate(0.85)' }}>{isTrain ? '🏋️' : '🛌'}</span>
+                  <span style={{ fontSize:8, fontWeight:700, color: isSelected ? 'rgba(0,0,0,0.55)' : isTrain ? 'rgba(34,197,94,0.9)' : 'rgba(255,255,255,0.36)', letterSpacing:'0.3px' }}>{isTrain ? 'ТРЕНЯ' : 'ОТДЫХ'}</span>
                 </button>
               );
             })}
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:6, padding:4, borderRadius:14, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
             <button onClick={() => { setPlanDays(1); generatePlan(1); }} style={{
-              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
-              background: planDays === 1 ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-              border: planDays === 1 ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              color: planDays === 1 ? '#000' : 'rgba(255,255,255,0.85)',
-              fontWeight:700, fontSize:11,
+              padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
+              background: planDays === 1 ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 55%, #00b894 100%)' : 'transparent',
+              border: planDays === 1 ? '1px solid rgba(0,230,138,0.45)' : '1px solid transparent',
+              color: planDays === 1 ? '#0A0A0A' : 'rgba(255,255,255,0.72)',
+              fontWeight:800, fontSize:12, letterSpacing:'-0.2px',
+              boxShadow: planDays === 1 ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
             }}>📅 1 день</button>
             <button onClick={() => { setPlanDays(3); generatePlan(3, undefined, undefined, { async: true }); }} style={{
-              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
-              background: planDays === 3 ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-              border: planDays === 3 ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              color: planDays === 3 ? '#000' : 'rgba(255,255,255,0.85)',
-              fontWeight:700, fontSize:11,
+              padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
+              background: planDays === 3 ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 55%, #00b894 100%)' : 'transparent',
+              border: planDays === 3 ? '1px solid rgba(0,230,138,0.45)' : '1px solid transparent',
+              color: planDays === 3 ? '#0A0A0A' : 'rgba(255,255,255,0.72)',
+              fontWeight:800, fontSize:12, letterSpacing:'-0.2px',
+              boxShadow: planDays === 3 ? '0 4px 14px rgba(0,230,138,0.28)' : 'none',
             }}>{planBusy && planDays === 3 ? '⏳…' : '📅 3 дня'}</button>
             <button onClick={() => { setPlanDays(7); setPlanView('calendar'); generatePlan(7, undefined, undefined, { async: true }); }} style={{
-              padding:'11px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
-              background: planDays === 7 && !monthPlanMode ? 'linear-gradient(135deg,#8b5cf6,#7c3aed)' : '#202023',
-              border: planDays === 7 && !monthPlanMode ? 'none' : '1px solid rgba(255,255,255,0.06)',
-              color: planDays === 7 && !monthPlanMode ? '#fff' : 'rgba(255,255,255,0.85)',
-              fontWeight:700, fontSize:11,
+              padding:'10px 6px', borderRadius:10, cursor:'pointer', textAlign:'center', minHeight: 40,
+              background: planDays === 7 && !monthPlanMode ? 'linear-gradient(135deg,#8b5cf6 0%, #7c3aed 70%, #6d28d9 100%)' : 'transparent',
+              border: planDays === 7 && !monthPlanMode ? '1px solid rgba(139,92,246,0.42)' : '1px solid transparent',
+              color: planDays === 7 && !monthPlanMode ? '#fff' : 'rgba(255,255,255,0.72)',
+              fontWeight:800, fontSize:12, letterSpacing:'-0.2px',
+              boxShadow: planDays === 7 && !monthPlanMode ? '0 4px 14px rgba(139,92,246,0.28)' : 'none',
             }}>{planBusy && planDays === 7 ? '⏳…' : '📆 Неделя'}</button>
           </div>
           {planDays === 1 && generated && (
@@ -471,29 +491,29 @@ export const IndividualPlanResults: React.FC = () => {
           </div>
         </GlassCard>
       </>)}
-      {/* #8 Health-score дня */}
+      {/* Health-score — улучшена читаемость */}
       {plannerMode === 'pro' && generated && dayPlan && (dayPlan as any).healthScore && (() => {
         const hs = (dayPlan as any).healthScore;
         const col = hs.status === 'green' ? '#22c55e' : hs.status === 'yellow' ? '#f59e0b' : '#ef4444';
-        const bg = hs.status === 'green' ? 'rgba(34,197,94,0.08)' : hs.status === 'yellow' ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.08)';
-        const bor = hs.status === 'green' ? '1px solid rgba(34,197,94,0.25)' : hs.status === 'yellow' ? '1px solid rgba(245,158,11,0.25)' : '1px solid rgba(239,68,68,0.3)';
+        const bg = hs.status === 'green' ? 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.04))' : hs.status === 'yellow' ? 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.04))' : 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04))';
+        const bor = hs.status === 'green' ? '1px solid rgba(34,197,94,0.22)' : hs.status === 'yellow' ? '1px solid rgba(245,158,11,0.22)' : '1px solid rgba(239,68,68,0.22)';
         const bars = [['Микро', hs.micro], ['Клетч', hs.fiber], ['MPS', hs.mps], ['EA', hs.ea], ['Диверс', hs.diversity]] as [string,number][];
         return (
-          <div style={{ padding:'8px 12px', borderRadius:12, background:bg, border:bor, marginBottom:8, display:'flex', alignItems:'center', gap:10 }}>
-            <div style={{ textAlign:'center', minWidth:54 }}>
-              <div style={{ fontSize:20, fontWeight:800, color:col, lineHeight:1 }}>{hs.score}</div>
-              <div style={{ fontSize:10, color:col, fontWeight:600, textTransform:'uppercase' }}>{hs.status === 'green' ? 'отлично' : hs.status === 'yellow' ? 'норма' : 'внимание'}</div>
+          <div style={{ padding:'12px 14px', borderRadius:16, background:bg, border:bor, marginBottom:10, display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 16px rgba(0,0,0,0.12)' }}>
+            <div style={{ textAlign:'center', minWidth:56, padding:'6px 0', borderRadius:12, background:`${col}14`, border:`1px solid ${col}22` }}>
+              <div style={{ fontSize:22, fontWeight:900, color:col, lineHeight:1, letterSpacing:'-0.6px' }}>{hs.score}</div>
+              <div style={{ fontSize:9, color:col, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.5px', marginTop:1 }}>{hs.status === 'green' ? 'отлично' : hs.status === 'yellow' ? 'норма' : 'внимание'}</div>
             </div>
-            <div style={{ flex:1, display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
+            <div style={{ flex:1, display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:6 }}>
               {bars.map(([lab,val]) => (
-                <div key={lab} style={{ textAlign:'center' }}>
-                  <div style={{ fontSize:6, color:'rgba(255,255,255,0.6)' }}>{lab}</div>
-                  <div style={{ fontSize:9, fontWeight:700, color: val >= 75 ? '#22c55e' : val >= 50 ? '#f59e0b' : '#ef4444' }}>{val}</div>
-                  <div style={{ height:3, borderRadius:2, background:'rgba(255,255,255,0.08)', marginTop:1, overflow:'hidden' }}><div style={{ height:'100%', width:`${Math.min(100,val)}%`, background: val >= 75 ? '#22c55e' : val >= 50 ? '#f59e0b' : '#ef4444' }} /></div>
+                <div key={lab} style={{ textAlign:'center', padding:'4px 2px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)', fontWeight:600, letterSpacing:'0.2px' }}>{lab}</div>
+                  <div style={{ fontSize:12, fontWeight:800, color: val >= 75 ? '#4ade80' : val >= 50 ? '#fbbf24' : '#f87171', marginTop:1 }}>{val}</div>
+                  <div style={{ height:4, borderRadius:999, background:'rgba(255,255,255,0.07)', marginTop:3, overflow:'hidden' }}><div style={{ height:'100%', width:`${Math.min(100,val)}%`, borderRadius:999, background: val >= 75 ? '#22c55e' : val >= 50 ? '#f59e0b' : '#ef4444', boxShadow: `0 0 6px ${val >= 75 ? 'rgba(34,197,94,0.4)' : val >= 50 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)'}` }} /></div>
                 </div>
               ))}
             </div>
-            {hs.conflicts > 0 && <span style={{ fontSize:10, color:'#ef4444', fontWeight:600 }}>⚠ {hs.conflicts} конфликт</span>}
+            {hs.conflicts > 0 && <span style={{ fontSize:11, color:'#f87171', fontWeight:800, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', padding:'4px 8px', borderRadius:999, whiteSpace:'nowrap' }}>⚠ {hs.conflicts}</span>}
           </div>
         );
       })()}

@@ -17,17 +17,18 @@ interface Props {
 
 const btnCardStyle: React.CSSProperties = {
   flex: 1, minWidth: 0,
-  padding: '12px 10px', borderRadius: 14, cursor: 'pointer', textAlign: 'center',
-  background: 'rgba(24,24,27,0.6)', border: '1px solid rgba(255,255,255,0.06)',
-  color: '#fff', fontWeight: 600, fontSize: 10,
-  transition: 'all 0.15s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+  padding: '13px 10px', borderRadius: 14, cursor: 'pointer', textAlign: 'center',
+  background: 'linear-gradient(180deg, rgba(32,32,38,0.92), rgba(24,24,27,0.88))', border: '1px solid rgba(255,255,255,0.07)',
+  color: '#fff', fontWeight: 700, fontSize: 10.5, letterSpacing:'-0.15px',
+  transition: 'all 0.2s cubic-bezier(0.16,1,0.3,1)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+  boxShadow: '0 4px 14px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.04)',
 };
 
 const activeCardStyle: React.CSSProperties = {
   ...btnCardStyle,
-  borderColor: 'rgba(0,230,138,0.3)',
-  background: 'rgba(0,230,138,0.08)',
-  boxShadow: '0 0 16px rgba(0,230,138,0.06)',
+  borderColor: 'rgba(0,230,138,0.32)',
+  background: 'linear-gradient(180deg, rgba(0,230,138,0.12), rgba(0,230,138,0.06))',
+  boxShadow: '0 6px 18px rgba(0,230,138,0.14), inset 0 1px 0 rgba(255,255,255,0.08)',
 };
 
 const popupOverlay: React.CSSProperties = {

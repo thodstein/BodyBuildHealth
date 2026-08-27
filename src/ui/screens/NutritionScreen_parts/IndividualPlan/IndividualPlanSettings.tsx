@@ -34,18 +34,23 @@ const CollapsibleSection: React.FC<{ id: string; title: string; icon: string; co
   const { collapsed, toggle } = useCollapsedSections();
   const isCollapsed = collapsed.has(id);
   return (
-    <div style={{ marginBottom: 4 }}>
+    <div style={{ marginBottom: 6 }}>
       <div onClick={() => toggle(id)} style={{
-        display: 'flex', alignItems: 'center', gap: 4, padding: '6px 10px', cursor: 'pointer',
-        fontSize: 10, fontWeight: 700, color, letterSpacing: 0.3,
-        background: color + '08', borderRadius: 8, marginBottom: isCollapsed ? 0 : 4,
-        userSelect: 'none',
+        display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', cursor: 'pointer',
+        fontSize: 11, fontWeight: 800, color, letterSpacing: '-0.15px',
+        background: `linear-gradient(135deg, ${color}14, ${color}06)`, borderRadius: 12, marginBottom: isCollapsed ? 0 : 6,
+        border: `1px solid ${color}18`, boxShadow: `0 2px 10px ${color}0d`,
+        userSelect: 'none', transition:'all 0.18s ease',
       }}>
-        <span style={{ fontSize: 7, transition: 'transform 0.2s', display: 'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}>▼</span>
-        <span style={{ fontSize: 12 }}>{icon}</span>
-        <span>{title}</span>
+        <span style={{
+          width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center',
+          background: `${color}16`, border:`1px solid ${color}22`, fontSize: 9, transition: 'transform 0.2s', transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', flexShrink:0,
+        }}>▼</span>
+        <span style={{ fontSize: 14, filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' }}>{icon}</span>
+        <span style={{flex:1}}>{title}</span>
+        <span style={{fontSize:9, color:'rgba(255,255,255,0.32)', fontWeight:600}}>{isCollapsed ? 'развернуть' : 'свернуть'}</span>
       </div>
-      {!isCollapsed && <div style={{ animation: 'fadeSlideIn 0.2s ease' }}>{children}</div>}
+      {!isCollapsed && <div style={{ animation: 'fadeSlideIn 0.22s cubic-bezier(0.16,1,0.3,1)' }}>{children}</div>}
     </div>
   );
 };

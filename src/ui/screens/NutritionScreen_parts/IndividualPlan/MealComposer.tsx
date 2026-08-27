@@ -22,37 +22,38 @@ const KbjuProgressBars: React.FC<{ dayPlan: any; targetKcal: number; targetP: nu
   };
 
   const items = [
-    { label: 'Ккал', actual: Math.round(t.kcal), target: targetKcal, pct: pct(t.kcal, targetKcal), icon: '🔥' },
-    { label: 'Белки', actual: Math.round(t.p), target: targetP, pct: pct(t.p, targetP), icon: '🥩' },
-    { label: 'Жиры', actual: Math.round(t.f), target: targetF, pct: pct(t.f, targetF), icon: '🧈' },
-    { label: 'Углев.', actual: Math.round(t.c), target: targetC, pct: pct(t.c, targetC), icon: '🍚' },
+    { label: 'Ккал', actual: Math.round(t.kcal), target: targetKcal, pct: pct(t.kcal, targetKcal), icon: '🔥', grad: 'linear-gradient(90deg,#22c55e,#4ade80)' },
+    { label: 'Белки', actual: Math.round(t.p), target: targetP, pct: pct(t.p, targetP), icon: '🥩', grad: 'linear-gradient(90deg,#3b82f6,#60a5fa)' },
+    { label: 'Жиры', actual: Math.round(t.f), target: targetF, pct: pct(t.f, targetF), icon: '🧈', grad: 'linear-gradient(90deg,#f59e0b,#fbbf24)' },
+    { label: 'Углев.', actual: Math.round(t.c), target: targetC, pct: pct(t.c, targetC), icon: '🍚', grad: 'linear-gradient(90deg,#f97316,#fb923c)' },
   ];
 
   return (
-    <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.02)', border: '1px solid rgba(0,230,138,0.06)', marginBottom: 8 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 6 }}>
-        📊 КБЖУ дня
-        <span style={{ fontSize: 7, fontWeight: 400, color: 'rgba(255,255,255,0.4)', marginLeft: 6 }}>
+    <div style={{ padding: '12px 14px', borderRadius: 14, background: 'linear-gradient(180deg, rgba(24,24,27,0.86), rgba(18,18,20,0.92))', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 10, boxShadow:'0 6px 20px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)' }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', marginBottom: 8, display:'flex', alignItems:'center', gap:6 }}>
+        <span style={{width:22,height:22,borderRadius:7,background:'rgba(0,230,138,0.10)',border:'1px solid rgba(0,230,138,0.14)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11}}>📊</span> КБЖУ дня
+        <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.42)', marginLeft: 6, background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:999 }}>
           факт / цель
         </span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
         {items.map(item => (
-          <div key={item.label} style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <div key={item.label} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)' }}>
-                {item.icon} {item.label}
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.68)', fontWeight:600, display:'inline-flex', alignItems:'center', gap:4 }}>
+                <span style={{fontSize:10}}>{item.icon}</span> {item.label}
               </span>
-              <span style={{ fontSize: 8, fontWeight: 700, color: color(item.pct) }}>
-                {item.actual}/{item.target}
-                <span style={{ fontSize: 7, fontWeight: 400, marginLeft: 2 }}>({item.pct}%)</span>
+              <span style={{ fontSize: 11, fontWeight: 800, color: color(item.pct) }}>
+                {item.actual}<span style={{fontWeight:600, color:'rgba(255,255,255,0.32)'}}>/{item.target}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 4, background: color(item.pct)+'18', border:`1px solid ${color(item.pct)}22`, padding:'1px 5px', borderRadius:999 }}>{item.pct}%</span>
               </span>
             </div>
-            <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+            <div style={{ height: 5, borderRadius: 999, background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
               <div style={{
-                width: `${item.pct}%`, height: '100%', borderRadius: 2,
-                background: `linear-gradient(90deg, ${color(item.pct)}, ${color(item.pct)}88)`,
-                transition: 'width 0.3s',
+                width: `${item.pct}%`, height: '100%', borderRadius: 999,
+                background: (item as any).grad,
+                boxShadow: `0 0 8px ${color(item.pct)}44`,
+                transition: 'width 0.35s cubic-bezier(0.16,1,0.3,1)',
               }} />
             </div>
           </div>
@@ -168,15 +169,23 @@ export const MealComposer: React.FC = () => {
   };
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      <div style={{ padding:10, borderRadius:10, background:'rgba(0,230,138,0.03)', border:'1px solid rgba(0,230,138,0.08)' }}>
-        <div style={{ fontSize:10, fontWeight:700, color:'var(--accent)', marginBottom:4 }}>🍳 Компоновщик приёмов</div>
-        <div style={{ fontSize:8, color:'var(--text-dim)', lineHeight:1.4 }}>
-          {composerMode === 'basic' ? (
-            <>📊 <b>Обычный режим</b>: поиск продуктов с КБЖУ-подсказками. 🔄 <b>Заменить</b> — выберите продукт и найдите замену. ✏️ <b>Кол-во</b> — измените граммовку. ↩ <b>Отменить</b> — вернуть последнее изменение.</>
-          ) : (
-            <>🧬 <b>Продвинутый режим</b>: поиск с фильтрацией по DIAAS, GI, PRAL, качеству, обработке. Настройте фильтры для точного подбора.</>
-          )}
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      <div style={{
+        padding:'12px 14px', borderRadius:14,
+        background:'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.03))',
+        border:'1px solid rgba(0,230,138,0.12)', boxShadow:'0 4px 16px rgba(0,230,138,0.06)',
+        display:'flex', gap:10, alignItems:'flex-start',
+      }}>
+        <span style={{width:30,height:30,borderRadius:10,background:'rgba(0,230,138,0.12)',border:'1px solid rgba(0,230,138,0.18)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0}}>🍳</span>
+        <div>
+          <div style={{ fontSize:12, fontWeight:800, color:'#00e68a', marginBottom:3, letterSpacing:'-0.2px' }}>Компоновщик приёмов</div>
+          <div style={{ fontSize:10.5, color:'rgba(255,255,255,0.68)', lineHeight:1.45 }}>
+            {composerMode === 'basic' ? (
+              <><b style={{color:'#fff'}}>Обычный</b> — подбор по КБЖУ · <b style={{color:'#6ee7b7'}}>Заменить</b> — найдите замену · <b style={{color:'#93c5fd'}}>Кол-во</b> — граммовку · <b style={{color:'#c4b5fd'}}>↩</b> Отменить</>
+            ) : (
+              <><b style={{color:'#fff'}}>Продвинутый</b> — фильтрация по <span style={{color:'#a78bfa'}}>DIAAS</span> · <span style={{color:'#fb923c'}}>GI</span> · <span style={{color:'#fbbf24'}}>PRAL</span> · обработка и качество</>
+            )}
+          </div>
         </div>
       </div>
 

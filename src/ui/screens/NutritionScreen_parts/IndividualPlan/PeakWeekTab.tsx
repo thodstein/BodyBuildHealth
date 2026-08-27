@@ -35,9 +35,9 @@ const BTN_GHOST: React.CSSProperties = {
   background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.85)',
 };
 const CARD: React.CSSProperties = {
-  padding: 12, borderRadius: 14, background: 'linear-gradient(180deg, rgba(30,30,34,0.9), rgba(24,24,27,0.7))',
-  border: '1px solid rgba(255,255,255,0.07)', marginBottom: 10,
-  boxShadow: '0 2px 14px rgba(0,0,0,0.25)',
+  padding: 14, borderRadius: 16, background: 'linear-gradient(180deg, rgba(28,28,32,0.96), rgba(20,20,23,0.92))',
+  border: '1px solid rgba(255,255,255,0.07)', marginBottom: 12,
+  boxShadow: '0 8px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05)',
 };
 const CARD_TITLE: React.CSSProperties = { fontSize: 12, fontWeight: 800, color: '#fff', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 };
 
@@ -250,18 +250,6 @@ export const PeakWeekTab: React.FC = () => {
     return isoDiffDays(isoToday(), result.config.showDate);
   }, [result]);
 
-  const trainingStatus = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('he_bb_plan_saved');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      const plan = parsed?.plan || parsed;
-      if (!plan || !Array.isArray(plan.weeks)) return null;
-      const hasTaper = plan.weeks.some((w: any) => w?.contestPhase === 'taper' || w?.contestPhase === 'peak_week' || (w as any)?.taper);
-      return hasTaper ? 'applied' : 'not_applied';
-    } catch { return null; }
-  }, [bbPrepConfig]);
-
   const autofillFromProfile = () => {
     try {
       const p = getProfile();
@@ -329,6 +317,21 @@ export const PeakWeekTab: React.FC = () => {
     } catch { fallbackCopy(text); }
   };
 
+  const catsFor = draft.sex === 'female' ? FEMALE_CATS : MALE_CATS;
+
+  const SPECIALIZATIONS: ContestSpecialization[] = ['none', 'chest', 'back', 'shoulders', 'arms', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs', 'traps'];
+  const competitions = draft.competitions ?? [];
+  const patchCompetition = (id: string, p: Partial<ContestEventEntry>) =>
+    patch({ competitions: (draft.competitions || []).map(c => (c.id === id ? { ...c, ...p } : c)) });
+  const addCompetition = () =>
+    patch({ competitions: [...(draft.competitions || []), { id: `comp_${Date.now().toString(36)}`, name: `Старт ${(draft.competitions?.length ?? 0) + 1}`, priority: 'B' }] });
+  const removeCompetition = (id: string) =>
+    patch({
+      competitions: (draft.competitions || []).filter(c => c.id !== id),
+      mainCompetitionId: draft.mainCompetitionId === id ? undefined : draft.mainCompetitionId,
+    });
+  const resolveMainId = (c: BBContestPrepConfig): string | undefined => resolveMainCompetition(c)?.id;
+
   const readinessColor = !result ? '#60a5fa' : result.readiness.verdict === 'behind' ? '#f87171' : result.readiness.verdict === 'ahead' ? '#4ade80' : '#60a5fa';
   const countdownChip = daysToShow == null ? null : daysToShow < 0
     ? { text: `🎬 Шоу прошло (${-daysToShow} дн назад)`, color: '#94a3b8' }
@@ -386,22 +389,6 @@ export const PeakWeekTab: React.FC = () => {
       </div>
 
       <ContestPrepConfigEditor value={draft} onChange={patch} />
-
-      {/* Статус единого плана + тренировок */}
-      <div style={{ ...CARD, borderColor: bbPrepConfig ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.07)', background: bbPrepConfig ? 'linear-gradient(180deg, rgba(34,197,94,0.08), rgba(24,24,27,0.7))' : CARD.background }}>
-        <div style={CARD_TITLE}>{bbPrepConfig ? '✅ Единый план активен' : 'ℹ️ Единый план не собран'}</div>
-        <div style={{ fontSize: 10, color: bbPrepConfig ? '#86efac' : DIM, lineHeight: 1.5 }}>
-          {bbPrepConfig
-            ? `Версионированный план: шоу ${bbPrepConfig.showDate} · ${bbPrepConfig.category} · тапер ${bbPrepConfig.weeksOut} нед · ${bbPrepConfig.trainingProtocol}. Питание уже использует все фазы (подготовка/тапер/пик). Тренировки — тапер накладывается в ББ-авто на шаге «🏁 Contest Prep» кнопкой «Собрать и применить».`
-            : 'Настройте параметры выше и нажмите «Применить тапер-план ББ» — создастся версионированный план для питания (все фазы) и тренировок.'}
-        </div>
-        {bbPrepConfig && (
-          <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ ...chip, background: 'rgba(34,197,94,0.12)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>● Питание: все фазы</span>
-            <span style={{ ...chip, background: trainingStatus === 'applied' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)', color: trainingStatus === 'applied' ? '#4ade80' : '#fbbf24', border: `1px solid ${trainingStatus === 'applied' ? 'rgba(34,197,94,0.3)' : 'rgba(245,158,11,0.3)'}` }}>{trainingStatus === 'applied' ? '🏋️ Тренировки: тапер применён' : '🏋️ Тренировки: соберите в ББ-авто'}</span>
-          </div>
-        )}
-      </div>
 
       {result && (
         <>
