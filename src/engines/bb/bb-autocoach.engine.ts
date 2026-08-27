@@ -515,12 +515,22 @@ export function detectGarbageVolume(weeks: BBWeek[], weakPoints: string[], opts?
         // Дублирование механического паттерна: два жима/тяги в одной сессии (кроме слабых групп).
         // Для спины используем нашу функциональную классификацию (vertical_pull объединяет
         // подтягивания/верхний блок), для остальных — movementPattern каталога.
+        // Для рук используем substitutionGroup (трицепс: long vs pushdown — разные головки,
+        // бицепс: hammer vs curl — брахиалис vs бицепс) — иначе французский жим + блок
+        // ложно считались одним паттерном isolation_arms.
         let pattern: string | null = null;
+        let subGroup: string | null = null;
         if (e.muscle === 'back') {
           pattern = classifyBackExercise(e.name).pattern;
         } else {
           const catalogEx = EXERCISE_CATALOG.find(x => x.name === e.name);
           pattern = (catalogEx?.movementPattern as string) || null;
+          subGroup = (catalogEx as any)?.substitutionGroup || null;
+        }
+        // Для мелких мышц (руки/икры/пресс/трапы) изоляция с разным subGroup —
+        // не дубль (французский жим overhead vs разгибание на блоке pushdown).
+        if (['biceps','triceps','forearms','calves','abs','traps'].includes(e.muscle) && subGroup) {
+          pattern = `${pattern}:${subGroup}`;
         }
         // Compound-паттерны (horizontal_push, heavy_row, squat...) НЕ считаются
         // мусором: разные углы/снаряды одного compound — это нормальная ББ-практика

@@ -23,11 +23,14 @@ const STATUS_META: Record<BBMuscleVolume['status'], { label: string; color: stri
 };
 
 function recommendation(m: BBMuscleVolume): string {
-  if (m.totalSets < m.mev) return `Недотрен: +${m.mev - m.totalSets} подход(ов) до минимума MEV ${m.mev} — иначе нет стимула для роста`;
-  if (m.totalSets >= m.mrv) return `Перегруз: −${m.totalSets - m.mrv} подход(ов) — выше максимума MRV ${m.mrv}, риск недовосстановления и травмы`;
-  if (m.totalSets > m.mav) return `Выше оптимума: в зоне MAV–MRV (${m.mav}–${m.mrv}), можно держать или −${m.totalSets - m.mav} до оптимума MAV`;
-  if (m.totalSets < m.mav) return `Ниже оптимума: +${m.mav - m.totalSets} подход(ов) до оптимума MAV ${m.mav} для максимального роста`;
-  return 'Оптимум — объём в точке MAV, баланс стимула и восстановления';
+  // Используем effectiveSets (прямой + косвенный) — иначе передняя дельта
+  // с косвенной от жимов показывала 0, хотя фактически получает 2-4 effective.
+  const eff = m.effectiveSets;
+  if (eff < m.mev) return `Недотрен: +${(m.mev - eff).toFixed(1)} effective до MEV ${m.mev} — иначе нет стимула`;
+  if (eff >= m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} effective — выше MRV ${m.mrv}, риск недовосстановления`;
+  if (eff > m.mav) return `Выше оптимума: в зоне MAV–MRV (${m.mav}–${m.mrv}), можно держать или −${(eff - m.mav).toFixed(1)} до MAV`;
+  if (eff < m.mav) return `Ниже оптимума: +${(m.mav - eff).toFixed(1)} effective до MAV ${m.mav}`;
+  return 'Оптимум — объём в точке MAV';
 }
 
 function ru(muscle: string): string { return GROUP_RU[muscle] || muscle; }
@@ -58,18 +61,22 @@ export const VolumeBudgetCard: React.FC<{ metrics: BBPlanMetrics | null; mrvMult
 
       {rows.map(m => {
         const st = STATUS_META[m.status];
-        const barMax = Math.max(m.mrv, m.totalSets, 1);
+        // Показываем effective (прямой + косвенный) — иначе передняя дельта
+        // с жимов получала 0 effective, хотя status уже учитывает indirect.
+        const displaySets = m.effectiveSets;
+        const barMax = Math.max(m.mrv, displaySets, 1);
         const pct = (v: number) => (v / barMax * 100);
         const тяжPct = m.totalSets > 0 ? Math.round((m.тяжSets / m.totalSets) * 100) : 0;
+        const directNote = m.directSets !== displaySets ? ` (прямых ${m.directSets})` : '';
         return (
           <div key={m.muscle} style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>{ru(m.muscle)}</span>
-              <span style={{ fontSize: 10, fontWeight: 800, color: st.color }}>{m.totalSets} сетов · {st.label}</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: st.color }}>{displaySets.toFixed(1)} eff{directNote} · {st.label}</span>
             </div>
-            {/* Бар с тремя порогами */}
+            {/* Бар с тремя порогами — по effective */}
             <div style={{ position: 'relative', height: 10, borderRadius: 5, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 3 }}>
-              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: pct(m.totalSets) + '%', background: st.color, borderRadius: 5, opacity: 0.85 }} />
+              <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: pct(displaySets) + '%', background: st.color, borderRadius: 5, opacity: 0.85 }} />
               {/* MEV marker */}
               <div title={`MEV ${m.mev}`} style={{ position: 'absolute', left: pct(m.mev) + '%', top: -2, bottom: -2, width: 2, background: '#22c55e' }} />
               {/* MAV marker */}

@@ -79,16 +79,24 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   // P2-3: частота — среднее число сессий на мышцу за ВСЕ недели (не только пик-неделя).
   // Раньше: только по пик-неделе → для bro_5 (1×/нед) частота=1 всегда, для PPL (2×/нед) =2.
   // Теперь: агрегируем по всем неделям, делим на число недель → реальная частота/нед.
+  // Важно: для front/rear дельт частота учитывает и indirect (жимы → delt_front, тяги → delt_rear).
   const freqMapAll: Record<string, number> = {};
   const totalWeeks = plan.weeks.length || 1;
   for (const w of plan.weeks) {
     for (const s of w.sessions) {
-      const musclesInSession = new Set(s.exercises.map(ex => shoulderHead(ex as any)));
-      for (const muscle of musclesInSession) freqMapAll[muscle] = (freqMapAll[muscle] || 0) + 1;
+      const directMuscles = new Set(s.exercises.map(ex => shoulderHead(ex as any)));
+      // indirect мышцы сессии (через aggregateBBVolume per session)
+      const sessEff = aggregateBBVolume([s]);
+      const allMusclesInSession = new Set<string>([...directMuscles, ...Object.keys(sessEff)]);
+      for (const muscle of allMusclesInSession) freqMapAll[muscle] = (freqMapAll[muscle] || 0) + 1;
     }
   }
 
-  const perMuscle: BBMuscleVolume[] = Object.entries(agg).map(([muscle, a]) => {
+  // Объединяем direct (agg) и indirect (effectiveByMuscle) — иначе передняя дельта
+  // с косвенной нагрузкой от жимов не попадала в список (агг был только chest).
+  const allMuscleKeys = new Set<string>([...Object.keys(agg), ...Object.keys(effectiveByMuscle)]);
+  let perMuscle: BBMuscleVolume[] = [...allMuscleKeys].map(muscle => {
+    const a = agg[muscle] || { total: 0, тяж: 0, памп: 0, лёг: 0, hard: 0, rirSum: 0, rirN: 0, freq: 0 };
     const lm = getVolumeLandmarks(level, muscle) || { mev: 0, mav: 0, mrv: 0 };
     const finalLm = plan.volumeLandmarks?.find(row => row.group === muscle);
     const effective = effectiveByMuscle[muscle]?.effectiveSets ?? a.total;
@@ -111,6 +119,36 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
       mev, mav, mrv, status,
     };
   });
+  // Корректировка плеч: косвенная shoulders (от жимов/тяг) распределяется по головкам,
+  // иначе передняя дельта всегда 0, а shoulders-generic дублирует per-head.
+  const hasHeads = perMuscle.some(m => m.muscle === 'delt_front' || m.muscle === 'delt_mid' || m.muscle === 'delt_rear');
+  if (hasHeads) {
+    const shouldersIdx = perMuscle.findIndex(m => m.muscle === 'shoulders');
+    if (shouldersIdx >= 0) {
+      const sh = perMuscle[shouldersIdx];
+      const shEff = sh.effectiveSets;
+      // распределение косвенной плечевой нагрузки: 55% front (жимы), 25% rear (тяги), 20% mid
+      const dist: Record<string, number> = { delt_front: 0.55, delt_mid: 0.20, delt_rear: 0.25 };
+      for (const m of perMuscle) {
+        if (dist[m.muscle] != null) {
+          const add = shEff * dist[m.muscle]!;
+          m.effectiveSets = Math.round((m.effectiveSets + add) * 10) / 10;
+          m.directSets = Math.round((m.directSets + add) * 10) / 10; // для отображения effective как direct+indirect
+          // частота головок +1 если shoulders частота >0
+          if ((freqMapAll['shoulders'] || 0) > 0) {
+            m.frequencyPerRotation = Math.round(Math.max(m.frequencyPerRotation, (freqMapAll['shoulders'] || 0) / totalWeeks) * 10) / 10;
+          }
+          // пересчёт статуса после добавки косвенной
+          if (m.effectiveSets >= m.mrv) m.status = 'exceeding_mrv';
+          else if (m.effectiveSets > m.mav) m.status = 'approaching_mrv';
+          else if (m.effectiveSets >= m.mev) m.status = 'optimal';
+          else m.status = 'below_mev';
+        }
+      }
+      // удаляем generic shoulders, чтобы не дублировать per-head
+      perMuscle.splice(shouldersIdx, 1);
+    }
+  }
   const totalSets = perMuscle.reduce((s, m) => s + m.totalSets, 0);
   const тяжSets = perMuscle.reduce((s, m) => s + m.тяжSets, 0);
   const пампSets = perMuscle.reduce((s, m) => s + m.пампSets, 0);
