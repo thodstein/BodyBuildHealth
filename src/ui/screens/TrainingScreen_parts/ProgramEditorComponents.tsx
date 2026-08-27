@@ -308,14 +308,38 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
     setWeeks(arr.map((w, i) => ({ ...w, week: i + 1 })));
   };
 
-  /** Метрики для выбранной недели — пересчитываем при каждом изменении блоков/сетов. */
+  /** Метрики для выбранной недели — мемоизированы по хэшу выбранной недели (не всей программы). */
+  const selectedWeek = volWeekIdx != null ? body.weeks[volWeekIdx] : null;
+  const selectedWeekHash = selectedWeek ? JSON.stringify(selectedWeek) : '';
   const volMetrics = useMemo(() => {
-    if (volWeekIdx == null) return null;
-    const w = body.weeks[volWeekIdx];
-    if (!w) return null;
-    if ((w.sessions ?? []).length === 0) return null;
-    try { return calcBBPlanMetrics(userWeekToBBPlan(w, level)); } catch { return null; }
-  }, [volWeekIdx, body.weeks, level]);
+    if (selectedWeek == null) return null;
+    if ((selectedWeek.sessions ?? []).length === 0) return null;
+    try { return calcBBPlanMetrics(userWeekToBBPlan(selectedWeek, level)); } catch { return null; }
+  }, [selectedWeekHash, level]);
+
+  const liveQuality = useMemo(() => {
+    if (body.weeks.length === 0) return null;
+    try {
+      const tmpProg = { meta: { id:'tmp', title:'tmp', author:'', goal:'hypertrophy', level, daysPerWeek: body.weeks[0]?.sessions.length ?? 3, weeks: body.weeks.length, direction:'bb' as const, createdAt:'', updatedAt:'', source:'custom' as const }, bb: body } as any;
+      return computePlanQualityFor(tmpProg, level);
+    } catch { return null; }
+  }, [JSON.stringify(body.weeks), level]);
+
+  // Keyboard shortcuts for week navigation (проф-удобство)
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        if (expandedWeekIdx >= 0 && expandedWeekIdx < body.weeks.length) {
+          e.preventDefault();
+          cloneWeek(expandedWeekIdx);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expandedWeekIdx, body.weeks.length]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -347,11 +371,9 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
           <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.65)' }}>Канон расписания:</span> 3д → Пн·Ср·Пт · 4д → Пн·Вт·Чт·Пт · 5д → Пн·Вт·Ср·Пт·Сб · 6д → Пн-Сб · <span style={{ color:'#f59e0b' }}>⭐</span> — рекомендовано, можно любой день 0-6.
         </div>
       )}
-      {/* Live качество — score + баланс, прямо в редакторе недель */}
-      {body.weeks.length > 0 && (() => {
-        try {
-          const tmpProg = { meta: { id:'tmp', title:'tmp', author:'', goal:'hypertrophy', level, daysPerWeek: body.weeks[0]?.sessions.length ?? 3, weeks: body.weeks.length, direction:'bb' as const, createdAt:'', updatedAt:'', source:'custom' as const }, bb: body } as any;
-          const q = computePlanQualityFor(tmpProg, level);
+      {/* Live качество — score + баланс, мемоизировано (liveQuality) */}
+      {liveQuality && (() => {
+          const q = liveQuality;
           const low = q.perMuscle.filter(m => m.status === 'low');
           const over = q.perMuscle.filter(m => m.status === 'over');
           const col = q.score >=75 ? '#22c55e' : q.score >=50 ? '#f59e0b' : '#ef4444';
@@ -385,8 +407,7 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               )}
             </div>
           );
-        } catch { return null; }
-      })()}
+        })()}
       {body.weeks.length > 1 && (
         <div style={{ ...CARD, padding: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: ACCENT }}>🗺 Тепловая карта объёма</span>
@@ -410,7 +431,12 @@ const BBEditor: React.FC<{ body: BBProgramBody; onChange: (b: BBProgramBody) => 
               const active = !showAllWeeks && expandedWeekIdx === wi;
               const sets = w.sessions.reduce((s,ses)=> s+ses.blocks.reduce((b,blk)=> b+blk.sets.length,0),0);
               return (
-                <button key={wi} role="tab" aria-selected={active} onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(wi); }} style={{ flex:'0 0 auto', minWidth: 64, padding: '6px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor:'pointer', background: active ? c+'20' : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${c}` : '1px solid rgba(255,255,255,0.08)', color: active ? c : 'rgba(255,255,255,0.7)', display:'flex', flexDirection:'column', alignItems:'center', gap: 2 }}>
+                <button key={wi} id={`week-tab-${wi}`} role="tab" aria-selected={active} aria-controls={`week-panel-${wi}`} tabIndex={active ? 0 : -1} onClick={() => { setShowAllWeeks(false); setExpandedWeekIdx(wi); }} onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') { e.preventDefault(); const n=(wi+1)%body.weeks.length; setShowAllWeeks(false); setExpandedWeekIdx(n); setTimeout(()=>document.getElementById(`week-tab-${n}`)?.focus(),0); }
+                  else if (e.key === 'ArrowLeft') { e.preventDefault(); const p=(wi-1+body.weeks.length)%body.weeks.length; setShowAllWeeks(false); setExpandedWeekIdx(p); setTimeout(()=>document.getElementById(`week-tab-${p}`)?.focus(),0); }
+                  else if (e.key === 'Home') { e.preventDefault(); setShowAllWeeks(false); setExpandedWeekIdx(0); setTimeout(()=>document.getElementById('week-tab-0')?.focus(),0); }
+                  else if (e.key === 'End') { e.preventDefault(); const last=body.weeks.length-1; setShowAllWeeks(false); setExpandedWeekIdx(last); setTimeout(()=>document.getElementById(`week-tab-${last}`)?.focus(),0); }
+                }} style={{ flex:'0 0 auto', minWidth: 64, padding: '6px 10px', borderRadius: 10, fontSize: 11, fontWeight: 700, cursor:'pointer', background: active ? c+'20' : 'rgba(255,255,255,0.04)', border: active ? `1px solid ${c}` : '1px solid rgba(255,255,255,0.08)', color: active ? c : 'rgba(255,255,255,0.7)', display:'flex', flexDirection:'column', alignItems:'center', gap: 2 }}>
                   <span>Н{w.week}{w.deload ? ' · deload' : ''}</span>
                   <span style={{ fontSize: 10, fontWeight:400, color: active ? c : 'rgba(255,255,255,0.45)' }}>{w.phase} · {sets}с</span>
                   <span style={{ width: '100%', height: 3, borderRadius: 2, background: c, opacity: active ? 1 : 0.6 }} />
@@ -1274,16 +1300,19 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
           {/* Ряд 1: drag + тип + упражнение + мышца + сеты */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
           <span
-            title="Перетащите для изменения порядка"
-            style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            role="button" tabIndex={0} aria-label="Перетащить упражнение"
+            title={`Перетащите для изменения порядка — ${bi+1} из ${blocks.length}. Стрелки ↑↓ — переместить, Home/End — в начало/конец.`}
+            style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
+            role="button" tabIndex={0} aria-label={`Перетащить упражнение ${bi+1} из ${blocks.length}: ${b.exerciseName || 'без названия'}`} aria-grabbed={overIdx===bi ? 'true' : 'false'} aria-describedby={`block-pos-${bi}`}
             onKeyDown={event => {
               if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                 event.preventDefault();
                 moveBlock(bi, event.key === 'ArrowUp' ? -1 : 1);
-              }
+              } else if (event.key === 'Home') { event.preventDefault(); if (bi!==0) moveTo(bi,0); }
+              else if (event.key === 'End') { event.preventDefault(); if (bi!==blocks.length-1) moveTo(bi,blocks.length-1); }
             }}
-          >☰</span>
+            onFocus={(e)=>{ (e.target as HTMLElement).style.outline='2px solid #00e68a'; (e.target as HTMLElement).style.outlineOffset='2px'; }}
+            onBlur={(e)=>{ (e.target as HTMLElement).style.outline='none'; }}
+          >☰<span id={`block-pos-${bi}`} style={{ position:'absolute', width:1, height:1, overflow:'hidden', clip:'rect(0,0,0,0)' }}>{bi+1} из {blocks.length}</span></span>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginLeft: 2 }}>
             <button onClick={() => moveBlock(bi, -1)} disabled={bi === 0} aria-label={`Переместить упражнение ${bi + 1} выше`} title="Вверх" style={{ ...BTN_GHOST, minWidth: 28, minHeight: 22, padding: '2px 4px', fontSize: 9, lineHeight: 1, opacity: bi === 0 ? 0.35 : 1, borderColor: 'rgba(255,255,255,0.12)' }}>▲</button>
             <button onClick={() => moveBlock(bi, 1)} disabled={bi === blocks.length - 1} aria-label={`Переместить упражнение ${bi + 1} ниже`} title="Вниз" style={{ ...BTN_GHOST, minWidth: 28, minHeight: 22, padding: '2px 4px', fontSize: 9, lineHeight: 1, opacity: bi === blocks.length - 1 ? 0.35 : 1, borderColor: 'rgba(255,255,255,0.12)' }}>▼</button>
