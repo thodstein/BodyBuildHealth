@@ -36,13 +36,15 @@ export interface BBPlanValidationOptions {
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   /** Опыт в годах — для enhanced-лимитов сессии (60/18 вместо 24/10). */
   trainingYears?: number;
+  patternId?: string;
+  splitId?: string;
 }
 
 /** Лимиты сессии зависят от уровня: natural 24/10, enhanced 60/18 (3+ лет)
  *  и 40/14 (1-2 года) — делегирует в централизованный sessionLimitsFor (bb-volume),
  *  чтобы не дублировать логику в 13 местах. */
 export function sessionLimitsFor(options: BBPlanValidationOptions): { maxExercises: number; maxWorkingSets: number } {
-  const l = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears });
+  const l = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId || (options as any).splitId } as any, { id: (options as any).patternId || (options as any).splitId } as any);
   return { maxExercises: l.maxExercises, maxWorkingSets: l.maxWorkingSets };
 }
 
@@ -138,10 +140,11 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
 }
 
 export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = {}): BBPlanValidationResult {
+  const resolvedOptions = { ...options, patternId: (options as any).patternId || (options as any).splitId || (plan as any).pattern?.id } as BBPlanValidationOptions;
   const issues: BBPlanValidationIssue[] = [];
   if (!plan.weeks.length) issues.push({ level: 'error', code: 'empty_plan', message: 'План не содержит недель.' });
   plan.weeks.forEach((week, wi) => week.sessions.forEach((session, si) => {
-    issues.push(...validateSession(session, week.week || wi + 1, si + 1, options));
+    issues.push(...validateSession(session, week.week || wi + 1, si + 1, resolvedOptions));
     const allowedMuscles = TAG_MUSCLES[session.sessionTag || ''];
     if (allowedMuscles?.length) for (const exercise of session.exercises) {
       const canonical = trueMuscleOf({ name: exercise.name, muscle: exercise.muscle } as any) || exercise.muscle;
@@ -151,7 +154,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     const sessionSets = session.exercises
       .filter(exercise => !(exercise as any).warmupActivator && !(exercise as any).optional)
       .reduce((sum, exercise) => sum + exercise.sets, 0);
-    const { maxWorkingSets } = sessionLimitsFor(options);
+    const { maxWorkingSets } = sessionLimitsFor(resolvedOptions);
     if (sessionSets > maxWorkingSets) {
       issues.push({ level: 'warning', code: 'session_working_set_cap', message: `Сессия содержит ${sessionSets} рабочих сетов; target/session cap равен ${maxWorkingSets}.`, week: week.week || wi + 1, session: si + 1 });
     }

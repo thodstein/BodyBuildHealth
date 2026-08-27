@@ -125,7 +125,7 @@ function ensureWeakPatternCoverage(session: any, options: BBFinalizeOptions): vo
 
 const SMALL_MUSCLES = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps', 'abs', 'shoulders']);
 
-function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: string[] = [], optionsHighVolumeBack = false): void {
+function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: string[] = [], optionsHighVolumeBack = false, isPPL = false): void {
   const priority = new Set(priorityMuscles);
   const counts = new Map<string, number>();
   const ranked = session.exercises.map((exercise, index) => ({ exercise, index })).sort((a, b) => {
@@ -144,7 +144,7 @@ function dedupeAdaptivePatterns(session: { exercises: any[] }, priorityMuscles: 
     const highVolumeBack = muscle === 'back' && optionsHighVolumeBack;
     const cap = highVolumeBack
       ? (pattern === 'vertical_pull' ? 1 : pattern === 'heavy_row' ? 2 : 1)
-      : (SMALL_MUSCLES.has(muscle) ? 1 : 2);
+      : (isPPL && ['shoulders', 'biceps', 'triceps'].includes(muscle) ? 2 : (SMALL_MUSCLES.has(muscle) ? 1 : 2));
     const count = counts.get(key) || 0;
     // Back specialization is not a license for repeated primary rows. Keep
     // the pattern cap even for primary exercises; volume is distributed into
@@ -1331,8 +1331,8 @@ function ensurePPLTraps(session, week, options) {
   if (excluded.has('traps')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('traps')) return;
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  // PPL-gated by applyPPLRules; ensure helpers are PPL-only -> maxEx 14 (18 for enhanced 3+)
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   const working = session.exercises.filter((e) => !e.warmupActivator);
   if (working.length >= maxEx) return;
   let shrug = working.find((e) => e.muscle === 'traps' && /шраг|shrug/i.test(e.name || ''));
@@ -1374,8 +1374,7 @@ function ensurePPLRearDelts(session, week, options) {
   if (excluded.has('shoulders')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('shoulders')) return;
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   const working = session.exercises.filter((e) => !e.warmupActivator);
   if (working.length >= maxEx) return;
   const rear = working.filter((e) => e.muscle === 'shoulders' && /задн.*дельт|rear|обратн.*разведен|reverse.*fly|лиц.*тяга|face.?pull|махи.*наклон/i.test(e.name || ''));
@@ -1447,8 +1446,7 @@ function ensurePPLBiceps(session, week, options) {
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('biceps')) return;
   if ((options.excludedMuscles || []).includes('biceps')) return;
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
   const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'biceps');
   const w = (options.workMax && options.workMax.biceps) || 40;
@@ -1512,8 +1510,7 @@ function ensurePPLTriceps(session, week, options) {
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('triceps')) return;
   if ((options.excludedMuscles || []).includes('triceps')) return;
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
   const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'triceps');
   const w = (options.workMax && options.workMax.triceps) || 50;
@@ -1576,8 +1573,7 @@ function ensurePPLCalves(session, week, options) {
   if (excluded.has('calves')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('calves')) return;
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
   const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'calves');
   const w = (options.workMax && options.workMax.calves) || 60;
@@ -1618,8 +1614,7 @@ function ensurePPLChest(session, week, options) {
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('chest')) return;
   if ((options.excludedMuscles || []).includes('chest')) return;
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
   const working = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'chest');
   const hasIncline = working.some((e) => /наклон|incline/i.test(e.name || ''));
@@ -1666,8 +1661,7 @@ function ensurePPLBack(session, week, options) {
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   if (donors.has('back')) return;
   if ((options.excludedMuscles || []).includes('back')) return;
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
   const workingPullovers = session.exercises.filter((e) => !e.warmupActivator && e.muscle === 'back' && /пулловер|pullover|прям.*рук/i.test(e.name || ''));
   if (workingPullovers.length > 0) {
@@ -1707,8 +1701,7 @@ function ensurePPLLegs(session, week, options, heavyQuads) {
   if (!/Legs|Lower/i.test(session.sessionTag || '')) return;
   const donors = tradeoffDonorsForWeek(options, (week && week.week) || 0);
   const excluded = new Set(options.excludedMuscles || []);
-  const isPPL = isPPLPattern(options, { pattern: { id: (options as any).patternId || '' } });
-  const maxEx = isPPL ? 14 : ((options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 10);
+  const maxEx = (options as any).level === 'enhanced' && ((options as any).trainingYears ?? 0) >= 3 ? 18 : 14;
   if (session.exercises.filter((e: any) => !(e as any).warmupActivator).length >= maxEx) return;
   const hasRomanian = session.exercises.some((e) => /румын|rdl/i.test(e.name || ''));
   const hasDead = session.exercises.some((e) => /мёртв|мертв/i.test(e.name || '') && !/румын|rdl/i.test(e.name || ''));
@@ -2187,7 +2180,23 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
  *  и никогда не удаляются (не вытесняют обязательную работу). */
 function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): void {
   const iso = (n: string) => /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|скручив|отведен|сведен|face.?pull|тяга.*лиц|подъём.*бицепс|подъем.*бицепс|подъём гантел|подъем гантел|наклонн.*скам|incline.*curl|молот|hammer|француз|french|из.?за.*голов|overhead/i.test(n);
-  const maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
+  const isPPL = isPPLPattern(options, plan);
+  // PPL-aware: intermediate PPL needs 12 exercises (rear 2× + biceps 2× + back + traps = 12),
+  // centralizedSessionLimits already returns 32/12 for PPL intermediate.
+  let maxEx: number;
+  if (options.maxExercises != null) {
+    maxEx = options.maxExercises;
+    if (isPPL && maxEx < 12) maxEx = 12;
+  } else {
+    try {
+      const lim = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined);
+      maxEx = lim.maxExercises;
+    } catch {
+      const computed = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
+      maxEx = isPPL ? Math.max(computed, 12) : computed;
+    }
+    if (isPPL && maxEx < 12) maxEx = 12;
+  }
   for (const week of plan.weeks) {
     for (const session of week.sessions) {
       const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
@@ -2878,12 +2887,12 @@ for (const week of next.weeks) {
           // vertical/lat после allocation (паттерны, а не сеты).
           options.level === 'enhanced' && (options.trainingYears ?? 0) >= 6 ? 6 : 4,
         );
-        dedupeAdaptivePatterns(session, options.priorityMuscles, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3);
+        dedupeAdaptivePatterns(session, options.priorityMuscles, options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3, isPPLPattern(options, next));
       }
       // Faithful сохраняет исходный набор и порядок, но safety-budget
       // обязателен для каждого режима и источника BB-auto.
       const fitted = options.preserveSource ? { removed: [], cost: estimateBBSessionCost(session) } : fitBBSessionToBudget(session, {
-        maxExercises: options.maxExercises ?? 10,
+        maxExercises: options.maxExercises ?? (isPPLPattern(options, next) ? 12 : 10),
         maxWorkingSets,
         minSetsByMuscle: sessionGuard,
       });
