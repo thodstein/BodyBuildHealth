@@ -3428,7 +3428,7 @@ for (const week of next.weeks) {
           const legsCnt = (week as any).sessions.filter((s: any) => /Legs|Lower/i.test(s.sessionTag || '')).length || 1;
           const pplMin: Record<string, number> = { traps: 5 * pullCnt, biceps: 10 * pullCnt, triceps: 10 * pushCnt, calves: 9 * legsCnt, shoulders: 6 * pullCnt, delt_rear: 6 * pullCnt, delt_mid: 3 * pushCnt } as any;
           const minWeekly2 = (pplMin as any)[muscle];
-          if (minWeekly2 != null && directTotal <= minWeekly2) { /*console.log(`[DBG cap skip] ${muscle} direct ${directTotal} <= min ${minWeekly2}`);*/ continue; }
+          if (minWeekly2 != null && directTotal <= minWeekly2) continue;
         }
         const targetDirect = Math.max(0, Math.floor(cap - indirectTotal));
         let need = Math.max(0, directTotal - targetDirect);
