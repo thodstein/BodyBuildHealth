@@ -22,3 +22,10 @@ export function filterByMobilityCB(pool: string[], restrictions: string[] | unde
   if (!restrictions || restrictions.length===0) return pool;
   return pool.filter(id => !isMobilityRestrictedCB(id, restrictions));
 }
+
+const AXIAL_IDS_CB = new Set(['squat','front_squat','trap_bar_dead','zercher_squat','deadbug','ab_wheel','hang_clean','high_pull','sled_push','sled_pull','farmer_carry','suitcase_carry']);
+export function isAxialLoadExerciseCB(id: string): boolean {
+  if (AXIAL_IDS_CB.has(id)) return true;
+  if (id.includes('squat') || id.includes('dead') || id.includes('yoke') || id.includes('stone') || id.includes('carry')) return true;
+  return false;
+}

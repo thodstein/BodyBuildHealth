@@ -16,11 +16,12 @@ describe('P3 Sinclair/IWF/masters', () => {
     expect(m).not.toBe(f);
   });
   it('IWF categories', () => {
-    expect(getIWFCategory(80, 'male')).toBe('81');
-    expect(getIWFCategory(95, 'male')).toBe('96');
-    expect(getIWFCategory(45, 'female')).toBe('45');
-    expect(getIWFCategory(90, 'female')).toBe('+87');
-    expect(getIWFCategory(110, 'male')).toBe('+109');
+    expect(getIWFCategory(80, 'male')).toBe('88');
+    expect(getIWFCategory(95, 'male')).toBe('98');
+    expect(getIWFCategory(45, 'female')).toBe('48');
+    expect(getIWFCategory(90, 'female')).toBe('+86');
+    expect(getIWFCategory(110, 'male')).toBe('110');
+    expect(getIWFCategory(111, 'male')).toBe('+110');
   });
   it('Masters factor', () => {
     expect(getMastersFactor(30)).toBe(1);

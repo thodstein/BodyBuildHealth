@@ -53,6 +53,9 @@ export function weightCutVolumeMultiplier(week: number, totalWeeks: number, prot
   const ph = weightCutPhaseForWeek(week, totalWeeks, protocol);
   if (ph === 'fight_week') return 0.65; // fight week — минимум зала
   if (ph === 'taper') return 0.82;
+  // camp — дефицит: срез объёма (ISSN: дефицит -10-25% в зависимости от сгонки)
+  if (protocol.targetLossKg >= 5) return 0.70;
+  if (protocol.targetLossKg >= 3) return 0.75;
   return 1;
 }
 

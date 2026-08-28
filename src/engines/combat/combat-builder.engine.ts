@@ -14,10 +14,13 @@ import { filterByTierCB, filterByInjuryCB, selectDiverseCB } from './combat-sele
 import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
-import { filterByMobilityCB } from './combat-mobility';
+import { filterByMobilityCB, isAxialLoadExerciseCB } from './combat-mobility';
 import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
+import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
+import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
+import { coreWeeklyPlan } from './combat-core.engine';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
@@ -181,6 +184,11 @@ function filterPool(ids: string[], input: CombatInput): string[] {
   const beforeMob=[...out];
   out = filterByMobilityCB(out, mob);
   if (out.length===0 && mob && mob.length>0) out = beforeMob.slice(0,2);
+  if ((input as any).avoidAxialLoad) {
+    const beforeAxial=[...out];
+    out = out.filter(id => !isAxialLoadExerciseCB(id));
+    if (out.length===0 && beforeAxial.length) out = beforeAxial.slice(0,2);
+  }
   return out;
 }
 function gentleFactorCB(id: string, injuries: any[]|undefined): number {
@@ -218,7 +226,9 @@ function buildWorkSets(reps: [number, number], sets: number, rir: number, weight
 export function buildCombatPlan(input: CombatInput): CombatPlan {
   const weeks = clampWeeks(input.weeks);
   const daysPerWeek = clampDays(input.daysPerWeek);
-  const outsideSessions = input.outsideLoad?.sessionsPerWeek ?? 0;
+  // P0-6: sparring декомпозиция — приоритет над generic outsideLoad
+  const effectiveOutsideLoad: OutsideLoad | null = (input as any).sparringLoad ? sparringToOutsideLoad((input as any).sparringLoad as any) : (input.outsideLoad as OutsideLoad) || null;
+  const outsideSessions = effectiveOutsideLoad?.sessionsPerWeek ?? 0;
   const level = input.level || 'intermediate';
   const discipline = input.discipline || 'general';
   const goal = input.goal || (outsideSessions >= 4 ? 'maintenance' : 'power');
@@ -228,27 +238,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     pattern = recommendCombatPattern(daysPerWeek, outsideSessions, level);
   }
 
-  const outsideMetrics = computeOutsideMetrics(input.outsideLoad as OutsideLoad);
-  // изолированные мультипликаторы (не из ББ)
-  const recoveryMult = (() => {
-    let v = 1;
-    if (input.bodyFat != null) v *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1;
-    if (input.leanMass != null) v *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1 : 0.9;
-    if (input.hrvMs != null) v *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1 : 0.85;
-    if (input.sleepHours != null) v *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1 : 0.85;
-    if (input.stressLevel != null) v *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1 : 0.85;
-    return Math.max(0.6, Math.min(1.5, v));
-  })();
-  const nutritionMult = (() => {
-    let v = 1;
-    if (input.calorieSurplus != null) v *= input.calorieSurplus > 300 ? 1.1 : input.calorieSurplus > 100 ? 1.05 : input.calorieSurplus < -200 ? 0.8 : 1.0;
-    if (input.proteinPerKg != null) v *= input.proteinPerKg >= 2.0 ? 1.1 : input.proteinPerKg >= 1.6 ? 1.05 : input.proteinPerKg < 1.0 ? 0.85 : 1.0;
-    return Math.max(0.6, Math.min(1.5, v));
-  })();
-  const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
+  const outsideMetrics = computeOutsideMetrics(effectiveOutsideLoad as OutsideLoad);
+  // изолированные мультипликаторы — делегируем в единый движок (P1-1)
+  const recoveryMult = computeRecoveryMultiplier({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
+  const nutritionMult = computeNutritionMultiplier({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, female: (input as any).sex === 'female' });
+  const outsideMult = outsideVolumeMultiplier(effectiveOutsideLoad as OutsideLoad) || 1;
   const acwrMult = (input as any).acwr?.zone === 'dangerous' ? 0.60 : (input as any).acwr?.zone === 'caution' ? 0.85 : (input as any).acwr?.zone === 'undertrained' ? 1.1 : 1;
   const weeklyBudget = (() => {
-    const ped = adaptForPEDsCombat(input.peds, input.pedDoses as any, input.courseIntensity, discipline as any);
+    const ped = adaptForPEDsCombat(input.peds, input.pedDoses as any, input.courseIntensity, discipline as any, goal as any);
     const base = Math.round(112 * ped.mrvMult);
     const lab = input.labMrvMultiplier ?? 1;
     return Math.round(base * lab * outsideMult * recoveryMult * nutritionMult * acwrMult);
@@ -259,6 +256,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const wcProtocol: any = (input as any).weightCutProtocol || (goal === 'weight_cut' && input.weightCutKg ? buildWeightCutProtocol(input.weightCutKg, { startWeightKg: input.bodyweight } as any) : null);
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline} · цель ${goal} · ${weeks} нед · ${pattern.name} · модель ${periodModelEarly}`);
+  if ((input as any).sparringLoad) rationale.push(sparringSummary((input as any).sparringLoad));
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${outsideMetrics.interference}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''} · Budget ${weeklyBudget}`);
   if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
@@ -290,6 +288,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       // linear использует gpp/power/taper/deload — уже верные
     } else if (periodModel === 'atr_10' && phase === 'accumulation') phase = 'accumulation';
     // conjugate оставляет 'conjugate'
+    const condSessionsWeek = (input as any).conditioningMode !== 'off' ? conditioningSessionsForWeek(w, phase as any, goal, outsideSessions) : [];
     const sessions: CombatSession[] = [];
     for (let d = 0; d < 7; d++) {
       const slot = pattern.schedule[d];
@@ -297,7 +296,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       const tag = slot.sessionTag || 'full_power';
       const character = slot.character as any;
       // outside конфликт: тяж ноги за день до high вне зала → делаем лёг/памп
-      const conflict = isDayConflictWithOutside(d, input.outsideLoad as OutsideLoad);
+      const conflict = isDayConflictWithOutside(d, effectiveOutsideLoad as OutsideLoad);
       const isLegDay = tag === 'lower_power' || tag === 'full_power';
       const effectiveCharacter = (conflict && isLegDay && character === 'тяж') ? 'памп' : character;
       const poolIds = POOL_BY_TAG[tag] || POOL_BY_TAG.full_power;
@@ -328,11 +327,17 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const accentKey = id.includes('neck') ? 'neck' : (id.includes('grip')||id.includes('pinch')||id.includes('wrist')) ? 'grip' : (id.includes('landmine')||id.includes('pallof')||id.includes('med_ball')||id.includes('rotation')) ? 'rotational' : tag.includes('lower')||tag.includes('full') ? 'legs' : 'push';
         const accMult = (accentMap as any)[accentKey] || 1;
         if (accMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * accMult)));
+        // P2-4 fightStyle: striker→rotational +1, grappler→neck/grip +1
+        const fs = (input as any).fightStyle as string | undefined;
+        if (fs === 'striker' && (id.includes('landmine') || id.includes('med_ball') || id.includes('sledge') || id.includes('rotation'))) sets = Math.min(6, sets + 1);
+        else if (fs === 'grappler' && (id.includes('neck') || id.includes('grip') || id.includes('wrist') || id.includes('towel') || id.includes('rope') || id.includes('pullup'))) sets = Math.min(6, sets + 1);
         if (wcProtocol) {
           const wcm = weightCutVolumeMultiplier(w, weeks, wcProtocol);
           if (wcm < 1) sets = Math.max(2, Math.round(sets * wcm));
         } else if (goal === 'weight_cut' && sets > 2) sets -= 1;
         if (outsideMult < 0.75 && sets > 2) sets -= 1;
+        // P1-4: кондиция отнимает объём (1 сет за каждую конди-сессию, но минимум 2)
+        if (condSessionsWeek.length > 0 && sets > 2) sets = Math.max(2, sets - (condSessionsWeek.length > 1 ? 1 : 0) - (condSessionsWeek.length === 1 ? 0 : 0));
         if (acwrMult < 1 && sets > 2) sets = Math.max(2, Math.round(sets * acwrMult));
         else if (acwrMult > 1 && sets < 6) sets = Math.min(6, sets + 1);
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
@@ -379,6 +384,43 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       sessions.push({ day: d + 1, week: w, sessionTag: tag, character: deload ? 'лёг' : (effectiveCharacter as any), exercises, durationMin: exercises.length * 10 + 10 });
     }
     sessions.sort((a, b) => a.day - b.day);
+    // P1-4 Core 4 функции — гарантия (если не делод/тапер, до 4 сетов)
+    const coreAntiCount = sessions.flatMap(s=> s.exercises).filter(e=> ['deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','pallof_rotation_press','suitcase_carry'].includes(e.id)).reduce((a,e)=>a+e.sets,0);
+    if (coreAntiCount < 4 && !deload && !taper) {
+      const target = sessions.find(s=> s.sessionTag.includes('upper_power') || s.sessionTag.includes('full_power')) || sessions[0];
+      if (target && target.exercises.length < 8 && target.exercises.reduce((a,e)=>a+e.sets,0) < 22) {
+        // выбираем недостающую функцию
+        const eq = (input.equipment || []).map((s: string) => String(s).toLowerCase());
+        const hasCable = eq.includes('cable') || eq.includes('other') || eq.length===0;
+        const needExt = !sessions.flatMap(s=> s.exercises).some(e=> ['deadbug','hollow_hold','ab_wheel'].includes(e.id));
+        const needRot = !sessions.flatMap(s=> s.exercises).some(e=> e.id==='pallof_rotation_press');
+        const needLat = !sessions.flatMap(s=> s.exercises).some(e=> ['side_plank','copenhagen_plank','suitcase_carry'].includes(e.id));
+        let coreId: string | null = null;
+        if (needExt) coreId = 'deadbug';
+        else if (needRot) coreId = hasCable ? 'pallof_rotation_press' : 'deadbug';
+        else if (needLat) coreId = 'side_plank';
+        else coreId = 'deadbug';
+        const coreMeta = getExerciseMeta(coreId) || { name: coreId, group: 'core', pattern: 'anti_extension' };
+        const coreEx: any = {
+          id: coreId,
+          name: coreMeta.name,
+          group: 'core',
+          pattern: coreMeta.pattern,
+          role: 'accessory',
+          character: 'памп',
+          sets: 3,
+          reps: coreId==='side_plank' ? '30с' : '8-10',
+          rir: 3,
+          weight: 0,
+          workSets: Array.from({length:3}, ()=> ({ reps: coreId==='side_plank'? 1 : 8, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: 60 })),
+          tempo: '2-1-1-0',
+          restSeconds: 60,
+          comment: 'Core Boxing Science: обязательный anti-функция (авто)',
+        };
+        target.exercises.push(coreEx);
+        target.durationMin = (target.durationMin||0)+6;
+      }
+    }
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
     const totalTonnage = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
     weeksData.push({ week: w, phase, deload, taper, sessions, totalSets, totalTonnage, outsideLoad: outsideMetrics?.weeklyLoad });
@@ -423,6 +465,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     }
   }
 
+  const snap: any = { ...input, outsideLoad: effectiveOutsideLoad };
   const plan: CombatPlan = {
     id: `cb_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     discipline,
@@ -435,8 +478,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     conditioning: conditioningPlan,
     validation: { ok: errors.length === 0, warnings, errors },
     rationale,
-    inputSnapshot: input,
-  };
+    inputSnapshot: snap,
+  } as any;
   return plan;
 }
 

@@ -34,7 +34,7 @@ function curveInsulin(iu: number): number {
   return 1.05;
 }
 
-export function adaptForPEDsSS(peds: string[] | undefined, pedDoses: PedDoses | undefined, courseIntensity?: string): { mrvMult: number; details: string } {
+export function adaptForPEDsSS(peds: string[] | undefined, pedDoses: PedDoses | undefined, courseIntensity?: string, isWeightCut?: boolean): { mrvMult: number; details: string } {
   const doses = pedDoses || {};
   const has = (k: string) => (peds || []).some(p => p.toLowerCase().includes(k.toLowerCase()));
   // P1: tEq для тренболона 2.5 и нандролона 1.3 — как в bb-ped-adaptation
@@ -80,7 +80,10 @@ export function adaptForPEDsSS(peds: string[] | undefined, pedDoses: PedDoses | 
   // diminishing 0.85 если несколько PED (как в bb)
   const count = [has('aas')||aasDose>0, has('gh')||ghDose>0, has('insulin')||insDose>0, has('mgf'), has('igf')].filter(Boolean).length;
   if (count >= 2) mult = 1 + (mult - 1) * 0.85;
+  if (isWeightCut) mult = 1 + (mult - 1) * 0.70;
 
-  mult = Math.min(1.70, Math.max(1.0, Math.round(mult * 100) / 100));
+  let cap = 1.70;
+  if (isWeightCut) cap = 1.35;
+  mult = Math.min(cap, Math.max(1.0, Math.round(mult * 100) / 100));
   return { mrvMult: mult, details: parts.join(', ') || 'natural' };
 }

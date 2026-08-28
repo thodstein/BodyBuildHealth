@@ -36,7 +36,8 @@ export function adaptForPEDsCombat(
   peds: string[] | undefined,
   pedDoses: PedDoses | undefined,
   courseIntensity?: string,
-  discipline?: string
+  discipline?: string,
+  goal?: string
 ): { mrvMult: number; details: string } {
   const doses = pedDoses || {};
   const has = (k: string) => (peds || []).some(p => p.toLowerCase().includes(k.toLowerCase()));
@@ -73,12 +74,16 @@ export function adaptForPEDsCombat(
   }
   if (has('mgf') || mgfDose > 0) mult *= 1.02;
   if (has('igf') || igfDose > 0) mult *= 1.02;
+  // GH+IGF синергия — лёгкий буст 2% но с diminishing 0.90 (как в tz-spec)
+  if ((has('gh') || ghDose > 0) && (has('igf') || igfDose > 0)) mult *= 1.01;
 
   if (courseIntensity === 'heavy') mult *= 1.03;
   else if (courseIntensity === 'mild') mult *= 0.97;
 
   const count = [has('aas')||aasDose>0, has('gh')||ghDose>0, has('insulin')||insDose>0, has('mgf'), has('igf')].filter(Boolean).length;
   if (count >= 2) mult = 1 + (mult - 1) * 0.85;
+  // весогонка — дефицит съедает PED-выгоду
+  if (goal === 'weight_cut') mult = 1 + (mult - 1) * 0.70;
 
   // cap по дисциплине: борьба выигрывает от массы чуть больше
   let cap = 1.35;
@@ -87,6 +92,7 @@ export function adaptForPEDsCombat(
   else if (d.includes('mma')) cap = 1.38;
   else if (d.includes('box')) cap = 1.32;
   else if (d.includes('kick')) cap = 1.33;
+  if (goal === 'weight_cut') cap = Math.min(cap, 1.18);
 
   mult = Math.min(cap, Math.max(1.0, Math.round(mult * 100) / 100));
   return { mrvMult: mult, details: parts.join(', ') || 'natural' };

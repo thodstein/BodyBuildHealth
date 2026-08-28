@@ -3,7 +3,7 @@
  * Уровень ББ-авто: периодизация, RIR/drift, outside-load, recovery, PED, ACWR-делод.
  * Только силовая часть зала — техника вне зала декларируется, не тренируется здесь.
  */
-import { computeOutsideMetrics, outsideVolumeMultiplier, type OutsideLoad } from '../outside-load.engine';
+import { computeOutsideMetrics, outsideVolumeMultiplier, outsideFrequencyPenalty, type OutsideLoad } from '../outside-load.engine';
 import { getStrengthSportPattern, recommendStrengthSportPattern, type StrengthSportPattern } from './strength-sport-split-patterns';
 import { SS_TAG_MUSCLES } from './strength-sport-day-types';
 import { pmForWeek, rirForWeek, phaseForWeek, phaseForDate, buildPhaseDistribution } from './strength-sport-progression';
@@ -12,11 +12,13 @@ import { filterByTier, filterByInjury, selectDiverse } from './strength-sport-se
 import { volumeMultForExercise } from './strength-sport-specialization';
 import { tempoForSS, restForSS, pctForSS, repsForSS } from './strength-sport-loading';
 import { adaptForPEDsSS } from './strength-sport-ped-adaptation';
-import { filterByMobility } from './strength-sport-mobility';
+import { filterByMobility, isAxialLoadExerciseSS } from './strength-sport-mobility';
 import { lengthenedBonus } from './strength-sport-bonus';
 import { warmupRampFor } from './strength-sport-warmup';
 import { applyDUP } from './strength-sport-dup';
 import { applyIntensity } from './strength-sport-intensity';
+import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, weightCutNutritionForWeekSS, weightCutRehydrationNotesSS } from './strength-sport-weight-cut.engine';
+import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
 /** Пул упражнений по тегу — кандидаты (id каталога) + замены — P0-5: +15 вариаций ТА (high_hang/low_block/pause_jerk/tempo/pin) */
@@ -86,6 +88,12 @@ function filterPool(ids: string[], input: StrengthSportInput): string[] {
   const mob = (input as any).mobilityRestrictions as string[] | undefined;
   out = filterByMobility(out, mob);
   if (out.length===0 && mob && mob.length>0) out = beforeInjury.slice(0,2);
+  // P0-7 axial — щадящий как в BB 1.4
+  if ((input as any).avoidAxialLoad) {
+    const beforeAxial = [...out];
+    out = out.filter(id => !isAxialLoadExerciseSS(id));
+    if (out.length === 0 && beforeAxial.length) out = beforeAxial.slice(0,2);
+  }
   return out;
 }
 function gentleFactor(id: string, injuries: any[]|undefined): number {
@@ -144,6 +152,26 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     const f = volumeMultForExercise(id, input.focus);
     sets = Math.max(2, Math.min(6, Math.round(sets * f)));
   }
+  // P0-2: weakPoints — спец-объём +1 на слабые лифты (как в BB isWeak ×1.15)
+  if (Array.isArray((input as any).weakPoints) && (input as any).weakPoints.length) {
+    const wp = (input as any).weakPoints.map((s: any) => String(s).toLowerCase());
+    let weakMult = 1;
+    const isSn = id.includes('snatch');
+    const isCj = id.includes('clean') || id.includes('jerk');
+    const isSq = id.includes('squat');
+    const isOh = id.includes('press') || id.includes('ohp') || id.includes('log') || id === 'bench_bar';
+    const isDl = id.includes('deadlift') || id.includes('pull') || id === 'rdl';
+    const isCarry = id.includes('farmers') || id.includes('yoke') || id.includes('carry') || id.includes('sled');
+    const isStone = id.includes('stone') || id.includes('sandbag') || id.includes('tire');
+    if (wp.some((w: string) => w.includes('snatch') && isSn)) weakMult = 1.15;
+    else if (wp.some((w: string) => (w.includes('clean') || w.includes('jerk')) && isCj)) weakMult = 1.15;
+    else if (wp.some((w: string) => w.includes('squat') && isSq)) weakMult = 1.15;
+    else if (wp.some((w: string) => (w.includes('overhead') || w.includes('press') || w.includes('жим')) && isOh)) weakMult = 1.15;
+    else if (wp.some((w: string) => (w.includes('deadlift') || w.includes('тяг') || w.includes('pull')) && isDl)) weakMult = 1.15;
+    else if (wp.some((w: string) => w.includes('carry') && isCarry)) weakMult = 1.15;
+    else if (wp.some((w: string) => (w.includes('stone') || w.includes('кам')) && isStone)) weakMult = 1.15;
+    if (weakMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * weakMult)));
+  }
   // Полный объём: outside × ACWR × VBT — мультипликативно
   const outM = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   const acwr = (input as any).acwr as { ratio:number; zone:string } | null | undefined;
@@ -199,27 +227,18 @@ function goalRir(goal: string): number {
   return 2;
 }
 
-// ——— ИЗОЛИРОВАННЫЕ recovery/nutrition/budget (не зависит от ББ) ———
+// ——— ИЗОЛИРОВАННЫЕ recovery/nutrition/budget — делегируем в единый движок (P1-1) ———
 function computeRecMult(input: { bodyFat?: number; leanMass?: number; hrvMs?: number; sleepHours?: number; stressLevel?: number }): number {
-  let v = 1;
-  if (input.bodyFat != null) v *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1;
-  if (input.leanMass != null) v *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1 : 0.9;
-  if (input.hrvMs != null) v *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1 : 0.85;
-  if (input.sleepHours != null) v *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1 : 0.85;
-  if (input.stressLevel != null) v *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1 : 0.85;
-  return Math.max(0.6, Math.min(1.5, v));
+  return computeRecoveryMultiplier(input);
 }
-function computeNutMult(input: { calorieSurplus?: number; proteinPerKg?: number }): number {
-  let v = 1;
-  if (input.calorieSurplus != null) v *= input.calorieSurplus > 300 ? 1.1 : input.calorieSurplus > 100 ? 1.05 : input.calorieSurplus < -200 ? 0.8 : 1.0;
-  if (input.proteinPerKg != null) v *= input.proteinPerKg >= 2.0 ? 1.1 : input.proteinPerKg >= 1.6 ? 1.05 : input.proteinPerKg < 1.0 ? 0.85 : 1.0;
-  return Math.max(0.6, Math.min(1.5, v));
+function computeNutMult(input: { calorieSurplus?: number; proteinPerKg?: number; female?: boolean }): number {
+  return computeNutritionMultiplier(input as any);
 }
 // P0-4: бюджет per level (begin 60, inter 85, adv 110, enh 135) — вместо магии 112
-function computeBudget(input: { level?: string; peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number }): number {
+function computeBudget(input: { level?: string; peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number; isWeightCut?: boolean }): number {
   const levelBase: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
   const baseSets = levelBase[(input.level as string) || 'intermediate'] ?? 85;
-  const ped = adaptForPEDsSS(input.peds, input.pedDoses as any, input.courseIntensity);
+  const ped = adaptForPEDsSS(input.peds, input.pedDoses as any, input.courseIntensity, !!input.isWeightCut);
   const base = Math.round(baseSets * ped.mrvMult);
   const lab = input.labMrvMultiplier ?? 1;
   const nut = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
@@ -393,16 +412,39 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   const recoveryMult = computeRecMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
   const nutritionMult = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
+  // P0-4 весогонка (лайт): строим протокол если передан weightCutKg / weightCutProtocolSS
+  const wcProtoInput: any = (input as any).weightCutProtocolSS || (input as any).weightCutProtocol || null;
+  const wcLossKg: number | null = typeof (input as any).weightCutKg === 'number' ? (input as any).weightCutKg : null;
+  const wcProto: any = wcProtoInput || (wcLossKg ? buildWeightCutProtocolSS(wcLossKg, { startWeightKg: (input as any).bodyweight } as any) : null);
+  const isWeightCut = !!wcProto;
   // P0-7 ACWR + outside + VBT — полный объём (outside high 0.55, ACWR dangerous 0.60, VBT 30% 0.90 → ×0.30)
   const acwrMult = input.acwr?.zone === 'dangerous' ? 0.60 : input.acwr?.zone === 'caution' ? 0.85 : input.acwr?.zone === 'undertrained' ? 1.10 : 1;
   const vbtMult = (input as any).velocityLossPct > 20 ? 0.90 : 1;
-  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier }) * acwrMult * outsideMult * vbtMult);
+  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier, isWeightCut }) * acwrMult * outsideMult * vbtMult);
+  // P0-5 frequencyPenalty — если outside high + 5× зал, форсим 3×
+  let effectiveDaysPerWeek = daysPerWeek;
+  if (outsideFrequencyPenalty(input.outsideLoad as OutsideLoad) === 1 && daysPerWeek >= 4) {
+    effectiveDaysPerWeek = 3;
+  }
+  // если форсим дни — пересобираем pattern
+  if (effectiveDaysPerWeek !== daysPerWeek) {
+    const forced = recommendStrengthSportPattern(mode, effectiveDaysPerWeek, level);
+    if (forced.sessionsPerRotation === effectiveDaysPerWeek) pattern = forced;
+  }
 
   const weeksData: StrengthSportWeek[] = [];
   const rationale: string[] = [];
   rationale.push(`Режим: ${mode} · цель ${goal} · ${weeks} нед · ${pattern.name}`);
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load → объём ×${outsideMetrics.volumeMultiplier} (интерференция ${outsideMetrics.interference})`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)} · Budget ${weeklyBudget} сетов/нед`);
+  if (Array.isArray((input as any).weakPoints) && (input as any).weakPoints.length) rationale.push(`Слабые лифты: ${(input as any).weakPoints.join(', ')} → объём ×1.15 на целевые`);
+  if (wcProto) {
+    rationale.push(`Весогонка ТА: −${wcProto.targetLossKg}кг за ${wcProto.weeksOut}нед · вода ${wcProto.waterMode} · Na ${wcProto.sodiumMode} · угли ${wcProto.carbMode}`);
+    const nutW1 = weightCutNutritionForWeekSS(1, weeks, wcProto, (input as any).bodyweight || 80);
+    if (nutW1.kcal) rationale.push(`Питание W1: ${nutW1.kcal}ккал P${nutW1.proteinG}/C${nutW1.carbsG} · вода ${nutW1.waterMl}мл Na ${nutW1.sodiumMg}мг`);
+    rationale.push(weightCutRehydrationNotesSS(wcProto.targetLossKg)[0]);
+  }
+  if (effectiveDaysPerWeek !== daysPerWeek) rationale.push(`Частота скорректирована: внезальная высокая → зал ${daysPerWeek}× → ${effectiveDaysPerWeek}× (frequencyPenalty)`);
 
   for (let w = 1; w <= weeks; w++) {
     const phase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate) : phaseForWeek(w, weeks, goal)) as any;
@@ -434,6 +476,11 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         const taperWeeks = (input as any).taperWeeks ?? (goal === 'peaking' ? 1 : 0);
         const taper = taperWeeks > 0 && w > weeks - taperWeeks && (goal === 'peaking' || phase === 'peaking' || phase === 'deload');
         const built = buildExerciseSets(id, tag, phase, input, isPrimary, w);
+        // P0-4 весогонка — режем объём в taper/fight_week
+        if (wcProto) {
+          const wcm = weightCutVolumeMultiplierSS(w, weeks, wcProto);
+          if (wcm < 1) built.sets = Math.max(2, Math.round(built.sets * wcm));
+        }
         // P3 taper vs deload — taper сохраняет интенсивность (Bosquet), deload снижает всё
         let finalSets = built.sets;
         let finalWeight = built.weight;
@@ -515,7 +562,20 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     const hasStrongEx = weeksData.some(w => w.sessions.some(s => s.exercises.some(e => isStrong(e.id))));
     if (hasStrongEx) warnings.push('Нет спец-снарядов (лог/йок/камни) — стронг-ивенты заменены на штангу/фермер.');
   }
+  if (wcProto) {
+    // валидация протокола
+    try {
+      const mod: any = require('./strength-sport-weight-cut.engine');
+      if (typeof mod.validateWeightCutProtocolSS === 'function') {
+        const errs = mod.validateWeightCutProtocolSS(wcProto);
+        for (const e of errs) warnings.push(e);
+      }
+    } catch {}
+    if ((wcProto.targetLossKg || 0) > 5 && goal !== 'peaking') warnings.push(`Весогонка ${wcProto.targetLossKg}кг без цели peaking — объём снижен, но без тапера`);
+  }
 
+  const snap: any = { ...input };
+  if (wcProto) snap.weightCutProtocolSS = wcProto;
   const plan: StrengthSportPlan = {
     id: `ss_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     mode,
@@ -528,8 +588,9 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     outsideMetrics,
     validation: { ok: errors.length === 0, warnings, errors },
     rationale,
-    inputSnapshot: input,
-  };
+    inputSnapshot: snap,
+  } as any;
+  if (wcProto) (plan as any).weightCutProtocol = wcProto;
   return plan;
 }
 

@@ -21,11 +21,12 @@ export function calcSinclair(total: number, bw: number, sex: string): number {
   return Math.round(total * coeff);
 }
 export function getIWFCategory(bw: number, sex: string): string {
-  const catsM = [55,61,67,73,81,89,96,102,109];
-  const catsF = [45,49,55,59,64,71,76,81,87];
+  // IWF 2025 новые категории (с 01.06.2025): M 60/65/71/79/88/98/110/110+, W 48/53/58/63/69/77/86/86+
+  const catsM = [60, 65, 71, 79, 88, 98, 110];
+  const catsF = [48, 53, 58, 63, 69, 77, 86];
   const cats = sex === 'female' ? catsF : catsM;
   for (const c of cats) if (bw <= c) return `${c}`;
-  return `+${cats[cats.length-1]}`;
+  return `+${cats[cats.length - 1]}`;
 }
 export function getMastersFactor(age: number): number {
   if (!age || age < 35) return 1;

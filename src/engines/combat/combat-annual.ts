@@ -57,14 +57,41 @@ export function annualCBPhaseForWeek(annual: AnnualCB | null, week: number): Ann
 }
 
 export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetition): AnnualCB {
-  const next = { ...annual, competitions: [...annual.competitions, comp], updatedAt: new Date().toISOString() } as AnnualCB;
-  // если дата боя попадает в блок, помечаем block.fightDate
+  const next: AnnualCB = { ...annual, competitions: [...annual.competitions, comp], updatedAt: new Date().toISOString(), blocks: annual.blocks.map(b=> ({...b})) } as AnnualCB;
   try {
     const d = new Date(comp.date).getTime();
-    // грубо: неделя боя = (дата - сегодня)/7 +1, если в пределах totalWeeks — помечаем
     const start = Date.now();
     const w = Math.floor((d - start)/ (7*86400000)) +1;
     if (w>=1 && w<=annual.totalWeeks) {
+      // P1-5: вставляем taper-блок 2нед перед боем (w-1..w) если влезает
+      if (w >= 2 && w <= annual.totalWeeks) {
+        const taperStart = w - 1;
+        const taperEnd = w;
+        // найдём блок, содержащий taperStart
+        const idx = next.blocks.findIndex(b => taperStart >= b.startWeek && taperStart < b.startWeek + b.weeks);
+        if (idx >= 0) {
+          const b = next.blocks[idx];
+          // проверим что taper помещается внутри одного блока (обычный случай — большой ATR блок)
+          const bEnd = b.startWeek + b.weeks - 1;
+          if (taperEnd <= bEnd) {
+            const prefixWeeks = taperStart - b.startWeek;
+            const suffixWeeks = bEnd - taperEnd;
+            const newBlocks: AnnualCBBlock[] = [];
+            for (let i=0;i<next.blocks.length;i++) {
+              if (i !== idx) { newBlocks.push(next.blocks[i]); continue; }
+              if (prefixWeeks > 0) newBlocks.push({ ...b, id: `${b.id}_pre`, weeks: prefixWeeks, fightDate: null } as any);
+              newBlocks.push({ id: `taper_${comp.id}`, startWeek: taperStart, weeks: 2, discipline: b.discipline, phase: 'taper' as AnnualCBPhase, status: 'planned' as const, fightDate: comp.date });
+              if (suffixWeeks > 0) newBlocks.push({ ...b, id: `${b.id}_post`, weeks: suffixWeeks, fightDate: null } as any);
+            }
+            // пересчёт startWeek
+            let cur=1; for(const nb of newBlocks){ nb.startWeek=cur; cur+=nb.weeks; }
+            next.blocks = newBlocks;
+            next.totalWeeks = cur-1;
+            return next;
+          }
+        }
+      }
+      // fallback: просто помечаем блок
       for(const b of next.blocks) if (w>=b.startWeek && w< b.startWeek+b.weeks) b.fightDate = comp.date;
     }
   } catch {}

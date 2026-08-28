@@ -15,6 +15,7 @@ import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } f
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
+import { CARD, CARD_ACCENT, CARD_STRONG, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 
@@ -287,15 +288,29 @@ export const StrengthSportConstructor: React.FC = () => {
     try { navigator.clipboard?.writeText(JSON.stringify(prog, null, 2)); } catch {}
   };
 
+  const stepIndex = (['params','outside','split','plan'] as Step[]).indexOf(step) + 1;
+  const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#3b82f6';
   return (
     <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h2 style={{ margin: 0, color: '#fff' }}>Силовой экстрим / Тяжёлая атлетика</h2>
-      <div style={{ fontSize: 11, color: '#fff', opacity: 0.7 }}>Только силовая часть зала. Внешняя нагрузка учитывается как фон.</div>
-
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {(['params','outside','split','plan'] as Step[]).map(s => (
-          <button key={s} onClick={() => setStep(s)} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: step===s ? '#00e68a' : 'rgba(255,255,255,0.06)', color: step===s ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>{s}</button>
-        ))}
+      <div style={mode === 'strongman' ? CARD_STRONG : CARD_ACCENT}>
+        <div style={ROW}>
+          <span style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg,${modeColor},${modeColor}cc)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: modeColor === '#00e68a' ? '#000' : '#fff' }}>{mode === 'weightlifting' ? '🏋️' : mode === 'strongman' ? '🪨' : '🔀'}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{mode === 'weightlifting' ? 'Тяжёлая атлетика — PRO' : mode === 'strongman' ? 'Силовой экстрим — PRO' : 'Гибрид — PRO'}</div>
+            <div style={HINT_SM}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · попытки 92/97/102 · внезальная × — интегрировано</div>
+          </div>
+          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}32`}>{stepIndex}/4 · {step}</Badge>
+        </div>
+        <ProgressBar value={stepIndex} max={4} color={modeColor} />
+        <SectionNav items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🏃 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} />
+        <div style={ROW}>
+          {(['params','outside','split','plan'] as Step[]).map(s => (
+            <ChipToggle key={s} active={step===s} onClick={() => setStep(s)}>{s}</ChipToggle>
+          ))}
+          {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}24`}>План {plan.weeks}нед · {plan.patternId}</Badge>}
+          {outsideMetrics && <Badge>Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
+          {acwr && <Badge color={acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#f59e0b':'#00e68a'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)':'rgba(0,230,138,0.08)'}>ACWR {acwr.ratio}</Badge>}
+        </div>
       </div>
 
       {step === 'params' && (

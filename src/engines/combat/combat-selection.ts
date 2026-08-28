@@ -97,6 +97,12 @@ export function filterByTierCB(pool: string[], level: string, hasCable?: boolean
 
 export function filterByInjuryCB(pool: string[], injuries: any[] | undefined): string[] {
   if (!injuries || injuries.length===0) return pool;
+  // graded vs exclude — как в strength/BB: только exclude режет пул, graded идёт через gentleFactor
+  const hasExclude = injuries.some((it:any)=>{
+    if(typeof it === 'string') return it.toLowerCase().includes('исключ') || it.toLowerCase().includes('exclude') || it.includes('⛔');
+    return it?.exclude === true || it?.type === 'exclude' || String(it?.severity||'').toLowerCase()==='high' || String(it?.mode||'').toLowerCase()==='exclude';
+  });
+  if (!hasExclude) return pool;
   const txt = JSON.stringify(injuries).toLowerCase();
   let out=[...pool];
   if (txt.includes('neck')||txt.includes('ше')) out = out.filter(id=>!id.includes('neck'));

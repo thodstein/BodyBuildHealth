@@ -28,9 +28,14 @@ describe('combat PRO gym', () => {
   });
   it('filterByInjury neck', () => {
     const pool=['neck_harness_ext','bench_bar'];
-    const f=filterByInjuryCB(pool, [{location:'neck'} as any]);
+    const f=filterByInjuryCB(pool, [{location:'neck', exclude:true} as any]);
     expect(f).not.toContain('neck_harness_ext');
     expect(f).toContain('bench_bar');
+  });
+  it('filterByInjury neck graded keeps', () => {
+    const pool=['neck_harness_ext','bench_bar'];
+    const f=filterByInjuryCB(pool, [{location:'neck'} as any]);
+    expect(f).toContain('neck_harness_ext');
   });
   it('selectDiverseCB', () => {
     const pool=['bench_bar','row_bar','neck_harness_ext','gi_grip_pullup'];

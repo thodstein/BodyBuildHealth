@@ -17,6 +17,7 @@ import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.typ
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
+import { CARD, CARD_ACCENT, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider } from './CombatUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 
@@ -39,6 +40,12 @@ export const CombatConstructor: React.FC = () => {
   const [conditioningMode, setConditioningMode] = useState<CombatInput['conditioningMode']>('auto');
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('mma'));
   const [outsideEnabled, setOutsideEnabled] = useState(true);
+  const [sparringHard, setSparringHard] = useState(1);
+  const [sparringTech, setSparringTech] = useState(2);
+  const [sparringWrest, setSparringWrest] = useState(1);
+  const [sparringEnabled, setSparringEnabled] = useState(false);
+  const [fightStyle, setFightStyle] = useState<'striker'|'grappler'|'hybrid'>('hybrid');
+  const [avoidAxialLoad, setAvoidAxialLoad] = useState(false);
   const [equipment, setEquipment] = useState<string[]>([]);
   const [mobility, setMobility] = useState<string[]>([]);
   const [injuries, setInjuries] = useState<any[]>([]);
@@ -160,6 +167,7 @@ export const CombatConstructor: React.FC = () => {
       }
     }catch{}
     const wcProtocol = weightCut>0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions } as any) : null;
+    const sparringLoad = sparringEnabled ? { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest } as any : null;
     let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
       weightCutKg: weightCut, weightCutProtocol: wcProtocol as any, methodology, dupMode, intensityTech,
@@ -169,7 +177,10 @@ export const CombatConstructor: React.FC = () => {
       workMax: workMax as any,
       workMaxByExercise: Object.keys(workMaxByExercise).length ? workMaxByExercise as any : undefined,
       acwr: acwr as any, velocityLossPct: velocityLoss>0? velocityLoss : null,
-      outsideLoad: outsideEnabled ? outside : null,
+      outsideLoad: outsideEnabled && !sparringEnabled ? outside : null,
+      sparringLoad,
+      fightStyle: fightStyle as any,
+      avoidAxialLoad: avoidAxialLoad as any,
       equipment, injuries, mobilityRestrictions: mobility as any,
       patternId: patternId || undefined,
       ...extra,
@@ -259,15 +270,27 @@ export const CombatConstructor: React.FC = () => {
     const a = document.createElement('a'); a.href=url; a.download=`combat-annual-${annual.totalWeeks}w.ics`; a.click(); URL.revokeObjectURL(url);
   };
 
+  const stepIndex = (['params','outside','split','plan'] as Step[]).indexOf(step) + 1;
   return (
     <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <h2 style={{ margin: 0, color: '#fff' }}>Единоборства — PRO силовая часть</h2>
-      <div style={{ fontSize: 11, color: '#fff', opacity: 0.7 }}>Бокс / ММА / Борьба / Кик · ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · годовой</div>
-
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        {(['params','outside','split','plan'] as Step[]).map(s => (
-          <button key={s} onClick={() => setStep(s)} style={{ padding: '6px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, background: step===s ? '#a855f7' : 'rgba(255,255,255,0.06)', color: step===s ? '#fff' : '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>{s}</button>
-        ))}
+      <div style={CARD_ACCENT}>
+        <div style={ROW}>
+          <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🥊</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Единоборства — PRO силовая</div>
+            <div style={HINT_SM}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · sparring · годовой</div>
+          </div>
+          <Badge color="#a855f7" bg="rgba(168,85,247,0.14)" border="rgba(168,85,247,0.32)">{stepIndex}/4 · {step}</Badge>
+        </div>
+        <ProgressBar value={stepIndex} max={4} color="#a855f7" />
+        <SectionNav items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🥋 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} />
+        <div style={ROW}>
+          {(['params','outside','split','plan'] as Step[]).map(s => (
+            <ChipToggle key={s} active={step===s} onClick={() => setStep(s)}>{s}</ChipToggle>
+          ))}
+          {plan && <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.24)">План {plan.weeks}нед · {plan.patternId}</Badge>}
+          {outsideMetrics && <Badge>Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
+        </div>
       </div>
 
       {step === 'params' && (
@@ -434,23 +457,52 @@ export const CombatConstructor: React.FC = () => {
       )}
 
       {step === 'outside' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
-          <label style={{ color: '#fff', fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-            <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} /> Учитывать вне зала (ринг/татами)
-          </label>
-          {outsideEnabled && outside && (
-            <>
-              <label style={{ color: '#fff', fontSize: 11 }}>Сессий/нед вне зала: {outside.sessionsPerWeek}</label>
-              <input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} />
-              <label style={{ color: '#fff', fontSize: 11 }}>Длительность мин: {outside.avgDurationMin}</label>
-              <input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} />
-              <label style={{ color: '#fff', fontSize: 11 }}>RPE: {outside.avgSRPE}</label>
-              <input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} />
-              <div style={{ fontSize: 11, color: '#a855f7' }}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference})` : ''}</div>
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.6 }}>Тяж ноги не ставим за день до high внезальной. При внезал ≥5× — кондиция зала авто 0, бюджет ×{outsideMetrics?.volumeMultiplier ?? 1}.</div>
-            </>
-          )}
-          <button onClick={() => setStep('split')} style={{ padding: '8px 12px', borderRadius: 8, background: '#a855f7', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Далее → Сплит</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <SectionCard title="🥋 Вне зала — спарринг декомпозиция" hint="Hard spar = ЦНС-удар (RPE 8.5), tech = техника/лапы (5.5), wrestling = борьба (7.5). При ≥5× кондиция зала авто 0.">
+            <label style={{ color: '#fff', fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} /> Учитывать вне зала (ринг/татами)
+            </label>
+            {outsideEnabled && (
+              <>
+                <Field label="Режим спарринга">
+                  <div style={ROW}>
+                    <ChipToggle active={!sparringEnabled} onClick={() => setSparringEnabled(false)}>Общий (OutsideLoad)</ChipToggle>
+                    <ChipToggle active={sparringEnabled} onClick={() => setSparringEnabled(true)}>Декомпозиция (P0-6)</ChipToggle>
+                  </div>
+                </Field>
+                {!sparringEnabled && outside && (
+                  <>
+                    <Field label={`Сессий/нед вне зала: ${outside.sessionsPerWeek}`}><input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} style={{ width: '100%' }} /></Field>
+                    <Field label={`Длительность мин: ${outside.avgDurationMin}`}><input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} style={{ width: '100%' }} /></Field>
+                    <Field label={`RPE: ${outside.avgSRPE}`}><input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} style={{ width: '100%' }} /></Field>
+                  </>
+                )}
+                {sparringEnabled && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      <Field label={`Hard spar: ${sparringHard}×`} hint="RPE 8.5 · 90мин"><input type="range" min={0} max={4} value={sparringHard} onChange={e => setSparringHard(Number(e.target.value))} style={{ width: '100%' }} /></Field>
+                      <Field label={`Tech spar: ${sparringTech}×`} hint="RPE 5.5 · 60мин"><input type="range" min={0} max={4} value={sparringTech} onChange={e => setSparringTech(Number(e.target.value))} style={{ width: '100%' }} /></Field>
+                      <Field label={`Борьба: ${sparringWrest}×`} hint="RPE 7.5 · 75мин"><input type="range" min={0} max={4} value={sparringWrest} onChange={e => setSparringWrest(Number(e.target.value))} style={{ width: '100%' }} /></Field>
+                    </div>
+                    <InfoBanner tone="info">Спарринг load = {sparringHard*90*8.5 + sparringTech*60*5.5 + sparringWrest*75*7.5} load → {sparringHard+sparringTech+sparringWrest}×/нед</InfoBanner>
+                  </>
+                )}
+                <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : 'info'}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём зала ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference})` : 'Вне зала: нет данных — объём 100%'}</InfoBanner>
+                <div style={HINT_SM}>Тяж ноги не ставим за день до high внезальной. При внезал ≥5× — кондиция зала авто 0, бюджет ×{outsideMetrics?.volumeMultiplier ?? 1}.</div>
+              </>
+            )}
+          </SectionCard>
+          <SectionCard title="🥊 Стиль боя + нагрузка" hint="Стиль влияет на объём: striker +rotational, grappler +neck/grip (P2-4). Avoid axial — убирает осевые (присед/тяга).">
+            <Field label="Стиль">
+              <div style={ROW}>
+                <ChipToggle active={fightStyle==='striker'} onClick={() => setFightStyle('striker')}>Ударник</ChipToggle>
+                <ChipToggle active={fightStyle==='grappler'} onClick={() => setFightStyle('grappler')}>Борец</ChipToggle>
+                <ChipToggle active={fightStyle==='hybrid'} onClick={() => setFightStyle('hybrid')}>Гибрид</ChipToggle>
+              </div>
+            </Field>
+            <label style={{ color: '#fff', fontSize: 11, display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={avoidAxialLoad} onChange={e => setAvoidAxialLoad(e.target.checked)} /> Избегать осевой нагрузки (грыжа/перегруз)</label>
+          </SectionCard>
+          <button onClick={() => setStep('split')} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Далее → Сплит</button>
         </div>
       )}
 

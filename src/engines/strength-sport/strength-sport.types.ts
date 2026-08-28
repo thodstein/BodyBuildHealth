@@ -71,6 +71,10 @@ export interface StrengthSportInput {
   cardioSuggested?: boolean; // P2: zone2 подсказан
   taperWeeks?: number; // P3: тейпер недель перед стартом (1-2)
   diaryTrend?: { lift: string; changePct: number }[] | null; // P3: e1RM тренд 28д
+  // Весогонка (лайт для ТА/стронга)
+  weightCutKg?: number;
+  weightCutProtocolSS?: import('./strength-sport-weight-cut.engine').WeightCutProtocolSS | null;
+  weightCutProtocol?: any;
 }
 
 export interface StrengthSportSet {
