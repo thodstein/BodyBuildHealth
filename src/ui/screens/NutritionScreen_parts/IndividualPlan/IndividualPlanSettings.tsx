@@ -220,14 +220,21 @@ export const IndividualPlanSettings: React.FC = () => {
   const [recentPreset, setRecentPreset] = useState<string | null>(null);
   // FIX button-audit: локальный toast вместо alert() (window.showToast нигде не определён)
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [hematAdv, setHematAdv] = React.useState<any>(null);
+  React.useEffect(()=>{
+    try{ const raw=localStorage.getItem('he_hematology_advice'); if(raw) setHematAdv(JSON.parse(raw)); }catch{}
+    const h=(e:any)=>{ try{ const r=localStorage.getItem('he_hematology_advice'); if(r) setHematAdv(JSON.parse(r)); else setHematAdv(null); }catch{} };
+    window.addEventListener('storage', h); window.addEventListener('he-hematology-advice', h as any);
+    return ()=>{ window.removeEventListener('storage', h); window.removeEventListener('he-hematology-advice', h as any); };
+  }, []);
   const settingsSection = 'all';
   const persistPlannerValue = (key: string, value: unknown) => {
     try { localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value)); } catch {}
   };
 
   if (plannerMode === 'minimal') {
-    // Быстрый режим: только 3 ключевые цели (масса / сушка / поддержание)
-    const MINIMAL_GOALS = GOALS.filter(g => g.id === 'mass' || g.id === 'cutting' || g.id === 'maintenance');
+    // Быстрый режим: только 3 ключевые цели (масса / сушка / поддержание) + Здоровье
+    const MINIMAL_GOALS = GOALS.filter(g => g.id === 'mass' || g.id === 'cutting' || g.id === 'maintenance' || g.id === 'health');
     return (
       <>
         <GlassCard title="⚡ Быстрый КБЖУ" icon="⚡" color="#f59e0b">
@@ -304,6 +311,26 @@ export const IndividualPlanSettings: React.FC = () => {
           >💾 Сохранить в профиль</button>
         </div>
       </GlassCard>
+
+      {hematAdv && hematAdv.hct!=null && (
+        <GlassCard title={`🩸 Гематокрит ${hematAdv.hct}% — ${hematAdv.zone ?? hematAdv.ironRec}`} icon="🩸" color={hematAdv.hct>54 ? '#ef4444' : hematAdv.hct>51 ? '#f59e0b' : '#eab308'}>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.45, marginBottom:6 }}>
+            <b>Метаболик-хаб → Кровь:</b> HCT {hematAdv.hct}% · вода {hematAdv.waterTargetMl}мл · {hematAdv.ironRec==='zero' ? '⛔ ZERO железо' : hematAdv.ironRec==='cap_15' ? '⚠ кап 15мг' : 'железо норма'} · {hematAdv.donation?.needed ? `🩸 ${hematAdv.donation.text}` : 'донация не требуется'}
+          </div>
+          {hematAdv.ironRec==='zero' && <div style={{ fontSize:8, color:'#ef4444', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.15)', borderRadius:6, padding:'5px 7px', marginBottom:6 }}>⛔ При HCT&gt;51 гемовое железо (говядина/печень) штрафуется в скоринге. План автоматически деприоритизирует красное мясо — выбирай курицу/индейку/рыбу.</div>}
+          <div style={{ display:'flex', gap:6 }}>
+            <button onClick={()=>{
+              try{ localStorage.removeItem('he_hematology_advice'); setHematAdv(null); }catch{}
+            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'rgba(255,255,255,0.6)', fontSize:8, fontWeight:600, cursor:'pointer' }}>✕ Скрыть</button>
+            <button onClick={()=>{
+              if(hematAdv.ironRec==='zero'){
+                const highIronIds=['beef_lean','beef_minced','liver','pork_liver','beef_liver'];
+                const cur=new Set(excludedFoods||[]); highIronIds.forEach(id=> cur.add(id)); setExcludedFoods([...cur]);
+              }
+            }} style={{ flex:1, padding:'6px 8px', borderRadius:7, border:'1px solid rgba(249,115,22,0.18)', background:'rgba(249,115,22,0.08)', color:'#f97316', fontSize:8, fontWeight:600, cursor:'pointer' }}>🍽 Применить к плану</button>
+          </div>
+        </GlassCard>
+      )}
 
       {/* Кнопка генерации (Pro Engine — единый движок) */}
       {true && (

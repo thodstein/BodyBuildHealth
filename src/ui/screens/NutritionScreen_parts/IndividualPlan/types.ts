@@ -1,6 +1,6 @@
 // --- Types & Constants ---
 // ─── Types ───
-export type GoalId = 'mass' | 'strength' | 'fat_loss' | 'cutting' | 'post_cut' | 'maintenance' | 'recomposition' | 'rehab';
+export type GoalId = 'mass' | 'strength' | 'fat_loss' | 'cutting' | 'post_cut' | 'maintenance' | 'recomposition' | 'rehab' | 'health';
 export type PhaseId = 'course' | 'bridge' | 'pct' | 'recovery' | 'cutting' | 'maintenance' | 'recomp' | 'fat_loss' | 'post_cut';
 export type BudgetLevel = 'low' | 'medium' | 'max' | 'enhanced';
 export type NutritionLevel = 'base' | 'medium' | 'enhanced' | 'max';
@@ -21,6 +21,7 @@ export const GOALS: { id: GoalId; label: string; icon: string; desc: string }[] 
   { id: 'maintenance', label: 'Поддержка', icon: '⚖️', desc: 'Баланс, сохранение формы' },
   { id: 'recomposition', label: 'Рекомпозиция', icon: '🔄', desc: 'Одновременный рост + жиросжигание' },
   { id: 'rehab', label: 'Реабилитация', icon: '🩹', desc: 'Восстановление после травм/болезни' },
+  { id: 'health', label: 'Здоровье', icon: '🩸', desc: 'Сосуды/вязкость/почки: 1.8г/кг · 30г клетчатки · PRAL±5' },
 ];
 
 export const PHASES: { id: PhaseId; label: string; icon: string; desc: string }[] = [

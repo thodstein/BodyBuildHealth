@@ -108,6 +108,7 @@ export interface DailyDietReport {
   // N4: перегруженность приёма — крупяная/углеводная порция упирается в разумный потолок.
   maxSinglePortionG: number;
   overloadWarning: boolean;
+  hctWarning: string | null;
 }
 
 export function getDefaultProfile(): UserDietProfile {
@@ -898,6 +899,19 @@ export function analyzeDailyDiet(
     else if (highHistamineCount >= 3) histamineWarning = `⚠️ ${highHistamineCount} продукта со средним гистамином — возможно накопление`;
   }
 
+  // ── HCT — суточный гематокрит-флаг ──
+  let hctWarning: string | null = null;
+  const ironHemeTotal = sumF(f => f.trace_elements_100g?.iron_heme_mg ?? 0);
+  const hctVal = profile.labs.hematocrit ?? 0;
+  const hgbVal = profile.labs.hemoglobin ?? 0;
+  if (hctVal > 51 || hgbVal > 170) {
+    if (ironHemeTotal > 8) hctWarning = `🚨 HCT ${hctVal}% — гемовое железо ${ironHemeTotal.toFixed(1)}мг/сут высоко (ZERO). Убери печень/говядину`;
+    else if (ironHemeTotal > 5) hctWarning = `⚠ HCT ${hctVal}% — железо ${ironHemeTotal.toFixed(1)}мг: сократи красное мясо`;
+    else if (pralTotal > 100) hctWarning = `⚠ HCT ${hctVal}% — PRAL ${Math.round(pralTotal)}: закисление повышает вязкость`;
+  } else if (hctVal >= 48) {
+    if (ironHemeTotal > 12) hctWarning = `⚠ HCT ${hctVal}% — железо ${ironHemeTotal.toFixed(1)}мг высоко (кап 15мг)`;
+  }
+
   return {
     date: new Date().toISOString().slice(0, 10),
     totalKcal: Math.round(kcal),
@@ -925,6 +939,7 @@ export function analyzeDailyDiet(
     glutathioneWarning,
     histamineWarning,
     histamineSensitive: profile.histamineSensitive,
+    hctWarning,
     // N4: максимальная одиночная порция (г) — если ≥280 г, приём перегружен (каша/крупа).
     maxSinglePortionG: Math.round(allProducts.reduce((s, p) => Math.max(s, p.weightGrams), 0)),
     overloadWarning: allProducts.some(p => p.weightGrams >= 280),
