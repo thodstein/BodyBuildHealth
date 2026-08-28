@@ -43,7 +43,7 @@ export function calcNutritionV2(input: NutritionV2Input): NutritionV2Output {
   const lbm = input.weightKg * (1 - bfPct / 100);
   const bmrRes = computeBMR({ weight: input.weightKg, height: input.heightCm, age: input.age, sex: input.sex, bodyFat: input.bodyFatPercent });
   let bmr = bmrRes.bmr;
-  let bmrMethod: 'mifflin' | 'katch_mcardle' = bmrRes.method;
+  let bmrMethod: 'mifflin' | 'katch_mcardle' | 'cunningham' | 'owen' | 'ten_haaf' = bmrRes.method;
 
   // 3. Base TDEE — validated PAL (B11 fix)
   const pal = Math.max(1.15, Math.min(2.4, input.pal || 1.55));
