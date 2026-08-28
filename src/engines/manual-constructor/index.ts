@@ -11,3 +11,4 @@ export * from './manual-storage';
 export * from './manual-volume.engine';
 export * from './manual-selection.engine';
 export * from './manual-progression.engine';
+export * from './manual-autoreg.engine';
