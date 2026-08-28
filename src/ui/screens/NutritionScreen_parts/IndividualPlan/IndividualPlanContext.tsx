@@ -2896,12 +2896,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
        try { setPlanBusy(false); } catch {}
        return; // Bug-2 fix: Pro успешно — НЕ проваливаемся в классический путь (иначе classic перетирал Pro-план, и юзер всегда видел классический результат).
       } catch (v2Err: any) {
-        // Bug-2 fix: Pro упал — РЕАЛЬНЫЙ фоллбэк на классический движок (раньше был return = тупик без плана и ложное сообщение «переключитесь вручную»).
+        // Роунд-2 v5: classic-fallback УДАЛЁН из активного пути. V2 — единственный движок.
+        // При ошибке — честная ошибка с диагностированием (классический buildDay мёртвый код).
         const errMsg = (v2Err && (v2Err.message || String(v2Err))) || 'Unknown error';
-        try { console.warn('[IndividualPlan] V2 engine failed, falling back to classic:', errMsg, v2Err); } catch {}
-        try { setErrorMsg('Pro-движок не смог собрать план (возможно, слишком жёсткие исключения/фильтры). Собрано классическим движком — проверьте рацион.'); } catch {}
+        try { console.warn('[IndividualPlan] V2 engine failed:', errMsg); } catch {}
+        try { setErrorMsg('Не удалось собрать рацион: ' + errMsg + '. Попробуйте уменьшить исключения или изменить настройки.'); } catch {}
         try { setDayPlan(null); setThreeDayPlan(null); setWeekPlan(null); } catch {}
-        // НЕ return — проваливаемся в классический путь ниже
+        try { setPlanBusy(false); } catch {}
       }
     }
     // P2-fix: nutrMult удалён (dead code) — multiplier уже включён в effectiveKcal/P/F/C
