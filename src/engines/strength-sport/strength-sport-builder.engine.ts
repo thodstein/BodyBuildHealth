@@ -19,22 +19,22 @@ import { applyDUP } from './strength-sport-dup';
 import { applyIntensity } from './strength-sport-intensity';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
-/** Пул упражнений по тегу — кандидаты (id каталога) + замены — P0-5: +15 вариаций ТА */
+/** Пул упражнений по тегу — кандидаты (id каталога) + замены — P0-5: +15 вариаций ТА (high_hang/low_block/pause_jerk/tempo/pin) */
 const POOL_BY_TAG: Record<string, string[]> = {
-  snatch_day: ['snatch', 'hang_snatch', 'power_snatch', 'muscle_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'snatch_pull', 'pause_pull', 'overhead_squat_v2', 'snatch_balance', 'back_squat', 'front_squat'],
-  clean_day: ['clean_and_jerk', 'hang_clean', 'power_clean', 'muscle_clean', 'deficit_clean', 'block_clean', 'pause_clean', 'push_jerk', 'split_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk', 'front_squat_clean_grip', 'front_squat'],
-  strength_day: ['squat', 'front_squat', 'back_squat', 'pause_squat', 'deadlift', 'sumo_dl', 'rdl', 'bench_bar', 'bench_bar', 'ohp'],
-  technique_day: ['hang_snatch', 'hang_clean', 'muscle_snatch', 'muscle_clean', 'snatch_balance', 'jerk_dip', 'overhead_squat_v2', 'pause_snatch', 'pause_clean'],
+  snatch_day: ['snatch', 'hang_snatch', 'power_snatch', 'muscle_snatch', 'high_hang_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'snatch_pull', 'pause_pull', 'overhead_squat_v2', 'snatch_balance', 'back_squat', 'front_squat'],
+  clean_day: ['clean_and_jerk', 'hang_clean', 'power_clean', 'muscle_clean', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'push_jerk', 'split_jerk', 'pause_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk', 'front_squat_clean_grip', 'front_squat'],
+  strength_day: ['squat', 'front_squat', 'back_squat', 'pause_squat', 'tempo_squat', 'deadlift', 'sumo_dl', 'rdl', 'bench_bar', 'bench_bar', 'ohp', 'pin_press'],
+  technique_day: ['hang_snatch', 'hang_clean', 'high_hang_snatch', 'muscle_snatch', 'muscle_clean', 'snatch_balance', 'jerk_dip', 'overhead_squat_v2', 'pause_snatch', 'pause_clean', 'pause_jerk'],
   pull_day: ['snatch_pull', 'clean_pull', 'pause_pull', 'deficit_pull', 'rdl', 'deadlift', 'row_bar', 'pullup'],
-  accessory_day: ['db_press', 'ohp', 'lateral_raise', 'face_pull', 'row_db', 'hip_thrust', 'pause_squat'],
-  overhead_day: ['log_press', 'circus_db_press', 'ohp', 'push_press', 'db_press', 'push_jerk', 'jerk_recovery', 'behind_neck_jerk'],
+  accessory_day: ['db_press', 'ohp', 'lateral_raise', 'face_pull', 'row_db', 'hip_thrust', 'pause_squat', 'tempo_squat'],
+  overhead_day: ['log_press', 'circus_db_press', 'ohp', 'push_press', 'db_press', 'push_jerk', 'pause_jerk', 'jerk_recovery', 'behind_neck_jerk', 'pin_press'],
   deadlift_day: ['deadlift', 'sumo_dl', 'axle_deadlift', 'rdl', 'deficit_pull', 'farmers_walk_heavy', 'yoke_walk'],
-  squat_day: ['squat', 'front_squat', 'pause_squat', 'hack_squat', 'leg_press', 'bulgarian_split', 'calf_raise', 'overhead_squat_v2'],
+  squat_day: ['squat', 'front_squat', 'pause_squat', 'tempo_squat', 'hack_squat', 'leg_press', 'bulgarian_split', 'calf_raise', 'overhead_squat_v2'],
   event_day: ['farmers_walk_heavy', 'yoke_walk', 'atlas_stone_load', 'stone_lift', 'sandbag_shoulder', 'zercher_carry', 'tire_flip', 'sled_push_sprint'],
-  oly_day: ['snatch', 'clean_and_jerk', 'snatch_pull', 'clean_pull', 'front_squat', 'pause_snatch', 'pause_clean'],
+  oly_day: ['snatch', 'clean_and_jerk', 'high_hang_snatch', 'snatch_pull', 'clean_pull', 'front_squat', 'pause_snatch', 'pause_clean', 'pause_jerk'],
 };
 
-const OLY_IDS = new Set(['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk','snatch_pull','clean_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2','jerk_dip','jerk_recovery','behind_neck_jerk','pause_squat']);
+const OLY_IDS = new Set(['snatch','hang_snatch','power_snatch','high_hang_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','low_block_clean','pause_clean','push_jerk','split_jerk','pause_jerk','snatch_pull','clean_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2','jerk_dip','jerk_recovery','behind_neck_jerk','pause_squat','tempo_squat']);
 const STRONG_IDS = new Set(['log_press','yoke_walk','farmers_walk_heavy','atlas_stone_load','axle_deadlift','circus_db_press','tire_flip','stone_lift','sandbag_shoulder','zercher_carry','sled_push_sprint']);
 
 function isOly(id: string): boolean { return OLY_IDS.has(id); }
@@ -111,12 +111,12 @@ function pctFor(phase: string, goal: string): number {
 }
 
 function basePmFor(id: string, wm: StrengthSportInput['workMax']): number {
-  // точные + подстроковые для вариаций (deficit/block/pause)
-  if (['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2'].includes(id) || id.includes('snatch')) return wm.snatch || 60;
-  if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(id) || id.includes('clean') || id.includes('jerk')) return wm.cleanJerk || wm.clean || wm.frontSquat || 80;
-  if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip','pause_squat','overhead_squat_v2'].includes(id) || id.includes('squat')) return wm.backSquat || wm.frontSquat || 100;
+  // точные + подстроковые для вариаций (deficit/block/pause/high_hang/low_block/tempo/pin)
+  if (['snatch','hang_snatch','power_snatch','high_hang_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2'].includes(id) || id.includes('snatch')) return wm.snatch || 60;
+  if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','low_block_clean','pause_clean','push_jerk','split_jerk','pause_jerk','clean_pull','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(id) || id.includes('clean') || id.includes('jerk')) return wm.cleanJerk || wm.clean || wm.frontSquat || 80;
+  if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip','pause_squat','tempo_squat','overhead_squat_v2'].includes(id) || id.includes('squat')) return wm.backSquat || wm.frontSquat || 100;
   if (['deadlift','sumo_dl','axle_deadlift','rdl','deficit_pull','pause_pull'].includes(id) || id.includes('deadlift') || id.includes('pull') && id.includes('deficit')) return wm.deadlift || 120;
-  if (['ohp','push_press','log_press','circus_db_press','bench_bar','jerk_recovery','behind_neck_jerk'].includes(id) || id.includes('press') || id.includes('jerk')) return wm.overheadPress || wm.bench || wm.logPress || 60;
+  if (['ohp','push_press','log_press','circus_db_press','bench_bar','pin_press','jerk_recovery','behind_neck_jerk','pause_jerk'].includes(id) || id.includes('press') || id.includes('jerk')) return wm.overheadPress || wm.bench || wm.logPress || 60;
   return wm.backSquat || 80;
 }
 function weightForExercise(id: string, input: StrengthSportInput, pct: number, week: number): number {
@@ -179,8 +179,8 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     finalReps = [reps[0]+1, reps[1]+2] as [number, number];
   }
   const tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
-  const rest = restForSS(isPrimary ? 'тяж' : 'памп', isOly(id) ? id : isStrong(id) ? id : undefined);
-  // P0-6: для стронга 300-360с, для oly 180с — теперь rest уже учитывает id
+  const rest = restForSS(isPrimary ? 'тяж' : 'памп', isPrimary, id, pct);
+  // P0-6: для стронга 300-360с, для oly 180с — теперь rest уже учитывает id+pct
   const finalRest = gentle < 1 ? rest + 30 : rest;
   const workSets: StrengthSportSet[] = [];
   for (let i = 0; i < sets; i++) {
@@ -273,18 +273,23 @@ const SS_EX_META: Record<string, { name: string; group: string; pattern: string 
   zercher_carry: { name: 'Зерчер', group: 'back', pattern: 'carry' },
   tire_flip: { name: 'Покрышка', group: 'legs', pattern: 'hinge' },
   sled_push_sprint: { name: 'Сани спринт', group: 'legs', pattern: 'carry' },
-  // P0-5: 15 вариаций ТА для про-вариативности
+  // P0-5: 15+ вариаций ТА для про-вариативности
   deficit_snatch: { name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge' },
   block_snatch: { name: 'Рывок с блоков', group: 'legs', pattern: 'hinge' },
   pause_snatch: { name: 'Рывок с паузой', group: 'legs', pattern: 'hinge' },
+  high_hang_snatch: { name: 'Рывок с высокого виса', group: 'legs', pattern: 'hinge' },
   deficit_clean: { name: 'Взятие с дефицита', group: 'legs', pattern: 'hinge' },
   block_clean: { name: 'Взятие с блоков', group: 'legs', pattern: 'hinge' },
+  low_block_clean: { name: 'Взятие с низких блоков', group: 'legs', pattern: 'hinge' },
   pause_clean: { name: 'Взятие с паузой', group: 'legs', pattern: 'hinge' },
   pause_squat: { name: 'Присед с паузой', group: 'legs', pattern: 'squat' },
+  tempo_squat: { name: 'Присед темповый 3-0-1', group: 'legs', pattern: 'squat' },
   jerk_recovery: { name: 'Восстановление после толчка', group: 'legs', pattern: 'squat' },
   behind_neck_jerk: { name: 'Толчок из-за головы', group: 'shoulders', pattern: 'vertical_push' },
+  pause_jerk: { name: 'Толчок с паузой', group: 'shoulders', pattern: 'vertical_push' },
   pause_pull: { name: 'Тяга с паузой', group: 'back', pattern: 'hinge' },
   deficit_pull: { name: 'Тяга с дефицита', group: 'back', pattern: 'hinge' },
+  pin_press: { name: 'Жим с пинов', group: 'chest', pattern: 'horizontal_push' },
 };
 const SS_TECHNIQUE: Record<string,string> = {
   snatch:'Рывок: широкий хват, тяга + подрыв + уход в сед, фиксация над головой',
@@ -324,14 +329,19 @@ const SS_TECHNIQUE: Record<string,string> = {
   deficit_snatch:'С дефицита (2-4см): тяга длиннее, контроль спины',
   block_snatch:'С блоков: старт выше колен, акцент на подрыв',
   pause_snatch:'Пауза 2с у колен + взрыв, без потери позиции',
+  high_hang_snatch:'Высокий вис 10см выше колен, короткий разгон, скорость',
   deficit_clean:'С дефицита: глубокая тяга, пятки прижаты',
   block_clean:'С блоков: мощный подрыв, быстрый уход',
+  low_block_clean:'Низкие блоки 15см: старт с паузой, тяга длиннее',
   pause_clean:'Пауза у колен 2с, затем взятие',
   pause_squat:'Пауза 2-3с внизу, без отбива',
+  tempo_squat:'Темп 3-0-1: медленно вниз, без паузы, мощно вверх',
   jerk_recovery:'Вставание из ножниц с весом над головой',
   behind_neck_jerk:'Из-за головы: вертикальный толчок, баланс',
+  pause_jerk:'Пауза 2с в подседе перед толчком, синхрон',
   pause_pull:'Пауза 2с у колен, тяга до груди',
   deficit_pull:'С дефицита 3-5см, длинная амплитуда',
+  pin_press:'Жим с пинов: старт с груди без импульса, сила',
   deadlift:'Нейтральная спина, гриф по ногам',
   sumo_dl:'Сумо: ноги широко, носки наружу',
   rdl:'Таз назад, гриф по ногам, растяжение бицепса бедра',
@@ -445,7 +455,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           workSets,
           warmupSets: isPrimary ? buildWarmup(finalWeight, id) : [],
           tempo: tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase),
-          restSeconds: restForSS(isPrimary ? 'тяж' : 'памп', id),
+          restSeconds: restForSS(isPrimary ? 'тяж' : 'памп', isPrimary, id, pctForSS(phase, goal)),
           comment: deload ? 'Делод — лёгкая неделя' : gentle < 1 ? 'Щадящий режим: снижен вес, +RIR' : (meta as any).technique || undefined,
           isCompetitionLift: isOly(id) || isStrong(id),
         };

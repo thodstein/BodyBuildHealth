@@ -3,26 +3,26 @@
  * ANGLE_CLASSES, STRICT_GROUPS, tier-like фильтр, injury/mobility.
  */
 
-// Угловые классы: одно упражнение из класса на сессию (разнообразие стимула)
+// Угловые классы: одно упражнение из класса на сессию (разнообразие стимула) — P0-5 расширение
 export const SS_ANGLE_CLASSES: Record<string, Record<string, string[]>> = {
   snatch_day: {
-    full: ['snatch', 'hang_snatch', 'power_snatch'],
-    pull: ['snatch_pull', 'clean_pull'],
-    squat: ['back_squat', 'front_squat', 'overhead_squat_v2', 'snatch_balance'],
+    full: ['snatch', 'hang_snatch', 'power_snatch', 'high_hang_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch'],
+    pull: ['snatch_pull', 'pause_pull', 'deficit_pull', 'clean_pull'],
+    squat: ['back_squat', 'front_squat', 'overhead_squat_v2', 'snatch_balance', 'tempo_squat', 'pause_squat'],
     accessory: ['muscle_snatch', 'row_bar', 'pullup'],
   },
   clean_day: {
-    full: ['clean_and_jerk', 'hang_clean', 'power_clean'],
-    jerk: ['push_jerk', 'split_jerk', 'push_press'],
-    squat: ['front_squat', 'front_squat_clean_grip', 'back_squat'],
-    pull: ['clean_pull', 'snatch_pull'],
+    full: ['clean_and_jerk', 'hang_clean', 'power_clean', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean'],
+    jerk: ['push_jerk', 'split_jerk', 'pause_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk'],
+    squat: ['front_squat', 'front_squat_clean_grip', 'back_squat', 'tempo_squat', 'pause_squat'],
+    pull: ['clean_pull', 'pause_pull', 'snatch_pull', 'deficit_pull'],
   },
   overhead_day: {
-    press: ['log_press', 'ohp', 'push_press', 'circus_db_press', 'push_jerk'],
-    tricep: ['db_press', 'bench_bar'],
+    press: ['log_press', 'ohp', 'push_press', 'circus_db_press', 'push_jerk', 'pause_jerk', 'pin_press'],
+    tricep: ['db_press', 'bench_bar', 'pin_press'],
   },
   deadlift_day: {
-    hinge: ['deadlift', 'sumo_dl', 'axle_deadlift', 'rdl'],
+    hinge: ['deadlift', 'sumo_dl', 'axle_deadlift', 'rdl', 'deficit_pull', 'pause_pull'],
     carry: ['farmers_walk_heavy', 'yoke_walk'],
   },
   event_day: {
@@ -54,7 +54,7 @@ export function groupMembers(group: string): string[] {
 }
 
 // Tier-подобный фильтр — P0-5 + P1: beginner без сложных, intermediate без самых экзотических без разрешения
-const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'yoke_walk', 'log_press', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'deficit_clean', 'block_clean']);
+const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'yoke_walk', 'log_press', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'high_hang_snatch', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'pause_jerk', 'tempo_squat']);
 const EXOTIC_STRONG = new Set(['log_press','atlas_stone_load','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift','tire_flip','stone_lift','sandbag_shoulder']);
 
 export function filterByTier(pool: string[], level: string, allowExotic?: boolean, hasSpecialty?: boolean): string[] {

@@ -24,46 +24,75 @@ export function tempoForSS(id: string, character: DayCharacter, phase: string): 
   if (character==='памп') return '2-0-1-1';
   return '2-0-1-0';
 }
-// P0-6: рест по ивентам — стронг-ивенты 5-8 мин (Rest Timer Science), oly/strength 2-3 мин
-export function restForSS(character: DayCharacter, isPrimary: boolean, id?: string): number {
+// P0-6: рест по ивентам + по % (90%+ дольше) — Rest Timer Science, памп всегда 75 кроме стронга
+export function restForSS(character: DayCharacter, isPrimary: boolean, id?: string, pct?: number): number {
   const strongCarry = id && ['yoke_walk','farmers_walk_heavy','zercher_carry','sled_push_sprint','tire_flip','atlas_stone_load','stone_lift','sandbag_shoulder'].some(k => id.includes(k));
   const strongPress = id && ['log_press','circus_db_press','axle_deadlift'].some(k => id.includes(k));
+  const p = pct ?? 0.80;
+  if (character === 'памп') {
+    if (strongCarry) return p >= 0.90 ? 360 : 300;
+    if (strongPress) return 180;
+    return 75;
+  }
   if (strongCarry) {
-    // фермер/йок/камни/сани — 5-8 мин
-    if (isPrimary && character==='тяж') return 360;
-    return 300;
+    if (p >= 0.90) return isPrimary ? 480 : 360; // 8 / 6 мин для 90%+
+    if (p >= 0.80) return isPrimary ? 360 : 300; // 6 / 5
+    return isPrimary ? 300 : 240;
   }
   if (strongPress) {
-    // лог/аксель — 3-5 мин
-    if (isPrimary && character==='тяж') return 240;
-    return 180;
+    if (p >= 0.90) return isPrimary ? 300 : 240;
+    if (p >= 0.80) return isPrimary ? 240 : 180;
+    return isPrimary ? 180 : 120;
   }
+  if (p >= 0.90) return isPrimary ? 240 : 180;
+  if (p >= 0.80) return isPrimary ? 180 : 120;
   if (isPrimary && character==='тяж') return 180;
   if (character==='тяж') return 120;
-  if (character==='памп') return 75;
   return 90;
 }
 export function pctForSS(phase: string, goal: string): number {
   if (goal==='technique') return 0.65;
   return PCT_BY_PHASE[phase] || 0.78;
 }
+/**
+ * Prilepin детальная таблица — оптимальные повторы по % (Soviet manual)
+ * Для WL (взрывные) — меньше повторов, для силовых — больше
+ */
+export function optimalRepsForPct(pct: number, isWL: boolean): [number, number] {
+  if (isWL) {
+    if (pct < 0.70) return [3, 5];
+    if (pct < 0.80) return [2, 4];
+    if (pct < 0.90) return [1, 3];
+    return [1, 2];
+  } else {
+    if (pct < 0.70) return [5, 8];
+    if (pct < 0.80) return [3, 6];
+    if (pct < 0.90) return [2, 5];
+    return [1, 3];
+  }
+}
+
 export function repsForSS(tag: string, phase: string, goal: string, isPrimary: boolean): [number, number] {
   if (goal==='technique') return [1,3];
-  if (tag==='snatch_day' || tag==='clean_day' || tag==='oly_day') return isPrimary ? [1,3] : [3,5];
+  const isWL = tag==='snatch_day' || tag==='clean_day' || tag==='oly_day' || tag==='technique_day';
+  const pct = pctForSS(phase, goal);
+  // Prilepin-коррекция для WL vs силовых
+  const pri = optimalRepsForPct(pct, isWL);
+  if (tag==='snatch_day' || tag==='clean_day' || tag==='oly_day') return isPrimary ? [1,3] : pri;
   if (tag==='technique_day') return [1,2];
   if (tag==='event_day') return isPrimary ? [1,5] : [6,10];
-  if (phase==='peaking') return isPrimary ? [1,3] : [3,6];
-  if (phase==='accumulation') return isPrimary ? [3,6] : [8,12];
-  if (phase==='intensification') return isPrimary ? [2,5] : [6,10];
+  if (phase==='peaking') return isPrimary ? [1,3] : pri;
+  if (phase==='accumulation') return isPrimary ? pri : [8,12];
+  if (phase==='intensification') return isPrimary ? pri : [6,10];
   if (phase==='deload') return isPrimary ? [3,5] : [8,12];
-  return [3,6];
+  return pri;
 }
 
 export function computeSSLoading(tag: string, phase: string, goal: string, isPrimary: boolean, character: DayCharacter, id?: string): LoadingOut {
   const reps = repsForSS(tag, phase, goal, isPrimary);
   const pct = pctForSS(phase, goal);
   const tempo = tempoForSS(id || '', character, phase);
-  const rest = restForSS(character, isPrimary, id);
+  const rest = restForSS(character, isPrimary, id, pct);
   // RIR will be set via rirForWeek outside (needs week)
   return { reps, rir: 2, pct, tempo, rest };
 }

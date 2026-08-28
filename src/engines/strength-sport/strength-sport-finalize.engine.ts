@@ -135,9 +135,10 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     const liftsSquat = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
     const liftsPull = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
     const liftsOverhead = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['log_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
-    // carry meters — P0-4: считаем дистанцию как сеты*20м (средний carry), проверка по STRONG_LANDMARKS
-    const carrySets = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
-    const carryMeters = carrySets * 20;
+    // P0-4 carry per-exercise дистанция (yoke 20, farmers 40, sled 25, tire 15)
+    const CARRY_DIST: Record<string, number> = { yoke_walk:20, farmers_walk_heavy:40, zercher_carry:20, sled_push_sprint:25, tire_flip:15, sandbag_shoulder:15 };
+    const carrySets = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint','tire_flip','sandbag_shoulder'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    const carryMeters = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint','tire_flip','sandbag_shoulder'].includes(e.id))).reduce((a,e)=> a + e.sets * (CARRY_DIST[e.id] || 20), 0);
     const stoneLifts = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['atlas_stone_load','stone_lift','sandbag_shoulder','tire_flip'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
     const lvl = plan.level;
     const lmS = getWL(lvl,'snatch');
