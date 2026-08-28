@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcTrendFromHistory, calcAdaptiveAdjustment } from '../metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment } from '../metabolic-hub.engine';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
 
@@ -212,5 +212,65 @@ describe('metabolic-hub — адаптивный TDEE', () => {
   it('adaptive null без истории', () => {
     const r = calcSteps({ ...base });
     expect(r.adaptive).toBeNull();
+  });
+});
+
+describe('metabolic-hub — calcHematology (ESC/ASA)', () => {
+  it('unknown без HCT', () => {
+    const r = calcHematology({ weight:80 });
+    expect(r.zone).toBe('unknown');
+    expect(r.waterAdjMl).toBe(0);
+    expect(r.donation.needed).toBe(false);
+  });
+  it('зоны 45/49/52/55/61', () => {
+    expect(calcHematology({ weight:80, hct:45 }).zone).toBe('normal');
+    expect(calcHematology({ weight:80, hct:49 }).zone).toBe('attention');
+    expect(calcHematology({ weight:80, hct:52 }).zone).toBe('phlebotomy');
+    expect(calcHematology({ weight:80, hct:55 }).zone).toBe('stop');
+    expect(calcHematology({ weight:80, hct:61 }).zone).toBe('critical');
+  });
+  it('вода +300/500/750 по порогам', () => {
+    expect(calcHematology({ weight:80, hct:49 }).waterAdjMl).toBe(300);
+    expect(calcHematology({ weight:80, hct:52 }).waterAdjMl).toBe(500);
+    expect(calcHematology({ weight:80, hct:55 }).waterAdjMl).toBe(750);
+    expect(calcHematology({ weight:80, hct:45 }).waterAdjMl).toBe(0);
+  });
+  it('железо ZERO при >51, cap при 48-51', () => {
+    expect(calcHematology({ weight:80, hct:52 }).ironRec).toBe('zero');
+    expect(calcHematology({ weight:80, hct:49 }).ironRec).toBe('cap_15');
+    expect(calcHematology({ weight:80, hct:45 }).ironRec).toBe('normal');
+  });
+  it('донация elective/soon/urgent', () => {
+    expect(calcHematology({ weight:80, hct:52 }).donation.urgency).toBe('elective');
+    expect(calcHematology({ weight:80, hct:53 }).donation.urgency).toBe('soon');
+    expect(calcHematology({ weight:80, hct:55 }).donation.urgency).toBe('urgent');
+    expect(calcHematology({ weight:80, hct:45 }).donation.needed).toBe(false);
+  });
+  it('вязкость + GFR/ферритин флаги', () => {
+    const v1 = calcHematology({ weight:80, hct:52, waterL:1.2 });
+    expect(v1.viscosityFlag).toBe(true);
+    const v2 = calcHematology({ weight:80, hct:52, waterL:2.5 });
+    expect(v2.viscosityFlag).toBe(false);
+    expect(calcHematology({ weight:80, hct:45, gfr:55 }).gfrFlag).toBe(true);
+    expect(calcHematology({ weight:80, hct:45, ferritin:20 }).ferritinFlag).toBe(true);
+  });
+  it('nutritionMult растёт с дефицитами', () => {
+    const good = calcHematology({ weight:80, hct:45, waterL:2.5, sodiumG:3, potassiumG:3, proteinPerKg:1.8, fiberG:30, omega3G:1.5 });
+    const bad = calcHematology({ weight:80, hct:45, waterL:1.2, sodiumG:5, potassiumG:2, proteinPerKg:1.0, fiberG:10, omega3G:0.2 });
+    expect(bad.nutritionMult).toBeGreaterThan(good.nutritionMult);
+    expect(bad.nutritionMult).toBeLessThanOrEqual(1.25);
+  });
+  it('HGB оценка HCT*3.4', () => {
+    const r = calcHematology({ weight:80, hct:50 });
+    expect(r.hgbEstimated).toBe(170);
+    const withHgb = calcHematology({ weight:80, hct:50, hgb:180 });
+    expect(withHgb.hgbEstimated).toBe(180);
+  });
+  it('health цель: 1.8г/кг в КБЖУ', () => {
+    const health = calcKBJU({ ...base, goal:'health' });
+    const maintain = calcKBJU({ ...base, goal:'maintain' });
+    expect(health.nat.protPerKg).toBe(1.8);
+    expect(maintain.nat.protPerKg).toBe(2.0);
+    expect(health.nat.protPerKg).toBeLessThan(maintain.nat.protPerKg);
   });
 });

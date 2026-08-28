@@ -270,7 +270,19 @@ export const MetabolicHub: React.FC = () => {
   const kbju = useMemo(()=> calcKBJU(input), [input]);
   const fat = useMemo(()=> calcBodyFat(input), [input]);
   const cortisol = useMemo(()=> calcCortisol(input), [input]);
-  const hematology = useMemo(()=> calcHematology({ weight, hct, hgb, ferritin, gfr, waterL, sodiumG, potassiumG, ironIntakeMg: undefined, onAAS, aasDose, sex }), [weight,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,onAAS,aasDose,sex]);
+  const hematology = useMemo(()=>{
+    let proteinPerKg: number|undefined; let fiberG: number|undefined; let omega3G: number|undefined;
+    try{
+      const p:any=getProfile()?.settings||{};
+      proteinPerKg = p.nutrition?.proteinPerKg;
+      fiberG = p.nutrition?.fiberG;
+      omega3G = p.nutrition?.omega3G;
+    }catch{}
+    // fallback из КБЖУ
+    if(proteinPerKg==null) proteinPerKg = kbju?.nat?.protPerKg;
+    if(fiberG==null) fiberG = kbju?.fiber?.nat;
+    return calcHematology({ weight, hct, hgb, ferritin, gfr, waterL, sodiumG, potassiumG, proteinPerKg, fiberG, omega3G, ironIntakeMg: undefined, onAAS, aasDose, sex });
+  }, [weight,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,onAAS,aasDose,sex, kbju]);
 
   const active = MODE_DEFS.find(d=> d.m===mode)!;
   const waistErr = waist && neck && waist <= neck ? 'Талия ≤ шеи — Navy невалиден' : null;
@@ -594,6 +606,12 @@ export const MetabolicHub: React.FC = () => {
                 <div style={{ marginTop:8, padding:'7px 10px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:9, color:'rgba(255,255,255,0.55)' }}>Адаптивный TDEE: нужно ≥3 взвешивания (сейчас {weightHistory.length}) — данные из he_nutrition_v2.</div>
               ) : null}
               <div style={{ marginTop:6, fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'8px 10px' }}>{kbju.note} · {kbju.carbTiming}</div>
+              {goal==='health' && (
+                <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', fontSize:10, color:'#fff', lineHeight:1.4 }}>
+                  <b style={{ color:'#f87171' }}>🎯 Здоровье-профиль:</b> белок 1.8г/кг · клетчатка ≥30г (муж 34г) · PRAL −5..+5 · omega-3 ≥2г · вода {hematology.waterTargetMl}мл ({hematology.mlPerKg}мл/кг) · Na 2.3-3.5г · железо {hematology.ironRecLabel.split(' —')[0]} · {hematology.pralNote}
+                  <span style={{ display:'block', fontSize:8, color:'rgba(255,255,255,0.55)', marginTop:3 }}>Цель «Здоровье» — maintenance с акцентом на сосуды/вязкость/почки. При HCT&gt;51 — ZERO железо, 42мл/кг воды.</span>
+                </div>
+              )}
               <div style={{ marginTop:6, display:'flex', gap:6 }}>
                 <button onClick={applyKBJU} style={{ flex:1, padding:10, borderRadius:10, border:'none', cursor:'pointer', background:'linear-gradient(135deg,#f59e0b,#d97706)', color:'#000', fontWeight:800, fontSize:11 }}>🍽 Применить к плану питания → буфер</button>
                 <button onClick={()=> { const s = onAAS? kbju.aas:kbju.nat; const t=`КБЖУ ${s.kcal} Б${s.p} Ж${s.f} У${s.c} (P${s.protPerKg})`; navigator.clipboard?.writeText(t).then(()=> showToast('Скопировано: '+t)).catch(()=> showToast(t)); }} style={{ padding:'10px 12px', borderRadius:10, border:'1px solid rgba(255,255,255,0.10)', background:'rgba(255,255,255,0.04)', color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>⎘ Копировать</button>
@@ -715,6 +733,20 @@ export const MetabolicHub: React.FC = () => {
                   const payload={ hct: hematology.hct, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, ts: Date.now(), source:'metabolic-hub-hematology' };
                   try{ localStorage.setItem('he_hematology_advice', JSON.stringify(payload)); window.dispatchEvent(new CustomEvent('he-hematology-advice', {detail: payload})); showToast(`Сохранено he_hematology_advice: HCT ${hematology.hct}% → ${hematology.zoneLabel}`); }catch{ showToast('Сохранено'); }
                 }} style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', fontWeight:800, fontSize:10, cursor:'pointer' }}>💾 В планировщик (he_hematology_advice)</button>
+              </div>
+              <div style={{ marginTop:6, display:'flex', gap:6 }}>
+                <button onClick={()=>{
+                  try{
+                    const html=`<!doctype html><html><head><meta charset="utf-8"><title>Гематология — ${hematology.hct ?? '—'}%</title><style>body{font-family:system-ui;padding:24px;color:#111}h1{font-size:18px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ddd;padding:6px 8px;font-size:12px}th{background:#f5f5f5;text-align:left}.badge{padding:2px 6px;border-radius:6px;color:#fff;font-weight:700;font-size:11px}</style></head><body><h1>🩸 Гематокрит — сводка PRO</h1><p>Дата: ${new Date().toLocaleString('ru-RU')} · Вес ${weight}кг · Пол ${sex} · ААС ${onAAS? aasDose+'мг': 'нет'}</p><table><tr><th>Показатель</th><th>Значение</th></tr><tr><td>HCT</td><td><span class="badge" style="background:${hematology.color}">${hematology.hct ?? '—'}% — ${hematology.zoneLabel}</span></td></tr><tr><td>HGB (оценка)</td><td>${hematology.hgbEstimated ?? '—'} г/л</td></tr><tr><td>Вода цель</td><td>${hematology.waterTargetMl} мл (${hematology.mlPerKg} мл/кг) ${hematology.waterAdjMl? `+${hematology.waterAdjMl} к базе`:''} · факт ${waterL}л</td></tr><tr><td>Железо</td><td>${hematology.ironRecLabel}</td></tr><tr><td>Донация</td><td>${hematology.donation.text} k=${hematology.donation.k}</td></tr><tr><td>Вязкость</td><td>${hematology.viscosityFlag? '⚠ гипервязкость':'OK'} · GFR ${gfr ?? '—'} ${hematology.gfrFlag? '⚠ &lt;60':''} · ферритин ${ferritin ?? '—'} ${hematology.ferritinFlag? '⚠ &lt;30':''}</td></tr><tr><td>Питание×гематология</td><td>×${hematology.nutritionMult} · PRAL ${hematology.pralNote}</td></tr></table><h3>Рекомендации</h3><ul>${hematology.recommendations.map(r=>`<li>${r}</li>`).join('')}</ul><p style="font-size:10px;color:#666">Источники: ESC 2023 эритроцитоз &gt;52% (м)/48% (ж), ASA флеботомия &gt;54%, lab-tier-recommendations, PROCEDURE_DB k0.30/0.45. Дисклеймер: не назначение — к гематологу + JAK2 при HCT&gt;52%.</p><script>window.print()</`+`script></body></html>`;
+                    const w=window.open('','_blank'); if(w){ w.document.write(html); w.document.close(); } else showToast('Всплывающие окна заблокированы');
+                  }catch{ showToast('Печать: открой HCT вкладку'); }
+                }} style={{ flex:1, padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:10, cursor:'pointer' }}>🖨 Печать / PDF</button>
+                <button onClick={()=>{
+                  try{
+                    const data={ date: new Date().toISOString().slice(0,10), weight, sex, onAAS, aasDose, hct: hematology.hct, hgb: hematology.hgbEstimated, gfr, ferritin, waterTargetMl: hematology.waterTargetMl, ironRec: hematology.ironRec, donation: hematology.donation, zone: hematology.zone, recommendations: hematology.recommendations, nutritionMult: hematology.nutritionMult };
+                    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`hematology-${data.date}.json`; a.click(); URL.revokeObjectURL(url); showToast('JSON экспортирован');
+                  }catch{ showToast('Экспорт'); }
+                }} style={{ padding:'8px 10px', borderRadius:8, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.03)', color:'#fff', fontWeight:700, fontSize:10, cursor:'pointer' }}>⬇ JSON</button>
               </div>
               <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.45)', lineHeight:1.35 }}>Зоны: &lt;48 норма · 48-51 внимание · 51-54 донация · &gt;54 стоп ААС · &gt;60 критично. Источник: ESC 2023, ASA флеботомия, lab-tier-recommendations. Дисклеймер: не назначение — к гематологу + JAK2 при HCT&gt;52%.</div>
             </div>

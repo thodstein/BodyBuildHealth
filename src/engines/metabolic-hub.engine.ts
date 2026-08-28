@@ -14,6 +14,7 @@ import {
   calcAdaptiveAdjustment as calcAdaptiveBase,
   type WeightPoint as WeightPointBase,
 } from '../core/metabolic-constants';
+import { clinicalFloorsForLabs } from './risk-engine-tz-spec';
 
 export type WeightPoint = WeightPointBase;
 export interface MetabolicInput {
@@ -317,6 +318,9 @@ export interface HematologyInput {
   waterL?: number; // факт л/сут
   sodiumG?: number;
   potassiumG?: number;
+  proteinPerKg?: number;
+  fiberG?: number;
+  omega3G?: number;
   ironIntakeMg?: number;
   onAAS?: boolean;
   aasDose?: number;
@@ -394,14 +398,23 @@ export function calcHematology(input: HematologyInput): HematologyResult {
   const viscosityFlag = hct != null && ((hct > 51 && waterL < 1.8) || hct > 53);
   const gfrFlag = typeof gfr === 'number' && gfr < 60;
   const ferritinFlag = typeof ferritin === 'number' && ferritin < 30;
-  // nutritionMult как в risk-engine:663 (1.0-1.25)
+  // nutritionMult как в risk-engine:663-672 (1.0-1.25) — синхронизировано с TZ-spec
   let nutritionMult = 1.0;
+  if (typeof input.proteinPerKg === 'number' && input.proteinPerKg < 1.5) nutritionMult += 0.05;
+  if (typeof input.fiberG === 'number' && input.fiberG < 20) nutritionMult += 0.05;
+  if (typeof input.omega3G === 'number' && input.omega3G < 1.0) nutritionMult += 0.05;
   if (typeof input.sodiumG === 'number' && input.sodiumG > 4) nutritionMult += 0.03;
   if (typeof input.potassiumG === 'number' && input.potassiumG < 2.5) nutritionMult += 0.03;
   if (waterL < 1.5) nutritionMult += 0.04;
-  // если есть данные по белку/клетчатке из профиля — можно расширить, пока по воде/Na/K
   nutritionMult = Math.min(1.25, Math.round(nutritionMult * 100) / 100);
+  // якорные floors из риск-движка (единый источник порогов)
+  const floors = hct != null ? clinicalFloorsForLabs({ HCT: hct, HGB: hgb ?? undefined } as any).filter(f=> f.organId==='hematologic') : [];
   const recommendations: string[] = [];
+  if (floors.length>0) {
+    // floors уже содержат текст порога — добавим для прозрачности
+    // но zona уже покрывает, поэтому только если very_high
+    if (floors.some(f=> f.level>=50)) recommendations.push(`Якорный порог: ${floors.map(f=> f.label).join('; ')}`);
+  }
   if (hct == null) {
     recommendations.push('Сдайте ОАК (HCT, HGB, ферритин, GFR) — без HCT инструмент слепой');
   } else {
