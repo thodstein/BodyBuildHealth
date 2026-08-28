@@ -201,7 +201,7 @@ export function suggestDeload(
   const reasons: string[] = [];
   let severity: 'info'|'warning'|'error' = 'info';
   if (acwr.zone === 'dangerous') { reasons.push(`ACWR ${acwr.ratio} dangerous`); severity = 'error'; }
-  else if (acwr.zone === 'caution') { reasons.push(`ACWR ${acwr.ratio} caution`); severity = severity === 'error' ? 'error' : 'warning'; }
+  else if (acwr.zone === 'caution') { reasons.push(`ACWR ${acwr.ratio} caution`); severity = 'warning'; }
   if (monotony.monotony > 2) { reasons.push(`Monotony ${monotony.monotony} >2`); severity = severity === 'info' ? 'warning' : severity; }
   if ((signals.fatigue ?? 0) > 75) { reasons.push(`Fatigue ${signals.fatigue}>75`); severity = 'error'; }
   if ((signals.lastVelocityLossPct ?? 0) > 40) { reasons.push(`VLoss ${signals.lastVelocityLossPct}% >40`); severity = 'error'; }

@@ -9,7 +9,8 @@ import type { UserProgram } from '../../../engines/user-program/user-program.typ
 import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { ACCENT, CARD, DIM, BTN_GHOST } from './training-ui';
-import { bulkProgressWeeks, type LoadStrategy } from '../../../engines/manual-constructor/manual-progression.engine';
+import { bulkProgressWeeks } from '../../../engines/manual-constructor/manual-progression.engine';
+import type { LoadStrategy } from '../../../engines/bb/bb-autocoach.engine';
 import { applyDUPToProgram, type DupPreset, DUP_PRESETS, applySpecializationToProgram, applyTaperToProgram, inheritWeekBlocks } from '../../../engines/manual-constructor/manual-periodization-pro.engine';
 
 interface Props {
@@ -110,7 +111,7 @@ export const BulkApplyCard: React.FC<Props> = ({ program, onChange, showToast })
 
   const applySpec = () => {
     const targets = specTargets.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).slice(0,2);
-    if (targets.length===0) { showToast('⚠ Укажите 1-2 мышцы (напр. chest, delt_mid)','error' as any); return; }
+    if (targets.length===0) { showToast('⚠ Укажите 1-2 мышцы (напр. chest, delt_mid)'); return; }
     const from = weekRange === 'all' ? 1 : rangeStart;
     const to = weekRange === 'all' ? totalWeeks : rangeEnd;
     const next = applySpecializationToProgram(program, { targets }, from, to, program.meta.level);
