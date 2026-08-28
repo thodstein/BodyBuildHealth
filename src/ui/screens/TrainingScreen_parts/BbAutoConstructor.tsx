@@ -556,7 +556,6 @@ export const BbAutoConstructor: React.FC = () => {
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
-  const [autoRegOn, setAutoRegOn] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
   const [expandedMuscles, setExpandedMuscles] = useState<Set<string>>(new Set());
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
@@ -1572,7 +1571,7 @@ export const BbAutoConstructor: React.FC = () => {
     let plan: BBPlan;
 
     // AutoReg-пейлоад (для buildBBPlan → applyPostPhaseProcessing)
-    const autoRegPayload = (autoRegOn && autoRegResult) ? {
+    const autoRegPayload = (autoRegResult) ? {
       volumeMultiplier: autoRegResult.volumeMultiplier,
       topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
       rirShift: autoRegResult.rirShift,
@@ -3507,8 +3506,8 @@ export const BbAutoConstructor: React.FC = () => {
                 <div style={{ padding:'4px 0' }}>
                   {s.exercises.map((e, ei) => {
                     const rawW = e.workSets[0]?.weight || 80;
-                    const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
-                    const adjSets0 = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
+                    const adjW = autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
+                    const adjSets0 = autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
                     const editKey = `${si}-${ei}`;
                     const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
                     const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
@@ -5032,7 +5031,7 @@ export const BbAutoConstructor: React.FC = () => {
     autoDeload,
     deloadType,
     loadStrategy,
-    autoRegResult: (autoRegOn && autoRegResult) ? { volumeMultiplier: autoRegResult.volumeMultiplier, topSetPctMultiplier: autoRegResult.topSetPctMultiplier, rirShift: autoRegResult.rirShift } : undefined,
+    autoRegResult: (autoRegResult) ? { volumeMultiplier: autoRegResult.volumeMultiplier, topSetPctMultiplier: autoRegResult.topSetPctMultiplier, rirShift: autoRegResult.rirShift } : undefined,
     methodology: bbMethodology,
     eccentricMult,
     previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,

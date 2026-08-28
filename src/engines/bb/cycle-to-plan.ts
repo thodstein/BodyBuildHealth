@@ -1052,8 +1052,18 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         const focusFactor = 1.0;
         // P0-1: female glute boost ×1.2 (как в buildBBPlan:590) —女性 glutes требуют большего объёма
         const femaleGluteBoost = (input.sex === 'female' && muscle === 'glutes') ? 1.2 : 1.0;
+        // Goal→объём (паритет с bb-builder: cut 0.72 / recomp 0.92 / maintenance 0.80 / mass 1.05 / strength_mass 1.03)
+        const goalMult = mode === 'faithful' ? 1.0 : (() => {
+          const g = (input.goal || 'mass').toLowerCase();
+          if (g === 'cut') return 0.72;
+          if (g === 'recomp') return 0.92;
+          if (g === 'maintenance') return 0.80;
+          if (g === 'mass') return 1.05;
+          if (g === 'strength_mass') return 1.03;
+          return 1.0;
+        })();
         // volumeGoal: MEV×0.7 / MAV×1.0 / MRV×1.15
-        const setMult = specFactor * pedFactor * volGoalMult * focusFactor * femaleGluteBoost;
+        const setMult = specFactor * pedFactor * volGoalMult * goalMult * focusFactor * femaleGluteBoost;
         const baseSets = exSpec.sets[0]?.sets || 3;
         let targetSets = Math.max(1, Math.round(baseSets * setMult));
         // Минимум 2 сета для любого упражнения (ББ-практика)
@@ -1866,6 +1876,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           // volumeGoal scaling: MEV=0.7, MAV=1.0, MRV=1.15 (как в convertCycleToBBPlan)
           const volGoalMultProgram = (opts as any).volumeGoal === 'mev' ? 0.70 : (opts as any).volumeGoal === 'mrv' ? 1.15 : 1.0;
           if (volGoalMultProgram !== 1.0) adjSets = Math.round(adjSets * volGoalMultProgram);
+          // Goal→объём (паритет с bb-builder)
+          const g = ((opts as any).goal || 'mass').toLowerCase();
+          const goalMultProgram = g === 'cut' ? 0.72 : g === 'recomp' ? 0.92 : g === 'maintenance' ? 0.80 : g === 'mass' ? 1.05 : g === 'strength_mass' ? 1.03 : 1.0;
+          if (goalMultProgram !== 1.0) adjSets = Math.round(adjSets * goalMultProgram);
           // Единый резолвер акцентов НЕДЕЛИ: focus ×1.3 / weak ×1.15 — без стэкинга.
           const isWeakMuscle = isSpecializationWeak(muscle, weekSpec);
           const isFocus = isSpecializationFocus(muscle, weekSpec);
