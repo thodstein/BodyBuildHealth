@@ -7,6 +7,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcHematology, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
+import { readDiaryV2, onDiaryChangeV2 } from '../NutritionScreen_parts/diary-storage-v2';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { PopupNumber, PopupSelect } from '../SRCBBScreen_parts/TrainingPopups';
@@ -89,6 +90,8 @@ export const MetabolicHub: React.FC = () => {
   const [hctHistory, setHctHistory] = useState<Array<{date:string;hct:number}>>([]);
   const [donationLog, setDonationLog] = useState<Array<{date:string;hct:number}>>([]);
   const [weightHistory, setWeightHistory] = useState<{date:string;kg:number}[]>([]);
+  const [diaryAvgKcal, setDiaryAvgKcal] = useState<number|undefined>(undefined);
+  const [diaryDays, setDiaryDays] = useState(0);
   const [toast, setToast] = useState<string|null>(null);
   const showToast = useCallback((m:string)=>{ setToast(m); setTimeout(()=> setToast(null), 2400); }, []);
 
@@ -119,6 +122,34 @@ export const MetabolicHub: React.FC = () => {
     window.addEventListener('focus', refreshWeightHistory);
     return ()=>{ clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refreshWeightHistory); };
   }, [refreshWeightHistory]);
+
+  // diary avg kcal 7д — live из diary-storage-v2
+  const refreshDiaryAvg = useCallback(()=>{
+    try{
+      const data = readDiaryV2();
+      const dates = Object.keys(data).sort().slice(-7);
+      if(dates.length===0){ setDiaryAvgKcal(undefined); setDiaryDays(0); return; }
+      let sum=0, cnt=0;
+      for(const d of dates){
+        const day=data[d];
+        if(!day?.meals) continue;
+        let dayKcal=0;
+        for(const items of Object.values(day.meals) as any[]) for(const it of items as any[]) dayKcal+= Number(it.kcal)||0;
+        if(dayKcal>300){ sum+=dayKcal; cnt++; }
+      }
+      if(cnt>0){ setDiaryAvgKcal(Math.round(sum/cnt)); setDiaryDays(cnt); } else { setDiaryAvgKcal(undefined); setDiaryDays(0); }
+    }catch{ setDiaryAvgKcal(undefined); setDiaryDays(0); }
+  }, []);
+  useEffect(()=>{
+    refreshDiaryAvg();
+    const off = onDiaryChangeV2(()=> refreshDiaryAvg());
+    const id=setInterval(refreshDiaryAvg, 10000);
+    const onStorage=(e:StorageEvent)=>{ if(e.key && e.key.includes('nutrition_diary')) refreshDiaryAvg(); };
+    const onFocus=()=> refreshDiaryAvg();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+    return ()=>{ off(); clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', onFocus); };
+  }, [refreshDiaryAvg]);
 
   // HCT history + donation log
   const HCT_HIST_KEY = 'he_hct_history_v1';
@@ -320,22 +351,16 @@ export const MetabolicHub: React.FC = () => {
     return calcHematology({ weight, hct, hgb, ferritin, gfr, waterL, sodiumG, potassiumG, proteinPerKg, fiberG: fiberGV, omega3G: omega3GV, ironIntakeMg: undefined, onAAS, aasDose, sex });
   }, [weight,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG,onAAS,aasDose,sex, kbju, fiberG, omega3G]);
   const ea = useMemo(()=>{
-    let intake:number|undefined;
-    try{
-      const p:any=getProfile()?.settings||{};
-      // пробуем diary средний ккал если есть
-      intake = p.nutrition?.avgKcal || kbju.nat.kcal;
-    }catch{ intake = kbju.nat.kcal; }
+    const intake = diaryAvgKcal ?? kbju.nat.kcal;
     const eee = weeklyVolumeTons ? Math.round(weeklyVolumeTons* 420) : (trainingDays* 340 + cardioMin*7);
     return calcEnergyAvailability({ weight, bodyFat, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eee, trainingDays });
-  }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin]);
+  }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, diaryAvgKcal]);
   const alcohol = useMemo(()=> calcAlcohol(alcoholG, weight), [alcoholG, weight]);
   const proteinTiming = useMemo(()=> calcProteinTiming(onAAS? kbju.aas.p: kbju.nat.p, weight, 4), [kbju, weight, onAAS]);
   const maintenance = useMemo(()=>{
-    let avgKcal:number|undefined;
-    try{ avgKcal = kbju.nat.kcal; }catch{}
+    const avgKcal = diaryAvgKcal ?? kbju.nat.kcal;
     return calcMaintenanceFinder(weightHistory, avgKcal);
-  }, [weightHistory, kbju]);
+  }, [weightHistory, kbju, diaryAvgKcal]);
   const goalTimeline = useMemo(()=> targetWeight ? calcGoalTimeline({ weight, targetWeight, tdee: kbju.nat.tdee }) : null, [weight,targetWeight,kbju]);
 
   // сценарии
@@ -620,6 +645,20 @@ export const MetabolicHub: React.FC = () => {
           <div style={{ fontSize:8, color:'rgba(255,255,255,0.55)' }}>{maintenance ? `TDEE ~${maintenance.tdee} R2 ${maintenance.r2}` : goalTimeline?.note.slice(0,28) || 'введи цель вес'}</div>
         </div>
       </div>
+
+      {diaryAvgKcal != null && (
+        <div style={{ ...CARD, padding:'10px 12px', background: Math.abs(diaryAvgKcal - stepsCalc.tdeeNat) < 150 ? 'rgba(34,197,94,0.08)' : diaryAvgKcal < stepsCalc.tdeeNat ? 'rgba(245,158,11,0.08)' : 'rgba(239,68,68,0.06)', border:`1px solid ${Math.abs(diaryAvgKcal - stepsCalc.tdeeNat) < 150 ? 'rgba(34,197,94,0.18)' : diaryAvgKcal < stepsCalc.tdeeNat ? 'rgba(245,158,11,0.18)' : 'rgba(239,68,68,0.12)'}`, display:'flex', alignItems:'center', gap:10 }}>
+          <span style={{ fontSize:18 }}>📓</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:'#fff' }}>Дневник 7д: {diaryAvgKcal}ккал/сут · {diaryDays}д · факт vs TDEE {stepsCalc.tdeeNat} → {diaryAvgKcal - stepsCalc.tdeeNat > 0 ? '+' : ''}{diaryAvgKcal - stepsCalc.tdeeNat}ккал/сут</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.55)' }}>{diaryAvgKcal < stepsCalc.tdeeNat -150 ? 'Дефицит — тренд должен −0.3…−0.6кг/нед' : diaryAvgKcal > stepsCalc.tdeeNat +150 ? 'Профицит — набор +0.2кг/нед, проверь EA' : 'Баланс — вес стабилен'} · EA {ea.ea ?? '—'} · TDEE finder R2 {maintenance?.r2 ?? '—'}</div>
+          </div>
+          <span style={{ fontSize:9, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontWeight:700 }}>{ea.zoneLabel}</span>
+        </div>
+      )}
+      {diaryAvgKcal == null && (
+        <div style={{ ...CARD, padding:'8px 12px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', fontSize:10, color:'rgba(255,255,255,0.55)', textAlign:'center' }}>📓 Нет данных дневника 7д — веди дневник питания, появится факт vs TDEE + EA live</div>
+      )}
 
       <div style={{ position:'sticky', top:0, zIndex:5, margin:'-2px -8px 10px', padding:'8px 8px', background:'rgba(10,10,12,0.72)', backdropFilter:'blur(10px)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:6, overflowX:'auto', scrollbarWidth:'none' }}>
         {MODE_DEFS.map(({m,label,icon,desc,accent})=> (
