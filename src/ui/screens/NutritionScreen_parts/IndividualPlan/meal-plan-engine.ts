@@ -2327,9 +2327,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   meals.push(breakfast);
   markUsed(breakfast);
 
-  // П3 (Роунд-2): стек добавок бодибилдера — креатин 3 г ежедневно на завтрак
-  // (сила/объём/нейропротекция; ISSN position stand). Не добавляется, если исключён
-  // пользователем или уже есть в приёме. КБЖУ ~0 — не влияет на сходимость.
+  // П3 (Роунд-2): стек добавок бодибилдера — креатин 3 г + витамин D3 2000 IU ежедневно
+  // на завтрак (сила/объём/гормональная поддержка; ISSN position stand). Не добавляется,
+  // если исключён пользователем или уже есть в приёме. КБЖУ ~0 — не влияет на сходимость.
   {
     const _creat = FOOD_DB.find(f => f.id === 'supp_creatine_hcl' && !combinedExcluded.has(f.id));
     if (_creat && !breakfast.items.some(it => it.id === 'supp_creatine_hcl')) {
@@ -2337,6 +2337,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       breakfast.items.push(_crItem);
       breakfast.totals = breakfast.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
       notes.push('💪 Креатин 3 г/день (завтрак) — поддержка силы и объёма клетки (ISSN position stand)');
+    }
+    const _d3 = FOOD_DB.find(f => f.id === 'supp_vitamin_d3' && !combinedExcluded.has(f.id));
+    if (_d3 && !breakfast.items.some(it => it.id === 'supp_vitamin_d3')) {
+      breakfast.items.push(makeItem(_d3, 1, 'supplement'));
+      notes.push('☀️ Витамин D3 2000 IU/день (завтрак) — тестостерон, кости, иммунитет');
     }
   }
 

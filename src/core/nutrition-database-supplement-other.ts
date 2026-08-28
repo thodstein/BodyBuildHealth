@@ -133,4 +133,5 @@ export const SUPPLEMENT_OTHER: FoodItem[] = [
   {id:"granola",name:"Гранола с орехами",category:"grain",kcal:450,protein:10,fat:17,carbs:62,fiber:7,gi:48,servingSize:"50 г",tier:"mid",bestFor:["bulk"],timing:"breakfast",micros:{Mg:90,Fe:2.6,Zn:2.2,K:340,VitE:3}},
   {id:"pistachios",name:"Фисташки",category:"fat",kcal:560,protein:20,fat:45,carbs:28,fiber:10,gi:15,servingSize:"30 г",tier:"mid",bestFor:["bulk","maintenance"],timing:"any",micros:{K:1025,Mg:121,Fe:3.9,Zn:2.2,VitB6:1.7}},
   {id:"tahini",name:"Тахини (кунжутная паста)",category:"fat",kcal:595,protein:17,fat:54,carbs:21,fiber:9,gi:0,servingSize:"20 г",tier:"mid",bestFor:["bulk","maintenance"],timing:"any",micros:{Ca:426,Fe:8.9,Mg:95,Zn:4.6,K:264}},
+  {id:"supp_vitamin_d3",name:"Витамин D3 (холекальциферол)",category:"supplement",kcal:0,protein:0,fat:0,carbs:0,fiber:0,gi:0,servingSize:"1 капсула",tier:"basic",bestFor:["cut","bulk","maintenance","strength"],timing:"morning",description:"2000 IU — поддержка тестостерона, костей и иммунитета при недостатке солнца",micros:{VitD:50, Ca:0}},
 ];

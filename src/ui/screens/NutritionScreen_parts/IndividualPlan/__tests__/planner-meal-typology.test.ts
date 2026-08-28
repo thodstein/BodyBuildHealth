@@ -101,8 +101,9 @@ describe('E8: молоко к завтраку (по выбору пользов
     const plan = buildDayPlan(base({ mealsCount: 4, addMilkToBreakfast: true }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
     expect(breakfast.items.some(it => it.id === 'milk')).toBe(true);
-    // Роунд-2 П3: креатин 3 г ежедневно на завтрак (стек добавок бодибилдера)
+    // Роунд-2 П3: креатин 3 г + D3 2000 IU ежедневно на завтрак (стек добавок бодибилдера)
     expect(breakfast.items.some(it => it.id === 'supp_creatine_hcl')).toBe(true);
+    expect(breakfast.items.some(it => it.id === 'supp_vitamin_d3')).toBe(true);
   });
 
   it('не добавляет молоко, если молочные исключены (no_dairy)', () => {
