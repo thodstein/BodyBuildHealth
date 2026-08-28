@@ -25,7 +25,7 @@ function findExerciseByLabel(label: string): Exercise | undefined {
   });
 }
 
-export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press' | 'sumo' | 'biceps';
+export type Lift = 'bench' | 'squat' | 'deadlift' | 'ohp' | 'row' | 'pulldown' | 'incline_press' | 'sumo' | 'biceps' | 'triceps' | 'calf' | 'shrug';
 export type WeakPoint = 'off_chest' | 'mid' | 'lockout' | 'start' | 'bottom'
   | 'sumo_start' | 'sumo_mid' | 'sumo_lockout'
   | 'ohp_start' | 'ohp_mid' | 'ohp_lockout'

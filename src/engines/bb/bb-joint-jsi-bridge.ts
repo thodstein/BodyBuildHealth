@@ -21,23 +21,25 @@ function parseTempoEcc(tempoSpec?: string): number {
 
 function mapExerciseToLift(name: string): Lift {
   const n = String(name || '').toLowerCase();
+  // Изоляции рук — ДО компаундов, иначе «жим узким хватом» уходит в bench
+  if (/француз|разгибан.*трицепс|трицепс.*блок|трицепс|overhead.*tricep|француз.*жим|жим.*узк|close.?grip/i.test(n)) return 'triceps';
+  if (/бицепс|сгибан.*рук|подъём.*бицепс|подъем.*бицепс|biceps|curl|молот|hammer/i.test(n)) return 'biceps';
+  if (/икр|calf|подъ?ем.*носк/i.test(n)) return 'calf';
+  if (/шраг|shrug|трапеци/i.test(n)) return 'shrug';
   if (/жим.*лёжа|жим.*лежа|bench.*press|жим штанги лёжа|жим гантелей лёжа/i.test(n)) return 'bench';
   if (/наклон.*жим|incline.*press|жим.*наклон.*30/i.test(n)) return 'incline_press';
-  if (/жим.*стоя|армейск|военн.*жим|overhead.*press|ohp/i.test(n)) return 'ohp';
-  if (/присед|squat|фронт.*присед|гакк.*присед|колодец|гоблет/i.test(n) && !/тяга/i.test(n)) return 'squat';
+  if (/жим.*стоя|армейск|военн.*жим|overhead.*press|ohp|жим.*сидя.*плеч/i.test(n)) return 'ohp';
+  if (/присед|squat|фронт.*присед|гакк.*присед|колодец|гоблет|выпад|lunge|болгар|leg.?press|жим.*ног/i.test(n) && !/тяга/i.test(n)) return 'squat';
   if (/сумо|sumo/i.test(n)) return 'sumo';
   if (/станов.*тяга|deadlift|мёртв|мертв/i.test(n) && !/румын/i.test(n)) return 'deadlift';
   if (/тяга.*штанги.*наклон|тяга.*гантел|тяга.*т-?гриф|row/i.test(n)) return 'row';
   if (/тяга.*верхн.*блок|pulldown|подтягиван/i.test(n)) return 'pulldown';
-  if (/бицепс|сгибан.*рук|подъём.*бицепс|biceps/i.test(n)) return 'biceps';
-  if (/жим.*узк|француз|разгибан.*трицепс|трицепс/i.test(n)) return 'bench';
-  if (/шраг|shrug|трапеци/i.test(n)) return 'row';
-  if (/икр|calf/i.test(n)) return 'squat';
   return 'bench';
 }
 
 export interface CompactJsiSummary {
-  perJointMax: Record<JointId, { jsi: number; level: JointJsiResult['overallLevel']; count: number }>;
+  perJointMax: Record<JointId, { jsi: number; level: JointJsiResult['overallLevel']; count: number; source?: string }>;
+  perJointSource: Record<JointId, { exercise: string; weight: number; reps: number; sets: number }>;
   maxJsi: number;
   maxJoint: JointId;
   overallLevel: JointJsiResult['overallLevel'];
@@ -69,10 +71,14 @@ export function buildCompactJsiSummary(
         if (weightKg <= 0 && reps <= 0) continue;
         const tempoEccSec = parseTempoEcc(ex.tempoSpec || (ex as any).tempo);
         const lift = mapExerciseToLift(name);
+        const isBodyweight = /подтяг|pull.?up|chin|брус|dip|отжим/i.test(name) && weightKg <= 0;
+        const effectiveWeight = weightKg > 0 ? weightKg : isBodyweight ? Math.round((opts.bodyWeightKg ?? 80) * 0.9) : Math.round((opts.bodyWeightKg ?? 80) * 0.3);
         inputs.push({
           lift,
           exerciseId: (ex as any).id || undefined,
-          weightKg: weightKg > 0 ? weightKg : Math.round((opts.bodyWeightKg ?? 80) * 0.3),
+          // @ts-ignore internal
+          _exName: name,
+          weightKg: effectiveWeight,
           sets,
           reps,
           tempoEccSec,
@@ -82,13 +88,14 @@ export function buildCompactJsiSummary(
           aasStack: opts.aasStack || [],
           bodyWeightKg: opts.bodyWeightKg,
           oldInjuries: opts.oldInjuries || [],
-        });
+        } as any);
       }
     }
   }
   if (inputs.length === 0) return null;
   const results = inputs.map(calcJointJsi);
-  const perJointMax: Record<string, { jsi: number; level: any; count: number }> = {};
+  const perJointMax: Record<string, { jsi: number; level: any; count: number; source?: string }> = {};
+  const perJointSource: Record<string, { exercise: string; weight: number; reps: number; sets: number }> = {};
   let maxJsi = -1;
   let maxJoint: JointId = 'shoulder';
   const allDeadly: JointJsiResult['deadlyCombos'] = [];
@@ -96,11 +103,16 @@ export function buildCompactJsiSummary(
   let worstNutra: JointJsiResult['nutraceutical'] | null = null;
   let worstLevelRank = 0;
   const rank: Record<string, number> = { green: 0, yellow: 1, red: 2, critical: 3 };
-  for (const r of results) {
+  for (let idx = 0; idx < results.length; idx++) {
+    const r = results[idx];
+    const inp = inputs[idx];
+    const exName = (inp as any)._exName || inp.lift;
     for (const [jid, pj] of Object.entries(r.perJoint)) {
       const cur = (perJointMax as any)[jid];
-      if (!cur || pj.jsi > cur.jsi) (perJointMax as any)[jid] = { jsi: pj.jsi, level: pj.level, count: (cur?.count || 0) + 1 };
-      else cur.count += 1;
+      if (!cur || pj.jsi > cur.jsi) {
+        (perJointMax as any)[jid] = { jsi: pj.jsi, level: pj.level, count: (cur?.count || 0) + 1, source: exName };
+        (perJointSource as any)[jid] = { exercise: exName, weight: inp.weightKg, reps: inp.reps, sets: inp.sets };
+      } else cur.count += 1;
       if (pj.jsi > maxJsi) { maxJsi = pj.jsi; maxJoint = jid as JointId; }
     }
     if (r.deadlyCombos.length) allDeadly.push(...r.deadlyCombos);
@@ -112,6 +124,7 @@ export function buildCompactJsiSummary(
   const overallLevel = (maxJsi >= 115 ? 'critical' : maxJsi >= 85 ? 'red' : maxJsi >= 50 ? 'yellow' : 'green') as any;
   return {
     perJointMax: perJointMax as any,
+    perJointSource: perJointSource as any,
     maxJsi: Math.round(maxJsi),
     maxJoint,
     overallLevel,

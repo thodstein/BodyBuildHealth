@@ -125,13 +125,41 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
     if (options.excludedMuscles?.includes(exercise.muscle)) issues.push({ level: 'error', code: 'excluded_muscle_present', message: `${exercise.name}: мышца ${exercise.muscle} исключена ограничениями.`, week, session: sessionIndex, exercise: exercise.name });
     if (options.avoidAxialLoad && isAxialLoadExercise({ name: exercise.name, id: exercise.exerciseName } as any)) issues.push({ level: 'error', code: 'axial_restriction_violation', message: `${exercise.name}: осевая нагрузка запрещена.`, week, session: sessionIndex, exercise: exercise.name });
     if (options.equipment?.length) {
-        const catalog = EXERCISE_CATALOG.find(item => item.name === exercise.name || item.id === exercise.exerciseName);
+        let catalog: any = EXERCISE_CATALOG.find(item => item.name === exercise.name || item.id === exercise.exerciseName);
+        // Попытка резолва коротких имён циклов ("Разгибания на блоке" → "Разгибания на трицепс в верхнем блоке"):
+        // EXERCISE_ALIAS_MAP + нечёткий поиск по токенам, чтобы не сыпать equipment_unknown_exercise.
+        if (!catalog) {
+          const lower = String(exercise.name || '').toLowerCase().replace(/ё/g, 'е').trim();
+          const aliasShortMap: Record<string, string> = {
+            'разгибания на блоке': 'tricep_cable',
+            'разгибания рук на блоке': 'tricep_cable',
+            'разгибания на блоке канат': 'rope_pushdown',
+            'разгибания рук на блоке (канат)': 'rope_pushdown',
+            'сгибания на блоке': 'cable_curl',
+            'сгибания рук на блоке': 'cable_curl',
+            'сгибания на блоке (бицепс)': 'cable_curl',
+            'сгибание рук на блоке (бицепс)': 'cable_curl',
+            'тяга верхнего блока': 'pulldown',
+            'тяга гантели в наклоне': 'row_db',
+            'тяга штанги в наклоне': 'row_bar',
+          };
+          const aliasId = aliasShortMap[lower] || null;
+          if (aliasId) catalog = EXERCISE_CATALOG.find(item => item.id === aliasId);
+          if (!catalog) {
+            // фолбэк: подстрока по ключевым токенам (разгибан+блок → трицепс, сгибан+блок → бицепс)
+            if (/разгибан/i.test(exercise.name) && /блок/i.test(exercise.name)) {
+              catalog = EXERCISE_CATALOG.find(item => item.id === 'tricep_cable');
+            } else if (/сгибан/i.test(exercise.name) && /блок/i.test(exercise.name)) {
+              catalog = EXERCISE_CATALOG.find(item => item.id === 'cable_curl');
+            }
+          }
+        }
         const rawEquipment = catalog?.equipment;
         const equipment = Array.isArray(rawEquipment) ? rawEquipment.map(String) : rawEquipment ? [String(rawEquipment)] : [];
         const syntheticMuscleName = new Set(['chest', 'back', 'shoulders', 'quads', 'hamstrings', 'glutes', 'calves', 'biceps', 'triceps', 'forearms', 'abs', 'traps', 'arms', 'legs', 'core', 'lower_back']).has(exercise.name.toLowerCase());
         if (!catalog && !syntheticMuscleName) {
           issues.push({ level: 'error', code: 'equipment_unknown_exercise', message: `${exercise.name}: упражнение отсутствует в каталоге, оборудование невозможно подтвердить.`, week, session: sessionIndex, exercise: exercise.name });
-        } else if (equipment.length > 0 && !equipment.includes('bodyweight') && !equipment.some(item => options.equipment!.includes(item))) {
+        } else if (catalog && equipment.length > 0 && !equipment.includes('bodyweight') && !equipment.some(item => options.equipment!.includes(item))) {
           issues.push({ level: 'error', code: 'equipment_restriction_violation', message: `${exercise.name}: оборудование не входит в доступный список.`, week, session: sessionIndex, exercise: exercise.name });
         }
       }

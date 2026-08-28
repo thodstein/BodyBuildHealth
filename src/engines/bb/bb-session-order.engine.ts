@@ -36,7 +36,7 @@ function musclePriority(muscle: string): number {
 /* ───────────────────────── Классификаторы по имени ───────────────────────── */
 
 /** Базовое (compound) упражнение по имени или роли. */
-const ISOLATION_RE = /мах|raise|fly|развод|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём гантелей|подъем гантелей|бицепс|трицепс|молотк|сведен|отведение|приведение|cable.*lateral/i;
+const ISOLATION_RE = /мах|raise|fly|разв(од|ед)|сгибан|разгибан|curl|extension|kickback|crunch|пресс|скручив|француз|шраг|кроссовер|из-за головы|в стороны|перед собой|на носки|подъём|подъем|бицепс|трицепс|молотк|сведен|отведение|приведение|cable.*lateral/i;
 /** True for isolation movements by name (french press, curl, lateral/front raise, shrug, pushdown,
  *  fly, calf raise, crunch, etc.) — used to keep heavy/primary isolations out of the compound tier. */
 export function isIsolationByName(name: string): boolean {
@@ -128,10 +128,28 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     primaryMuscle = firstPrimary?.muscle || forOrder.find(e => e.role === 'primary')?.muscle || '';
   } else {
     // ★ Arms day: triceps первым (compound-first — больше мышечная масса, жим узким хватом),
-    // не biceps (tagMuscles[0]='biceps'). Для Legs: quads первым (присед перед RDL).
+    // не biceps (tagMuscles[0]='biceps').
     const tag = opts.sessionTag || '';
     if (tag === 'Arms') primaryMuscle = 'triceps';
-    else if (tag === 'Legs' || tag === 'Lower' || tag === 'LowerPower' || tag === 'LowerHyp') primaryMuscle = 'quads';
+    else if (tag === 'Legs' || tag === 'Lower' || tag === 'LowerPower' || tag === 'LowerHyp' || tag === 'Glutes' || tag === 'GlutesHams') {
+      // Ноги: тяжёлая мышца дня должна идти первой.
+      // Раньше quads всегда был primary (присед перед RDL), но в день
+      // бицепса бедра памп-квадрицепс стоял ПЕРЕД тяжёлым бицепсом бедра.
+      // Определяем тяжёлую мышцу по факту упражнений (характер 'тяж').
+      let heavy: string | null = null;
+      let bestScore = -1;
+      for (const cand of ['quads', 'hamstrings', 'glutes']) {
+        const score = forOrder.filter(e => e.muscle === cand && (e as any).character === 'тяж').reduce((s, e) => s + (e.sets || 0), 0);
+        if (score > bestScore) { bestScore = score; heavy = cand; }
+      }
+      if (heavy && bestScore > 0) primaryMuscle = heavy;
+      else {
+        const hasHamHeavy = forOrder.some(e => e.muscle === 'hamstrings' && (e as any).character === 'тяж');
+        const hasQuadHeavy = forOrder.some(e => e.muscle === 'quads' && (e as any).character === 'тяж');
+        if (hasHamHeavy && !hasQuadHeavy) primaryMuscle = 'hamstrings';
+        else primaryMuscle = tagMuscles[0] || 'quads';
+      }
+    }
     else primaryMuscle = tagMuscles[0] || '';
   }
   if (!primaryMuscle) {

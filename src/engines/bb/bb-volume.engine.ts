@@ -301,7 +301,7 @@ function hasAny(name: string, patterns: RegExp): boolean {
 export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Array<{ muscle: string; coefficient: number }> {
   const name = String(exercise.name || '').toLowerCase();
   const type = String(exercise.type || exercise.exerciseType || '').toLowerCase();
-  const isIsolation = type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|crunch|скручив/i.test(name);
+  const isIsolation = type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|разв(од|ед)|шраг|pushdown|crunch|скручив|подъ?ем/i.test(name);
   if (isIsolation) return [];
 
   // Жимы рук/груди (НЕ «жим ногами» — это квадрицепс-движение и даёт
@@ -340,12 +340,14 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
     return [
       { muscle: 'biceps', coefficient: 0.4 },
       { muscle: 'shoulders', coefficient: 0.2 },
+      { muscle: 'traps', coefficient: 0.20 },
     ];
   }
   if (hasAny(name, /row|тяга.*наклон|тяга.*гриф|тяга.*гантел|горизонтальн.*тяга/i)) {
     return [
       { muscle: 'biceps', coefficient: 0.4 },
-      { muscle: 'shoulders', coefficient: 0.2 },
+      { muscle: 'shoulders', coefficient: 0.20 },
+      { muscle: 'traps', coefficient: 0.30 },
     ];
   }
   if (hasAny(name, /присед|squat|leg.?press|жим.*ног|выпад|lunge/i)) {

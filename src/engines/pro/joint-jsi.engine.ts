@@ -110,6 +110,9 @@ const K_BASE: Record<Lift, Partial<Record<JointId, number>>> = {
   row:          { spine:0.75, shoulder:0.55, elbow:0.7, wrist:0.4, hip:0.3, knee:0.1, ankle:0 },
   pulldown:     { shoulder:0.7, elbow:0.65, wrist:0.35, spine:0.2, hip:0.05, knee:0, ankle:0 },
   biceps:       { elbow:1.0, wrist:0.55, shoulder:0.25, spine:0.1, hip:0, knee:0, ankle:0 },
+  triceps:      { elbow:1.0, wrist:0.55, shoulder:0.30, spine:0.10, hip:0, knee:0, ankle:0 },
+  calf:         { ankle:1.0, knee:0.25, hip:0.05, spine:0.10, shoulder:0, elbow:0, wrist:0 },
+  shrug:        { shoulder:0.55, spine:0.65, elbow:0.05, wrist:0.20, hip:0.10, knee:0, ankle:0 },
 };
 
 const DRY_AAS = new Set(['stanozolol','stan','winstrol','drostanolone','masteron','mast','trenbolone','tren','tren_acet','tren_enan']);

@@ -1399,8 +1399,21 @@ export const BbAutoConstructor: React.FC = () => {
   }, [bbWorkMax, weakPoints, peds, courseIntensity, loadStrategy, planMode, selectedCycleId]);
 
   // FIX-19: Авто-загрузка сохранённого плана при монтировании
+  // Расширено: также черновик авто-сборки he_bb_auto_draft (сплит не надо собирать заново
+  // при переходе в «Суставы» и обратно — план живёт в памяти между шагами 4-5-6).
   useEffect(() => {
     try {
+      const draft = localStorage.getItem('he_bb_auto_draft');
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        if (parsed.plan && parsed.date) {
+          setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
+          if (parsed.step) setStep(parsed.step as Step);
+          else setStep('plan');
+          setBbWeekSel(1);
+          return;
+        }
+      }
       const saved = localStorage.getItem('he_bb_plan_saved');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -1413,6 +1426,16 @@ export const BbAutoConstructor: React.FC = () => {
       }
     } catch {}
   }, []);
+
+  // Автосохранение черновика: любой построенный план сразу сохраняется,
+  // чтобы переход в «Суставы» и возврат не требовал пересборки сплита.
+  useEffect(() => {
+    try {
+      if (builtPlan) {
+        localStorage.setItem('he_bb_auto_draft', JSON.stringify({ plan: builtPlan, date: new Date().toISOString(), step }));
+      }
+    } catch {}
+  }, [builtPlan, step]);
 
   // ⚙️ Живой приём плана из «Сборки цикла» Годового планировщика (he-bb-plan-saved)
   useEffect(() => {
@@ -2227,7 +2250,7 @@ export const BbAutoConstructor: React.FC = () => {
     setExSwapModal(null);
     setShowCompare(false);
     setShowPeakWeek(false);
-    try { localStorage.removeItem('he_bb_plan_saved'); } catch { /* ignore */ }
+    try { localStorage.removeItem('he_bb_plan_saved'); localStorage.removeItem('he_bb_auto_draft'); } catch { /* ignore */ }
     setStep('params');
     flash('🔄 Сборка сброшена — начинаем заново');
   };
@@ -3859,67 +3882,115 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        {/* Логика — компактно 3 + expand */}
+        {/* Логика — человекочитаемо: только ключевые решения, без внутреннего мусора */}
         {(() => {
-          const rationale = builtPlan.rationale || [];
-          if (rationale.length===0) return null;
+          const rationale = (builtPlan.rationale || []) as string[];
+          if (!rationale.length) return null;
+          // Фильтруем только пользовательские строки (с эмодзи) + переводим тех.термины
+          const isUserFacing = (s: string) => /^[📌📈📦💪🔥⭐🎯🧩🧬🩸🔄]/.test(s.trim()) || s.includes('Источник:') || s.includes('Стратегия:') || s.includes('Объём:') || s.includes('Слабые группы:');
           const clean = (r: string): string => {
-            let s=String(r||'');
+            let s = String(r || '');
             const M: Array<[RegExp,string]> = [[/double_progression/g,'двойная прогрессия'],[/MEV coverage/g,'покрытие MEV'],[/Experienced enhanced/g,'опытный на курсе'],[/Warmup activator/g,'разминка'],[/back budget allocation/g,'бюджет спины'],[/volume/g,'объём'],[/sets/g,'подходов'],[/week/g,'нед']];
-            for(const [re,ru] of M) s=s.replace(re,ru);
+            for (const [re, ru] of M) s = s.replace(re, ru);
             return s.replace(/\s{2,}/g,' ').trim();
           };
-          const shown = rationale.map(clean).filter(Boolean);
+          const userLines = rationale.filter(isUserFacing).map(clean).filter(Boolean);
+          const techLines = rationale.filter(s => !isUserFacing(s)).map(clean).filter(Boolean).slice(0,3);
+          const allShown = [...userLines, ...techLines];
+          if (!allShown.length) return null;
           return (
-            <ExpandableCard title={`🧠 Логика — ${shown.length} пунктов`} icon="🧠" short={shown.slice(0,2).join(' · ')||'—'} full={<div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>{shown.map((r,i)=><div key={i} style={{ marginBottom:2 }}>• {r}</div>)}</div>} />
+            <ExpandableCard title={`🧠 Логика сборки — ${userLines.length} ключевых + ${techLines.length} тех.`} icon="🧠" short={userLines.slice(0,2).join(' · ') || allShown.slice(0,2).join(' · ') || '—'} full={<div style={{ fontSize:11, color:'#fff', lineHeight:1.5 }}>{allShown.map((r,i)=><div key={i} style={{ marginBottom:3, paddingLeft:6, borderLeft: i < userLines.length ? '2px solid #a78bfa' : '2px solid rgba(255,255,255,0.1)', opacity: i < userLines.length ? 1 : 0.7 }}>• {r}</div>)}<div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>Внутренние тех.детали скрыты — показано только то, что влияет на результат.</div></div>} />
           );
         })()}
-        {/* JSI компакт — теплокарта из плана, детали в «Суставы и ортопедия» */}
+        {/* JSI — переработан: источник упражнения, понятные зоны, без «магии чисел» */}
         {jsiSummary ? (
           <ExpandableCard
-            title={`🦴 JSI плана — ${jsiSummary.overallLevel==='green'?'🟢 Норма': jsiSummary.overallLevel==='yellow'?'🟡 Внимание': jsiSummary.overallLevel==='red'?'🔴 Высокая':'⛔ Критично'} · max ${jsiSummary.maxJsi} (${jsiSummary.maxJoint})`}
+            title={`🦴 Нагрузка на суставы — ${jsiSummary.overallLevel==='green'?'🟢 Норма': jsiSummary.overallLevel==='yellow'?'🟡 Умеренно': jsiSummary.overallLevel==='red'?'🔴 Высоко':'⛔ Критично'} · пик ${jsiSummary.maxJsi} (${(jsiSummary as any).perJointSource?.[jsiSummary.maxJoint]?.exercise || jsiSummary.maxJoint})`}
             icon="🦴"
-            short={`${Object.entries(jsiSummary.perJointMax).length} суставов · ${jsiSummary.maxJoint}:${jsiSummary.maxJsi} · ${jsiSummary.tuningTop.length? jsiSummary.tuningTop[0].action : 'без тюнинга'}`}
+            short={`${Object.entries(jsiSummary.perJointMax).filter(([,v]:any)=>v.level!=='green').length || Object.entries(jsiSummary.perJointMax).length} суставов с нагрузкой · макс ${jsiSummary.maxJoint}:${jsiSummary.maxJsi}${(jsiSummary as any).perJointSource?.[jsiSummary.maxJoint] ? ` ← ${(jsiSummary as any).perJointSource[jsiSummary.maxJoint].exercise}` : ''}`}
             full={
               <div style={{ fontSize:11, lineHeight:1.4 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:6, marginBottom:8 }}>
-                  {Object.entries(jsiSummary.perJointMax).sort((a,b)=> b[1].jsi - a[1].jsi).slice(0,8).map(([jid, v]: any)=> {
-                    const bg = v.level==='green'?'rgba(34,197,94,0.14)': v.level==='yellow'?'rgba(250,204,21,0.14)': v.level==='red'?'rgba(239,68,68,0.14)':'rgba(153,27,27,0.25)';
+                <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginBottom:6, padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:6 }}>JSI = тоннаж × техника × анатомия × фарма. Зоны: <span style={{color:'#22c55e'}}>0-49 норма</span> · <span style={{color:'#facc15'}}>50-84 умеренно</span> · <span style={{color:'#ef4444'}}>85-114 высоко</span> · <span style={{color:'#991b1b'}}>115+ критично</span>. Показан пик по каждому суставу и упражнение-источник.</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px,1fr))', gap:6, marginBottom:8 }}>
+                  {Object.entries(jsiSummary.perJointMax).sort((a,b)=> b[1].jsi - a[1].jsi).map(([jid, v]: any)=> {
+                    const src = (jsiSummary as any).perJointSource?.[jid] as {exercise:string;weight:number;reps:number;sets:number}|undefined;
+                    const bg = v.level==='green'?'rgba(34,197,94,0.10)': v.level==='yellow'?'rgba(250,204,21,0.10)': v.level==='red'?'rgba(239,68,68,0.10)':'rgba(153,27,27,0.20)';
                     const col = v.level==='green'?'#22c55e': v.level==='yellow'?'#facc15': v.level==='red'?'#ef4444':'#991b1b';
-                    return <div key={jid} style={{ padding:'6px 6px', borderRadius:8, background:bg, border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.7 }}>{jid}</div><div style={{ fontSize:12, fontWeight:800, color:col }}>{v.jsi}</div><div style={{ fontSize:9, color:col }}>{v.level}</div></div>;
+                    const ru: Record<string,string> = { wrist:'Кисть', elbow:'Локоть', shoulder:'Плечо', spine:'Поясница', hip:'Таз', knee:'Колено', ankle:'Голеностоп' };
+                    return <div key={jid} style={{ padding:'7px 8px', borderRadius:8, background:bg, border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{ru[jid]||jid}</span><span style={{ fontSize:11, fontWeight:800, color:col }}>{v.jsi}</span></div><div style={{ fontSize:10, color:col, fontWeight:600 }}>{v.level==='green'?'норма':v.level==='yellow'?'умеренно':v.level==='red'?'высоко':'критично'}</div>{src && <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', marginTop:3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }} title={src.exercise}>{src.exercise} · {src.sets}×{src.reps}×{src.weight}кг</div>}{v.level!=='green' && src && <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginTop:2 }}>пик от этого упражнения</div>}</div>;
                   })}
                 </div>
-                {jsiSummary.deadlyCombos.length>0 && <div style={{ marginBottom:6 }}>{jsiSummary.deadlyCombos.map((c,i)=><div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(153,27,27,0.12)', border:'1px solid rgba(153,27,27,0.18)', color:'#ef4444', fontSize:11, marginBottom:4 }}>⛔ {c.title} — {c.desc}</div>)}</div>}
-                {jsiSummary.tuningTop.length>0 && <div style={{ marginBottom:6 }}><div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>Тюнинг:</div>{jsiSummary.tuningTop.map((t,i)=><div key={i} style={{ fontSize:11, color:'#fff', marginBottom:2 }}>• {t.action} <span style={{ color:'#22c55e', fontWeight:700 }}>{t.expected}</span></div>)}</div>}
-                <div style={{ fontSize:10, color:'#fff', opacity:0.7 }}>Нутрицевтика ({jsiSummary.nutraceutical.tier}): {jsiSummary.nutraceutical.basket.slice(0,3).join(' · ')}{jsiSummary.nutraceutical.basket.length>3?' …':''}</div>
-                <div style={{ marginTop:8, display:'flex', gap:8 }}>
+                {jsiSummary.deadlyCombos.length>0 && <div style={{ marginBottom:8 }}><div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>⛔ Критические связки:</div>{jsiSummary.deadlyCombos.map((c,i)=><div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(153,27,27,0.12)', border:'1px solid rgba(153,27,27,0.18)', color:'#ef4444', fontSize:11, marginBottom:4 }}><b>{c.title}</b> — {c.desc}</div>)}</div>}
+                {jsiSummary.tuningTop.length>0 && <div style={{ marginBottom:8 }}><div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>🔧 Что снизить в первую очередь:</div>{jsiSummary.tuningTop.slice(0,3).map((t,i)=><div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, padding:'4px 6px', background:'rgba(96,165,250,0.06)', borderRadius:6, borderLeft:'2px solid #60a5fa' }}>{t.action} <span style={{ color:'#22c55e', fontWeight:700 }}>{t.expected}</span>{t.alternative && <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:6 }}>→ {t.alternative}</span>}</div>)}</div>}
+                <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
                   <button onClick={() => { try { const fn=(window as any).__navigateToTrainingTab; if(fn) fn('joints_ortho'); else { localStorage.setItem('he_training_tab','joints_ortho'); window.dispatchEvent(new StorageEvent('storage',{key:'he_training_tab'} as any)); } } catch{} }} style={{ padding:'7px 12px', borderRadius:8, fontSize:11, fontWeight:800, cursor:'pointer', background:'#60a5fa', color:'#000', border:'none' }}>🦴 Открыть Суставы — детально</button>
-                  <span style={{ fontSize:10, color:'#fff', opacity:0.55, alignSelf:'center' }}>{jsiSummary.totalInputs} упражнений · делод исключён</span>
+                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>{jsiSummary.totalInputs} упр. · делод исключён · вес для своих = 0.9× тела</span>
                 </div>
               </div>
             }
           />
         ) : (
           <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-            <div style={{ flex:1, minWidth:180 }}><div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>🦴 Суставы и ортопедия</div><div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>JSI теплокарта плана недоступна — откройте инструмент для полной диагностики.</div></div>
+            <div style={{ flex:1, minWidth:180 }}><div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>🦴 Нагрузка на суставы</div><div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>JSI недоступна — нет рабочих сетов или все в делоде. Постройте план и вернитесь.</div></div>
             <button onClick={() => { try { const fn=(window as any).__navigateToTrainingTab; if(fn) fn('joints_ortho'); else { localStorage.setItem('he_training_tab','joints_ortho'); window.dispatchEvent(new StorageEvent('storage',{key:'he_training_tab'} as any)); } } catch{} }} style={{ padding:'7px 12px', borderRadius:8, fontSize:11, fontWeight:800, cursor:'pointer', background:'#60a5fa', color:'#000', border:'none' }}>🦴 Открыть</button>
           </div>
         )}
-        {/* PRO — одна строка */}
+        {/* PRO — детализация, а не «ни о чём» */}
         {q.proResult && (
-          <div style={{ ...CARD, padding:'8px 10px', background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#a855f7' }}>🧠 PRO {q.proResult.scoreDelta>0?'+':''}{q.proResult.scoreDelta} · паттерны {q.proResult.patterns.filter((p:any)=>p.ok).length}/{q.proResult.patterns.length} · углы {q.proResult.angles.filter((a:any)=>a.ok).length}/{q.proResult.angles.length} · растяжка {q.proResult.stretches.filter((s:any)=>s.ok).length}/{q.proResult.stretches.length} · техники {q.proResult.technique.pct}%</div>
-            {q.proResult.totalIssues.length>0 && <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.7 }}>{q.proResult.totalIssues.slice(0,2).map((iss:string,i:number)=><div key={i}>• {iss}</div>)}</div>}
-          </div>
+          <ExpandableCard
+            title={`🧠 PRO-качество — ${q.proResult.scoreDelta>0?'+':''}${q.proResult.scoreDelta} · ${q.proResult.patterns.filter((p:any)=>p.ok).length}/${q.proResult.patterns.length} паттернов`}
+            icon="🧠"
+            short={`углы ${q.proResult.angles.filter((a:any)=>a.ok).length}/${q.proResult.angles.length} · растяжка ${q.proResult.stretches.filter((s:any)=>s.ok).length}/${q.proResult.stretches.length} · техники ${q.proResult.technique.pct}% · цель ${q.proResult.goalAlignment.goal}`}
+            full={
+              <div style={{ fontSize:11, lineHeight:1.4 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                  <div style={{ padding:'8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa', marginBottom:4 }}>Паттерны (разные углы тяги/жима)</div>
+                    {q.proResult.patterns.map((p:any)=><div key={p.muscle} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color: p.ok ? '#22c55e' : '#f59e0b', marginBottom:2 }}><span>{p.muscle}</span><span>{p.distinct}/{p.expected.length} {p.ok?'✓':`→ ${p.issue || 'добавьте'}`}</span></div>)}
+                  </div>
+                  <div style={{ padding:'8px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>Углы (верх/низ/центр)</div>
+                    {q.proResult.angles.map((a:any)=><div key={a.muscle} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color: a.ok ? '#22c55e' : '#f59e0b', marginBottom:2 }}><span>{a.muscle}</span><span>{Math.round(a.coverage*100)}% {a.ok?'✓':`→ ${a.expected.filter((e:string)=> !a.angles.includes(e)).join(', ')}`}</span></div>)}
+                  </div>
+                </div>
+                <div style={{ padding:'8px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.12)', marginBottom:8 }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Растяжка (длинная позиция) · Цель: {q.proResult.goalAlignment.volumePctAvg}% MRV · Техники {q.proResult.technique.pct}%</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:4 }}>{q.proResult.stretches.map((s:any)=><span key={s.muscle} style={{ fontSize:10, padding:'2px 6px', borderRadius:12, background: s.ok ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: s.ok ? '#22c55e' : '#ef4444', border: s.ok ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(239,68,68,0.2)' }}>{s.muscle} {s.ok?'✓':'✗ ' + (s.stretchExercises.slice(0,1).join('') || 'нет')}</span>)}</div>
+                  {!q.proResult.goalAlignment.ok && <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ {q.proResult.goalAlignment.issue} → {q.proResult.goalAlignment.recommendation}</div>}
+                  {q.proResult.goalAlignment.ok && <div style={{ fontSize:10, color:'#22c55e' }}>✓ {q.proResult.goalAlignment.recommendation}</div>}
+                </div>
+                {q.proResult.totalIssues.length>0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}><div style={{ fontWeight:700, color:'#a78bfa', marginBottom:4 }}>Что поправить в первую очередь:</div>{q.proResult.totalRecommendations.slice(0,3).map((r:string,i:number)=><div key={i} style={{ marginBottom:2 }}>• {r}</div>)}</div>}
+                {q.proResult.totalIssues.length===0 && <div style={{ fontSize:11, color:'#22c55e', fontWeight:600 }}>✓ Паттерны, углы и растяжка закрыты — PRO-оценка на максимуме.</div>}
+              </div>
+            }
+          />
         )}
-        {/* Рекомендации — единственный блок */}
-        {q.recommendations && q.recommendations.length > 0 && (
-          <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации</div>
-            {q.recommendations.slice(0,6).map((r:string, i:number) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:6, borderLeft:'2px solid #f59e0b', lineHeight:1.35 }}>{r}</div>)}
-            {q.recommendations.length>6 && <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>…и ещё {q.recommendations.length-6}</div>}
-          </div>
-        )}
+        {/* Рекомендации — только действие, без мусора */}
+        {(() => {
+          const raw: string[] = (q.recommendations as string[]) || [];
+          // Фильтруем информационный шум: разнообразие <6, методика diversity, пустые «слабые не указаны» без слабых
+          const filtered = raw.filter(r => {
+            const s = String(r).toLowerCase();
+            if (/низкое разнообразие.*\d+\/\d+/.test(s) && !s.includes('критич')) return false;
+            if (s.includes('методика') && s.includes('разнообразие низкое')) return false;
+            if (s.includes('специализация') && s.includes('слабые группы не указаны')) return q.proResult ? false : true;
+            if (s.includes('цель «сушка» выбрана') && s.includes('максимальный (mrv)')) return false;
+            return true;
+          }).slice(0,5);
+          if (!filtered.length) return (
+            <div style={{ ...CARD, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#22c55e' }}>✓ Рекомендаций нет — план чистый</div>
+              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:4 }}>Все проверки пройдены. Можно идти в «Коррекция» или «К выполнению».</div>
+            </div>
+          );
+          return (
+            <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Что исправить (приоритет)</div>
+              {filtered.map((r:string, i:number) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:6, borderLeft: i===0 ? '3px solid #ef4444' : i===1 ? '3px solid #f59e0b' : '3px solid #facc15', lineHeight:1.35 }}>{i===0?'🔥 ':'• '}{r}</div>)}
+              {raw.length>filtered.length && <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:4 }}>Скрыто {raw.length - filtered.length} второстепенных подсказок (разнообразие/методика).</div>}
+            </div>
+          );
+        })()}
         {/* Суставы — только в JSI блоке выше (инструмент «Суставы и ортопедия»), дубль безопасности убран */}
         {/* Volume chart */}
         {(() => {
