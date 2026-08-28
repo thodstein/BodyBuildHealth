@@ -96,12 +96,13 @@ describe('E2: заметка о неравномерном интервале', 
   });
 });
 
-describe('E8: молоко к завтраку и кокосовое масло (по выбору пользователя)', () => {
-  it('включает молоко и кокосовое масло в завтрак при включённых флагах', () => {
-    const plan = buildDayPlan(base({ mealsCount: 4, addMilkToBreakfast: true, coconutOilBoost: true }));
+describe('E8: молоко к завтраку (по выбору пользователя) + креатин-стек (Роунд-2)', () => {
+  it('включает молоко в завтрак при включённом флаге + креатин 3 г (Р-2.1 стек)', () => {
+    const plan = buildDayPlan(base({ mealsCount: 4, addMilkToBreakfast: true }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
     expect(breakfast.items.some(it => it.id === 'milk')).toBe(true);
-    expect(breakfast.items.some(it => it.id === 'coconut_oil')).toBe(true);
+    // Роунд-2 П3: креатин 3 г ежедневно на завтрак (стек добавок бодибилдера)
+    expect(breakfast.items.some(it => it.id === 'supp_creatine_hcl')).toBe(true);
   });
 
   it('не добавляет молоко, если молочные исключены (no_dairy)', () => {
@@ -110,11 +111,17 @@ describe('E8: молоко к завтраку и кокосовое масло 
     expect(breakfast.items.some(it => it.id === 'milk')).toBe(false);
   });
 
-  it('без флагов молоко/кокосовое масло не добавляются', () => {
+  it('без флагов молоко не добавляется; креатин добавляется всегда (кроме исключения)', () => {
     const plan = buildDayPlan(base({ mealsCount: 4 }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
     expect(breakfast.items.some(it => it.id === 'milk')).toBe(false);
-    expect(breakfast.items.some(it => it.id === 'coconut_oil')).toBe(false);
+    expect(breakfast.items.some(it => it.id === 'supp_creatine_hcl')).toBe(true);
+  });
+
+  it('креатин не добавляется при исключении supp_creatine_hcl', () => {
+    const plan = buildDayPlan(base({ mealsCount: 4, excludedIds: new Set(['supp_creatine_hcl']) }));
+    const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
+    expect(breakfast.items.some(it => it.id === 'supp_creatine_hcl')).toBe(false);
   });
 });
 

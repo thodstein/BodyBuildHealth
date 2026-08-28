@@ -137,10 +137,9 @@ export interface MealPlanInput {
   // Этап 7: верхний предел клетчатки (из prep/пик-недели ББ — fiberMaxG). На пик-дне снижает
   // объём овощей, чтобы высокоуглеводная загрузка не «упиралась» в порции.
   fiberCapG?: number;
-  // E8: осознанный выбор пользователя — молоко к завтраку (учитывает no_dairy/аллергены)
-  // и кокосовое масло/жиры в рацион. Пусто/не установлено = не добавлять.
+  // Роунд-2: coconutOilBoost удалён (масла и так входят пулом жиров — дублирующий тумблер).
+  // E8: осознанный выбор пользователя — молоко к завтраку. Пусто/не установлено = не добавлять.
   addMilkToBreakfast?: boolean;
-  coconutOilBoost?: boolean;
   // N1: профиль вкуса завтрака — основа (каша/хлопья/яйца/творог).
   breakfastStyle?: BreakfastStyle;
   // N7: завтрак-шаблон — готовый «классический завтрак бодибилдера» (детерминированный состав).
@@ -2274,22 +2273,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     breakfast = buildBreakfastFromTemplate(_bfTmpl, tBreakfast, combinedExcluded, input.allergenTags, _tmplTargetKcal);
     const _extraSeed = FOOD_DB.find(f => f.id === 'chia_seeds' && !combinedExcluded.has(f.id))
       || FOOD_DB.find(f => f.id === 'flaxseed' && !combinedExcluded.has(f.id));
-    if (input.coconutOilBoost) {
-      const _co = FOOD_DB.find(f => f.id === 'coconut_oil' && !combinedExcluded.has(f.id));
-      if (_co && !breakfast.items.some(it => it.id === 'coconut_oil')) breakfast.items.push(makeItem(_co, 10, 'fat'));
-    }
     if (_extraSeed && !breakfast.items.some(it => it.id === _extraSeed.id)) breakfast.items.push(makeItem(_extraSeed, 10, 'fat'));
     breakfast.totals = breakfast.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
   } else {
-  // E8: молоко к завтраку и кокосовое масло (по выбору пользователя, с учётом исключений).
+  // E8: молоко к завтраку (по выбору пользователя, с учётом исключений).
+  // Роунд-2: coconutOilBoost удалён — дублирующий тумблер (масла входят пулом жиров).
   const _breakfastExtras: { food: FoodItem; grams: number; role?: MealItem['role'] }[] = [];
   if (input.addMilkToBreakfast && !_dairyExcluded) {
     const _milk = FOOD_DB.find(f => f.id === 'milk' && !combinedExcluded.has(f.id));
     if (_milk) _breakfastExtras.push({ food: _milk, grams: 200, role: 'liquid' });
-  }
-  if (input.coconutOilBoost) {
-    const _co = FOOD_DB.find(f => f.id === 'coconut_oil' && !combinedExcluded.has(f.id));
-    if (_co) _breakfastExtras.push({ food: _co, grams: 10, role: 'fat' });
   }
   // D-28 П10: омега-3 семена (чиа/льняное) в завтрак — небольшой ALA-буст к утреннему приёму
   // (жирорастворимые + клетчатка), с учётом исключений пользователя.
@@ -2322,6 +2314,19 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   meals.push(breakfast);
   markUsed(breakfast);
+
+  // П3 (Роунд-2): стек добавок бодибилдера — креатин 3 г ежедневно на завтрак
+  // (сила/объём/нейропротекция; ISSN position stand). Не добавляется, если исключён
+  // пользователем или уже есть в приёме. КБЖУ ~0 — не влияет на сходимость.
+  {
+    const _creat = FOOD_DB.find(f => f.id === 'supp_creatine_hcl' && !combinedExcluded.has(f.id));
+    if (_creat && !breakfast.items.some(it => it.id === 'supp_creatine_hcl')) {
+      const _crItem = makeItem(_creat, 3, 'supplement');
+      breakfast.items.push(_crItem);
+      breakfast.totals = breakfast.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+      notes.push('💪 Креатин 3 г/день (завтрак) — поддержка силы и объёма клетки (ISSN position stand)');
+    }
+  }
 
   // 2. Обед — основной цельный приём ─────────────────────────────────────
   const lunchRot = rotationForMeal(1);
