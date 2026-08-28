@@ -261,8 +261,8 @@ export function buildBBVolumeTarget(input: {
   const goal = input.volumeGoal || 'mav';
   const base = goal === 'mev' ? input.landmarks.mev : goal === 'mrv' ? input.landmarks.mrv : input.landmarks.mav;
   const emphasis = (input.weakPoint ? 1.2 : 1) * (input.focus ? 1.3 : 1);
-  const recovery = Math.max(0.6, Math.min(1.1, input.recoveryMultiplier ?? 1));
-  const phase = Math.max(0.4, Math.min(1.1, input.phaseMultiplier ?? 1));
+  const recovery = Math.max(0.6, Math.min(1.5, input.recoveryMultiplier ?? 1));
+  const phase = Math.max(0.4, Math.min(1.5, input.phaseMultiplier ?? 1));
   const targetSets = Math.max(
     input.landmarks.mev,
     Math.min(input.landmarks.mrv * recovery, Math.round((input.rotationSets ?? base) * emphasis * phase)),

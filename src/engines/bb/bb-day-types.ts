@@ -44,7 +44,7 @@ export const TAG_MUSCLES: Record<string, string[]> = {
   // остаточным одним упражнением между грудью и руками.
   Upper: ['chest', 'back', 'shoulders', 'biceps', 'triceps'],
   Lower: ['quads', 'hamstrings', 'glutes', 'calves', 'abs'],
-  FullBody: ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'biceps', 'triceps'],
+  FullBody: ['chest', 'back', 'quads', 'hamstrings', 'glutes', 'shoulders', 'biceps', 'triceps', 'traps', 'calves'],
   Chest: ['chest', 'delt_front', 'triceps'],
   Back: ['back', 'biceps', 'delt_rear', 'traps'],
   Shoulders: ['delt_front', 'delt_mid', 'delt_rear', 'traps'],

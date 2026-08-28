@@ -47,7 +47,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive } from './bb-insulin-window.engine';
@@ -2744,23 +2744,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const muscleVolumeRotation: Record<string, number> = {};
   const mrvByMuscle: Record<string, number> = {};
   const volumeTargets: Record<string, BBVolumeTarget> = {};
-  // Recovery multiplier from body composition + recovery metrics (Helms 2022, Plews 2022, Watson 2022)
-  // BUG-FIX: используем Number.isFinite() вместо != null для защиты от строк/NaN/undefined.
-  const recoveryMult = Math.max(0.6, Math.min(1.5, (() => {
-    let r = 1.0;
-    if (Number.isFinite(input.bodyFat)) r *= (input.bodyFat as number) > 25 ? 0.9 : (input.bodyFat as number) > 20 ? 0.95 : 1.0;
-    if (Number.isFinite(input.leanMass)) r *= (input.leanMass as number) >= 90 ? 1.15 : (input.leanMass as number) >= 75 ? 1.05 : (input.leanMass as number) >= 60 ? 1.0 : 0.9;
-    if (Number.isFinite(input.hrvMs)) r *= (input.hrvMs as number) > 70 ? 1.1 : (input.hrvMs as number) >= 50 ? 1.0 : 0.85;
-    if (Number.isFinite(input.sleepHours)) r *= (input.sleepHours as number) >= 7 ? 1.05 : (input.sleepHours as number) >= 6 ? 1.0 : 0.85;
-    if (Number.isFinite(input.stressLevel)) r *= (input.stressLevel as number) < 3 ? 1.05 : (input.stressLevel as number) < 6 ? 1.0 : 0.85;
-    return r;
-  })()));
-  const nutritionMult = Math.max(0.6, Math.min(1.5, (() => {
-    let n = 1.0;
-    if (Number.isFinite(input.calorieSurplus)) n *= (input.calorieSurplus as number) > 300 ? 1.1 : (input.calorieSurplus as number) > 100 ? 1.05 : (input.calorieSurplus as number) < -200 ? 0.8 : 1.0;
-    if (Number.isFinite(input.proteinPerKg)) n *= (input.proteinPerKg as number) >= 2.0 ? 1.1 : (input.proteinPerKg as number) >= 1.6 ? 1.05 : (input.proteinPerKg as number) < 1.0 ? 0.85 : 1.0;
-    return n;
-  })()));
+  // Recovery/nutrition — единый источник из bb-volume.engine (fix F1: убираем дубли)
+  const recoveryMult = computeBBRecoveryMultiplier({
+    bodyFat: input.bodyFat,
+    leanMass: input.leanMass,
+    hrvMs: input.hrvMs,
+    sleepHours: input.sleepHours,
+    stressLevel: input.stressLevel,
+  });
+  const nutritionMult = computeBBNutritionMultiplier({
+    calorieSurplus: input.calorieSurplus,
+    proteinPerKg: input.proteinPerKg,
+  });
   // Общая цепочка модификаторов целевого объёма (уровень/стаж/PED/lab/meso) —
   // применяется к ЛЮБОМУ варианту целевого объёма (спец-блок или баланс).
   const applyRotationModifiers = (m: string, v: number): number => {
