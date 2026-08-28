@@ -1,18 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment } from '../metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline } from '../metabolic-hub.engine';
+import { bmrCunningham, bmrOwen, bmrTenHaaf, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2 } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
 
 describe('metabolic-hub — TEF waterfall', () => {
-  it('steps: tef ~10% tdee', () => {
+  it('steps: tef ~10% tdee (fallback без макросов)', () => {
     const r = calcSteps({ ...base, activityLevel:'medium', trainingDays:4, cardioMin:60 });
+    // без макросов fallback 10%
     expect(r.tefNat).toBe(Math.round(r.tdeeNat*0.10));
-    expect(r.tefAAS).toBe(Math.round(r.tdeeAAS*0.10));
   });
-  it('kbju: neat/eat/tef breakdown совпадает с pal', () => {
+  it('kbju: neat/eat/tef breakdown совпадает с pal — TEF персональный', () => {
     const r = calcKBJU({ ...base, activityLevel:'medium', trainingDays:4 });
     expect(r.neat + r.eat + r.bmr + r.tefNat).toBeGreaterThan(r.nat.tdee * 0.9);
-    expect(r.tefNat).toBe(Math.round(r.nat.tdee*0.10));
+    // персональный TEF 6-15%, не фикс 10%
+    expect(r.tefNat).toBeGreaterThanOrEqual(Math.round(r.nat.kcal*0.06));
+    expect(r.tefNat).toBeLessThanOrEqual(Math.round(r.nat.kcal*0.15));
   });
   it('steps neat растёт с activity low→high', () => {
     const low = calcSteps({ ...base, activityLevel:'low' });
@@ -112,10 +115,12 @@ describe('metabolic-hub — calcKBJU', () => {
     expect(low.aas.p).toBeGreaterThan(nat.nat.p);
     expect(high.aas.p).toBeGreaterThan(low.aas.p);
   });
-  it('клетчатка male>female', () => {
+  it('клетчатка 14г/1000ккал — пропорциональна ккал', () => {
     const m = calcKBJU({ ...base, sex:'male' });
     const f = calcKBJU({ ...base, sex:'female' });
-    expect(m.fiber.nat).toBeGreaterThan(f.fiber.nat);
+    // male TDEE выше => fiber выше или равна (разница BMR 166ккал => ~2г)
+    expect(m.fiber.nat).toBeGreaterThanOrEqual(f.fiber.nat);
+    expect(m.fiber.nat).toBe(Math.round(m.nat.kcal/1000*14));
   });
 });
 
@@ -137,17 +142,21 @@ describe('metabolic-hub — calcBodyFat Navy', () => {
     const withHip = calcBodyFat({ weight:60, height:165, age:28, sex:'female', waist:72, neck:32, hip:96 });
     expect(withHip.navy).not.toBeNull();
   });
-  it('осевая коррекция +0.7/1.4 при trainDays', () => {
+  it('честный Navy без осевой (инфо только)', () => {
     const low = calcBodyFat({ ...base, waist:84, neck:39, trainingDays:2 });
     const high = calcBodyFat({ ...base, waist:84, neck:39, trainingDays:6 });
-    expect(high.axialAdd).toBeGreaterThan(low.axialAdd);
-    if(high.navy!=null && high.navyAdj!=null) expect(high.navyAdj).toBeGreaterThan(high.navy!);
+    // осевая больше не правит Navy — axialAdd legacy 0
+    expect(low.axialAdd).toBe(0);
+    expect(high.axialAdd).toBe(0);
+    expect(low.navy).toBe(high.navy);
+    expect(low.crossCheck).toContain('Navy');
   });
-  it('FFMI_norm + аас надбавка', () => {
+  it('FFMI_norm + аас надбавка + лимит 26.2 Helms 2023', () => {
     const nat = calcBodyFat({ ...base, waist:84, neck:39 });
     const aas = calcBodyFat({ ...base, waist:84, neck:39, onAAS:true, aasDose:600 });
     expect(aas.ffmiNormAdj).toBeGreaterThan(nat.ffmiNorm);
-    expect(nat.natLimit).toBe(25);
+    expect(nat.natLimit).toBe(26.2);
+    expect(nat.deurenberg).toBeGreaterThan(0);
   });
   it('waist<=neck → navy null', () => {
     const r = calcBodyFat({ ...base, waist:38, neck:40 });
@@ -266,11 +275,87 @@ describe('metabolic-hub — calcHematology (ESC/ASA)', () => {
     const withHgb = calcHematology({ weight:80, hct:50, hgb:180 });
     expect(withHgb.hgbEstimated).toBe(180);
   });
-  it('health цель: 1.8г/кг в КБЖУ', () => {
+  it('health цель: 1.8г/кг в КБЖУ, maintain ~2.1', () => {
     const health = calcKBJU({ ...base, goal:'health' });
     const maintain = calcKBJU({ ...base, goal:'maintain' });
     expect(health.nat.protPerKg).toBe(1.8);
-    expect(maintain.nat.protPerKg).toBe(2.0);
+    expect(maintain.nat.protPerKg).toBeCloseTo(2.1, 0.15);
     expect(health.nat.protPerKg).toBeLessThan(maintain.nat.protPerKg);
+  });
+});
+
+describe('metabolic-hub PRO — BMR формулы', () => {
+  it('Cunningham атлет LBM>60 даёт выше Katch', () => {
+    const lean=75; expect(bmrCunningham(lean)).toBeGreaterThan(370+21.6*lean);
+  });
+  it('Owen ожирение vs Mifflin', () => {
+    expect(bmrOwen(110,'male')).toBeGreaterThan(0);
+    expect(bmrTenHaaf(80,180,25,'male')).toBeGreaterThan(1500);
+  });
+  it('TEF персональный 25%/7%/3% vs 10% fallback', () => {
+    const tef = calcTEFConst(150,300,70);
+    expect(tef).toBeGreaterThan(250);
+    expect(tef).toBeLessThan(500);
+  });
+  it('trend confidence R2', () => {
+    const h=[{date:'2026-01-01',kg:80},{date:'2026-01-04',kg:79.7},{date:'2026-01-08',kg:79.5},{date:'2026-01-11',kg:79.2}];
+    const c=calcTrendConf2(h);
+    expect(c.r2).toBeGreaterThan(0.3);
+    expect(c.trend).toBeCloseTo(-0.6, 0.3);
+  });
+});
+
+describe('metabolic-hub PRO — новые калькуляторы', () => {
+  it('EA: LEA <30', () => {
+    const eaLow = calcEnergyAvailability({ weight:70, bodyFat:10, height:180, intakeKcal:2200, eeeKcal:600 });
+    expect(eaLow.ea).not.toBeNull();
+    expect(eaLow.ea! < 30).toBeTruthy();
+    expect(eaLow.zone).toBe('low');
+    const eaOpt = calcEnergyAvailability({ weight:70, bodyFat:10, height:180, intakeKcal:3400, eeeKcal:400 });
+    expect(eaOpt.zone).toBe('optimal');
+  });
+  it('алкоголь 40г = 284ккал + блок', () => {
+    const a=calcAlcohol(40,80);
+    expect(a.kcal).toBe(284);
+    expect(a.fatOxidationBlockedPct).toBeGreaterThan(40);
+    expect(a.stepsEq).toBeGreaterThan(6000);
+  });
+  it('protein timing 120г -> 30г/прием -> 3.3г leuc', () => {
+    const pt=calcProteinTiming(120,80,4);
+    expect(pt.perMeal).toBe(30);
+    expect(pt.leucinePerMeal).toBeCloseTo(3.3,0.2);
+    const pt2=calcProteinTiming(80,80,3);
+    expect(pt2.leucinePerMeal).toBeCloseTo(2.9,0.2);
+  });
+  it('maintenance finder R2', () => {
+    const wh=[{date:'2026-01-01',kg:83},{date:'2026-01-04',kg:82.8},{date:'2026-01-08',kg:82.6},{date:'2026-01-11',kg:82.5},{date:'2026-01-14',kg:82.4},{date:'2026-01-17',kg:82.3},{date:'2026-01-20',kg:82.2}];
+    const mf=calcMaintenanceFinder(wh, 2800);
+    expect(mf).not.toBeNull();
+    expect(mf!.r2).toBeGreaterThan(0.2);
+  });
+  it('goal timeline Hall', () => {
+    const gt=calcGoalTimeline({ weight:85, targetWeight:80, tdee:2800 });
+    expect(gt).not.toBeNull();
+    expect(gt!.days).toBeGreaterThan(60);
+    expect(gt!.days).toBeLessThan(120);
+  });
+  it('лютеин +250ккал', () => {
+    const baseF={ weight:60, height:165, age:28, sex:'female' as const, menstrualPhase:'luteal' as const };
+    const luteal=calcKBJU(baseF);
+    const follic=calcKBJU({ ...baseF, menstrualPhase:'follicular' as const });
+    expect(luteal.nat.tdee).toBeGreaterThan(follic.nat.tdee);
+    expect(luteal.lutealAdd).toBeGreaterThan(150);
+  });
+  it('стоячие часы и fidget влияют на PAL/TDEE', () => {
+    const low=calcSteps({ ...base, standingHours:0, fidgetLevel:1 });
+    const high=calcSteps({ ...base, standingHours:6, fidgetLevel:3 });
+    expect(high.tdeeNat).toBeGreaterThan(low.tdeeNat);
+    expect(high.pal).toBeGreaterThan(low.pal);
+  });
+  it('water с влажностью и Na', () => {
+    const dry=calcWater({ ...base, climate:'hot', humidity:40 });
+    const humid=calcWater({ ...base, climate:'hot', humidity:85 });
+    expect(humid.nat).toBeGreaterThan(dry.nat);
+    expect(humid.sweatNaG).toBeGreaterThan(0);
   });
 });

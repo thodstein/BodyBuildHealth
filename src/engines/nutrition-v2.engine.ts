@@ -24,7 +24,7 @@ export interface NutritionV2Output {
   trendKgPerWeek: number;
   metabolicAdaptation: number;
   refeedRecommended: boolean;
-  bmrMethod: 'mifflin' | 'katch_mcardle';
+  bmrMethod: 'mifflin' | 'katch_mcardle' | 'cunningham' | 'owen' | 'ten_haaf';
   lbm: number;
   proteinGPerKgLbm: number;
   carbFloorG: number;
