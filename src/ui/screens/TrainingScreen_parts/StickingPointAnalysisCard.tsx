@@ -79,7 +79,7 @@ function detectFailures(sessions: WorkoutLog[], lift: Lift, aliases: string[]): 
     const en = (e.exerciseName || e.exerciseId || '').toLowerCase();
     return ss + (aliases.some(a => en.includes(a)) ? (e.sets || []).length : 0);
   }, 0), 0);
-  const labels: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Становая тяга (классика)', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс' };
+  const labels: Record<Lift, string> = { squat: 'Присед', bench: 'Жим лёжа', deadlift: 'Становая тяга (классика)', ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс', triceps: 'Трицепс', calf: 'Икры', shrug: 'Шраги (трапеции)' };
   return {
     lift, label: labels[lift] || lift,
     currentMax,
@@ -103,6 +103,9 @@ const LIFT_ALIASES: Record<Lift, string[]> = {
   incline_press: ['incline bench', 'жим на наклонной', 'жим под углом', 'incline press'],
   sumo: ['sumo', 'сумо', 'тяга сумо', 'sumo deadlift'],
   biceps: ['biceps', 'бицепс', 'подъём на бицепс', 'сгибание', 'curl'],
+  triceps: ['triceps', 'трицепс', 'французский жим', 'разгибание'],
+  calf: ['calf', 'икр', 'подъём на носки', 'голень'],
+  shrug: ['shrug', 'шраг', 'трапеци', 'пожимание плечами'],
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -129,6 +132,15 @@ const PHASE_LABELS: Record<string, string> = {
   biceps_start: 'Сгибание: старт',
   biceps_mid: 'Сгибание: середина',
   biceps_top: 'Сгибание: пик (сокращение)',
+  triceps_start: 'Разгибание: старт',
+  triceps_mid: 'Разгибание: середина',
+  triceps_lockout: 'Разгибание: дожим',
+  calf_bottom: 'Икры: низ',
+  calf_mid: 'Икры: середина',
+  calf_top: 'Икры: верх (пик)',
+  shrug_start: 'Шраги: старт',
+  shrug_mid: 'Шраги: середина',
+  shrug_top: 'Шраги: пик',
 };
 
 const StickingPointAnalysisCard: React.FC<{ sessions: WorkoutLog[] }> = ({ sessions }) => {

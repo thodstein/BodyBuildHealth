@@ -56,6 +56,9 @@ function groupsForLiftPhase(lift: Lift, phase: WeakPoint): string[] {
     incline_press: ['chest', 'arms'],
     sumo: ['legs', 'back'],
     biceps: ['arms'],
+    triceps: ['arms'],
+    calf: ['legs'],
+    shrug: ['back', 'shoulders'],
   };
   const fallback = LIFT_FALLBACK_GROUPS[lift] ?? [];
   for (const g of fallback) groups.add(g);
@@ -113,6 +116,7 @@ const LIFT_RU: Record<Lift, string> = {
   bench: 'жим лёжа', squat: 'присед', deadlift: 'становая тяга',
   ohp: 'жим стоя', row: 'тяга в наклоне', pulldown: 'тяга верхнего блока', incline_press: 'жим на наклонной',
   sumo: 'становая тяга (сумо)', biceps: 'подъём на бицепс',
+  triceps: 'разгибание на трицепс', calf: 'подъём на носки (икры)', shrug: 'шраги (трапеции)',
 };
 
 /** Группа упражнения → что она нагружает (для rationale по тренерски). */
@@ -312,6 +316,9 @@ const LIFT_PHASES_ALL: Record<Lift, WeakPoint[]> = {
   incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
   sumo: ['sumo_start', 'sumo_mid', 'sumo_lockout'],
   biceps: ['biceps_start', 'biceps_mid', 'biceps_top'],
+  triceps: ['triceps_start', 'triceps_mid', 'triceps_lockout'],
+  calf: ['calf_bottom', 'calf_mid', 'calf_top'],
+  shrug: ['shrug_start', 'shrug_mid', 'shrug_top'],
 };
 
 /**

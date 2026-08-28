@@ -85,6 +85,7 @@ const LIFT_RU: Record<Lift, string> = {
   bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга (классика)',
   ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной',
   sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс',
+  triceps: 'Трицепс', calf: 'Икры', shrug: 'Шраги (трапеции)',
 };
 const ISSUE_RU: Record<BarPathIssue, string> = {
   forward_drift: 'Уход штанги вперёд',
@@ -104,6 +105,9 @@ const PHASE_RU: Record<string, string> = {
   inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим',
   sumo_mid: 'Сумо: середина (проход коленей)',
   biceps_start: 'Сгибание: старт', biceps_mid: 'Сгибание: середина', biceps_top: 'Сгибание: пик (сокращение)',
+  triceps_start: 'Разгибание: старт', triceps_mid: 'Разгибание: середина', triceps_lockout: 'Разгибание: дожим',
+  calf_bottom: 'Икры: низ (растяжение)', calf_mid: 'Икры: середина', calf_top: 'Икры: верх (пик)',
+  shrug_start: 'Шраги: старт', shrug_mid: 'Шраги: середина', shrug_top: 'Шраги: пик (удержание)',
 };
 /** Перевод упражнений срывов на русский (если в каталоге английский). */
 const EX_RU: Record<string,string> = {
@@ -127,8 +131,11 @@ const LIFT_PHASES: Record<Lift, WeakPoint[]> = {
   incline_press: ['inc_off', 'inc_mid', 'inc_lockout'],
   sumo: ['sumo_start', 'sumo_mid', 'sumo_lockout'],
   biceps: ['biceps_start', 'biceps_mid', 'biceps_top'],
+  triceps: ['triceps_start', 'triceps_mid', 'triceps_lockout'],
+  calf: ['calf_bottom', 'calf_mid', 'calf_top'],
+  shrug: ['shrug_start', 'shrug_mid', 'shrug_top'],
 };
-const LIFT_TO_GROUP: Record<Lift, string> = { bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest', sumo: 'legs', biceps: 'arms' };
+const LIFT_TO_GROUP: Record<Lift, string> = { bench: 'chest', squat: 'legs', deadlift: 'back', ohp: 'shoulders', row: 'back', pulldown: 'back', incline_press: 'chest', sumo: 'legs', biceps: 'arms', triceps: 'arms', calf: 'legs', shrug: 'back' };
 
 /* ── Персистентность выбора карточки (he_pl_diagnostic_card_v1) ─────────────
  * Выбор пользователя (движение/фаза/отклонения/отмеченные упражнения/слабые
@@ -382,6 +389,9 @@ export const PlDeadpointsBarPathCard: React.FC<{ dayCount?: number; template?: S
       incline_press: ['incline bench', 'жим на наклонной', 'incline press'],
       sumo: ['sumo', 'сумо', 'тяга сумо', 'sumo deadlift'],
       biceps: ['biceps', 'бицепс', 'подъём на бицепс', 'curl', 'сгибание'],
+      triceps: ['triceps', 'трицепс', 'французский жим', 'разгибание'],
+      calf: ['calf', 'икр', 'подъём на носки', 'голень'],
+      shrug: ['shrug', 'шраг', 'трапеци', 'пожимание плечами'],
     };
     const aliases = LIFT_ALIASES[lift] ?? [];
     const phaseCounts: Record<string, number> = {};

@@ -64,6 +64,9 @@ const LIFT_GUIDE: Record<Lift, { title: string; cam: string; dist: string; heigh
   pulldown: { title: 'Тяга блока — сбоку', cam: 'Сбоку', dist: '1.5–2 м', height: 'Уровень груди', light: 'Равномерный', markers: ['Локти к корпусу'], bad: [] },
   incline_press: { title: 'Наклонный жим — сбоку 45°', cam: 'Сбоку 45°', dist: '2 м', height: 'Уровень грифа', light: 'Без бликов', markers: ['Касание верха груди'], bad: [] },
   biceps: { title: 'Бицепс — сбоку', cam: 'Сбоку', dist: '1.5 м', height: 'Уровень локтя', light: 'Равномерный', markers: ['Локоть прижат'], bad: [] },
+  triceps: { title: 'Трицепс — сбоку', cam: 'Сбоку', dist: '1.5 м', height: 'Уровень локтя', light: 'Равномерный', markers: ['Локоть прижат', 'Плечо неподвижно'], bad: [] },
+  calf: { title: 'Икры — сбоку', cam: 'Сбоку', dist: '1.5 м', height: 'Уровень голени', light: 'Равномерный', markers: ['Пятка свободно', 'Полная амплитуда'], bad: [] },
+  shrug: { title: 'Шраги — спереди', cam: 'Спереди', dist: '1.5 м', height: 'Уровень плеч', light: 'Равномерный', markers: ['Плечи к ушам', 'Без рывка корпусом'], bad: [] },
 };
 
 export interface VideoAnalysisResult {

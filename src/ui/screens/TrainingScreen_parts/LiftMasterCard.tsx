@@ -74,6 +74,7 @@ const LIFT_RU: Record<Lift, string> = {
   bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга (классика)',
   ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока', incline_press: 'Жим на наклонной',
   sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс',
+  triceps: 'Трицепс', calf: 'Икры', shrug: 'Шраги (трапеции)',
 };
 const PHASE_RU: Record<string, string> = {
   off_chest: 'Сход с груди', mid: 'Средняя точка', lockout: 'Дожим', start: 'Старт',

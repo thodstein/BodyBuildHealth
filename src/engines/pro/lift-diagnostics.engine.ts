@@ -254,6 +254,7 @@ export function phaseForReps(reps: number, lift: Lift): WeakPoint | null {
     bench: 'off_chest', squat: 'bottom', deadlift: 'start',
     ohp: 'ohp_start', row: 'row_start', pulldown: 'pd_top', incline_press: 'inc_off',
     sumo: 'sumo_start', biceps: 'biceps_start',
+    triceps: 'triceps_start', calf: 'calf_bottom', shrug: 'shrug_start',
   };
   let candidate: WeakPoint | null = null;
   if (reps <= 2) candidate = MAX_MOMENT_PHASE[lift] ?? null;

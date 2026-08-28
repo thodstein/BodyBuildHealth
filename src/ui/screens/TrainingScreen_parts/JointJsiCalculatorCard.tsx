@@ -14,7 +14,7 @@ const DIM='#ffffff';
 const CARD: React.CSSProperties = { padding:12, borderRadius:10, background:'rgba(24,24,27,0.45)', border:'1px solid rgba(255,255,255,0.08)', marginTop:8 };
 const btn: React.CSSProperties = { padding:'5px 10px', borderRadius:7, cursor:'pointer', fontSize:10, fontWeight:700, minHeight:32 };
 
-const LIFT_RU: Record<Lift,string> = { bench:'Жим лёжа', squat:'Присед', deadlift:'Становая', ohp:'Жим стоя', row:'Тяга в наклоне', pulldown:'Тяга блока', incline_press:'Наклонный жим', sumo:'Сумо', biceps:'Бицепс' };
+const LIFT_RU: Record<Lift,string> = { bench:'Жим лёжа', squat:'Присед', deadlift:'Становая', ohp:'Жим стоя', row:'Тяга в наклоне', pulldown:'Тяга блока', incline_press:'Наклонный жим', sumo:'Сумо', biceps:'Бицепс', triceps:'Трицепс', calf:'Икры', shrug:'Шраги' };
 const AMPLITUDE_OPTS: {id:AmplitudeMode; label:string}[] = [
   {id:'full', label:'Полная'}, {id:'partial_top', label:'Частичная верх'}, {id:'partial_stretched', label:'Частичная растянутая (HIGH RISK)'}];
 const JOINTS: JointId[] = ['wrist','elbow','shoulder','spine','hip','knee','ankle'];

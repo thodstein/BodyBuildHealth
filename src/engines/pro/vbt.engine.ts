@@ -134,6 +134,7 @@ const VELOCITY_STICKING_PHASE: Record<Lift, WeakPoint> = {
   bench: 'off_chest', squat: 'bottom', deadlift: 'start',
   ohp: 'ohp_start', row: 'row_start', pulldown: 'pd_top', incline_press: 'inc_off',
   sumo: 'sumo_start', biceps: 'biceps_start',
+  triceps: 'triceps_mid', calf: 'calf_mid', shrug: 'shrug_mid',
 };
 
 export interface VelocityDiagnosis {
@@ -166,7 +167,9 @@ export function diagnoseVelocity(
   // incline_press→bench (жимовый паттерн), sumo→deadlift (тяговый паттерн),
   // biceps→row (сгибательный паттерн) — ближайшие профили.
   const vbtLift: VBTLift = lift === 'pulldown' ? 'row' : lift === 'incline_press' ? 'bench'
-    : lift === 'sumo' ? 'deadlift' : lift === 'biceps' ? 'row' : lift;
+    : lift === 'sumo' ? 'deadlift' : lift === 'biceps' ? 'row'
+    : lift === 'triceps' ? 'bench' : lift === 'calf' ? 'squat' : lift === 'shrug' ? 'row'
+    : (lift as unknown as VBTLift);
   let e1RMByVelocity: number | null = null;
   if (weightKg && weightKg > 0 && lastVelocity > 0) {
     e1RMByVelocity = estimate1RMFromVelocity(vbtLift, lastVelocity, weightKg).e1RM || null;

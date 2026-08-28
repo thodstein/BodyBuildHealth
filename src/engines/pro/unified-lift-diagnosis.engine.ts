@@ -115,6 +115,7 @@ const LIFT_RU: Record<Lift, string> = {
   bench: 'Жим лёжа', squat: 'Присед', deadlift: 'Становая тяга (классика)',
   ohp: 'Жим стоя', row: 'Тяга в наклоне', pulldown: 'Тяга верхнего блока',
   incline_press: 'Жим на наклонной', sumo: 'Становая тяга (сумо)', biceps: 'Подъём на бицепс',
+  triceps: 'Трицепс', calf: 'Икры', shrug: 'Трапеции (шраги)',
 };
 
 function parseNum(s: string | undefined): number | null {
@@ -232,6 +233,7 @@ export function groupsForPhase(lift: Lift, phase: WeakPoint): string[] {
     bench: ['chest', 'arms'], squat: ['legs'], deadlift: ['back', 'legs'],
     ohp: ['shoulders', 'arms'], row: ['back', 'arms'], pulldown: ['back', 'arms'],
     incline_press: ['chest', 'arms'], sumo: ['legs', 'back'], biceps: ['arms'],
+    triceps: ['arms'], calf: ['legs'], shrug: ['back', 'shoulders'],
   };
   for (const g of (FALLBACK[lift] ?? [])) set.add(g);
   return [...set];
