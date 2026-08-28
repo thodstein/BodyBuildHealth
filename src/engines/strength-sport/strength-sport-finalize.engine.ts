@@ -5,6 +5,7 @@
 import type { StrengthSportPlan } from './strength-sport.types';
 import { getWL, getStrong } from './strength-sport-volume';
 import { sessionLimitsFor, validateSync } from './strength-sport-limits';
+import { calcDOTS, calcWilks, calcIPFGL } from '../pl-points.engine';
 
 export interface FinalizeOptions {
   outsideLoad?: any;
@@ -148,6 +149,22 @@ export function buildStrengthSportReport(plan: StrengthSportPlan): string {
   const lines: string[] = [];
   lines.push(`Силовой экстрим/ТА: ${plan.mode} · ${plan.goal} · ${plan.level} · ${plan.weeks} нед · ${plan.patternId}`);
   if (plan.inputSnapshot?.focus) lines.push(`Фокус: ${plan.inputSnapshot.focus} · Методика: ${plan.inputSnapshot.methodology || 'compound_first'} · DUP: ${plan.inputSnapshot.dupMode || 'off'} · Техника: ${plan.inputSnapshot.intensityTech || 'none'}`);
+  // P1: Wilks/DOTS/IPF GL если есть вес тела
+  const bw = (plan.inputSnapshot as any)?.bodyweight as number | undefined;
+  const sex = (plan.inputSnapshot as any)?.sex as string | undefined;
+  if (typeof bw === 'number' && bw > 30) {
+    const wm = plan.workMax || {};
+    let total = 0;
+    if (plan.mode === 'weightlifting') total = (wm.snatch||0) + (wm.cleanJerk||wm.clean||0);
+    else if (plan.mode === 'strongman') total = (wm.deadlift||0) + (wm.logPress||wm.overheadPress||0) + (wm.backSquat||0);
+    else total = (wm.snatch||0) + (wm.cleanJerk||0) + (wm.backSquat||0);
+    if (total > 0) {
+      const dots = calcDOTS(bw, total);
+      const wilks = calcWilks(bw, total);
+      const ipf = calcIPFGL(bw, total);
+      lines.push(`Вес: ${bw}кг${sex?' '+sex:''} · Тотал ~${total}кг · DOTS ${dots} · Wilks ${wilks} · IPF GL ${ipf}`);
+    }
+  }
   lines.push(`Сеты/нед: ${plan.weeksData.map(w => `Н${w.week}:${w.totalSets}${w.deload?' (делод)':''}`).join(' | ')}`);
   lines.push(`Тоннаж/нед: ${plan.weeksData.map(w => `Н${w.week}:${Math.round((w.totalTonnage || 0)/1000)}т`).join(' | ')}`);
   // heatmap per lift
