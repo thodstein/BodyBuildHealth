@@ -926,7 +926,7 @@ function sessionShareFor(mavRot: number, sessionsPerWeek: number, role: 'primary
  *  + per-exercise кап: максимум 8 сетов на упражнение (ББ-практика).
  *  C6: isDeload — во время deload floor=2 НЕ применяется (4 упр × 2 = 8 сетов
  *  нарушает intended deload ~4-6 сетов). floor=1 для deload, floor=2 для рабочих недель. */
-export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>, isDeload: boolean = false): void {
+export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<string, number>, isDeload: boolean = false, opts?: { level?: string; trainingYears?: number }): void {
   const syncWorkSets = (ex: BBExercise): void => {
     const target = Math.max(0, ex.sets || 0);
     const current = Array.isArray(ex.workSets) ? ex.workSets : [];
@@ -948,14 +948,15 @@ export function normalizeWeekMrv(weekSessions: BBSession[], mrvByMuscle: Record<
     }
   }
   for (const [m, info] of Object.entries(sums)) {
-    // Per-exercise cap: не более 8 сетов на одно упражнение (ББ-практика).
+    // Per-exercise cap: единый источник perExerciseCap (8 для enhanced 3+ back/chest/quads, иначе 5)
     // BUG-B8: для малых мышц (forearms/calves/abs) cap = 6 — они не требуют
     // большого объёма за одно упражнение (Schoenfeld: small muscles 4-6 сетов/упр).
     // P1-4: per-exercise FLOOR — минимум 2 сета (1 сет = разминка, не рабочий объём).
-    const perExCap = 5; // унификация: perExCap triple 8/6/5 -> 5 (freeze, паритет с finalize cap 5)
+    const perExCapFor = (muscle: string) => (opts?.level ? perExerciseCap(opts.level, muscle, opts.trainingYears) : 5);
     const floor = isDeload ? 1 : 2; // C6: deload floor=1, рабочая неделя floor=2
     for (const ex of info.exs) {
-      if (ex.sets > perExCap) ex.sets = perExCap;
+      const cap = perExCapFor(ex.muscle);
+      if (ex.sets > cap) ex.sets = cap;
       if (ex.sets < floor) ex.sets = floor;
       syncWorkSets(ex);
     }
@@ -2842,6 +2843,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
       const specMrv = specializationMrvFactor(m, specRes);
       if (specMrv !== 1) capMrv = Math.round(capMrv * specMrv);
+      // Blast/Cruise: потолок должен позволять blast-неделю (+15%), иначе blast overflow
+      if (input.blastCruiseEnabled) capMrv = Math.round(capMrv * 1.15);
       mrvByMuscle[m] = capMrv;
     }
   }
@@ -2864,6 +2867,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       }
       const specMrvPro = specializationMrvFactor(m, specRes);
       if (specMrvPro !== 1) capMrv = Math.round(capMrv * specMrvPro);
+      if (input.blastCruiseEnabled) capMrv = Math.round(capMrv * 1.15);
       mrvByMuscle[m] = capMrv;
     }
   }
@@ -3209,8 +3213,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       sess.exercises.length = 0; sess.exercises.push(...reordered);
       weekSessions.push(sess);
     }
-    // fix D: капаем недельный объём каждой мышцы по её истинному MRV
-    normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload');
+    // fix D: капаем недельный объём каждой мышцы по её истинному MRV — единый perExerciseCap
+    normalizeWeekMrv(weekSessions, mrvByMuscle, phase === 'deload', { level: input.level, trainingYears: input.trainingYears });
     weeks.push({ week: w, phase, deload: phase === 'deload', sessions: weekSessions });
     // Запоминаем упражнения этой недели для мягкого freshness блокировки следующей.
     // В режиме «запрет» (forbid) freshness отключён — строго те же упражнения.
