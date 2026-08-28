@@ -43,11 +43,11 @@ export const DUP_PRESETS: Record<Exclude<DUPMode, 'none'>, DUPDayCharacter[]> = 
     { character: 'тяж', repTarget: [3, 5], rirTarget: 1, label: 'Силовой день (RPE 9)' },
     { character: 'памп', repTarget: [8, 12], rirTarget: 3, label: 'Гипертрофийный день (RPE 7)' },
   ],
-  // full_dup: полный DUP — 3 разных дня (сила/гиперт/выносливость)
+  // full_dup: полный DUP — 3 разных дня (сила/гиперт/выносливость) — fix: гиперт день должен быть памп
   full_dup: [
     { character: 'тяж', repTarget: [3, 5], rirTarget: 1, label: 'Силовой день (5×5, RIR 1)' },
-    { character: 'тяж', repTarget: [8, 12], rirTarget: 3, label: 'Гипертрофийный день (3×10, RIR 3)' },
-    { character: 'памп', repTarget: [15, 20], rirTarget: 4, label: 'Метаболический день (4×20, RIR 4)' },
+    { character: 'памп', repTarget: [8, 12], rirTarget: 2, label: 'Гипертрофийный день (3×10, RIR 2)' },
+    { character: 'памп', repTarget: [15, 20], rirTarget: 3, label: 'Метаболический день (4×20, RIR 3)' },
   ],
 };
 
@@ -66,12 +66,12 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
   const preset = DUP_PRESETS[config.mode];
   if (!preset) return plan;
 
-  // Глубокая копия плана
+  // Глубокая копия плана — deep clone workSets объекты (fix P0: shallow copy мутировал оригинал)
   const newPlan: BBPlan = {
     ...plan,
     weeks: plan.weeks.map(w => ({
       ...w,
-      sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: [...e.workSets] })) })),
+      sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: e.workSets.map(ws => ({ ...ws })) })) })),
     })),
   };
 
