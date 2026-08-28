@@ -392,6 +392,23 @@ export const PeakWeekTab: React.FC = () => {
       <ContestPrepConfigEditor value={draft} onChange={patch} />
 
       {result && (
+        <div style={CARD}>
+          <div style={CARD_TITLE}>🗺 Гент-диаграмма фаз</div>
+          <div style={{ display:'flex', gap:2, height:14, marginBottom:6 }}>
+            {['preparation','final_preparation','taper','peak_week'].map(k => {
+              const c = result.config as any;
+              const weeks = k==='preparation'?8:k==='final_preparation'?2:k==='taper'?c.weeksOut:1;
+              const color = k==='preparation'?'#3b82f6':k==='final_preparation'?'#8b5cf6':k==='taper'?'#f59e0b':'#ec4899';
+              return <div key={k} title={k} style={{ flex:weeks, background:color, borderRadius:3, opacity:0.9 }} />;
+            })}
+          </div>
+          <div style={{ display:'flex', gap:6, fontSize:8, color:DIM }}>
+            <span style={{ color:'#3b82f6' }}>■ Подготовка</span><span style={{ color:'#8b5cf6' }}>■ Финал</span><span style={{ color:'#f59e0b' }}>■ Taper</span><span style={{ color:'#ec4899' }}>■ Пик</span>
+          </div>
+        </div>
+      )}
+
+      {result && (
         <>
           <div style={CARD}>
             <div style={CARD_TITLE}>📊 Готовность к пику</div>
