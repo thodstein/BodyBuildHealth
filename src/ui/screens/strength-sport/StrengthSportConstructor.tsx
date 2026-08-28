@@ -448,7 +448,7 @@ export const StrengthSportConstructor: React.FC = () => {
               <input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} />
               <label style={{ color: '#fff', fontSize: 11 }}>RPE: {outside.avgSRPE}</label>
               <input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} />
-              <div style={{ fontSize: 11, color: '#00e68a' }}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём ×${outsideMetrics.volumeMultiplier}` : ''}</div>
+              <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : 'info'}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём зала ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference==='high'?'высокая': outsideMetrics.interference==='medium'?'средняя': outsideMetrics.interference==='low'?'низкая': outsideMetrics.interference})` : 'Вне зала: нет данных — объём 100%'}</InfoBanner>
             </>
           )}
           <button onClick={() => setStep('split')} style={{ padding: '8px 12px', borderRadius: 8, background: '#00e68a', color: '#000', fontWeight: 700, cursor: 'pointer' }}>Далее → Сплит</button>
@@ -481,7 +481,7 @@ export const StrengthSportConstructor: React.FC = () => {
           <div style={{ background: 'rgba(0,230,138,0.1)', padding: 10, borderRadius: 10, color: '#fff', fontSize: 11, whiteSpace: 'pre-wrap' }}>{buildStrengthSportReport(plan)}</div>
           {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Quality heatmap (подъёмы/нед vs MEV/MAV/MRV) — P0-4 расширение:</div>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Карта качества (подъёмы/нед vs MEV/MAV/MRV):</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {plan.weeksData.map(wk => {
                 const sn = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
@@ -514,17 +514,17 @@ export const StrengthSportConstructor: React.FC = () => {
                 return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {carry}м carry</span>;
               })}
             </div>
-            {acwr && <div style={{ marginTop: 6, fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a' }}>ACWR {acwr.ratio} ({acwr.zone}) — объём скорректирован ×{acwr.zone==='dangerous'?0.65: acwr.zone==='caution'?0.85:1}</div>}
+            {acwr && <div style={{ marginTop: 6, fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a' }}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} — объём скорректирован ×{acwr.zone==='dangerous'?0.65: acwr.zone==='caution'?0.85:1}</div>}
           </div>
           {diaryLoad != null && (
             <div style={{ background: diaryLoad > 30 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)', padding: 6, borderRadius: 6, border: `1px solid ${diaryLoad > 30 ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.06)'}`, color: diaryLoad > 30 ? '#f59e0b' : '#fff', fontSize: 10 }}>
-              Дневник (изолированно): нагрузка 7д ≈ {diaryLoad}{diaryLoad > 30 ? ' — высоко, рассмотрите лёгкую неделю' : ' — норма'}
+              Дневник (изолированно): нагрузка 7д ≈ {diaryLoad}{diaryLoad > 30 ? ' — высоко, рассмотрите лёгкую неделю' : ' — норма'} {acwr? `· ACWR ${acwr.ratio} · ${ruLabel(ZONE_RU, acwr.zone)}`:''}
             </div>
           )}
           {plan.weeksData.map(wk => (
-            <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
+            <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8, border: wk.deload? '1px solid rgba(245,158,11,0.35)': (wk as any).taper?'1px solid rgba(59,130,246,0.35)' : '1px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#00e68a', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {wk.phase}{wk.deload ? ' · делод' : ''} · {wk.totalSets} сетов · {wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000 |0}т тоннаж</span>
+                <span style={{ color: wk.deload? '#f59e0b' : (wk as any).taper? '#60a5fa' : '#00e68a', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {ruLabel(PHASE_RU, wk.phase)}{wk.deload ? ' · разгрузка' : (wk as any).taper? ' · тапер':''} · {wk.totalSets} сетов · {wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000 |0}т тоннаж</span>
                 <button onClick={() => {
                   const txt = wk.sessions.map(s=> `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e=> `  ${e.name} ${e.sets}x${e.reps} ${e.weight}кг RIR${e.rir} ${e.tempo} отдых${e.restSeconds}с${e.comment? ' // '+e.comment:''}`).join('\n')).join('\n\n');
                   navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n`+txt); setMsg(`Неделя ${wk.week} скопирована`);

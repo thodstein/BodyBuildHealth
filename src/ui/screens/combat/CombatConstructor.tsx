@@ -334,11 +334,11 @@ export const CombatConstructor: React.FC = () => {
             </div>
           </div>
           <label style={{ color: '#fff', fontSize: 12 }}>Уровень</label>
-          <select value={level} onChange={e => setLevel(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+          <select value={level} onChange={e => setLevel(e.target.value as any)} style={INPUT}>
             <option value="beginner">Новичок</option>
             <option value="intermediate">Средний</option>
             <option value="advanced">Продвинутый</option>
-            <option value="enhanced">Enhanced</option>
+            <option value="enhanced">На курсе</option>
           </select>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
             <label style={{ color: '#fff', fontSize: 11 }}>Недель: {weeks} <input type="range" min={2} max={12} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ width:'100%' }} /></label>
@@ -378,16 +378,16 @@ export const CombatConstructor: React.FC = () => {
             <label style={{ color: '#fff', fontSize: 11 }}>Вес тела: <input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={{ width:'100%', padding: 4, borderRadius: 6 }} /> кг</label>
             <label style={{ color: '#fff', fontSize: 11 }}>Возраст: <input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||28)} style={{ width:'100%', padding: 4, borderRadius: 6 }} /></label>
           </div>
-          {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#a855f7', background:'rgba(255,255,255,0.04)', padding:6, borderRadius:6 }}>ACWR {acwr.ratio} · {acwr.zone} {acwr.zone==='dangerous'?'— объём ×0.60,RIR+2': acwr.zone==='caution'?'— ×0.85,RIR+1': acwr.zone==='undertrained'?'— добавить объём':''} · дневник sRPE 28д</div>}
+          {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#a855f7', background:'rgba(255,255,255,0.04)', padding:6, borderRadius:6 }}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60,RIR+2': acwr.zone==='caution'?'— ×0.85,RIR+1': acwr.zone==='undertrained'?'— добавить объём':''} · дневник sRPE 28д</div>}
           {hrvLine && <div style={{ fontSize: 10, color: hrvLine.includes('dangerous')?'#ef4444': hrvLine.includes('caution')?'#eab308':'#10b981', background:'rgba(255,255,255,0.04)', padding:6, borderRadius:6 }}>{hrvLine}</div>}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
             <label style={{ color: '#fff', fontSize: 11 }}>VBT потеря: {velocityLoss}% <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ width:'100%' }} /></label>
             <div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Vitruve: &gt;20% → RIR+1, &gt;30% → стоп сет. Влив в бюджет ×{velocityLoss>20?0.9:1}</div>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
             {(['bench','squat','deadlift','chest','back','shoulders','quads'] as const).map(k => (
-              <label key={k} style={{ color: '#fff', fontSize: 11 }}>{k}: <input type="number" value={(workMax as any)[k] || 0} onChange={e=> setWorkMax(s=> ({...s, [k]: Number(e.target.value)||0}))} style={{ width:'100%', padding:4, borderRadius:6 }} /></label>
+              <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || 0} onChange={e=> setWorkMax(s=> ({...s, [k]: Number(e.target.value)||0}))} style={INPUT} placeholder="кг" /></Field>
             ))}
           </div>
           <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>WorkMax группы → BW×коэфф если пусто. Точные — ниже.</div>
@@ -402,23 +402,23 @@ export const CombatConstructor: React.FC = () => {
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
             <label style={{ color: '#fff', fontSize: 11 }}>Методика порядка
-              <select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={{ padding: 6, borderRadius: 6, width:'100%', marginTop:2 }}>
+              <select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={{ ...INPUT, width:'100%', marginTop:2 }}>
                 <option value="compound_first">База первой</option>
                 <option value="pre_exhaust">Предутомление</option>
                 <option value="post_exhaust">Постутомление</option>
               </select>
             </label>
             <label style={{ color: '#fff', fontSize: 11 }}>DUP волны
-              <select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={{ padding: 6, borderRadius: 6, width:'100%', marginTop:2 }}>
+              <select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={{ ...INPUT, width:'100%', marginTop:2 }}>
                 <option value="off">Выкл</option>
                 <option value="power_endurance">Сила/выносливость</option>
                 <option value="heavy_light">Тяж/лёг волна</option>
-                <option value="conjugate">Conjugate</option>
+                <option value="conjugate">Сопряжённая</option>
               </select>
             </label>
           </div>
           <label style={{ color: '#fff', fontSize: 11 }}>Интенс-техника
-            <select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={{ padding: 6, borderRadius: 6, width:'100%' }}>
+            <select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={{ ...INPUT, width:'100%' }}>
               <option value="none">Нет</option>
               <option value="rest_pause">Rest-pause (аксесс.)</option>
               <option value="myo_reps">Myo-reps (хват)</option>
@@ -443,30 +443,29 @@ export const CombatConstructor: React.FC = () => {
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
-            <label style={{ color: '#fff', fontSize: 11 }}>Оборудование</label>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {['barbell','dumbbell','machine','cable','other'].map(eq => (
-                <label key={eq} style={{ color: '#fff', fontSize: 11, display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <input type="checkbox" checked={equipment.includes(eq)} onChange={e => setEquipment(s => e.target.checked ? [...s, eq] : s.filter(x=>x!==eq))} /> {eq}
-                </label>
-              ))}
-            </div>
-            <label style={{ color: '#fff', fontSize: 11 }}>Щадящие травмы (neck/knee/shoulder/wrist/back/ankle, через запятую)</label>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="neck, wrist, knee" style={{ flex: 1, padding: 4, borderRadius: 6, fontSize: 11 }} />
-              <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, background: '#a855f7', color: '#fff', cursor: 'pointer' }}>Применить</button>
-            </div>
-            {injuries.length>0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>Щадящий: {injuries.map((j:any)=> j.location).join(', ')} — вес ×0.6-0.7, +RIR, фильтр 풀</div>}
-            <label style={{ color: '#fff', fontSize: 11 }}>Мобильность (ограничения)</label>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {['shoulder','hip','knee','ankle','wrist','neck','lower_back'].map(m => (
-                <label key={m} style={{ color: '#fff', fontSize: 10, display: 'flex', gap: 3, alignItems: 'center' }}>
-                  <input type="checkbox" checked={mobility.includes(m)} onChange={e => setMobility(s => e.target.checked ? [...s, m] : s.filter(x=> x!==m))} /> {m}
-                </label>
-              ))}
-            </div>
-          </div>
+          <SectionCard title="🛠 Оборудование и ограничения">
+            <Field label="Доступное оборудование (пусто — всё доступно)">
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(['barbell','dumbbell','machine','cable','other'] as const).map(eq => (
+                  <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{EQUIP_RU[eq]}</ChipToggle>
+                ))}
+              </div>
+            </Field>
+            <Field label="Травмы — щадящий режим (через запятую)" hint="Снижает вес ×0.6 и повышает RIR, фильтрует опасные движения">
+              <div style={{ display:'flex', gap:6 }}>
+                <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: шея, колено, плечо, кисть" style={{ ...INPUT, flex:1 }} />
+                <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); setMsg(parts.length? 'Травмы применены':'Список очищен'); }} style={BTN_SMALL}>Применить</button>
+              </div>
+              {injuries.length>0 && <InfoBanner tone="warn">Щадящий режим: {injuries.map((j:any)=> j.location).join(', ')} — вес снижен</InfoBanner>}
+            </Field>
+            <Field label="Ограничения мобильности">
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(['shoulder','hip','knee','ankle','wrist','neck','lower_back'] as const).map(m => (
+                  <ChipToggle key={m} active={mobility.includes(m)} onClick={()=> setMobility(s=> s.includes(m)? s.filter(x=> x!==m): [...s,m])}>{MOBILITY_RU[m]}</ChipToggle>
+                ))}
+              </div>
+            </Field>
+          </SectionCard>
           <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля (workMax/вес/травмы/ACWR)</button>
           <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#a855f7', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
         </div>
@@ -503,8 +502,8 @@ export const CombatConstructor: React.FC = () => {
                     <InfoBanner tone="info">Спарринг load = {sparringHard*90*8.5 + sparringTech*60*5.5 + sparringWrest*75*7.5} load → {sparringHard+sparringTech+sparringWrest}×/нед</InfoBanner>
                   </>
                 )}
-                <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : 'info'}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём зала ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference})` : 'Вне зала: нет данных — объём 100%'}</InfoBanner>
-                <div style={HINT_SM}>Тяж ноги не ставим за день до high внезальной. При внезал ≥5× — кондиция зала авто 0, бюджет ×{outsideMetrics?.volumeMultiplier ?? 1}.</div>
+                <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : 'info'}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём зала ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference==='high'?'высокая': outsideMetrics.interference==='medium'?'средняя': outsideMetrics.interference==='low'?'низкая': outsideMetrics.interference})` : 'Вне зала: нет данных — объём 100%'}</InfoBanner>
+                <div style={HINT_SM}>Тяж ноги не ставим за день до высокой внезальной. При внезал ≥5× — кондиция зала авто 0, бюджет ×{outsideMetrics?.volumeMultiplier ?? 1}.</div>
               </>
             )}
           </SectionCard>
@@ -524,7 +523,7 @@ export const CombatConstructor: React.FC = () => {
 
       {step === 'split' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
-          <div style={{ color: '#fff', fontSize: 11, background:'rgba(168,85,247,0.1)', padding:6, borderRadius:6 }}>Рекомендуемый: <b style={{ color:'#a855f7' }}>{recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).name}</b> {patternId ? `· выбран: ${COMBAT_PATTERNS.find(p=>p.id===patternId)?.name || patternId}` : '· авто'} · модель <b>{periodizationModel}</b></div>
+          <div style={{ color: '#fff', fontSize: 11, background:'rgba(168,85,247,0.1)', padding:6, borderRadius:6 }}>Рекомендуемый: <b style={{ color:'#a855f7' }}>{recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).name}</b> {patternId ? `· выбран: ${COMBAT_PATTERNS.find(p=>p.id===patternId)?.name || patternId}` : '· авто'} · модель <b>{ruLabel(PERIODIZATION_RU, periodizationModel)}</b></div>
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             {COMBAT_PATTERNS.map(p => {
               const active = patternId ? patternId===p.id : p.id===recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).id;
@@ -539,8 +538,8 @@ export const CombatConstructor: React.FC = () => {
               );
             })}
           </div>
-          <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>ATR 5/3/2: 10нед → 5 Accum (6-10rep/RIR2-3) → 3 Trans (3-6/RIR1-2) → 2 Real (taper). Conjugate — ротация max/dynamic/repetition. Linear — gpp/power/taper.</div>
-          <button onClick={build} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Собрать PRO-план {patternId ? `(${patternId})` : ''} · {periodizationModel}</button>
+          <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>ATR 5/3/2: 10 нед → 5 накопление (6-10/RIR2-3) → 3 трансформация (3-6/RIR1-2) → 2 реализация (тапер). Сопряжённая — ротация макс/динам/повтор. Линейная — ОФП/сила/тапер.</div>
+          <button onClick={build} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Собрать PRO-план {patternId ? `(${patternId})` : ''} · {ruLabel(PERIODIZATION_RU, periodizationModel)}</button>
         </div>
       )}
 
@@ -552,18 +551,18 @@ export const CombatConstructor: React.FC = () => {
             <div style={{ background:'rgba(59,130,246,0.08)', padding:8, borderRadius:8, border:'1px solid rgba(59,130,246,0.18)' }}>
               <div style={{ color:'#60a5fa', fontWeight:700, fontSize:11, marginBottom:4 }}>Кондиция (3 системы) — вне зала {outside?.sessionsPerWeek ?? 0}× ({outsideMetrics?.volumeMultiplier ?? 1}×)</div>
               {(plan as any).conditioning.sessions.map((week:any[], wi:number)=> (
-                <div key={wi} style={{ fontSize:10, color:'#fff', marginTop:4 }}><b>Нед {wi+1} {plan.weeksData[wi]?.phase}:</b> {week.length? week.map((s:any)=> `${s.modality} ${s.durationMin}′ ${s.intervals||''}`).join(' | ') : '— внезал покрывает'}</div>
+                <div key={wi} style={{ fontSize:10, color:'#fff', marginTop:4 }}><b>Нед {wi+1} {ruLabel(PHASE_RU, plan.weeksData[wi]?.phase)}:</b> {week.length? week.map((s:any)=> `${s.modality} ${s.durationMin}′ ${s.intervals||''}`).join(' | ') : '— внезал покрывает'}</div>
               ))}
             </div>
           )}
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Quality heatmap (сеты/нед vs MEV/MRV):</div>
+            <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Карта качества (сеты/нед vs MEV/MRV):</div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               {plan.weeksData.map(wk => {
                 const neck = wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('neck')).reduce((a,e)=> a+e.sets,0),0);
                 const lm = getCombat(plan.level,'neck'); const st = lm ? (neck<lm.mev?'below': neck<=lm.mav?'optimal': neck<=lm.mrv?'high':'over') : 'optimal';
                 const col = st==='below'?'#f59e0b': st==='optimal'?'#a855f7': st==='high'?'#eab308':'#ef4444';
-                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week} {wk.phase}: шея {neck}{wk.deload?' делод': (wk as any).taper?' taper':''}</span>;
+                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week} {ruLabel(PHASE_RU, wk.phase)}: шея {neck}{wk.deload?' · разгрузка': (wk as any).taper?' · тапер':''}</span>;
               })}
             </div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
@@ -584,13 +583,13 @@ export const CombatConstructor: React.FC = () => {
           </div>
           {diaryLoad != null && (
             <div style={{ background: diaryLoad > 30 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)', padding: 6, borderRadius: 6, border: `1px solid ${diaryLoad > 30 ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.06)'}`, color: diaryLoad > 30 ? '#f59e0b' : '#fff', fontSize: 10 }}>
-              Дневник (изолированно): нагрузка 7д ≈ {diaryLoad}{diaryLoad > 30 ? ' — высоко, рассмотрите лёгкую неделю' : ' — норма'} {acwr? `· ACWR ${acwr.ratio} ${acwr.zone}`:''}
+              Дневник (изолированно): нагрузка 7д ≈ {diaryLoad}{diaryLoad > 30 ? ' — высоко, рассмотрите лёгкую неделю' : ' — норма'} {acwr? `· ACWR ${acwr.ratio} · ${ruLabel(ZONE_RU, acwr.zone)}`:''}
             </div>
           )}
           {plan.weeksData.map(wk => (
             <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8, border: wk.deload? '1px solid rgba(245,158,11,0.35)': (wk as any).taper?'1px solid rgba(59,130,246,0.35)' : '1px solid transparent' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: wk.deload? '#f59e0b' : (wk as any).taper? '#60a5fa' : '#a855f7', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {wk.phase}{wk.deload ? ' · делод' : (wk as any).taper? ' · тапер':''} · {wk.totalSets} сетов{(wk as any).totalTonnage? ` · ${((wk as any).totalTonnage/1000).toFixed(1)}т`:''}</span>
+                <span style={{ color: wk.deload? '#f59e0b' : (wk as any).taper? '#60a5fa' : '#a855f7', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {ruLabel(PHASE_RU, wk.phase)}{wk.deload ? ' · разгрузка' : (wk as any).taper? ' · тапер':''} · {wk.totalSets} сетов{(wk as any).totalTonnage? ` · ${((wk as any).totalTonnage/1000).toFixed(1)}т`:''}</span>
                 <button onClick={() => {
                   const txt = wk.sessions.map(s=> `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e=> `  ${e.name} ${e.sets}x${e.reps} ${e.weight?e.weight+'кг':''} RIR${e.rir} ${e.tempo} отдых${e.restSeconds}с${e.comment? ' // '+e.comment:''}`).join('\n')).join('\n\n');
                   navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n`+txt); setMsg(`Неделя ${wk.week} скопирована`);
