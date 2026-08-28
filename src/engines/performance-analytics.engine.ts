@@ -219,26 +219,24 @@ export function projectedTimeline(current1RM: number, target1RM: number, weeklyG
   return Math.ceil(Math.log(target1RM / current1RM) / Math.log(1 + weeklyGain));
 }
 
+/** Holt double exponential smoothing — прогноз e1RM на N шагов. Чистая функция. */
+export function holtForecast(series: number[], alpha = 0.4, beta = 0.2, steps = 4): number[] {
+  if (series.length < 2) return Array(steps).fill(series[0] ?? 0);
+  let level = series[0];
+  let trend = series[1] - series[0];
+  for (let i = 1; i < series.length; i++) {
+    const prevLevel = level;
+    level = alpha * series[i] + (1 - alpha) * (level + trend);
+    trend = beta * (level - prevLevel) + (1 - beta) * trend;
+  }
+  const out: number[] = [];
+  for (let h = 1; h <= steps; h++) out.push(Math.round((level + h * trend) * 10) / 10);
+  return out;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. Wilks/Dots/IPF for any federation
+// 5. Wilks/Dots/IPF — re-export канона из relative-strength.engine.ts (P0-3 дедуп)
 // ═══════════════════════════════════════════════════════════════════════════
-
-export function dotsScore(total: number, bw: number, sex: 'male' | 'female'): number {
-  const a = sex === 'male' ? -0.0000010930 : -0.0000010702;
-  const b = sex === 'male' ? 0.0007391293 : 0.0007195833;
-  const c = sex === 'male' ? -0.1918759221 : -0.1881243692;
-  const d = sex === 'male' ? 24.0900756 : 22.8480074;
-  const e = sex === 'male' ? -307.75076 : -281.2251;
-  return Math.round((total * 500 / (a * bw**4 + b * bw**3 + c * bw**2 + d * bw + e)) * 100) / 100;
-}
-
-export function ipfGLPoints(total: number, bw: number, sex: 'male' | 'female'): number {
-  const A = sex === 'male' ? 1236.25115 : 758.63878;
-  const B = sex === 'male' ? 1449.21864 : 949.31382;
-  const C = sex === 'male' ? 0.01644 : 0.00936;
-  return Math.round((100 / (A - B * Math.exp(-C * bw))) * total * 10) / 10;
-}
-
-export function relativeStrength(total: number, bw: number): number {
-  return Math.round((total / bw) * 100) / 100;
-}
+export { dotsScore, ipfGLPoints, relativeStrength } from './pro/relative-strength.engine';
+/** @deprecated используйте dotsScore/ipfGLPoints из pro/relative-strength.engine */
+export { wilksScore } from './pro/relative-strength.engine';

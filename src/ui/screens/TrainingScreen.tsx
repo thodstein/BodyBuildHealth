@@ -188,17 +188,8 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   // Exercise DB state
 
 
-  // Calculator state
-  const [calcWeight, setCalcWeight] = useState(100);
-  const [calcReps, setCalcReps] = useState(5);
-  const [calcRPE, setCalcRPE] = useState(8);
-  const [calc1RM, setCalc1RM] = useState(100);
-  const [calcPercent, setCalcPercent] = useState(75);
-  const [plSquat, setPlSquat] = useState(140);
-  const [plBench, setPlBench] = useState(100);
-  const [plDeadlift, setPlDeadlift] = useState(180);
-  const [plWeight, setPlWeight] = useState(80);
-  const [plSex, setPlSex] = useState<'male' | 'female'>('male');
+  // Calculator state — legacy 1RM/PL removed (канон в StrengthAnalysisHub), metabolic сеты ниже сохранены
+  // calcWeight/calcReps/calcRPE/calc1RM/calcPercent и plSquat/plBench/plDeadlift/plWeight/plSex удалены (P1-8)
   const [bmiWeight, setBmiWeight] = useState(70);
   const [bmiHeight, setBmiHeight] = useState(175);
   const [bmiResult, setBmiResult] = useState<number | null>(null);

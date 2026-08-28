@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   getStrengthPercentile as getPctRaw, getStrengthLevel, calculateRatios, analyzeRatios,
-  getAllVolumeLandmarks, checkVolumeStatus, trainingAgeLevel, projectedTimeline,
+  getAllVolumeLandmarks, checkVolumeStatus, trainingAgeLevel, projectedTimeline, holtForecast,
 } from '../../../engines/performance-analytics.engine';
 import { loadTrainingProfile, saveTrainingProfile } from './training-profile';
 import { applyToPlanner } from './planner-bridge';
@@ -231,6 +231,37 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
       {diarySeries.length > 0 && (
         <div style={CARD}>
           <div style={H}>📈 Динамика e1RM из дневника (последние {diarySeries.length} дней)</div>
+          {/* мини-график приседа: факт + Holt-прогноз */}
+          {(() => {
+            const fact = diarySeries.map(d => d.squatE1RM).filter(v => v > 0);
+            if (fact.length >= 3) {
+              const forecast = holtForecast(fact, 0.4, 0.2, 4);
+              const all = [...fact, ...forecast];
+              const min = Math.min(...all) * 0.95;
+              const max = Math.max(...all) * 1.05;
+              const w = 320, h = 60, pad = 4;
+              const xStep = (w - pad * 2) / (all.length - 1);
+              const y = (v: number) => h - pad - ((v - min) / (max - min || 1)) * (h - pad * 2);
+              const factPath = fact.map((v, i) => `${i === 0 ? 'M' : 'L'} ${pad + i * xStep} ${y(v)}`).join(' ');
+              const forePath = forecast.map((v, i) => `${i === 0 ? 'M' : 'L'} ${pad + (fact.length - 1 + i) * xStep} ${y(v)}`).join(' ');
+              return (
+                <div style={{ marginBottom: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize: 10, color: DIM, marginBottom: 4 }}>Присед e1RM — факт (зелёный) + Holt-прогноз 4 шага (пунктир)</div>
+                  <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
+                    <path d={factPath} fill="none" stroke="#00e68a" strokeWidth={2} />
+                    <path d={forePath} fill="none" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 3" />
+                    {fact.map((v, i) => <circle key={i} cx={pad + i * xStep} cy={y(v)} r={2} fill="#00e68a" />)}
+                    {forecast.map((v, i) => <circle key={'f' + i} cx={pad + (fact.length - 1 + i) * xStep} cy={y(v)} r={2} fill="#f59e0b" />)}
+                  </svg>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: DIM, marginTop: 2 }}>
+                    <span>факт {fact[fact.length - 1]} кг</span>
+                    <span>Holt +4: {forecast.join(' → ')} кг</span>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10, minWidth: 420 }}>
               <thead><tr style={{ color: DIM, borderBottom: '1px solid rgba(255,255,255,0.06)' }}><th style={{ padding: '4px 6px', textAlign: 'left' }}>Дата</th><th style={{ padding: '4px 6px' }}>Присед</th><th style={{ padding: '4px 6px' }}>Жим</th><th style={{ padding: '4px 6px' }}>Тяга</th></tr></thead>
@@ -246,19 +277,26 @@ export const StrengthAnalyticsCard: React.FC<Props> = ({ snapshot }) => {
               </tbody>
             </table>
           </div>
-          <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Берётся лучший e1RM дня по каждому движению (Epley). Пусто — нет тренировки этого движения. Для графика Holt используется тренд последних 28 дней (см. прогноз).</div>
+          <div style={{ fontSize: 10, color: DIM, marginTop: 6 }}>Берётся лучший e1RM дня (Epley). Holt — двойное экспоненциальное сглаживание (α=0.4, β=0.2) по приседу. ACWR оверлей — см. тоннаж выше.</div>
         </div>
       )}
 
       <div style={CARD}>
-        <div style={H}>📈 Прогноз и стаж</div>
+        <div style={H}>📈 Прогноз и стаж (Holt 4 нед)</div>
         <div style={{ fontSize: 11, color: '#fff', marginBottom: 6 }}>
-          Уровень стажа: <b>{LEVEL_RU[age.level] || age.level}</b> · ожидаемый прирост <b>{age.expectedWeeklyGain} кг/нед</b> · Holt-идея: экспоненциальное сглаживание последних 4 нед (тренд ≈ прирост/нед).
+          Уровень стажа: <b>{LEVEL_RU[age.level] || age.level}</b> · ожидаемый прирост <b>{age.expectedWeeklyGain} кг/нед</b> · Holt: {(() => {
+            const fact = diarySeries.map(d => d.squatE1RM).filter(v => v > 0);
+            if (fact.length >= 3) {
+              const f = holtForecast(fact, 0.4, 0.2, 4);
+              return `факт ${fact.slice(-3).join('→')} → прогноз ${f.join('→')} кг`;
+            }
+            return 'недостаточно данных (нужно ≥3 точки приседа)';
+          })()}
         </div>
         <div style={{ fontSize: 10, color: DIM, marginBottom: 6 }}>
-          Прогноз: +10% к приседу ({target1RM} кг) ≈ <b style={{ color: ACCENT }}>{weeks} нед</b> при текущем темпе (логарифм: ln(target/current)/ln(1+gain)). ACWR учитывается в авторегуляции — при danger прогноз удлиняется.
+          Прогноз +10% к приседу ({target1RM} кг) ≈ <b style={{ color: ACCENT }}>{weeks} нед</b> (логарифм). Holt даёт тренд с учётом последних 4 нед — точнее при плато/скачке.
         </div>
-        {acwr && acwr.zone !== 'optimal' && <div style={{ fontSize: 10, color: acwr.zone === 'dangerous' ? '#ef4444' : '#f59e0b' }}>ACWR {acwr.zone} — прогноз может сдвинуться (нужен делод/вариативность).</div>}
+        {acwr && acwr.zone !== 'optimal' && <div style={{ fontSize: 10, color: acwr.zone === 'dangerous' ? '#ef4444' : '#f59e0b' }}>ACWR {acwr.zone} — прогноз сдвинут (делод/вариативность). Тоннаж 7д {tonnage7} / 28д {tonnage28} кг·повт.</div>}
       </div>
 
       <div style={CARD}>
