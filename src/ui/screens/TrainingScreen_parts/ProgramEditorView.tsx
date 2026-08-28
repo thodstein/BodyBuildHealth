@@ -41,6 +41,7 @@ import type { Macrocycle, BBMacrocycle } from '../../../engines/lms/macrocycle.e
 import { ACCENT, ACCENT_LINE, CARD, BTN, BTN_GHOST, SMALL, DIM, DIM_STRONG, IN, panelStyle, STEP_PILL, UI_METRICS } from './training-ui';
 import { ManualHeader, ManualStepper, SectionCard as ManualSectionCard, Badge, ProgressBar, InfoBanner, VolumeMiniBar, ScoreBadge, MethodHint, CARD_BTN, CARD_BTN_ACTIVE, MANUAL_STYLE_TAG } from './ManualUI';
 import { buildProgramIcs, downloadIcs } from './ManualExport';
+import { buildProgramCsv, downloadCsv, buildProgramJsonForCoach, downloadJson, buildProgramPrintHtmlFile, downloadHtml, buildProgramQrPayload } from './ManualExportPro';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { suggestFeeders } from '../../../engines/bb/bb-autocoach.engine';
 import { useDataLink } from '../../../core/data-link';
@@ -738,11 +739,15 @@ return (
             <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: 'rgba(255,255,255,0.75)', fontSize: 13 }} onClick={undo} title="Отменить (Ctrl+Z)">↩</button>
             <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: 'rgba(255,255,255,0.75)', fontSize: 13 }} onClick={redo} title="Повторить (Ctrl+Shift+Z)">↪</button>
           </div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 3 }}>
-            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#a78bfa', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={printProgram} title="Печать / PDF">🖨 PDF</button>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 3, flexWrap: 'wrap' }}>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#a78bfa', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={printProgram} title="Печать / PDF (окно)">🖨 PDF</button>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 8px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#38bdf8', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => { try { const html = buildProgramPrintHtmlFile(program, program.meta.level); downloadHtml((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.html', html); showToast('🖨 HTML файл скачан'); } catch { showToast('⚠ Не удалось собрать HTML', 'error'); } }} title="Скачать HTML файл для печати/отправки">🖨 HTML</button>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 8px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#f59e0b', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => { try { const csv = buildProgramCsv(program); downloadCsv((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.csv', csv); showToast('📄 CSV скачан'); } catch { showToast('⚠ Не удалось собрать CSV', 'error'); } }} title="Скачать CSV (Неделя,День,Упражнение,Сеты×Повт,RIR,кг,%1RM,tempo)">📄 CSV</button>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 8px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#a78bfa', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => { try { const json = buildProgramJsonForCoach(program, program.meta.level); downloadJson((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '-coach.json', json); showToast('📤 JSON тренеру скачан'); } catch { showToast('⚠ Не удалось собрать JSON', 'error'); } }} title="JSON для тренера (enriched + volume analysis)">📤 JSON</button>
             <input type="number" value={icsHour} min={6} max={22} onChange={e=> setIcsHour(Math.max(6,Math.min(22,Number(e.target.value)||9)))} title="Час начала" aria-label="Час начала тренировки" style={{ width: 44, padding: '4px 4px', fontSize: 11, minHeight: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.25)', color: '#fff', textAlign: 'center' }} />
             <input type="number" value={icsDur} min={30} max={180} step={15} onChange={e=> setIcsDur(Math.max(30,Math.min(180,Number(e.target.value)||75)))} title="Длительность мин" aria-label="Длительность мин" style={{ width: 50, padding: '4px 4px', fontSize: 11, minHeight: 30, borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.25)', color: '#fff', textAlign: 'center' }} />
             <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid transparent', color: '#00e68a', fontSize: 11, fontWeight: 700, minHeight: 32 }} onClick={() => { try { const ics = buildProgramIcs(program, undefined, { startHour: icsHour, durationMin: icsDur }); downloadIcs((program.meta.title || 'program').replace(/[^\wа-яА-ЯёЁ -]/g, '') + '.ics', ics); showToast('📅 ICS скачан'); } catch { showToast('⚠ Не удалось собрать ICS', 'error'); } }} title="Скачать календарь (.ics)">📅 ICS</button>
+            <button style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '5px 8px', borderRadius: 8, cursor: 'pointer', background: 'transparent', border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.60)', fontSize: 11, minHeight: 32 }} onClick={async () => { try { const payload = buildProgramQrPayload(program); await navigator.clipboard.writeText(payload); showToast('🔗 QR payload скопирован'); } catch { showToast('⚠ Не удалось скопировать', 'error'); } }} title="Копировать QR payload (JSON)">🔗 QR</button>
           </div>
           {(dir === 'bb' || dir === 'pl') && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.14)', borderRadius: 10, padding: '3px 6px' }}>
@@ -1487,6 +1492,19 @@ return (
               <MethodHint icon="⏱" title="Темп и TUT" text="3-1-1-0 масса (5с), 2-1-1-0 сила. TUT = повт × сек." color="#06b6d4" />
             </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* PRO: Quality live над неделями (всегда виден, как MesoHeatmap) + RIR wave collapsed */}
+      {estep === 'weeks' && (dir === 'bb' && program.bb || dir === 'hybrid' && program.hybrid?.bbWeeks) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <QualityScorePanel program={program} level={program.meta.level} tprofile={tprofile} labMrvMult={labAdjust.mrvMultiplier} />
+          {program.meta.weeks >= 4 && (
+            <details style={{ ...CARD, padding: 10 }}>
+              <summary style={{ fontSize: 11, fontWeight: 800, color: ACCENT, cursor: 'pointer' }}>📉 RIR-волна (ожидаемая vs факт) — свернуто</summary>
+              <div style={{ marginTop: 8 }}><RirWaveChart program={program} /></div>
+            </details>
           )}
         </div>
       )}

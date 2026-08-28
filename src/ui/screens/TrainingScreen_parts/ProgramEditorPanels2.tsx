@@ -120,29 +120,46 @@ interface QualityScorePanelProps {
 
 export const QualityScorePanel: React.FC<QualityScorePanelProps> = ({ program, level, tprofile, labMrvMult }) => {
   const dir = program.meta.direction;
-  if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks)) return null;
+  if (!(dir === 'bb' && program.bb || dir === 'pl' && program.pl?.customWeeks || dir === 'hybrid' && program.hybrid?.bbWeeks)) return null;
   const q = computePlanQualityFor(program, level, {
     onCourse: tprofile.onCourse ?? false,
     courseIntensity: tprofile.courseIntensity ?? 'moderate',
     labMult: labMrvMult,
-  });
+    trainingYears: (tprofile as any).trainingYears,
+  } as any);
   const bar = q.score >= 75 ? '#22c55e' : q.score >= 50 ? '#f59e0b' : '#ef4444';
+  const pro = (q as any).proMeta as { weeklyBudget: number; sessionLimits: { weeklyWorkingSets: number; maxWorkingSets: number; maxExercises: number }; weeklyIssues: string[] } | undefined;
   return (
     <div style={{ ...CARD, padding: 10, borderLeft: '2px solid ' + bar }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🏆 Качество (live)</span>
+        <span style={{ fontSize: 13, fontWeight: 800, color: ACCENT }}>🏆 Качество (live PRO)</span>
         <span style={{ fontSize: 14, fontWeight: 800, color: bar, marginLeft: 'auto' }}>{q.score}/100 {q.grade}</span>
       </div>
       <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 6, height: 6, overflow: 'hidden', marginBottom: 6 }}>
         <div style={{ width: q.score + '%', height: '100%', background: bar, transition: 'width 0.3s' }} />
       </div>
+      {q.perMuscle.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+          {q.perMuscle.slice(0, 10).map(pm => {
+            const col = pm.status === 'over' ? '#ef4444' : pm.status === 'high' ? '#f59e0b' : pm.status === 'low' ? '#38bdf8' : '#22c55e';
+            const eff = (pm as any).effectivePeak != null ? ` eff ${(pm as any).effectivePeak}` : '';
+            return <span key={pm.muscle} title={`${pm.muscle} MEV${pm.mev} MAV${pm.mav} MRV${pm.mrv}${eff}`} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.06)', border: `1px solid ${col}40`, color: col }}>{pm.muscle} {pm.peakSets}{eff} /{pm.mrv}</span>;
+          })}
+        </div>
+      )}
+      {pro && (
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 6, lineHeight: 1.4 }}>
+          Бюджет {pro.weeklyBudget} сетов/нед · лимит сессии {pro.sessionLimits.maxWorkingSets} сетов / {pro.sessionLimits.maxExercises} упр
+          {pro.weeklyIssues?.length ? <span style={{ color: '#f59e0b' }}> · {pro.weeklyIssues.slice(0, 2).join(' · ')}</span> : null}
+        </div>
+      )}
       {q.issues.length > 0 && (
         <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.5, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           {q.issues.slice(0, 5).map((iss, i) => <div key={i} style={{ marginBottom: 2 }}>{iss}</div>)}
         </div>
       )}
       <div style={{ fontSize: 11, color: DIM, marginTop: 4, fontStyle: 'italic' }}>
-        Оценка в реальном времени: weeklySets vs MRV. Зелёный ≥75, жёлтый ≥50, красный &lt;50.
+        Effective (direct + indirect 0.45/0.35/0.4) · per-head дельты · сессионные капы 24/40/60
       </div>
     </div>
   );

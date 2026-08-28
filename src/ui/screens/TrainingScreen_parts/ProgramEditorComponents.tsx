@@ -38,6 +38,8 @@ import { RIR_MATRIX } from '../../../engines/rir-matrix.engine';
 import { periodLabelRu } from '../../../data/lms-cycles/period-labels';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import { VolumeMiniBar, ScoreBadge, Badge, ProgressBar, CARD_BTN, CARD_BTN_ACTIVE, CARD_BTN_GRID, CARD_ACTION, ICON_CARD_BTN, MethodHint } from './ManualUI';
+import { calcPlates, weightToPct, pctToWeight } from '../../../engines/manual-constructor/manual-selection.engine';
+import { suggestWeightFromVelocity } from '../../../engines/manual-constructor/manual-progression.engine';
 import { getVolumeLandmarks } from '../../../engines/volume-landmarks.engine';
 import { MesoHeatmap } from './MesoHeatmap';
 import { MANUAL_STORAGE_KEYS } from '../../../engines/manual-constructor/manual-storage';
@@ -842,14 +844,14 @@ const SessionList: React.FC<{ sessions: UserSession[]; phase?: UserWeek['phase']
             <input style={{ ...IN, padding: '7px 10px', fontSize: 11, flex: '1 1 120px', minHeight: 38, background: 'rgba(0,0,0,0.22)', borderColor: 'rgba(255,255,255,0.08)' }} value={s.focus} onChange={e => updateSession(si, { focus: e.target.value })} placeholder="Фокус: грудь / трицепс" aria-label={`Фокус тренировки ${si + 1}`} />
           </div>
           {noteOpenIdx === si && <textarea value={s.note ?? ''} onChange={e => updateSession(si, { note: e.target.value })} placeholder="Заметка к тренировке — попадёт в экспорт и PDF" rows={2} style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: `1px solid ${ACCENT_LINE}`, borderRadius: 8, padding: '8px 10px', color: '#fff', fontSize: 11, resize: 'vertical', minHeight: 44 }} />}
-          {/* Живой баланс объёма сессии — MEV/MAV/MRV полоски, компакт */}
+          {/* PRO: VolumeMiniBar — показываем только проблемные (cur < MEV синий / >=MAV жёлтый/красный), иначе скрываем шум */}
           {s.blocks.length > 0 && (() => {
             const effLevel = levelProp || (() => { try { return loadTrainingProfile().level; } catch { return 'intermediate'; } })();
             const byMuscle: Record<string, number> = {};
             for (const b of s.blocks) { const mu = (b.muscle || '').toLowerCase(); if (!mu) continue; byMuscle[mu] = (byMuscle[mu] || 0) + (b.sets?.length || 0); }
-            const entries = Object.entries(byMuscle).slice(0, 3);
+            const entries = Object.entries(byMuscle).filter(([mu, cur]) => { const lm = getVolumeLandmarks(effLevel, mu); if (!lm) return false; return cur < lm.mev || cur >= lm.mav; }).slice(0, 4);
             if (entries.length === 0) return null;
-            return <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.05)' }}>{entries.map(([mu, cur]) => { const lm = getVolumeLandmarks(effLevel, mu); if (!lm) return null; return <VolumeMiniBar key={mu} cur={cur} mrv={lm.mrv} mev={lm.mev} label={GROUP_RU[mu] ?? mu} compact />; })}</div>;
+            return <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.05)' }}>{entries.map(([mu, cur]) => { const lm = getVolumeLandmarks(effLevel, mu); if (!lm) return null; const isOver = cur > lm.mrv; return <div key={mu} style={isOver ? { borderLeft: '3px solid #ef4444', paddingLeft: 4, borderRadius: 4 } : undefined}><VolumeMiniBar cur={cur} mrv={lm.mrv} mev={lm.mev} label={GROUP_RU[mu] ?? mu} compact /></div>; })}</div>;
           })()}
           <BlockList blocks={s.blocks} phase={phase} sessionFocus={s.focus} sessionName={s.name} otherSessions={sessions.map((os, oi) => ({ idx: oi, name: os.name || `День ${oi + 1}` })).filter((_, oi) => oi !== si)} onMoveBlock={(bi, targetSi) => moveBlockToSession(si, bi, targetSi)} onChange={(blocks) => updateSession(si, { blocks })} />
           </div>
@@ -1534,7 +1536,7 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
     }
     del(i);
   };
-  const [weightMode, setWeightMode] = useState<'kg' | 'pct'>('kg');
+  const [weightMode, setWeightMode] = useState<'kg' | 'pct' | 'velocity'>('kg');
   const wmKey = (muscle || '').toLowerCase();
   const wm = workMax?.[wmKey] ?? workMax?.[muscle || ''] ?? 0;
   const autoCalcWeight = (setIdx: number, rir: number, reps: number) => {
@@ -1544,7 +1546,15 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
     const repFactor = typeof reps === 'number' ? (reps > 10 ? 0.95 : reps > 6 ? 1.0 : 1.02) : 1.0;
     const pct = pctForRir * (typeof reps === 'number' && reps <= 1 ? 1.0 : repFactor);
     const wt = Math.round((wm * pct) / 2.5) * 2.5;
-    upd(setIdx, { weight: wt });
+    upd(setIdx, { weight: wt, weightMode: 'kg' });
+  };
+  const autoCalcFromVelocity = (setIdx: number, velocityMs: number, weight: number) => {
+    const s = sets[setIdx];
+    if (!s || !velocityMs || !weight) return;
+    const reps = typeof s.reps === 'number' ? s.reps : 8;
+    const rir = typeof s.rir === 'number' ? s.rir : 2;
+    const res = suggestWeightFromVelocity(muscle || 'squat', velocityMs, weight, { reps, rir });
+    if (res) upd(setIdx, { weight: res.suggested, weightMode: 'velocity' });
   };
   const toggleTechnique = (i: number, tech: IntensityTechnique) => {
     const s = sets[i];
@@ -1573,7 +1583,8 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
           <div className="editor-kicker">СХЕМА ПОДХОДОВ</div>
           <div className="editor-sets-help">Повторы × RIR @ вес · отдых · техники</div>
         </div>
-        {wm > 0 && <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : 'kg')} style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, border: weightMode === 'pct' ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', background: weightMode === 'pct' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: weightMode === 'pct' ? '#00e68a' : 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>{weightMode === 'kg' ? 'кг · показать %' : '% · показать кг'}</button>}
+        {wm > 0 && <button type="button" onClick={() => setWeightMode(m => m === 'kg' ? 'pct' : m === 'pct' ? 'velocity' : 'kg')} style={{ fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 8, border: weightMode !== 'kg' ? '1px solid rgba(0,230,138,0.35)' : '1px solid rgba(255,255,255,0.10)', background: weightMode !== 'kg' ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.04)', color: weightMode !== 'kg' ? '#00e68a' : 'rgba(255,255,255,0.60)', cursor: 'pointer' }}>{weightMode === 'kg' ? 'кг' : weightMode === 'pct' ? '%1RM' : 'м/с'} · сменить</button>}
+        <select value={sets[0]?.setKind || 'normal'} onChange={e => { const v=e.target.value as any; onChange(sets.map(s=> ({...s, setKind: v}))); }} style={{ fontSize: 10, padding: '4px 6px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }} title="Тип сета"><option value="normal">сет</option><option value="amrap">AMRAP</option><option value="emom">EMOM</option><option value="cluster">кластер</option><option value="dropset">дроп</option><option value="myo">myo</option></select>
         <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2px 8px' }}>{sets.length} шт.</span>
       </div>
       {/* Header таблицы подходов — Excel-like */}
@@ -1614,22 +1625,28 @@ const SetEditor: React.FC<{ sets: UserSet[]; onChange: (s: UserSet[]) => void; m
                </div>
              </div>
             <span style={{ fontSize: 11, color: DIM }}>@</span>
-            {weightMode === 'pct' ? (
+             {weightMode === 'pct' ? (
               <>
-                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 44, textAlign:'center' }} value={s.pctOf1RM != null ? Math.round(s.pctOf1RM * 100) : ''} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { pctOf1RM: v / 100, weight: Math.round((wm * v / 100) / 2.5) * 2.5 }); }} title="% от 1ПМ" placeholder="%" />
+                <input type="number" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 38, minHeight: 44, textAlign:'center' }} value={s.pctOf1RM != null ? Math.round(s.pctOf1RM * 100) : ''} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { pctOf1RM: v / 100, weightMode: 'pct', weight: Math.round((wm * v / 100) / 2.5) * 2.5 }); }} title="% от 1ПМ" placeholder="%" />
                 <span style={{ fontSize: 11, color: DIM }}>%→</span>
               </>
+            ) : weightMode === 'velocity' ? (
+              <>
+                <input type="number" step="0.05" style={{ ...IN, padding: '3px 4px', fontSize: 11, width: 44, minHeight: 44, textAlign:'center' }} value={(s as any).velocityMs ?? ''} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { velocityMs: v, weightMode: 'velocity' } as any); }} title="скорость м/с (VBT)" placeholder="м/с" />
+                <button type="button" onClick={() => autoCalcFromVelocity(i, (s as any).velocityMs ?? 0.6, s.weight ?? 0)} style={{ fontSize: 9, padding: '3px 6px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.25)', background: 'rgba(96,165,250,0.12)', color: '#60a5fa', cursor: 'pointer' }}>VBT→кг</button>
+              </>
             ) : null}
-             <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
-               <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 46, minHeight: 44, textAlign:'center' }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0 })} title="вес (кг)" aria-label={`Вес подхода ${i + 1} в килограммах`} placeholder="кг" />
+              <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
+                <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 46, minHeight: 44, textAlign:'center' }} value={s.weight ?? 0} onChange={e => upd(i, { weight: parseFloat(e.target.value) || 0, weightMode: 'kg' } as any)} title="вес (кг)" aria-label={`Вес подхода ${i + 1} в килограммах`} placeholder="кг" />
                <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
                  <button type="button" onClick={() => upd(i,{ weight: Math.round(((s.weight??0)+2.5)/2.5)*2.5 })} style={{ width:16, height:14, fontSize:7, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>+2.5</button>
                  <button type="button" onClick={() => upd(i,{ weight: Math.max(0, Math.round(((s.weight??0)-2.5)/2.5)*2.5) })} style={{ width:16, height:14, fontSize:8, lineHeight:1, padding:0, borderRadius:3, border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.06)', color:'#fff', cursor:'pointer' }}>−2.5</button>
                </div>
-             </div>
-            {wm > 0 && typeof s.reps === 'number' && (
-              <button style={{ border: 'none', background: 'rgba(0,230,138,0.12)', color: ACCENT, cursor: 'pointer', fontSize: 11, padding: '4px 6px', borderRadius: 4, fontWeight: 700, minHeight: 44 }} onClick={() => autoCalcWeight(i, s.rir, s.reps as number)} title="Рассчитать вес из %1RM" aria-label="calc">🧮</button>
-            )}
+              </div>
+             {typeof s.weight === 'number' && s.weight > 20 && <span title="Блины на сторону (штанга 20кг)" style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', minWidth: 48, textAlign: 'center' }}>{(() => { try { const p = calcPlates(s.weight); return p.perSide.length ? p.perSide.join('+') : '—'; } catch { return ''; }})()} </span>}
+             {wm > 0 && typeof s.reps === 'number' && (
+               <button style={{ border: 'none', background: 'rgba(0,230,138,0.12)', color: ACCENT, cursor: 'pointer', fontSize: 11, padding: '4px 6px', borderRadius: 4, fontWeight: 700, minHeight: 44 }} onClick={() => autoCalcWeight(i, s.rir, s.reps as number)} title="Рассчитать вес из %1RM" aria-label="calc">🧮</button>
+             )}
             <div style={{ display:'flex', alignItems:'center', gap: 2 }}>
               <input type="number" style={{ ...IN, padding: '4px 6px', fontSize: 11, width: 36, minHeight: 44, textAlign:'center' }} value={Math.floor((s.restSec ?? 90) / 60)} min={0} max={20} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) upd(i, { restSec: Math.max(0, Math.round(v)) * 60 }); }} title="отдых (мин)" placeholder="отд" aria-label="Отдых в минутах" inputMode="numeric" />
               <span style={{ fontSize: 11, color: DIM }}>м</span>
