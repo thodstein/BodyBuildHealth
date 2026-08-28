@@ -912,6 +912,18 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
     onChange([...blocks, { id: newId('blk'), type: 'accessory', exerciseName: '', muscle: '', role: 'accessory', sets: [{ reps: 10, rir: 2 }] }]);
   };
   const updateBlock = (bi: number, patch: Partial<UserBlock>) => onChange(blocks.map((b, i) => i === bi ? { ...b, ...patch } : b));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggleSelect = (id: string) => setSelected(prev => { const n=new Set(prev); if(n.has(id)) n.delete(id); else n.add(id); return n; });
+  const selectAll = () => setSelected(new Set(blocks.map(b=>b.id)));
+  const clearSel = () => setSelected(new Set());
+  const bulkRir = (delta: number) => onChange(blocks.map(b=> selected.has(b.id) ? { ...b, sets: b.sets.map(s=> ({...s, rir: Math.max(0, Math.min(5, (s.rir??2)+delta))})) } : b));
+  const bulkWeight = (delta: number) => onChange(blocks.map(b=> selected.has(b.id) ? { ...b, sets: b.sets.map(s=> ({...s, weight: Math.max(0, Math.round(((s.weight??0)+delta)/2.5)*2.5)})) } : b));
+  const bulkDelete = async () => {
+    if (selected.size===0) return;
+    const ok = await confirm({ title: `Удалить ${selected.size} упражнений?`, message: 'Будет потеряно выбранное.', confirmLabel: 'Удалить', danger: true });
+    if (!ok) return;
+    onChange(blocks.filter(b=> !selected.has(b.id))); clearSel();
+  };
   // P0-3: быстрый старт — группа мышц → упражнения из движка подбора + поиск
   const [quickGroup, setQuickGroup] = useState<string | null>(null);
   const [quickSearch, setQuickSearch] = useState('');
@@ -1232,7 +1244,18 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
       )}
       {blocks.length > 0 && (
         <>
-          <div className="editor-exercise-list-heading"><span>УПРАЖНЕНИЯ</span><span>{blocks.length} шт.</span></div>
+          <div className="editor-exercise-list-heading"><span>УПРАЖНЕНИЯ</span><span>{blocks.length} шт.</span>{selected.size>0 && <span style={{ marginLeft: 8, fontSize: 10, color:'#00e68a' }}>выделено {selected.size}</span>}</div>
+          <div style={{ display:'flex', gap:4, flexWrap:'wrap', padding:'4px 0' }}>
+            <button onClick={selectAll} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:DIM, cursor:'pointer' }}>Выбрать все</button>
+            <button onClick={clearSel} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.08)', background:'transparent', color:DIM, cursor:'pointer', opacity: selected.size?1:0.4 }} disabled={!selected.size}>Сброс</button>
+            {selected.size>0 && <>
+              <button onClick={()=> bulkRir(-1)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.25)', background:'rgba(96,165,250,0.08)', color:'#60a5fa', cursor:'pointer' }}>RIR −1</button>
+              <button onClick={()=> bulkRir(1)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.25)', background:'rgba(96,165,250,0.08)', color:'#60a5fa', cursor:'pointer' }}>RIR +1</button>
+              <button onClick={()=> bulkWeight(2.5)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(34,197,94,0.25)', background:'rgba(34,197,94,0.08)', color:'#22c55e', cursor:'pointer' }}>+2.5кг</button>
+              <button onClick={()=> bulkWeight(-2.5)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(34,197,94,0.25)', background:'rgba(34,197,94,0.08)', color:'#22c55e', cursor:'pointer' }}>−2.5кг</button>
+              <button onClick={bulkDelete} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.25)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer' }}>✕ Удалить</button>
+            </>}
+          </div>
           {/* Быстрое добавление — карточки групп вместо мелких чипов */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 0', borderBottom: '1px dashed rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1331,6 +1354,7 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
           )}
           {/* Ряд 1: drag + тип + упражнение + мышца + сеты */}
           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input type="checkbox" checked={selected.has(b.id)} onChange={()=> toggleSelect(b.id)} aria-label={`Выбрать упражнение ${bi+1}`} style={{ width:16, height:16, accentColor:'#00e68a' }} />
           <span
             title={`Перетащите для изменения порядка — ${bi+1} из ${blocks.length}. Стрелки ↑↓ — переместить, Home/End — в начало/конец.`}
             style={{ cursor: 'grab', fontSize: 13, color: '#64748b', userSelect: 'none', padding: '4px 6px', touchAction: 'none', minWidth: 44, minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
