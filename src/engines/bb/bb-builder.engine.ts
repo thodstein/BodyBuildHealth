@@ -3316,13 +3316,20 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   ];
 
   const basePlan: BBPlan = { pattern, weeks, rotationMuscleVolume: muscleVolumeRotation, rationale, volumeTargets };
-  // Баланс мышц — проф-отчёт (не меняет объём, только rationale)
+  // Баланс мышц — проф-отчёт + автоправка (не только rationale, но и объём)
   try {
     const weeklyAgg = aggregateBBVolume(weeks[0]?.sessions || []);
     const effMap: Record<string, { effectiveSets: number }> = {};
     for (const [k, v] of Object.entries(weeklyAgg)) effMap[k] = { effectiveSets: (v as any).effectiveSets };
     const bal = computeMuscleBalance(effMap);
-    if (bal.issues.length) rationale.push(...bal.issues.map(s => `⚖️ Баланс: ${s} (ratio ${Object.entries(bal.ratios).map(([kk, vv]) => `${kk}=${vv}`).join(', ')})`));
+    if (bal.issues.length) {
+      rationale.push(...bal.issues.map(s => `⚖️ Баланс: ${s} (ratio ${Object.entries(bal.ratios).map(([kk, vv]) => `${kk}=${vv}`).join(', ')})`));
+      // Автоправка: chest/back >1.3 → +2 сета спине, quad/ham → +2 отстающей
+      if (bal.ratios['chest/back'] > 1.3 && mrvByMuscle['back']) mrvByMuscle['back'] = Math.round(mrvByMuscle['back'] * 1.15);
+      if (bal.ratios['chest/back'] < 0.7 && mrvByMuscle['chest']) mrvByMuscle['chest'] = Math.round(mrvByMuscle['chest'] * 1.15);
+      if (bal.ratios['quad/ham'] > 1.5 && mrvByMuscle['hamstrings']) mrvByMuscle['hamstrings'] = Math.round(mrvByMuscle['hamstrings'] * 1.2);
+      if (bal.ratios['quad/ham'] < 0.66 && mrvByMuscle['quads']) mrvByMuscle['quads'] = Math.round(mrvByMuscle['quads'] * 1.2);
+    }
   } catch {}
   if (pedAdapt) {
     basePlan.pedAdaptation = {

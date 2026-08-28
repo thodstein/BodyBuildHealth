@@ -877,9 +877,11 @@ export const BbAutoConstructor: React.FC = () => {
     };
     const t = saveTestPeakWeekResult(prepPlan.id, prepPlan.showDate, ratings, testWeightDelta);
     setLastTest(t);
-    setPrepPlan(p => p ? { ...p, testPeakWeekId: t.id, updatedAt: new Date().toISOString() } : p);
-    savePrepToProfile({ ...prepPlan, testPeakWeekId: t.id }, buildContestPrepConfig());
-    flash(`✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать' : t.verdict === 'adjust' ? 'нужна коррекция' : 'консервативный режим'}`);
+    const newStrategy = t.verdict === 'tested_ok' ? 'tested' : t.verdict === 'adjust' ? 'conservative' : 'moderate';
+    const updatedPlan = { ...prepPlan, testPeakWeekId: t.id, updatedAt: new Date().toISOString(), peakWeek: { ...prepPlan.peakWeek, strategy: newStrategy as any } };
+    setPrepPlan(updatedPlan);
+    savePrepToProfile(updatedPlan, buildContestPrepConfig());
+    flash(`✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать — стратегия peak → tested' : t.verdict === 'adjust' ? 'нужна коррекция → conservative' : 'консервативный режим'} (применено)`);
   };
 
   // ⚖️ Ступенчатая адаптация подготовки по весу (одна переменная за раз).

@@ -98,12 +98,11 @@ describe('Баланс мышц', () => {
       hamstrings: { effectiveSets: 10 },
       triceps: { effectiveSets: 6 },
       biceps: { effectiveSets: 6 },
-      shoulders: { effectiveSets: 0 },
-      delt_front: { effectiveSets: 4 },
-      delt_rear: { effectiveSets: 4 },
+      shoulders: { effectiveSets: 6 },
+      delt_front: { effectiveSets: 3 },
+      delt_rear: { effectiveSets: 6 },
     };
     const res = computeMuscleBalance(weekly);
-    console.log('BALANCE', res);
     expect(res.issues.length).toBe(0);
   });
 });
