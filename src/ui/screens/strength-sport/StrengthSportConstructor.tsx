@@ -7,10 +7,11 @@ import React, { useState, useMemo } from 'react';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
 import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../../engines/strength-sport/strength-sport-split-patterns';
+import { buildStrengthCsv, downloadStrengthCsv, buildStrengthPrintHtml, shareStrengthDigest } from '../../../engines/strength-sport/strength-sport-export';
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
-import { buildAnnualFromSS, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
+import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
@@ -35,6 +36,12 @@ export const StrengthSportConstructor: React.FC = () => {
   const [injInput, setInjInput] = useState('');
   const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('weightlifting'));
   const [outsideEnabled, setOutsideEnabled] = useState(false);
+  const [sex, setSex] = useState<'male'|'female'>('male');
+  const [bodyweight, setBodyweight] = useState<number>(80);
+  const [age, setAge] = useState<number>(30);
+  const [competitionDate, setCompetitionDate] = useState<string>('');
+  const [patternId, setPatternId] = useState<string>('');
+  const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -49,6 +56,20 @@ export const StrengthSportConstructor: React.FC = () => {
       if (Array.isArray(arr) && arr.length) {
         const week = arr.slice(-7).reduce((a:any, s:any)=> a + (s.load || s.sRPE || s.rpe || 0), 0);
         setDiaryLoad(week);
+        // P0-7 ACWR из sRPE (как в TrainingScreen)
+        try{
+          const daily: Record<string, number> = {};
+          for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+(s.load||s.sRPE||s.rpe||0); }
+          const vals = Object.values(daily).slice(-28);
+          if(vals.length>=14){
+            const acute = vals.slice(-7).reduce((a,c)=>a+c,0)/7;
+            const chronic = vals.reduce((a,c)=>a+c,0)/vals.length;
+            const ratio = chronic>0? acute/chronic : 0;
+            let zone='optimal';
+            if(ratio>1.5) zone='dangerous'; else if(ratio>1.3) zone='caution'; else if(ratio<0.8) zone='undertrained';
+            setAcwr({ ratio: Math.round(ratio*100)/100, zone });
+          }
+        }catch{}
       }
     } catch {}
   }, [plan]);
@@ -58,28 +79,68 @@ export const StrengthSportConstructor: React.FC = () => {
       const raw = localStorage.getItem('he_profile_v2');
       if (!raw) return;
       const p = JSON.parse(raw);
+      const personal = p.personal || {};
       const training = p.training || p;
+      const lifestyle = p.lifestyle || {};
+      const health = p.health || {};
       if (training.workMax) setWorkMax(s => ({ ...s, ...training.workMax }));
+      if (personal.workMax) setWorkMax(s => ({ ...s, ...personal.workMax }));
+      if ((training.workMaxByExercise || personal.workMaxByExercise)) {
+        // workMaxByExercise → workMax маппинг (упрощённо берём chest/back как squat/press)
+      }
       if (training.level) setLevel(training.level);
-      if (Array.isArray(p.health?.injuries)) setInjuries(p.health.injuries);
+      else if (personal.level) setLevel(personal.level);
+      if (personal.sex) setSex(personal.sex === 'female' ? 'female' : 'male');
+      if (typeof personal.weight === 'number') setBodyweight(personal.weight);
+      else if (typeof personal.bodyweight === 'number') setBodyweight(personal.bodyweight);
+      if (typeof personal.age === 'number') setAge(personal.age);
+      if (Array.isArray(health.injuries)) setInjuries(health.injuries);
       else if (Array.isArray(training.injuries)) setInjuries(training.injuries);
       if (Array.isArray(training.equipment)) setEquipment(training.equipment);
-      if (Array.isArray(training.mobilityRestrictions)) setMobility(training.mobilityRestrictions);
-      else if (Array.isArray(p.health?.mobilityRestrictions)) setMobility(p.health.mobilityRestrictions);
-      if (p.personal?.sex) { /* could set sex but input not exposed */ }
-      // outside из профиля: спорт → дефолт внезальной
-      const sport = (p.training?.sportType || p.goals?.primaryGoal || '').toLowerCase();
+      else if (Array.isArray(personal.equipment)) setEquipment(personal.equipment);
+      if (Array.isArray(health.mobilityRestrictions)) setMobility(health.mobilityRestrictions);
+      else if (Array.isArray(training.mobilityRestrictions)) setMobility(training.mobilityRestrictions);
+      // lifestyle → sleep/hrv/stress позже в build пробросим
+      const sport = (training.sportType || p.goals?.primaryGoal || '').toLowerCase();
       if (sport.includes('weightlifting') || sport.includes('та')) setOutside(defaultOutsideLoadFor('weightlifting'));
       else if (sport.includes('strongman') || sport.includes('стронг')) setOutside(defaultOutsideLoadFor('strongman'));
+      setMsg('Профиль подтянут: ' + (personal.sex || '') + ' ' + (personal.weight || '') + 'кг');
     } catch {}
   };
 
   const build = () => {
+    // P0-12: тянем recovery/питание из профиля
+    let extra: any = {};
+    try{
+      const raw = localStorage.getItem('he_profile_v2');
+      if(raw){
+        const p = JSON.parse(raw);
+        const personal = p.personal || {};
+        const lifestyle = p.lifestyle || {};
+        const health = p.health || {};
+        extra.bodyFat = typeof personal.bodyFat === 'number' ? personal.bodyFat : undefined;
+        extra.leanMass = typeof personal.bodyFat === 'number' && typeof personal.weight === 'number' ? Math.round(personal.weight * (1 - personal.bodyFat/100)) : undefined;
+        extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined;
+        extra.sleepHours = typeof lifestyle.sleepHours === 'number' ? lifestyle.sleepHours : undefined;
+        extra.stressLevel = typeof lifestyle.stressLevel === 'number' ? lifestyle.stressLevel : undefined;
+        extra.calorieSurplus = typeof p.nutrition?.calorieSurplus === 'number' ? p.nutrition.calorieSurplus : undefined;
+        extra.proteinPerKg = typeof p.nutrition?.proteinPerKg === 'number' ? p.nutrition.proteinPerKg : undefined;
+        // pharma
+        const ph = p.pharma || {};
+        if(Array.isArray(ph.currentSubstances) && ph.currentSubstances.length) extra.peds = ph.currentSubstances;
+      }
+    }catch{}
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
       equipment, injuries, mobilityRestrictions: mobility as any,
-    };
+      sex, bodyweight, age,
+      competitionDate: competitionDate || undefined,
+      startDate: new Date().toISOString().slice(0,10),
+      acwr: acwr as any,
+      patternId: patternId || undefined,
+      ...extra,
+    } as any;
     try {
       const prev = loadStrengthSportPlans()[0];
       if (prev) input = applyMesocycleProgression(prev, input) as any;
@@ -90,7 +151,7 @@ export const StrengthSportConstructor: React.FC = () => {
     saveStrengthSportPlan(p);
     try {
       const hist = loadStrengthSportPlans().slice(0, 6);
-      const ann = buildAnnualFromSS(hist);
+      const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks: 1 }) : buildAnnualFromSS(hist);
       saveAnnualSS(ann);
       setAnnual(ann);
     } catch {}
@@ -194,6 +255,21 @@ export const StrengthSportConstructor: React.FC = () => {
             <option value="advanced">Продвинутый</option>
             <option value="enhanced">Enhanced</option>
           </select>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <label style={{ color: '#fff', fontSize: 11 }}>Пол: <select value={sex} onChange={e=> setSex(e.target.value as any)} style={{ padding: 4, borderRadius: 6, width: 90 }}><option value="male">М</option><option value="female">Ж</option></select></label>
+            <label style={{ color: '#fff', fontSize: 11 }}>Вес тела: <input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={{ width: 70, padding: 4, borderRadius: 6 }} /> кг</label>
+            <label style={{ color: '#fff', fontSize: 11 }}>Возраст: <input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||30)} style={{ width: 70, padding: 4, borderRadius: 6 }} /></label>
+            <label style={{ color: '#fff', fontSize: 11 }}>Старт: <input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={{ padding: 4, borderRadius: 6, fontSize: 10 }} /></label>
+          </div>
+          {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a', background: 'rgba(255,255,255,0.04)', padding: 4, borderRadius: 4 }}>ACWR {acwr.ratio} · {acwr.zone} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</div>}
+          {(() => {
+            const sn = workMax.snatch||0, cj = workMax.cleanJerk||workMax.clean||0, sq = workMax.backSquat||0, dl = workMax.deadlift||0;
+            const warns: string[] = [];
+            if(sn && cj && sn > cj) warns.push('Рывок > толчка — проверьте ПМ');
+            if(cj && sq && cj > sq) warns.push('Толчок > приседа — редко, проверьте');
+            if(sq && dl && sq > dl) warns.push('Присед > тяги — проверьте (обычно тяга выше)');
+            return warns.length ? <div style={{ fontSize: 10, color: '#f59e0b' }}>{warns.map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null;
+          })()}
           <label style={{ color: '#fff', fontSize: 12 }}>Недель: {weeks}</label>
           <input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} />
           <label style={{ color: '#fff', fontSize: 12 }}>Дней/нед в зале: {days}</label>
@@ -281,15 +357,22 @@ export const StrengthSportConstructor: React.FC = () => {
 
       {step === 'split' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
-          <div style={{ color: '#fff', fontSize: 12 }}>Рекомендуемый сплит: {recommendStrengthSportPattern(mode, days, level).name}</div>
+          <div style={{ color: '#fff', fontSize: 12 }}>Рекомендуемый: <b style={{ color: '#00e68a' }}>{recommendStrengthSportPattern(mode, days, level).name}</b> {patternId ? `· выбран: ${STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name || patternId}` : ''}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {STRENGTH_SPORT_PATTERNS.filter(p => p.mode===mode || p.mode==='any').map(p => (
-              <div key={p.id} style={{ padding: 8, borderRadius: 8, background: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 11 }}>
-                <b>{p.name}</b> — {p.sessionsPerRotation}×/нед · {p.description}
-              </div>
-            ))}
+            {STRENGTH_SPORT_PATTERNS.filter(p => p.mode===mode || p.mode==='any').map(p => {
+              const active = patternId ? patternId===p.id : p.id===recommendStrengthSportPattern(mode, days, level).id;
+              const preview = p.schedule.map((s,i)=> s.kind==='тренировка' ? (s.sessionTag||'тренировка').slice(0,4) : 'отд').join(' · ');
+              return (
+                <button key={p.id} onClick={()=> setPatternId(p.id)} style={{ textAlign: 'left', padding: 8, borderRadius: 8, background: active ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', border: active ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><b>{p.name}</b><span style={{ fontSize: 10, opacity: 0.7 }}>{p.sessionsPerRotation}×/нед</span></div>
+                  <div style={{ fontSize: 10, opacity: 0.7 }}>{p.description}</div>
+                  <div style={{ fontSize: 9, opacity: 0.5, marginTop: 2, fontFamily: 'monospace' }}>{preview}</div>
+                  {active && <div style={{ fontSize: 9, color: '#00e68a', marginTop: 2 }}>● выбран — предпросмотр: {p.schedule.filter(s=>s.kind==='тренировка').map(s=> s.sessionTag).join(', ')}</div>}
+                </button>
+              );
+            })}
           </div>
-          <button onClick={build} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, cursor: 'pointer' }}>Собрать план</button>
+          <button onClick={build} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, cursor: 'pointer' }}>Собрать план {patternId ? `(${patternId})` : ''}</button>
         </div>
       )}
 
@@ -365,7 +448,9 @@ export const StrengthSportConstructor: React.FC = () => {
           )}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
-            <button onClick={() => { const txt = buildStrengthSportReport(plan); const w = window.open('', '_blank'); if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap">${txt.replace(/</g,'&lt;')}</pre>`); w.document.close(); w.print(); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Печать</button>
+            <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>🖨 Печать (HTML)</button>
+            <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📊 CSV (Excel)</button>
+            <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест скопирован'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📋 Дайджест</button>
             <button onClick={exportToUserProgram} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.15)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>Экспорт в программу</button>
           </div>
           {msg && <div style={{ color: '#00e68a', fontSize: 11 }}>{msg}</div>}

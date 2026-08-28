@@ -1,18 +1,74 @@
 /**
  * strength-sport-annual.ts — изолированный годовой план для ТА/стронга (не трогает annual-training).
  * Хранит свои блоки отдельно: he_strength_annual_v1
+ * P0-8: sync/taper/валидация как в annual-training/block-builders но изолированно.
  */
 import type { StrengthSportPlan } from './strength-sport.types';
 
-export interface AnnualSSBlock { id: string; startWeek: number; weeks: number; mode: string; plan?: StrengthSportPlan; status: 'built'|'planned'|'error'; }
-export interface AnnualSS { id: string; totalWeeks: number; blocks: AnnualSSBlock[]; createdAt: string; }
+export interface AnnualSSBlock { id: string; startWeek: number; weeks: number; mode: string; plan?: StrengthSportPlan; status: 'built'|'planned'|'error'; competitionDate?: string; taperWeeks?: number; }
+export interface AnnualSS { id: string; totalWeeks: number; blocks: AnnualSSBlock[]; createdAt: string; updatedAt?: string; }
 
 const KEY='he_strength_annual_v1';
-export function saveAnnualSS(a: AnnualSS){ try{ localStorage.setItem(KEY, JSON.stringify(a)); }catch{} }
+export function saveAnnualSS(a: AnnualSS){
+  try{
+    const withUpdated = { ...a, updatedAt: new Date().toISOString() };
+    localStorage.setItem(KEY, JSON.stringify(withUpdated));
+    try{ window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: withUpdated })); }catch{}
+  }catch{}
+}
 export function loadAnnualSS(): AnnualSS | null { try{ const r=localStorage.getItem(KEY); return r? JSON.parse(r): null;}catch{return null;} }
+export function removeAnnualSS(){ try{ localStorage.removeItem(KEY);}catch{} }
+
 export function buildAnnualFromSS(plans: StrengthSportPlan[]): AnnualSS {
   let w=1; const blocks: AnnualSSBlock[] = plans.map(p=> ({ id: p.id, startWeek: w, weeks: p.weeks, mode: p.mode, plan:p, status:'built' as const, }));
   // обновить startWeek последовательно
   for (let i=0;i<blocks.length;i++){ blocks[i].startWeek=w; w+=blocks[i].weeks; }
   return { id:`ann_ss_${Date.now()}`, totalWeeks: w-1, blocks, createdAt: new Date().toISOString() };
+}
+
+// P0-8: построить годовой с учётом competitionDate и taper (1 нед <65% перед стартом)
+export function buildAnnualWithTaper(plans: StrengthSportPlan[], opts?: { competitionDate?: string; taperWeeks?: number }): AnnualSS {
+  const base = buildAnnualFromSS(plans);
+  if (!opts?.competitionDate) return base;
+  const taperW = Math.max(1, Math.min(2, opts.taperWeeks ?? 1));
+  // если последний блок — peaking, помечаем taper недели (последняя неделя последнего плана — deload/taper)
+  const last = base.blocks[base.blocks.length - 1];
+  if (last && last.plan) {
+    last.taperWeeks = taperW;
+    last.competitionDate = opts.competitionDate;
+    // помечаем последнюю неделю как taper в плане
+    const pw = last.plan.weeksData;
+    if (pw.length >= taperW) {
+      for (let i = pw.length - taperW; i < pw.length; i++) {
+        pw[i].taper = true;
+        // volume уже срезан в builder deload; дополнительно помечаем
+      }
+    }
+  }
+  return base;
+}
+
+export function validateAnnualSS(annual: AnnualSS): { ok: boolean; warnings: string[]; errors: string[] } {
+  const warnings: string[] = []; const errors: string[] = [];
+  let expected = 1;
+  for (const b of annual.blocks) {
+    if (b.startWeek !== expected) warnings.push(`Блок ${b.id}: startWeek ${b.startWeek} ≠ ожидаемо ${expected} — сдвиг.`);
+    expected = b.startWeek + b.weeks;
+  }
+  if (annual.totalWeeks !== expected - 1) errors.push(`totalWeeks ${annual.totalWeeks} ≠ сумме блоков ${expected - 1}`);
+  if (annual.blocks.some(b=> b.weeks < 2 || b.weeks > 16)) warnings.push('Блок вне 2-16 нед — проверьте.');
+  return { ok: errors.length===0, warnings, errors };
+}
+
+export function activeBlockForWeek(annual: AnnualSS, week: number): AnnualSSBlock | null {
+  return annual.blocks.find(b=> week >= b.startWeek && week < b.startWeek + b.weeks) || null;
+}
+
+export function weeksUntilCompetition(annual: AnnualSS, competitionDate: string, startDate?: string): number | null {
+  try{
+    const start = startDate ? new Date(startDate) : new Date(annual.createdAt);
+    const comp = new Date(competitionDate);
+    const diff = Math.round((comp.getTime() - start.getTime()) / (1000*60*60*24*7));
+    return diff;
+  }catch{ return null; }
 }

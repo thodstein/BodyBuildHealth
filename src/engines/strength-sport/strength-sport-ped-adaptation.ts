@@ -37,8 +37,16 @@ function curveInsulin(iu: number): number {
 export function adaptForPEDsSS(peds: string[] | undefined, pedDoses: PedDoses | undefined, courseIntensity?: string): { mrvMult: number; details: string } {
   const doses = pedDoses || {};
   const has = (k: string) => (peds || []).some(p => p.toLowerCase().includes(k.toLowerCase()));
-  // пробуем найти дозы по ключам
-  const aasDose = parseDose(doses['aas'] ?? doses['AAS'] ?? doses['test'] ?? doses['mg'] ?? 0);
+  // P1: tEq для тренболона 2.5 и нандролона 1.3 — как в bb-ped-adaptation
+  const aasTeq = has('tren') ? 2.5 : has('nand') || has('deca') ? 1.3 : has('bold') || has('eq') ? 1.1 : 1.0;
+  // пробуем найти дозы по ключам — сумма всех AAS-подобных
+  let aasDose = 0;
+  const aasKeys = ['aas','test','tren','deca','nand','bold','eq','primo','mast','drol','anavar','winstrol','oxan','stan'];
+  for(const [k,v] of Object.entries(doses)){
+    const lk = String(k).toLowerCase();
+    if(aasKeys.some(x=> lk.includes(x))){ aasDose += parseDose(v); }
+  }
+  if(aasDose===0) aasDose = parseDose((doses as any)['mg'] ?? 0);
   const ghDose = parseDose(doses['gh'] ?? doses['hgh'] ?? 0);
   const insDose = parseDose(doses['insulin'] ?? doses['ins'] ?? 0);
   const mgfDose = parseDose(doses['mgf'] ?? 0);
@@ -46,10 +54,11 @@ export function adaptForPEDsSS(peds: string[] | undefined, pedDoses: PedDoses | 
 
   let mult = 1.0;
   const parts: string[] = [];
-  if (has('aas') || aasDose > 0) {
-    const m = curveAAS(aasDose || (has('aas') ? 500 : 0));
+  if (has('aas') || has('tren') || has('deca') || has('nand') || has('test') || aasDose > 0) {
+    const effDose = Math.round(aasDose * aasTeq);
+    const m = curveAAS(effDose || (has('tren') || has('aas') ? 500 : 0));
     mult *= m;
-    parts.push(`AAS ${aasDose||500}mg → ×${m.toFixed(2)}`);
+    parts.push(`AAS ${aasDose||500}mg${aasTeq!==1?` ×tEq${aasTeq}→${effDose}mg`:''} → ×${m.toFixed(2)}`);
   }
   if (has('gh') || ghDose > 0) {
     const m = curveGH(ghDose || 4);

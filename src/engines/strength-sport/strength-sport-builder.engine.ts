@@ -6,10 +6,10 @@
 import { computeOutsideMetrics, outsideVolumeMultiplier, type OutsideLoad } from '../outside-load.engine';
 import { getStrengthSportPattern, recommendStrengthSportPattern, type StrengthSportPattern } from './strength-sport-split-patterns';
 import { SS_TAG_MUSCLES } from './strength-sport-day-types';
-import { pmForWeek, rirForWeek, phaseForWeek } from './strength-sport-progression';
+import { pmForWeek, rirForWeek, phaseForWeek, phaseForDate, buildPhaseDistribution } from './strength-sport-progression';
 import { filterByTier, filterByInjury, selectDiverse } from './strength-sport-selection';
 import { volumeMultForExercise } from './strength-sport-specialization';
-import { tempoForSS, restForSS } from './strength-sport-loading';
+import { tempoForSS, restForSS, pctForSS, repsForSS } from './strength-sport-loading';
 import { adaptForPEDsSS } from './strength-sport-ped-adaptation';
 import { filterByMobility } from './strength-sport-mobility';
 import { lengthenedBonus } from './strength-sport-bonus';
@@ -18,23 +18,23 @@ import { applyDUP } from './strength-sport-dup';
 import { applyIntensity } from './strength-sport-intensity';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
-/** Пул упражнений по тегу — кандидаты (id каталога) + замены */
+/** Пул упражнений по тегу — кандидаты (id каталога) + замены — P0-5: +15 вариаций ТА */
 const POOL_BY_TAG: Record<string, string[]> = {
-  snatch_day: ['snatch', 'hang_snatch', 'power_snatch', 'muscle_snatch', 'snatch_pull', 'overhead_squat_v2', 'snatch_balance', 'back_squat', 'front_squat'],
-  clean_day: ['clean_and_jerk', 'hang_clean', 'power_clean', 'muscle_clean', 'push_jerk', 'split_jerk', 'push_press', 'front_squat_clean_grip', 'front_squat'],
-  strength_day: ['squat', 'front_squat', 'back_squat', 'deadlift', 'sumo_dl', 'rdl', 'bench_bar', 'bench_bar', 'ohp'],
-  technique_day: ['hang_snatch', 'hang_clean', 'muscle_snatch', 'muscle_clean', 'snatch_balance', 'jerk_dip', 'overhead_squat_v2'],
-  pull_day: ['snatch_pull', 'clean_pull', 'rdl', 'deadlift', 'row_bar', 'pullup'],
-  accessory_day: ['db_press', 'ohp', 'lateral_raise', 'face_pull', 'row_db', 'hip_thrust'],
-  overhead_day: ['log_press', 'circus_db_press', 'ohp', 'push_press', 'db_press', 'push_jerk'],
-  deadlift_day: ['deadlift', 'sumo_dl', 'axle_deadlift', 'rdl', 'farmers_walk_heavy', 'yoke_walk'],
-  squat_day: ['squat', 'front_squat', 'hack_squat', 'leg_press', 'bulgarian_split', 'calf_raise'],
+  snatch_day: ['snatch', 'hang_snatch', 'power_snatch', 'muscle_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'snatch_pull', 'pause_pull', 'overhead_squat_v2', 'snatch_balance', 'back_squat', 'front_squat'],
+  clean_day: ['clean_and_jerk', 'hang_clean', 'power_clean', 'muscle_clean', 'deficit_clean', 'block_clean', 'pause_clean', 'push_jerk', 'split_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk', 'front_squat_clean_grip', 'front_squat'],
+  strength_day: ['squat', 'front_squat', 'back_squat', 'pause_squat', 'deadlift', 'sumo_dl', 'rdl', 'bench_bar', 'bench_bar', 'ohp'],
+  technique_day: ['hang_snatch', 'hang_clean', 'muscle_snatch', 'muscle_clean', 'snatch_balance', 'jerk_dip', 'overhead_squat_v2', 'pause_snatch', 'pause_clean'],
+  pull_day: ['snatch_pull', 'clean_pull', 'pause_pull', 'deficit_pull', 'rdl', 'deadlift', 'row_bar', 'pullup'],
+  accessory_day: ['db_press', 'ohp', 'lateral_raise', 'face_pull', 'row_db', 'hip_thrust', 'pause_squat'],
+  overhead_day: ['log_press', 'circus_db_press', 'ohp', 'push_press', 'db_press', 'push_jerk', 'jerk_recovery', 'behind_neck_jerk'],
+  deadlift_day: ['deadlift', 'sumo_dl', 'axle_deadlift', 'rdl', 'deficit_pull', 'farmers_walk_heavy', 'yoke_walk'],
+  squat_day: ['squat', 'front_squat', 'pause_squat', 'hack_squat', 'leg_press', 'bulgarian_split', 'calf_raise', 'overhead_squat_v2'],
   event_day: ['farmers_walk_heavy', 'yoke_walk', 'atlas_stone_load', 'stone_lift', 'sandbag_shoulder', 'zercher_carry', 'tire_flip', 'sled_push_sprint'],
-  oly_day: ['snatch', 'clean_and_jerk', 'snatch_pull', 'clean_pull', 'front_squat'],
+  oly_day: ['snatch', 'clean_and_jerk', 'snatch_pull', 'clean_pull', 'front_squat', 'pause_snatch', 'pause_clean'],
 };
 
-const OLY_IDS = new Set(['snatch','hang_snatch','power_snatch','muscle_snatch','clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','snatch_pull','clean_pull','snatch_balance','overhead_squat_v2','jerk_dip']);
-const STRONG_IDS = new Set(['log_press','yoke_walk','farmers_walk_heavy','atlas_stone_load','axle_deadlift','circus_db_press','tire_flip','stone_lift','sandbag_shoulder','zercher_carry']);
+const OLY_IDS = new Set(['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk','snatch_pull','clean_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2','jerk_dip','jerk_recovery','behind_neck_jerk','pause_squat']);
+const STRONG_IDS = new Set(['log_press','yoke_walk','farmers_walk_heavy','atlas_stone_load','axle_deadlift','circus_db_press','tire_flip','stone_lift','sandbag_shoulder','zercher_carry','sled_push_sprint']);
 
 function isOly(id: string): boolean { return OLY_IDS.has(id); }
 function isStrong(id: string): boolean { return STRONG_IDS.has(id); }
@@ -59,9 +59,22 @@ function filterPool(ids: string[], input: StrengthSportInput): string[] {
   const beforeTier = [...out];
   out = filterByTier(out, input.level, input.allowExotic, hasOther);
   if (!hasOther) {
-    for (const orig of beforeTier) if (!out.includes(orig) && STRONG_FALLBACK[orig]) {
-      const fb = STRONG_FALLBACK[orig];
-      if (!out.includes(fb)) out.push(fb);
+    // P2-28: BFS по цепочке STRONG_FALLBACK (yoke→farmers→deadlift)
+    const resolveFallback = (id: string, visited = new Set<string>()): string | null => {
+      let cur = STRONG_FALLBACK[id];
+      while (cur && !visited.has(cur)) {
+        visited.add(cur);
+        // если кур доступен по hasOther? но мы без specialty — ищем первый доступный не-strong
+        if (!['log_press','atlas_stone_load','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift','tire_flip','stone_lift'].includes(cur)) return cur;
+        // иначе пробуем дальше
+        const nxt = STRONG_FALLBACK[cur];
+        if (nxt && !visited.has(nxt)) cur = nxt; else return cur;
+      }
+      return cur || null;
+    };
+    for (const orig of beforeTier) if (!out.includes(orig)) {
+      const fb = resolveFallback(orig);
+      if (fb && !out.includes(fb)) out.push(fb);
     }
     if (out.length===0) out = ['back_squat','deadlift','ohp'].slice(0,3);
   }
@@ -88,44 +101,30 @@ function gentleFactor(id: string, injuries: any[]|undefined): number {
   return 1;
 }
 
+// P0-2: единый источник — делегируем в strength-sport-loading.ts (Prilepin зоны)
 function repsFor(tag: string, phase: string, goal: string, isPrimary: boolean): [number, number] {
-  if (goal === 'technique') return [1, 3];
-  // OLY — всегда 1-3
-  if (tag === 'snatch_day' || tag === 'clean_day' || tag === 'oly_day') return isPrimary ? [1, 3] : [3, 5];
-  if (tag === 'technique_day') return [1, 2];
-  // Strong
-  if (tag === 'event_day') return isPrimary ? [1, 5] : [6, 10];
-  if (phase === 'peaking') return isPrimary ? [1, 3] : [3, 6];
-  if (phase === 'accumulation') return isPrimary ? [3, 6] : [8, 12];
-  if (phase === 'intensification') return isPrimary ? [2, 5] : [6, 10];
-  if (phase === 'deload') return isPrimary ? [3, 5] : [8, 12];
-  return [3, 6];
+  return repsForSS(tag, phase, goal, isPrimary);
 }
-
 function pctFor(phase: string, goal: string): number {
-  if (goal === 'technique') return 0.65;
-  if (phase === 'accumulation') return 0.75;
-  if (phase === 'intensification') return 0.85;
-  if (phase === 'peaking') return 0.92;
-  if (phase === 'deload') return 0.60;
-  return 0.78;
+  return pctForSS(phase, goal);
 }
 
 function basePmFor(id: string, wm: StrengthSportInput['workMax']): number {
-  if (['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_pull','snatch_balance','overhead_squat_v2'].includes(id)) return wm.snatch || 60;
-  if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip'].includes(id)) return wm.cleanJerk || wm.clean || wm.frontSquat || 80;
-  if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip'].includes(id)) return wm.backSquat || wm.frontSquat || 100;
-  if (['deadlift','sumo_dl','axle_deadlift','rdl'].includes(id)) return wm.deadlift || 120;
-  if (['ohp','push_press','log_press','circus_db_press','bench_bar'].includes(id)) return wm.overheadPress || wm.bench || wm.logPress || 60;
+  // точные + подстроковые для вариаций (deficit/block/pause)
+  if (['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2'].includes(id) || id.includes('snatch')) return wm.snatch || 60;
+  if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(id) || id.includes('clean') || id.includes('jerk')) return wm.cleanJerk || wm.clean || wm.frontSquat || 80;
+  if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip','pause_squat','overhead_squat_v2'].includes(id) || id.includes('squat')) return wm.backSquat || wm.frontSquat || 100;
+  if (['deadlift','sumo_dl','axle_deadlift','rdl','deficit_pull','pause_pull'].includes(id) || id.includes('deadlift') || id.includes('pull') && id.includes('deficit')) return wm.deadlift || 120;
+  if (['ohp','push_press','log_press','circus_db_press','bench_bar','jerk_recovery','behind_neck_jerk'].includes(id) || id.includes('press') || id.includes('jerk')) return wm.overheadPress || wm.bench || wm.logPress || 60;
   return wm.backSquat || 80;
 }
 function weightForExercise(id: string, input: StrengthSportInput, pct: number, week: number): number {
   const wm = input.workMax || {};
   const base = basePmFor(id, wm);
-  const pm = pmForWeek(base, week, input);
+  const pm = pmForWeek(base, week, input, id);
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  const adj = outsideMult < 0.75 ? 0.95 : 1;
-  return Math.round((pm || base) * pct * adj / 2.5) * 2.5;
+  // P0-4: double-dip убран — outside уже режет сеты, вес не трогаем (как в BB fix 2)
+  return Math.round((pm || base) * pct / 2.5) * 2.5;
 }
 
 function buildWarmup(weight: number, id?: string): StrengthSportSet[] {
@@ -146,9 +145,16 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   }
   const outM = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   if (outM < 0.75 && sets > 2) sets -= 1;
-  const rir = rirForWeek(week, input.weeks, input.goal);
+  // P0-7 ACWR: срезаем объём
+  const acwr = (input as any).acwr as { ratio:number; zone:string } | null | undefined;
+  if (acwr?.zone === 'dangerous' && sets > 2) sets = Math.max(2, Math.round(sets * 0.65));
+  else if (acwr?.zone === 'caution' && sets > 2) sets = Math.max(2, Math.round(sets * 0.85));
+  else if (acwr?.zone === 'undertrained') sets = Math.min(6, sets + 1);
+  const rir = rirForWeek(week, input.weeks, input.goal, isOly(id));
   let finalRir = rir;
   if (phase === 'deload') finalRir = 4;
+  else if (acwr?.zone === 'dangerous') finalRir = Math.min(4, finalRir + 2);
+  else if (acwr?.zone === 'caution') finalRir = Math.min(4, finalRir + 1);
   const gentle = gentleFactor(id, input.injuries as any);
   let finalWeight = baseWeight;
   let finalReps = reps;
@@ -159,11 +165,13 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     finalReps = [reps[0]+1, reps[1]+2] as [number, number];
   }
   const tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
-  const rest = restForSS(isPrimary ? 'тяж' : 'памп', isPrimary);
+  const rest = restForSS(isPrimary ? 'тяж' : 'памп', isOly(id) ? id : isStrong(id) ? id : undefined);
+  // P0-6: для стронга 300-360с, для oly 180с — теперь rest уже учитывает id
+  const finalRest = gentle < 1 ? rest + 30 : rest;
   const workSets: StrengthSportSet[] = [];
   for (let i = 0; i < sets; i++) {
     const rep = Math.round((finalReps[0] + finalReps[1]) / 2);
-    workSets.push({ reps: rep, rir: finalRir, weight: finalWeight, pct: Math.round(pct * 100), tempo, restSeconds: gentle<1? rest+30 : rest });
+    workSets.push({ reps: rep, rir: finalRir, weight: finalWeight, pct: Math.round(pct * 100), tempo, restSeconds: finalRest });
   }
   return { sets, reps: finalReps, rir: finalRir, weight: finalWeight, workSets };
 }
@@ -192,9 +200,12 @@ function computeNutMult(input: { calorieSurplus?: number; proteinPerKg?: number 
   if (input.proteinPerKg != null) v *= input.proteinPerKg >= 2.0 ? 1.1 : input.proteinPerKg >= 1.6 ? 1.05 : input.proteinPerKg < 1.0 ? 0.85 : 1.0;
   return Math.max(0.6, Math.min(1.5, v));
 }
-function computeBudget(input: { peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number }): number {
+// P0-4: бюджет per level (begin 60, inter 85, adv 110, enh 135) — вместо магии 112
+function computeBudget(input: { level?: string; peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number }): number {
+  const levelBase: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
+  const baseSets = levelBase[(input.level as string) || 'intermediate'] ?? 85;
   const ped = adaptForPEDsSS(input.peds, input.pedDoses as any, input.courseIntensity);
-  const base = Math.round(112 * ped.mrvMult);
+  const base = Math.round(baseSets * ped.mrvMult);
   const lab = input.labMrvMultiplier ?? 1;
   const nut = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
   return Math.round(base * lab * nut);
@@ -248,6 +259,18 @@ const SS_EX_META: Record<string, { name: string; group: string; pattern: string 
   zercher_carry: { name: 'Зерчер', group: 'back', pattern: 'carry' },
   tire_flip: { name: 'Покрышка', group: 'legs', pattern: 'hinge' },
   sled_push_sprint: { name: 'Сани спринт', group: 'legs', pattern: 'carry' },
+  // P0-5: 15 вариаций ТА для про-вариативности
+  deficit_snatch: { name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge' },
+  block_snatch: { name: 'Рывок с блоков', group: 'legs', pattern: 'hinge' },
+  pause_snatch: { name: 'Рывок с паузой', group: 'legs', pattern: 'hinge' },
+  deficit_clean: { name: 'Взятие с дефицита', group: 'legs', pattern: 'hinge' },
+  block_clean: { name: 'Взятие с блоков', group: 'legs', pattern: 'hinge' },
+  pause_clean: { name: 'Взятие с паузой', group: 'legs', pattern: 'hinge' },
+  pause_squat: { name: 'Присед с паузой', group: 'legs', pattern: 'squat' },
+  jerk_recovery: { name: 'Восстановление после толчка', group: 'legs', pattern: 'squat' },
+  behind_neck_jerk: { name: 'Толчок из-за головы', group: 'shoulders', pattern: 'vertical_push' },
+  pause_pull: { name: 'Тяга с паузой', group: 'back', pattern: 'hinge' },
+  deficit_pull: { name: 'Тяга с дефицита', group: 'back', pattern: 'hinge' },
 };
 const SS_TECHNIQUE: Record<string,string> = {
   snatch:'Рывок: широкий хват, тяга + подрыв + уход в сед, фиксация над головой',
@@ -284,6 +307,17 @@ const SS_TECHNIQUE: Record<string,string> = {
   zercher_carry:'Зерчер: штанга в сгибах локтей, кор напряжён',
   tire_flip:'Покрышка: присед + взрыв + толчок коленом',
   sled_push_sprint:'Сани: лёгкий вес, спринт 20-30м',
+  deficit_snatch:'С дефицита (2-4см): тяга длиннее, контроль спины',
+  block_snatch:'С блоков: старт выше колен, акцент на подрыв',
+  pause_snatch:'Пауза 2с у колен + взрыв, без потери позиции',
+  deficit_clean:'С дефицита: глубокая тяга, пятки прижаты',
+  block_clean:'С блоков: мощный подрыв, быстрый уход',
+  pause_clean:'Пауза у колен 2с, затем взятие',
+  pause_squat:'Пауза 2-3с внизу, без отбива',
+  jerk_recovery:'Вставание из ножниц с весом над головой',
+  behind_neck_jerk:'Из-за головы: вертикальный толчок, баланс',
+  pause_pull:'Пауза 2с у колен, тяга до груди',
+  deficit_pull:'С дефицита 3-5см, длинная амплитуда',
   deadlift:'Нейтральная спина, гриф по ногам',
   sumo_dl:'Сумо: ноги широко, носки наружу',
   rdl:'Таз назад, гриф по ногам, растяжение бицепса бедра',
@@ -321,7 +355,9 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   const recoveryMult = computeRecMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
   const nutritionMult = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  const weeklyBudget = computeBudget({ peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier });
+  // P0-7 ACWR: dangerous 0.60, caution 0.85, undertrained 1.10 — как в lms-builder
+  const acwrMult = input.acwr?.zone === 'dangerous' ? 0.60 : input.acwr?.zone === 'caution' ? 0.85 : input.acwr?.zone === 'undertrained' ? 1.1 : 1;
+  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier }) * acwrMult);
 
   const weeksData: StrengthSportWeek[] = [];
   const rationale: string[] = [];
@@ -330,7 +366,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)} · Budget ${weeklyBudget} сетов/нед`);
 
   for (let w = 1; w <= weeks; w++) {
-    const phase = phaseForWeek(w, weeks) as any;
+    const phase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate) : phaseForWeek(w, weeks, goal)) as any;
     const deload = phase === 'deload';
     const sessions: StrengthSportSession[] = [];
     let absoluteDay = 0;
@@ -378,7 +414,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           workSets,
           warmupSets: isPrimary ? buildWarmup(finalWeight, id) : [],
           tempo: tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase),
-          restSeconds: restForSS(isPrimary ? 'тяж' : 'памп', isPrimary),
+          restSeconds: restForSS(isPrimary ? 'тяж' : 'памп', id),
           comment: deload ? 'Делод — лёгкая неделя' : gentle < 1 ? 'Щадящий режим: снижен вес, +RIR' : (meta as any).technique || undefined,
           isCompetitionLift: isOly(id) || isStrong(id),
         };

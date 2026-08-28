@@ -63,6 +63,10 @@ export interface StrengthSportInput {
   labMrvMultiplier?: number;
   calorieSurplus?: number;
   proteinPerKg?: number;
+  // P0-1 + P0-7: соревнование и авторегуляция
+  competitionDate?: string;
+  startDate?: string;
+  acwr?: { ratio: number; zone: 'undertrained'|'optimal'|'caution'|'dangerous' } | null;
 }
 
 export interface StrengthSportSet {

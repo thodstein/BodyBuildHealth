@@ -32,13 +32,16 @@ export const SS_ANGLE_CLASSES: Record<string, Record<string, string[]>> = {
   },
 };
 
-// Жёсткие группы: упражнение меняется только внутри группы
+// Жёсткие группы: упражнение меняется только внутри группы — P0-5 расширение 5→8
 export const SS_STRICT_GROUPS: Record<string, string[]> = {
-  snatch_full: ['snatch', 'hang_snatch', 'power_snatch'],
-  clean_full: ['clean_and_jerk', 'hang_clean', 'power_clean'],
-  jerk: ['push_jerk', 'split_jerk', 'push_press'],
-  carry_heavy: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry'],
-  stone: ['atlas_stone_load', 'stone_lift', 'sandbag_shoulder'],
+  snatch_full: ['snatch', 'hang_snatch', 'power_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch'],
+  clean_full: ['clean_and_jerk', 'hang_clean', 'power_clean', 'deficit_clean', 'block_clean', 'pause_clean'],
+  jerk: ['push_jerk', 'split_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk'],
+  carry_heavy: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry', 'sled_push_sprint'],
+  stone: ['atlas_stone_load', 'stone_lift', 'sandbag_shoulder', 'tire_flip'],
+  squat: ['back_squat', 'front_squat', 'front_squat_clean_grip', 'hack_squat', 'overhead_squat_v2', 'pause_squat'],
+  press: ['log_press', 'push_press', 'ohp', 'circus_db_press', 'bench_bar', 'db_press'],
+  pull: ['snatch_pull', 'clean_pull', 'pause_pull', 'rdl', 'deficit_pull'],
 };
 
 export function strictGroupFor(id: string): string | null {
@@ -50,13 +53,17 @@ export function groupMembers(group: string): string[] {
   return SS_STRICT_GROUPS[group] || [];
 }
 
-// Tier-подобный фильтр: beginner без other/specialty и без сложных oly/стронг
-const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'yoke_walk', 'log_press']);
+// Tier-подобный фильтр — P0-5 + P1: beginner без сложных, intermediate без самых экзотических без разрешения
+const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'yoke_walk', 'log_press', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'deficit_clean', 'block_clean']);
+const EXOTIC_STRONG = new Set(['log_press','atlas_stone_load','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift','tire_flip','stone_lift','sandbag_shoulder']);
 
 export function filterByTier(pool: string[], level: string, allowExotic?: boolean, hasSpecialty?: boolean): string[] {
   let out = [...pool];
-  if (!allowExotic && level === 'beginner') out = out.filter(id => !COMPLEX_IDS.has(id));
-  if (!hasSpecialty) out = out.filter(id => !['log_press','atlas_stone_load','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift'].includes(id));
+  if (!allowExotic) {
+    if (level === 'beginner') out = out.filter(id => !COMPLEX_IDS.has(id));
+    else if (level === 'intermediate') out = out.filter(id => !['yoke_walk','atlas_stone_load','log_press','snatch_balance'].includes(id));
+  }
+  if (!hasSpecialty) out = out.filter(id => !EXOTIC_STRONG.has(id));
   return out;
 }
 

@@ -17,13 +17,27 @@ const TEMPO_OVERRIDES: Record<string,string> = {
   bench_bar:'2-0-1-0', squat:'2-0-1-0', back_squat:'2-0-1-0', front_squat:'2-0-1-0', deadlift:'2-0-1-0', sumo_dl:'2-0-1-0',
 };
 export function tempoForSS(id: string, character: DayCharacter, phase: string): string {
-  if (phase==='deload') return '3-1-1-0';
+  const isExplosive = id && TEMPO_OVERRIDES[id] === 'X-0-X-0';
+  if (phase === 'deload') return isExplosive ? 'X-0-X-0' : '3-1-1-0';
   if (id && TEMPO_OVERRIDES[id]) return TEMPO_OVERRIDES[id];
   if (character==='тяж') return '2-0-1-0';
   if (character==='памп') return '2-0-1-1';
   return '2-0-1-0';
 }
-export function restForSS(character: DayCharacter, isPrimary: boolean): number {
+// P0-6: рест по ивентам — стронг-ивенты 5-8 мин (Rest Timer Science), oly/strength 2-3 мин
+export function restForSS(character: DayCharacter, isPrimary: boolean, id?: string): number {
+  const strongCarry = id && ['yoke_walk','farmers_walk_heavy','zercher_carry','sled_push_sprint','tire_flip','atlas_stone_load','stone_lift','sandbag_shoulder'].some(k => id.includes(k));
+  const strongPress = id && ['log_press','circus_db_press','axle_deadlift'].some(k => id.includes(k));
+  if (strongCarry) {
+    // фермер/йок/камни/сани — 5-8 мин
+    if (isPrimary && character==='тяж') return 360;
+    return 300;
+  }
+  if (strongPress) {
+    // лог/аксель — 3-5 мин
+    if (isPrimary && character==='тяж') return 240;
+    return 180;
+  }
   if (isPrimary && character==='тяж') return 180;
   if (character==='тяж') return 120;
   if (character==='памп') return 75;
@@ -45,11 +59,11 @@ export function repsForSS(tag: string, phase: string, goal: string, isPrimary: b
   return [3,6];
 }
 
-export function computeSSLoading(tag: string, phase: string, goal: string, isPrimary: boolean, character: DayCharacter): LoadingOut {
+export function computeSSLoading(tag: string, phase: string, goal: string, isPrimary: boolean, character: DayCharacter, id?: string): LoadingOut {
   const reps = repsForSS(tag, phase, goal, isPrimary);
   const pct = pctForSS(phase, goal);
-  const tempo = tempoForSS('', character, phase);
-  const rest = restForSS(character, isPrimary);
+  const tempo = tempoForSS(id || '', character, phase);
+  const rest = restForSS(character, isPrimary, id);
   // RIR will be set via rirForWeek outside (needs week)
   return { reps, rir: 2, pct, tempo, rest };
 }
