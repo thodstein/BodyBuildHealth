@@ -90,9 +90,10 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
           if (ex.role === 'primary' || keep.length < lim.maxExercises) keep.push(ex);
           else remove.push(ex);
         }
-        // если всё ещё много — срезаем с конца keep accessory
+        // если всё ещё много — срезаем с конца keep accessory (совместимость без findLastIndex)
         while (keep.length > lim.maxExercises) {
-          const idx = keep.findLastIndex(e => e.role === 'accessory');
+          let idx = -1;
+          for (let i = keep.length - 1; i >= 0; i--) if ((keep[i] as any).role === 'accessory') { idx = i; break; }
           if (idx >= 0) keep.splice(idx, 1); else keep.pop();
         }
         sess.exercises = keep;
