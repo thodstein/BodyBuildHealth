@@ -33,6 +33,7 @@ export interface CombatInput {
   // Методика и периодизация
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   periodizationModel?: 'atr_10' | 'linear_12' | 'conjugate';
+  conditioningMode?: 'auto' | 'off' | 'alactic' | 'lactic' | 'aerobic';
   fightDate?: string | null; // ISO date боя — для тапера
   taperWeeks?: number; // 1 | 2
   workMax?: Record<string, number> | null; // групповой (chest/back/quads etc)
@@ -110,6 +111,7 @@ export interface CombatPlan {
   patternId: string;
   weeksData: CombatWeek[];
   outsideMetrics?: import('../outside-load.engine').OutsideLoadMetrics | null;
+  conditioning?: import('./combat-conditioning.engine').ConditioningPlan | null;
   validation?: { ok: boolean; warnings: string[]; errors: string[] };
   rationale: string[];
   report?: any;

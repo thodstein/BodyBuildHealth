@@ -9,6 +9,7 @@ import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progre
 import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
 import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale } from './combat-taper.engine';
 import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek } from './combat-weight-cut.engine';
+import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB } from './combat-selection';
 import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
@@ -279,6 +280,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     rationale.push(weightCutRehydrationNotes(wcProtocol.targetLossKg)[0]);
   }
   if (taperCfg) rationale.push(...buildTaperRationale(taperCfg, weeks));
+  if ((input as any).conditioningMode !== 'off') rationale.push(...buildConditioningRationale(goal, outsideSessions, weeks));
 
   const weeksData: CombatWeek[] = [];
   // periodization model: atr_10 для >=9 нед, иначе linear; camp → camp_8; conjugate явный
@@ -393,6 +395,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     weeksData.push({ week: w, phase, deload, taper, sessions, totalSets, totalTonnage, outsideLoad: outsideMetrics?.weeklyLoad });
   }
 
+  // conditioning (отдельно от зала, не ломает сессии)
+  let conditioningPlan: any = null;
+  if ((input as any).conditioningMode !== 'off') {
+    const sessionsPerWeek = weeksData.map(wk => conditioningSessionsForWeek(wk.week, wk.phase as any, goal, outsideSessions));
+    conditioningPlan = { weeks, sessions: sessionsPerWeek };
+  }
+
   if (input.dupMode && input.dupMode !== 'off') {
     const tmp:any = { weeksData, rationale: [] };
     applyCombatDUP(tmp as any, input.dupMode as any);
@@ -430,6 +439,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     patternId: pattern.id,
     weeksData,
     outsideMetrics,
+    conditioning: conditioningPlan,
     validation: { ok: errors.length === 0, warnings, errors },
     rationale,
     inputSnapshot: input,
