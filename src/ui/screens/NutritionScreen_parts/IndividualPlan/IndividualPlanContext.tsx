@@ -517,6 +517,33 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     () => (annualPlan ? annualPlanPhaseForDate(annualPlan, isoToday()) : null),
     [annualPlan],
   );
+  // Combat/Strength → питание: проводка payload (как BB prep) — combatToNutritionPayload/combatToCardioPayload, strength payload
+  const [combatNutritionPayload, setCombatNutritionPayload] = useState<any>(() => {
+    try { const v = localStorage.getItem('he_combat_nutrition_payload'); return v ? JSON.parse(v) : null; } catch { return null; }
+  });
+  const [strengthNutritionPayload, setStrengthNutritionPayload] = useState<any>(() => {
+    try { const v = localStorage.getItem('he_strength_nutrition_payload'); return v ? JSON.parse(v) : null; } catch { return null; }
+  });
+  useEffect(() => {
+    const onCombat = (e: any) => {
+      try { const detail = (e as any).detail || {}; const payload = detail.nutrition || detail; if (payload && payload.proteinG) { setCombatNutritionPayload(payload); try { localStorage.setItem('he_combat_nutrition_payload', JSON.stringify(payload)); } catch {} } } catch {}
+    };
+    const onStrength = (e: any) => {
+      try { const detail = (e as any).detail || {}; const payload = detail.nutrition || detail; if (payload && payload.proteinG) { setStrengthNutritionPayload(payload); try { localStorage.setItem('he_strength_nutrition_payload', JSON.stringify(payload)); } catch {} } } catch {}
+    };
+    window.addEventListener('he-combat-updated', onCombat as any);
+    window.addEventListener('he-strength-updated', onStrength as any);
+    const onStorage = (ev: StorageEvent) => {
+      if (ev.key === 'he_combat_nutrition_payload') try { setCombatNutritionPayload(ev.newValue ? JSON.parse(ev.newValue) : null); } catch {}
+      if (ev.key === 'he_strength_nutrition_payload') try { setStrengthNutritionPayload(ev.newValue ? JSON.parse(ev.newValue) : null); } catch {}
+    };
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('he-combat-updated', onCombat as any);
+      window.removeEventListener('he-strength-updated', onStrength as any);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
   const applyBBPeakToPlan = (cfg: BBContestPrepConfig | null) => {
     if (!cfg) {
       try { clearContestPrepEverywhere(); } catch {}
@@ -793,7 +820,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // P0-fix Aug 23 2026: manualP/F НЕ умножаются повторно на _nutrMult — switchKbjuMode уже
   // скопировал эффективные (умноженные) значения в manualP/F. При kbjuMode==='manual' берём как есть.
   const _baseP = kbjuMode === 'manual' && manualP !== null ? manualP : (kbjuMode === 'profile' ? profileTargets.protein : calcTargets.protein);
-  const effectiveP = kbjuMode === 'manual' ? _baseP : Math.round(_baseP * _nutrMult);
+  let effectiveP = kbjuMode === 'manual' ? _baseP : Math.round(_baseP * _nutrMult);
   // D-28+ fix (КБЖУ-соответствие, Aug 22 2026): ЖИРЫ НЕ ниже физиологического пола 0.8 г/кг —
   // движок (FAT_FLOOR_PER_KG) никогда не спускается ниже, а раньше цель в карточке (60 г для
   // 120 кг = 0.5 г/кг) была ниже пола → «разбег» жиров до 60%+. Поднимаем отображаемую цель до пола.
@@ -835,6 +862,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   let effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
     ? manualKcal
     : Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+  // Проводка combat/strength → питание (как намечалось): combatToNutritionPayload/combatToCardioPayload, strength payload
+  // При активном payload (единоборства в весогонке или стронг в дефиците) подменяем P/C, kcal пересчитываем, не трогаем manual
+  if (kbjuMode !== 'manual') {
+    if (combatNutritionPayload?.proteinG && combatNutritionPayload?.carbsG) {
+      effectiveP = combatNutritionPayload.proteinG;
+      effectiveC = combatNutritionPayload.carbsG;
+      effectiveKcal = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+    } else if (strengthNutritionPayload?.proteinG && strengthNutritionPayload?.carbsG) {
+      effectiveP = strengthNutritionPayload.proteinG;
+      effectiveC = strengthNutritionPayload.carbsG;
+      effectiveKcal = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+    }
+  }
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
@@ -4313,6 +4353,6 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase]);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase, combatNutritionPayload, strengthNutritionPayload } as any), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase, combatNutritionPayload, strengthNutritionPayload]);
   return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };
