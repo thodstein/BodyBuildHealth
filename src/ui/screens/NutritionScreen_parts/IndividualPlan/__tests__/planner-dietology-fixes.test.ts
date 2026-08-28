@@ -215,7 +215,8 @@ describe('D4/D5: диетологический потолок углеводо�
     const target = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817 });
     const plan = buildDayPlan(base({ weightKg: 120, lbmKg: 100, goalCarbsG: target, goalKcal: 5000, goalProteinG: 360, goalFatG: 135, mealsCount: 6 }));
     expect(plan.totals.c).toBeLessThanOrEqual(target * 1.06); // в пределах ~6% (без абсурда 814+)
-    expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.88);
+    // Р-2.3: межприёмный баланс подтягивает приёмы к долям — день может уйти на ~8% ниже
+    expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.92);
   });
 });
 

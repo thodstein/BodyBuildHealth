@@ -122,9 +122,10 @@ describe('планировщик: матрица качества (Этап 0)',
                   if (isMainMeal && share < minMainShare) minMainShare = share;
                   if (!impossible && isMainMeal && share > 0 && share < 70) mainShareBelow70++;
                   // Р-2.1: вырожденная позиция — углевод/белок основного приёма ниже пола
+                  // (карб-порог 15 г: у cut-целей 15-20 г гарнира — легитимная порция)
                   if (isMainMeal) for (const it of (m.items || [])) {
                     if (it.role === 'protein' && !String(it.id).includes('whey') && !String(it.id).includes('casein') && (it.amount || 0) > 0 && (it.amount || 0) < 40) { degenerateItems++; if (!degenerateCell) degenerateCell = `${prof.weight}/${prof.sex}/${goal}/${mode}`; }
-                    if ((it.role === 'carb_slow') && (it.amount || 0) > 0 && (it.amount || 0) < 18) { degenerateItems++; if (!degenerateCell) degenerateCell = `${prof.weight}/${prof.sex}/${goal}/${mode}`; }
+                    if ((it.role === 'carb_slow') && (it.amount || 0) > 0 && (it.amount || 0) < 15) { degenerateItems++; if (!degenerateCell) degenerateCell = `${prof.weight}/${prof.sex}/${goal}/${mode}`; }
                   }
                 }
                 const cell = `w${prof.weight}${prof.sex === 'female' ? 'Ж' : ''}/${goal}${prof.sex === 'female' ? '/' + cycle : ''}/${mealsCount}пр/${mode}/s${seed}`;
