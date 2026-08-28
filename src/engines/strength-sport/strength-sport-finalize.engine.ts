@@ -8,25 +8,25 @@ import { sessionLimitsFor, validateSync } from './strength-sport-limits';
 import { calcDOTS, calcWilks, calcIPFGL } from '../pl-points.engine';
 
 // P3: Sinclair для ТА (IWF 2017-2020 коэффициенты, актуальны для сравнения)
-const SINCLAIR = {
+export const SINCLAIR = {
   male: { A: 0.751945030, b: 175.508 },
   female: { A: 0.783497476, b: 153.655 },
 };
-function calcSinclair(total: number, bw: number, sex: string): number {
+export function calcSinclair(total: number, bw: number, sex: string): number {
   if (total <= 0 || bw <= 0) return 0;
   const s = sex === 'female' ? SINCLAIR.female : SINCLAIR.male;
   const log = Math.log10(bw / s.b);
   const coeff = Math.pow(10, s.A * log * log);
   return Math.round(total * coeff);
 }
-function getIWFCategory(bw: number, sex: string): string {
+export function getIWFCategory(bw: number, sex: string): string {
   const catsM = [55,61,67,73,81,89,96,102,109];
   const catsF = [45,49,55,59,64,71,76,81,87];
   const cats = sex === 'female' ? catsF : catsM;
   for (const c of cats) if (bw <= c) return `${c}`;
   return `+${cats[cats.length-1]}`;
 }
-function getMastersFactor(age: number): number {
+export function getMastersFactor(age: number): number {
   if (!age || age < 35) return 1;
   if (age < 40) return 1.02;
   if (age < 45) return 1.05;
