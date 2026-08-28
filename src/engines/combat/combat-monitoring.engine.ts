@@ -52,10 +52,51 @@ export function hrvGrade(hrvMs: number, mean: number, sd: number): { grade: 'opt
   return { grade: 'optimal', note: 'HRV в норме' };
 }
 
+export function hrvFromHistory(history: number[]): { mean:number; sd:number; last:number } | null {
+  if (!Array.isArray(history) || history.length < 7) return null;
+  const vals = history.slice(-28).filter(v=> typeof v==='number' && v>10 && v<250);
+  if (vals.length < 7) return null;
+  const mean = vals.reduce((a,b)=>a+b,0)/vals.length;
+  const sd = Math.sqrt(vals.reduce((a,b)=> a + (b-mean)*(b-mean),0)/vals.length) || 8;
+  const last = vals[vals.length-1];
+  return { mean, sd, last };
+}
+
+export function loadHrvHistory(): number[] {
+  try {
+    for (const key of ['he_hrv_log','he_hrv_history','he_diary_hrv']) {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          const nums = arr.map((x:any)=> typeof x==='number'? x : (x.hrvMs ?? x.hrv ?? x.value ?? x.ms)).filter((v:any)=> typeof v==='number');
+          if (nums.length) return nums;
+        }
+      }
+    }
+    // fallback из профиля lifestyle
+    const pr = typeof localStorage !== 'undefined' ? localStorage.getItem('he_profile_v2') : null;
+    if (pr) {
+      const p = JSON.parse(pr);
+      const v = p?.lifestyle?.morningHRV ?? p?.lifestyle?.hrvMs;
+      if (typeof v==='number') return [v];
+    }
+  } catch {}
+  return [];
+}
+
 export function combatLoadStatus(acwr: ACWRReport | null, hrvGradeResult: string | null, velocityLoss?: number | null): string[] {
   const notes: string[] = [];
   if (acwr) notes.push(`ACWR ${acwr.ratio} (${acwr.zone}): ${acwr.recommendation}`);
   if (hrvGradeResult) notes.push(`HRV: ${hrvGradeResult}`);
   if (typeof velocityLoss === 'number') notes.push(`VBT потеря ${velocityLoss}%: ${vbtRecommendation(velocityLoss).action}`);
   return notes;
+}
+
+export function combatHrvReport(): { grade:'optimal'|'caution'|'dangerous'; note:string; mean:number; sd:number; last:number } | null {
+  const hist = loadHrvHistory();
+  const h = hrvFromHistory(hist);
+  if (!h) return null;
+  const g = hrvGrade(h.last, h.mean, h.sd);
+  return { ...g, mean: Math.round(h.mean), sd: Math.round(h.sd), last: h.last };
 }

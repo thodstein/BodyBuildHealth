@@ -11,10 +11,11 @@ import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '
 import { saveCombatPlan, loadCombatPlans } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
 import { buildAnnualFromCB, buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual } from '../../../engines/combat/combat-annual';
+import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
-import { combatACWR } from '../../../engines/combat/combat-monitoring.engine';
+import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
@@ -50,8 +51,11 @@ export const CombatConstructor: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
+  const [hrvLine, setHrvLine] = useState<string | null>(null);
   const [patternId, setPatternId] = useState<string>('');
   const [workMax, setWorkMax] = useState<Record<string,number>>({ bench:80, squat:90, deadlift:100, chest:80, back:70, quads:90, hamstrings:80, shoulders:50 });
+  const [workMaxByExercise, setWorkMaxByExercise] = useState<Record<string,number>>({});
+  const [showExactWM, setShowExactWM] = useState(false);
   const [plan, setPlan] = useState<CombatPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualCB());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -80,6 +84,11 @@ export const CombatConstructor: React.FC = () => {
           }
         }catch{}
       }
+      try{
+        const h = combatHrvReport();
+        if(h) setHrvLine(`HRV ${h.last}мс (ср ${h.mean}±${h.sd}) — ${h.grade}: ${h.note}`);
+        else setHrvLine(null);
+      }catch{ setHrvLine(null); }
     } catch {}
   }, [plan]);
 
@@ -105,10 +114,14 @@ export const CombatConstructor: React.FC = () => {
       if (personal.workMax) Object.assign(wm, personal.workMax);
       if (Object.keys(wm).length) setWorkMax(s => ({ ...s, ...wm }));
       if (training.workMaxByExercise || personal.workMaxByExercise) {
-        // маппим часть ex в групповые для combat
         const exBy = training.workMaxByExercise || personal.workMaxByExercise;
+        if (exBy && typeof exBy === 'object') {
+          const direct: Record<string,number> = {};
+          for(const [k,v] of Object.entries(exBy as Record<string,number>)) if(typeof v==='number'&&v>0) direct[k]=v;
+          if(Object.keys(direct).length) setWorkMaxByExercise(direct);
+        }
         const map: Record<string,string> = { bench_bar:'bench', squat:'squat', front_squat:'squat', row_bar:'back', ohp:'shoulders' };
-        for(const [k,v] of Object.entries(exBy as Record<string,number>)){
+        for(const [k,v] of Object.entries((training.workMaxByExercise || personal.workMaxByExercise) as Record<string,number>)){
           const g = map[k];
           if(g && typeof v==='number' && v>0) wm[g]=v;
         }
@@ -154,6 +167,7 @@ export const CombatConstructor: React.FC = () => {
       fightDate: fightDate || null, taperWeeks: fightDate ? taperWeeks : undefined, startDate,
       bodyweight, sex, age,
       workMax: workMax as any,
+      workMaxByExercise: Object.keys(workMaxByExercise).length ? workMaxByExercise as any : undefined,
       acwr: acwr as any, velocityLossPct: velocityLoss>0? velocityLoss : null,
       outsideLoad: outsideEnabled ? outside : null,
       equipment, injuries, mobilityRestrictions: mobility as any,
@@ -326,6 +340,7 @@ export const CombatConstructor: React.FC = () => {
             <label style={{ color: '#fff', fontSize: 11 }}>Возраст: <input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||28)} style={{ width:'100%', padding: 4, borderRadius: 6 }} /></label>
           </div>
           {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#a855f7', background:'rgba(255,255,255,0.04)', padding:6, borderRadius:6 }}>ACWR {acwr.ratio} · {acwr.zone} {acwr.zone==='dangerous'?'— объём ×0.60,RIR+2': acwr.zone==='caution'?'— ×0.85,RIR+1': acwr.zone==='undertrained'?'— добавить объём':''} · дневник sRPE 28д</div>}
+          {hrvLine && <div style={{ fontSize: 10, color: hrvLine.includes('dangerous')?'#ef4444': hrvLine.includes('caution')?'#eab308':'#10b981', background:'rgba(255,255,255,0.04)', padding:6, borderRadius:6 }}>{hrvLine}</div>}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
             <label style={{ color: '#fff', fontSize: 11 }}>VBT потеря: {velocityLoss}% <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ width:'100%' }} /></label>
             <div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Vitruve: &gt;20% → RIR+1, &gt;30% → стоп сет. Влив в бюджет ×{velocityLoss>20?0.9:1}</div>
@@ -336,7 +351,15 @@ export const CombatConstructor: React.FC = () => {
               <label key={k} style={{ color: '#fff', fontSize: 11 }}>{k}: <input type="number" value={(workMax as any)[k] || 0} onChange={e=> setWorkMax(s=> ({...s, [k]: Number(e.target.value)||0}))} style={{ width:'100%', padding:4, borderRadius:6 }} /></label>
             ))}
           </div>
-          <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>WorkMax: точные веса по упражнениям тянутся из профиля (he_profile_v2). Пусто → BW×коэфф. Шаг 2.5кг (шея 0.5кг).</div>
+          <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>WorkMax группы → BW×коэфф если пусто. Точные — ниже.</div>
+          <button onClick={()=> setShowExactWM(v=>!v)} style={{ padding:'4px 8px', borderRadius:6, fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', cursor:'pointer' }}>{showExactWM?'▲ Скрыть точные':'▼ Точные веса по упражнениям (64) — hang_clean/bench_bar/squat и т.д.'}</button>
+          {showExactWM && (
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, background:'rgba(255,255,255,0.03)', padding:6, borderRadius:6, maxHeight:220, overflowY:'auto' }}>
+              {['bench_bar','row_bar','ohp','pullup','squat','front_squat','rdl','trap_bar_dead','zercher_squat','hang_clean','high_pull','push_press','landmine_press','fat_bar_row','towel_pullup','rope_climb','neck_harness_ext','neck_flexion','plate_pinch','farmer_carry','sled_push','sled_pull','deadbug','ab_wheel','copenhagen_plank','band_external_rotation'].map(id => (
+                <label key={id} style={{ color:'#fff', fontSize:9 }}>{id}: <input type="number" value={workMaxByExercise[id]||0} onChange={e=> { const v=Number(e.target.value)||0; setWorkMaxByExercise(s=> { const n={...s}; if(v>0) n[id]=v; else delete n[id]; return n; }); }} style={{ width:'100%', padding:2, borderRadius:4, fontSize:9 }} /></label>
+              ))}
+            </div>
+          )}
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
             <label style={{ color: '#fff', fontSize: 11 }}>Методика порядка
@@ -575,7 +598,9 @@ export const CombatConstructor: React.FC = () => {
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
-            <button onClick={() => { const txt = buildCombatReport(plan); const w = window.open('', '_blank'); if (w) { w.document.write(`<pre style="font-family:monospace;white-space:pre-wrap">${txt.replace(/</g,'&lt;')}</pre>`); w.document.close(); w.print(); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Печать</button>
+            <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>🖨 Печать плана (HTML)</button>
+            <button onClick={() => { downloadCombatCsv(plan); setMsg('CSV скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📊 CSV</button>
+            <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob=new Blob([ics],{type:'text/calendar'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000); setMsg('ICS плана скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📅 План .ics</button>
             <button onClick={exportToUserProgram} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)', cursor: 'pointer' }}>Экспорт в программу</button>
             <button onClick={()=> { const s = (plan as any).conditioning; if(s) { navigator.clipboard?.writeText(JSON.stringify(s,null,2)); setMsg('Кондиция скопирована'); }}} style={{ padding:'8px 10px', borderRadius:8, background:'rgba(59,130,246,0.12)', color:'#60a5fa', border:'1px solid rgba(59,130,246,0.22)', cursor:'pointer' }}>Кондиция JSON</button>
           </div>

@@ -54,17 +54,44 @@ export function cbStrictGroupFor(id: string): string | null {
   return null;
 }
 
-export function filterByTierCB(pool: string[], level: string, hasCable?: boolean): string[] {
+export const CB_TIER: Record<string, 1|2|3|4> = {
+  // tier1 база 3-6 повт, tier2 аксессуар 8-12, tier3 explosive, tier4 exotic
+  bench_bar:1, squat:1, front_squat:1, rdl:1, row_bar:1, pullup:1, ohp:1, trap_bar_dead:1,
+  zercher_squat:2, bulgarian_split_heavy:2, single_leg_rdl_combat:2, cossack_squat:2, step_up:2, hip_thrust:2, calf_raise:2,
+  face_pull:2, single_arm_row:2, fat_bar_row:2, landmine_press:2, push_press:2, landmine_rotation:2, landmine_180:2, pallof_rotation_press:2, suitcase_carry:2, farmer_carry:2, plate_pinch:2, wrist_flexion:2, wrist_extension:2, wrist_roller:2, band_external_rotation:2, band_pull_apart:2, ytw_raise:2,
+  deadbug:2, hollow_hold:2, side_plank:2, copenhagen_plank:2, neck_harness_ext:2, neck_lateral_flex:2, neck_flexion:2, neck_rotation:2,
+  hang_clean:3, high_pull:3, kb_swing:3, box_jump:3, broad_jump:3, med_ball_throw:3, med_ball_slam:3, med_ball_rot_throw:3, sledge_hammer:3, battle_rope:3,
+  nordic_curl:4, glute_ham_raise:4, depth_jump:4, sled_push:4, sled_pull:4, ab_wheel:4, neck_bridge_wrestler:4, rope_climb:4, towel_pullup:4,
+};
+
+export function tierForCB(id: string): 1|2|3|4 { return CB_TIER[id] ?? 2; }
+
+export function filterByTierCB(pool: string[], level: string, hasCable?: boolean, allowExotic?: boolean): string[] {
   let out = [...pool];
+  const allowT4 = allowExotic || level === 'advanced' || level === 'enhanced';
+  const allowT3 = level !== 'beginner';
   if (level === 'beginner') {
-    out = out.filter(id => !['neck_bridge_wrestler','hang_clean','high_pull','nordic_curl','glute_ham_raise','depth_jump','box_jump','sled_push','sled_pull','rope_climb','towel_pullup','ab_wheel'].includes(id));
+    out = out.filter(id => {
+      const t = tierForCB(id);
+      if (t === 4) return false;
+      if (t === 3) return ['box_jump','broad_jump','kb_swing'].includes(id); // только безопасный плио
+      return true;
+    });
   } else if (level === 'intermediate') {
-    out = out.filter(id => !['neck_bridge_wrestler','depth_jump'].includes(id));
+    out = out.filter(id => {
+      const t = tierForCB(id);
+      if (t === 4 && !allowT4) return !['neck_bridge_wrestler','depth_jump'].includes(id) ? true : false;
+      // intermediate без depth_jump/neck_bridge по умолчанию
+      return !['neck_bridge_wrestler','depth_jump'].includes(id);
+    });
   }
-  // advanced/enhanced — всё можно
+  if (!allowT4) out = out.filter(id => tierForCB(id) !== 4);
+  else if (level === 'intermediate' && !allowExotic) out = out.filter(id => !['neck_bridge_wrestler','depth_jump'].includes(id));
   if (!hasCable) out = out.filter(id => !['pallof_rotation_press','band_external_rotation','band_pull_apart'].includes(id));
-  const hasSled = hasCable; // упрощённо: sled требует зала
+  const hasSled = hasCable;
   if (!hasSled) out = out.filter(id => !['sled_push','sled_pull'].includes(id));
+  // если фильтр вырезал всё — вернуть хотя бы tier1-2
+  if (out.length === 0) return pool.filter(id => tierForCB(id) <= 2).slice(0, 3);
   return out;
 }
 

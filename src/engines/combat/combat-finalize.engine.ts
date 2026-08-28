@@ -6,6 +6,7 @@ import type { CombatPlan } from './combat.types';
 import { isDayConflictWithOutside } from '../outside-load.engine';
 import { getCombat } from './combat-volume';
 import { sessionLimitsForCombat, validateSyncCombat } from './combat-limits';
+import { combatHrvReport } from './combat-monitoring.engine';
 
 export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   const warnings = [...(plan.validation?.warnings || [])];
@@ -52,6 +53,20 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
     if (lmR && rotSets > lmR.mrv) warnings.push(`Нед ${wk.week}: ротация ${rotSets} > MRV ${lmR.mrv}.`);
     if (neckSets > 12) warnings.push(`Нед ${wk.week}: шея ${neckSets} сетов > 12 — риск.`);
     if (coreAnti < 4) warnings.push(`Нед ${wk.week}: core anti <4 сетов (${coreAnti}) — добавьте deadbug/side plank/pallof.`);
+    // prehab: auto-добавка если <3 сетов на upper — вставляем face_pull 3×15 в первую upper/full сессию (изолировано, не ломает бюджет)
+    const hasUpper = wk.sessions.some(s=> s.sessionTag.includes('upper') || s.sessionTag.includes('full_power'));
+    if (hasUpper) {
+      const prehab = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['face_pull','band_external_rotation','band_pull_apart','ytw_raise'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+      if (prehab < 3) {
+        warnings.push(`Нед ${wk.week}: prehab <3 сетов (${prehab}) — авто-добавлен face_pull 3×15 для плеча.`);
+        const target = wk.sessions.find(s=> s.sessionTag.includes('upper_power')) || wk.sessions.find(s=> s.sessionTag.includes('full_power'));
+        if (target && target.exercises.length < lim.maxExercises && target.exercises.reduce((a,e)=>a+e.sets,0) + 3 <= lim.maxSets) {
+          const prePerEx = Math.min(3, lim.perExerciseCap);
+          target.exercises.push({ id:'face_pull', name:'Тяга к лицу', group:'shoulders', pattern:'isolation', role:'accessory', character:'памп', sets: prePerEx, reps:'12-15', rir:3, weight: 15, workSets: Array.from({length:prePerEx},()=>({reps:13, rir:3, weight:15, tempo:'2-0-1-0', restSeconds:60})), tempo:'2-0-1-0', restSeconds:60, comment:'Prehab: скапула/ротаторы — авто' } as any);
+          target.durationMin = (target.durationMin||0)+6;
+        }
+      }
+    }
     // баланс push/pull общий
     const push = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['bench_bar','ohp','push_press','landmine_press'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
     const pull = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['row_bar','pullup','gi_grip_pullup','fat_bar_row','single_arm_row','towel_pullup','rope_climb','high_pull'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
@@ -96,6 +111,12 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
       }
     }
   }
+
+  // HRV — если есть история, добавляем градацию
+  try {
+    const hrv = combatHrvReport();
+    if (hrv && hrv.grade !== 'optimal') warnings.push(`HRV ${hrv.last}мс (ср ${hrv.mean}±${hrv.sd}): ${hrv.note}`);
+  } catch {}
 
   // Весогонка: проверка дефицита
   if (plan.inputSnapshot?.weightCutKg && plan.inputSnapshot.weightCutKg > 0 && plan.goal !== 'weight_cut') {

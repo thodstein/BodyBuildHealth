@@ -17,7 +17,7 @@ import { adaptForPEDsCombat } from './combat-ped-adaptation';
 import { filterByMobilityCB } from './combat-mobility';
 import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
-import { getCombatWorkMax, weightForCombatExerciseResolved } from './combat-workmax';
+import { weightForCombatExerciseResolved } from './combat-workmax';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
@@ -199,24 +199,13 @@ function weightForCombatExercise(id: string, input: CombatInput, goal: string): 
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   const bodyweightIds = new Set(['pullup','gi_grip_pullup','towel_pullup','rope_climb','box_jump','depth_jump','broad_jump','deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','neck_bridge_wrestler','plate_pinch','wrist_roller','wrist_flexion','wrist_extension','band_external_rotation','band_pull_apart','ytw_raise']);
   if (bodyweightIds.has(id) || id.includes('pinch')) return 0;
-  const resolved = weightForCombatExerciseResolved(id, {
+  return weightForCombatExerciseResolved(id, {
     workMaxByExercise: (input as any).workMaxByExercise ?? null,
     workMax: (input as any).workMax ?? null,
     bodyweight: (input as any).bodyweight ?? null,
     goalMult,
     outsideMult,
   });
-  // если есть точный workMax — используем его, иначе уже учтён внутри weightForCombatExerciseResolved
-  // для совместимости: если resolved 0 (bodyweight) — возвращаем 0
-  if (resolved === 0) return 0;
-  // также пробуем напрямую из getCombatWorkMax для проверки наличия (чтобы дефолт 50 не затирал)
-  const direct = getCombatWorkMax(id, (input as any).workMaxByExercise, (input as any).workMax, (input as any).bodyweight);
-  if (direct != null && direct > 0) {
-    // direct уже с coeff, применяем goal/outside
-    const adj = outsideMult < 0.75 ? 0.93 : 1;
-    return Math.round(direct * goalMult * adj / 2.5) * 2.5;
-  }
-  return resolved;
 }
 
 function buildWorkSets(reps: [number, number], sets: number, rir: number, weight: number, isHeavy: boolean): CombatSet[] {
