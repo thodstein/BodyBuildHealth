@@ -68,7 +68,7 @@ import { useOriginalPrograms } from './useOriginalPrograms';
 import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { getPlanFeedback } from '../../../engines/plan-execution-feedback.engine';
 
-import { VolumeByWeekChart, type WeekVolume } from './PlanCharts';
+import { VolumeByWeekChart, RirDriftChart, type WeekVolume, type RirRecord } from './PlanCharts';
 import { distributePhases as distributePhasesUnified, PHASE_CONFIGS, getPhaseConfig, type PhaseDistribution } from '../../../engines/periodization';
 import { validatePlanQuality, bbPlanToQualityInput, type PlanQualityResult } from '../../../engines/plan-quality.engine';
 import { PlanExportCard } from './PlanExportCard';
@@ -101,7 +101,6 @@ import {
 import { getPattern } from '../../../engines/bb/bb-split-patterns';
 import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../../../engines/bb/bb-frequency-optimizer.engine';
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
-import { buildCompactJsiSummary } from '../../../engines/bb/bb-joint-jsi-bridge';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
@@ -556,6 +555,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   const [builtPlan, setBuiltPlan] = useState<BBPlan | null>(null);
   const [bbWeekSel, setBbWeekSel] = useState<number>(1);
+  const [autoRegOn, setAutoRegOn] = useState(false);
   const [isBuilding, setIsBuilding] = useState(false);
   const [expandedMuscles, setExpandedMuscles] = useState<Set<string>>(new Set());
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
@@ -624,13 +624,6 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepCreatineStop, setPrepCreatineStop] = useState(false);
   const [prepCompetitions, setPrepCompetitions] = useState<ContestEventEntry[] | undefined>(undefined);
   const [prepMainCompetitionId, setPrepMainCompetitionId] = useState<string | undefined>(undefined);
-  const [prepEnabled, setPrepEnabled] = useState<boolean>(() => {
-    try {
-      const g: any = (getProfile().settings as any)?.goals;
-      if (typeof g?.prepEnabled === 'boolean') return g.prepEnabled;
-      return !!g?.bbContestPrepPlan;
-    } catch { return false; }
-  });
   // 🏁 Режим подготовки (тренировочная логика недель подготовки): 1.0 = сохранение
   // (RIR 1–3, без отказа, объём как в плане), 0.85 = поддерживающий объём при дефиците.
   const [prepVolumeMode, setPrepVolumeMode] = useState<number>(1.0);
@@ -877,11 +870,9 @@ export const BbAutoConstructor: React.FC = () => {
     };
     const t = saveTestPeakWeekResult(prepPlan.id, prepPlan.showDate, ratings, testWeightDelta);
     setLastTest(t);
-    const newStrategy = t.verdict === 'tested_ok' ? 'tested' : t.verdict === 'adjust' ? 'conservative' : 'moderate';
-    const updatedPlan = { ...prepPlan, testPeakWeekId: t.id, updatedAt: new Date().toISOString(), peakWeek: { ...prepPlan.peakWeek, strategy: newStrategy as any } };
-    setPrepPlan(updatedPlan);
-    savePrepToProfile(updatedPlan, buildContestPrepConfig());
-    flash(`✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать — стратегия peak → tested' : t.verdict === 'adjust' ? 'нужна коррекция → conservative' : 'консервативный режим'} (применено)`);
+    setPrepPlan(p => p ? { ...p, testPeakWeekId: t.id, updatedAt: new Date().toISOString() } : p);
+    savePrepToProfile({ ...prepPlan, testPeakWeekId: t.id }, buildContestPrepConfig());
+    flash(`✅ Тест пик-недели сохранён: ${t.verdict === 'tested_ok' ? 'протокол можно использовать' : t.verdict === 'adjust' ? 'нужна коррекция' : 'консервативный режим'}`);
   };
 
   // ⚖️ Ступенчатая адаптация подготовки по весу (одна переменная за раз).
@@ -1130,7 +1121,7 @@ export const BbAutoConstructor: React.FC = () => {
         setSelectedProgramId(cycle.meta.id.replace('prog_', ''));
         setSelectedCycleId(cycle.meta.id);
         setBbDays(cycle.meta.sessionsPerWeek);
-        setBbWeeks(Math.max(4, Math.min(24, Math.round(Number(cycle.meta.weeks) || 8))));
+        setBbWeeks(cycle.meta.weeks);
         setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
         setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
         setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
@@ -1175,7 +1166,7 @@ export const BbAutoConstructor: React.FC = () => {
     setSelectedProgramId(program.id);
     setSelectedCycleId('prog_' + program.id);
     setBbDays(program.daysPerWeek);
-    setBbWeeks(Math.max(4, Math.min(24, Math.round(Number(program.durationWeeks) || 8))));
+    setBbWeeks(program.durationWeeks);
     setBbLevel(program.level === 'beginner' ? 'beginner' : program.level === 'advanced' ? 'advanced' : 'intermediate');
     const goalMap: Record<string, string> = {
       hypertrophy: 'mass', strength: 'strength_mass', bodybuilding: 'mass',
@@ -1298,9 +1289,10 @@ export const BbAutoConstructor: React.FC = () => {
       goal: bbGoal,
     });
   }, [builtPlan, linked.profile, injuries, mobilityRestrictions, acwrData, bbGoal]);
-  // Единый рейтинг — отражает реальное состояние (объём/частота/баланс/deload/PRO + ACWR/hardSets)
+  // FIX-6: Единый источник качества — validatePlanQuality + pro-quality-analysis (паттерны/углы/растяжка)
   const quality = useMemo(() => {
     if (!builtPlan) return null;
+    // Фактический делод по неделям плана (а не тоггл autoDeload)
     const hasDeloadActual = builtPlan.weeks.some((w:any) => (w as any).deload || (w as any).phase === 'deload');
     const deloadWeeksActual = builtPlan.weeks.filter((w:any) => (w as any).deload || (w as any).phase === 'deload').map((w:any) => w.week).filter(Boolean);
     const input = bbPlanToQualityInput(builtPlan, {
@@ -1321,16 +1313,19 @@ export const BbAutoConstructor: React.FC = () => {
       splitPattern: builtPlan.pattern?.id,
     });
     const result = validatePlanQuality(input);
+    // PRO-качество из интеллектуальных — паттерны/углы/растяжка/техники (читает технику из workSets)
     let proDelta = 0;
     let proIssues: string[] = [];
     let proResult: ReturnType<typeof analyzeProQuality> | null = null;
     try {
+      // Передаём технику честно: маппим workSets с technique, иначе PRO всегда 0%
       const dummyProgram: any = {
         bb: {
           weeks: builtPlan.weeks.map((w:any) => ({
             sessions: w.sessions.map((s:any) => ({
               blocks: s.exercises.map((e:any) => {
                 const ws = e.workSets || [{ reps: e.repsRange?.[0] || 10, rir: e.rir || 2 }];
+                // Техника — из workSets с technique, иначе из коммента/parent
                 const tech = (ws[0] as any)?.technique || (e as any).technique || 'none';
                 return { exerciseName: e.name, muscle: e.muscle, sets: ws.map((x:any) => ({ reps: x.reps, rir: x.rir ?? e.rir, technique: x.technique || tech })), technique: tech };
               }),
@@ -1346,83 +1341,30 @@ export const BbAutoConstructor: React.FC = () => {
       proDelta = proResult.scoreDelta;
       proIssues = proResult.totalIssues.slice(0, 2);
     } catch {}
-    // Реальные штрафы вне validatePlanQuality: ACWR и hardSets (Helms 2018)
-    let acwrPenalty = 0;
-    let acwrNote: string | null = null;
-    const acwrRatio = (acwrData as any)?.ratio;
-    if (Number.isFinite(acwrRatio)) {
-      if (acwrRatio > 1.5) { acwrPenalty = 15; acwrNote = `ACWR ${acwrRatio.toFixed(2)} — перегруз (>1.5) −15`; }
-      else if (acwrRatio > 1.3) { acwrPenalty = 8; acwrNote = `ACWR ${acwrRatio.toFixed(2)} — зона риска (1.3-1.5) −8`; }
-      else if (acwrRatio < 0.8) { acwrPenalty = 4; acwrNote = `ACWR ${acwrRatio.toFixed(2)} — растренированность (<0.8) −4`; }
-    }
-    let hardPenalty = 0;
-    let hardNote: string | null = null;
-    const m = metrics as any;
-    if (m?.hardSetWarning) { hardPenalty = 10; hardNote = m.hardSetWarning; }
-    else if (m && Number.isFinite(m.hardSets) && m.hardSets > 0) {
-      const cap = bbLevel === 'advanced' || bbLevel === 'enhanced' ? 10 : bbLevel === 'intermediate' ? 6 : 3;
-      if (m.hardSets > cap * 1.5) { hardPenalty = 8; hardNote = `Hard-сетов ${m.hardSets} >> кап ${cap} — перебор отказа −8`; }
-    }
-    const baseScore = Math.max(0, Math.min(100, result.score + proDelta));
-    const finalScore = Math.max(0, Math.min(100, baseScore - acwrPenalty - hardPenalty));
+    const finalScore = Math.max(0, Math.min(100, result.score + proDelta));
     const finalGrade = finalScore >= 85 ? '🟢 Отлично' : finalScore >= 65 ? '🟡 Хорошо' : finalScore >= 45 ? '🟠 Средне' : '🔴 Слабо';
-    const extraDetails: string[] = [];
-    if (acwrNote) extraDetails.push(acwrNote);
-    if (hardNote) extraDetails.push(hardNote);
     return {
       score: finalScore,
-      baseScore,
       label: finalGrade,
-      acwrPenalty,
-      hardPenalty,
-      acwrNote,
-      hardNote,
-      details: [...result.issues.map(i => i.message), ...proIssues, ...extraDetails],
-      perMuscle: result.muscles.map(mm => ({
-        muscle: mm.muscle, sets: mm.weeklySets, mev: mm.mev, mav: mm.mav, mrv: mm.mrv,
-        pct: mm.pctOfMav, status: mm.status, contextNote: mm.contextNote,
+      details: [...result.issues.map(i => i.message), ...proIssues],
+      perMuscle: result.muscles.map(m => ({
+        muscle: m.muscle, sets: m.weeklySets, mev: m.mev, mav: m.mav, mrv: m.mrv,
+        pct: m.pctOfMav, status: m.status, contextNote: m.contextNote,
       })),
-      recommendations: [...result.recommendations, ...(proDelta < 0 ? [`PRO: ${proIssues.join('; ')}`] : []), ...(acwrNote ? [acwrNote] : []), ...(hardNote ? [hardNote] : [])],
+      recommendations: [...result.recommendations, ...(proDelta < 0 ? [`PRO: ${proIssues.join('; ')}`] : [])],
       proResult,
       hasDeloadActual,
       deloadWeeksActual,
-      rawResult: result,
     };
-  }, [builtPlan, bbLevel, weakPoints, peds, bbTrainingYears, pedAdapt.combinedMrvMultiplier, bbGoal, injuries, bbTrainingFocus, bbMethodology, bbVolGoal, specializationMode, acwrData, metrics]);
-
-  const jsiSummary = useMemo(() => {
-    if (!builtPlan) return null;
-    try {
-      const personal = linked.profile?.settings?.personal as any;
-      const pharma = (peds as any) || [];
-      const bodyWeightKg = Number(personal?.weight) || 80;
-      const aasStack = Array.isArray(pharma) ? pharma.map((p: any) => String(p?.id || p || '').toLowerCase()) : [];
-      const painMap: any = {};
-      const oldInjuries = (injuries as any[] || []).map(i => String(i.muscle || ''));
-      return buildCompactJsiSummary(builtPlan as any, { bodyWeightKg, aasStack, painMap, oldInjuries });
-    } catch { return null; }
-  }, [builtPlan, linked.profile, peds, injuries]);
+  }, [builtPlan, bbLevel, weakPoints, peds, bbTrainingYears, pedAdapt.combinedMrvMultiplier, bbGoal, injuries]);
 
   useEffect(() => {
     try { saveTrainingProfile({ ...loadTrainingProfile(), workMax: bbWorkMax, weakPoints, injuries, mobilityRestrictions, onCourse: peds.length > 0, bbPeds: peds, courseIntensity, loadStrategy, planMode, bbCycleId: selectedCycleId }); } catch {}
   }, [bbWorkMax, weakPoints, peds, courseIntensity, loadStrategy, planMode, selectedCycleId]);
 
   // FIX-19: Авто-загрузка сохранённого плана при монтировании
-  // Расширено: также черновик авто-сборки he_bb_auto_draft (сплит не надо собирать заново
-  // при переходе в «Суставы» и обратно — план живёт в памяти между шагами 4-5-6).
   useEffect(() => {
     try {
-      const draft = localStorage.getItem('he_bb_auto_draft');
-      if (draft) {
-        const parsed = JSON.parse(draft);
-        if (parsed.plan && parsed.date) {
-          setBuiltPlan(revalidateEditedPlan(parsed.plan as BBPlan));
-          if (parsed.step) setStep(parsed.step as Step);
-          else setStep('plan');
-          setBbWeekSel(1);
-          return;
-        }
-      }
       const saved = localStorage.getItem('he_bb_plan_saved');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -1435,16 +1377,6 @@ export const BbAutoConstructor: React.FC = () => {
       }
     } catch {}
   }, []);
-
-  // Автосохранение черновика: любой построенный план сразу сохраняется,
-  // чтобы переход в «Суставы» и возврат не требовал пересборки сплита.
-  useEffect(() => {
-    try {
-      if (builtPlan) {
-        localStorage.setItem('he_bb_auto_draft', JSON.stringify({ plan: builtPlan, date: new Date().toISOString(), step }));
-      }
-    } catch {}
-  }, [builtPlan, step]);
 
   // ⚙️ Живой приём плана из «Сборки цикла» Годового планировщика (he-bb-plan-saved)
   useEffect(() => {
@@ -1603,7 +1535,7 @@ export const BbAutoConstructor: React.FC = () => {
     let plan: BBPlan;
 
     // AutoReg-пейлоад (для buildBBPlan → applyPostPhaseProcessing)
-    const autoRegPayload = (autoRegResult) ? {
+    const autoRegPayload = (autoRegOn && autoRegResult) ? {
       volumeMultiplier: autoRegResult.volumeMultiplier,
       topSetPctMultiplier: autoRegResult.topSetPctMultiplier,
       rirShift: autoRegResult.rirShift,
@@ -2259,7 +2191,7 @@ export const BbAutoConstructor: React.FC = () => {
     setExSwapModal(null);
     setShowCompare(false);
     setShowPeakWeek(false);
-    try { localStorage.removeItem('he_bb_plan_saved'); localStorage.removeItem('he_bb_auto_draft'); } catch { /* ignore */ }
+    try { localStorage.removeItem('he_bb_plan_saved'); } catch { /* ignore */ }
     setStep('params');
     flash('🔄 Сборка сброшена — начинаем заново');
   };
@@ -3538,8 +3470,8 @@ export const BbAutoConstructor: React.FC = () => {
                 <div style={{ padding:'4px 0' }}>
                   {s.exercises.map((e, ei) => {
                     const rawW = e.workSets[0]?.weight || 80;
-                    const adjW = autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
-                    const adjSets0 = autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
+                    const adjW = autoRegOn && autoRegResult ? Math.round(rawW * autoRegResult.topSetPctMultiplier * 10) / 10 : rawW;
+                    const adjSets0 = autoRegOn && autoRegResult ? Math.max(1, Math.round(e.sets * autoRegResult.volumeMultiplier)) : e.sets;
                     const editKey = `${si}-${ei}`;
                     const edit = exerciseEdits[editKey] || { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW };
                     const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
@@ -3796,35 +3728,270 @@ export const BbAutoConstructor: React.FC = () => {
   const renderQuality = () => {
     if (!metrics || !quality || !builtPlan) return null;
     const W = builtPlan.weeks;
+    // Единый ACWR из селектора (а не 5 расчётов)
     const ratio = acwrData;
-    const q: any = quality;
-    const baseScore = q.baseScore ?? q.score;
-    const hasPenalties = (q.acwrPenalty || 0) > 0 || (q.hardPenalty || 0) > 0;
     return (
       <div>
+        {safetyScore && (
+          <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, borderRadius: 14, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)', overflow:'hidden' }}>
+            {/* Header gauge + overall */}
+            <div style={{ padding: 12, display:'flex', gap:12, alignItems:'center', background: `linear-gradient(135deg, ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.14)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.14)':'rgba(239,68,68,0.14)'}, transparent)`}}>
+              <div style={{ width:62, height:62, borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center', background: safetyScore.riskLevel==='safe'?'#22c55e': safetyScore.riskLevel==='caution'?'#f59e0b':'#ef4444', color:'#000', fontWeight:900, fontSize:22, boxShadow:'0 4px 12px rgba(0,0,0,0.25)' }}>{safetyScore.score}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
+                <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Формула каждого фактора — ниже</div>
+              </div>
+            </div>
+            {/* Factor breakdown with calculations */}
+            {safetyScore.details?.factorBreakdown && (
+              <div style={{ padding:'8px 12px', display:'grid', gridTemplateColumns:'1fr', gap:6, background:'rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, letterSpacing:0.3, textTransform:'uppercase' }}>Расчёт по факторам — откуда баллы</div>
+                {safetyScore.details.factorBreakdown.map(f=> (
+                  <div key={f.key} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:11, fontWeight:700, color: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444' }}>{f.label}</span>
+                      <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{f.score}/{f.max}</span>
+                    </div>
+                    <div style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', marginTop:4, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${(f.score/f.max)*100}%`, background: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444', transition:'width 0.3s' }} />
+                    </div>
+                    <div style={{ fontSize:10, color:'#fff', opacity:0.68, marginTop:4, lineHeight:1.35, fontFamily:'ui-monospace, SFMono-Regular, monospace' }}>{f.calculation}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Joint stress detailed */}
+            {safetyScore.details?.jointStressDetails && (
+              <div style={{ padding:'8px 12px' }}>
+                <ExpandableCard
+                  title="🦴 Суставная нагрузка — детально (расчёт)"
+                  icon="🦴"
+                  short={`${safetyScore.details.jointStressDetails.overallRisk==='high'?'Высокий': safetyScore.details.jointStressDetails.overallRisk==='moderate'?'Умеренный':'Низкий'} стресс · пик нед ${safetyScore.details.jointStressDetails.peakWeek || '—'} · средний ${Math.round(safetyScore.details.jointStressDetails.avgWeeklyStress)} · самый нагруженный: ${safetyScore.details.jointStressDetails.mostLoadedJoint ? `${safetyScore.details.jointStressDetails.mostLoadedJoint.joint} ${Math.round(safetyScore.details.jointStressDetails.mostLoadedJoint.stress)}` : '—'}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)', marginBottom:8, fontSize:10, color:'#fff' }}>
+                        <b>Формула стресса упражнения:</b> base(jointStress low=3 / med=6 / high=10 из EXERCISE_CATALOG) × sets × proximity(1+max(0,2−RIR)×0.15) × intensity(1+min(0.5,(weight−60)/200)) → сумма по упражнениям → <b>byJoint</b>. Пороги сессии: low&lt;15 moderate&lt;25 high≥40; неделя low&lt;45 moderate&lt;75 high≥120 (×3). Пиковая неделя и средний — для оценки перегруза.
+                      </div>
+                      {Object.keys(safetyScore.details.jointStressDetails.byJointPeak).length===0 ? (
+                        <div style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Нет суставной нагрузки — план пустой или только deload.</div>
+                      ) : (
+                        <div style={{ display:'grid', gap:6 }}>
+                          {Object.entries(safetyScore.details.jointStressDetails.byJointPeak).sort((a,b)=> (b[1] as number)-(a[1] as number)).map(([joint, peak])=>{
+                            const avg = (safetyScore.details!.jointStressDetails.byJointAvg as any)[joint] || 0;
+                            const thresh = safetyScore.details!.jointStressDetails.thresholds;
+                            const lvl = (peak as number) > thresh.high ? 'high' : (peak as number) > thresh.moderate ? 'moderate' : (peak as number) > thresh.low ? 'low' : 'none';
+                            const color = lvl==='high'?'#ef4444': lvl==='moderate'?'#f59e0b': lvl==='low'?'#eab308':'#22c55e';
+                            const pct = Math.min(100, ((peak as number)/ (thresh.high*1.5))*100);
+                            return (
+                              <div key={joint} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:`1px solid ${color}22` }}>
+                                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                  <span style={{ fontWeight:700, color:'#fff' }}>{joint}</span>
+                                  <span style={{ fontWeight:800, color }}>{Math.round(peak as number)} пик · {Math.round(avg)} средн.</span>
+                                </div>
+                                <div style={{ height:5, borderRadius:5, background:'rgba(255,255,255,0.08)', marginTop:4, overflow:'hidden' }}>
+                                  <div style={{ width:`${pct}%`, height:'100%', background: color }} />
+                                </div>
+                                <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>пороги: {thresh.low}/{thresh.moderate}/{thresh.high} · {lvl==='high'?'высокий':lvl==='moderate'?'умеренный':lvl==='low'?'низкий':'минимальный'}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {safetyScore.details.jointStressDetails.weeklyReports.length>0 && (
+                        <div style={{ marginTop:8, fontSize:10, color:'#fff', opacity:0.7 }}>
+                          Пиковая неделя: {safetyScore.details.jointStressDetails.peakWeek} · средний недельный стресс: {Math.round(safetyScore.details.jointStressDetails.avgWeeklyStress)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Orthopedic constraints */}
+            {safetyScore.details?.orthopedic && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🦿 Ортопедика: ${safetyScore.details.orthopedic.phase==='acute'?'острая': safetyScore.details.orthopedic.phase==='subacute'?'подострая': safetyScore.details.orthopedic.phase==='chronic'?'хроническая':'поддержание'} фаза`}
+                  icon="🦿"
+                  short={`${safetyScore.details.orthopedic.blockedPatterns.length ? `заблокировано ${safetyScore.details.orthopedic.blockedPatterns.length} паттернов` : 'паттерны без блоков'} · лимиты суставов: ${Object.keys(safetyScore.details.orthopedic.jointStressLimits).length}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                        <div style={{ padding:'7px 9px', borderRadius:8, background: safetyScore.details!.orthopedic.blockedPatterns.length ? 'rgba(239,68,68,0.07)' : 'rgba(34,197,94,0.07)', border:`1px solid ${safetyScore.details!.orthopedic.blockedPatterns.length ? 'rgba(239,68,68,0.14)' : 'rgba(34,197,94,0.14)'}` }}>
+                          <div style={{ fontSize:10, fontWeight:800, color: safetyScore.details!.orthopedic.blockedPatterns.length ? '#ef4444' : '#22c55e' }}>Заблокированные паттерны</div>
+                          <div style={{ fontSize:11, marginTop:3, color:'#fff' }}>{safetyScore.details!.orthopedic.blockedPatterns.length ? safetyScore.details!.orthopedic.blockedPatterns.join(', ') : '— нет блоков'}</div>
+                          <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>Источник: INJURY_PATTERN_BLACKLIST + ROM_LIMITS (orthopedic-load-engines) · травмы/ограничения → чёрный список движений (hinge/squat/lunge/carry/vertical_push и т.д.)</div>
+                        </div>
+                        <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(96,165,250,0.07)', border:'1px solid rgba(96,165,250,0.14)' }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa' }}>Разрешённые паттерны</div>
+                          <div style={{ fontSize:11, marginTop:3, color:'#fff' }}>{safetyScore.details!.orthopedic.allowedPatterns.join(', ') || '—'}</div>
+                        </div>
+                      </div>
+                      {Object.keys(safetyScore.details.orthopedic.romLimits).length>0 && (
+                        <div style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#a855f7', marginBottom:4 }}>ROM лимиты (градусы)</div>
+                          {Object.entries(safetyScore.details.orthopedic.romLimits).map(([j, lim]:any)=> (
+                            <div key={j} style={{ display:'flex', justifyContent:'space-between', padding:'4px 8px', borderRadius:6, background:'rgba(255,255,255,0.04)', marginBottom:3, fontSize:11 }}>
+                              <span style={{ color:'#fff' }}>{j}</span><span style={{ fontWeight:700, color:'#fff' }}>{lim.min}° – {lim.max}°</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {Object.keys(safetyScore.details.orthopedic.jointStressLimits).length>0 && (
+                        <div style={{ marginBottom:8 }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', marginBottom:4 }}>Лимиты стресса по суставам (1–4, ниже = строже)</div>
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>
+                            {Object.entries(safetyScore.details.orthopedic.jointStressLimits).map(([j, lim]:any)=> (
+                              <div key={j} style={{ padding:'5px 7px', borderRadius:8, background: (lim as number)<=1?'rgba(239,68,68,0.1)': (lim as number)<=2?'rgba(245,158,11,0.1)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center' }}>
+                                <div style={{ fontSize:9, color:'#fff', opacity:0.7 }}>{j}</div><div style={{ fontSize:12, fontWeight:800, color: (lim as number)<=1?'#ef4444': (lim as number)<=2?'#f59e0b':'#fff' }}>{String(lim)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {safetyScore.details.orthopedic.recommendations.length>0 && (
+                        <div>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#00e68a', marginBottom:4 }}>Рекомендации ортопедии</div>
+                          {safetyScore.details.orthopedic.recommendations.map((r,i)=> <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:6, borderLeft:'2px solid rgba(0,230,138,0.5)' }}>{r}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Load distribution */}
+            {safetyScore.details?.loadDistribution && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`📅 Распределение нагрузки: ${safetyScore.details.loadDistribution.hardDays} тяж. дней · ${safetyScore.details.loadDistribution.totalVolume} объём`}
+                  icon="📅"
+                  short={`7 дней: ${safetyScore.details.loadDistribution.weekPlan.filter(d=>d.difficulty!=='off').map(d=> d.difficulty==='hard'?'тяж': d.difficulty==='medium'?'сред': d.difficulty==='light'?'лёг':'реаб').join(' · ')}${safetyScore.details.loadDistribution.warnings.length?` · ⚠ ${safetyScore.details.loadDistribution.warnings.length}`:''}`}
+                  full={
+                    <div style={{ fontSize:11, lineHeight:1.45, color:'#fff' }}>
+                      <div style={{ display:'grid', gridTemplateColumns:'repeat(7, 1fr)', gap:4, marginBottom:8 }}>
+                        {safetyScore.details!.loadDistribution.weekPlan.map((d:any)=> (
+                          <div key={d.day} style={{ padding:'6px 4px', borderRadius:8, textAlign:'center', background: d.difficulty==='hard'?'rgba(239,68,68,0.12)': d.difficulty==='medium'?'rgba(245,158,11,0.10)': d.difficulty==='light'?'rgba(96,165,250,0.10)': d.difficulty==='rehab'?'rgba(168,85,247,0.10)':'rgba(255,255,255,0.04)', border:`1px solid ${d.difficulty==='hard'?'rgba(239,68,68,0.18)': d.difficulty==='medium'?'rgba(245,158,11,0.16)': d.difficulty==='light'?'rgba(96,165,250,0.14)': d.difficulty==='rehab'?'rgba(168,85,247,0.14)':'rgba(255,255,255,0.06)'}` }}>
+                            <div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Дн {d.day}</div>
+                            <div style={{ fontSize:10, fontWeight:800, color:'#fff' }}>{d.difficulty==='off'?'отдых': d.difficulty==='hard'?'тяж': d.difficulty==='medium'?'сред': d.difficulty==='light'?'лёг':'реаб'}</div>
+                            {d.difficulty!=='off' && <><div style={{ fontSize:9, color:'#fff' }}>V{d.volumeTarget}</div><div style={{ fontSize:9, color:'#fff', opacity:0.7 }}>I{d.intensityTarget}</div></>}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, marginBottom:8 }}>
+                        <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Сумм. объём</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{safetyScore.details!.loadDistribution.totalVolume}</div></div>
+                        <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Ср. интенсивность</div><div style={{ fontSize:12, fontWeight:800, color:'#fff' }}>{safetyScore.details!.loadDistribution.avgIntensity}</div></div>
+                        <div style={{ padding:'6px 8px', borderRadius:8, background: safetyScore.details!.loadDistribution.hardDays>=4?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Тяж. дней</div><div style={{ fontSize:12, fontWeight:800, color: safetyScore.details!.loadDistribution.hardDays>=4?'#ef4444':'#22c55e' }}>{safetyScore.details!.loadDistribution.hardDays}</div></div>
+                      </div>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginBottom:6 }}>{'Формула: distributeWeeklyLoad({weeklySessions, goal, volumeCapacity, intensityCapacity, priScore, riskLevel}) → слоты hard/medium/light/rehab по goal-паттерну → равномерное распределение по 7 дням (POSITION_MAP) · risk high понижает hard→medium · тяжёлые подряд → warning.'}</div>
+                      {safetyScore.details.loadDistribution.warnings.length>0 && (
+                        <div>
+                          {safetyScore.details.loadDistribution.warnings.map((w,i)=> <div key={i} style={{ fontSize:11, color:'#f59e0b', marginTop:3 }}>⚠ {w}</div>)}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Joint diagnoses */}
+            {safetyScore.details?.jointDiagnoses && safetyScore.details.jointDiagnoses.length>0 && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🧬 Диагностика суставов — ${safetyScore.details.jointDiagnoses.length} зоны (интеллект)`}
+                  icon="🧬"
+                  short={safetyScore.details.jointDiagnoses.map(j=> `${j.joint.icon} ${j.joint.label} (${j.phase})`).join(' · ')}
+                  full={
+                    <div style={{ display:'grid', gap:8 }}>
+                      {safetyScore.details!.jointDiagnoses.map((jd:any)=> (
+                        <div key={jd.joint.id} style={{ padding:'9px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                          <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:4 }}>
+                            <span style={{ fontSize:14 }}>{jd.joint.icon}</span>
+                            <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{jd.joint.label}</span>
+                            <span style={{ fontSize:10, padding:'2px 6px', borderRadius:6, background: jd.phase==='acute'?'rgba(239,68,68,0.14)': jd.phase==='subacute'?'rgba(245,158,11,0.14)': jd.phase==='chronic'?'rgba(96,165,250,0.14)':'rgba(34,197,94,0.10)', color: jd.phase==='acute'?'#ef4444': jd.phase==='subacute'?'#f59e0b': jd.phase==='chronic'?'#60a5fa':'#22c55e', fontWeight:700 }}>{jd.phase}</span>
+                            <span style={{ marginLeft:'auto', fontSize:10, color:'#fff', opacity:0.6 }}>{jd.joint.dangerous.slice(0,2).join(', ')}</span>
+                          </div>
+                          <div style={{ fontSize:10, color:'#fff', opacity:0.75, lineHeight:1.4, marginBottom:6 }}>{jd.joint.description}</div>
+                          {(jd.blockedPatterns?.length || jd.allowedPatterns?.length) && (
+                            <div style={{ fontSize:10, color:'#fff', marginBottom:6 }}>
+                              <span style={{ color:'#ef4444' }}>блок: {jd.blockedPatterns?.join(', ') || '—'}</span> · <span style={{ color:'#22c55e' }}>разрешено: {jd.allowedPatterns?.slice(0,6).join(', ')}</span>
+                            </div>
+                          )}
+                          {jd.options?.length>0 && (
+                            <div style={{ display:'grid', gap:6 }}>
+                              {jd.options.slice(0,2).map((opt:any)=> (
+                                <div key={opt.id} style={{ padding:'7px 8px', borderRadius:8, background: opt.level==='critical'?'rgba(239,68,68,0.08)': opt.level==='high'?'rgba(245,158,11,0.08)': opt.level==='moderate'?'rgba(96,165,250,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${opt.level==='critical'?'rgba(239,68,68,0.14)': opt.level==='high'?'rgba(245,158,11,0.14)': 'rgba(255,255,255,0.06)'}` }}>
+                                  <div style={{ fontSize:11, fontWeight:700, color: opt.level==='critical'?'#ef4444': opt.level==='high'?'#f59e0b':'#fff' }}>{opt.label} · {opt.level}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.8, marginTop:2 }}>{opt.description}</div>
+                                  <div style={{ fontSize:10, color:'#00e68a', marginTop:3 }}><b>Метод:</b> {opt.method}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}><b>Ассисты:</b> {opt.assistance?.join(', ')}</div>
+                                  <div style={{ fontSize:10, color:'#fff', marginTop:2, padding:'3px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', display:'inline-block' }}>Протокол: {opt.protocol.sets}×{opt.protocol.reps} RIR{opt.protocol.rir}{opt.protocol.tempo?` ${opt.protocol.tempo}`:''}{opt.protocol.rest?` · ${opt.protocol.rest}`:''}{opt.protocol.note?` · ${opt.protocol.note}`:''}</div>
+                                  <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>{opt.rationale}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Volume & Frequency details */}
+            {safetyScore.details?.volumeDetails && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`📊 MRV — ${safetyScore.details.volumeDetails.filter(v=>v.violation).length ? `${safetyScore.details.volumeDetails.filter(v=>v.violation).length} нарушений` : 'в норме'}`}
+                  icon="📊"
+                  short={`Допуск ×${safetyScore.details.volumeDetails[0]?.tolerance || 1.15} · ${safetyScore.details.volumeDetails.slice(0,4).map(v=> `${v.muscle} ${v.effectiveSets}/${v.allowed}${v.violation?'⚠':''}`).join(' · ')}`}
+                  full={
+                    <div style={{ display:'grid', gap:4 }}>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:6 }}>Расчёт: effectiveSets (aggregateBBVolume) &gt; cap(mrvByMuscle||landmarks.mrv) × {safetyScore.details!.volumeDetails[0]?.tolerance || 1.15} → violation. Исключаем deload недели. Пиковая effective по мышце.</div>
+                      {safetyScore.details.volumeDetails.sort((a,b)=> (b.over||0)-(a.over||0)).slice(0,10).map(v=> (
+                        <div key={v.muscle} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background: v.violation?'rgba(239,68,68,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${v.violation?'rgba(239,68,68,0.14)':'rgba(255,255,255,0.06)'}` }}>
+                          <span style={{ fontSize:11, fontWeight:700, color: v.violation?'#ef4444':'#fff' }}>{v.muscle}</span>
+                          <span style={{ fontSize:11, color:'#fff' }}>{v.effectiveSets} / {v.allowed} <span style={{ opacity:0.6, fontSize:10 }}>(cap {v.cap})</span>{v.violation && <span style={{ color:'#ef4444', fontWeight:800, marginLeft:6 }}>+{v.over} ⚠</span>}</span>
+                        </div>
+                      ))}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* Frequency */}
+            {safetyScore.details?.frequencyDetails && safetyScore.details.frequencyDetails.some(f=>f.violation) && (
+              <div style={{ padding:'0 12px 8px' }}>
+                <ExpandableCard
+                  title={`🔁 Частота — ${safetyScore.details.frequencyDetails.filter(f=>f.violation).length} нарушений`}
+                  icon="🔁"
+                  short={safetyScore.details.frequencyDetails.filter(f=>f.violation).map(f=> `${f.muscle} ${f.days}/${f.required}`).join(' · ') || 'в норме'}
+                  full={
+                    <div style={{ display:'grid', gap:4 }}>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:6 }}>Малые мышцы (biceps/triceps/forearms/calves/abs) требуют ≥2×/нед, остальные ≥1×/нед. Низкая частота → объём концентрирован в одну сессию → выше утомление сустава.</div>
+                      {safetyScore.details.frequencyDetails.filter(f=>f.violation).map(f=> (
+                        <div key={f.muscle} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)', fontSize:11, color:'#fff' }}>{f.muscle}: {f.days} дней / {f.required} требуется ⚠</div>
+                      ))}
+                    </div>
+                  }
+                />
+              </div>
+            )}
+            {/* All issues compact */}
+            <div style={{ padding:'8px 12px', background:'rgba(0,0,0,0.12)', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, marginBottom:4 }}>Все сигналы ({safetyScore.issues.length})</div>
+              {safetyScore.issues.slice(0,8).map((issue, index) => <div key={index} style={{ marginTop: 3, fontSize: 11, color: issue.includes('высокий')|| issue.includes('опасн')|| issue.includes('КРИТИЧНО')?'#ef4444':'#f59e0b', lineHeight:1.35 }}>⚠ {issue}</div>)}
+              {safetyScore.issues.length>8 && <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>…и ещё {safetyScore.issues.length-8}</div>}
+            </div>
+            <div style={{ padding:'8px 12px', background:'rgba(34,197,94,0.06)', borderTop:'1px solid rgba(34,197,94,0.12)' }}>
+              <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', marginBottom:4 }}>Рекомендации ({safetyScore.recommendations.length})</div>
+              {safetyScore.recommendations.slice(0,6).map((r,i)=> <div key={i} style={{ fontSize:11, color:'#fff', marginTop:3, lineHeight:1.35, paddingLeft:6, borderLeft:'2px solid rgba(34,197,94,0.4)' }}>{r}</div>)}
+            </div>
+          </div>
+        )}
         <div style={H}>📊 Шаг 5: Качество и нагрузка плана</div>
-        {/* Единый гейдж — реальное состояние (база + PRO + ACWR/hard) */}
-        <div style={{ ...CARD, textAlign:'center', borderLeft:'3px solid ' + (q.score >= 85 ? '#22c55e' : q.score >= 65 ? '#eab308' : '#ef4444') }}>
-          <div style={{ fontSize:36, fontWeight:800, color:q.score >=85?'#22c55e':q.score >=65?'#eab308':'#ef4444' }}>{q.score}/100</div>
-          <div style={{ fontSize:13, fontWeight:700, color:q.score >=85?'#22c55e':q.score >=65?'#eab308':'#ef4444' }}>{q.label}</div>
-          <div style={{ marginTop:6, fontSize:11, color:'#fff', opacity:0.75, lineHeight:1.4 }}>
-            База {baseScore}{q.proResult ? ` ${q.proResult.scoreDelta>=0?'+':''}${q.proResult.scoreDelta} PRO` : ''}{(q.acwrPenalty||0) ? ` · ACWR −${q.acwrPenalty}` : ''}{(q.hardPenalty||0) ? ` · Hard −${q.hardPenalty}` : ''} → итог {q.score}
-          </div>
-          <div style={{ marginTop:8, display:'flex', justifyContent:'center', gap:8, flexWrap:'wrap' }}>
-            <div style={SMALL}>Сетов пик: <b style={{ color:'#fff' }}>{metrics.totalSets}</b></div>
-            <div style={SMALL}>Тяж: <b style={{ color:'#ef4444' }}>{(metrics.тяжPct*100).toFixed(0)}%</b></div>
-            <div style={SMALL}>Памп: <b style={{ color:'#60a5fa' }}>{(metrics.пампPct*100).toFixed(0)}%</b></div>
-            <div style={SMALL}>RIR: <b style={{ color:'#f59e0b' }}>{metrics.avgRir.toFixed(1)}</b></div>
-            <div style={SMALL}>Фаз: <b style={{ color:'#a855f7' }}>{Array.from(new Set(W.map((w:any) => (w as any).phase || 'accumulation'))).length}</b></div>
-            {pedAdapt.combinedMrvMultiplier > 1 && <span style={{ fontSize:10, padding:'3px 8px', borderRadius:20, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b', fontWeight:700 }}>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span>}
-          </div>
-          {hasPenalties && <div style={{ marginTop:6, fontSize:10, color:'#f59e0b' }}>{[q.acwrNote, q.hardNote].filter(Boolean).join(' · ')}</div>}
-          {q.proResult && q.proResult.scoreDelta!==0 && <div style={{ marginTop:4, fontSize:10, color: q.proResult.scoreDelta>=0?'#22c55e':'#f59e0b' }}>PRO: {q.proResult.scoreDelta>0?'+':''}{q.proResult.scoreDelta} (паттерны/углы/растяжка уже учтены)</div>}
-          <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.55 }}>Средний объём — в «Бюджете», пик — здесь · Уровень {bbLevel} · Цель {bbGoal} · Фокус {bbTrainingFocus}</div>
-        </div>
-        {/* Бюджет объёма — единственный источник perMuscle */}
-        {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
-        {/* Фаза + прогноз — один блок */}
+        {/* Фаза — факт из плана, а не синтетика distributePhases */}
         {(() => {
           const Wq = builtPlan.weeks;
           const wkq = Wq[Math.min(bbWeekSel, Wq.length) - 1] || Wq[0];
@@ -3841,166 +4008,433 @@ export const BbAutoConstructor: React.FC = () => {
           const cfg = getPhaseConfig(curPh, bbTrainingFocus as any);
           const totalW = builtPlan.weeks.length;
           const phaseGroups: Record<string, number[]> = {};
-          for (const w of builtPlan.weeks) { const p = ((w as any).phase || 'accumulation') as string; if (!phaseGroups[p]) phaseGroups[p]=[]; phaseGroups[p].push(w.week); }
+          for (const w of builtPlan.weeks) {
+            const p = ((w as any).phase || 'accumulation') as string;
+            if (!phaseGroups[p]) phaseGroups[p] = [];
+            phaseGroups[p].push(w.week);
+          }
           const distText = Object.entries(phaseGroups).map(([p, weeks]) => `${PHASE_LABELS[p as BBPhase] || p}: нед ${weeks.join(',')}`).join(' · ');
           const totalSetsWeek = wkExs.reduce((a,e)=> a+ (e.sets||0),0);
-          const peakWeek = W.reduce((best, w) => { const ts = w.sessions.reduce((s, ss) => s + ss.exercises.reduce((ss2,e)=> ss2+e.sets,0),0); return ts>best.ts?{wk:w.week, ts}:best; }, {wk:1, ts:0});
-          const actualDeloadWeeks = W.filter((w:any) => (w as any).phase==='deload'||(w as any).deload).map((w:any)=>w.week);
-          const hasDeload = actualDeloadWeeks.length>0;
-          return (
-            <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh]+'14', border:'1px solid '+PHASE_COLORS[curPh]+'28' }}>
+          return <>
+            <div style={{ marginBottom:6, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
-                <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 {PHASE_LABELS[curPh]} — нед {wkq.week}/{totalW}</span>
-                <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'3px 8px', borderRadius:20 }}>RIR {avgRirFact.toFixed(1)} · {repMin}-{repMax} повт · {tempoFact} · {totalSetsWeek} сетов</span>
+                <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт недели {wkq.week} из {totalW}): {PHASE_LABELS[curPh]}</span>
+                <span style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>RIR факт {avgRirFact.toFixed(1)} · Повт {repMin}-{repMax} · Темп {tempoFact} · Сетов {totalSetsWeek}</span>
               </div>
               <div style={{ marginTop:8, display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
-                {builtPlan.weeks.map(w=>{ const p=((w as any).phase||'accumulation') as BBPhase; const isCur=w.week===wkq.week; return <div key={w.week} title={`Нед ${w.week}: ${PHASE_LABELS[p]||p}`} style={{ flex:1, background:PHASE_COLORS[p]||'#fff', opacity:isCur?1:0.55 }} />; })}
+                {builtPlan.weeks.map(w=>{
+                  const p = ((w as any).phase || 'accumulation') as BBPhase;
+                  const isCur = w.week===wkq.week;
+                  return <div key={w.week} title={`Нед ${w.week}: ${PHASE_LABELS[p] || p}`} style={{ flex:1, background: PHASE_COLORS[p] || '#fff', opacity: isCur?1:0.55, borderLeft: isCur?'1px solid #fff': 'none', borderRight: isCur?'1px solid #fff':'none' }} />
+                })}
               </div>
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.62, lineHeight:1.35 }}>{distText} · {totalW} нед</div>
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', display:'flex', flexWrap:'wrap', gap:6 }}>
-                <span>Пик: нед {peakWeek.wk} ({peakWeek.ts} сетов)</span><span>·</span><span style={{ color: hasDeload?'#22c55e':'#ef4444' }}>Разгрузка: {hasDeload ? 'нед '+actualDeloadWeeks.join(', ') : 'нет' + (W.length>=6 ? ' ⚠' : '')}</span><span>·</span><span>ACWR {acwrQ?acwrQ.ratio.toFixed(2):'—'}</span>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.62, marginTop:4, lineHeight:1.35 }}>{distText} · всего {totalW} нед · логика: distributePhases(totalWeeks={totalW}, goal={bbGoal}, trainingFocus={bbTrainingFocus || 'hypertrophy'})</div>
+              <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div style={{ padding:'8px 9px', borderRadius:8, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:PHASE_COLORS[curPh], marginBottom:4 }}>Конфиг фазы ({bbTrainingFocus || 'hypertrophy'})</div>
+                  <div style={{ display:'grid', gap:2, fontSize:10, color:'#fff', lineHeight:1.35, fontFamily:'ui-monospace, monospace' }}>
+                    <div>repRange: {cfg.repRange[0]}–{cfg.repRange[1]} · RIR {String((cfg as any).rir ?? '2-3')} · tempo {cfg.tempo} · отдых {cfg.restBase}с</div>
+                    <div>volume ×{cfg.volumeMultiplier ?? 1} · intensity ×{cfg.intensityMultiplier ?? 1} · {curPh==='deload'?'разгрузка':curPh==='accumulation'?'накопление':curPh==='intensification'?'интенсификация':'пик'}</div>
+                    <div style={{ opacity:0.55 }}>Источник: getPhaseConfig('{curPh}', '{bbTrainingFocus}') · PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} · уровень {bbLevel}</div>
+                  </div>
+                </div>
+                <div style={{ padding:'8px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#fff', marginBottom:4 }}>Факт недели {wkq.week} — расчёт</div>
+                  <div style={{ display:'grid', gap:2, fontSize:10, color:'#fff', lineHeight:1.35, fontFamily:'ui-monospace, monospace' }}>
+                    <div>сетов: {totalSetsWeek} · упражнений: {wkExs.length} · RIR средн. {avgRirFact.toFixed(1)} = Σ(rir×sets)/Σsets</div>
+                    <div>повторы факт: {repMin}-{repMax} (из workSets) vs конфиг {cfg.repRange[0]}–{cfg.repRange[1]} {Math.abs(repMin - cfg.repRange[0])>3 || Math.abs(repMax - cfg.repRange[1])>3 ? '⚠ отклонение' : '✓ соответствует'}</div>
+                    <div>темп факт: {tempoFact} vs конфиг {cfg.tempo} · {avgRirFact.toFixed(1)} vs {(cfg as any).rir ?? '—'}</div>
+                  </div>
+                </div>
               </div>
-              {needsDeloadQ && curPh!=='deload' && <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.18)', color:'#ef4444', fontSize:11, fontWeight:600 }}>🚨 ACWR {acwrQ?.ratio.toFixed(2)} &gt; 1.3 — рекомендуется разгрузка</div>}
-              {curPh==='deload' && (()=>{ const dp=DELOAD_PROTOCOLS[deloadType]||DELOAD_PROTOCOLS.pump; return <div style={{ marginTop:6, fontSize:10, color:'#22c55e' }}>🔋 Разгрузка: объём −{Math.round((1-dp.volumeMultiplier)*100)}% · интенсивность −{Math.round((1-dp.intensityMultiplier)*100)}% · RIR →{dp.rirTarget}</div>; })()}
+              <div style={{ marginTop:6, fontSize:11, color:'#fff', lineHeight:1.4 }}>
+                {curPh === 'accumulation' && '🎯 Накопление: метаболический стресс, больший объём, умеренные веса. Дрифт RIR −1/2н, повторы −1/2н, объём ×1.0.'}
+                {curPh === 'intensification' && '🎯 Интенсификация: механическое натяжение, снижение объёма ×0.85, рост весов, RIR ↓.'}
+                {curPh === 'deload' && '🎯 Разгрузка: активное восстановление, объём ×0.6, RIR+2, темп контроль.'}
+                {curPh === 'peaking' && '🎯 Пик: реализация, низкий объём ×0.7, RIR 0-1, высокая интенсивность.'}
+              </div>
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.7, display:'flex', flexWrap:'wrap', gap:8 }}>
+                <span>Уровень «{bbLevel}»</span><span>Цель «{bbGoal}»</span><span>Фокус «{bbTrainingFocus}»</span><span>Методика «{bbMethodology}»</span><span>Сплит «{builtPlan.pattern?.name || ''}»</span><span>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span><span>ACWR {acwrQ ? acwrQ.ratio.toFixed(2) : '—'}</span><span>Стадий {Object.keys(phaseGroups).length}</span>
+              </div>
+              <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Логика: distributePhases(totalWeeks={totalW}, goal={bbGoal}, trainingFocus={bbTrainingFocus}) → {distText} · curPh из builtPlan.weeks[{wkq.week}].phase</div>
             </div>
-          );
+            {needsDeloadQ && curPh !== 'deload' && (
+              <div style={{ marginBottom:6, padding:8, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', fontSize:11, fontWeight:600 }}>🚨 ACWR {acwrQ?.ratio.toFixed(2)} &gt; 1.3 — рекомендуется разгрузка (факт фаза {PHASE_LABELS[curPh]} не делод).</div>
+            )}
+            {curPh === 'deload' && (() => {
+              const dp = DELOAD_PROTOCOLS[deloadType] || DELOAD_PROTOCOLS.pump;
+              return <div style={{ marginBottom:8, padding:10, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)' }}><div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔋 Разгрузка — активное восстановление (параметры из DELOAD_PROTOCOLS['{deloadType}'])</div><div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, fontSize:11 }}><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Объём</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.volumeMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Интенсивность</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.intensityMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>RIR</div><div style={{ fontWeight:700, color:'#22c55e' }}>→{dp.rirTarget}</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Повторения</div><div style={{ fontWeight:700, color:'#22c55e' }}>{dp.repRange[0]}-{dp.repRange[1]}</div></div></div></div>;
+            })()}
+          </>;
         })()}
-        {/* Параметры — единственный блок, без дубля сплита */}
+        {/* 🧩 Оценка сплита — соответствие выбранным параметрам (скор) */}
         {(() => {
           const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
           const sc = sel?.score ?? bestSplit?.score ?? 0;
-          const maxSc = Math.max(...ranked.map(r=>r.score),1);
+          const maxSc = Math.max(...ranked.map(r=>r.score), 1);
           const pct = Math.round((sc/maxSc)*100);
+          const color = pct>=80?'#22c55e': pct>=60?'#f59e0b':'#ef4444';
           return (
-            <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6, marginBottom:6 }}>
-                <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>⚙️ Параметры</span>
-                <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>Сплит {builtPlan.pattern?.name || '—'} · {pct}% · {sel?.rationale.slice(0,2).join(' · ') || ''}</span>
+            <div style={{ ...CARD, background:`linear-gradient(135deg, ${color}14, transparent)`, border:`1px solid ${color}22`, marginTop:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, flexWrap:'wrap', gap:6 }}>
+                <span style={{ fontSize:12, fontWeight:800, color }}>🧩 Сплит: {builtPlan.pattern?.name || '—'} · скор {sc} ({pct}%)</span>
+                <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>{bbDays}×/нед · {bbLevel} · {bbGoal} · {weakPoints.length?`слабые ${weakPoints.slice(0,2).join(',')}`:'баланс'}</span>
               </div>
-              <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-                <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(0,230,138,0.10)', border:'1px solid rgba(0,230,138,0.18)', color:'#00e68a' }}>{bbLevel}</span>
-                <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(59,130,246,0.10)', border:'1px solid rgba(59,130,246,0.18)', color:'#60a5fa' }}>{bbGoal}</span>
-                <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(168,85,247,0.10)', border:'1px solid rgba(168,85,247,0.18)', color:'#a855f7' }}>{bbTrainingFocus}</span>
-                <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b' }}>{bbMethodology}</span>
-                <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{bbDays}×/нед · {builtPlan.weeks.length} нед</span>
-                {pedAdapt.combinedMrvMultiplier>1 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', color:'#ef4444' }}>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span>}
-                {bbEquipment.length>0 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff' }}>{bbEquipment.slice(0,2).join(', ')}{bbEquipment.length>2?` +${bbEquipment.length-2}`:''}</span>}
-                {injuries.length>0 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(245,158,11,0.10)', border:'1px solid rgba(245,158,11,0.18)', color:'#f59e0b' }}>травм {injuries.length}</span>}
-                {weakPoints.length>0 && <span style={{ fontSize:10, padding:'4px 8px', borderRadius:20, background:'rgba(250,204,21,0.10)', border:'1px solid rgba(250,204,21,0.18)', color:'#facc15' }}>слабые {weakPoints.slice(0,2).join(', ')}{weakPoints.length>2?` +${weakPoints.length-2}`:''}</span>}
+              <div style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', overflow:'hidden', marginBottom:8 }}>
+                <div style={{ width:`${pct}%`, height:'100%', background:color, transition:'width 0.3s' }} />
+              </div>
+              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                <b>Соответствие:</b> {sel ? sel.rationale.slice(0,3).join(' · ') : '—'}<br/>
+                <b>Выбрано:</b> дней {bbDays}, цель {bbGoal}, слабые {weakPoints.join(', ')||'—'}, фокус —, оборудование {bbEquipment.slice(0,2).join(', ')||'все'}, травмы {injuries.length||'нет'} · <b>План:</b> {builtPlan.pattern?.schedule?.length||'?'} дн/ротацию
+              </div>
+              {sel?.warnings?.length ? <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>{sel.warnings.slice(0,2).map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null}
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>Формула: rankBBSplits(level, goal, days, weakPoints, focusGroup, donorMuscles, specialization, equipment, injuries, mobility, peds) → {sc} / max {maxSc}. Топ-3: {ranked.slice(0,3).map(r=>`${r.pattern.id} ${r.score}`).join(' · ')}</div>
+            </div>
+          );
+        })()}
+        {/* Legacy cycle info — для старых сохранённых bb_cycle планов */}
+        {(planMode === 'programs' || planMode === 'bb_cycle') && selectedCycleId && getCycleById(selectedCycleId) && (() => {
+          const c = getCycleById(selectedCycleId);
+          if (!c) return null;
+          return (
+            <div style={{ ...CARD, marginBottom:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 ПРОФ-цикл: {c.meta.title}</div>
+              <div style={{ fontSize:11, color:'#fff' }}>
+                <div>Упражнения: заданы циклом ({c.week1.reduce((s, d) => s + d.exercises.length, 0)} упр/день)</div>
+                <div>Фазы: {c.meta.phases && c.meta.phases.length > 0 ? c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ') : 'RIR-прогрессия'}</div>
+                <div>{c.meta.conditions.slice(0, 2).map((cond, i) => <div key={i}>• {cond}</div>)}</div>
               </div>
             </div>
           );
         })()}
-        {/* Логика — человекочитаемо: только ключевые решения, без внутреннего мусора */}
+        {/* Score gauge — фактические фазы из плана */}
+        <div style={{ ...CARD, textAlign:'center', borderLeft:'3px solid ' + (quality.score >= 85 ? '#22c55e' : quality.score >= 65 ? '#eab308' : '#ef4444') }}>
+          <div style={{ fontSize:36, fontWeight:800, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.score}/100</div>
+          <div style={{ fontSize:13, fontWeight:700, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.label}</div>
+          <div style={{ marginTop:8, display:'flex', justifyContent:'center', gap:12, flexWrap:'wrap' }}>
+            <div style={SMALL}>Всего сетов (пик): <b style={{ color:'#fff' }}>{metrics.totalSets}</b></div>
+            <div style={SMALL}>Тяж: <b style={{ color:'#ef4444' }}>{(metrics.тяжPct*100).toFixed(0)}%</b></div>
+            <div style={SMALL}>Памп: <b style={{ color:'#60a5fa' }}>{(metrics.пампPct*100).toFixed(0)}%</b></div>
+            <div style={SMALL}>RIR: <b style={{ color:'#f59e0b' }}>{metrics.avgRir.toFixed(1)}</b></div>
+            <div style={SMALL}>Фаз: <b style={{ color:'#a855f7' }}>{Array.from(new Set(W.map((w:any) => (w as any).phase || 'accumulation'))).length}</b></div>
+          </div>
+          {pedAdapt.combinedMrvMultiplier > 1 && (
+            <div style={{ marginTop:6, fontSize:11, fontWeight:700, color:'#f59e0b', background:'rgba(245,158,11,0.08)', padding:'4px 10px', borderRadius:8, display:'inline-block' }}>
+              💉 PED: MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} — пороги MEV/MAV/MRV увеличены
+            </div>
+          )}
+          <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Средний объём по мезо — в «Бюджете объёма», пик — здесь</div>
+        </div>
+        {/* Бюджет объёма — единственный источник perMuscle (пиковая неделя) */}
+        {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
+        {/* === Детальный анализ — перенесено из Step4, оптимизировано === */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {freqOptResult && freqOptResult.totalAdjustments > 0 && (
+            <ExpandableCard title={`🔧 Частота ${freqOptResult.totalAdjustments}`} icon="🔧" short={`${freqOptResult.totalAdjustments} рекомендаций`} full={
+              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                {freqOptResult.recommendations.slice(0,3).map((rec:any,i:number)=> {
+                  const up = rec.recommendedFrequency > rec.currentFrequency;
+                  return <div key={i} style={{ fontSize:10, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', color:'#fff' }}>{up?'↑':'↓'} {(MUSCLE_LABEL_RU as any)[rec.muscle]||rec.muscle}: {rec.currentFrequency}→{rec.recommendedFrequency}× {rec.reason}</div>
+                })}
+              </div>
+            } />
+          )}
+          {(() => {
+            const summary = summarizeAutoRegulation(builtPlan);
+            if (summary.adjustedExercises === 0) return null;
+            return <ExpandableCard title={`↻ Авто ${summary.adjustedExercises}`} icon="↻" short={`${summary.adjustedExercises} скоррект.`} full={
+              <div style={{ fontSize:10, color:'#fff', display:'flex', flexDirection:'column', gap:2 }}>{summary.details.slice(0,3).map((d,i)=><div key={i}>{d.exercise}: {d.from}→{d.to}</div>)} </div>
+            } />
+          })()}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {builtPlan.rotationReport && (
+            <ExpandableCard title="🔁 Ротация" icon="🔁" short={`${Object.keys(builtPlan.rotationReport.primaryByMuscle).length} групп`} full={
+              <div style={{ fontSize:10, color:'#fff' }}>{Object.entries(builtPlan.rotationReport.primaryByMuscle).slice(0,3).map(([m,names])=><div key={m}><b>{(MUSCLE_LABEL_RU as any)[m]||m}:</b> {(names as string[]).slice(0,2).join(', ')}</div>)}</div>
+            } />
+          )}
+          {builtPlan.fatigueReport && (
+            <ExpandableCard title="⚙️ Усталость" icon="⚙️" short={`${Math.round(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.timeSeconds,0)/60)} мин`} full={
+              <div style={{ fontSize:10, color:'#fff' }}>Системная {(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.systemic,0) || 0).toFixed(1)} · Осевая {(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.axial,0) || 0).toFixed(1)}</div>
+            } />
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+          {builtPlan.report && (
+            <ExpandableCard title="📋 Отчёт" icon="📋" short={`${builtPlan.report.weeks}нед · ${builtPlan.report.peakWeek} пик`} full={
+              <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>
+                <div><b>Сплит:</b> {builtPlan.pattern.name} · <b>Объём:</b> {builtPlan.report.totalDirectSets} сетов</div>
+                <div><b>Фазы:</b> {Array.from(new Set(builtPlan.weeks.map((w:any)=>w.phase))).join(', ')}</div>
+              </div>
+            } />
+          )}
+          {builtPlan.balanceReport && (
+            <ExpandableCard title="⚖️ Баланс" icon="⚖️" short={`${builtPlan.balanceReport.press}ж/${builtPlan.balanceReport.pull}т`} full={
+              <div style={{ fontSize:10, color:'#fff' }}>Тяги {builtPlan.balanceReport.pull} · Жимы {builtPlan.balanceReport.press} · Растянутая {builtPlan.balanceReport.lengthened}</div>
+            } />
+          )}
+        </div>
+                {/* Логика построения — ВСЕ пункты, без обрезки и EN-мусора */}
         {(() => {
-          const rationale = (builtPlan.rationale || []) as string[];
-          if (!rationale.length) return null;
-          // Фильтруем только пользовательские строки (с эмодзи) + переводим тех.термины
-          const isUserFacing = (s: string) => /^[📌📈📦💪🔥⭐🎯🧩🧬🩸🔄]/.test(s.trim()) || s.includes('Источник:') || s.includes('Стратегия:') || s.includes('Объём:') || s.includes('Слабые группы:');
+          const rationale = builtPlan.rationale || [];
+          if (rationale.length === 0) return null;
+          // Чистим EN-коды и технический мусор — полностью на русский, с привязкой к выбранным параметрам
+          const STRAT_RU_L: Record<string,string> = { double_progression:'двойная прогрессия', linear:'линейная', wave:'волновая', rpe_based:'RPE-авторегуляция', undulating:'волновая', block:'блочная' };
           const clean = (r: string): string => {
             let s = String(r || '');
-            const M: Array<[RegExp,string]> = [[/double_progression/g,'двойная прогрессия'],[/MEV coverage/g,'покрытие MEV'],[/Experienced enhanced/g,'опытный на курсе'],[/Warmup activator/g,'разминка'],[/back budget allocation/g,'бюджет спины'],[/volume/g,'объём'],[/sets/g,'подходов'],[/week/g,'нед']];
-            for (const [re, ru] of M) s = s.replace(re, ru);
-            return s.replace(/\s{2,}/g,' ').trim();
+            s = s.replace(/double_progression|linear|wave|rpe_based|undulating|block/g, m => STRAT_RU_L[m] || m);
+            // Полная карта EN → RU для остатков rationale из движков
+            const MAP: Array<[RegExp,string]> = [
+              [/MEV coverage|Adaptive MEV/g, 'покрытие MEV'],
+              [/Experienced enhanced/g, 'опытный на курсе'],
+              [/Warmup activator/g, 'разминочная активация'],
+              [/back budget allocation/g, 'бюджет спины'],
+              [/direct residual volume after indirect overlap/g, 'остаточный прямой объём после косвенной нагрузки'],
+              [/Усталость и длительность budget:/g, 'Бюджет утомления:'],
+              [/Adaptive safety replacement/g, 'Замена по безопасности'],
+              [/Controlled rotation:/g, 'Контролируемая ротация:'],
+              [/S-MRV/g, 'С-MRV'],
+              [/Cross-mesocycle:/g, 'Межмезоцикл:'],
+              [/Per-muscle ACWR/g, 'Помышечный ACWR'],
+              [/Doнорское перераспределение/g, 'Донорское перераспределение'],
+              [/Due to|due to/g, 'из-за'],
+              [/volume/g, 'объём'],
+              [/sets/g, 'подходов'],
+              [/reps/g, 'повт'],
+              [/RIR/g, 'RIR'],
+              [/week/g, 'нед'],
+              [/day/g, 'день'],
+              [/exercise/g, 'упражнение'],
+              [/muscle/g, 'мышца'],
+              [/level/g, 'уровень'],
+              [/goal/g, 'цель'],
+              [/focus/g, 'фокус'],
+              [/methodology/g, 'методика'],
+              [/frequency/g, 'частота'],
+              [/intensity/g, 'интенсивность'],
+              [/recovery/g, 'восстановление'],
+            ];
+            for (const [re, ru] of MAP) s = s.replace(re, ru);
+            // Удаляем технический мусор, не несущий смысла для пользователя (оставляем факт)
+            s = s.replace(/MEV coverage|Adaptive MEV|Experienced enhanced|Warmup activator|back budget allocation|direct residual volume after indirect overlap/g, '');
+            s = s.replace(/\.\s*\./g, '.').replace(/\s{2,}/g, ' ').trim();
+            // Убираем остатки EN в скобках
+            s = s.replace(/\b[A-Z]{2,}\b/g, m => m.length<=3 ? m : m); // оставляем короткие аббр.
+            return s;
           };
-          const userLines = rationale.filter(isUserFacing).map(clean).filter(Boolean);
-          const techLines = rationale.filter(s => !isUserFacing(s)).map(clean).filter(Boolean).slice(0,3);
-          const allShown = [...userLines, ...techLines];
-          if (!allShown.length) return null;
+          const shown = rationale.map(clean).filter(Boolean);
           return (
-            <ExpandableCard title={`🧠 Логика сборки — ${userLines.length} ключевых + ${techLines.length} тех.`} icon="🧠" short={userLines.slice(0,2).join(' · ') || allShown.slice(0,2).join(' · ') || '—'} full={<div style={{ fontSize:11, color:'#fff', lineHeight:1.5 }}>{allShown.map((r,i)=><div key={i} style={{ marginBottom:3, paddingLeft:6, borderLeft: i < userLines.length ? '2px solid #a78bfa' : '2px solid rgba(255,255,255,0.1)', opacity: i < userLines.length ? 1 : 0.7 }}>• {r}</div>)}<div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,0.5)' }}>Внутренние тех.детали скрыты — показано только то, что влияет на результат.</div></div>} />
-          );
-        })()}
-        {/* JSI — переработан: источник упражнения, понятные зоны, без «магии чисел» */}
-        {jsiSummary ? (
-          <ExpandableCard
-            title={`🦴 Нагрузка на суставы — ${jsiSummary.overallLevel==='green'?'🟢 Норма': jsiSummary.overallLevel==='yellow'?'🟡 Умеренно': jsiSummary.overallLevel==='red'?'🔴 Высоко':'⛔ Критично'} · пик ${jsiSummary.maxJsi} (${(jsiSummary as any).perJointSource?.[jsiSummary.maxJoint]?.exercise || jsiSummary.maxJoint})`}
-            icon="🦴"
-            short={`${Object.entries(jsiSummary.perJointMax).filter(([,v]:any)=>v.level!=='green').length || Object.entries(jsiSummary.perJointMax).length} суставов с нагрузкой · макс ${jsiSummary.maxJoint}:${jsiSummary.maxJsi}${(jsiSummary as any).perJointSource?.[jsiSummary.maxJoint] ? ` ← ${(jsiSummary as any).perJointSource[jsiSummary.maxJoint].exercise}` : ''}`}
-            full={
-              <div style={{ fontSize:11, lineHeight:1.4 }}>
-                <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginBottom:6, padding:'6px 8px', background:'rgba(255,255,255,0.03)', borderRadius:6 }}>JSI = тоннаж × техника × анатомия × фарма. Зоны: <span style={{color:'#22c55e'}}>0-49 норма</span> · <span style={{color:'#facc15'}}>50-84 умеренно</span> · <span style={{color:'#ef4444'}}>85-114 высоко</span> · <span style={{color:'#991b1b'}}>115+ критично</span>. Показан пик по каждому суставу и упражнение-источник.</div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px,1fr))', gap:6, marginBottom:8 }}>
-                  {Object.entries(jsiSummary.perJointMax).sort((a,b)=> b[1].jsi - a[1].jsi).map(([jid, v]: any)=> {
-                    const src = (jsiSummary as any).perJointSource?.[jid] as {exercise:string;weight:number;reps:number;sets:number}|undefined;
-                    const bg = v.level==='green'?'rgba(34,197,94,0.10)': v.level==='yellow'?'rgba(250,204,21,0.10)': v.level==='red'?'rgba(239,68,68,0.10)':'rgba(153,27,27,0.20)';
-                    const col = v.level==='green'?'#22c55e': v.level==='yellow'?'#facc15': v.level==='red'?'#ef4444':'#991b1b';
-                    const ru: Record<string,string> = { wrist:'Кисть', elbow:'Локоть', shoulder:'Плечо', spine:'Поясница', hip:'Таз', knee:'Колено', ankle:'Голеностоп' };
-                    return <div key={jid} style={{ padding:'7px 8px', borderRadius:8, background:bg, border:'1px solid rgba(255,255,255,0.06)' }}><div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{ru[jid]||jid}</span><span style={{ fontSize:11, fontWeight:800, color:col }}>{v.jsi}</span></div><div style={{ fontSize:10, color:col, fontWeight:600 }}>{v.level==='green'?'норма':v.level==='yellow'?'умеренно':v.level==='red'?'высоко':'критично'}</div>{src && <div style={{ fontSize:9, color:'rgba(255,255,255,0.65)', marginTop:3, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }} title={src.exercise}>{src.exercise} · {src.sets}×{src.reps}×{src.weight}кг</div>}{v.level!=='green' && src && <div style={{ fontSize:9, color:'rgba(255,255,255,0.5)', marginTop:2 }}>пик от этого упражнения</div>}</div>;
-                  })}
-                </div>
-                {jsiSummary.deadlyCombos.length>0 && <div style={{ marginBottom:8 }}><div style={{ fontSize:10, fontWeight:700, color:'#ef4444', marginBottom:4 }}>⛔ Критические связки:</div>{jsiSummary.deadlyCombos.map((c,i)=><div key={i} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(153,27,27,0.12)', border:'1px solid rgba(153,27,27,0.18)', color:'#ef4444', fontSize:11, marginBottom:4 }}><b>{c.title}</b> — {c.desc}</div>)}</div>}
-                {jsiSummary.tuningTop.length>0 && <div style={{ marginBottom:8 }}><div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>🔧 Что снизить в первую очередь:</div>{jsiSummary.tuningTop.slice(0,3).map((t,i)=><div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, padding:'4px 6px', background:'rgba(96,165,250,0.06)', borderRadius:6, borderLeft:'2px solid #60a5fa' }}>{t.action} <span style={{ color:'#22c55e', fontWeight:700 }}>{t.expected}</span>{t.alternative && <span style={{ color:'rgba(255,255,255,0.5)', marginLeft:6 }}>→ {t.alternative}</span>}</div>)}</div>}
-                <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center', marginTop:6 }}>
-                  <button onClick={() => { try { const fn=(window as any).__navigateToTrainingTab; if(fn) fn('joints_ortho'); else { localStorage.setItem('he_training_tab','joints_ortho'); window.dispatchEvent(new StorageEvent('storage',{key:'he_training_tab'} as any)); } } catch{} }} style={{ padding:'7px 12px', borderRadius:8, fontSize:11, fontWeight:800, cursor:'pointer', background:'#60a5fa', color:'#000', border:'none' }}>🦴 Открыть Суставы — детально</button>
-                  <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>{jsiSummary.totalInputs} упр. · делод исключён · вес для своих = 0.9× тела</span>
-                </div>
+            <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой (все пункты)</div>
+              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
+                {shown.map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
               </div>
-            }
-          />
-        ) : (
-          <div style={{ padding:'10px 12px', borderRadius:12, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-            <div style={{ flex:1, minWidth:180 }}><div style={{ fontSize:11, fontWeight:800, color:'#60a5fa' }}>🦴 Нагрузка на суставы</div><div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>JSI недоступна — нет рабочих сетов или все в делоде. Постройте план и вернитесь.</div></div>
-            <button onClick={() => { try { const fn=(window as any).__navigateToTrainingTab; if(fn) fn('joints_ortho'); else { localStorage.setItem('he_training_tab','joints_ortho'); window.dispatchEvent(new StorageEvent('storage',{key:'he_training_tab'} as any)); } } catch{} }} style={{ padding:'7px 12px', borderRadius:8, fontSize:11, fontWeight:800, cursor:'pointer', background:'#60a5fa', color:'#000', border:'none' }}>🦴 Открыть</button>
-          </div>
-        )}
-        {/* PRO — детализация, а не «ни о чём» */}
-        {q.proResult && (
-          <ExpandableCard
-            title={`🧠 PRO-качество — ${q.proResult.scoreDelta>0?'+':''}${q.proResult.scoreDelta} · ${q.proResult.patterns.filter((p:any)=>p.ok).length}/${q.proResult.patterns.length} паттернов`}
-            icon="🧠"
-            short={`углы ${q.proResult.angles.filter((a:any)=>a.ok).length}/${q.proResult.angles.length} · растяжка ${q.proResult.stretches.filter((s:any)=>s.ok).length}/${q.proResult.stretches.length} · техники ${q.proResult.technique.pct}% · цель ${q.proResult.goalAlignment.goal}`}
-            full={
-              <div style={{ fontSize:11, lineHeight:1.4 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-                  <div style={{ padding:'8px', borderRadius:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.12)' }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#a78bfa', marginBottom:4 }}>Паттерны (разные углы тяги/жима)</div>
-                    {q.proResult.patterns.map((p:any)=><div key={p.muscle} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color: p.ok ? '#22c55e' : '#f59e0b', marginBottom:2 }}><span>{p.muscle}</span><span>{p.distinct}/{p.expected.length} {p.ok?'✓':`→ ${p.issue || 'добавьте'}`}</span></div>)}
-                  </div>
-                  <div style={{ padding:'8px', borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.12)' }}>
-                    <div style={{ fontSize:10, fontWeight:700, color:'#60a5fa', marginBottom:4 }}>Углы (верх/низ/центр)</div>
-                    {q.proResult.angles.map((a:any)=><div key={a.muscle} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color: a.ok ? '#22c55e' : '#f59e0b', marginBottom:2 }}><span>{a.muscle}</span><span>{Math.round(a.coverage*100)}% {a.ok?'✓':`→ ${a.expected.filter((e:string)=> !a.angles.includes(e)).join(', ')}`}</span></div>)}
-                  </div>
-                </div>
-                <div style={{ padding:'8px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.12)', marginBottom:8 }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:'#22c55e', marginBottom:4 }}>Растяжка (длинная позиция) · Цель: {q.proResult.goalAlignment.volumePctAvg}% MRV · Техники {q.proResult.technique.pct}%</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:4 }}>{q.proResult.stretches.map((s:any)=><span key={s.muscle} style={{ fontSize:10, padding:'2px 6px', borderRadius:12, background: s.ok ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', color: s.ok ? '#22c55e' : '#ef4444', border: s.ok ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(239,68,68,0.2)' }}>{s.muscle} {s.ok?'✓':'✗ ' + (s.stretchExercises.slice(0,1).join('') || 'нет')}</span>)}</div>
-                  {!q.proResult.goalAlignment.ok && <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ {q.proResult.goalAlignment.issue} → {q.proResult.goalAlignment.recommendation}</div>}
-                  {q.proResult.goalAlignment.ok && <div style={{ fontSize:10, color:'#22c55e' }}>✓ {q.proResult.goalAlignment.recommendation}</div>}
-                </div>
-                {q.proResult.totalIssues.length>0 && <div style={{ fontSize:10, color:'rgba(255,255,255,0.7)' }}><div style={{ fontWeight:700, color:'#a78bfa', marginBottom:4 }}>Что поправить в первую очередь:</div>{q.proResult.totalRecommendations.slice(0,3).map((r:string,i:number)=><div key={i} style={{ marginBottom:2 }}>• {r}</div>)}</div>}
-                {q.proResult.totalIssues.length===0 && <div style={{ fontSize:11, color:'#22c55e', fontWeight:600 }}>✓ Паттерны, углы и растяжка закрыты — PRO-оценка на максимуме.</div>}
-              </div>
-            }
-          />
-        )}
-        {/* Рекомендации — только действие, без мусора */}
-        {(() => {
-          const raw: string[] = (q.recommendations as string[]) || [];
-          // Фильтруем информационный шум: разнообразие <6, методика diversity, пустые «слабые не указаны» без слабых
-          const filtered = raw.filter(r => {
-            const s = String(r).toLowerCase();
-            if (/низкое разнообразие.*\d+\/\d+/.test(s) && !s.includes('критич')) return false;
-            if (s.includes('методика') && s.includes('разнообразие низкое')) return false;
-            if (s.includes('специализация') && s.includes('слабые группы не указаны')) return q.proResult ? false : true;
-            if (s.includes('цель «сушка» выбрана') && s.includes('максимальный (mrv)')) return false;
-            return true;
-          }).slice(0,5);
-          if (!filtered.length) return (
-            <div style={{ ...CARD, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#22c55e' }}>✓ Рекомендаций нет — план чистый</div>
-              <div style={{ fontSize:10, color:'rgba(255,255,255,0.6)', marginTop:4 }}>Все проверки пройдены. Можно идти в «Коррекция» или «К выполнению».</div>
             </div>
           );
+        })()}
+        {/* Прогноз по фазам — факт из плана */}
+        {(() => {
+          const peakWeek = W.reduce((best, w, i) => {
+            const ts = w.sessions.reduce((s, ss) => s + ss.exercises.reduce((ss2, e) => ss2 + e.sets, 0), 0);
+            return ts > best.ts ? { wk: w.week, ts } : best;
+          }, { wk: 1, ts: 0 });
+          const actualDeloadWeeks = W.filter((w:any) => (w as any).phase === 'deload' || (w as any).deload).map((w:any) => w.week);
+          const hasDeload = actualDeloadWeeks.length > 0;
+          const accWeeks = W.filter((w:any) => ((w as any).phase || 'accumulation') === 'accumulation');
+          const intensWeeks = W.filter((w:any) => ((w as any).phase || '') === 'intensification');
+          return (
+            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔮 Прогноз по фазам</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:11 }}>
+                <div>
+                  <span style={{ color:'#fff' }}>Пик объёма: </span>
+                  <span style={{ fontWeight:700, color:'#f59e0b' }}>нед {peakWeek.wk}</span>
+                  <span style={{ color:'#fff' }}> ({peakWeek.ts} сетов)</span>
+                </div>
+                <div>
+                  <span style={{ color:'#fff' }}>Разгрузка: </span>
+                  <span style={{ fontWeight:700, color: hasDeload ? '#22c55e' : '#ef4444' }}>
+                    {hasDeload ? 'нед ' + actualDeloadWeeks.join(', ') : 'НЕ ЗАПЛАНИРОВАНА ⚠'}
+                  </span>
+                </div>
+                {(() => {
+                  const avgRirFor = (weeks: any[]) => {
+                    const exs = weeks.flatMap((w:any) => w.sessions.flatMap((s:any) => s.exercises));
+                    if (exs.length === 0) return '—';
+                    const avg = exs.reduce((a:any,e:any) => a + (Number.isFinite(e.rir) ? e.rir : 2), 0) / exs.length;
+                    return avg.toFixed(1);
+                  };
+                  return (<>
+                    <div>
+                      <span style={{ color:'#fff' }}>Накопление: </span>
+                      <span style={{ fontWeight:700, color:'#60a5fa' }}>{accWeeks.length} нед</span>
+                      <span style={{ color:'#fff' }}> (ср. RIR {avgRirFor(accWeeks)})</span>
+                    </div>
+                    <div>
+                      <span style={{ color:'#fff' }}>Интенсификация: </span>
+                      <span style={{ fontWeight:700, color:'#ef4444' }}>{intensWeeks.length} нед</span>
+                      <span style={{ color:'#fff' }}> (ср. RIR {avgRirFor(intensWeeks)})</span>
+                    </div>
+                  </>);
+                })()}
+              </div>
+              {!hasDeload && W.length >= 6 && (
+                <div style={{ marginTop:6, padding:'4px 8px', borderRadius:8, background:'rgba(239,68,68,0.1)', fontSize:11, color:'#ef4444' }}>
+                  ⚠ Мезоцикл {W.length} нед без разгрузки — высокий риск перетрена. Добавьте разгрузочную неделю.
+                </div>
+              )}
+            </div>
+          );
+        })()}
+        {/* Подробная таблица объёма по мышцам — убрана как дубль «Бюджета объёма» (Step 4 heatmap + Step 5 VolumeBudgetCard) */}
+        {/* PRO Quality — отдельный блок, данные из единого quality.proResult */}
+        {(() => {
+          const proQ = (quality as any).proResult as ReturnType<typeof analyzeProQuality> | null;
+          if (!proQ) return null;
+          return (
+            <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧠 PRO-качество (паттерны/углы/растяжка)</div>
+              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Оценка техники/углов/растяжки из интеллектуальных тренировок. Скорректировала базовую оценку на {proQ.scoreDelta>0?'+':''}{proQ.scoreDelta}.</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
+                <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} в норме {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
+                <div><b>Углы:</b> {proQ.angles.filter(a=>a.ok).length}/{proQ.angles.length} в норме {proQ.angles.filter(a=>!a.ok).map(a=>a.issue).slice(0,2).join('; ') || '—'}</div>
+                <div><b>Растяжка:</b> {proQ.stretches.filter(s=>s.ok).length}/{proQ.stretches.length} в норме</div>
+                <div><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
+              </div>
+              {proQ.totalIssues.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss,i)=><div key={i}>• {iss}</div>)}</div>}
+              {proQ.totalRecommendations.length > 0 && <div style={{ marginTop:4, fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec,i)=><div key={i}>→ {rec}</div>)}</div>}
+              <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Изменение оценки: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включено в итог {quality.score}/100)</div>
+            </div>
+          );
+        })()}
+
+        {/* Прогрессия весов по неделям (основные упражнения) — факт из плана */}
+        {(() => {
+          const totalW = W.length;
+          const cols = Math.min(8, totalW);
+          const primaryExs = new Map<string, { name: string; muscle: string; weights: number[] }>();
+          for (const w of W) {
+            for (const s of w.sessions) {
+              for (const e of s.exercises) {
+                if (e.role !== 'primary') continue;
+                const key = e.name;
+                if (!primaryExs.has(key)) primaryExs.set(key, { name: e.name, muscle: e.muscle, weights: new Array(totalW).fill(0) });
+                const rec = primaryExs.get(key)!;
+                rec.weights[w.week - 1] = e.workSets[0]?.weight || 0;
+              }
+            }
+          }
+          if (primaryExs.size === 0) return null;
+          const top = [...primaryExs.values()].filter(e => e.weights.some(w => w > 0)).slice(0, 6);
+          if (top.length === 0) return null;
           return (
             <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Что исправить (приоритет)</div>
-              {filtered.map((r:string, i:number) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:4, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:6, borderLeft: i===0 ? '3px solid #ef4444' : i===1 ? '3px solid #f59e0b' : '3px solid #facc15', lineHeight:1.35 }}>{i===0?'🔥 ':'• '}{r}</div>)}
-              {raw.length>filtered.length && <div style={{ fontSize:10, color:'rgba(255,255,255,0.45)', marginTop:4 }}>Скрыто {raw.length - filtered.length} второстепенных подсказок (разнообразие/методика).</div>}
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>📈 Прогрессия весов (кг) по неделям — факт плана</div>
+              <div style={{ overflowX:'auto' }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, minWidth: cols*40+120 }}>
+                  <span style={{ fontWeight:700, color:'#fff' }}>Упражнение</span>
+                  {Array.from({ length: cols }, (_, i) => (
+                    <span key={i} style={{ fontWeight:700, color:'#fff', textAlign:'center' }}>{i+1}</span>
+                  ))}
+                </div>
+                {top.map(ex => {
+                  const weights = ex.weights.slice(0, cols);
+                  const first = weights.find(w => w > 0) || 0;
+                  const last = weights.filter(w => w > 0).pop() || first;
+                  const delta = last > first ? '+' + (last - first) : '';
+                  return (
+                    <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, padding:'2px 0', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
+                      <span style={{ fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={ex.name}>{ex.name.substring(0, 18)}</span>
+                      {weights.map((w, wi) => {
+                        const prev = wi > 0 ? weights[wi-1] : 0;
+                        const up = prev > 0 && w > prev;
+                        const down = prev > 0 && w < prev;
+                        return (
+                          <span key={wi} style={{
+                            textAlign:'center', fontWeight: w > 0 ? 700 : 400,
+                            color: w > 0 ? (up ? '#22c55e' : down ? '#ef4444' : '#f59e0b') : 'rgba(255,255,255,0.2)',
+                          }}>{w > 0 ? w : '—'}</span>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ marginTop:4, fontSize:10, color:'#fff', display:'flex', gap:12 }}>
+                <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span>
+              </div>
+              {totalW > 8 && <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Показаны первые 8 нед из {totalW}</div>}
             </div>
           );
         })()}
-        {/* Суставы — только в JSI блоке выше (инструмент «Суставы и ортопедия»), дубль безопасности убран */}
+        {/* Мусорный объём — полностью на русском, проверка с учётом всех выбранных параметров и плана */}
+        {(() => {
+          const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears, focusGroup: '', specialization: specializationMode, specializationTargets: specTargets });
+          const ruMuscleG = (m: string) => (MUSCLE_LABEL_RU as any)[m] || m;
+          const ruReason = (r: string) => r
+            .replace(/Дублирование паттерна (\S+) для (\S+)/, 'Дубль изоляции «$1» для «$2» — в одной сессии достаточно одной')
+            .replace(/Мышца (\S+) не входит в тег сессии (\S+)/, 'Мышца «$1» не входит в день «$2» — проверьте совместимость сплита с выбранными группами');
+          const paramChips: string[] = [];
+          paramChips.push(`уровень ${bbLevel}`);
+          if (bbTrainingYears!==undefined) paramChips.push(`стаж ${bbTrainingYears}л`);
+          paramChips.push(`цель ${bbGoal}`);
+          paramChips.push(`фокус ${bbTrainingFocus}`);
+          paramChips.push(`методика ${bbMethodology}`);
+          paramChips.push(`сплит ${builtPlan.pattern?.name || builtPlan.pattern?.id || '—'}`);
+          paramChips.push(`объём ${bbVolGoal}${trainingVolumeMode==='high'?' (объёмный)':''}`);
+          if (weakPoints.length) paramChips.push(`слабые: ${weakPoints.join(', ')}`);
+          if (specializationMode) paramChips.push(`специализация ${specTargets.join('+')}`);
+          if (bbEquipment.length) paramChips.push(`оборудование ${bbEquipment.slice(0,3).join(', ')}${bbEquipment.length>3?'…':''}`);
+          if (injuries.length) paramChips.push(`травмы ${injuries.length}`);
+          if (garbage.length === 0) {
+            return (
+              <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(16,185,129,0.04))', border:'1px solid rgba(34,197,94,0.18)', position:'relative', overflow:'hidden' }}>
+                <div style={{ position:'absolute', top:-12, right:-12, width:80, height:80, borderRadius:80, background:'radial-gradient(circle, rgba(34,197,94,0.12), transparent 70%)' }} />
+                <div style={{ fontSize:12, fontWeight:800, color:'#22c55e', display:'flex', alignItems:'center', gap:6 }}>🗑 Мусорный объём: чисто ✅ <span style={{ fontSize:10, fontWeight:600, color:'#22c55e', background:'rgba(34,197,94,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(34,197,94,0.22)' }}>соответствует параметрам</span></div>
+                <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>Дублей изоляций не найдено. Для слабых/фокусных групп повтор паттерна допустим — учтена каноника <span style={{ fontFamily:'ui-monospace, monospace', background:'rgba(255,255,255,0.06)', padding:'1px 4px', borderRadius:4 }}>chest_upper→chest, delt_mid→shoulders</span>. Икры «стоя+сидя» — по дизайну 2 разных упражнения, не дубль. Проверка: compound-паттерны (жим/тяга/присед) — не считаются мусором (разные углы — норма).</div>
+                <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
+                  {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
+                </div>
+                <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>{`Логика: detectGarbageVolume(weeks, weakPoints, {level, trainingYears, focusGroup: '', specialization}) → warmup исключён, back по classifyBackExercise, compound исключён, seenPatterns per session, слабые/фокус — скип.`}</div>
+              </div>
+            );
+          }
+          return (
+            <div style={{ ...CARD, background:'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,158,11,0.04))', border:'1px solid rgba(239,68,68,0.18)', position:'relative', overflow:'hidden' }}>
+              <div style={{ position:'absolute', top:-10, right:-10, width:90, height:90, borderRadius:90, background:'radial-gradient(circle, rgba(239,68,68,0.12), transparent 70%)' }} />
+              <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', display:'flex', alignItems:'center', gap:8 }}>🗑 Мусорный объём: найдено {garbage.length} <span style={{ fontSize:10, fontWeight:600, color:'#ef4444', background:'rgba(239,68,68,0.12)', padding:'2px 7px', borderRadius:20, border:'1px solid rgba(239,68,68,0.22)' }}>несоответствие параметрам</span></div>
+              <div style={{ fontSize:11, color:'#fff', marginTop:6, lineHeight:1.5 }}>
+                Дублирование изоляций: план содержит повторы одного паттерна для одной мышцы в одной сессии — при выбранных параметрах это избыточно. Для слабых/фокусных групп дубль <b>допустим</b> (учтена каноника), для остальных — мусор. Проверено по: {paramChips.slice(0,6).join(' · ')}{paramChips.length>6?' …':''}.
+              </div>
+              <div style={{ marginTop:8, display:'grid', gap:6 }}>
+                {garbage.slice(0, 6).map((g, i) => (
+                  <div key={i} style={{ display:'flex', gap:8, alignItems:'flex-start', padding:'7px 9px', borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.12)' }}>
+                    <span style={{ flexShrink:0, width:22, height:22, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.14)', color:'#ef4444', fontWeight:800, fontSize:11 }}>{i+1}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{g.exerciseName} <span style={{ fontWeight:400, opacity:0.7 }}>· {ruMuscleG(g.muscle)} · {g.sessionTag || 'день'}</span></div>
+                      <div style={{ fontSize:10, color:'#fbbf24', marginTop:2 }}>{ruReason(g.reason)}</div>
+                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:2 }}>Исправление: заменить на другой угол/хват или убрать (для слабых — оставить, если цель — специализация).</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {garbage.length > 6 && <div style={{ marginTop:6, fontSize:11, color:'#fff', textAlign:'center', opacity:0.7 }}>…и ещё {garbage.length - 6} — откройте план, проверьте сессии</div>}
+              <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
+                {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
+              </div>
+              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Формула: per session seenPatterns[day-muscle-pattern] → если дубль && !isWeak && !calvesByDesign → мусор. isWeak учитывает weakPoints+focusGroup+specializationTargets.</div>
+            </div>
+          );
+        })()}
+        {/* Рекомендации — единственные, детали уже в них (quality.details убраны как дубль) */}
+        {quality.recommendations && quality.recommendations.length > 0 && (
+          <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации по качеству плана</div>
+            {quality.recommendations.map((r, i) => (
+              <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:4, borderLeft:'2px solid #f59e0b' }}>{r}</div>
+            ))}
+          </div>
+        )}
         {/* Volume chart */}
         {(() => {
           const vdata: WeekVolume[] = W.map(w => {
@@ -4011,11 +4445,49 @@ export const BbAutoConstructor: React.FC = () => {
           if (vdata.length < 2) return null;
           return (
             <div style={{ ...CARD }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Объём по неделям</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Объём по неделям (сетов)</div>
               <VolumeByWeekChart data={vdata} />
             </div>
           );
         })()}
+        {/* RIR drift chart */}
+        {(() => {
+          const rdata: RirRecord[] = [];
+          W.forEach(w => w.sessions.forEach(s => s.exercises.forEach(e => rdata.push({ week: w.week, exercise: e.name || e.muscle || '', rir: e.rir || 0 }))));
+          if (rdata.length < 2) return null;
+          return (
+            <div style={{ ...CARD, marginTop:8 }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>📉 Динамика RIR по неделям</div>
+              <RirDriftChart data={rdata} />
+            </div>
+          );
+        })()}
+        {/* Load assessment */}
+        <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 Оценка тренировочной нагрузки</div>
+          {!ratio ? <div style={SMALL}>Недостаточно данных sRPE для расчёта ACWR. Ведите дневник тренировок.</div> : (
+            <div>
+              <div style={{ display:'flex', gap:12, alignItems:'center' }}>
+                <span style={SMALL}>ACWR: <b style={{ color:ratio.ratio>1.5?'#ef4444':ratio.ratio>1.3?'#eab308':'#22c55e', fontSize:14 }}>{ratio.ratio.toFixed(2)}</b></span>
+                <span style={{ padding:'3px 8px', borderRadius:8, fontSize:11, fontWeight:700, background:ratio.zone==='dangerous'?'rgba(239,68,68,0.15)':ratio.zone==='caution'?'rgba(234,179,8,0.15)':'rgba(34,197,94,0.15)', color:ratio.zone==='dangerous'?'#ef4444':ratio.zone==='caution'?'#eab308':'#22c55e' }}>{ratio.zone === 'dangerous' ? '⛔ Опасно' : ratio.zone === 'caution' ? '⚠ Осторожно' : ratio.zone === 'optimal' ? '✅ Оптимум' : '⬇ Недотрен'}</span>
+              </div>
+              <div style={{ marginTop:6, ...SMALL }}>Хроническая нагрузка (28д) vs острая (7д). Цель: 0.8-1.3. Разгрузка при {`>`}1.5.</div>
+            </div>
+          )}
+        </div>
+        {/* Дополнительно: прогрессия мезоцикла + сценарии — свернуто по умолчанию */}
+        <ExpandableCard
+          title="🔧 Дополнительно: прогноз прогрессии и сценарии"
+          icon="🔧"
+          short="Прогрессия мезоцикла · сценарии «что если» (калории/сон/курс)"
+          full={
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
+              <WhatIfCard baseRisk={quality?.score ? 100 - quality.score : 20} baseReadiness={Math.round((linked.readiness?.recovery ?? 80))} />
+            </div>
+          }
+        />
+        {/* Экспорт — фактические параметры плана */}
         {quality && (
           <div style={{ marginTop:8 }}>
             <PlanExportCard
@@ -4038,6 +4510,7 @@ export const BbAutoConstructor: React.FC = () => {
             />
           </div>
         )}
+
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
@@ -4303,34 +4776,6 @@ export const BbAutoConstructor: React.FC = () => {
           обычный; этот шаг накладывает фазы поверх него (копию) и генерирует дневные цели питания.
           Можно пропустить — план останется обычным.
         </div>
-        {/* Флаг изоляции обычного режима */}
-        <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8, padding:10, borderRadius:10, background: prepEnabled ? 'rgba(236,72,153,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${prepEnabled ? 'rgba(236,72,153,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
-          <label style={{ display:'flex', gap:8, alignItems:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: prepEnabled ? '#f472b6' : '#fff' }}>
-            <input type="checkbox" checked={prepEnabled} onChange={e => {
-              const v = e.target.checked;
-              setPrepEnabled(v);
-              try {
-                const cur = getProfile();
-                const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
-                if (!next.goals) next.goals = {};
-                next.goals.prepEnabled = v;
-                if (!v) {
-                  delete next.goals.bbContestPrepPlan;
-                  delete next.goals.bbPeakConfig;
-                  next.goals.peakWeek = false;
-                }
-                updateProfile({ settings: next });
-                if (!v) {
-                  setPrepPlan(null);
-                  setPrepApplied(false);
-                  window.dispatchEvent(new CustomEvent(CONTEST_PREP_UPDATED_EVENT, { detail: { source: 'clear' } }));
-                }
-              } catch {}
-            }} />
-            {prepEnabled ? '✅ Подготовка включена' : '⬜ Включить подготовку'}
-          </label>
-          <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginLeft:'auto' }}>{prepEnabled ? 'Тапер активен' : 'Обычный режим'}</span>
-        </div>
 
         {/* Параметры */}
         <div style={{ ...CARD, marginTop:10 }}>
@@ -4471,19 +4916,16 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             <button
-              style={{ ...BTN, flex:1, background: prepBusy ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,#ec4899,#db2777)', color: prepBusy ? 'rgba(255,255,255,0.5)' : '#fff', opacity: prepBusy ? 0.6 : 1, cursor: prepBusy ? 'default' : 'pointer' }}
-              disabled={prepBusy}
-              onClick={() => {
-                if (!builtPlan) { flash('Сначала соберите план тренировок (шаги 1-4) — затем вернитесь сюда и нажмите снова. Настройки уже можно сохранить.'); return; }
-                assembleContestPrep(true);
-              }}
+              style={{ ...BTN, flex:1, background: 'linear-gradient(135deg,#ec4899,#db2777)', color:'#fff' }}
+              disabled={prepBusy || !builtPlan}
+              onClick={() => assembleContestPrep(true)}
             >
               {prepBusy ? 'Собираю…' : prepApplied ? '🔄 Пересобрать и применить' : '🏁 Собрать contest prep и применить'}
             </button>
-            <button style={{ ...BTN_GHOST, opacity: prepBusy ? 0.6 : 1 }} onClick={() => assembleContestPrep(false)} disabled={prepBusy}>💾 Только сохранить настройки</button>
+            <button style={BTN_GHOST} onClick={() => assembleContestPrep(false)} disabled={prepBusy || !builtPlan}>💾 Только сохранить настройки</button>
             <button style={BTN_GHOST} onClick={() => setStep('adjust')}>Пропустить →</button>
           </div>
-          {!builtPlan && <div style={{ fontSize:11, color:'#f59e0b', marginTop:6, padding:8, borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)' }}>ℹ️ План ещё не собран — вы можете настроить параметры и нажать «Только сохранить настройки», затем собрать план и вернуться для применения.</div>}
+          {!builtPlan && <div style={{ fontSize:11, color:'#ef4444', marginTop:6 }}>Сначала соберите план тренировок (шаги 1-4).</div>}
         </div>
 
         {/* Результат */}
@@ -5142,7 +5584,7 @@ export const BbAutoConstructor: React.FC = () => {
     autoDeload,
     deloadType,
     loadStrategy,
-    autoRegResult: (autoRegResult) ? { volumeMultiplier: autoRegResult.volumeMultiplier, topSetPctMultiplier: autoRegResult.topSetPctMultiplier, rirShift: autoRegResult.rirShift } : undefined,
+    autoRegResult: (autoRegOn && autoRegResult) ? { volumeMultiplier: autoRegResult.volumeMultiplier, topSetPctMultiplier: autoRegResult.topSetPctMultiplier, rirShift: autoRegResult.rirShift } : undefined,
     methodology: bbMethodology,
     eccentricMult,
     previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
@@ -5287,12 +5729,11 @@ export const BbAutoConstructor: React.FC = () => {
         {/* Шаги */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
           {steps.map((s, i) => (
-            <button key={s.id} onClick={() => setPrepStep(s.id)} style={{
-              padding: '6px 10px', borderRadius: 999, cursor: 'pointer',
+            <button key={s.id} onClick={() => { if (i < stepIdx) setPrepStep(s.id); }} style={{
+              padding: '6px 10px', borderRadius: 999, border: 'none', cursor: i < stepIdx ? 'pointer' : 'default',
               fontSize: 10, fontWeight: 800, minHeight: 32,
               background: prepStep === s.id ? 'linear-gradient(135deg,#ec4899,#be185d)' : 'rgba(255,255,255,0.05)',
-              color: prepStep === s.id ? '#fff' : 'rgba(255,255,255,0.7)',
-              border: prepStep === s.id ? '1px solid rgba(236,72,153,0.5)' : '1px solid rgba(255,255,255,0.08)',
+              color: prepStep === s.id ? '#fff' : '#fff',
             }}>{s.label}</button>
           ))}
         </div>
@@ -5819,7 +6260,7 @@ export const BbAutoConstructor: React.FC = () => {
             }
             setBbAnnualMacrocycle(source as BBMacrocycle);
             setPlanMode('generic_split');
-            setBbWeeks(Math.max(4, Math.min(24, Math.round(Number(source.totalWeeks) || 8))));
+            setBbWeeks(source.totalWeeks);
             setBbTrainingFocus(source.trainingFocus);
             setStep('params');
             }} onApplyCycle={() => {

@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from "react";
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
@@ -13,7 +13,7 @@ import { updateSection } from "../../../../core/profile-manager";
 import { getWeightLog, saveWeightLog } from "../../../../engines/profile-store";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
-import { computePlannerTargets, computeDieteticCarbTarget, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
+import { computePlannerTargets, computeDieteticCarbTarget } from "./planner-targets";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
@@ -113,8 +113,6 @@ export interface PlanCtx {
   effectiveP: number;
   effectiveF: number;
   effectiveC: number;
-  carbCapClipped: boolean;
-  carbCapGPerKg: number;
   kbjuMode: string; setKbjuMode: (v: any) => void;
   switchKbjuMode: (mode: any) => void;
   manualKcal: number | null; setManualKcal: (v: any) => void;
@@ -138,6 +136,7 @@ export interface PlanCtx {
   healthIssues: string[]; setHealthIssues: (v: any) => void;
   eveningLowCarb: boolean; setEveningLowCarb: (v: boolean) => void;
   addMilkToBreakfast: boolean; setAddMilkToBreakfast: (v: boolean) => void;
+  coconutOilBoost: boolean; setCoconutOilBoost: (v: boolean) => void;
   breakfastStyle: BreakfastStyle; setBreakfastStyle: (v: BreakfastStyle) => void;
   breakfastTemplate: BreakfastTemplateId; setBreakfastTemplate: (v: BreakfastTemplateId) => void;
   planType: PlanType; setPlanType: (v: PlanType) => void;
@@ -517,33 +516,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     () => (annualPlan ? annualPlanPhaseForDate(annualPlan, isoToday()) : null),
     [annualPlan],
   );
-  // Combat/Strength → питание: проводка payload (как BB prep) — combatToNutritionPayload/combatToCardioPayload, strength payload
-  const [combatNutritionPayload, setCombatNutritionPayload] = useState<any>(() => {
-    try { const v = localStorage.getItem('he_combat_nutrition_payload'); return v ? JSON.parse(v) : null; } catch { return null; }
-  });
-  const [strengthNutritionPayload, setStrengthNutritionPayload] = useState<any>(() => {
-    try { const v = localStorage.getItem('he_strength_nutrition_payload'); return v ? JSON.parse(v) : null; } catch { return null; }
-  });
-  useEffect(() => {
-    const onCombat = (e: any) => {
-      try { const detail = (e as any).detail || {}; const payload = detail.nutrition || detail; if (payload && payload.proteinG) { setCombatNutritionPayload(payload); try { localStorage.setItem('he_combat_nutrition_payload', JSON.stringify(payload)); } catch {} } } catch {}
-    };
-    const onStrength = (e: any) => {
-      try { const detail = (e as any).detail || {}; const payload = detail.nutrition || detail; if (payload && payload.proteinG) { setStrengthNutritionPayload(payload); try { localStorage.setItem('he_strength_nutrition_payload', JSON.stringify(payload)); } catch {} } } catch {}
-    };
-    window.addEventListener('he-combat-updated', onCombat as any);
-    window.addEventListener('he-strength-updated', onStrength as any);
-    const onStorage = (ev: StorageEvent) => {
-      if (ev.key === 'he_combat_nutrition_payload') try { setCombatNutritionPayload(ev.newValue ? JSON.parse(ev.newValue) : null); } catch {}
-      if (ev.key === 'he_strength_nutrition_payload') try { setStrengthNutritionPayload(ev.newValue ? JSON.parse(ev.newValue) : null); } catch {}
-    };
-    window.addEventListener('storage', onStorage);
-    return () => {
-      window.removeEventListener('he-combat-updated', onCombat as any);
-      window.removeEventListener('he-strength-updated', onStrength as any);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, []);
   const applyBBPeakToPlan = (cfg: BBContestPrepConfig | null) => {
     if (!cfg) {
       try { clearContestPrepEverywhere(); } catch {}
@@ -820,84 +792,35 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // P0-fix Aug 23 2026: manualP/F НЕ умножаются повторно на _nutrMult — switchKbjuMode уже
   // скопировал эффективные (умноженные) значения в manualP/F. При kbjuMode==='manual' берём как есть.
   const _baseP = kbjuMode === 'manual' && manualP !== null ? manualP : (kbjuMode === 'profile' ? profileTargets.protein : calcTargets.protein);
-  let effectiveP = kbjuMode === 'manual' ? _baseP : Math.round(_baseP * _nutrMult);
+  const effectiveP = kbjuMode === 'manual' ? _baseP : Math.round(_baseP * _nutrMult);
   // D-28+ fix (КБЖУ-соответствие, Aug 22 2026): ЖИРЫ НЕ ниже физиологического пола 0.8 г/кг —
   // движок (FAT_FLOOR_PER_KG) никогда не спускается ниже, а раньше цель в карточке (60 г для
   // 120 кг = 0.5 г/кг) была ниже пола → «разбег» жиров до 60%+. Поднимаем отображаемую цель до пола.
   const _baseF = kbjuMode === 'manual' && manualF !== null ? manualF : (kbjuMode === 'profile' ? profileTargets.fats : calcTargets.fats);
-  let effectiveF = kbjuMode === 'manual' ? Math.max(Math.round(weight * 0.8), _baseF) : Math.max(Math.round(weight * 0.8), Math.round(_baseF * _nutrMult));
+  const effectiveF = kbjuMode === 'manual' ? Math.max(Math.round(weight * 0.8), _baseF) : Math.max(Math.round(weight * 0.8), Math.round(_baseF * _nutrMult));
   // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом и ограничены
   // ДИЕТОЛОГИЧЕСКИМ потолком (computeDieteticCarbTarget). Цель углеводов — г/кг (межсезонье
   // 4-6 г/кг), а не абстрактный ×множитель (жалоба «120 кг на курсе → 900/814 г углеводов»).
   // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, до 8 г/кг). Применяется ко ВСЕМ
   // уровням (не только enhanced/max) — иначе на base/medium дисплей по-прежнему показывал бы 800+.
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
-  // Aug 28 2026 (жалоба «110 кг атлет — цель срезана»): потолок углей КОНТЕКСТНЫЙ —
-  // bulk с тренировочным объёмом ≥400 мин/нед получает 7-8 г/кг вместо плоских 5
-  // (см. contextualCarbCapGPerKg). Cut — 5 г/кг как раньше. Ручной режим — без капа.
-  const _wpwCtx = Math.max(0, trainingDays.filter(Boolean).length || 0);
-  const _avgMinCtx = (() => {
-    try {
-      const v = (s as any)?.training?.minutesPerSession || (s as any)?.avgWorkoutMinutes;
-      return typeof v === 'number' && v > 0 ? v : 60;
-    } catch { return 60; }
-  })();
-  const _weeklyTrainMin = _wpwCtx * _avgMinCtx;
-  const _carbCapGPerKg = contextualCarbCapGPerKg(plannerGoalCategory(goal), _weeklyTrainMin);
-  const _rawCPre = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-  let effectiveC = (() => {
+  const effectiveC = (() => {
     if (kbjuMode === 'manual' && manualC !== null) return manualC;
     if (kbjuMode === 'manual' && manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
       return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
     }
     const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits, goalPhase: plannerGoalCategory(goal), trainingVolumeMinPerWeek: _weeklyTrainMin });
+    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits });
   })();
-  // UI-чип: потолок срезал «сырую» цель углеводов (rawC > капа) — пользователь должен
-  // видеть, почему ккал-цель ниже TDEE+профицит, и путь снять ограничение (ручной режим).
-  const carbCapClipped = kbjuMode !== 'manual' && _rawCPre > effectiveC + 5;
   // Kcal согласуем с фактическими макросами (Atwater) ВСЕГДА (для auto): display == генерация,
   // чтобы не было «разбега» между целью углеводов и собранным планом. Усиление уровня (nutrMult)
   // поднимает Б/Ж, а углеводы — в пределах диетологического потолка; kcal = сумма макросов.
-  let effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
+  const effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
     ? manualKcal
     : Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
-  // Проводка combat/strength → питание (как намечалось): combatToNutritionPayload/combatToCardioPayload, strength payload
-  // При активном payload (единоборства в весогонке или стронг в дефиците) подменяем P/C, kcal пересчитываем, не трогаем manual
-  if (kbjuMode !== 'manual') {
-    if (combatNutritionPayload?.proteinG && combatNutritionPayload?.carbsG) {
-      effectiveP = combatNutritionPayload.proteinG;
-      effectiveC = combatNutritionPayload.carbsG;
-      effectiveKcal = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
-    } else if (strengthNutritionPayload?.proteinG && strengthNutritionPayload?.carbsG) {
-      effectiveP = strengthNutritionPayload.proteinG;
-      effectiveC = strengthNutritionPayload.carbsG;
-      effectiveKcal = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
-    }
-  }
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
-  const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
-  // План-тип — РЕАЛЬНЫЕ макросы (раньше planType был только фильтром пулов: «кето»
-  // не была кето по КБЖУ — жалоба «кнопка не работает»). Кето: углеводы ≤6% ккал,
-  // жиры = остаток (пол 0.8 г/кг сохраняется). High-carb: угли до контекстного потолка
-  // +1 ступень, жиры = остаток. Manual не трогаем; Mediterranean/vegetarian — только пулы.
-  if (kbjuMode !== 'manual') {
-    const _kcalPre = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
-    if (planType === 'keto') {
-      const _ketoC = Math.max(20, Math.min(effectiveC, Math.round(_kcalPre * 0.06 / 4)));
-      const _ketoF = Math.max(Math.round(weight * 0.8), Math.round((_kcalPre - effectiveP * 4 - _ketoC * 4) / 9));
-      effectiveF = _ketoF; effectiveC = _ketoC;
-    } else if (planType === 'highcarb') {
-      const _hcC = computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: Math.round(weight * (_carbCapGPerKg + 1)), insulinTotalUnits: _insulinUnits, carbGPerKg: Math.min(8, _carbCapGPerKg + 1), maxCarbGPerKg: 10, minCarbG: 50 });
-      if (_hcC > effectiveC) {
-        effectiveC = _hcC;
-        effectiveF = Math.max(Math.round(weight * 0.8), Math.round((_kcalPre - effectiveP * 4 - effectiveC * 4) / 9));
-      }
-    }
-    effectiveKcal = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
-  }
   const resultsRef = useRef<HTMLDivElement>(null);
   const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? _pf.budget : 'medium');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
@@ -972,7 +895,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try { return localStorage.getItem('he_add_milk_breakfast') === 'true'; } catch {}
     return false;
   });
-  // Роунд-2: coconutOilBoost удалён (дублирующий тумблер — масла входят пулом жиров)
+  const [coconutOilBoost, setCoconutOilBoost] = useState<boolean>(() => {
+    try { return localStorage.getItem('he_coconut_oil_boost') === 'true'; } catch {}
+    return false;
+  });
   // N1: профиль вкуса завтрака (основа: каша/хлопья/яйца/творог).
   const [breakfastStyle, setBreakfastStyle] = useState<BreakfastStyle>(() => {
     try {
@@ -990,6 +916,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     return 'auto';
   });
 
+  const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
   // FIX persist-settings: пишем все локальные предпочтения в he_planner_prefs (debounce не нужен —
   // пишем на каждое изменение, объём крошечный). Раньше эти настройки не сохранялись вообще.
   useEffect(() => {
@@ -1041,25 +968,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { updateSection('nutrition', { preferredByMeal }); } catch {} }, [preferredByMeal]);
   // D-28+: advanced preference states
   const [specificity, setSpecificity] = useState<Specificity>(() => {
-    // Aug 28: легаси-значения 'generic'/'specific' (не из типа 'everyday'|'varied'|'gourmet')
-    // делали настройку no-op — теперь маппим на канон: generic→varied, specific→gourmet.
     try {
       const v = (s as any)?.nutrition?.specificity;
-      if (v === 'generic' || v === 'specific') return v === 'generic' ? 'varied' : 'gourmet';
-      if (v === 'everyday' || v === 'varied' || v === 'gourmet') return v;
+      if (v === 'generic' || v === 'specific') return v;
     } catch {}
     try {
       const v = localStorage.getItem('he_specificity');
-      if (v === 'generic' || v === 'specific') return v === 'generic' ? 'varied' : 'gourmet';
-      if (v === 'everyday' || v === 'varied' || v === 'gourmet') return v;
+      if (v === 'generic' || v === 'specific') return v;
     } catch {}
     return 'varied';
   });
   useEffect(() => {
     try {
-      // UnifiedSettings.specificity типизирован legacy 'generic'|'specific' — канонические
-      // значения пишутся as any (функционально состояние уже канонизировано выше).
-      updateSection('nutrition', { specificity: specificity as any });
+      // Маппинг Specificity → UnifiedSettings.specificity: 'everyday' → 'generic', остальное → 'specific'
+      const mapped = specificity === 'everyday' ? 'generic' : 'specific';
+      updateSection('nutrition', { specificity: mapped as any });
     } catch {}
   }, [specificity]);
   const [intolerances, setIntolerances] = useState<Intolerances>(() => {
@@ -2566,7 +2489,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _peakTargets = bbPrepPlan && _inPrepWindow
           ? nutritionTargetsForPrepDate(_prepDate, bbPrepPlan, {
               kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
-              proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
+              proteinG: Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
               fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
               carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
               waterMl: 3000,
@@ -2575,7 +2498,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           : bbPrepConfig
             ? computePeakWeekNutritionTargets(_prepDate, {
                 kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
-                proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
+                proteinG: Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
                 fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
                 carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
                 waterMl: 3000,
@@ -2594,7 +2517,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           // D-22: nutrMult folded into effective* above. Адаптация по дневнику: компенсация
           // вчерашнего отклонения применяется только к «сегодня» (offset === dayIdx).
           goalKcal: _applyPrepTargets ? _peakTargets.kcal : Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
-          goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
+          goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
           goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
           mealsCount: _effMealsCount, isTrainingDay: plannerModeRef.current === 'pro' ? isTrainDay(offset) : false,
@@ -2603,11 +2526,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
-          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); lockedFoodIds.forEach((id: string) => s.add(id)); return s; })(),
+          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
-          // Aug 28: histamineSensitive теперь ЕДИНЫЙ источник с intolerances.lowHistamine —
-          // раньше кнопка «Чувствителен к гистамину» влияла только на отчёты, не на генерацию.
-          specificity, intolerances: { ...(intolerances || {}), lowHistamine: !!(intolerances && (intolerances as any).lowHistamine) || !!histamineSensitive }, tasteProfile,
+          specificity, intolerances, tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
           deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
@@ -2623,6 +2544,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           planTypeMod: (() => { const pt = PLAN_TYPES.find(p => p.id === (dietPrefs.includes('vegetarian') ? 'vegetarian' : planType)); return { pMult: pt?.pMult || 1.0, fMult: pt?.fMult || 1.0, cMult: pt?.cMult || 1.0 }; })(),
           eveningLowCarb,
           addMilkToBreakfast,
+          coconutOilBoost,
           breakfastStyle,
           breakfastTemplate,
           labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
@@ -2647,8 +2569,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
-        // Роунд-2 v5: hungerLevel удалён из генерации — шумовый сигнал, сыть контролируется
-        // белком/объёмом/клетчаткой структурно (жалобы «кнопка не влияет» устранены удалением).
+        // #2 Голод: высокий → белок/клетчатка/объхм; хронический → refeed.
+        const _hungerNote: string | undefined = hungerLevel >= 8 ? '🔥 Высокий голод: +белок (сытость), добавлены объхмные овощи/клетчатка. Если хронически — refeed/повышение калорий.' : hungerLevel >= 6 ? '🔥 Повышенный голод: акцент на объхмную плотность.' : undefined;
         const _redSNote: string | undefined = _ea.note || undefined;
         const rawV2 = buildDayPlanV2(input);
         // D-28 П3: заметки спец-приёмов по дате (рефид/читмил/фастинг) — в proNotes плана.
@@ -2783,6 +2705,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           lifeStageNote: _lifeStageNote,
           redSNote: _redSNote,
           energyAvailability: _ea,
+          hungerNote: _hungerNote,
           healthScore: plannerModeRef.current === 'pro' ? { score: _healthScore, status: _healthStatus, micro: _microAvg, fiber: _fiberScore, mps: _mpsScore, ea: _eaScore, diversity: _divScore, conflicts: _conflicts } : null,
         };
       };
@@ -2817,63 +2740,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (days >= 7 && weekDays.length > 0) { allDayPlans = weekDays; }
       else if (days >= 3 && d2 && d3) { allDayPlans = [d1, d2, d3]; }
       else { allDayPlans = [d1]; }
-      // Финальный строгий кламп ≤3% — V2 (исправляет +30% жиров в про)
-      for (const day of allDayPlans) {
-        let guard3 = 25;
-        while (guard3-- > 0) {
-          const g = {kcal: effectiveKcal||0, p: effectiveP||0, f: effectiveF||0, c: effectiveC||0};
-          if (!g.kcal || !g.p) break;
-          const devK = Math.abs(day.totals.kcal - g.kcal)/g.kcal;
-          const devP = Math.abs(day.totals.p - g.p)/g.p;
-          const devF = Math.abs(day.totals.f - g.f)/g.f;
-          const devC = Math.abs(day.totals.c - g.c)/g.c;
-          if (Math.max(devK,devP,devF,devC) <= 0.0301) break;
-          const devs:any={k:devK,p:devP,f:devF,c:devC};
-          let worst:'k'|'p'|'f'|'c'='k'; if(devs.p>devs[worst]) worst='p'; if(devs.f>devs[worst]) worst='f'; if(devs.c>devs[worst]) worst='c';
-          let effWorst:'p'|'f'|'c'= worst==='k' ? (devs.p>=devs.c && devs.p>=devs.f ? 'p' : devs.c>=devs.f ? 'c':'f') : worst as any;
-          const target = effWorst==='p'?g.p:effWorst==='f'?g.f:g.c;
-          const cur = effWorst==='p'?day.totals.p:effWorst==='f'?day.totals.f:day.totals.c;
-          const need = target - cur;
-          if (Math.abs(need) < 0.5) break;
-          if (need < 0) {
-            let bMi=-1,bIi=-1,bScore=-1;
-            day.meals.forEach((m:any,mi:number)=> (m.items||[]).forEach((it:any,ii:number)=>{
-              const f:any=FOOD_DB.find((x:any)=>x.id===it.id);
-              const per100=effWorst==='p'?(f?.protein||0):effWorst==='c'?(f?.carbs||0):(f?.fat||0);
-              if(per100<=0) return;
-              const score=per100*(it.amount||0)/100;
-              if(score>bScore){bScore=score;bMi=mi;bIi=ii;}
-            }));
-            if(bIi<0) break;
-            const it=day.meals[bMi].items[bIi];
-            const na=Math.max(10,Math.round(it.amount*0.88));
-            if(na>=it.amount) break;
-            const r2=na/(it.amount||1);
-            it.p=+(it.p*r2).toFixed(1); it.f=+(it.f*r2).toFixed(1); it.c=+(it.c*r2).toFixed(1);
-            it.kcal=Math.round(4*it.p+9*it.f+4*it.c); it.amount=na;
-            day.meals[bMi].totals=day.meals[bMi].items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
-          } else {
-            const pool=FOOD_DB.filter((f:any)=>{
-              const v=effWorst==='p'?(f.protein||0):effWorst==='c'?(f.carbs||0):(f.fat||0);
-              return v>8;
-            }).sort((a:any,b:any)=>{
-              const av=effWorst==='p'?(a.protein||0)/(a.kcal||1):effWorst==='c'?(a.carbs||0)/(a.kcal||1):(a.fat||0)/(a.kcal||1);
-              const bv=effWorst==='p'?(b.protein||0)/(b.kcal||1):effWorst==='c'?(b.carbs||0)/(b.kcal||1):(b.fat||0)/(b.kcal||1);
-              return bv-av;
-            });
-            const best=pool[0]; if(!best) break;
-            const per100=effWorst==='p'?(best.protein||0):effWorst==='c'?(best.carbs||0):(best.fat||0);
-            const grams=Math.min(120,Math.max(15,Math.round(need/per100*100/10)*10));
-            const r=grams/100; const p2=Math.round((best.protein||0)*r),f2=Math.round((best.fat||0)*r),c2=Math.round((best.carbs||0)*r);
-            const it:any={id:best.id,name:best.name,amount:grams,kcal:Math.round(4*p2+9*f2+4*c2),p:p2,f:f2,c:c2,fiber:Math.round((best.fiber||0)*r)};
-            let tm=day.meals.find((m:any)=> m.label==='Перекус'||m.label==='Полдник')||day.meals[day.meals.length-1];
-            tm.items.push(it); tm.totals=tm.items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
-          }
-          day.totals=day.meals.reduce((a:any,m:any)=>({kcal:a.kcal+m.totals.kcal,p:a.p+m.totals.p,f:a.f+m.totals.f,c:a.c+m.totals.c}),{kcal:0,p:0,f:0,c:0});
-          day.totals.kcal=Math.round(day.totals.p*4+day.totals.f*9+day.totals.c*4);
-          day.meals.forEach((m:any)=>{m.totals.kcal=Math.round(m.totals.p*4+m.totals.f*9+m.totals.c*4);});
-        }
-      }
       const shoppingArr = buildShoppingFromPlans(allDayPlans);
       setShoppingList(shoppingArr);
       // Water
@@ -2896,13 +2762,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
        try { setPlanBusy(false); } catch {}
        return; // Bug-2 fix: Pro успешно — НЕ проваливаемся в классический путь (иначе classic перетирал Pro-план, и юзер всегда видел классический результат).
       } catch (v2Err: any) {
-        // Роунд-2 v5: classic-fallback УДАЛЁН из активного пути. V2 — единственный движок.
-        // При ошибке — честная ошибка с диагностированием (классический buildDay мёртвый код).
+        // Bug-2 fix: Pro упал — РЕАЛЬНЫЙ фоллбэк на классический движок (раньше был return = тупик без плана и ложное сообщение «переключитесь вручную»).
         const errMsg = (v2Err && (v2Err.message || String(v2Err))) || 'Unknown error';
-        try { console.warn('[IndividualPlan] V2 engine failed:', errMsg); } catch {}
-        try { setErrorMsg('Не удалось собрать рацион: ' + errMsg + '. Попробуйте уменьшить исключения или изменить настройки.'); } catch {}
+        try { console.warn('[IndividualPlan] V2 engine failed, falling back to classic:', errMsg, v2Err); } catch {}
+        try { setErrorMsg('Pro-движок не смог собрать план (возможно, слишком жёсткие исключения/фильтры). Собрано классическим движком — проверьте рацион.'); } catch {}
         try { setDayPlan(null); setThreeDayPlan(null); setWeekPlan(null); } catch {}
-        try { setPlanBusy(false); } catch {}
+        // НЕ return — проваливаемся в классический путь ниже
       }
     }
     // P2-fix: nutrMult удалён (dead code) — multiplier уже включён в effectiveKcal/P/F/C
@@ -3232,21 +3097,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (effectiveMealsCount >= 4) mealDefs.push({ label: 'Полдник' });
       mealDefs.push({ label: 'Ужин', anchor: Math.min(effectiveDinner, 1380) });
       if (effectiveMealsCount >= 6) mealDefs.push({ label: 'Перекус' });
-// Training-aware: ужин и другие приёмы не ставятся во время тренировки ±60 мин
-  if (linkToTraining && isTrainingDay && trainMin > 0) {
-    const trainEnd = trainMin + 90;
-    const buffer = 60;
-    for (const m of mealDefs) {
-      if (!m.anchor) continue;
-      if (m.anchor >= trainMin - buffer && m.anchor <= trainEnd + buffer) {
-        const before = trainMin - 90;
-        const after = trainEnd + 90;
-        (m as any).anchor = m.anchor < trainMin ? Math.max(effectiveWake + 15, before) : Math.min(effectiveBed - 15, after);
-      }
-    }
-  }
-  const anchored = mealDefs.map((m, i) => {
-  if (m.anchor) return { ...m, time: m.anchor, fixed: true };
+      const anchored = mealDefs.map((m, i) => {
+        if (m.anchor) return { ...m, time: m.anchor, fixed: true };
         let leftAnchorIdx = i; let leftTime = effectiveWake; while (leftAnchorIdx >= 0 && !mealDefs[leftAnchorIdx].anchor) leftAnchorIdx--; if (leftAnchorIdx >= 0) leftTime = mealDefs[leftAnchorIdx].anchor!;
         let rightAnchorIdx = i; let rightTime = effectiveBed - 30; while (rightAnchorIdx < mealDefs.length && !mealDefs[rightAnchorIdx].anchor) rightAnchorIdx++; if (rightAnchorIdx < mealDefs.length) rightTime = mealDefs[rightAnchorIdx].anchor!;
         const totalSlots = rightAnchorIdx - leftAnchorIdx; const thisSlot = i - leftAnchorIdx; let interp = totalSlots > 0 ? thisSlot / totalSlots : 0.5;
@@ -3847,76 +3699,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         } catch (e) { try { console.warn('[Planner] classic recipes attach failed:', e); } catch {} }
       }
     }
-    // Финальный строгий кламп ≤3% по каждому параметру и общему КБЖУ — для всех режимов
-    // (исправляет +57% в быстром и +30% жиров в про). Работает поверх V2 и classic.
-    const clampDayStrict = (day: any): any => {
-      if (!day?.meals?.length) return day;
-      const goals = { kcal: effectiveKcal||0, p: effectiveP||0, f: effectiveF||0, c: effectiveC||0 };
-      if (!goals.kcal || !goals.p) return day;
-      const maxDev = () => Math.max(
-        goals.kcal ? Math.abs(day.totals.kcal - goals.kcal)/goals.kcal : 0,
-        goals.p ? Math.abs(day.totals.p - goals.p)/goals.p : 0,
-        goals.f ? Math.abs(day.totals.f - goals.f)/goals.f : 0,
-        goals.c ? Math.abs(day.totals.c - goals.c)/goals.c : 0
-      );
-      let guard = 40;
-      while (maxDev() > 0.0301 && guard-- > 0) {
-        const totals: any = day.totals;
-        const devK = goals.kcal ? (totals.kcal - goals.kcal)/goals.kcal : 0;
-        const devP = goals.p ? (totals.p - goals.p)/goals.p : 0;
-        const devF = goals.f ? (totals.f - goals.f)/goals.f : 0;
-        const devC = goals.c ? (totals.c - goals.c)/goals.c : 0;
-        const abs: any = {k: Math.abs(devK), p: Math.abs(devP), f: Math.abs(devF), c: Math.abs(devC)};
-        let worst: 'k'|'p'|'f'|'c' = 'k'; if (abs.p > abs[worst]) worst='p'; if (abs.f > abs[worst]) worst='f'; if (abs.c > abs[worst]) worst='c';
-        let effWorst: 'p'|'f'|'c' = worst==='k' ? (abs.p>=abs.c && abs.p>=abs.f ? 'p' : abs.c>=abs.f ? 'c' : 'f') : worst as any;
-        const target = effWorst==='p'?goals.p:effWorst==='f'?goals.f:goals.c;
-        const cur = effWorst==='p'?totals.p:effWorst==='f'?totals.f:totals.c;
-        const need = target - cur;
-        if (Math.abs(need) < 0.5) break;
-        if (need < 0) {
-          let bMi=-1,bIi=-1,bScore=-1;
-          day.meals.forEach((m:any,mi:number)=> (m.items||[]).forEach((it:any,ii:number)=>{
-            const f:any = FOOD_DB.find((x:any)=>x.id===it.id);
-            const per100 = effWorst==='p' ? (f?.protein||0) : effWorst==='c' ? (f?.carbs||0) : (f?.fat||0);
-            if (per100<=0) return;
-            const score = per100 * (it.amount||0)/100;
-            if (score > bScore) {bScore=score; bMi=mi; bIi=ii;}
-          }));
-          if (bIi<0) break;
-          const it = day.meals[bMi].items[bIi];
-          const na = Math.max(10, Math.round(it.amount * 0.88));
-          if (na >= it.amount) break;
-          const r2 = na/(it.amount||1);
-          it.p = +(it.p*r2).toFixed(1); it.f = +(it.f*r2).toFixed(1); it.c = +(it.c*r2).toFixed(1);
-          it.kcal = Math.round(4*it.p + 9*it.f + 4*it.c); it.amount = na;
-          day.meals[bMi].totals = day.meals[bMi].items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
-        } else {
-          const pool = FOOD_DB.filter((f:any)=>{
-            if (f.category==='supplement' && !['whey_isolate','whey_protein','casein'].includes(f.id)) return false;
-            const v = effWorst==='p' ? (f.protein||0) : effWorst==='c' ? (f.carbs||0) : (f.fat||0);
-            return v>8;
-          }).sort((a:any,b:any)=>{
-            const av = effWorst==='p' ? (a.protein||0)/(a.kcal||1) : effWorst==='c' ? (a.carbs||0)/(a.kcal||1) : (a.fat||0)/(a.kcal||1);
-            const bv = effWorst==='p' ? (b.protein||0)/(b.kcal||1) : effWorst==='c' ? (b.carbs||0)/(b.kcal||1) : (b.fat||0)/(b.kcal||1);
-            return bv-av;
-          });
-          const best = pool[0]; if (!best) break;
-          const per100 = effWorst==='p' ? (best.protein||0) : effWorst==='c' ? (best.carbs||0) : (best.fat||0);
-          const grams = Math.min(120, Math.max(15, Math.round(need/per100*100/10)*10));
-          const r = grams/100; const p2=Math.round((best.protein||0)*r), f2=Math.round((best.fat||0)*r), c2=Math.round((best.carbs||0)*r);
-          const it:any = {id: best.id, name: best.name, amount: grams, kcal: Math.round(4*p2+9*f2+4*c2), p:p2, f:f2, c:c2, fiber: Math.round((best.fiber||0)*r)};
-          let tm = day.meals.find((m:any)=> m.label==='Перекус' || m.label==='Полдник') || day.meals[day.meals.length-1];
-          tm.items.push(it); tm.totals = tm.items.reduce((a:any,x:any)=>({kcal:a.kcal+x.kcal,p:a.p+x.p,f:a.f+x.f,c:a.c+x.c}),{kcal:0,p:0,f:0,c:0});
-        }
-        day.totals = day.meals.reduce((a:any,m:any)=>({kcal:a.kcal+m.totals.kcal,p:a.p+m.totals.p,f:a.f+m.totals.f,c:a.c+m.totals.c}),{kcal:0,p:0,f:0,c:0});
-        day.totals.kcal = Math.round(day.totals.p*4 + day.totals.f*9 + day.totals.c*4);
-        day.meals.forEach((m:any)=>{ m.totals.kcal = Math.round(m.totals.p*4 + m.totals.f*9 + m.totals.c*4); });
-      }
-      return day;
-    };
-    d1 = clampDayStrict(d1);
-    if (d2) d2 = clampDayStrict(d2);
-    if (d3) d3 = clampDayStrict(d3);
     setDayPlan(d1);
     if (days >= 3 && d2 && d3) setThreeDayPlan({ days: [d1, d2, d3], totals: { kcal: d1.totals.kcal + d2.totals.kcal + d3.totals.kcal, p: d1.totals.p + d2.totals.p + d3.totals.p, f: d1.totals.f + d2.totals.f + d3.totals.f, c: d1.totals.c + d2.totals.c + d3.totals.c } });
     let weekDays: any[] | null = null;
@@ -3950,8 +3732,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
      }
      try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations failed (classic):', e); } catch {} }
      const allDayPlans = days >= 7 ? weekDays! : days >= 3 ? [d1, d2, d3] : [d1];
-     // Финальный строгий кламп ≤3% — classic (неделя тоже)
-     for (const day of allDayPlans) { clampDayStrict(day); }
     // T4.5 — Weekly diversity score
     const allWeekFoodIds: string[] = [];
     allDayPlans.forEach((dp: any) => { (dp.meals || []).forEach((m: any) => { (m.items || []).forEach((it: any) => { allWeekFoodIds.push(it.id); }); }); });
@@ -4278,7 +4058,6 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern, isTrainDay,
     injectDrugTypes, calcTargets, profileTargets,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
-    carbCapClipped, carbCapGPerKg: _carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, nutrLevel, setNutrLevel,
@@ -4287,7 +4066,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
     morningTrainLoad, setMorningTrainLoad,
     eveningLowCarb, setEveningLowCarb, planType, setPlanType,
-    addMilkToBreakfast, setAddMilkToBreakfast, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
+    addMilkToBreakfast, setAddMilkToBreakfast, coconutOilBoost, setCoconutOilBoost, breakfastStyle, setBreakfastStyle, breakfastTemplate, setBreakfastTemplate,
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories, excludedFoods, setExcludedFoods,
     allergenExcludedCount, setAllergenExcludedCount, planTargets, setPlanTargets,
     cyclingMode, setCyclingMode, heavyTrainDay, setHeavyTrainDay,
@@ -4351,9 +4130,9 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, variety, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, coconutOilBoost, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase, combatNutritionPayload, strengthNutritionPayload } as any), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase, combatNutritionPayload, strengthNutritionPayload]);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase]);
   return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };

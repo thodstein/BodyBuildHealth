@@ -175,13 +175,6 @@ export function sessionLimitsFor(
     maxWorkingSets = Math.round(maxWorkingSets * (isMaxExp ? 1.3 : 1.2));
     maxExercises = Math.min(24, maxExercises + (isMaxExp ? 3 : 2));
   }
-  const isPPL = String(split?.id || (input as any).patternId || '').toLowerCase().includes('ppl');
-  if (isPPL && level !== 'enhanced') {
-    // PPL Push/Pull/Legs each 1-2×/нед: Pull can be 42 sets (back14+biceps10+rear5+traps5+forearms4+extra)
-    // Keep 45/12 to accommodate intermediate natural with full volume (PPL 3× needs higher per-session)
-    maxWorkingSets = Math.max(maxWorkingSets, 45);
-    maxExercises = Math.max(maxExercises, 12);
-  }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };
 }
 
@@ -261,8 +254,8 @@ export function buildBBVolumeTarget(input: {
   const goal = input.volumeGoal || 'mav';
   const base = goal === 'mev' ? input.landmarks.mev : goal === 'mrv' ? input.landmarks.mrv : input.landmarks.mav;
   const emphasis = (input.weakPoint ? 1.2 : 1) * (input.focus ? 1.3 : 1);
-  const recovery = Math.max(0.6, Math.min(1.5, input.recoveryMultiplier ?? 1));
-  const phase = Math.max(0.4, Math.min(1.5, input.phaseMultiplier ?? 1));
+  const recovery = Math.max(0.6, Math.min(1.1, input.recoveryMultiplier ?? 1));
+  const phase = Math.max(0.4, Math.min(1.1, input.phaseMultiplier ?? 1));
   const targetSets = Math.max(
     input.landmarks.mev,
     Math.min(input.landmarks.mrv * recovery, Math.round((input.rotationSets ?? base) * emphasis * phase)),
@@ -301,7 +294,7 @@ function hasAny(name: string, patterns: RegExp): boolean {
 export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Array<{ muscle: string; coefficient: number }> {
   const name = String(exercise.name || '').toLowerCase();
   const type = String(exercise.type || exercise.exerciseType || '').toLowerCase();
-  const isIsolation = type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|разв(од|ед)|шраг|pushdown|crunch|скручив|подъ?ем/i.test(name);
+  const isIsolation = type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|crunch|скручив/i.test(name);
   if (isIsolation) return [];
 
   // Жимы рук/груди (НЕ «жим ногами» — это квадрицепс-движение и даёт
@@ -340,14 +333,12 @@ export function indirectMuscleContributions(exercise: BBExerciseVolumeLike): Arr
     return [
       { muscle: 'biceps', coefficient: 0.4 },
       { muscle: 'shoulders', coefficient: 0.2 },
-      { muscle: 'traps', coefficient: 0.20 },
     ];
   }
   if (hasAny(name, /row|тяга.*наклон|тяга.*гриф|тяга.*гантел|горизонтальн.*тяга/i)) {
     return [
       { muscle: 'biceps', coefficient: 0.4 },
-      { muscle: 'shoulders', coefficient: 0.20 },
-      { muscle: 'traps', coefficient: 0.30 },
+      { muscle: 'shoulders', coefficient: 0.2 },
     ];
   }
   if (hasAny(name, /присед|squat|leg.?press|жим.*ног|выпад|lunge/i)) {
