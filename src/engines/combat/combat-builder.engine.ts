@@ -259,7 +259,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   const acwrMult = (input as any).acwr?.zone === 'dangerous' ? 0.60 : (input as any).acwr?.zone === 'caution' ? 0.85 : (input as any).acwr?.zone === 'undertrained' ? 1.1 : 1;
   const weeklyBudget = (() => {
-    const ped = adaptForPEDsCombat(input.peds, input.pedDoses as any, input.courseIntensity);
+    const ped = adaptForPEDsCombat(input.peds, input.pedDoses as any, input.courseIntensity, discipline as any);
     const base = Math.round(112 * ped.mrvMult);
     const lab = input.labMrvMultiplier ?? 1;
     return Math.round(base * lab * outsideMult * recoveryMult * nutritionMult * acwrMult);
@@ -402,13 +402,17 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     conditioningPlan = { weeks, sessions: sessionsPerWeek };
   }
 
+  const dupRationale: string[] = [];
   if (input.dupMode && input.dupMode !== 'off') {
-    const tmp:any = { weeksData, rationale: [] };
+    const tmp:any = { weeksData, rationale: dupRationale };
     applyCombatDUP(tmp as any, input.dupMode as any);
+    rationale.push(...dupRationale);
   }
+  const intRationale: string[] = [];
   if (input.intensityTech && input.intensityTech !== 'none') {
-    const tmp:any = { weeksData, rationale: [] };
+    const tmp:any = { weeksData, rationale: intRationale };
     applyCombatIntensity(tmp as any, input.intensityTech as any);
+    rationale.push(...intRationale);
   }
 
   const warnings: string[] = [];

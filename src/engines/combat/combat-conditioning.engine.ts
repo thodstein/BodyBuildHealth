@@ -35,7 +35,8 @@ const MODALITY_BY_GOAL: Record<string, ConditioningModality[]> = {
 export function modalityForWeek(goal: string, phase: ConditioningPhase): ConditioningModality[] {
   const base = MODALITY_BY_GOAL[goal] || MODALITY_BY_GOAL.general;
   if (phase === 'deload' || phase === 'taper' || phase === 'realization') return base.includes('aerobic') ? ['aerobic'] : base.slice(0, 1);
-  if (phase === 'accumulation' || phase === 'gpp') return base.includes('aerobic') ? ['aerobic'] : ['alactic'];
+  // accumulation (ATR) и gpp — база: оставляем полную базу (alactic+aerobic для power), чтобы Off-season имел обе системы
+  if (phase === 'accumulation' || phase === 'gpp') return base;
   if (phase === 'transmutation' || phase === 'power') return base;
   if (phase === 'conjugate') return ['alactic', 'aerobic'];
   return base;

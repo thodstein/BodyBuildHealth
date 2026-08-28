@@ -28,8 +28,8 @@ export interface CombatInput {
   weightCutProtocol?: import('./combat-weight-cut.engine').WeightCutProtocol | null;
   // Внешняя нагрузка
   outsideLoad?: import('../outside-load.engine').OutsideLoad | null;
-  dupMode?: 'off' | 'power_endurance';
-  intensityTech?: 'none' | 'rest_pause';
+  dupMode?: 'off' | 'power_endurance' | 'heavy_light' | 'conjugate';
+  intensityTech?: 'none' | 'rest_pause' | 'myo_reps' | 'cluster' | 'contrast';
   // Методика и периодизация
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
   periodizationModel?: 'atr_10' | 'linear_12' | 'conjugate';
