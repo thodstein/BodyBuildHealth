@@ -6,6 +6,7 @@
 import { computeOutsideMetrics, outsideVolumeMultiplier, isDayConflictWithOutside, type OutsideLoad } from '../outside-load.engine';
 import { getCombatPattern, recommendCombatPattern, type CombatPattern } from './combat-split-patterns';
 import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progression';
+import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB } from './combat-selection';
 import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
@@ -261,17 +262,28 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     return Math.round(base * lab * outsideMult * recoveryMult * nutritionMult * acwrMult);
   })();
 
+  const periodModelEarly: any = (input as any).periodizationModel || (goal === 'camp' ? 'camp_8' : weeks >= 9 ? 'atr_10' : 'linear');
   const rationale: string[] = [];
-  rationale.push(`Дисциплина: ${discipline} · цель ${goal} · ${weeks} нед · ${pattern.name}`);
+  rationale.push(`Дисциплина: ${discipline} · цель ${goal} · ${weeks} нед · ${pattern.name} · модель ${periodModelEarly}`);
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${outsideMetrics.interference}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''} · Budget ${weeklyBudget}`);
   if (input.weightCutKg && input.weightCutKg > 0) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
   if ((input as any).weightCutProtocol) rationale.push(`Протокол весогонки: ${(input as any).weightCutProtocol.targetLossKg}кг за ${(input as any).weightCutProtocol.weeksOut}нед`);
 
   const weeksData: CombatWeek[] = [];
+  // periodization model: atr_10 для >=9 нед, иначе linear; camp → camp_8; conjugate явный
+  const periodModel: any = (input as any).periodizationModel || (goal === 'camp' ? 'camp_8' : weeks >= 9 ? 'atr_10' : 'linear');
   for (let w = 1; w <= weeks; w++) {
-    const phase = phaseForCombatWeek(w, weeks, goal);
-    const deload = phase === 'deload' || phase === 'taper';
+    // ATR/linear/conjugate — единый источник
+    let phase: string = phaseForCombatWeekATR(w, weeks, goal, periodModel);
+    // legacy fallback: если model linear и старая функция даёт другой taper — сохраняем ATR как канон (backward compat: маппим realization→taper для старой UI)
+    const deload = phase === 'deload';
+    const taper = phase === 'taper' || phase === 'realization';
+    // нормализуем phase для отображения: realization → taper (совместимость), accumulation→gpp etc при linear? оставляем как есть для ATR, для linear маппим
+    if (periodModel === 'linear' || periodModel === 'camp_8') {
+      // linear использует gpp/power/taper/deload — уже верные
+    } else if (periodModel === 'atr_10' && phase === 'accumulation') phase = 'accumulation';
+    // conjugate оставляет 'conjugate'
     const sessions: CombatSession[] = [];
     for (let d = 0; d < 7; d++) {
       const slot = pattern.schedule[d];
@@ -299,9 +311,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const id = chosen[idx];
         const meta = getExerciseMeta(id) || { name: id, group: 'core', pattern: 'unknown' };
         const isPrimary = idx < primaryCount;
-        let reps = repsForCombat(goal, effectiveCharacter);
-        let rir = rirForCombat(goal, phase, effectiveCharacter);
-        let sets = effectiveCharacter === 'тяж' ? (isPrimary ? 4 : 3) : (deload ? 2 : 3);
+        // reps/rir через ATR-aware (совместимо с linear)
+        let reps: [number, number] = repsForCombatPhase(phase as any, effectiveCharacter as any, goal);
+        // fallback на старый если phase неизвестна (например 'gpp' vs 'accumulation')
+        if (!reps || (reps[0] as any)==null) reps = repsForCombat(goal, effectiveCharacter);
+        let rir = rirForCombatPhase(phase as any, effectiveCharacter as any, goal);
+        if (rir == null) rir = rirForCombat(goal, phase, effectiveCharacter);
+        let sets = effectiveCharacter === 'тяж' ? (isPrimary ? 4 : 3) : (deload || taper ? 2 : 3);
         const accentMap = accentForDiscipline(discipline as any);
         const accentKey = id.includes('neck') ? 'neck' : (id.includes('grip')||id.includes('pinch')||id.includes('wrist')) ? 'grip' : (id.includes('landmine')||id.includes('pallof')||id.includes('med_ball')||id.includes('rotation')) ? 'rotational' : tag.includes('lower')||tag.includes('full') ? 'legs' : 'push';
         const accMult = (accentMap as any)[accentKey] || 1;
@@ -311,6 +327,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         if (acwrMult < 1 && sets > 2) sets = Math.max(2, Math.round(sets * acwrMult));
         else if (acwrMult > 1 && sets < 6) sets = Math.min(6, sets + 1);
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
+        else if (taper) sets = Math.max(2, Math.round(sets * 0.62));
         const gentle = gentleFactorCB(id, input.injuries as any);
         let weight = weightForCombatExercise(id, input, goal);
         if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
@@ -346,7 +363,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     sessions.sort((a, b) => a.day - b.day);
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
     const totalTonnage = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
-    weeksData.push({ week: w, phase, deload, taper: deload && (phase === 'taper' || phase === 'realization'), sessions, totalSets, totalTonnage, outsideLoad: outsideMetrics?.weeklyLoad });
+    weeksData.push({ week: w, phase, deload, taper, sessions, totalSets, totalTonnage, outsideLoad: outsideMetrics?.weeklyLoad });
   }
 
   if (input.dupMode && input.dupMode !== 'off') {
