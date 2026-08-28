@@ -61,12 +61,48 @@ export function readJSONSafe<T>(key: string, fallback: T, validate: (v: any) => 
 
 /** Run once on app load. Wipes localStorage keys whose JSON shape no longer matches the
  *  expected schema. Prevents old-version corruption from breaking the planner. */
-export const PLANNER_SCHEMA_VERSION = 5;
+export const PLANNER_SCHEMA_VERSION = 6;
 export function migratePlannerStorage(): void {
   try {
     const vRaw = localStorage.getItem('he_planner_schema_version');
     const v = vRaw ? parseInt(vRaw, 10) : 0;
     if (v >= PLANNER_SCHEMA_VERSION) return;
+    // v6: nutrLevel→protein preset (same ids, new semantics), variety+strictness→varietyLevel, cycling+dietPause+wave→carbPeriodization, classic removed
+    if (v < 6) {
+      try {
+        const raw = localStorage.getItem('he_planner_prefs');
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p && typeof p === 'object' && !Array.isArray(p)) {
+            let migrated = false;
+            if (!p.varietyLevel) {
+              const ov = p.variety as string;
+              if (ov === 'minimal') p.varietyLevel = 'low';
+              else if (ov === 'medium') p.varietyLevel = 'medium';
+              else if (ov === 'max') p.varietyLevel = 'high';
+              else p.varietyLevel = 'high';
+              migrated = true;
+            }
+            if (!p.carbPeriodization) {
+              if (p.periodizationEnabled) p.carbPeriodization = 'wave';
+              else if (p.cyclingMode === 'macro') p.carbPeriodization = 'carb_cycle';
+              else if (p.cyclingMode === 'butch') p.carbPeriodization = 'butch';
+              else if (p.cyclingMode === 'cheatmeal') p.carbPeriodization = 'refeed';
+              else if (p.cyclingMode === 'carbload') p.carbPeriodization = 'carb_cycle';
+              else if (p.dietPauseMode === 'refeed') p.carbPeriodization = 'refeed';
+              else if (p.dietPauseMode === 'flex_80_20') p.carbPeriodization = 'flex_80_20';
+              else if (p.dietPauseMode === 'periodization_2_1') p.carbPeriodization = 'two_one';
+              else if (p.dietPauseMode === 'diet_5_2') p.carbPeriodization = 'five_two';
+              else p.carbPeriodization = 'none';
+              migrated = true;
+            }
+            if (migrated) {
+              try { localStorage.setItem('he_planner_prefs', JSON.stringify(p)); } catch {}
+            }
+          }
+        }
+      } catch {}
+    }
     // Schema changed at v4: defensively drop keys that should be arrays but might be objects.
     // v5: added he_manual_g_per_kg (object with protein/fat/carbs numbers)
     const objectKeys = [

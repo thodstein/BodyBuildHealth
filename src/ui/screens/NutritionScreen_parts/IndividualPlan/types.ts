@@ -50,6 +50,37 @@ export const NUTRITION_LEVELS: { id: NutritionLevel; label: string; icon: string
   { id: 'max', label: '+50%', icon: '🔴', mult: 1.5, desc: 'Максимум' },
 ];
 
+// v6: nutrLevel → пресет белка (1.6–2.6 г/кг). Те же id, новая семантика — только белок,
+// жиры фиксируются на физиологическом поле 0.8 г/кг, угли — остаток в диетпотолке.
+// NUTRITION_LEVELS оставлен как алиас-совместимость для старых импортов/тестов.
+export const PROTEIN_PRESETS: { id: NutritionLevel; label: string; icon: string; gPerKg: number; desc: string }[] = [
+  { id: 'base', label: 'База', icon: '🟢', gPerKg: 1.6, desc: '1.6 г/кг' },
+  { id: 'medium', label: 'Стандарт', icon: '🟡', gPerKg: 2.0, desc: '2.0 г/кг' },
+  { id: 'enhanced', label: 'Актив', icon: '🟠', gPerKg: 2.2, desc: '2.2 г/кг' },
+  { id: 'max', label: 'Макс', icon: '🔴', gPerKg: 2.6, desc: '2.6 г/кг' },
+];
+
+// ─── v6: Единая периодизация углеводов (cyclingMode+dietPause+periodizationEnabled → одно) ──
+export type CarbPeriodization = 'none' | 'refeed' | 'carb_cycle' | 'butch' | 'flex_80_20' | 'two_one' | 'five_two' | 'wave';
+export const CARB_PERIODIZATION_OPTIONS: { id: CarbPeriodization; label: string; icon: string; desc: string }[] = [
+  { id: 'none', label: 'Без периодизации', icon: '⏹️', desc: 'Ровные КБЖУ каждый день' },
+  { id: 'refeed', label: 'Рефид 1×/нед', icon: '🍝', desc: '1 день/нед углеводы ×2.2 (лептин/гликоген)' },
+  { id: 'carb_cycle', label: 'Угл. цикл', icon: '🔄', desc: 'Трен: +15% ккал/+30% угл, отдых: −15%/−30%' },
+  { id: 'butch', label: 'БУЧ', icon: '⤴️⤵️', desc: '3 дня ВУ (трен) + 1 день НУ (отдых)' },
+  { id: 'flex_80_20', label: '80/20', icon: '📊', desc: '80% цельные, 20% свободные (+5% ккал)' },
+  { id: 'two_one', label: '2+1', icon: '⏳', desc: '2 нед дефицит → 1 нед поддержание' },
+  { id: 'five_two', label: '5:2', icon: '📅', desc: '5 дней план → 2 дня лайт (80% ккал)' },
+  { id: 'wave', label: 'Волна 2+1', icon: '🌊', desc: 'Недельная волна: 2 нед работа + 1 нед поддержание' },
+];
+
+// ─── v6: Единое разнообразие (variety + varietyStrictness → один) ──
+export type VarietyLevel = 'low' | 'medium' | 'high';
+export const VARIETY_LEVELS: { id: VarietyLevel; label: string; icon: string; desc: string; color: string }[] = [
+  { id: 'low', label: 'Базовое', icon: '🎯', desc: '5 продуктов/кат, строго без повторов 1–2 дня', color: '#22c55e' },
+  { id: 'medium', label: 'Среднее', icon: '⚖️', desc: '10 продуктов/кат, мягкая ротация', color: '#f59e0b' },
+  { id: 'high', label: 'Максимум', icon: '🎪', desc: '20 продуктов/кат, строгое разнообразие', color: '#8b5cf6' },
+];
+
 export const PLAN_TYPES: { id: PlanType; label: string; icon: string; desc: string; pMult?: number; fMult?: number; cMult?: number }[] = [
   { id: 'classic', label: 'Классический', icon: '🥩', desc: 'Сбалансированное питание' },
   { id: 'keto', label: 'Кето', icon: '🥑', desc: 'Низкоуглеводный, высокожировой', cMult: 0.1, fMult: 2.5 },

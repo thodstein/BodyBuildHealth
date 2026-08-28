@@ -4,7 +4,7 @@ import { PHARMA_DB } from "../../../../core/pharma-database";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import {
-  GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PLAN_TYPES,
+  GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PROTEIN_PRESETS, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
   type CycleType,
 } from "./types";
@@ -84,8 +84,8 @@ export const IndividualPlanSettings: React.FC = () => {
     carbCapClipped, carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
-    budget, setBudget, nutrLevel, setNutrLevel,
-    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness,
+    budget, setBudget, nutrLevel, setNutrLevel, proteinPreset, setProteinPreset,
+    variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel,
     wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime,
     workFood, setWorkFood, mealsCount, setMealsCount,
@@ -98,7 +98,7 @@ export const IndividualPlanSettings: React.FC = () => {
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
     specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
     customNotes, setCustomNotes,
-    cyclingMode, setCyclingMode, trainingDays, setTrainingDays, DAY_LABELS,
+    cyclingMode, setCyclingMode, carbPeriodization, setCarbPeriodization, trainingDays, setTrainingDays, DAY_LABELS,
     heavyTrainDay, setHeavyTrainDay,
     workScheduleEnabled, setWorkScheduleEnabled,
     workStartTime, setWorkStartTime, workEndTime, setWorkEndTime,
@@ -686,33 +686,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         </GlassCard>
       )}
 
-      {plannerMode === 'pro' && (
-      <GlassCard title="Диетические паузы" icon="🔄" color="#a78bfa">
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 6 }}>
-          {[['none','⏹️ Нет','Без пауз'],['refeed','🍝 Рефид','1 день повыш. угл.'],['flex_80_20','📊 80/20','20% гибкость'],['periodization_2_1','⏳ 2+1','2 нед деф. + 1 нед'],['diet_5_2','📅 5/2','5 дней норм + 2 облегч.']].map(([id,label,desc]) => (
-            <button key={id} onClick={() => setDietPauseMode(id as any)} style={{
-              flex:1, minWidth:70, padding:'8px 6px', borderRadius:10, cursor:'pointer', textAlign:'center',
-              background: dietPauseMode === id ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.02)',
-              border: dietPauseMode === id ? '1.5px solid #a78bfa' : '1px solid rgba(255,255,255,0.05)',
-              color: dietPauseMode === id ? '#a78bfa' : 'rgba(255,255,255,0.7)',
-              transition:'all 0.12s', fontWeight: dietPauseMode === id ? 700 : 400, fontSize:9,
-            }}>
-              <div style={{ fontSize:12, marginBottom:2 }}>{label.slice(0,2)}</div>
-              <div style={{ fontWeight:600 }}>{label.slice(2)}</div>
-              <div style={{ fontSize:6, color:'rgba(255,255,255,0.8)', marginTop:2 }}>{desc}</div>
-            </button>
-          ))}
-        </div>
-        {dietPauseMode !== 'none' && (
-          <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', padding:'6px 8px', borderRadius:6, background:'rgba(167,139,250,0.04)', border:'1px solid rgba(167,139,250,0.08)', lineHeight:1.5 }}>
-            {dietPauseMode === 'refeed' && '🍝 Рефид: 1 день в неделю повысить углеводы до 4-5 г/кг. Снижает лептин, восстанавливает гликоген, ускоряет метаболизм. Рекомендуется после 2+ недель дефицита.'}
-            {dietPauseMode === 'flex_80_20' && '📊 80/20: 80% рациона — цельные продукты из плана, 20% — любые продукты по выбору. Снижает психологическое давление диеты, повышает приверженность.'}
-            {dietPauseMode === 'periodization_2_1' && '⏳ 2+1: 2 недели строгого дефицита → 1 неделя поддержания. Предотвращает метаболическую адаптацию и плато жиросжигания.'}
-            {dietPauseMode === 'diet_5_2' && '📅 5/2: 5 дней нормального питания по плану → 2 дня облегчённых (50% ккал, акцент на белок + овощи). Популярно для длительного жиросжигания.'}
-          </div>
-        )}
-      </GlassCard>
-      )}
+      {/* v6: Диетические паузы → объединены в «Периодизация углеводов» (см. карту Циклирование) */}
 
       {true && (
       <GlassCard title="Цель" icon="🎯" color="#00e68a">
@@ -1382,26 +1356,22 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       )}
 
       {plannerMode === 'pro' && (
-      <GlassCard title="Разнообразие рациона" icon="🎲" color="#8b5cf6">
+      <GlassCard title="Разнообразие" icon="🎲" color="#8b5cf6">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          Минимум — одни и те же продукты каждый день (проще готовить и закупать). Максимум — полная ротация для разнообразия нутриентов.
+          Уровень разнообразия: пул продуктов + жёсткость ротации. Базовое — мало продуктов, строго без повторов; среднее — баланс; максимум — полный пул, строгое разнообразие.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5 }}>
-          {[
-            { id: 'minimal' as const, label: '🎯 База', desc: '2-3 продукта на категорию, минимум разнообразия', color: '#22c55e' },
-            { id: 'medium' as const, label: '⚖️ Средний', desc: '4-5 продуктов, баланс удобства и разнообразия', color: '#f59e0b' },
-            { id: 'max' as const, label: '🎪 Максимум', desc: 'Полный пул продуктов, макс. разнообразие', color: '#8b5cf6' },
-          ].map(v => (
-            <button key={v.id} onClick={() => setVariety(v.id)} style={{
+          {VARIETY_LEVELS.map(v => (
+            <button key={v.id} onClick={() => setVarietyLevel(v.id)} style={{
               padding: '10px 8px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-              background: variety === v.id ? `${v.color}18` : '#202023',
-              border: variety === v.id ? `2px solid ${v.color}` : '1px solid rgba(255,255,255,0.06)',
-              color: variety === v.id ? '#fff' : 'rgba(255,255,255,0.7)',
-              fontWeight: variety === v.id ? 700 : 500, fontSize: 10,
+              background: varietyLevel === v.id ? `${v.color}18` : '#202023',
+              border: varietyLevel === v.id ? `2px solid ${v.color}` : '1px solid rgba(255,255,255,0.06)',
+              color: varietyLevel === v.id ? '#fff' : 'rgba(255,255,255,0.7)',
+              fontWeight: varietyLevel === v.id ? 700 : 500, fontSize: 10,
             }}>
-              <div style={{ fontSize: 14, marginBottom: 2 }}>{v.label.split(' ')[0]}</div>
-              <div style={{ fontWeight: 700, fontSize: 10 }}>{v.label.split(' ').slice(1).join(' ')}</div>
-              <div style={{ fontSize: 7, color: variety === v.id ? `${v.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 2 }}>{v.desc}</div>
+              <div style={{ fontSize: 14, marginBottom: 2 }}>{v.icon}</div>
+              <div style={{ fontWeight: 700, fontSize: 10 }}>{v.label}</div>
+              <div style={{ fontSize: 7, color: varietyLevel === v.id ? `${v.color}aa` : 'rgba(255,255,255,0.85)', marginTop: 2 }}>{v.desc}</div>
             </button>
           ))}
         </div>
@@ -1409,25 +1379,25 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       )}
 
       {plannerMode === 'pro' && (
-      <GlassCard title="Уровень питания" icon="📈" color="#22c55e">
+      <GlassCard title="Белок · пресет" icon="🥩" color="#22c55e">
         <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 8, lineHeight: 1.5 }}>
-          База ×1.0, Средний ×1.15, Усиление ×1.3, Максимум ×1.5. Используется для коррекции калоража без смены цели.
+          Пресет белка определяет целевой белок: 1.6–2.6 г/кг. Жиры фиксированы на 0.8 г/кг, угли — остаток в диетпотолке.
         </div>
-        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Множитель калорийности: {NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1.0}× — итоговый план будет на {Math.round(( (NUTRITION_LEVELS.find(n => n.id === nutrLevel)?.mult || 1) - 1) * 100)}% больше базы</div>
+        <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginBottom: 4 }}>Сейчас: {effectiveP} г белка · {(weight>0?(effectiveP/weight).toFixed(2):'–')} г/кг · {PROTEIN_PRESETS.find(p=>p.id===proteinPreset)?.gPerKg || 2} г/кг пресет</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5 }}>
-          {NUTRITION_LEVELS.map(n => (
-            <button key={n.id} onClick={() => setNutrLevel(n.id)} style={{
+          {PROTEIN_PRESETS.map(p => (
+            <button key={p.id} onClick={() => setProteinPreset(p.id)} style={{
               padding: '10px 6px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
-              background: nutrLevel === n.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
-              border: nutrLevel === n.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
-              color: nutrLevel === n.id ? '#000' : 'rgba(255,255,255,0.7)',
-              fontWeight: nutrLevel === n.id ? 800 : 500, fontSize: 10,
+              background: proteinPreset === p.id ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
+              border: proteinPreset === p.id ? '2px solid #00e68a' : '1px solid rgba(255,255,255,0.06)',
+              color: proteinPreset === p.id ? '#000' : 'rgba(255,255,255,0.7)',
+              fontWeight: proteinPreset === p.id ? 800 : 500, fontSize: 10,
               transition: 'all 0.2s',
             }}>
-              <div style={{ fontSize: 14, marginBottom: 2 }}>{n.icon}</div>
-              <div style={{ fontWeight: 700 }}>{n.label}</div>
-              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{n.desc}</div>
-              <div style={{ fontSize: 8, color: nutrLevel === n.id ? '#00e68a' : 'rgba(255,255,255,0.8)', marginTop: 1 }}>×{n.mult}</div>
+              <div style={{ fontSize: 14, marginBottom: 2 }}>{p.icon}</div>
+              <div style={{ fontWeight: 700 }}>{p.label}</div>
+              <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginTop: 1 }}>{p.desc}</div>
+              <div style={{ fontSize: 8, color: proteinPreset === p.id ? '#00e68a' : 'rgba(255,255,255,0.8)', marginTop: 1 }}>{p.gPerKg} г/кг</div>
             </button>
           ))}
         </div>
@@ -1674,12 +1644,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               <span style={{ position:'absolute', top:2, left: diaryAdaptation ? 19 : 3, width:16, height:16, borderRadius:'50%', background:'#fff', boxShadow:'0 1px 4px rgba(0,0,0,0.3)', transition:'left 0.15s' }} />
             </button>
           </div>
-          <div style={{ display:'flex', gap:4, marginBottom:6 }}>
-            {([['soft','Мягкая'],['strict','Строгая']] as [string,string][]).map(([id,label]) => (
-              <button key={id} onClick={() => setVarietyStrictness(id as any)} style={{ flex:1, padding:'5px 4px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight: varietyStrictness===id?800:600, background: varietyStrictness===id?'rgba(16,185,129,0.15)':'rgba(255,255,255,0.03)', border: varietyStrictness===id?'1px solid #10b981':'1px solid rgba(255,255,255,0.06)', color: varietyStrictness===id?'#10b981':'rgba(255,255,255,0.7)' }}>{label} вариативность</button>
-            ))}
-          </div>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>{varietyStrictness==='strict' ? 'Строго: продукты последних 1-2 дней исключаются из следующих дней.' : 'Мягко: только деприоритизация повторов.'}</div>
+          <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6 }}>Вариативность теперь в карточке «Разнообразие» выше (пул + ротация).</div>
         </div>
                 {/* D: Specificity */}
         {/* Роунд-2 v5: specificity UI удалён (no-op, бюджет 'max' покрывает premium) */}
@@ -1716,22 +1681,22 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         {/* P2.1: 3 categories, 12 presets */}
         {([
           { cat: '🎯 По цели', color: '#00e68a', presets: [
-            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, 2.5г белка/кг, низкий GI', fn: () => { const foods = ['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']; setGoal('cutting'); setBudget('medium'); setVariety('max'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'mass', label: '💪 Масса', desc: 'Профицит, 2г/кг, высоко-углеводные', fn: () => { const foods = ['beef_lean','chicken_breast','salmon','egg_whole','rice_white','buckwheat','pasta_durum','banana','nuts_almonds']; setGoal('mass'); setBudget('medium'); setVariety('max'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, 2.5г/кг, carb cycling', fn: () => { const foods = ['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']; setGoal('recomposition'); setBudget('medium'); setVariety('max'); setCyclingMode('macro'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'maint', label: '⚖️ Поддержание', desc: 'Баланс 30/25/45', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek']; setGoal('maintenance'); setBudget('medium'); setVariety('medium'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'cut', label: '🔥 Сушка', desc: 'Дефицит, 2.5г белка/кг, низкий GI', fn: () => { const foods = ['chicken_breast','turkey_breast','cod','egg_white','cottage_cheese_5','broccoli','spinach','cucumber']; setGoal('cutting'); setBudget('medium'); setVarietyLevel('high'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'mass', label: '💪 Масса', desc: 'Профицит, 2г/кг, высоко-углеводные', fn: () => { const foods = ['beef_lean','chicken_breast','salmon','egg_whole','rice_white','buckwheat','pasta_durum','banana','nuts_almonds']; setGoal('mass'); setBudget('medium'); setVarietyLevel('high'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'recomp', label: '🔄 Рекомпозиция', desc: 'Maintenance, 2.5г/кг, carb cycling', fn: () => { const foods = ['chicken_breast','salmon','egg_whole','cottage_cheese_5','rice_brown','quinoa','broccoli','avocado','olive_oil']; setGoal('recomposition'); setBudget('medium'); setVarietyLevel('high'); setCarbPeriodization('carb_cycle'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+            { id: 'maint', label: '⚖️ Поддержание', desc: 'Баланс 30/25/45', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_brown','buckwheat','broccoli','tomato','olive_oil','yogurt_greek']; setGoal('maintenance'); setBudget('medium'); setVarietyLevel('medium'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
           ]},
           { cat: '🥗 По типу питания', color: '#3b82f6', presets: [
              { id: 'meat', label: '🥩 Мясной', desc: 'Курица, говядина, индейка', fn: () => { const foods = ['chicken_breast','beef_lean','turkey_breast','rice_white','broccoli']; setPlanType('classic'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
              { id: 'fish', label: '🐟 Рыбный', desc: 'Лосось, тунец, треска', fn: () => { const foods = ['salmon','tuna_canned','cod','rice_brown','broccoli','olive_oil']; setPlanType('mediterranean'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
              { id: 'vegan', label: '🌱 Веган', desc: 'Бобовые, тофу, киноа', fn: () => { const foods = ['tofu','tempeh','lentils','quinoa','broccoli','avocado']; setPlanType('vegetarian'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
              { id: 'budget', label: '💰 Бюджет', desc: 'Яйца, курица, гречка', fn: () => { const foods = ['egg_whole','chicken_thigh','buckwheat','cabbage','apple']; setBudget('low'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-            { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. разнообразие', fn: () => { setBudget('max'); setNutrLevel('max'); setVariety('max'); } },
+             { id: 'max', label: '🚀 Максимум', desc: 'Топ-рейтинг + макс. разнообразие', fn: () => { setBudget('max'); setProteinPreset('max'); setVarietyLevel('high'); } },
           ]},
           { cat: '💉 По фазе', color: '#a78bfa', presets: [
              { id: 'course', label: '💉 Курс', desc: 'Высокий белок, печень-суппорт', fn: () => { const foods = ['chicken_breast','beef_lean','salmon','egg_whole','rice_white','buckwheat','broccoli','spinach','cottage_cheese_5','olive_oil']; setPhase('course'); setGoal('mass'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
              { id: 'pct', label: '🔄 ПКТ', desc: 'Цинк, витамин D, антиоксиданты', fn: () => { const foods = ['beef_lean','egg_whole','oysters','pumpkin_seeds','nuts_almonds','broccoli','spinach','salmon','yogurt_greek','kiwi']; setPhase('pct'); setGoal('maintenance'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
-             { id: 'train', label: '🏋️ Тренировочный', desc: 'Peri-workout акцент, carb cycling', fn: () => { const foods = ['chicken_breast','whey_protein','rice_white','banana','salmon','sweet_potato','broccoli']; setLinkToTraining(true); setCyclingMode('macro'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
+              { id: 'train', label: '🏋️ Тренировочный', desc: 'Peri-workout акцент, carb cycling', fn: () => { const foods = ['chicken_breast','whey_protein','rice_white','banana','salmon','sweet_potato','broccoli']; setLinkToTraining(true); setCarbPeriodization('carb_cycle'); setPreferredFoods(foods); persistPlannerValue('he_preferred_foods', foods); } },
           ]},
         ] as { cat: string; color: string; presets: { id: string; label: string; desc: string; fn: () => void }[] }[]).map(group => (
           <div key={group.cat} style={{ marginBottom: 8 }}>
@@ -2008,29 +1973,20 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       })()}
 
       {plannerMode === 'pro' && (
-      <GlassCard title="Циклирование" icon="🔄" color="#3b82f6">
+      <GlassCard title="Периодизация углеводов" icon="🔄" color="#3b82f6">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
-          {[
-            { id: 'none' as CycleType, label: 'Выкл', icon: '⏹️' },
-            { id: 'macro' as CycleType, label: 'Макросы', icon: '🔄' },
-            { id: 'butch' as CycleType, label: 'БУЧ', icon: '⤴️⤵️' },
-            { id: 'cheatmeal' as CycleType, label: 'Читмил', icon: '🍔' },
-            { id: 'carbload' as CycleType, label: 'Углев. загр.', icon: '🍚' },
-          ].map(c => (
-            <PillBtn key={c.id} active={cyclingMode === c.id} onClick={() => setCyclingMode(c.id)} color={cyclingMode === c.id ? '#3b82f6' : undefined}>
-              {c.icon} {c.label}
+          {CARB_PERIODIZATION_OPTIONS.map(opt => (
+            <PillBtn key={opt.id} active={carbPeriodization === opt.id} onClick={() => setCarbPeriodization(opt.id)} color={carbPeriodization === opt.id ? '#3b82f6' : undefined}>
+              {opt.icon} {opt.label}
             </PillBtn>
           ))}
         </div>
-        {cyclingMode !== 'none' && (
+        {carbPeriodization !== 'none' && (
           <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)' }}>
-            {cyclingMode === 'macro' && 'Тренировочные: +15% ккал/+30% угл. Отдых: −15% ккал/−30% угл. Белок постоянный.'}
-            {cyclingMode === 'butch' && '3 дня ВУ (тренировочные) + 1 день НУ (отдых). Белок 2.2г/кг всегда.'}
-            {cyclingMode === 'cheatmeal' && 'Один приём пищи ПОСЛЕ тяжёлой тренировки. До 1500 ккал.'}
-            {cyclingMode === 'carbload' && '6-8г/кг углеводов за 24-48ч до тяжёлой тренировки. +1-1.5л воды.'}
+            {CARB_PERIODIZATION_OPTIONS.find(o=>o.id===carbPeriodization)?.desc}
           </div>
         )}
-        {(cyclingMode === 'macro' || cyclingMode === 'butch') && (
+        {(carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch') && (
           <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
             <div style={{ fontSize: 9, fontWeight: 600, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
               📅 Выберите тренировочные дни:
@@ -2282,29 +2238,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           )}
         </div>
 
-        {/* Периодизация диеты */}
-        <div style={{ marginTop:8, padding:12, borderRadius:12, background: periodizationEnabled ? 'rgba(139,92,246,0.05)' : 'rgba(255,255,255,0.02)', border: periodizationEnabled ? '1px solid rgba(139,92,246,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-              <span style={{ fontSize:14 }}>🔄</span>
-              <div>
-                <div style={{ fontSize:10, fontWeight:700, color: periodizationEnabled ? '#8b5cf6' : 'rgba(255,255,255,0.5)' }}>Периодизация диеты</div>
-                {!periodizationEnabled && <div style={{ fontSize:10, color:'rgba(255,255,255,0.75)' }}>Чередование фаз дефицита/поддержания</div>}
-              </div>
-            </div>
-            <button onClick={() => setPeriodizationEnabled(!periodizationEnabled)} style={{
-              padding:'5px 10px', borderRadius:8, fontSize:9, fontWeight:600, cursor:'pointer',
-              background: periodizationEnabled ? 'rgba(139,92,246,0.1)' : 'rgba(255,255,255,0.04)',
-              border: periodizationEnabled ? '1px solid rgba(139,92,246,0.2)' : '1px solid rgba(255,255,255,0.06)',
-              color: periodizationEnabled ? '#8b5cf6' : 'rgba(255,255,255,0.5)',
-            }}>{periodizationEnabled ? '✓ Вкл' : 'Выкл'}</button>
-          </div>
-          {periodizationEnabled && (
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.45)', marginTop:6, lineHeight:1.4 }}>
-              Чередование 2 недели дефицита + 2 недели поддержания. Помогает избежать метаболической адаптации и плато. Рекомендуется при длительном жиросжигании (8+ недель).
-            </div>
-          )}
-        </div>
+        {/* v6: Периодизация диеты → объединена в «Периодизация углеводов» (wave) */}
 
         {/* Special Meal — collapsed card + popup */}
         <div style={{ marginTop:8, padding:12, borderRadius:12, background: specialMealMode ? 'rgba(249,115,22,0.05)' : 'rgba(255,255,255,0.02)', border: specialMealMode ? '1px solid rgba(249,115,22,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
