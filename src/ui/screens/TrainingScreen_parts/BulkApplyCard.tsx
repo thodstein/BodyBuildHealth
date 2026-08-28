@@ -10,7 +10,7 @@ import { INTENSITY_TECHNIQUES, type IntensityTechnique } from '../../../engines/
 import { tempoFor } from '../../../engines/bb/bb-tempo-rest';
 import { ACCENT, CARD, DIM, BTN_GHOST } from './training-ui';
 import { bulkProgressWeeks, type LoadStrategy } from '../../../engines/manual-constructor/manual-progression.engine';
-import { applyDUPToProgram, type DupPreset, DUP_PRESETS, applySpecializationToProgram, applyTaperToProgram } from '../../../engines/manual-constructor/manual-periodization-pro.engine';
+import { applyDUPToProgram, type DupPreset, DUP_PRESETS, applySpecializationToProgram, applyTaperToProgram, inheritWeekBlocks } from '../../../engines/manual-constructor/manual-periodization-pro.engine';
 
 interface Props {
   program: UserProgram;
@@ -124,6 +124,31 @@ export const BulkApplyCard: React.FC<Props> = ({ program, onChange, showToast })
     showToast(`📉 Taper ${taperWeeks} нед → финал`);
   };
 
+  const applyInherit = () => {
+    const from = 1;
+    const toStart = weekRange === 'all' ? 2 : rangeStart;
+    const toEnd = weekRange === 'all' ? totalWeeks : rangeEnd;
+    const baseWeek = program.bb!.weeks.find(w=> w.week===from);
+    if (!baseWeek) { showToast('⚠ Нет недели 1 для наследования'); return; }
+    let nextWeeks = [...program.bb!.weeks];
+    let inherited = 0;
+    for (let wi = toStart; wi <= toEnd; wi++) {
+      const idx = nextWeeks.findIndex(w=> w.week===wi);
+      if (idx<0) continue;
+      const target = nextWeeks[idx];
+      const isEmpty = target.sessions.every(s=> s.blocks.length===0);
+      if (!isEmpty) continue;
+      const merged = inheritWeekBlocks(baseWeek, { week: wi, sessions: target.sessions } as any);
+      // если target пустой — наследовать полностью базу, иначе мержить
+      const finalWeek = isEmpty ? { ...baseWeek, week: wi, sessions: baseWeek.sessions.map(s=> ({ ...s, id: s.id + `_inh_${wi}` })) } as any : merged;
+      nextWeeks[idx] = finalWeek;
+      inherited++;
+    }
+    if (inherited===0) { showToast('ℹ Нет пустых недель в диапазоне'); return; }
+    onChange({ ...program, bb: { ...program.bb!, weeks: nextWeeks } });
+    showToast(`🧬 Наследование: неделя 1 → ${inherited} пустых недель`);
+  };
+
   return (
     <div style={{ ...CARD, padding: 10 }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: ACCENT, marginBottom: 6 }}>
@@ -200,6 +225,15 @@ export const BulkApplyCard: React.FC<Props> = ({ program, onChange, showToast })
           <input type="number" min={1} max={3} value={taperWeeks} onChange={e=> setTaperWeeks(Math.max(1, Math.min(3, parseInt(e.target.value)||2)))} style={{ width: 50, fontSize: 11, padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }} />
           <span style={{ fontSize: 11, color: DIM }}>нед</span>
           <button onClick={applyTaper} style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#a78bfa', fontWeight: 700 }}>Применить taper</button>
+        </div>
+      </div>
+
+      {/* PRO: наследование */}
+      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8, marginTop: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(16,185,129,0.9)', marginBottom: 4 }}>🧬 Наследование блоков (base → custom)</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button onClick={applyInherit} style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981', fontWeight: 700 }}>Наследовать из недели 1 → пустые</button>
+          <span style={{ fontSize: 10, color: DIM }}>Копирует упражнения недели 1 в пустые недели диапазона</span>
         </div>
       </div>
 
