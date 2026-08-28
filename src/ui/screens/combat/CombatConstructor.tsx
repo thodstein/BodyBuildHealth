@@ -18,9 +18,11 @@ import { getCombat } from '../../../engines/combat/combat-volume';
 import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
-import { CARD, CARD_ACCENT, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider } from './CombatUI';
+import { CARD, CARD_ACCENT, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel } from './CombatUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
+const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
+const WM_LABEL_RU: Record<string,string> = { bench:'Жим лёжа', squat:'Присед', deadlift:'Тяга', chest:'Грудь', back:'Спина', quads:'Квадрицепс', hamstrings:'Бицепс бедра', shoulders:'Плечи' };
 
 export const CombatConstructor: React.FC = () => {
   const [step, setStep] = useState<Step>('params');
@@ -286,18 +288,24 @@ export const CombatConstructor: React.FC = () => {
           <span style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🥊</span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1 }}>Единоборства — PRO силовая</div>
-            <div style={HINT_SM}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · sparring · годовой</div>
+            <div style={HINT_SM}>ATR 5/3/2 · кондиция 3 системы · тапер к дате · весогонка ISSN · спарринг · годовой</div>
           </div>
-          <Badge color="#a855f7" bg="rgba(168,85,247,0.14)" border="rgba(168,85,247,0.32)">{stepIndex}/4 · {step}</Badge>
+          <Badge color="#a855f7" bg="rgba(168,85,247,0.14)" border="rgba(168,85,247,0.32)">{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge>
         </div>
         <ProgressBar value={stepIndex} max={4} color="#a855f7" />
-        <SectionNav items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🥋 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} />
-        <div style={ROW}>
+        <SectionNav activeId={step} onSelect={(id)=> setStep(id as Step)} items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🥋 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} />
+        <div style={{ ...ROW, justifyContent:'space-between' }}>
+          <div style={ROW}>
+            {plan && <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.24)">План {plan.weeks}нед · {plan.patternId}</Badge>}
+            {outsideMetrics && <Badge>Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
+            {acwr && <Badge color={acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#f59e0b':'#10b981'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)':'rgba(16,185,129,0.10)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
+          </div>
+          {msg && <span style={{ fontSize:11, color:'#c4b5fd', background:'rgba(168,85,247,0.10)', border:'1px solid rgba(168,85,247,0.20)', padding:'3px 8px', borderRadius:20 }}>{msg}</span>}
+        </div>
+        <div style={{ display:'none' }}>
           {(['params','outside','split','plan'] as Step[]).map(s => (
             <ChipToggle key={s} active={step===s} onClick={() => setStep(s)}>{s}</ChipToggle>
           ))}
-          {plan && <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.24)">План {plan.weeks}нед · {plan.patternId}</Badge>}
-          {outsideMetrics && <Badge>Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
         </div>
       </div>
 

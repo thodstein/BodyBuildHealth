@@ -106,9 +106,16 @@ export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string 
   </div>
 );
 
-export const SectionNav: React.FC<{ items: { id: string; label: string }[] }> = ({ items }) => {
-  const goTo = (id: string) => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-  return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{items.map(n => <button key={n.id} style={{ ...BTN_SMALL, fontSize: 10 }} onClick={() => goTo(n.id)}>{n.label}</button>)}</div>;
+export const SectionNav: React.FC<{ items: { id: string; label: string }[]; activeId?: string; onSelect?: (id:string)=>void }> = ({ items, activeId, onSelect }) => {
+  const goTo = (id: string) => {
+    if(onSelect){ onSelect(id); return; }
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{items.map(n => {
+    const active = activeId ? activeId===n.id : false;
+    return <button key={n.id} style={{ ...(active? {...BTN_SMALL, background:'rgba(0,230,138,0.16)', borderColor:'rgba(0,230,138,0.32)', color:'#86efac'}: BTN_SMALL), fontSize: 10 }} onClick={() => goTo(n.id)} aria-pressed={active}>{n.label}</button>;
+  })}</div>;
 };
 
 export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 6 }) => {
