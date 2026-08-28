@@ -96,9 +96,9 @@ export function buildHybridPlan(input: {
   if (!cycle) return null;
   const workMax = input.workMax || {};
   const pmMap: Record<string, number> = {};
-  if (input.pmMap.squat) pmMap['Приседания'] = input.pmMap.squat;
-  if (input.pmMap.bench) pmMap['Жим лежа'] = input.pmMap.bench;
-  if (input.pmMap.dead) pmMap['Тяга'] = input.pmMap.dead;
+  if (input.pmMap.squat) { pmMap['Приседания'] = input.pmMap.squat; pmMap['Squat'] = input.pmMap.squat; pmMap['присед'] = input.pmMap.squat; }
+  if (input.pmMap.bench) { pmMap['Жим лежа'] = input.pmMap.bench; pmMap['Bench'] = input.pmMap.bench; pmMap['жим'] = input.pmMap.bench; }
+  if (input.pmMap.dead) { pmMap['Тяга'] = input.pmMap.dead; pmMap['Deadlift'] = input.pmMap.dead; pmMap['тяга'] = input.pmMap.dead; }
   const lms = buildLMSPlan({ template: cycle, pmMap, weeksOverride: input.weeks, fallbackPm: 100 });
   const level = input.level || 'intermediate';
   const equipment = input.equipment || [];
