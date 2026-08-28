@@ -69,6 +69,8 @@ export interface StrengthSportInput {
   acwr?: { ratio: number; zone: 'undertrained'|'optimal'|'caution'|'dangerous' } | null;
   velocityLossPct?: number; // P1 VBT: потеря скорости %
   cardioSuggested?: boolean; // P2: zone2 подсказан
+  taperWeeks?: number; // P3: тейпер недель перед стартом (1-2)
+  diaryTrend?: { lift: string; changePct: number }[] | null; // P3: e1RM тренд 28д
 }
 
 export interface StrengthSportSet {

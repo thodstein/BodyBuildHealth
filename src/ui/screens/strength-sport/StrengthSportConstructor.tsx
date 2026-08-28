@@ -43,6 +43,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [patternId, setPatternId] = useState<string>('');
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
+  const [taperWeeks, setTaperWeeks] = useState<number>(1);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -131,6 +132,39 @@ export const StrengthSportConstructor: React.FC = () => {
         if(Array.isArray(ph.currentSubstances) && ph.currentSubstances.length) extra.peds = ph.currentSubstances;
       }
     }catch{}
+    // P3 diary e1RM trend 28д (epley) — считываем логи как в BB
+    let diaryTrend: any[] | null = null;
+    try{
+      const rawLog = localStorage.getItem('he_workout_log') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_history') || '[]';
+      const logs = JSON.parse(rawLog);
+      if(Array.isArray(logs) && logs.length){
+        const epley = (w:number,r:number)=> w*(1+r/30);
+        const now = Date.now(); const dayMs=24*3600*1000;
+        const lifts = [
+          { key:'snatch', names:['snatch','рывок'] },
+          { key:'clean', names:['clean','толчок','clean_and_jerk'] },
+          { key:'squat', names:['squat','присед','back_squat','front_squat'] },
+          { key:'deadlift', names:['deadlift','тяга'] },
+        ];
+        diaryTrend=[];
+        for(const lf of lifts){
+          const recent = logs.filter((e:any)=>{
+            const n=(e.exerciseName||e.name||'').toLowerCase();
+            return lf.names.some(k=> n.includes(k)) && Array.isArray(e.sets) && (()=>{ const d=e.date||''; const t=new Date(d).getTime(); return now-t<=28*dayMs && now-t>=0; })();
+          }).map((e:any)=> Math.max(...(e.sets as any[]).map((s:any)=> epley(s.weight||0,s.reps||0)))).filter((v:number)=> v>0);
+          const prev = logs.filter((e:any)=>{
+            const n=(e.exerciseName||e.name||'').toLowerCase();
+            const d=e.date||''; const t=new Date(d).getTime();
+            return lf.names.some(k=> n.includes(k)) && Array.isArray(e.sets) && now-t>28*dayMs && now-t<=56*dayMs;
+          }).map((e:any)=> Math.max(...(e.sets as any[]).map((s:any)=> epley(s.weight||0,s.reps||0)))).filter((v:number)=> v>0);
+          if(recent.length && prev.length){
+            const maxR=Math.max(...recent), maxP=Math.max(...prev);
+            diaryTrend.push({ lift: lf.key, changePct: Math.round(((maxR-maxP)/maxP*100)*10)/10 });
+          }
+        }
+        if(diaryTrend.length===0) diaryTrend=null;
+      }
+    }catch{}
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
@@ -141,6 +175,8 @@ export const StrengthSportConstructor: React.FC = () => {
       acwr: acwr as any,
       velocityLossPct: velocityLoss > 0 ? velocityLoss : undefined,
       patternId: patternId || undefined,
+      diaryTrend: diaryTrend || undefined,
+      taperWeeks: goal==='peaking' ? taperWeeks : undefined,
       ...extra,
     } as any;
     try {
@@ -202,6 +238,24 @@ export const StrengthSportConstructor: React.FC = () => {
     });
   };
 
+  const updateSet = (wkIdx: number, day: number, exId: string, setIdx: number, patch: Partial<{ weight:number; reps:number; rir:number }>) => {
+    setPlan(prev=>{
+      if(!prev) return prev;
+      const copy: StrengthSportPlan = JSON.parse(JSON.stringify(prev));
+      const ex = copy.weeksData[wkIdx]?.sessions.find(s=> s.day===day)?.exercises.find(e=> e.id===exId);
+      if(!ex || !ex.workSets[setIdx]) return prev;
+      if(patch.weight!=null){
+        if(patch.weight<0 || patch.weight>600) return prev;
+        ex.workSets[setIdx].weight = patch.weight;
+        // также обновляем общий вес упражнения как среднее
+        ex.weight = Math.round(ex.workSets.reduce((a,s)=>a+s.weight,0)/ex.workSets.length);
+      }
+      if(patch.reps!=null) ex.workSets[setIdx].reps = Math.max(1, Math.min(20, patch.reps));
+      if(patch.rir!=null) ex.workSets[setIdx].rir = Math.max(0, Math.min(5, patch.rir));
+      saveStrengthSportPlan(copy);
+      return copy;
+    });
+  };
   const moveEx = (wkIdx: number, day: number, exId: string, dir: -1|1) => {
     setPlan(prev => {
       if (!prev) return prev;
@@ -271,8 +325,11 @@ export const StrengthSportConstructor: React.FC = () => {
             <label style={{ color: '#fff', fontSize: 11 }}>Пол: <select value={sex} onChange={e=> setSex(e.target.value as any)} style={{ padding: 4, borderRadius: 6, width: 90 }}><option value="male">М</option><option value="female">Ж</option></select></label>
             <label style={{ color: '#fff', fontSize: 11 }}>Вес тела: <input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={{ width: 70, padding: 4, borderRadius: 6 }} /> кг</label>
             <label style={{ color: '#fff', fontSize: 11 }}>Возраст: <input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||30)} style={{ width: 70, padding: 4, borderRadius: 6 }} /></label>
-            <label style={{ color: '#fff', fontSize: 11 }}>Старт: <input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={{ padding: 4, borderRadius: 6, fontSize: 10 }} /></label>
+            <label style={{ color: '#fff', fontSize: 11 }}>Дата пика: <input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={{ padding: 4, borderRadius: 6, fontSize: 10 }} /></label>
           </div>
+          {goal==='peaking' && competitionDate && (
+            <label style={{ color: '#fff', fontSize: 11 }}>Тейпер недель: <select value={taperWeeks} onChange={e=> setTaperWeeks(Number(e.target.value))} style={{ padding: 4, borderRadius: 6 }}><option value={1}>1 нед</option><option value={2}>2 нед</option></select> <span style={{ opacity:0.6, fontSize:10 }}>— объём ×0.55/0.45, интенсивность 92-95%</span></label>
+          )}
           {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a', background: 'rgba(255,255,255,0.04)', padding: 4, borderRadius: 4 }}>ACWR {acwr.ratio} · {acwr.zone} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</div>}
           <label style={{ color: '#fff', fontSize: 11 }}>VBT потеря скорости: {velocityLoss}% {velocityLoss>20?'— снизьте объём':''}</label>
           <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} />
@@ -462,7 +519,20 @@ export const StrengthSportConstructor: React.FC = () => {
                       </div>
                       {ex.comment && <div style={{ fontSize: 10, opacity: 0.7, marginLeft: 4, borderLeft: '2px solid rgba(0,230,138,0.3)', paddingLeft: 6 }}>{ex.comment}</div>}
                       {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize: 10, opacity: 0.5 }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
-                      <div style={{ fontSize: 10, opacity: 0.45 }}>Сеты: {ex.workSets.map(s=> `${s.reps}×${s.weight}кг RIR${s.rir}`).join(' | ')}</div>
+                      <div style={{ fontSize: 10, opacity: 0.45 }}>Сеты: {ex.workSets.map(s=> `${s.reps}×${s.weight}кг RIR${s.rir} ${s.pct?`(${s.pct}%)`:''}`).join(' | ')}</div>
+                      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
+                        {ex.workSets.map((s,si)=> (
+                          <span key={si} style={{ display:'flex', gap:2, alignItems:'center', background:'rgba(255,255,255,0.04)', padding:'2px 4px', borderRadius:4, fontSize:9, color:'#fff' }}>
+                            #{si+1}
+                            <input aria-label={`вес сет ${si+1}`} type="number" value={s.weight} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{weight:Number(e.target.value)||0})} style={{width:44, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
+                            кг
+                            <input aria-label={`повторы сет ${si+1}`} type="number" value={s.reps} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{width:32, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
+                            ×
+                            <input aria-label={`RIR сет ${si+1}`} type="number" value={s.rir} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{width:28, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
+                            RIR
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -473,8 +543,16 @@ export const StrengthSportConstructor: React.FC = () => {
             <div style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>Годовой план (изолирован): {annual.totalWeeks} нед · {annual.blocks.length} блоков</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                {annual.blocks.map(b => <span key={b.id} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', fontSize: 10 }}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}: {b.mode} ×{b.weeks}</span>)}
+                {annual.blocks.map(b => <span key={b.id} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', fontSize: 10 }}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}: {b.mode} ×{b.weeks}{b.competitionDate?` 🏁${b.competitionDate}`:''}</span>)}
               </div>
+              <div style={{ display: 'flex', height: 14, borderRadius: 6, overflow: 'hidden', marginTop: 6, border: '1px solid rgba(255,255,255,0.08)' }}>
+                {annual.blocks.map(b=> {
+                  const w = (b.weeks/annual.totalWeeks*100).toFixed(1);
+                  const col = b.mode==='weightlifting'?'#00e68a': b.mode==='strongman'?'#f59e0b':'#3b82f6';
+                  return <div key={b.id} title={`${b.mode} ${b.weeks}нед`} style={{ width: `${w}%`, background: col, opacity: 0.85, borderRight: '1px solid rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#000', fontWeight: 700 }}>{b.weeks}</div>;
+                })}
+              </div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 2, display: 'flex', justifyContent: 'space-between' }}><span>Нед 1</span><span>Нед {annual.totalWeeks}</span></div>
             </div>
           )}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

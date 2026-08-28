@@ -7,6 +7,7 @@ import { computeOutsideMetrics, outsideVolumeMultiplier, type OutsideLoad } from
 import { getStrengthSportPattern, recommendStrengthSportPattern, type StrengthSportPattern } from './strength-sport-split-patterns';
 import { SS_TAG_MUSCLES } from './strength-sport-day-types';
 import { pmForWeek, rirForWeek, phaseForWeek, phaseForDate, buildPhaseDistribution } from './strength-sport-progression';
+import { getExerciseById } from '../../core/exercise-catalog';
 import { filterByTier, filterByInjury, selectDiverse } from './strength-sport-selection';
 import { volumeMultForExercise } from './strength-sport-specialization';
 import { tempoForSS, restForSS, pctForSS, repsForSS } from './strength-sport-loading';
@@ -153,6 +154,13 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   // P1 VBT: потеря скорости >20% — срезаем объём 10%
   const vLoss = (input as any).velocityLossPct as number | undefined;
   if (typeof vLoss === 'number' && vLoss > 20 && sets > 2) sets = Math.max(2, Math.round(sets * 0.90));
+  // P3 diary e1RM trend: -5% down → -15%, plateau <2% → +1 сет
+  const trends: any[] = (input as any).diaryTrend || [];
+  const myTrend = trends.find((t:any)=> t.lift===id || (id.includes('snatch')&&t.lift==='snatch') || (id.includes('clean')&&t.lift==='clean') || (id.includes('squat')&&t.lift==='squat') || (id.includes('deadlift')&&t.lift==='deadlift'));
+  if (myTrend) {
+    if (myTrend.changePct < -5 && sets > 2) sets = Math.max(2, Math.round(sets * 0.85));
+    else if (myTrend.changePct < 2 && myTrend.changePct >= -5) sets = Math.min(6, sets + 1);
+  }
   const rir = rirForWeek(week, input.weeks, input.goal, isOly(id));
   let finalRir = rir;
   if (phase === 'deload') finalRir = 4;
@@ -160,6 +168,7 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   else if (acwr?.zone === 'caution') finalRir = Math.min(4, finalRir + 1);
   else if (typeof vLoss === 'number' && vLoss > 25) finalRir = Math.min(4, finalRir + 1);
   else if (typeof vLoss === 'number' && vLoss > 20) finalRir = Math.min(4, finalRir + 1);
+  else if (myTrend && myTrend.changePct < -5) finalRir = Math.min(4, finalRir + 1);
   const gentle = gentleFactor(id, input.injuries as any);
   let finalWeight = baseWeight;
   let finalReps = reps;
@@ -338,6 +347,19 @@ const SS_TECHNIQUE: Record<string,string> = {
   hip_thrust:'Таз вверх, пауза 2с, без переразгиба',
 };
 function getExerciseMeta(id: string): { name: string; group: string; pattern: string; equipment: string; technique?: string } | null {
+  // P3: пробуем основной каталог 584 для обогащения (оборудование, техника)
+  try{
+    const main: any = (getExerciseById as any)(id);
+    if (main) {
+      return {
+        name: main.name || SS_EX_META[id]?.name || id,
+        group: main.group || SS_EX_META[id]?.group || 'legs',
+        pattern: main.movementPattern || (main as any).pattern || SS_EX_META[id]?.pattern || 'unknown',
+        equipment: main.equipment || 'barbell',
+        technique: SS_TECHNIQUE[id] || main.technique,
+      };
+    }
+  }catch{}
   const m = SS_EX_META[id];
   if (!m) return { name: id, group: 'legs', pattern: 'unknown', equipment: 'barbell', technique: SS_TECHNIQUE[id] };
   return { name: m.name, group: m.group, pattern: m.pattern, equipment: 'barbell', technique: SS_TECHNIQUE[id] };
@@ -397,12 +419,16 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         const id = chosen[idx];
         const meta = getExerciseMeta(id) || { name: id, group: 'legs', pattern: 'unknown', equipment: 'barbell' };
         const isPrimary = idx < primaryCount;
+        const taperWeeks = (input as any).taperWeeks ?? (goal === 'peaking' ? 1 : 0);
+        const taper = taperWeeks > 0 && w > weeks - taperWeeks && (goal === 'peaking' || phase === 'peaking' || phase === 'deload');
         const built = buildExerciseSets(id, tag, phase, input, isPrimary, w);
-        // deload — режем сеты и вес
+        // P3 taper vs deload — taper сохраняет интенсивность (Bosquet), deload снижает всё
         let finalSets = built.sets;
         let finalWeight = built.weight;
         let finalRir = built.rir;
-        if (deload) { finalSets = Math.max(2, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
+        if (taper && !deload) { finalSets = Math.max(2, Math.round(built.sets * 0.55)); finalWeight = Math.round(built.weight * 0.92 / 2.5) * 2.5; finalRir = 1; }
+        else if (taper && deload) { finalSets = Math.max(2, Math.round(built.sets * 0.45)); finalWeight = Math.round(built.weight * 0.90 / 2.5) * 2.5; finalRir = 1; }
+        else if (deload) { finalSets = Math.max(2, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
         const workSets: StrengthSportSet[] = built.workSets.slice(0, finalSets).map(s => ({ ...s, weight: finalWeight, rir: finalRir }));
         const gentle = gentleFactor(id, input.injuries as any);
         const ex: StrengthSportExercise = {
@@ -442,7 +468,9 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     sessions.sort((a, b) => a.day - b.day);
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
     const totalTonnage = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
-    weeksData.push({ week: w, phase, deload, taper: w === weeks && goal === 'peaking', sessions, totalSets, totalTonnage });
+    const taperWeeksOuter = (input as any).taperWeeks ?? (goal === 'peaking' ? 1 : 0);
+    const isTaperWeek = taperWeeksOuter > 0 && w > weeks - taperWeeksOuter && (goal === 'peaking' || phase === 'peaking' || phase === 'deload');
+    weeksData.push({ week: w, phase, deload, taper: isTaperWeek, sessions, totalSets, totalTonnage });
   }
 
   // DUP / intensity (изолированно, только зал)
