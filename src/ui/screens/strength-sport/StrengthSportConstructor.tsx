@@ -189,12 +189,20 @@ export const StrengthSportConstructor: React.FC = () => {
     setPlan(p);
     saveStrengthSportPlan(p);
     try {
+      const bw = (input as any).bodyweight || 80;
+      const nut = { proteinG: Math.round(bw * ((input as any).weightCutKg ? 2.3 : 2.0)), carbsG: Math.round(bw * ((input as any).weightCutKg ? 3 : 5)), note: `TA/стронг ${input.mode} ${input.weeks}нед`, bodyweight: bw, mode: input.mode };
+      localStorage.setItem('he_strength_nutrition_payload', JSON.stringify({ planId: p.id, ...nut }));
+      window.dispatchEvent(new CustomEvent('he-strength-updated', { detail: { planId: p.id, nutrition: nut } }));
+      const wc = (p as any).weightCutProtocol;
+      if (wc) localStorage.setItem('he_strength_weightcut_payload', JSON.stringify(wc));
+    } catch {}
+    try {
       const hist = loadStrengthSportPlans().slice(0, 6);
       const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks: 1 }) : buildAnnualFromSS(hist);
       saveAnnualSS(ann);
       setAnnual(ann);
     } catch {}
-    setMsg('План сохранён');
+    setMsg('План сохранён · питание/кардио payload записан');
     setStep('plan');
   };
 

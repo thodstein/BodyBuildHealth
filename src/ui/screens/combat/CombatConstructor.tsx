@@ -17,6 +17,7 @@ import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.typ
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
+import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import { CARD, CARD_ACCENT, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider } from './CombatUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
@@ -190,8 +191,15 @@ export const CombatConstructor: React.FC = () => {
     p = finalizeCombatPlan(p);
     setPlan(p);
     saveCombatPlan(p);
+    try {
+      const nut = combatToNutritionPayload(p);
+      localStorage.setItem('he_combat_nutrition_payload', JSON.stringify({ planId: p.id, ...nut, bodyweight, discipline, goal }));
+      const cardio = combatToCardioPayload(p);
+      if (cardio) localStorage.setItem('he_combat_cardio_payload', JSON.stringify({ planId: p.id, ...cardio }));
+      window.dispatchEvent(new CustomEvent('he-combat-updated', { detail: { planId: p.id, nutrition: nut, cardio } }));
+    } catch {}
     try { const hist = loadCombatPlans().slice(0,6); const ann = buildAnnualFromCB(hist); saveAnnualCB(ann); setAnnual(ann); } catch {}
-    setMsg('План сохранён · модель ' + (periodizationModel||'atr_10') + (fightDate? ' · тапер к бою' : '') + (wcProtocol? ' · весогонка '+wcProtocol.targetLossKg+'кг':''));
+    setMsg('План сохранён · модель ' + (periodizationModel||'atr_10') + (fightDate? ' · тапер к бою' : '') + (wcProtocol? ' · весогонка '+wcProtocol.targetLossKg+'кг':'') + ' · питание/кардио payload записан');
     setStep('plan');
   };
 
