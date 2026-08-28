@@ -94,6 +94,25 @@ describe('P4 per-set editor', () => {
     const fin = finalizeStrengthSportPlan(p);
     expect(fin.validation.warnings.some(w=> w.includes('йок'))).toBe(true);
   });
+  it('outside high + ACWR dangerous + VBT 30% full volume комбо', () => {
+    const base = buildStrengthSportPlan({ mode:'weightlifting', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ snatch:80, backSquat:150 } } as any);
+    const combo = buildStrengthSportPlan({
+      mode:'weightlifting', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ snatch:80, backSquat:150 },
+      outsideLoad:{ sessionsPerWeek:5, avgDurationMin:90, avgSRPE:8, interference:'high' },
+      acwr:{ ratio:1.7, zone:'dangerous' },
+      velocityLossPct:30,
+    } as any);
+    const bSets = base.weeksData[0].totalSets||0;
+    const cSets = combo.weeksData[0].totalSets||0;
+    expect(cSets).toBeLessThan(bSets);
+    expect(cSets).toBeLessThanOrEqual(Math.round(bSets * 0.55)); // outside 0.55*0.65*0.90≈0.32 но min 2 + округления → 0.45-0.55 реально
+    const cRir = combo.weeksData[0].sessions[0].exercises[0].rir;
+    const bRir = base.weeksData[0].sessions[0].exercises[0].rir;
+    expect(cRir).toBeGreaterThan(bRir);
+    const fin = finalizeStrengthSportPlan(combo);
+    expect(fin.validation.warnings.some(w=> w.includes('комбо') && w.includes('outside'))).toBe(true);
+    expect(fin.validation.warnings.some(w=> w.includes('VBT'))).toBe(true);
+  });
   it('docs STRONG_TA_PRO_PLAN exists', async () => {
     expect(true).toBe(true);
   });

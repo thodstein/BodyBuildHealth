@@ -144,15 +144,14 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     const f = volumeMultForExercise(id, input.focus);
     sets = Math.max(2, Math.min(6, Math.round(sets * f)));
   }
+  // Полный объём: outside × ACWR × VBT — мультипликативно
   const outM = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  if (outM < 0.75 && sets > 2) sets -= 1;
-  // P0-7 ACWR: срезаем объём
   const acwr = (input as any).acwr as { ratio:number; zone:string } | null | undefined;
+  const vLoss = (input as any).velocityLossPct as number | undefined;
+  if (outM < 1 && sets > 2) sets = Math.max(2, Math.round(sets * outM));
   if (acwr?.zone === 'dangerous' && sets > 2) sets = Math.max(2, Math.round(sets * 0.65));
   else if (acwr?.zone === 'caution' && sets > 2) sets = Math.max(2, Math.round(sets * 0.85));
   else if (acwr?.zone === 'undertrained') sets = Math.min(6, sets + 1);
-  // P1 VBT: потеря скорости >20% — срезаем объём 10%
-  const vLoss = (input as any).velocityLossPct as number | undefined;
   if (typeof vLoss === 'number' && vLoss > 20 && sets > 2) sets = Math.max(2, Math.round(sets * 0.90));
   // P3 diary e1RM trend: -5% down → -15%, plateau <2% → +1 сет
   const trends: any[] = (input as any).diaryTrend || [];
@@ -164,11 +163,13 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   const rir = rirForWeek(week, input.weeks, input.goal, isOly(id));
   let finalRir = rir;
   if (phase === 'deload') finalRir = 4;
-  else if (acwr?.zone === 'dangerous') finalRir = Math.min(4, finalRir + 2);
-  else if (acwr?.zone === 'caution') finalRir = Math.min(4, finalRir + 1);
-  else if (typeof vLoss === 'number' && vLoss > 25) finalRir = Math.min(4, finalRir + 1);
-  else if (typeof vLoss === 'number' && vLoss > 20) finalRir = Math.min(4, finalRir + 1);
-  else if (myTrend && myTrend.changePct < -5) finalRir = Math.min(4, finalRir + 1);
+  else {
+    if (acwr?.zone === 'dangerous') finalRir = Math.min(4, finalRir + 2);
+    else if (acwr?.zone === 'caution') finalRir = Math.min(4, finalRir + 1);
+    if (typeof vLoss === 'number' && vLoss > 20) finalRir = Math.min(4, finalRir + 1);
+    if (myTrend && myTrend.changePct < -5) finalRir = Math.min(4, finalRir + 1);
+    if (outM < 0.75) finalRir = Math.min(4, finalRir + 1);
+  }
   const gentle = gentleFactor(id, input.injuries as any);
   let finalWeight = baseWeight;
   let finalReps = reps;
@@ -392,9 +393,10 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   const recoveryMult = computeRecMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
   const nutritionMult = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  // P0-7 ACWR: dangerous 0.60, caution 0.85, undertrained 1.10 — как в lms-builder
-  const acwrMult = input.acwr?.zone === 'dangerous' ? 0.60 : input.acwr?.zone === 'caution' ? 0.85 : input.acwr?.zone === 'undertrained' ? 1.1 : 1;
-  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier }) * acwrMult);
+  // P0-7 ACWR + outside + VBT — полный объём (outside high 0.55, ACWR dangerous 0.60, VBT 30% 0.90 → ×0.30)
+  const acwrMult = input.acwr?.zone === 'dangerous' ? 0.60 : input.acwr?.zone === 'caution' ? 0.85 : input.acwr?.zone === 'undertrained' ? 1.10 : 1;
+  const vbtMult = (input as any).velocityLossPct > 20 ? 0.90 : 1;
+  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier }) * acwrMult * outsideMult * vbtMult);
 
   const weeksData: StrengthSportWeek[] = [];
   const rationale: string[] = [];

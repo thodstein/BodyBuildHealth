@@ -6,6 +6,7 @@ import type { StrengthSportPlan } from './strength-sport.types';
 import { getWL, getStrong } from './strength-sport-volume';
 import { sessionLimitsFor, validateSync } from './strength-sport-limits';
 import { calcDOTS, calcWilks, calcIPFGL } from '../pl-points.engine';
+import { outsideVolumeMultiplier } from '../outside-load.engine';
 
 // P3: Sinclair для ТА (IWF 2017-2020 коэффициенты, актуальны для сравнения)
 export const SINCLAIR = {
@@ -170,6 +171,12 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     const vLoss = (plan.inputSnapshot as any)?.velocityLossPct as number | undefined;
     if (typeof vLoss === 'number' && vLoss > 20) {
       warnings.push(`Нед ${wk.week}: VBT потеря ${vLoss}% >20% — снизьте объём 10%, +1 RIR (усталость ЦНС).`);
+    }
+    // Full volume комбо: outside high + ACWR dangerous + VBT 30%
+    const outM2 = out ? outsideVolumeMultiplier(out as any) : 1;
+    const acwr2 = (plan.inputSnapshot as any)?.acwr as any;
+    if (outM2 < 0.75 && acwr2?.zone === 'dangerous' && typeof vLoss === 'number' && vLoss >= 30) {
+      warnings.push(`Нед ${wk.week}: комбо outside×${outM2.toFixed(2)} + ACWR dangerous + VBT ${vLoss}% — полный объём ×${(outM2*0.60*0.90).toFixed(2)}, RIR+3.`);
     }
     // P2 cardio для ТА — 1× zone2 30 мин для восстановления
     if (plan.mode === 'weightlifting' && !plan.outsideMetrics && wk.week === 1 && !(plan.inputSnapshot as any)?.cardioSuggested) {
