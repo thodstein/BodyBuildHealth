@@ -64,7 +64,7 @@ export const TAB_LABELS: Record<TrainingTab, string> = {
   import_data: '📥 Импорт CSV',
   pl_norms: '🏆 Нормативы ПЛ',
 
-  rel_strength: '💪 Относительная сила',
+  rel_strength: '💪 Относительная сила (→ Анализ силы)',
   calendar: '📅 Календарь тренировок',
   mixes: '💪 Тренировочные миксы',
   periodization_designer: '🎨 Дизайнер периодизации',

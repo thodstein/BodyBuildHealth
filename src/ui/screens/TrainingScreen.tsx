@@ -406,14 +406,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
     }
   }, [macrocycle, selectedWeek]);
 
-  const calcResults = useMemo(() => {
-    const epley1RM = calcWeight * (1 + calcReps / 30);
-    const brzycki1RM = calcWeight * (36 / (37 - calcReps));
-    const rpePercent = Math.max(0.3, 1 - (calcRPE - 1) * 0.03 - (calcReps - 1) * 0.025);
-    const rpe1RM = calcWeight / rpePercent;
-    const percentWeight = calc1RM * (calcPercent / 100);
-    return { epley1RM, brzycki1RM, rpe1RM, percentWeight, rpePercent };
-  }, [calcWeight, calcReps, calcRPE, calc1RM, calcPercent]);
+  // calcResults legacy removed — теперь канон в StrengthAnalysisHub/estimate1rm.engine (см. P1-8). Оставлено для backward-compat, но не используется.
 
   const handleLogWorkout = async () => {
     if (!logExercise) return;

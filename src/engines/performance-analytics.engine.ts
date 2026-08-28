@@ -89,22 +89,23 @@ function getClosestBracket(bw: number): number {
   );
 }
 
-export function getStrengthLevel(exercise: string, weightKg: number, oneRM: number): StrengthLevel {
+export function getStrengthLevel(exercise: string, weightKg: number, oneRM: number, sex: 'male' | 'female' = 'male'): StrengthLevel {
   const standards = STRENGTH_STANDARDS[exercise];
   if (!standards) return 'intermediate';
 
+  const effectiveOneRM = sex === 'female' ? oneRM / 0.62 : oneRM;
   const bracketIdx = BODYWEIGHT_BRACKETS.indexOf(getClosestBracket(weightKg));
   const levels: StrengthLevel[] = ['world_class', 'elite', 'advanced', 'intermediate', 'novice', 'untrained'];
 
   for (const level of levels) {
     const threshold = standards[level][Math.min(bracketIdx, standards[level].length - 1)];
-    if (oneRM >= threshold) return level;
+    if (effectiveOneRM >= threshold) return level;
   }
 
   return 'untrained';
 }
 
-export function getNextLevelTarget(exercise: string, weightKg: number, currentLevel: StrengthLevel): number {
+export function getNextLevelTarget(exercise: string, weightKg: number, currentLevel: StrengthLevel, sex: 'male' | 'female' = 'male'): number {
   const standards = STRENGTH_STANDARDS[exercise];
   if (!standards) return 0;
 
@@ -114,14 +115,17 @@ export function getNextLevelTarget(exercise: string, weightKg: number, currentLe
 
   if (idx < levels.length - 1) {
     const nextLevel = levels[idx + 1];
-    return standards[nextLevel][Math.min(bracketIdx, standards[nextLevel].length - 1)];
+    const maleVal = standards[nextLevel][Math.min(bracketIdx, standards[nextLevel].length - 1)];
+    return sex === 'female' ? Math.round(maleVal * 0.62) : maleVal;
   }
 
   return 0; // Already world class
 }
 
-export function getStrengthPercentile(exercise: string, weightKg: number, oneRM: number): number {
-  const level = getStrengthLevel(exercise, weightKg, oneRM);
+export function getStrengthPercentile(exercise: string, weightKg: number, oneRM: number, sex: 'male' | 'female' = 'male'): number {
+  // sex-aware: женские пороги ~62% от мужских (DOTS ratio). Для women масштабируем oneRM к мужскому эквиваленту.
+  const effectiveOneRM = sex === 'female' ? oneRM / 0.62 : oneRM;
+  const level = getStrengthLevel(exercise, weightKg, effectiveOneRM);
   const levels: StrengthLevel[] = ['untrained', 'novice', 'intermediate', 'advanced', 'elite', 'world_class'];
   const idx = levels.indexOf(level);
 
@@ -132,7 +136,7 @@ export function getStrengthPercentile(exercise: string, weightKg: number, oneRM:
   const levelMin = standards[level][Math.min(bracketIdx, standards[level].length - 1)];
   const nextLevel = idx < levels.length - 1 ? standards[levels[idx + 1]][Math.min(bracketIdx, standards[levels[idx + 1]].length - 1)] : levelMin * 1.5;
 
-  const withinLevel = (oneRM - levelMin) / (nextLevel - levelMin);
+  const withinLevel = (effectiveOneRM - levelMin) / (nextLevel - levelMin);
   return Math.round(Math.min(99, (idx / (levels.length - 1) + withinLevel / (levels.length - 1)) * 100));
 }
 

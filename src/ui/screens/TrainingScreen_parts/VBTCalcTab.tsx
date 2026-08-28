@@ -2,9 +2,9 @@
  * VBTCalcTab.tsx — ВПТ-калькулятор (тренировка по скорости): целевая скорость по цели →
  * прогнозируемый %1RM и вес. Также: e1RM по скорости штанги, анализ потери скорости,
  * пороги потери по цели. Источники: Gonzalez-Badillo, Jovanovic — без выдумок.
- * Использует pro/vbt.engine.
+ * Использует pro/vbt.engine. Питается от хаба (snapshot).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   LOAD_VELOCITY_PROFILE,
   INTENT_ZONES,
@@ -26,6 +26,7 @@ import { analyzeStickingCorrections, type AssistanceAnalysis } from '../../../en
 import type { Lift } from '../../../engines/lms/weakpoint-pl';
 import { PopupNumber, PopupSelect, ExpandableCard, MetricCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { applyToPlanner } from './planner-bridge';
+import type { HubSnapshot } from './StrengthAnalysisHub';
 
 const ACCENT = '#00e68a';
 const DIM = '#fff';
@@ -47,13 +48,104 @@ const INTENT_RU: Record<VBTIntent, string> = {
 const liftOpts: { id: VBTLift; label: string; desc: string }[] = (Object.keys(LOAD_VELOCITY_PROFILE) as VBTLift[]).map(k => ({ id: k, label: LIFT_RU[k], desc: `Профиль: ${LOAD_VELOCITY_PROFILE[k].length} точек %[1RM]→скорость (м/с)` }));
 const intentOpts: { id: VBTIntent; label: string; desc: string }[] = (Object.keys(INTENT_ZONES) as VBTIntent[]).map(k => ({ id: k, label: INTENT_RU[k], desc: `Целевые %1RM: ${(INTENT_ZONES[k].pct[0] * 100).toFixed(0)}–${(INTENT_ZONES[k].pct[1] * 100).toFixed(0)}%` }));
 
-export const VBTCalcTab: React.FC = () => {
-  const [lift, setLift] = useState<VBTLift>('squat');
-  const [intent, setIntent] = useState<VBTIntent>('strength');
-  const [e1RM, setE1RM] = useState(180);
-  const [measuredVelocity, setMeasuredVelocity] = useState(0);
-  const [measuredWeight, setMeasuredWeight] = useState(0);
-  const [velocitiesStr, setVelocitiesStr] = useState('1.0,0.94,0.9,0.86,0.82');
+interface Props {
+  snapshot?: HubSnapshot;
+  onHubPatch?: (patch: Partial<HubSnapshot>) => void;
+}
+
+const LS_KEY = 'he_vbt_tab_v1';
+
+function hubLiftValue(snap: HubSnapshot | undefined, lift: VBTLift): number | null {
+  if (!snap) return null;
+  if (lift === 'squat') return snap.squat;
+  if (lift === 'bench') return snap.bench;
+  if (lift === 'deadlift') return snap.dead;
+  if (lift === 'ohp') return snap.ohp;
+  if (lift === 'row') return Math.round(snap.dead * 0.55);
+  return null;
+}
+
+export const VBTCalcTab: React.FC<Props> = ({ snapshot, onHubPatch }) => {
+  const [lift, setLift] = useState<VBTLift>(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const j = JSON.parse(raw);
+        if (j.lift && LOAD_VELOCITY_PROFILE[j.lift as VBTLift]) return j.lift as VBTLift;
+      }
+    } catch {}
+    return 'squat';
+  });
+  const [intent, setIntent] = useState<VBTIntent>(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const j = JSON.parse(raw);
+        if (j.intent && INTENT_ZONES[j.intent as VBTIntent]) return j.intent as VBTIntent;
+      }
+    } catch {}
+    return 'strength';
+  });
+  const [e1RM, setE1RM] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const j = JSON.parse(raw);
+        if (typeof j.e1RM === 'number' && j.e1RM > 0) return j.e1RM;
+      }
+    } catch {}
+    return snapshot ? hubLiftValue(snapshot, 'squat') || 180 : 180;
+  });
+  const [measuredVelocity, setMeasuredVelocity] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const j = JSON.parse(raw);
+        if (typeof j.measuredVelocity === 'number') return j.measuredVelocity;
+      }
+    } catch {}
+    return 0;
+  });
+  const [measuredWeight, setMeasuredWeight] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const j = JSON.parse(raw);
+        if (typeof j.measuredWeight === 'number') return j.measuredWeight;
+      }
+    } catch {}
+    return 0;
+  });
+  const [velocitiesStr, setVelocitiesStr] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const j = JSON.parse(raw);
+        if (typeof j.velocitiesStr === 'string') return j.velocitiesStr;
+      }
+    } catch {}
+    return '1.0,0.94,0.9,0.86,0.82';
+  });
+
+  // персист
+  useEffect(() => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr })); } catch {}
+  }, [lift, intent, e1RM, measuredVelocity, measuredWeight, velocitiesStr]);
+
+  // синхронизация e1RM с хабом при смене lift, если e1RM ещё дефолтный (не менялся вручную после переключения)
+  const hubVal = hubLiftValue(snapshot, lift);
+  useEffect(() => {
+    if (hubVal == null) return;
+    // если текущий e1RM сильно отличается от хаба и хаб менялся — предложить синхронизацию (не авто-перезапись, а мягко)
+    // Для P0-1 делаем авто-синхронизацию только если e1RM ещё равен предыдущему хаб-значению или впервые
+    // Упростим: если snapshot меняется и lift тот же — обновляем e1RM к хабу
+    // Чтобы не мешать ручному вводу, обновляем только если пользователь не трогал e1RM после последнего hubVal
+    // Здесь для простоты — не авто-заменяем, а показываем кнопку «Взять из хаба» в UI
+  }, [hubVal]);
+
+  // валидация скорости: 0..2.5, отрицательные — отклоняем
+  const safeVelocity = (v: number) => Math.max(0, Math.min(2.5, v));
+  const safeWeight = (w: number) => Math.max(0, Math.min(600, w));
 
   // Расчёт intent → цель
   const tgt = useMemo(() => {
@@ -64,38 +156,36 @@ export const VBTCalcTab: React.FC = () => {
     return { tv, tp, workWeight, predictedVel };
   }, [lift, intent, e1RM]);
 
-  // e1RM по скорости и весу
+  // e1RM по скорости и весу (с валидацией)
   const velEst = useMemo(() => {
     if (measuredVelocity <= 0 || measuredWeight <= 0) return null;
-    return estimate1RMFromVelocity(lift, measuredVelocity, measuredWeight);
+    if (measuredVelocity < 0.05 || measuredVelocity > 2.5) return null;
+    return estimate1RMFromVelocity(lift, safeVelocity(measuredVelocity), safeWeight(measuredWeight));
   }, [lift, measuredVelocity, measuredWeight]);
 
-  // velocity-loss анализ
+  // velocity-loss анализ (фильтр отрицательных, NaN, пустых)
   const vlRes = useMemo(() => {
-    const vs = velocitiesStr.split(/[\s,]+/).map(Number).filter(n => n > 0);
+    const vs = velocitiesStr.split(/[\s,;]+/).map((s: string) => Number(s.trim())).filter((n: number) => Number.isFinite(n) && n > 0.05 && n <= 2.5);
     if (vs.length === 0) return null;
     const thr = thresholdForIntent(intent);
     return velocityLoss(vs, thr);
   }, [velocitiesStr, intent]);
 
-  // Корректирующие упражнения фазы срыва (VBT): при превышении порога потери
-  // скорости → вероятная слабая фаза (максимальный момент) → корректировки.
+  // Корректирующие упражнения фазы срыва
   const vbtCorrections = useMemo<AssistanceAnalysis | null>(() => {
-    const vs = velocitiesStr.split(/[\s,]+/).map(Number).filter(n => n > 0);
+    const vs = velocitiesStr.split(/[\s,;]+/).map((s: string) => Number(s.trim())).filter((n: number) => Number.isFinite(n) && n > 0.05 && n <= 2.5);
     if (vs.length < 2) return null;
     const best = Math.max(...vs);
     const last = vs[vs.length - 1];
     const liftAsLift = lift as Lift;
-    const d = diagnoseVelocity(liftAsLift, best, last, measuredWeight > 0 ? measuredWeight : undefined);
+    const d = diagnoseVelocity(liftAsLift, best, last, measuredWeight > 0 ? safeWeight(measuredWeight) : undefined);
     if (!d.exceeded || !d.suggestedPhase) return null;
     return analyzeStickingCorrections(liftAsLift, d.suggestedPhase);
   }, [velocitiesStr, lift, measuredWeight]);
 
-  // LVP-таблица для выбранного движения
   const lvpTable = LOAD_VELOCITY_PROFILE[lift];
   const vlThreshold = thresholdForIntent(intent);
 
-  // Цвет скорости по интенту (в зоне?)
   const velColor = (v: number) => {
     const z = INTENT_ZONES[intent];
     return v >= z.velocity[0] && v <= z.velocity[1] ? ACCENT : '#fff';
@@ -111,14 +201,31 @@ export const VBTCalcTab: React.FC = () => {
         <b>3.</b> Анализ потери скорости: порог по цели для авторегулируемого окончания сета.
       </div>
 
+      {snapshot && hubVal != null && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', fontSize: 11, alignItems: 'center' }}>
+          <span style={{ color: '#fff' }}>Хаб {LIFT_RU[lift]}:</span>
+          <span style={{ color: '#3b82f6', fontWeight: 800 }}>{hubVal} кг</span>
+          <span style={{ color: '#fff' }}>· e1RM сейчас {e1RM} кг</span>
+          {hubVal !== e1RM && (
+            <button
+              onClick={() => setE1RM(hubVal)}
+              style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: 8, border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontWeight: 700, fontSize: 10, cursor: 'pointer' }}
+            >
+              Взять из хаба
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Параметры */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>⚙️ Параметры</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
           <PopupSelect label="Движение" value={lift} options={liftOpts} onChange={v => setLift(v as VBTLift)} />
           <PopupSelect label="Цель (намерение)" value={intent} options={intentOpts} onChange={v => setIntent(v as VBTIntent)} />
-          <PopupNumber label="Оценочный 1RM" value={e1RM} min={20} max={600} suffix=" кг" onChange={setE1RM} />
+          <PopupNumber label="Оценочный 1RM" value={e1RM} min={20} max={600} suffix=" кг" onChange={v => setE1RM(Math.max(20, Math.min(600, v || 20)))} />
         </div>
+        {snapshot && <div style={{ fontSize: 10, color: '#fff', lineHeight: 1.4 }}>Хаб питает этот калькулятор: при смене движения кнопка «Взять из хаба» подставляет актуальный ПМ из единого снапшота (без дубля ввода).</div>}
       </div>
 
       {/* Целевые значения по цели */}
@@ -145,23 +252,43 @@ export const VBTCalcTab: React.FC = () => {
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 8 }}>📏 Расчёт e1RM по скорости штанги (измеренной)</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-          <PopupNumber label="Скорость штанги (м/с)" value={measuredVelocity} min={0} max={2} step={0.01} suffix=" м/с" onChange={v => setMeasuredVelocity(v || 0)} />
-          <PopupNumber label="Поднятый вес (кг)" value={measuredWeight} min={0} max={600} suffix=" кг" onChange={v => setMeasuredWeight(v || 0)} />
+          <PopupNumber label="Скорость штанги (м/с)" value={measuredVelocity} min={0} max={2.5} step={0.01} suffix=" м/с" onChange={v => setMeasuredVelocity(safeVelocity(v || 0))} />
+          <PopupNumber label="Поднятый вес (кг)" value={measuredWeight} min={0} max={600} suffix=" кг" onChange={v => setMeasuredWeight(safeWeight(v || 0))} />
         </div>
+        {(measuredVelocity < 0 || measuredVelocity > 2.5) && (
+          <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', fontSize: 11, marginBottom: 8 }}>
+            ⚠️ Скорость вне диапазона 0.05–2.5 м/с — проверьте датчик.
+          </div>
+        )}
         {velEst ? (
           <div style={ROWStyle(ACCENT)}>
             <span style={{ color: '#fff' }}>Прогноз <b style={{ color: ACCENT }}>e1RM</b> (из профиля):</span>
             <span><b style={{ color: ACCENT }}>{velEst.e1RM} кг</b> · %1RM = <b>{Math.round(velEst.pct1RM * 100)}%</b></span>
           </div>
         ) : (
-          <div style={SMALL}>Введите скорость и вес → прогноз e1RM (через профиль «нагрузка–скорость» для {LIFT_RU[lift]}).</div>
+          <div style={SMALL}>Введите скорость 0.05–2.5 м/с и вес → прогноз e1RM (через профиль «нагрузка–скорость» для {LIFT_RU[lift]}).</div>
+        )}
+        {velEst && onHubPatch && (
+          <button
+            onClick={() => {
+              const patch: any = {};
+              if (lift === 'squat') patch.squat = velEst.e1RM;
+              else if (lift === 'bench') patch.bench = velEst.e1RM;
+              else if (lift === 'deadlift') patch.dead = velEst.e1RM;
+              else if (lift === 'ohp') patch.ohp = velEst.e1RM;
+              if (Object.keys(patch).length) onHubPatch(patch);
+            }}
+            style={{ marginTop: 8, width: '100%', padding: 10, borderRadius: 10, border: '1px solid rgba(0,230,138,0.3)', background: 'rgba(0,230,138,0.08)', color: ACCENT, fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+          >
+            ✏️ Обновить хаб ({LIFT_RU[lift]}) → {velEst.e1RM} кг
+          </button>
         )}
       </div>
 
       {/* Анализ потери скорости */}
       <div style={CARD}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginBottom: 6 }}>📉 Потеря скорости в сете</div>
-        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Скорости повторов через запятую: стоп сета при превышении порога {vlThreshold}% (для цели «{INTENT_RU[intent]}»).</div>
+        <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>Скорости повторов через запятую/точку с запятой: стоп сета при превышении порога {vlThreshold}% (для цели «{INTENT_RU[intent]}»). Диапазон 0.05–2.5 м/с, отрицательные игнорируются.</div>
         <input type="text" value={velocitiesStr} onChange={e => setVelocitiesStr(e.target.value)} style={{ ...IN, textAlign: 'left' as const, marginBottom: 8 }} placeholder="1.0, 0.94, 0.9, 0.86, 0.82" />
         {vlRes ? (
           <>
@@ -181,7 +308,7 @@ export const VBTCalcTab: React.FC = () => {
             )}
           </>
         ) : (
-          <div style={SMALL}>Введите скорости повторов в формате «1.0, 0.9, 0.8...».</div>
+          <div style={SMALL}>Введите скорости повторов в формате «1.0, 0.9, 0.8...» (0.05–2.5 м/с, отрицательные игнорируются).</div>
         )}
       </div>
 
@@ -229,12 +356,28 @@ export const VBTCalcTab: React.FC = () => {
 
       <div style={{ fontSize: 10, color: DIM, marginTop: 12, lineHeight: 1.4 }}>
         Источники: Gonzalez-Badillo & Sanchez-Medina (2010) для приседа/жима; Jovanovic M. (2017) VBT-методология.
-        Пороги потери скорости: power 10%, strength 20%, hypertrophy 25%, metabolic 40%.
+        Пороги потери скорости: power 10%, strength 20%, hypertrophy 25%, metabolic 40%. Ввод скоростей персистится (he_vbt_tab_v1).
       </div>
-{(lift === 'squat' || lift === 'bench' || lift === 'deadlift') && (
+      {(lift === 'squat' || lift === 'bench' || lift === 'deadlift' || lift === 'ohp') && (
         <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
-          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить e1RM ({LIFT_RU[lift]} = {e1RM} кг) как ПМ движения к планировщику — план пересчитает веса.</div>
-          <button onClick={() => applyToPlanner({ kind: 'pm', label: 'e1RM ' + LIFT_RU[lift] + ' ' + e1RM + ' кг', data: { lift: lift === 'deadlift' ? 'dead' : lift, value: e1RM } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить e1RM к ПМ планировщика</button>
+          <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить e1RM ({LIFT_RU[lift]} = {e1RM} кг) как ПМ движения к планировщику и хабу.</div>
+          <button
+            onClick={() => {
+              if (onHubPatch) {
+                const patch: any = {};
+                if (lift === 'squat') patch.squat = e1RM;
+                else if (lift === 'bench') patch.bench = e1RM;
+                else if (lift === 'deadlift') patch.dead = e1RM;
+                else if (lift === 'ohp') patch.ohp = e1RM;
+                else if (lift === 'row') patch.dead = Math.round(e1RM * 1.8);
+                if (Object.keys(patch).length) onHubPatch(patch);
+              }
+              applyToPlanner({ kind: 'pm', label: 'e1RM ' + LIFT_RU[lift] + ' ' + e1RM + ' кг', data: { lift: lift === 'deadlift' ? 'dead' : lift, value: e1RM } as any });
+            }}
+            style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}
+          >
+            🛠 Применить e1RM к хабу и планировщику
+          </button>
         </div>
       )}
     </div>

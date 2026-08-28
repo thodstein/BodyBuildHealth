@@ -1,8 +1,9 @@
 /**
- * pl-points.engine.ts — очковые формулы пауэрлифтинга (мужчины).
- * Источник коэффициентов: спецификация «Система» 2026.
+ * pl-points.engine.ts — очковые формулы пауэрлифтинга (мужчины, legacy).
+ * @deprecated Канон — src/engines/pro/relative-strength.engine.ts (sex-aware Wilks/DOTS/IPF GL).
+ * Этот файл оставлен для совместимости: мужские коэффициенты только. Для женщин используйте relative-strength.
+ * Glossbrenner — только мужские (женские не опубликованы, см. P0-3).
  * IPF GL: 0-120 шкала (100+ = элита). DOTS/Wilks/Glossbrenner: 300-500 шкала.
- * Женские коэффициенты не предоставлены — добавить позже.
  */
 
 export type PointsFormula = 'ipf_gl' | 'dots' | 'wilks' | 'glossbrenner';
