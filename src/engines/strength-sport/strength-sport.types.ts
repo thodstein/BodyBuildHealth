@@ -67,6 +67,8 @@ export interface StrengthSportInput {
   competitionDate?: string;
   startDate?: string;
   acwr?: { ratio: number; zone: 'undertrained'|'optimal'|'caution'|'dangerous' } | null;
+  velocityLossPct?: number; // P1 VBT: потеря скорости %
+  cardioSuggested?: boolean; // P2: zone2 подсказан
 }
 
 export interface StrengthSportSet {

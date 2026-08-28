@@ -7,7 +7,7 @@ import React, { useState, useMemo } from 'react';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
 import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../../engines/strength-sport/strength-sport-split-patterns';
-import { buildStrengthCsv, downloadStrengthCsv, buildStrengthPrintHtml, shareStrengthDigest } from '../../../engines/strength-sport/strength-sport-export';
+import { buildStrengthCsv, downloadStrengthCsv, buildStrengthPrintHtml, shareStrengthDigest, buildStrengthTelegramUrl, buildStrengthShareHash } from '../../../engines/strength-sport/strength-sport-export';
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
@@ -42,6 +42,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [competitionDate, setCompetitionDate] = useState<string>('');
   const [patternId, setPatternId] = useState<string>('');
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
+  const [velocityLoss, setVelocityLoss] = useState<number>(0);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -138,6 +139,7 @@ export const StrengthSportConstructor: React.FC = () => {
       competitionDate: competitionDate || undefined,
       startDate: new Date().toISOString().slice(0,10),
       acwr: acwr as any,
+      velocityLossPct: velocityLoss > 0 ? velocityLoss : undefined,
       patternId: patternId || undefined,
       ...extra,
     } as any;
@@ -172,7 +174,17 @@ export const StrengthSportConstructor: React.FC = () => {
       if (patch.weight != null) {
         if (patch.weight < 0 || patch.weight > 500) { setMsg('Вес вне диапазона 0-500'); return prev; }
         ex.weight = patch.weight;
-        ex.workSets = ex.workSets.map(s => ({ ...s, weight: patch.weight! }));
+        // P1: pct autosync — вес ↔ %ПМ (база из workMax)
+        const wmAny: any = (prev as any)?.inputSnapshot?.workMax || workMax || {};
+        let base = 100;
+        const lid = ex.id;
+        if (['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2'].includes(lid) || lid.includes('snatch')) base = wmAny.snatch || 60;
+        else if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(lid) || lid.includes('clean') || lid.includes('jerk')) base = wmAny.cleanJerk || wmAny.clean || wmAny.frontSquat || 80;
+        else if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip','pause_squat','overhead_squat_v2'].includes(lid) || lid.includes('squat')) base = wmAny.backSquat || wmAny.frontSquat || 100;
+        else if (['deadlift','sumo_dl','axle_deadlift','rdl','deficit_pull','pause_pull'].includes(lid)) base = wmAny.deadlift || 120;
+        else if (['ohp','push_press','log_press','circus_db_press','bench_bar','jerk_recovery','behind_neck_jerk'].includes(lid)) base = wmAny.overheadPress || wmAny.bench || wmAny.logPress || 60;
+        const newPct = base ? Math.round(patch.weight / base * 100) : 0;
+        ex.workSets = ex.workSets.map(s => ({ ...s, weight: patch.weight!, pct: newPct || s.pct }));
       }
       if (patch.reps != null) {
         ex.reps = patch.reps;
@@ -262,6 +274,8 @@ export const StrengthSportConstructor: React.FC = () => {
             <label style={{ color: '#fff', fontSize: 11 }}>Старт: <input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={{ padding: 4, borderRadius: 6, fontSize: 10 }} /></label>
           </div>
           {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a', background: 'rgba(255,255,255,0.04)', padding: 4, borderRadius: 4 }}>ACWR {acwr.ratio} · {acwr.zone} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</div>}
+          <label style={{ color: '#fff', fontSize: 11 }}>VBT потеря скорости: {velocityLoss}% {velocityLoss>20?'— снизьте объём':''}</label>
+          <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} />
           {(() => {
             const sn = workMax.snatch||0, cj = workMax.cleanJerk||workMax.clean||0, sq = workMax.backSquat||0, dl = workMax.deadlift||0;
             const warns: string[] = [];
@@ -468,6 +482,7 @@ export const StrengthSportConstructor: React.FC = () => {
             <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>🖨 Печать (HTML)</button>
             <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📊 CSV (Excel)</button>
             <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест скопирован'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📋 Дайджест</button>
+            <button onClick={()=> { const url=buildStrengthTelegramUrl(plan); navigator.clipboard?.writeText(url); setMsg('Telegram ссылка скопирована'); try{ window.open(url,'_blank'); }catch{} }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,136,204,0.15)', color: '#2ca5e0', border: '1px solid rgba(0,136,204,0.3)', cursor: 'pointer' }}>✈ Telegram</button>
             <button onClick={exportToUserProgram} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.15)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>Экспорт в программу</button>
           </div>
           {msg && <div style={{ color: '#00e68a', fontSize: 11 }}>{msg}</div>}

@@ -127,6 +127,26 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     if (lmPress && liftsOverhead > lmPress.mrv) warnings.push(`Нед ${wk.week}: жим/лог ${liftsOverhead} сетов > MRV ${lmPress.mrv}.`);
     if (lmCarry && carryMeters > lmCarry.mrv) warnings.push(`Нед ${wk.week}: переноски ${carryMeters}м > MRV ${lmCarry.mrv}м.`);
     if (lmStone && stoneLifts > lmStone.mrv) warnings.push(`Нед ${wk.week}: камни ${stoneLifts} подъёмов > MRV ${lmStone.mrv}.`);
+    // P2: Joint JSI — тяжёлые йок/лог >2.2×BW риск поясницы/плеча
+    const bwAny = (plan.inputSnapshot as any)?.bodyweight as number | undefined;
+    if (typeof bwAny === 'number' && bwAny > 0) {
+      const maxYoke = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> e.id==='yoke_walk').flatMap(e=> e.workSets.map(ws=> ws.weight))));
+      const maxLog = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> ['log_press','circus_db_press'].includes(e.id)).flatMap(e=> e.workSets.map(ws=> ws.weight))));
+      const maxStone = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> ['atlas_stone_load','stone_lift'].includes(e.id)).flatMap(e=> e.workSets.map(ws=> ws.weight))));
+      if (maxYoke > bwAny * 2.5) warnings.push(`Нед ${wk.week}: йок ${maxYoke}кг >2.5×BW — высокий стресс поясницы/колен, добавьте кор и +отдых.`);
+      if (maxLog > bwAny * 0.9) warnings.push(`Нед ${wk.week}: лог ${maxLog}кг ~${Math.round(maxLog/bwAny*100)}% BW — контроль плеча, добавьте стабилизацию.`);
+      if (maxStone > bwAny * 1.2) warnings.push(`Нед ${wk.week}: камень ${maxStone}кг >1.2×BW — поясница, используйте пояс и технику.`);
+    }
+    // P1 VBT — потеря скорости >20% (если передана)
+    const vLoss = (plan.inputSnapshot as any)?.velocityLossPct as number | undefined;
+    if (typeof vLoss === 'number' && vLoss > 20) {
+      warnings.push(`Нед ${wk.week}: VBT потеря ${vLoss}% >20% — снизьте объём 10%, +1 RIR (усталость ЦНС).`);
+    }
+    // P2 cardio для ТА — 1× zone2 30 мин для восстановления
+    if (plan.mode === 'weightlifting' && !plan.outsideMetrics && wk.week === 1 && !(plan.inputSnapshot as any)?.cardioSuggested) {
+      // soft рекомендация — не каждый план, только первая неделя
+      if ((liftsSnatch + liftsClean) > 60) warnings.push(`Рекомендация: 1×/нед zone2 25-30 мин для активного восстановления (не мешает ТА, улучшает лактат).`);
+    }
     // баланс push/pull — только для wl/hybrid; для strongman отдельно overhead vs carry?
     const push = liftsOverhead;
     const pull = liftsPull + wk.sessions.flatMap(s=> s.exercises.filter(e=> ['row_bar','row_db','pullup'].includes(e.id))).reduce((a,e)=> a+e.sets,0);

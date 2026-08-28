@@ -30,11 +30,16 @@ describe('strength-sport PRO gym', () => {
     expect(f).not.toContain('yoke_walk');
     expect(f).toContain('back_squat');
   });
-  it('filterByInjury knee removes squat', () => {
+  it('filterByInjury knee exclude removes squat', () => {
     const pool=['back_squat','deadlift','ohp'];
-    const f = filterByInjury(pool, [{type:'knee', location:'knee'} as any]);
+    const f = filterByInjury(pool, [{type:'knee', location:'knee', exclude:true} as any]);
     expect(f).not.toContain('back_squat');
     expect(f).toContain('ohp');
+  });
+  it('filterByInjury knee graded keeps squat (gentle via weight ×0.6)', () => {
+    const pool=['back_squat','deadlift','ohp'];
+    const f = filterByInjury(pool, [{type:'knee', location:'knee'} as any]);
+    expect(f).toContain('back_squat');
   });
   it('selectDiverse respects ANGLE', () => {
     const pool=['snatch','hang_snatch','snatch_pull','back_squat'];

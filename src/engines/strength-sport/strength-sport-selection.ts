@@ -67,15 +67,21 @@ export function filterByTier(pool: string[], level: string, allowExotic?: boolea
   return out;
 }
 
-// Injury: простое правило — если injuries содержит knee/back/shoulder — убираем соответствующие паттерны
+// Injury: P1 graded vs exclude — только exclude удаляет, graded идёт через gentleFactor 0.6
 export function filterByInjury(pool: string[], injuries: any[] | undefined): string[] {
   if (!injuries || injuries.length === 0) return pool;
+  // проверяем есть ли хоть один exclude-флаг
+  const hasExclude = injuries.some((it:any)=>{
+    if(typeof it === 'string') return it.toLowerCase().includes('исключ') || it.toLowerCase().includes('exclude') || it.includes('⛔');
+    return it?.exclude === true || it?.type === 'exclude' || String(it?.severity||'').toLowerCase()==='high' || String(it?.mode||'').toLowerCase()==='exclude';
+  });
+  if (!hasExclude) return pool; // graded — не фильтруем, только gentle
   const txt = JSON.stringify(injuries).toLowerCase();
   let out = [...pool];
-  if (txt.includes('knee') || txt.includes('колен')) out = out.filter(id => !['back_squat','front_squat','hack_squat','bulgarian_split','squat'].includes(id));
-  if (txt.includes('back') || txt.includes('спин') || txt.includes('поясниц')) out = out.filter(id => !['deadlift','sumo_dl','axle_deadlift','yoke_walk','atlas_stone_load'].includes(id));
-  if (txt.includes('shoulder') || txt.includes('плеч')) out = out.filter(id => !['snatch','log_press','push_jerk','split_jerk','overhead_squat_v2'].includes(id));
-  if (txt.includes('wrist') || txt.includes('запяст')) out = out.filter(id => !['clean_and_jerk','front_squat_clean_grip'].includes(id));
+  if (txt.includes('knee') || txt.includes('колен')) out = out.filter(id => !['back_squat','front_squat','hack_squat','bulgarian_split','squat','overhead_squat_v2','snatch_balance'].includes(id));
+  if (txt.includes('back') || txt.includes('спин') || txt.includes('поясниц')) out = out.filter(id => !['deadlift','sumo_dl','axle_deadlift','yoke_walk','atlas_stone_load','snatch_pull','clean_pull','deficit_pull','pause_pull'].includes(id));
+  if (txt.includes('shoulder') || txt.includes('плеч')) out = out.filter(id => !['snatch','deficit_snatch','block_snatch','pause_snatch','log_press','push_jerk','split_jerk','overhead_squat_v2','jerk_recovery','behind_neck_jerk','push_press'].includes(id));
+  if (txt.includes('wrist') || txt.includes('запяст')) out = out.filter(id => !['clean_and_jerk','front_squat_clean_grip','hang_clean','power_clean','deficit_clean','block_clean','pause_clean'].includes(id));
   return out;
 }
 

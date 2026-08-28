@@ -150,11 +150,16 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   if (acwr?.zone === 'dangerous' && sets > 2) sets = Math.max(2, Math.round(sets * 0.65));
   else if (acwr?.zone === 'caution' && sets > 2) sets = Math.max(2, Math.round(sets * 0.85));
   else if (acwr?.zone === 'undertrained') sets = Math.min(6, sets + 1);
+  // P1 VBT: потеря скорости >20% — срезаем объём 10%
+  const vLoss = (input as any).velocityLossPct as number | undefined;
+  if (typeof vLoss === 'number' && vLoss > 20 && sets > 2) sets = Math.max(2, Math.round(sets * 0.90));
   const rir = rirForWeek(week, input.weeks, input.goal, isOly(id));
   let finalRir = rir;
   if (phase === 'deload') finalRir = 4;
   else if (acwr?.zone === 'dangerous') finalRir = Math.min(4, finalRir + 2);
   else if (acwr?.zone === 'caution') finalRir = Math.min(4, finalRir + 1);
+  else if (typeof vLoss === 'number' && vLoss > 25) finalRir = Math.min(4, finalRir + 1);
+  else if (typeof vLoss === 'number' && vLoss > 20) finalRir = Math.min(4, finalRir + 1);
   const gentle = gentleFactor(id, input.injuries as any);
   let finalWeight = baseWeight;
   let finalReps = reps;

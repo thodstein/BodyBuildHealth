@@ -52,3 +52,23 @@ export function shareStrengthDigest(plan: StrengthSportPlan): string {
   const s = w1 ? w1.sessions.map(sess=> `${sess.sessionTag} ${sess.exercises.map(e=> e.name).join(', ')}`).join(' | ') : '';
   return `Стронг+ТА ${plan.mode} ${plan.weeks}нед ${plan.level} · ${s}`.slice(0, 1800);
 }
+
+// P2: telegram hash share (порт pl-export hash)
+export function buildStrengthShareHash(plan: StrengthSportPlan): string {
+  try{
+    const payload = { id: plan.id, mode: plan.mode, weeks: plan.weeks, level: plan.level, workMax: plan.workMax, patternId: plan.patternId, digest: shareStrengthDigest(plan).slice(0, 500) };
+    const json = JSON.stringify(payload);
+    // btoa utf8
+    const b64 = typeof btoa !== 'undefined' ? btoa(unescape(encodeURIComponent(json))) : Buffer.from(json, 'utf8').toString('base64');
+    return b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }catch{ return ''; }
+}
+export function buildStrengthTelegramUrl(plan: StrengthSportPlan): string {
+  const h = buildStrengthShareHash(plan);
+  const d = shareStrengthDigest(plan);
+  return `https://t.me/share/url?url=${encodeURIComponent(`https://app.local/#strength-${h}`)}&text=${encodeURIComponent(d)}`;
+}
+export function buildStrengthDigestWithHash(plan: StrengthSportPlan): string {
+  const h = buildStrengthShareHash(plan);
+  return `${shareStrengthDigest(plan)}\n\n#strength-${h}`;
+}
