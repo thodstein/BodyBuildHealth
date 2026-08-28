@@ -34,6 +34,8 @@ const SUPP_DOSE: Record<string, number> = {
   supp_pea_protein: 60, supp_rice_protein: 60, supp_hemp_protein: 60,
   supp_pumpkin_protein: 60, supp_hydrolyzed_whey: 60, supp_mass_gainer: 100,
   mass_gainer: 100, protein_bar: 80, bar_protein: 80,
+  // Р-2.3 (Aug 28): клетчаточные добавки — дозировки, не еда
+  psyllium_husk: 15, glucomannan: 10, inulin: 20,
 };
 
 const DEFAULT_SUPP_GRAMS = 30;

@@ -183,6 +183,9 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
   glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
   supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
   amylopectin: 90, dextrose: 90, maltodextrin: 90, vitargo: 90, isoton: 90, isotonic: 90, drink_isotonic: 90, collagen_hydrolysate: 20,
+  // Р-2.3 (Aug 28): клетчаточные добавки — дозировки, не еда (порция 10 г; 300 г псиллиума
+  // = 240 г клетчатки — опасно для ЖКТ). ВСАМ им сюда: saf fiber-supplements.
+  psyllium_husk: 15, glucomannan: 10, inulin: 20, Benefiber: 20, wheat_bran_supplement: 30, cocoa: 30,
 };
 // Глобальный лимит на одну порцию любого продукта (г)
 // Этап 6: для уровня «Максимум»/enhanced лимиты выше, чтобы высококалорийные планы
@@ -956,9 +959,12 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   const isMeatFish = cat === 'protein';
   const isFruitVegFresh = cat === 'veg_fruit';
   const isDairy = cat === 'dairy';
+  // Р-2.3: клетчаточные добавки (псиллиум и др.) — сетка дозировок [5,10,15], не «тарелка»
+  const isFiberSupp = cat === 'supplement' && (food.fiber || 0) >= 30;
   // Яйца целыми штуками: 1 яйцо ≈ 55 г съедобной части (55/110/165/220…)
   const isEggWhole = id === 'egg_whole' || id.startsWith('egg_whole');
   if (isEggWhole) { const eggs = Math.max(1, Math.round(base / 55)); base = eggs * 55; }
+  else if (isFiberSupp) base = snap(base, [5, 10, 15]);
   else if (isPorridge) base = snap(base, [50, 100, 125, 150, 200, 250]);
   else if (isLiquid) base = snap(base, [100, 150, 200, 250, 300, 400, 500, 750, 1000]);
   else if (isOil) base = snap(base, [5, 10, 15, 30]);
@@ -986,10 +992,13 @@ export function snapPortionG(food: FoodItem, grams: number): number {
   const isMeatFish = cat === 'protein';
   const isFruitVeg = cat === 'veg_fruit';
   const isDairy = cat === 'dairy';
+  // Р-2.3: клетчаточные добавки — сетка дозировок
+  const isFiberSupp = cat === 'supplement' && (food.fiber || 0) >= 30;
   let brackets: number[];
   const _isEggWholeSnap = id === 'egg_whole' || id.startsWith('egg_whole');
   if (_isEggWholeSnap) { const eggs = Math.max(1, Math.round(grams / 55)); return eggs * 55; }
-  if (isPorridge) brackets = [50, 100, 125, 150, 200, 250];
+  if (isFiberSupp) brackets = [5, 10, 15];
+  else if (isPorridge) brackets = [50, 100, 125, 150, 200, 250];
   else if (isLiquid) brackets = [100, 150, 200, 250, 300, 400, 500, 750, 1000];
   else if (isOil) brackets = [5, 10, 15, 30];
   else if (isAvocado) brackets = [50, 70, 100, 150];
@@ -1010,6 +1019,9 @@ export function snapPortionG(food: FoodItem, grams: number): number {
   }
   let best = brackets[0]; let bestDiff = Math.abs(grams - best);
   for (const b of brackets) { const d = Math.abs(grams - b); if (d < bestDiff || (d === bestDiff && b > best)) { bestDiff = d; best = b; } }
+  // Р-2.3: кап добавок (псиллиум и др. — дозировки, не еда)
+  const _supCap = SUPPLEMENT_MAX_G[food.id];
+  if (_supCap != null) best = Math.min(best, _supCap);
   return best;
 }
 
@@ -2898,11 +2910,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // 30г = 1 скуп, не 34г = 1.1 скупа. Для цельных продуктов snap ломает сходимость.
         const fd2 = FOOD_DB.find(f => f.id === item.id);
         const isPowder = fd2?.category === 'supplement';
-        // Р-2.1: анти-вырожденный минимум при резке — только БЕЛОК ≥40 г в основных
-        // приёмах (10 г курицы = «18 г каши»-класс). Углеводы режутся свободно — их
-        // дневная сходимость (БАГ-10/refeed-тесты) важнее per-meal пола.
+        // Р-2.1: анти-вырожденный минимум при резке — белок ≥40 г (solid main) / ≥20 г
+        // (порошок в любом приёме — MPS-порция); углеводы режутся свободно (сходимость)
         const _isMainMeal = !/Перекус|Полдник|Второй завтрак|Перед сном/i.test(meal.label || '') && meal.type !== 'presleep';
-        const _downFloor = Math.max(suppMin, (item.role === 'protein' && _isMainMeal && !isPowder) ? 40 : 0);
+        const _proteinMin = isProtein ? ((item.role === 'protein' && _isMainMeal && !isPowder) ? 40 : 20) : 0;
+        const _downFloor = Math.max(suppMin, _proteinMin, (item.role === 'fruit' ? 30 : 0));
         const newAmount = isPowder && fd2 ? snapPortionG(fd2, Math.max(_downFloor, Math.min(upCap, rawNew))) : Math.max(_downFloor, Math.min(upCap, rawNew));
         const factor = newAmount / (item.amount || 1);
         item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
@@ -3254,10 +3266,48 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
   }
 
+  // ─── Р-2.3 (Aug 28): МЕЖПРИЁМНЫЙ БАЛАНС — жалоба «полдник 52%, завтрак/обед по 12%» ──
+  // Каждый приём подтягивается к своей целевой доле КБЖУ (ratio = target/actual,
+  // кламп 0.7-1.5). Белок в основных приёмах не опускается ниже 40 г (Р-2.1).
+  // ПОРЯДОК: баланс → P4b (белок) → P4c (жир) → посадка (точность дня).
+  for (const m of meals) {
+    const t = (m as any).target;
+    if (!t) continue;
+    const tk = (t.p || 0) * 4 + (t.c || 0) * 4 + (t.f || 0) * 9;
+    const ak = m.totals?.kcal || 0;
+    if (tk <= 0 || ak <= 0) continue;
+    const ratio = Math.max(0.7, Math.min(1.5, tk / ak));
+    if (Math.abs(1 - ratio) < 0.08) continue; // уже сбалансирован
+    const _isMainM = ['breakfast', 'lunch', 'dinner'].includes(m.type);
+    m.items.forEach(it => {
+      let na = Math.max(5, Math.round((it.amount || 0) * ratio));
+      const _fdB = FOOD_DB.find(f => f.id === it.id);
+      // Р-2.1: цельный белок основных приёмов ≥40 г, гарнир ≥18 г, сыворотка peri ≥20 г
+      if (_isMainM && it.role === 'protein' && _fdB && _fdB.category !== 'supplement' && na < 40 && (it.amount || 0) >= 40) na = 40;
+      if (_isMainM && it.role === 'carb_slow' && na < 18 && (it.amount || 0) >= 18) na = 18;
+      if ((it.role === 'fast_protein' || it.role === 'slow_protein') && na < 20 && (it.amount || 0) >= 20) na = 20;
+      if (na === it.amount) return;
+      const r = na / (it.amount || 1);
+      it.amount = na;
+      it.kcal = Math.round(it.kcal * r);
+      it.p = Math.round(it.p * r * 10) / 10; it.f = Math.round(it.f * r * 10) / 10; it.c = Math.round(it.c * r * 10) / 10;
+      it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+      it.leucine_mg = Math.round((it.leucine_mg || 0) * r);
+    });
+    m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+  }
+  totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+  totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
+  totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
+  totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
+  totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+  totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+
   // P4b (Aug 28): ФИНАЛЬНАЯ белковая коррекция — ПОСЛЕ FINAL SNAP (сетка мяса/рыбы от 100 г
   // возвращала урезанный D-23-лосось 30г → 100г, +14 г белка) и ДО посадки (иначе ккал после
   // резки белка не добирается). Включает veg-роль с белком ≥10 г (D-23-добавки: лосось/печень).
   // БЕЗ snapPortionG — сетка мяса/рыбы [100,150,200...] возвращала урезанные 95г → 100г.
+  // Роунд-2: стоит ПОСЛЕ межприёмного баланса (баланс сдвигает белок, кламп замыкает).
   {
     const goalP4b = adjustedProteinG || input.goalProteinG;
     let guard4b = 6;
@@ -3345,16 +3395,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const need = target - cur; // >0 недобор, <0 перебор
       if (Math.abs(need) < 0.5) break;
       if (need < 0) {
-        // Перебор: урезать самый калорийный НЕ-белковый (кроме случая когда белок сам worst)
+        // Перебор: урезать item с НАИБОЛЬШИМ содержанием перебираемого МАКРО
+        // (раньше — «самый калорийный»: при жире↑ резали крупу, а не масло → осцилляция
+        // жир↑/угли↓ без сходимости). Белок НЕ режется посадкой вообще — им управляет P4b
+        // (посадочная резка сыворотки до 17 г ломала MPS-порцию).
         let bMi=-1,bIi=-1,bSaved=0;
         meals.forEach((m,mi)=> (m.items||[]).forEach((it:any,ii:number)=>{
           const role=(it as any).role||'';
           const isProtein = role==='protein'||role==='slow_protein'||role==='fast_protein';
-          if (isProtein && effWorst!=='p' && devP <= 0.03) return;
+          if (isProtein) return;
           if ((it.amount||0) < 20) return;
-          const per100 = effWorst==='p' ? (FOOD_DB.find((f:any)=>f.id===it.id)?.protein||0) : effWorst==='c' ? (FOOD_DB.find((f:any)=>f.id===it.id)?.carbs||0) : (FOOD_DB.find((f:any)=>f.id===it.id)?.fat||0);
+          const _fdCut = FOOD_DB.find((f:any)=>f.id===it.id);
+          const per100 = effWorst==='p' ? (_fdCut?.protein||0) : effWorst==='c' ? (_fdCut?.carbs||0) : (_fdCut?.fat||0);
           if (per100<=0) return;
-          const saved = (it.kcal||0) * 0.12;
+          // Р-2.3: ранжируем по ГРАММАМ перебираемого макро в порции (жир↑ → режем жирнейший)
+          const saved = (it.amount||0) * per100 / 100;
           if (saved > bSaved) { bSaved=saved; bMi=mi; bIi=ii; }
         }));
         if (bIi<0 || bSaved < 10) break;
@@ -3394,11 +3449,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         };
         const pool = FOOD_DB.filter((f:any)=>{
           if (!_foodAllowed(f)) return false;
-          // Aug 28: пул добавки — «чистые» степлы по роли с МИНИМАЛЬНЫМ белковым side-эффектом:
-          // для 'c' — продукты с белком ≤6 г/100 (лайм/мёд/сахар — победители плотности; овсянка/
-          // отруби с 13-15 г белка/100 раздували белок дня на +15%), для 'f' — то же (масла, не орехи).
+          // Р-2.3: для 'c' — крупы/крахмалы (рис 7 г белка/100 должен проходить!)
           if (effWorst==='p') return (f.protein||0) > 10 && (f.carbs||0) <= 8;
-          if (effWorst==='c') return (f.carbs||0) > 8 && (f.protein||0) <= 6;
+          if (effWorst==='c') return (f.carbs||0) > 8 && (f.protein||0) <= 14;
           return (f.fat||0) > 8 && (f.protein||0) <= 6;
         }).sort((a:any,b:any)=>{
           const av = effWorst==='p' ? (a.protein||0)/(a.kcal||1) : effWorst==='c' ? (a.carbs||0)/(a.kcal||1) : (a.fat||0)/(a.kcal||1);

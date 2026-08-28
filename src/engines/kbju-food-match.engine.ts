@@ -299,6 +299,9 @@ export const SUPPLEMENT_DOSE_CAP: Record<string, number> = {
   pre_workout: 15, supp_creatine_hcl: 5, aminos_complex: 15, isotonic: 30,
   supp_acetyl_carnitine: 2, supp_tyrosine: 3,
   supp_betaine: 5, supp_cla: 3, supp_bone_broth_protein: 25,
+  // Р-2.3 (Aug 28): клетчаточные добавки — дозировки, не еда (псиллиум 300 г = 240 г
+  // клетчатки — опасно; порция 10 г)
+  psyllium_husk: 15, glucomannan: 10, inulin: 20, wheat_bran_supplement: 30,
 };
 
 /** Дефолтная доза (г), если ID нет в кап-карте */
