@@ -1,15 +1,110 @@
 /**
- * combat-weight-cut.engine.ts — весогонка ISSN 2025 (stub P1.1 → full P2.3)
- * Полный протокол — в фазе 2.3. Сейчас минимальный тип для сборки.
+ * combat-weight-cut.engine.ts — весогонка ISSN 2025 (full).
+ * Источники: ISSN 2025 Fight Camp 8-10нед, тапер 1-2нед -40% vol + heat + water/sodium/carb манипуляции,
+ * Barley et al. Sports 2019 weight-cut prevalence, rehydration 125-150%.
+ * Изолировано.
  */
+export type WaterMode = 'stable' | 'load_cut'; // load 8-10л → 2л fight week
+export type SodiumMode = 'stable' | 'moderate_cut'; // 5г→3г→1.5г
+export type CarbMode = 'stable' | 'deplete_reload'; // 4г/кг →1г/кг 3д →8г/кг 2д
+
 export interface WeightCutProtocol {
   targetLossKg: number;
-  weeksOut: number;
-  waterMode?: 'stable' | 'load_cut';
-  sodiumMode?: 'stable' | 'moderate_cut';
-  carbMode?: 'stable' | 'deplete_reload';
+  weeksOut: number; // 4-12
+  startWeightKg?: number;
+  targetWeightKg?: number;
+  waterMode: WaterMode;
+  sodiumMode: SodiumMode;
+  carbMode: CarbMode;
+  heatSessions?: boolean; // сауна 15-20′×3/нед в тапер
+  dailyStepsTarget?: number;
+  notes?: string[];
 }
-export function buildWeightCutProtocol(lossKg: number): WeightCutProtocol | null {
+
+export function buildWeightCutProtocol(
+  lossKg: number,
+  opts?: Partial<WeightCutProtocol> & { startWeightKg?: number }
+): WeightCutProtocol | null {
   if (!lossKg || lossKg <= 0) return null;
-  return { targetLossKg: lossKg, weeksOut: 8, waterMode: 'stable', sodiumMode: 'stable', carbMode: 'stable' };
+  const w = Math.max(2, Math.min(12, Math.round(lossKg > 6 ? 10 : lossKg > 3 ? 8 : 6)));
+  return {
+    targetLossKg: lossKg,
+    weeksOut: opts?.weeksOut ?? w,
+    startWeightKg: opts?.startWeightKg,
+    targetWeightKg: opts?.startWeightKg ? opts.startWeightKg - lossKg : undefined,
+    waterMode: opts?.waterMode ?? (lossKg >= 4 ? 'load_cut' : 'stable'),
+    sodiumMode: opts?.sodiumMode ?? (lossKg >= 3 ? 'moderate_cut' : 'stable'),
+    carbMode: opts?.carbMode ?? (lossKg >= 5 ? 'deplete_reload' : 'stable'),
+    heatSessions: opts?.heatSessions ?? lossKg >= 3,
+    dailyStepsTarget: opts?.dailyStepsTarget,
+    notes: opts?.notes,
+  };
+}
+
+export function weightCutPhaseForWeek(week: number, totalWeeks: number, protocol: WeightCutProtocol | null): 'camp' | 'taper' | 'fight_week' | null {
+  if (!protocol) return null;
+  if (week === totalWeeks) return 'fight_week';
+  if (week >= totalWeeks - 1) return 'taper';
+  return 'camp';
+}
+
+export function weightCutVolumeMultiplier(week: number, totalWeeks: number, protocol: WeightCutProtocol | null): number {
+  if (!protocol) return 1;
+  const ph = weightCutPhaseForWeek(week, totalWeeks, protocol);
+  if (ph === 'fight_week') return 0.65; // fight week — минимум зала
+  if (ph === 'taper') return 0.82;
+  return 1;
+}
+
+export function weightCutNutritionForWeek(
+  week: number,
+  totalWeeks: number,
+  protocol: WeightCutProtocol | null,
+  bodyweightKg?: number
+): { kcal: number | null; proteinG: number | null; carbsG: number | null; waterMl: number | null; sodiumMg: number | null; notes: string[] } {
+  if (!protocol || bodyweightKg == null || bodyweightKg <= 30) return { kcal: null, proteinG: null, carbsG: null, waterMl: null, sodiumMg: null, notes: [] };
+  const ph = weightCutPhaseForWeek(week, totalWeeks, protocol);
+  const notes: string[] = [];
+  // белок 2.2г/кг camp, 2.3г/кг taper (защита мышц)
+  const protein = Math.round(bodyweightKg * (ph === 'taper' || ph === 'fight_week' ? 2.3 : 2.2));
+  let carbs = Math.round(bodyweightKg * 4); // camp
+  let water = Math.round(bodyweightKg * 35); // 35мл/кг
+  let sodium = 5000;
+  if (ph === 'taper') {
+    carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 1) : Math.round(bodyweightKg * 3);
+    water = protocol.waterMode === 'load_cut' ? 8000 : Math.round(bodyweightKg * 30);
+    sodium = protocol.sodiumMode === 'moderate_cut' ? 3000 : 4000;
+    notes.push('Тапер: углеводы ↓, вода ↑ (load) перед сливом');
+  } else if (ph === 'fight_week') {
+    carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 1) : Math.round(bodyweightKg * 2);
+    water = protocol.waterMode === 'load_cut' ? 2000 : Math.round(bodyweightKg * 20);
+    sodium = protocol.sodiumMode === 'moderate_cut' ? 1500 : 2500;
+    notes.push('Fight week: вода 2л + натрий 1.5г + углеводы 1г/кг (деплитация) → взвешивание → рефид 8г/кг + вода 150% + Na 1г/кг за 12-24ч');
+    if (protocol.heatSessions) notes.push('Сауна 15-20′×3 + sweat suit — компенсация ↓ объёма зала');
+  } else {
+    // camp — дефицит -15-20% TDEE, но ккал считаем вне (нужен TDEE), здесь только макро-ориентир
+    carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 4) : Math.round(bodyweightKg * 5);
+    water = Math.round(bodyweightKg * 35);
+    sodium = 5000;
+  }
+  // ккал ~ 4*P+4*C+9*F (жиры остаток 0.8г/кг)
+  const fat = Math.round(bodyweightKg * 0.8);
+  const kcal = protein * 4 + carbs * 4 + fat * 9;
+  return { kcal, proteinG: protein, carbsG: carbs, waterMl: water, sodiumMg: sodium, notes };
+}
+
+export function weightCutRehydrationNotes(lossKg: number): string[] {
+  return [
+    `Регидрейшн после взвешивания: 125-150% от потерянного (${(lossKg * 1.25).toFixed(1)}-${(lossKg * 1.5).toFixed(1)}л) за 12-24ч`,
+    'Натрий 1г/кг + углеводы 8г/кг в первые 12ч, контроль ЖКТ (не переливать >1л/ч)',
+    'Электролиты: Na 1г, K 0.5г, Mg 400мг, вода по жажде + моча светло-жёлтая',
+  ];
+}
+
+export function validateWeightCutProtocol(p: WeightCutProtocol): string[] {
+  const errs: string[] = [];
+  if (p.targetLossKg > 8) errs.push('Сгонка >8кг — высокий риск, требуется врач');
+  if (p.targetLossKg / p.weeksOut > 1.5) errs.push(`Темп ${(p.targetLossKg / p.weeksOut).toFixed(1)}кг/нед >1.5 — агрессивно, риск срыва`);
+  if (p.targetLossKg > 5 && p.weeksOut < 8) errs.push('При сгонке >5кг нужно ≥8 нед');
+  return errs;
 }

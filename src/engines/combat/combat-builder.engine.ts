@@ -7,6 +7,8 @@ import { computeOutsideMetrics, outsideVolumeMultiplier, isDayConflictWithOutsid
 import { getCombatPattern, recommendCombatPattern, type CombatPattern } from './combat-split-patterns';
 import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progression';
 import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
+import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale } from './combat-taper.engine';
+import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek } from './combat-weight-cut.engine';
 import { filterByTierCB, filterByInjuryCB, selectDiverseCB } from './combat-selection';
 import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
@@ -263,12 +265,20 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   })();
 
   const periodModelEarly: any = (input as any).periodizationModel || (goal === 'camp' ? 'camp_8' : weeks >= 9 ? 'atr_10' : 'linear');
+  const taperCfg = (input as any).fightDate ? { fightDate: (input as any).fightDate, taperWeeks: (input as any).taperWeeks || (goal === 'camp' ? 2 : 1), startDate: (input as any).startDate || null } as any : null;
+  const wcProtocol: any = (input as any).weightCutProtocol || (goal === 'weight_cut' && input.weightCutKg ? buildWeightCutProtocol(input.weightCutKg, { startWeightKg: input.bodyweight } as any) : null);
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline} · цель ${goal} · ${weeks} нед · ${pattern.name} · модель ${periodModelEarly}`);
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${outsideMetrics.interference}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''} · Budget ${weeklyBudget}`);
-  if (input.weightCutKg && input.weightCutKg > 0) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
-  if ((input as any).weightCutProtocol) rationale.push(`Протокол весогонки: ${(input as any).weightCutProtocol.targetLossKg}кг за ${(input as any).weightCutProtocol.weeksOut}нед`);
+  if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
+  if (wcProtocol) {
+    rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${wcProtocol.waterMode} · Na ${wcProtocol.sodiumMode} · угли ${wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
+    const nut = weightCutNutritionForWeek(1, weeks, wcProtocol, input.bodyweight || 80);
+    if (nut.kcal) rationale.push(`Питание W1: ${nut.kcal}ккал P${nut.proteinG}/C${nut.carbsG} · вода ${nut.waterMl}мл Na ${nut.sodiumMg}мг`);
+    rationale.push(weightCutRehydrationNotes(wcProtocol.targetLossKg)[0]);
+  }
+  if (taperCfg) rationale.push(...buildTaperRationale(taperCfg, weeks));
 
   const weeksData: CombatWeek[] = [];
   // periodization model: atr_10 для >=9 нед, иначе linear; camp → camp_8; conjugate явный
@@ -276,9 +286,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   for (let w = 1; w <= weeks; w++) {
     // ATR/linear/conjugate — единый источник
     let phase: string = phaseForCombatWeekATR(w, weeks, goal, periodModel);
-    // legacy fallback: если model linear и старая функция даёт другой taper — сохраняем ATR как канон (backward compat: маппим realization→taper для старой UI)
-    const deload = phase === 'deload';
-    const taper = phase === 'taper' || phase === 'realization';
+    let deload = phase === 'deload';
+    let taper = phase === 'taper' || phase === 'realization';
+    // fightDate override: тапер к бою важнее ATR
+    if (taperCfg && isTaperByFightDate(w, weeks, taperCfg)) {
+      taper = true;
+      deload = false;
+      phase = 'taper';
+    }
     // нормализуем phase для отображения: realization → taper (совместимость), accumulation→gpp etc при linear? оставляем как есть для ATR, для linear маппим
     if (periodModel === 'linear' || periodModel === 'camp_8') {
       // linear использует gpp/power/taper/deload — уже верные
@@ -322,12 +337,22 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const accentKey = id.includes('neck') ? 'neck' : (id.includes('grip')||id.includes('pinch')||id.includes('wrist')) ? 'grip' : (id.includes('landmine')||id.includes('pallof')||id.includes('med_ball')||id.includes('rotation')) ? 'rotational' : tag.includes('lower')||tag.includes('full') ? 'legs' : 'push';
         const accMult = (accentMap as any)[accentKey] || 1;
         if (accMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * accMult)));
-        if (goal === 'weight_cut' && sets > 2) sets -= 1;
+        if (wcProtocol) {
+          const wcm = weightCutVolumeMultiplier(w, weeks, wcProtocol);
+          if (wcm < 1) sets = Math.max(2, Math.round(sets * wcm));
+        } else if (goal === 'weight_cut' && sets > 2) sets -= 1;
         if (outsideMult < 0.75 && sets > 2) sets -= 1;
         if (acwrMult < 1 && sets > 2) sets = Math.max(2, Math.round(sets * acwrMult));
         else if (acwrMult > 1 && sets < 6) sets = Math.min(6, sets + 1);
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
-        else if (taper) sets = Math.max(2, Math.round(sets * 0.62));
+        else if (taper) {
+          if (taperCfg) {
+            const tm = taperVolumeMultiplier(w, weeks, taperCfg, false);
+            sets = Math.max(2, Math.round(sets * tm));
+          } else {
+            sets = Math.max(2, Math.round(sets * 0.62));
+          }
+        }
         const gentle = gentleFactorCB(id, input.injuries as any);
         let weight = weightForCombatExercise(id, input, goal);
         if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
@@ -339,6 +364,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
         const tempo = tempoForCB(id, isPrimary, effectiveCharacter as any);
         const rest = restForCB(isPrimary, effectiveCharacter as any, id);
+        const wcPhaseLocal = wcProtocol ? weightCutPhaseForWeek(w, weeks, wcProtocol) : null;
+        const wcComment = wcPhaseLocal==='fight_week' ? 'Fight week: вода 2л/Na1.5г/угли 1г/кг → взвешивание → рефид 8г/кг + 150% воды (контроль ЖКТ)' : wcPhaseLocal==='taper' ? 'Весогонка тапер: угли 1г/кг, вода 8л (load) → слив' : null;
         const ex: CombatExercise = {
           id,
           name: meta.name,
@@ -354,7 +381,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           warmupSets: isPrimary && weight > 20 ? [{ reps: 8, rir: 5, weight: Math.round(weight * 0.5 / 2.5) * 2.5, tempo, restSeconds: 60 }] : [],
           tempo,
           restSeconds: rest,
-          comment: (conflict && isLegDay) ? 'Снижена интенсивность: завтра высокая внезальная' : deload ? 'Делод' : gentle < 1 ? 'Щадящий: снижен вес, +RIR' : (meta as any).technique || undefined,
+          comment: (conflict && isLegDay) ? 'Снижена интенсивность: завтра высокая внезальная' : wcComment ? wcComment : deload ? 'Делод' : taper ? 'Тапер к бою: объём ↓ 35-55%, интенсивность 90-95%, спарринг ↓' : gentle < 1 ? 'Щадящий: снижен вес, +RIR' : (meta as any).technique || undefined,
         };
         exercises.push(ex);
       }
