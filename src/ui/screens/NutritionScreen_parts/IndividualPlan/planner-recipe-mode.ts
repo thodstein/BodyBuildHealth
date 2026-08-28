@@ -18,6 +18,7 @@ import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { decomposeRecipe, pickRecipesForMeal } from './recipe-engine';
+import { applyRealisticFloors } from './meal-plan-engine';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
 
 // ─── Типы формы плана (совместимо с форматом IndividualPlanContext) ────
@@ -40,6 +41,8 @@ export interface FlatRecipeOption {
   portions?: Record<string, number>;
   /** Масштаб порции рецепта к цели приёма (Aug 28, ×0.7-2.2) */
   appliedScale?: number;
+  /** Р-2.2: «закрывает приём на ~N%» после масштаба с капами (90-110% = зелёный) */
+  fitPct?: number;
 }
 
 export interface PlanMealLike {
@@ -800,73 +803,102 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // Масштаб дополнительно КАПИТСЯ по белку (≤1.25×цели), жиру (≤1.5×цели) и углям
     // (≤1.25×цели) — иначе ккал-масштаб рецепта раздувал доминирующий макрос в 2+ раза.
     const ranked = rankCands(cands);
-    const flats: FlatRecipeOption[] = ranked.slice(0, 3).map(flattenRecipeOption);
+    // Р-2.2: fitPct — «закрывает приём на ~N%» для каждого варианта (после масштаба
+    // с капами); 90-110% подсвечивается зелёным в UI, крайние значения — варн.
+    const flats: FlatRecipeOption[] = ranked.slice(0, 3).map(r => {
+      const f = flattenRecipeOption(r);
+      const t = decomposedFacts(r).totals;
+      if (t && t.kcal > 0 && targetKcal > 0) {
+        f.fitPct = Math.round(scaleOf(t.kcal, t.p, t.f, t.c) * t.kcal / Math.max(50, targetKcal) * 100);
+      }
+      return f;
+    });
     mealAny.recipeOptions = flats;
     mealAny.recipeOptionNames = flats.map(f => f.name);
-    // Автовыбор лучшего кандидата — авторские порции рецепта × масштаб к цели приёма.
-    // (жалоба «рецепты ужатые»: рецепт 500 ккал не дотягивал до обеда 1000 ккал, хвост
-    // выпадал голой курицей в перекус. Теперь порция масштабируется ×0.7-2.2, а остаток
-    // закрывается САЙДОМ в том же приёме.) Если у кандидата ПУСТАЯ декомпозиция (легаси)
-    // — пробуем следующий, иначе приём остался бы пустым.
-    let chosenFlat: FlatRecipeOption | null = null;
-    let items: PlanItemLike[] | null = null;
-    for (const cand of ranked) {
+    // Автовыбор лучшего кандидата — Р-2.2 «контур приёмки»: каждый ranked-кандидат
+    // собирается ЦЕЛИКОМ (масштаб ×0.7-2.2 с капами по Б/Ж/У → пол реалистичных порций
+    // → сайд-добивка в приём) и должен пройти гейт соответствия цели приёма:
+    //   |ккал − цель| ≤ 25%, Б ≥ 0.80×цели, Ж ≤ 1.35×цели, У ≥ 0.70×цели.
+    // Первый ПРОШЕДШИЙ берётся; ни один не прошёл — лучший по дистанции (как раньше)
+    // + вариант остаётся доступным пользователю. Пустая декомпозиция → следующий.
+    const tryBuild = (cand: Recipe): { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null => {
       const flat = flattenRecipeOption(cand);
       const built = buildRecipeMealItems(rebuildRecipeFromFlat(flat));
-      if (built && built.length > 0) { chosenFlat = flat; items = built; break; }
-    }
-    if (!chosenFlat || !items || items.length === 0) return;
-    const decompTot = sumMealTotals(items);
-    const s = scaleOf(decompTot.kcal || 1, decompTot.p, decompTot.f, decompTot.c);
-    let finalItems = (s !== 1)
-      ? items.map(it => scaleItem(it as PlanItemLike, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)))
-      : items as PlanItemLike[];
-    chosenFlat.appliedScale = s;
-    // Сайд-добивка В ТОТ ЖЕ приём: если после масштабирования приём недобирает >15% ккал,
-    // добавляем гарнир/жир по доминирующему дефициту макро (а не «хвост» в перекус).
-    let sideNote: string | null = null;
-    {
-      const tNow = sumMealTotals(finalItems);
-      const kcalNow = tNow.kcal || 0;
-      if (targetKcal > 0 && kcalNow < targetKcal * 0.85) {
-        const dP = (tgt.p || 0) - tNow.p;
-        const dC = (tgt.c || 0) - tNow.c;
-        const dF = (tgt.f || 0) - tNow.f;
-        const rel = (v: number, t: number) => v / Math.max(1, t);
-        const used = new Set(finalItems.map(i => i.id));
-        const sidePoolFor = (ids: string[]) => ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !used.has(f.id) && !excludedIds.has(f.id));
-        const dominant = Math.max(rel(dP, tgt.p || 30), rel(dC, tgt.c || 40), rel(dF, tgt.f || 15));
-        let pool: FoodItem[]; let macroOf: (f: FoodItem) => number; let dMacro: number; let role: string;
-        if (rel(dC, tgt.c || 40) >= rel(dP, tgt.p || 30) && rel(dC, tgt.c || 40) >= rel(dF, tgt.f || 15)) {
-          pool = sidePoolFor(['rice_white', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_basmati', 'bulgur']);
-          macroOf = f => f.carbs || 0; dMacro = dC; role = 'углеводы';
-        } else if (rel(dP, tgt.p || 30) >= rel(dF, tgt.f || 15)) {
-          pool = sidePoolFor(['chicken_breast', 'cottage_cheese_5', 'turkey_breast', 'egg_whole', 'tuna_fresh']);
-          macroOf = f => f.protein || 0; dMacro = dP; role = 'белок';
-        } else {
-          pool = sidePoolFor(['olive_oil', 'peanut_butter', 'avocado', 'walnuts']);
-          macroOf = f => f.fat || 0; dMacro = dF; role = 'жиры';
-        }
-        const ok = pool.filter(f => macroOf(f) > 5).sort((a, b) => macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1));
-        const side = ok[0];
-        if (side && dMacro > 8) {
-          let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, 300) / 10) * 10;
-          if (g >= 30) {
-            finalItems = [...finalItems, scaleItem({
-              name: side.name, id: side.id, amount: 100,
-              kcal: Math.round(side.kcal || 0), p: side.protein || 0, f: side.fat || 0, c: side.carbs || 0,
-              fiber: side.fiber || 0, role: role === 'углеводы' ? 'carb_slow' : role === 'белок' ? 'protein' : 'fat',
-            }, g)];
-            sideNote = `➕ Сайд к «${chosenFlat.name}»: ${side.name} ${g} г (${role}) — приём добран до своей доли без «хвоста» в перекус`;
+      if (!built || built.length === 0) return null;
+      const decompTot = sumMealTotals(built);
+      const s = scaleOf(decompTot.kcal || 1, decompTot.p, decompTot.f, decompTot.c);
+      let finalItems: PlanItemLike[] = (s !== 1)
+        ? built.map(it => scaleItem(it as PlanItemLike, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)))
+        : built as PlanItemLike[];
+      flat.appliedScale = s;
+      // Р-2.1: пол реалистичных порций в рецептурном ядре («18 г каши» — нет),
+      // бюджет строго ×1.03 от цели приёма — пол не рушит сходимость дня ±3%.
+      const _mealkT = (tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9;
+      finalItems = applyRealisticFloors(finalItems.map(it => ({ ...it, role: (it.role as any) || 'protein' })) as any, !!mealAny.target && /Перекус|Полдник|Второй завтрак/i.test(label), _mealkT ? _mealkT * 1.03 : undefined) as any;
+      // Сайд-добивка В ТОТ ЖЕ приём: если после масштабирования приём недобирает >15% ккал,
+      // добавляем гарнир/жир по доминирующему дефициту макро (а не «хвост» в перекус).
+      let sideNote: string | null = null;
+      {
+        const tNow = sumMealTotals(finalItems);
+        const kcalNow = tNow.kcal || 0;
+        if (targetKcal > 0 && kcalNow < targetKcal * 0.85) {
+          const dP = (tgt.p || 0) - tNow.p;
+          const dC = (tgt.c || 0) - tNow.c;
+          const dF = (tgt.f || 0) - tNow.f;
+          const rel = (v: number, t: number) => v / Math.max(1, t);
+          const used = new Set(finalItems.map(i => i.id));
+          const sidePoolFor = (ids: string[]) => ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !used.has(f.id) && !excludedIds.has(f.id));
+          let pool: FoodItem[]; let macroOf: (f: FoodItem) => number; let dMacro: number; let role: string;
+          if (rel(dC, tgt.c || 40) >= rel(dP, tgt.p || 30) && rel(dC, tgt.c || 40) >= rel(dF, tgt.f || 15)) {
+            pool = sidePoolFor(['rice_white', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_basmati', 'bulgur']);
+            macroOf = f => f.carbs || 0; dMacro = dC; role = 'углеводы';
+          } else if (rel(dP, tgt.p || 30) >= rel(dF, tgt.f || 15)) {
+            pool = sidePoolFor(['chicken_breast', 'cottage_cheese_5', 'turkey_breast', 'egg_whole', 'tuna_fresh']);
+            macroOf = f => f.protein || 0; dMacro = dP; role = 'белок';
+          } else {
+            pool = sidePoolFor(['olive_oil', 'peanut_butter', 'avocado', 'walnuts']);
+            macroOf = f => f.fat || 0; dMacro = dF; role = 'жиры';
+          }
+          const ok = pool.filter(f => macroOf(f) > 5).sort((a, b) => macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1));
+          const side = ok[0];
+          if (side && dMacro > 8) {
+            let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, 300) / 10) * 10;
+            if (g >= 30) {
+              finalItems = [...finalItems, scaleItem({
+                name: side.name, id: side.id, amount: 100,
+                kcal: Math.round(side.kcal || 0), p: side.protein || 0, f: side.fat || 0, c: side.carbs || 0,
+                fiber: side.fiber || 0, role: role === 'углеводы' ? 'carb_slow' : role === 'белок' ? 'protein' : 'fat',
+              }, g)];
+              sideNote = `➕ Сайд к «${flat.name}»: ${side.name} ${g} г (${role}) — приём добран до своей доли без «хвоста» в перекус`;
+            }
           }
         }
       }
+      return { flat, items: finalItems, totals: sumMealTotals(finalItems), sideNote };
+    };
+    let chosen: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null = null;
+    let fallback: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null = null;
+    for (const cand of ranked) {
+      const built = tryBuild(cand);
+      if (!built) continue;
+      if (!fallback) fallback = built;
+      const tk = built.totals.kcal || 1;
+      const passes = Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= 0.25
+        && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
+        && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
+        && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5;
+      if (passes) { chosen = built; break; }
     }
+    if (!chosen && !fallback) return;
+    const use = chosen || fallback!;
+    const chosenFlat = use.flat;
+    const finalItems = use.items;
     mealAny.items = finalItems;
-    mealAny.totals = sumMealTotals(finalItems);
+    mealAny.totals = use.totals;
     mealAny.recipeApplied = chosenFlat.name;
     mealAny.recipeAppliedData = chosenFlat;
-    if (sideNote) mealAny.rationale = [...(mealAny.rationale || []), sideNote];
+    if (use.sideNote) mealAny.rationale = [...(mealAny.rationale || []), use.sideNote];
+    if (!chosen) mealAny.rationale = [...(mealAny.rationale || []), `⚠ Рецепт «${chosenFlat.name}» не закрывает приём точно (${Math.round(use.totals.kcal)} из ~${Math.round(targetKcal)} ккал) — проверьте варианты`];
     dayUsedNames.add(chosenFlat.name);
     usedNamesAcrossDays?.add(chosenFlat.name);
     appliedCount++;
