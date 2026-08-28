@@ -13,6 +13,7 @@ import { createFromBuild } from '../user-program/program-store';
 import type { Injury } from '../manual-plan-builder';
 import type { BBTrainingFocus } from '../bb/bb-goal-types';
 import { toBBGoal, BB_GOALS_CANON } from '../goals';
+import { suggestExercisesPro } from './manual-selection.engine';
 
 export interface MuscleGroupPlan {
   muscle: string;
@@ -68,7 +69,7 @@ export interface AutoDraftOptions {
   proteinPerKg?: number;
 }
 
-/** Подбирает упражнения для одной мышечной группы: 1-2 базовых + 2-3 изоляции. */
+/** Подбирает упражнения для одной мышечной группы: 1-2 базовых + 2-3 изоляции. PRO-версия: multi-angle + strict + lengthened (Фаза 2). */
 export function suggestExercisesForGroup(
   group: string,
   level: string,
@@ -79,7 +80,18 @@ export function suggestExercisesForGroup(
   avoidAxialLoad = false,
   favoriteIds: string[] = [],
   excludeIds: string[] = [],
+  mobilityRestrictions: string[] = [],
+  trainingFocus?: 'strength'|'hypertrophy'|'endurance',
 ): SelectedExercise[] {
+  // PRO-подбор (ANGLE diversity + strict groups + lengthened bias + mobility)
+  try {
+    const res = suggestExercisesPro({
+      group, level, count, equipment, weakZones, injuryProfile,
+      avoidAxialLoad, favoriteIds, excludeIds,
+      mobilityRestrictions, trainingFocus,
+    });
+    if (res && res.length) return res as SelectedExercise[];
+  } catch { /* fallback */ }
   const pool: Exercise[] = getExercisesByGroup(group);
   if (pool.length === 0) return [];
   const wantCompound = count >= 2;
