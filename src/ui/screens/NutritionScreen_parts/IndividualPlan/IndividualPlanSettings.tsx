@@ -13,6 +13,7 @@ import { usePlanCtx } from "./IndividualPlanContext";
 import { getProfile } from "../../../../core/profile-manager";
 import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
+import { plannerWeightAdjustAdvice } from './planner-targets';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 
 
@@ -266,6 +267,21 @@ export const IndividualPlanSettings: React.FC = () => {
               ⚠ Углеводы ограничены диетологическим потолком {carbCapGPerKg} г/кг — цель ккал ниже «TDEE + профицит». На массе потолок растёт с объёмом тренировок (7-8 г/кг). Снять ограничение можно в ручном режиме КБЖУ.
             </div>
           )}
+          {(() => {
+            // П2 (Роунд-2): совет автокоррекции калорий по темпу веса (план → факт → коррекция)
+            const weights = (weightLogEntries || []).map((e: any) => e.weight).filter((w: any) => Number.isFinite(w) && w > 0);
+            if (weights.length < 4 || kbjuMode === 'manual') return null;
+            const advice = plannerWeightAdjustAdvice({ weightLog: weights, goal, sex, kcalTarget: effectiveKcal });
+            if (!advice || advice.status === 'no_data') return null;
+            const applyable = advice.kcalDelta !== 0;
+            const col = advice.status === 'ok' ? '#22c55e' : advice.kcalDelta > 0 ? '#60a5fa' : '#fbbf24';
+            return (
+              <div style={{ fontSize:9, color:col, padding:'6px 8px', marginBottom:7, background: advice.status === 'ok' ? 'rgba(34,197,94,0.06)' : 'rgba(96,165,250,0.06)', border:`1px solid ${advice.status === 'ok' ? 'rgba(34,197,94,0.2)' : 'rgba(96,165,250,0.25)'}`, borderRadius:8, lineHeight:1.5 }}>
+                ⚖️ {advice.reason}
+                {applyable && <button onClick={() => { switchKbjuMode('manual'); setManualKcal(Math.max(1200, effectiveKcal + advice.kcalDelta)); }} style={{ display:'block', marginTop:4, padding:'3px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:800, background:'rgba(96,165,250,0.14)', border:'1px solid rgba(96,165,250,0.35)', color:'#60a5fa' }}>⚖️ Применить {advice.kcalDelta > 0 ? '+' : ''}{advice.kcalDelta} ккал</button>}
+              </div>
+            );
+          })()}
           <div style={{ marginBottom:7 }}>
             <button onClick={() => switchKbjuMode(kbjuMode === 'manual' ? 'auto' : 'manual')} style={{ padding:'7px 10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700, background: kbjuMode === 'manual' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)', border: kbjuMode === 'manual' ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.1)', color: kbjuMode === 'manual' ? '#f59e0b' : 'rgba(255,255,255,0.75)' }}>✏️ Ручное КБЖУ: {kbjuMode === 'manual' ? 'ВКЛ' : 'ВЫКЛ'}</button>
           </div>

@@ -2993,8 +2993,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Р-2.1: резка точной подгонкой не ниже пола реалистичной порции
     const _paSnack = /Перекус|Полдник|Второй завтрак|Перед сном/i.test(best.meal.label || '') || best.meal.type === 'presleep';
     const _paRole = (best.item.role === 'carb_fast' ? 'carb_slow' : best.item.role) as any;
-    const _paFloor = ['protein', 'carb_slow', 'carb_fast', 'fruit', 'veg'].includes(best.item.role)
-      ? Math.max(minAmount, realisticFloorG(best.food, _paRole, _paSnack))
+    // Р-2.1: пол точной подгонки — ТОЛЬКО для белка (40 г, «курица 10 г» недопустима).
+    // Углеводы/жиры/фрукты режутся свободно — ккал/углеводная сходимость ±3-6% важнее
+    // (полноразмерная тарелка гарантируется структурой приёма: белок+гарнир+овощ+жир).
+    const _paFloor = best.item.role === 'protein'
+      ? Math.max(minAmount, realisticFloorG(best.food, 'protein', _paSnack) * 0.8)
       : minAmount;
     const suppMax = SUPPLEMENT_MAX_G[best.food.id];
     // Aug 28: капы точной подгонки — от цели приёма-хозяина item'а.
@@ -3010,7 +3013,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // D-28+ fix: цельный белок не раздувается за 300 г на приём (иначе «лосось 316 г»).
     if (!suppMax && best.item.role === 'protein') maxAmount = Math.min(maxAmount, Math.round(300 * Math.min(_bestMs, 1.25)));
     let newAmount = best.item.amount + deltaGrams;
-    newAmount = Math.max(Math.round(_paFloor * 0.8), Math.min(maxAmount, Math.round(newAmount)));
+    newAmount = Math.max(Math.round(_paFloor), Math.min(maxAmount, Math.round(newAmount)));
     // Реальная дельта после округления и капов
     const actualDeltaGrams = newAmount - best.item.amount;
     if (Math.abs(actualDeltaGrams) < 1) return Math.abs(dev) <= 0.05; // не можем скорректировать, оставляем ±5%
@@ -3351,11 +3354,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }));
         if (bIi<0 || bSaved < 10) break;
         const meal = meals[bMi]; const it = meal.items[bIi];
-        // Р-2.1: посадочная резка не ниже пола реалистичной порции
+        // Р-2.1: посадочная резка — пол только для БЕЛКА (40 г), углеводы/жиры свободно
+        // (ккал/углеводная сходимость ±3-6% — требование трекинга ББ)
         const _fdL = FOOD_DB.find((f:any)=>f.id===it.id);
-        const _isSnL = /Перекус|Полдник|Второй завтрак|Перед сном/i.test(meal.label || '') || meal.type === 'presleep';
-        const _flL = _fdL && ['protein','carb_slow','carb_fast','fruit','veg'].includes(String((it as any).role||''))
-          ? realisticFloorG(_fdL, (String((it as any).role||'protein') === 'carb_fast' ? 'carb_slow' : (it as any).role) as any, _isSnL)
+        const _flL = (it as any).role === 'protein' && _fdL
+          ? Math.max(15, realisticFloorG(_fdL, 'protein', false) * 0.8)
           : 15;
         const na = Math.max(_flL, Math.round(it.amount * 0.85));
         const r2 = na/(it.amount||1);

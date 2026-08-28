@@ -111,6 +111,62 @@ export function plannerGoalCategory(goal: string): string {
   return GOAL_MAP[goal] || 'maintenance';
 }
 
+// ─── П2 (Роунд-2, Aug 28): совет автокоррекции калорий по темпу веса ──────
+// Единый контур «план → факт → коррекция»: недельный темп из лога веса vs
+// целевой темп цели → ±150-250 ккал ОДНОЙ переменной (калории), без стэкинга.
+export interface PlannerWeightAdviceInput {
+  weightLog: number[];          // веса по дням (ASC или DESC — сортируется внутри)
+  goal: string;                 // mass/strength/fat_loss/cutting/maintenance/...
+  sex: 'male' | 'female' | '';
+  kcalTarget: number;
+  expectedLossKgWeek?: number;  // ожидаемый темп потери (если задан пользователем)
+}
+export interface PlannerWeightAdvice {
+  status: 'no_data' | 'ok' | 'too_fast_loss' | 'too_slow_loss' | 'too_fast_gain' | 'too_slow_gain';
+  weeklyKg: number;
+  targetWeeklyKg: number;
+  kcalDelta: number;            // применение: manualKcal += kcalDelta (совет, не авто)
+  reason: string;
+}
+export function plannerWeightAdjustAdvice(input: PlannerWeightAdviceInput): PlannerWeightAdvice {
+  const noData: PlannerWeightAdvice = { status: 'no_data', weeklyKg: 0, targetWeeklyKg: 0, kcalDelta: 0, reason: 'Записывайте вес в дневник ежедневно — совет появится через ~7 дней замеров.' };
+  const valid = [...(input.weightLog || [])].filter(w => Number.isFinite(w) && w > 0);
+  if (valid.length < 4) return noData;
+  const first = valid[0]; const last = valid[valid.length - 1];
+  const intervals = Math.max(1, valid.length - 1);
+  const weeklyKg = Math.round(((last - first) / intervals * 7) * 100) / 100; // + = набор
+  const isCut = ['cut', 'fat_loss', 'cutting'].includes(input.goal);
+  const isBulk = ['bulk', 'mass'].includes(input.goal);
+  if (!isCut && !isBulk) return { ...noData, reason: 'Совет коррекции — для целей набора/сушки (maintenance не корректируется по весу).' };
+  const female = input.sex === 'female';
+  const targetWeeklyKg = isCut
+    ? -(input.expectedLossKgWeek && input.expectedLossKgWeek > 0 ? input.expectedLossKgWeek : (female ? 0.004 : 0.005) * (valid.length > 0 ? Math.max(...valid) : 80))
+    : (female ? 0.0015 : 0.002) * Math.max(...valid);
+  const diff = weeklyKg - targetWeeklyKg; // >0 = быстрее цели (для cut: медленнее теряет)
+  // Порог значимости: ±0.1 кг/нед — меньше = шум воды
+  if (Math.abs(diff) < 0.1) {
+    return { status: 'ok', weeklyKg, targetWeeklyKg: Math.round(targetWeeklyKg * 100) / 100, kcalDelta: 0, reason: `Темп в норме: ${weeklyKg > 0 ? '+' : ''}${weeklyKg} кг/нед при цели ${Math.round(targetWeeklyKg * 100) / 100} кг/нед. Ничего не меняем.` };
+  }
+  // Сушка: теряет медленнее цели → ↓ккал; теряет быстрее → ↑ккал (защита мышц)
+  const step = female ? 125 : 150;
+  if (isCut) {
+    if (weeklyKg > targetWeeklyKg * 0.5) {
+      return { status: 'too_slow_loss', weeklyKg, targetWeeklyKg: Math.round(targetWeeklyKg * 100) / 100, kcalDelta: -step, reason: `Сушка stalled: ${weeklyKg} кг/нед вместо ${Math.round(targetWeeklyKg * 100) / 100}. Снизьте калории на ${step} и оцените через 2 недели.` };
+    }
+    if (weeklyKg < targetWeeklyKg * 1.5) {
+      return { status: 'too_fast_loss', weeklyKg, targetWeeklyKg: Math.round(targetWeeklyKg * 100) / 100, kcalDelta: step, reason: `Потеря слишком быстрая (${weeklyKg} кг/нед) — риск мышц. Добавьте ${step} ккал.` };
+    }
+  } else {
+    if (weeklyKg < targetWeeklyKg * 0.5) {
+      return { status: 'too_slow_gain', weeklyKg, targetWeeklyKg: Math.round(targetWeeklyKg * 100) / 100, kcalDelta: step, reason: `Набор медленнее цели: ${weeklyKg > 0 ? '+' : ''}${weeklyKg} кг/нед. Добавьте ${step} ккал.` };
+    }
+    if (weeklyKg > targetWeeklyKg * 2) {
+      return { status: 'too_fast_gain', weeklyKg, targetWeeklyKg: Math.round(targetWeeklyKg * 100) / 100, kcalDelta: -step, reason: `Набор слишком быстрый (${weeklyKg > 0 ? '+' : ''}${weeklyKg} кг/нед) — много жира. Снизьте на ${step} ккал.` };
+    }
+  }
+  return { status: 'ok', weeklyKg, targetWeeklyKg: Math.round(targetWeeklyKg * 100) / 100, kcalDelta: 0, reason: 'Темп в допустимом коридоре.' };
+}
+
 const PHASE_MULT: Record<string, { kcalMod: number; pAdd: number }> = {
   course: { kcalMod: 1.0, pAdd: 0.3 },
   bridge: { kcalMod: 0.95, pAdd: 0 },
@@ -290,6 +346,18 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   targets.fats = Math.max(0, targets.fats);
   targets.carbs = Math.max(0, targets.carbs);
   targets.kcal = Math.max(0, targets.kcal);
+
+  // Ж2 (Роунд-2, Aug 28): женский гейт сушки — дефицит ≤22% ккал (муж ≤25%):
+  // RED-S/гормональный контур женщин чувствительнее к агрессивному дефициту
+  // (Helms 2022, Iraki 2019). Цели ниже TDEE×0.78 у женщин поднимаются до 0.78.
+  if (sex === 'female' && (engineGoal === 'cut')) {
+    const tdeeRef = targets.tdee || 0;
+    if (tdeeRef > 0 && targets.kcal > 0 && targets.kcal < tdeeRef * 0.78) {
+      targets.kcal = Math.round(tdeeRef * 0.78);
+      // Углеводы пересчитываются из остатка (белок/жир защищены)
+      targets.carbs = Math.max(0, Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4));
+    }
+  }
 
   // 10. Manual г/кг (overrides macros, recompute kcal)
   if (manualGPerKg.protein > 0) targets.protein = Math.round(weight * manualGPerKg.protein);
