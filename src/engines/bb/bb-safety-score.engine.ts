@@ -204,7 +204,7 @@ export function calculatePlanSafetyScore(
 
   // 5. Volume Compliance (MRV) — единый источник: aggregateBBVolume(effective) + BB_MRV_TOLERANCE 1.15
   const volumeDetails: SafetyDetails['volumeDetails'] = [];
-  let volumeViolations = 0;
+  const violatingMuscles = new Set<string>();
   for (const w of plan.weeks) {
     if ((w as any).phase === 'deload') continue;
     const volume = aggregateBBVolume(w.sessions);
@@ -213,7 +213,7 @@ export function calculatePlanSafetyScore(
       const allowed = cap ? cap * BB_MRV_TOLERANCE : Infinity;
       const over = cap ? Math.max(0, values.effectiveSets - allowed) : 0;
       const violation = !!cap && values.effectiveSets > allowed;
-      if (violation) volumeViolations++;
+      if (violation) violatingMuscles.add(muscle);
       // collect for details (dedupe per muscle across weeks: keep max effective)
       const existing = volumeDetails.find(v => v.muscle === muscle);
       const cur = { muscle, effectiveSets: values.effectiveSets, cap: cap ?? 0, tolerance: BB_MRV_TOLERANCE, allowed: Number.isFinite(allowed) ? Math.round(allowed) : 0, over: Math.round(over*10)/10, violation };
@@ -221,6 +221,7 @@ export function calculatePlanSafetyScore(
       else if (cur.effectiveSets > existing.effectiveSets) Object.assign(existing, cur);
     }
   }
+  const volumeViolations = violatingMuscles.size;
   let volumeScore = SCORE_WEIGHTS.volumeCompliance;
   if (volumeViolations > 0) {
     volumeScore = Math.max(0, SCORE_WEIGHTS.volumeCompliance - volumeViolations * 3);
@@ -245,7 +246,7 @@ export function calculatePlanSafetyScore(
   let frequencyScore = SCORE_WEIGHTS.frequencyCompliance;
   if (frequencyIssues.length > 0) {
     frequencyScore = Math.max(0, frequencyScore - Math.min(SCORE_WEIGHTS.frequencyCompliance, frequencyIssues.length));
-    issues.push(`Низкая частота для ${frequencyIssues.map(([muscle]:any) => muscle).join(', ') || frequencyIssues.map(f=>f.muscle).join(', ')} — объём сильнее концентрирован по сессиям.`);
+    issues.push(`Низкая частота для ${frequencyIssues.map(f=>f.muscle).join(', ')} — объём сильнее концентрирован по сессиям.`);
     recommendations.push('Рассмотрите распределение объёма малых мышц минимум на 2 сессии в неделю.');
   }
 

@@ -68,7 +68,7 @@ export function analyzeBBBalance(plan: BBPlan): BBBalanceReport {
     const positionName = position(name, catalog);
     report[positionName] += sets;
     muscle[positionName] += sets;
-    const upper = !['quads', 'hamstrings', 'glutes', 'calves', 'legs'].includes(exercise.muscle);
+    const upper = !['quads', 'hamstrings', 'glutes', 'calves', 'legs', 'lower_back', 'abs', 'forearms'].includes(exercise.muscle);
     if (upper && isPress) report.upperPress += sets;
     if (upper && isPull) report.upperPull += sets;
   }
