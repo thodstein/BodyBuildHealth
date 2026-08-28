@@ -323,9 +323,11 @@ export function ensureStrictGroupCoverage(
     const classes = ANGLE_CLASSES[muscle] || [];
     const sameClass = poolMembers.filter(m =>
       classes.some(ac => ac.match(replaced) && ac.match(m))
-      && !exDatas.some(d => d.id === m.id));
-    if (sameClass.length === 0) continue;
-    const best = sameClass.slice().sort((a, b) => ((b._score ?? 0) - (a._score ?? 0)))[0];
+       && !exDatas.some(d => d.id === m.id));
+    // Fallback: если в том же классе кандидатов нет — берём любого члена группы (любой угол), чтобы группа всё же появилась
+    const candidates = sameClass.length > 0 ? sameClass : poolMembers.filter(m => !exDatas.some(d => d.id === m.id));
+    if (candidates.length === 0) continue;
+    const best = candidates.slice().sort((a, b) => ((b._score ?? 0) - (a._score ?? 0)))[0];
     if (!best) continue;
     exDatas[idx] = best;
     const iId = sessionSelectedIds.indexOf(replaced.id);

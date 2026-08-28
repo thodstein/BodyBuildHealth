@@ -1072,12 +1072,14 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (mode === 'adapt' && mrvMult >= 1.3 && ['triceps', 'biceps', 'shoulders', 'forearms'].includes(muscle)) {
           targetSets = Math.round(targetSets * 1.4);
         }
+        // MEV floor (защита от атрофии): 0.7 для не-целей не должен ронять ниже MEV (Schoenfeld maintenance ≥6 для biceps)
         // MRV cap (как в buildBBPlan normalizeWeekMrv): не превышать MRV×mrvMult.
         // Parity с generic: кап цели специализации поднимается specMrv (weak ×1.2,
         // focus ×1.3), иначе буст акцента недели стирается капом.
         if (mode === 'adapt') {
           const lm = (allLandmarks as any)[muscle];
           if (lm && lm.mrv) {
+            if (specFactor === 0.7 && lm.mev && targetSets < lm.mev) targetSets = lm.mev;
             const mrvCap = Math.round(lm.mrv * mrvMult * specializationMrvFactor(muscle, weekSpec));
             targetSets = Math.min(targetSets, mrvCap);
           }
