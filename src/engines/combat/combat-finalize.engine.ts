@@ -39,22 +39,45 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   for (const wk of plan.weeksData) {
     if (wk.deload) continue;
     const neckSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
-    const gripSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')).reduce((a, e) => a + e.sets, 0), 0);
-    const rotSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')).reduce((a, e) => a + e.sets, 0), 0);
+    const gripSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')||e.id.includes('farmer')||e.id.includes('towel')).reduce((a, e) => a + e.sets, 0), 0);
+    const rotSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')||e.id.includes('sledge')||e.id.includes('battle')).reduce((a, e) => a + e.sets, 0), 0);
+    const coreAnti = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => ['deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','pallof_rotation_press','suitcase_carry'].includes(e.id)).reduce((a,e)=>a+e.sets,0),0);
     const lmN = getCombat(plan.level,'neck');
     const lmG = getCombat(plan.level,'grip');
     const lmR = getCombat(plan.level,'rotational');
     if (lmN && neckSets > lmN.mrv) warnings.push(`Нед ${wk.week}: шея ${neckSets} > MRV ${lmN.mrv} — снизьте.`);
     if (lmN && neckSets < lmN.mev) warnings.push(`Нед ${wk.week}: шея ${neckSets} < MEV ${lmN.mev} — недобор.`);
     if (lmG && gripSets > lmG.mrv) warnings.push(`Нед ${wk.week}: хват ${gripSets} > MRV ${lmG.mrv}.`);
+    if (lmG && gripSets < (lmG.mev||4)) warnings.push(`Нед ${wk.week}: хват ${gripSets} < MEV ${lmG.mev} — добавьте хват.`);
     if (lmR && rotSets > lmR.mrv) warnings.push(`Нед ${wk.week}: ротация ${rotSets} > MRV ${lmR.mrv}.`);
     if (neckSets > 12) warnings.push(`Нед ${wk.week}: шея ${neckSets} сетов > 12 — риск.`);
-    // баланс push/pull
-    const push = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['bench_bar','ohp'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
-    const pull = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['row_bar','pullup','gi_grip_pullup'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    if (coreAnti < 4) warnings.push(`Нед ${wk.week}: core anti <4 сетов (${coreAnti}) — добавьте deadbug/side plank/pallof.`);
+    // баланс push/pull общий
+    const push = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['bench_bar','ohp','push_press','landmine_press'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    const pull = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['row_bar','pullup','gi_grip_pullup','fat_bar_row','single_arm_row','towel_pullup','rope_climb','high_pull'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
     if (push>0 && pull>0) {
       const r = push / Math.max(1,pull);
       if (r > 1.8 || r < 0.55) warnings.push(`Нед ${wk.week}: дисбаланс push ${push} / pull ${pull} = ${r.toFixed(2)} — выровняйте.`);
+    }
+    // горизонт vs вертикаль
+    const pushH = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['bench_bar'].includes(e.id))).reduce((a,e)=>a+e.sets,0);
+    const pullH = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['row_bar','fat_bar_row','single_arm_row'].includes(e.id))).reduce((a,e)=>a+e.sets,0);
+    if (pushH>0 && pullH>0) {
+      const rh = pushH / Math.max(1,pullH);
+      if (rh > 1.8 || rh < 0.55) warnings.push(`Нед ${wk.week}: дисбаланс horiz push ${pushH}/pull ${pullH}=${rh.toFixed(2)}`);
+    }
+    const pushV = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['ohp','push_press','landmine_press'].includes(e.id))).reduce((a,e)=>a+e.sets,0);
+    const pullV = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['pullup','gi_grip_pullup','towel_pullup','rope_climb','high_pull'].includes(e.id))).reduce((a,e)=>a+e.sets,0);
+    if (pushV>0 && pullV>0) {
+      const rv = pushV / Math.max(1,pullV);
+      if (rv > 1.8 || rv < 0.55) warnings.push(`Нед ${wk.week}: дисбаланс vert push ${pushV}/pull ${pullV}=${rv.toFixed(2)}`);
+    }
+    // унилатеральные ноги vs билатеральные
+    const uni = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['bulgarian_split_heavy','single_leg_rdl_combat','cossack_squat','step_up'].includes(e.id))).reduce((a,e)=>a+e.sets,0);
+    const bi = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['squat','front_squat','trap_bar_dead','zercher_squat'].includes(e.id))).reduce((a,e)=>a+e.sets,0);
+    if (wk.sessions.some(s=> s.sessionTag==='lower_power' || s.sessionTag==='full_power')) {
+      if (uni===0) warnings.push(`Нед ${wk.week}: нет унилатеральных ног — добавьте болгарский/казачий/step-up для баланса.`);
+      if (bi===0 && uni>0) warnings.push(`Нед ${wk.week}: нет билатеральных ног — добавьте присед/тягу.`);
     }
   }
 
