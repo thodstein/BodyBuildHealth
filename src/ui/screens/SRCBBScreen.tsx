@@ -739,6 +739,9 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     inc_off: 'Сход с груди (верх)', inc_mid: 'Середина', inc_lockout: 'Дожим',
     sumo_mid: 'Сумо: середина',
     biceps_start: 'Сгибание: старт', biceps_mid: 'Сгибание: середина', biceps_top: 'Сгибание: пик',
+    triceps_start: 'Разгибание: старт', triceps_mid: 'Разгибание: середина', triceps_lockout: 'Разгибание: дожим',
+    calf_bottom: 'Икры: низ', calf_mid: 'Икры: середина', calf_top: 'Икры: верх',
+    shrug_start: 'Шраги: старт', shrug_mid: 'Шраги: середина', shrug_top: 'Шраги: пик',
   };
   const PL_WP_OPTIONS = (Object.keys(WEAK_POINTS_BY_LIFT) as Lift[]).map(lift => ({
     lift, weakPoints: WEAK_POINTS_BY_LIFT[lift].map(wp => ({ id: wp, label: PL_WEAKPOINT_LABELS[wp] || wp })),
