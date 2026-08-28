@@ -64,6 +64,14 @@ export const PHASE_COLOR: Record<string, string> = {
 export const DISCIPLINE_COLOR: Record<string, string> = {
   boxing: '#3b82f6', mma: '#a855f7', wrestling: '#ef4444', kickboxing: '#f59e0b', general: '#6b7280',
 };
+export const EQUIP_RU: Record<string,string> = { barbell:'Штанга', dumbbell:'Гантели', machine:'Тренажёр', cable:'Блоки', other:'Прочее' };
+export const MOBILITY_RU: Record<string,string> = { shoulder:'Плечо', hip:'Таз', knee:'Колено', ankle:'Голеностоп', wrist:'Запястье', neck:'Шея', lower_back:'Поясница' };
+export const LEVEL_RU: Record<string,string> = { beginner:'Новичок', intermediate:'Средний', advanced:'Продвинутый', enhanced:'На курсе' };
+export const PHASE_RU: Record<string,string> = { accumulation:'Накопление', transmutation:'Трансформация', realization:'Реализация', gpp:'ОФП', power:'Сила', taper:'Тапер', deload:'Разгрузка', conjugate:'Сопряжённая', transition:'Переход', intensification:'Интенсификация', peaking:'Пик' };
+export const ZONE_RU: Record<string,string> = { optimal:'Оптимум', caution:'Внимание', dangerous:'Перегруз', undertrained:'Недотрен' };
+export const PERIODIZATION_RU: Record<string,string> = { atr_10:'ATR 5/3/2 (10 нед)', linear_12:'Линейная (12 нед)', conjugate:'Сопряжённая' };
+export const SESSION_TAG_RU: Record<string,string> = { upper_power:'Верх тяж', lower_power:'Низ тяж', full_power:'Фулбоди тяж', full_conditioning:'Фулбоди+конд.', snatch_day:'Рывок', clean_day:'Толчок', strength_day:'Сила' };
+export function ruLabel(map:Record<string,string>, key:string){ return (map as any)[key] ?? key; }
 
 // ─── Компоненты ───
 export const SectionCard: React.FC<{ id?: string; title?: React.ReactNode; right?: React.ReactNode; accent?: boolean; hint?: string; children: React.ReactNode }> = ({ id, title, right, accent, hint, children }) => (
@@ -104,9 +112,16 @@ export const GroupHeading: React.FC<{ icon: string; text: string; desc?: string 
   </div>
 );
 
-export const SectionNav: React.FC<{ items: { id: string; label: string }[] }> = ({ items }) => {
-  const goTo = (id: string) => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
-  return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{items.map(n => <button key={n.id} style={{ ...BTN_SMALL, fontSize: 10 }} onClick={() => goTo(n.id)}>{n.label}</button>)}</div>;
+export const SectionNav: React.FC<{ items: { id: string; label: string }[]; activeId?: string; onSelect?: (id:string)=>void }> = ({ items, activeId, onSelect }) => {
+  const goTo = (id: string) => {
+    if(onSelect){ onSelect(id); return; }
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  return <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{items.map(n => {
+    const active = activeId ? activeId===n.id : false;
+    return <button key={n.id} style={{ ...(active? {...BTN_SMALL, background:'rgba(168,85,247,0.18)', borderColor:'rgba(168,85,247,0.35)', color:'#c4b5fd'}: BTN_SMALL), fontSize: 10 }} onClick={() => goTo(n.id)} aria-pressed={active}>{n.label}</button>;
+  })}</div>;
 };
 
 export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 6 }) => {

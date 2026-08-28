@@ -1682,12 +1682,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)' }}>{varietyStrictness==='strict' ? 'Строго: продукты последних 1-2 дней исключаются из следующих дней.' : 'Мягко: только деприоритизация повторов.'}</div>
         </div>
                 {/* D: Specificity */}
-        <div style={{ fontSize:9, fontWeight:700, color:'#06b6d4', marginBottom:4 }}>📊 Специфичность продуктов</div>
-        <div style={{ display:'flex', gap:4, marginBottom:8 }}>
-          {([['everyday','🍱 Повседневные'],['varied','💡 Разнообразные'],['gourmet','🍩 Гурман']] as [string,string][]).map(([id,label]) => (
-            <button key={id} onClick={() => setSpecificity(id as any)} style={{ flex:1, padding:'5px 4px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight: specificity===id?800:600, background: specificity===id?'rgba(6,182,212,0.15)':'rgba(255,255,255,0.03)', border: specificity===id?'1px solid #06b6d4':'1px solid rgba(255,255,255,0.06)', color: specificity===id?'#06b6d4':'rgba(255,255,255,0.7)' }}>{label}</button>
-          ))}
-        </div>
+        {/* Роунд-2 v5: specificity UI удалён (no-op, бюджет 'max' покрывает premium) */}
         {/* E: Intolerances */}
         <div style={{ fontSize:9, fontWeight:700, color:'#ef4444', marginBottom:4 }}>🧪 Непереносимость</div>
         <div style={{ display:'flex', gap:4, marginBottom:8, flexWrap:'wrap' }}>

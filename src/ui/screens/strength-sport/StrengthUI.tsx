@@ -60,11 +60,19 @@ export const CHIP_ACTIVE: React.CSSProperties = { ...CHIP, border: `1px solid ${
 export const CHIP_STRONG_ACTIVE: React.CSSProperties = { ...CHIP, border: '1px solid rgba(245,158,11,0.45)', background: 'rgba(245,158,11,0.14)', color: TEXT_1 };
 
 export const PHASE_COLOR: Record<string, string> = {
-  accumulation: '#3b82f6', intensification: '#f59e0b', peaking: '#ef4444', deload: '#64748b', transition: '#475569',
+  accumulation: '#3b82f6', intensification: '#f59e0b', peaking: '#ef4444', deload: '#64748b', transition: '#475569', taper: '#eab308',
 };
 export const MODE_COLOR: Record<string, string> = {
   weightlifting: ACCENT, strongman: ACCENT_STRONG, hybrid: ACCENT_TA,
 };
+export const MODE_RU: Record<string,string> = { weightlifting:'Тяжёлая атлетика', strongman:'Силовой экстрим', hybrid:'Гибрид' };
+export const LEVEL_RU: Record<string,string> = { beginner:'Новичок', intermediate:'Средний', advanced:'Продвинутый', enhanced:'На курсе' };
+export const PHASE_RU: Record<string,string> = { accumulation:'Накопление', intensification:'Интенсификация', peaking:'Пик', deload:'Разгрузка', transition:'Переход', taper:'Тапер' };
+export const ZONE_RU: Record<string,string> = { optimal:'Оптимум', caution:'Внимание', dangerous:'Перегруз', undertrained:'Недотрен' };
+export const EQUIP_RU: Record<string,string> = { barbell:'Штанга', dumbbell:'Гантели', machine:'Тренажёр', cable:'Блоки', other:'Прочее' };
+export const MOBILITY_RU: Record<string,string> = { shoulder:'Плечо', hip:'Таз', knee:'Колено', ankle:'Голеностоп', wrist:'Запястье', lower_back:'Поясница' };
+export const SESSION_TAG_RU: Record<string,string> = { snatch_day:'Рывок', clean_day:'Толчок', strength_day:'Сила', technique_day:'Техника', pull_day:'Тяги', accessory_day:'Подсобка', overhead_day:'Жим', deadlift_day:'Тяга', event_day:'Ивенты', squat_day:'Присед', oly_day:'Олимпийка' };
+export function ruLabel(map:Record<string,string>, k:string){ return (map as any)[k] ?? k; }
 
 export const SectionCard: React.FC<{ id?: string; title?: React.ReactNode; right?: React.ReactNode; accent?: boolean; hint?: string; children: React.ReactNode }> = ({ id, title, right, accent, hint, children }) => (
   <div style={accent ? CARD_ACCENT : CARD} id={id}>

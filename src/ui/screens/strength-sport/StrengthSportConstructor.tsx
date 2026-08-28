@@ -15,9 +15,11 @@ import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } f
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
-import { CARD, CARD_ACCENT, CARD_STRONG, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider } from './StrengthUI';
+import { CARD, CARD_ACCENT, CARD_STRONG, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
+const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
+const WM_LABEL_RU: Record<string,string> = { backSquat:'Присед', frontSquat:'Фронт. присед', deadlift:'Тяга', snatch:'Рывок', cleanJerk:'Толчок', overheadPress:'Жим стоя' };
 
 export const StrengthSportConstructor: React.FC = () => {
   const [step, setStep] = useState<Step>('params');
@@ -307,19 +309,19 @@ export const StrengthSportConstructor: React.FC = () => {
             <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{mode === 'weightlifting' ? 'Тяжёлая атлетика — PRO' : mode === 'strongman' ? 'Силовой экстрим — PRO' : 'Гибрид — PRO'}</div>
             <div style={HINT_SM}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · попытки 92/97/102 · внезальная × — интегрировано</div>
           </div>
-          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}32`}>{stepIndex}/4 · {step}</Badge>
+          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}32`}>{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge>
         </div>
         <ProgressBar value={stepIndex} max={4} color={modeColor} />
-        <SectionNav items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🏃 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} />
-        <div style={ROW}>
-          {(['params','outside','split','plan'] as Step[]).map(s => (
-            <ChipToggle key={s} active={step===s} onClick={() => setStep(s)}>{s}</ChipToggle>
-          ))}
-          {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}24`}>План {plan.weeks}нед · {plan.patternId}</Badge>}
-          {outsideMetrics && <Badge>Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
-          {acwr && <Badge color={acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#f59e0b':'#00e68a'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)':'rgba(0,230,138,0.08)'}>ACWR {acwr.ratio}</Badge>}
+        <SectionNav activeId={step} onSelect={(id)=> setStep(id as Step)} items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🏃 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} />
+        <div style={{ ...ROW, justifyContent:'space-between' }}>
+          <div style={ROW}>
+            {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}24`}>План {plan.weeks}нед · {plan.patternId}</Badge>}
+            {outsideMetrics && <Badge>Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
+            {acwr && <Badge color={acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#f59e0b':'#00e68a'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)':'rgba(0,230,138,0.08)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
+          </div>
+          {msg && <span style={{ fontSize:11, color: mode==='strongman'?'#fcd34d':'#86efac', background: mode==='strongman'?'rgba(245,158,11,0.10)':'rgba(0,230,138,0.10)', border:`1px solid ${mode==='strongman'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.20)'}`, padding:'3px 8px', borderRadius:20 }}>{msg}</span>}
         </div>
-      </div>
+        </div>
 
       {step === 'params' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
@@ -338,24 +340,29 @@ export const StrengthSportConstructor: React.FC = () => {
             <option value="maintenance">Поддержание</option>
           </select>
           <label style={{ color: '#fff', fontSize: 12 }}>Уровень</label>
-          <select value={level} onChange={e => setLevel(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
+          <select value={level} onChange={e => setLevel(e.target.value as any)} style={INPUT}>
             <option value="beginner">Новичок</option>
             <option value="intermediate">Средний</option>
             <option value="advanced">Продвинутый</option>
-            <option value="enhanced">Enhanced</option>
+            <option value="enhanced">На курсе</option>
           </select>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            <label style={{ color: '#fff', fontSize: 11 }}>Пол: <select value={sex} onChange={e=> setSex(e.target.value as any)} style={{ padding: 4, borderRadius: 6, width: 90 }}><option value="male">М</option><option value="female">Ж</option></select></label>
-            <label style={{ color: '#fff', fontSize: 11 }}>Вес тела: <input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={{ width: 70, padding: 4, borderRadius: 6 }} /> кг</label>
-            <label style={{ color: '#fff', fontSize: 11 }}>Возраст: <input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||30)} style={{ width: 70, padding: 4, borderRadius: 6 }} /></label>
-            <label style={{ color: '#fff', fontSize: 11 }}>Дата пика: <input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={{ padding: 4, borderRadius: 6, fontSize: 10 }} /></label>
+          <div style={{ display: 'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+            <label style={{ color: '#fff', fontSize: 11 }}>Пол: <select value={sex} onChange={e=> setSex(e.target.value as any)} style={{ ...INPUT, width:'100%' }}><option value="male">Мужской</option><option value="female">Женский</option></select></label>
+            <label style={{ color: '#fff', fontSize: 11 }}>Вес тела, кг: <input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={INPUT} /></label>
+            <label style={{ color: '#fff', fontSize: 11 }}>Возраст: <input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||30)} style={INPUT} /></label>
+            <label style={{ color: '#fff', fontSize: 11 }}>Дата пика: <input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={INPUT} /></label>
           </div>
           {goal==='peaking' && competitionDate && (
-            <label style={{ color: '#fff', fontSize: 11 }}>Тейпер недель: <select value={taperWeeks} onChange={e=> setTaperWeeks(Number(e.target.value))} style={{ padding: 4, borderRadius: 6 }}><option value={1}>1 нед</option><option value={2}>2 нед</option></select> <span style={{ opacity:0.6, fontSize:10 }}>— объём ×0.55/0.45, интенсивность 92-95%</span></label>
+            <Field label="Тапер">
+              <select value={taperWeeks} onChange={e=> setTaperWeeks(Number(e.target.value))} style={INPUT}><option value={1}>1 неделя</option><option value={2}>2 недели</option></select>
+              <div style={HINT_SM}>Объём ×0.55/0.45, интенсивность 92–95%</div>
+            </Field>
           )}
-          {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a', background: 'rgba(255,255,255,0.04)', padding: 4, borderRadius: 4 }}>ACWR {acwr.ratio} · {acwr.zone} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</div>}
-          <label style={{ color: '#fff', fontSize: 11 }}>VBT потеря скорости: {velocityLoss}% {velocityLoss>20?'— снизьте объём':''}</label>
-          <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} />
+          {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</InfoBanner>}
+          <Field label={`Потеря скорости VBT: ${velocityLoss}% ${velocityLoss>20?'— снизьте объём':''}`}>
+            <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ width:'100%' }} />
+            <div style={HINT_SM}>VBT-контроль: &gt;20% — RIR+1, &gt;30% — стоп-подход.</div>
+          </Field>
           {(() => {
             const sn = workMax.snatch||0, cj = workMax.cleanJerk||workMax.clean||0, sq = workMax.backSquat||0, dl = workMax.deadlift||0;
             const warns: string[] = [];
@@ -395,35 +402,34 @@ export const StrengthSportConstructor: React.FC = () => {
             <option value="none">Нет</option>
             <option value="cluster">Кластер (3×1)</option>
           </select>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
-              <label key={k} style={{ color: '#fff', fontSize: 11 }}>{k}: <input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value) }))} style={{ width: 70, padding: 4, borderRadius: 6 }} /></label>
+              <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={INPUT} placeholder="кг" /></Field>
             ))}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, padding: 6, background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>
-            <label style={{ color: '#fff', fontSize: 11 }}>Оборудование (пусто — всё доступно)</label>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {['barbell','dumbbell','machine','cable','other'].map(eq => (
-                <label key={eq} style={{ color: '#fff', fontSize: 11, display: 'flex', gap: 4, alignItems: 'center' }}>
-                  <input type="checkbox" checked={equipment.includes(eq)} onChange={e => setEquipment(s => e.target.checked ? [...s, eq] : s.filter(x=>x!==eq))} /> {eq}
-                </label>
-              ))}
-            </div>
-            <label style={{ color: '#fff', fontSize: 11 }}>Щадящие травмы (knee/back/shoulder/wrist, через запятую)</label>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="knee, shoulder" style={{ flex: 1, padding: 4, borderRadius: 6, fontSize: 11 }} />
-              <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); }} style={{ padding: '4px 8px', borderRadius: 6, fontSize: 11, background: '#00e68a', color: '#000', cursor: 'pointer' }}>Применить</button>
-            </div>
-            {injuries.length>0 && <div style={{ fontSize: 10, color: '#f59e0b' }}>Щадящий режим: {injuries.map((j:any)=> j.location).join(', ')} — вес ×0.6, +RIR</div>}
-            <label style={{ color: '#fff', fontSize: 11 }}>Мобильность (ограничения)</label>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {['shoulder','hip','knee','ankle','wrist','lower_back'].map(m => (
-                <label key={m} style={{ color: '#fff', fontSize: 10, display: 'flex', gap: 3, alignItems: 'center' }}>
-                  <input type="checkbox" checked={mobility.includes(m)} onChange={e => setMobility(s => e.target.checked ? [...s, m] : s.filter(x=> x!==m))} /> {m}
-                </label>
-              ))}
-            </div>
-          </div>
+          <SectionCard title="🛠 Оборудование и ограничения">
+            <Field label="Доступное оборудование (пусто — всё доступно)">
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(['barbell','dumbbell','machine','cable','other'] as const).map(eq => (
+                  <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{EQUIP_RU[eq]}</ChipToggle>
+                ))}
+              </div>
+            </Field>
+            <Field label="Травмы — щадящий режим (через запятую)" hint="Снижает вес ×0.6 и повышает RIR, фильтрует опасные движения">
+              <div style={{ display:'flex', gap:6 }}>
+                <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: колено, плечо" style={{ ...INPUT, flex:1 }} />
+                <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); setMsg(parts.length? 'Травмы применены':'Список очищен'); }} style={BTN_SMALL}>Применить</button>
+              </div>
+              {injuries.length>0 && <InfoBanner tone="warn">Щадящий режим: {injuries.map((j:any)=> j.location).join(', ')} — вес снижен</InfoBanner>}
+            </Field>
+            <Field label="Ограничения мобильности">
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(['shoulder','hip','knee','ankle','wrist','lower_back'] as const).map(m => (
+                  <ChipToggle key={m} active={mobility.includes(m)} onClick={()=> setMobility(s=> s.includes(m)? s.filter(x=> x!==m): [...s,m])}>{MOBILITY_RU[m]}</ChipToggle>
+                ))}
+              </div>
+            </Field>
+          </SectionCard>
           <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля</button>
           <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#00e68a', color: '#000', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
         </div>
