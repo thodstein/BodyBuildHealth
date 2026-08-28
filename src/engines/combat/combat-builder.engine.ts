@@ -13,6 +13,7 @@ import { adaptForPEDsCombat } from './combat-ped-adaptation';
 import { filterByMobilityCB } from './combat-mobility';
 import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
+import { getCombatWorkMax, weightForCombatExerciseResolved } from './combat-workmax';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet } from './combat.types';
 
 const POOL_BY_TAG: Record<string, string[]> = {
@@ -114,19 +115,30 @@ function gentleFactorCB(id: string, injuries: any[]|undefined): number {
 }
 
 function weightForCombatExercise(id: string, input: CombatInput, goal: string): number {
-  // базовые ориентиры — консервативные, т.к. единоборцы не гонятся за ПМ
-  // используем условный workMax или дефолты 60-100кг
-  const defaults: Record<string, number> = {
-    bench_bar: 80, row_bar: 70, squat: 90, rdl: 80, ohp: 50, pullup: 0, // pullup — bodyweight
-    neck_harness_ext: 10, neck_lateral_flex: 8, gi_grip_pullup: 0, plate_pinch: 0, landmine_rotation: 20, suitcase_carry: 24,
-  };
-  const base = defaults[id] ?? 50;
-  if (id === 'pullup' || id === 'gi_grip_pullup' || id.includes('hang') || id.includes('pinch')) return 0; // bodyweight / hold
   const goalMult = goal === 'weight_cut' ? 0.92 : goal === 'maintenance' ? 0.95 : 1;
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  const adj = outsideMult < 0.75 ? 0.93 : 1;
-  // делаем шаг 2.5
-  return Math.round(base * goalMult * adj / 2.5) * 2.5;
+  // bodyweight / hold — без штанги
+  if (id === 'pullup' || id === 'gi_grip_pullup' || id.includes('pinch') || id === 'wrist_roller' || id === 'neck_bridge_wrestler') {
+    if (id.includes('pullup') || id.includes('pinch') || id === 'wrist_roller' || id === 'neck_bridge_wrestler') return 0;
+  }
+  const resolved = weightForCombatExerciseResolved(id, {
+    workMaxByExercise: (input as any).workMaxByExercise ?? null,
+    workMax: (input as any).workMax ?? null,
+    bodyweight: (input as any).bodyweight ?? null,
+    goalMult,
+    outsideMult,
+  });
+  // если есть точный workMax — используем его, иначе уже учтён внутри weightForCombatExerciseResolved
+  // для совместимости: если resolved 0 (bodyweight) — возвращаем 0
+  if (resolved === 0) return 0;
+  // также пробуем напрямую из getCombatWorkMax для проверки наличия (чтобы дефолт 50 не затирал)
+  const direct = getCombatWorkMax(id, (input as any).workMaxByExercise, (input as any).workMax, (input as any).bodyweight);
+  if (direct != null && direct > 0) {
+    // direct уже с coeff, применяем goal/outside
+    const adj = outsideMult < 0.75 ? 0.93 : 1;
+    return Math.round(direct * goalMult * adj / 2.5) * 2.5;
+  }
+  return resolved;
 }
 
 function buildWorkSets(reps: [number, number], sets: number, rir: number, weight: number, isHeavy: boolean): CombatSet[] {
@@ -167,18 +179,20 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     return Math.max(0.6, Math.min(1.5, v));
   })();
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
+  const acwrMult = (input as any).acwr?.zone === 'dangerous' ? 0.60 : (input as any).acwr?.zone === 'caution' ? 0.85 : (input as any).acwr?.zone === 'undertrained' ? 1.1 : 1;
   const weeklyBudget = (() => {
     const ped = adaptForPEDsCombat(input.peds, input.pedDoses as any, input.courseIntensity);
     const base = Math.round(112 * ped.mrvMult);
     const lab = input.labMrvMultiplier ?? 1;
-    return Math.round(base * lab * outsideMult);
+    return Math.round(base * lab * outsideMult * recoveryMult * nutritionMult * acwrMult);
   })();
 
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline} · цель ${goal} · ${weeks} нед · ${pattern.name}`);
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${outsideMetrics.interference}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
-  rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)} · Budget ${weeklyBudget}`);
+  rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)}${acwrMult !== 1 ? ` · ACWR ×${acwrMult.toFixed(2)}` : ''} · Budget ${weeklyBudget}`);
   if (input.weightCutKg && input.weightCutKg > 0) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
+  if ((input as any).weightCutProtocol) rationale.push(`Протокол весогонки: ${(input as any).weightCutProtocol.targetLossKg}кг за ${(input as any).weightCutProtocol.weeksOut}нед`);
 
   const weeksData: CombatWeek[] = [];
   for (let w = 1; w <= weeks; w++) {
@@ -220,10 +234,17 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         if (accMult !== 1) sets = Math.max(2, Math.min(6, Math.round(sets * accMult)));
         if (goal === 'weight_cut' && sets > 2) sets -= 1;
         if (outsideMult < 0.75 && sets > 2) sets -= 1;
+        if (acwrMult < 1 && sets > 2) sets = Math.max(2, Math.round(sets * acwrMult));
+        else if (acwrMult > 1 && sets < 6) sets = Math.min(6, sets + 1);
         if (deload) sets = Math.max(2, Math.round(sets * 0.6));
         const gentle = gentleFactorCB(id, input.injuries as any);
         let weight = weightForCombatExercise(id, input, goal);
         if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
+        // ACWR / velocity корректировка RIR
+        const vLoss = (input as any).velocityLossPct as number | undefined;
+        if ((input as any).acwr?.zone === 'dangerous') rir = Math.min(4, rir + 2);
+        else if ((input as any).acwr?.zone === 'caution') rir = Math.min(4, rir + 1);
+        else if (typeof vLoss === 'number' && vLoss > 25) rir = Math.min(4, rir + 1);
         const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
         const tempo = tempoForCB(id, isPrimary, effectiveCharacter as any);
         const rest = restForCB(isPrimary, effectiveCharacter as any);
@@ -250,7 +271,8 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     }
     sessions.sort((a, b) => a.day - b.day);
     const totalSets = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.sets, 0), 0);
-    weeksData.push({ week: w, phase, deload, sessions, totalSets, outsideLoad: outsideMetrics?.weeklyLoad });
+    const totalTonnage = sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
+    weeksData.push({ week: w, phase, deload, taper: deload && (phase === 'taper' || phase === 'realization'), sessions, totalSets, totalTonnage, outsideLoad: outsideMetrics?.weeklyLoad });
   }
 
   if (input.dupMode && input.dupMode !== 'off') {

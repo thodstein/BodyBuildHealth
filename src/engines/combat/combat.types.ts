@@ -24,13 +24,20 @@ export interface CombatInput {
   favoriteExercises?: string[];
   excludedExercises?: string[];
   // Весогонка (только camp/weight_cut)
-  weightCutKg?: number; // кг к сгонке за цикл
+  weightCutKg?: number; // кг к сгонке за цикл (legacy simple)
+  weightCutProtocol?: import('./combat-weight-cut.engine').WeightCutProtocol | null;
   // Внешняя нагрузка
   outsideLoad?: import('../outside-load.engine').OutsideLoad | null;
   dupMode?: 'off' | 'power_endurance';
   intensityTech?: 'none' | 'rest_pause';
-  // Методика
+  // Методика и периодизация
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
+  periodizationModel?: 'atr_10' | 'linear_12' | 'conjugate';
+  fightDate?: string | null; // ISO date боя — для тапера
+  taperWeeks?: number; // 1 | 2
+  workMax?: Record<string, number> | null; // групповой (chest/back/quads etc)
+  workMaxByExercise?: Record<string, number> | null; // точный
+  startDate?: string | null; // для годового
   // Recovery / PED
   peds?: string[];
   pedDoses?: Record<string, number>;
@@ -43,6 +50,9 @@ export interface CombatInput {
   labMrvMultiplier?: number;
   calorieSurplus?: number;
   proteinPerKg?: number;
+  // Мониторинг
+  acwr?: { ratio: number; zone: 'optimal' | 'caution' | 'dangerous' | 'undertrained' } | null;
+  velocityLossPct?: number | null;
 }
 
 export interface CombatSet {
@@ -82,10 +92,12 @@ export interface CombatSession {
 
 export interface CombatWeek {
   week: number;
-  phase: string; // gpp / power / endurance / taper / deload
+  phase: string; // gpp / power / endurance / taper / deload / accumulation / transmutation / realization
   deload?: boolean;
+  taper?: boolean;
   sessions: CombatSession[];
   totalSets?: number;
+  totalTonnage?: number;
   outsideLoad?: number;
 }
 
