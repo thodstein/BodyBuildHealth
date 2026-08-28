@@ -84,6 +84,7 @@ export interface BBContestPrepConfig {
   category: BBContestCategory;
   weightKg: number;                 // 40..200
   bodyFatPct?: number;              // текущий % жира — оценка готовности к пику
+  heightCm?: number;                // рост см — для BSA
   age?: number;                     // лет — влияет на targetBodyFat/recovery/GFR
   experienceLevel: ExperienceLevel;
   enhanced: boolean;                // курс/натурал (карбс-толерантность, диуретики)
@@ -684,7 +685,8 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
 
   // Вода — по составу тела (leanMass/BSA), не только по массе
   const leanMass = eff.bodyFatPct ? w * (1 - eff.bodyFatPct / 100) : w * 0.85;
-  const bsa = eff.bodyFatPct ? Math.sqrt((w * 170) / 3600) : Math.sqrt((w * 170) / 3600); // Du Bois упрощённо, рост 170 по умолчанию
+  const heightCm = (eff as any).heightCm || 175;
+  const bsa = Math.sqrt((w * heightCm) / 3600); // Mosteller, рост из профиля
   const waterFactor = eff.waterStrategy === 'classic' ? 0.115 : eff.waterStrategy === 'moderate' ? 0.075 : 0.04;
   let waterBase = clamp(round1(w * waterFactor), eff.waterStrategy === 'classic' ? 6 : eff.waterStrategy === 'moderate' ? 4 : 2.5, eff.waterStrategy === 'classic' ? 10 : eff.waterStrategy === 'moderate' ? 6 : 4);
   // Коррекция по leanMass/BSA: худым — меньше, тяжёлым — кап по BSA
@@ -1216,7 +1218,7 @@ export function applyContestPrepToBBPlan(
   const base = applyForcedModes(rawCfg);
   const cfg: BBContestPrepConfig = { ...base, showDate: resolveShowDate(base) };
   const taperWeeks = Math.min(4, Math.max(1, Math.round(opts.taperWeeks ?? cfg.weeksOut)));
-  const prepWeeks = Math.max(1, Math.round(opts.prepWeeks ?? 12));
+  const prepWeeks = Math.max(1, Math.round(opts.prepWeeks ?? (cfg as any).prepWeeks ?? 12));
   const needed = prepWeeks + taperWeeks + 1;
 
   // 1) Taper + пик-неделя на последние taperWeeks+1 недель.
@@ -1429,9 +1431,22 @@ export function deserializeBBPrepConfig(str: string | null | undefined): BBConte
     category: (c.category as BBContestCategory) || 'mens_physique',
     weightKg: Number(c.weightKg),
     bodyFatPct: c.bodyFatPct == null ? undefined : Number(c.bodyFatPct),
+    heightCm: c.heightCm == null ? undefined : clamp(Number(c.heightCm), 120, 220),
+    age: c.age == null ? undefined : clamp(Number(c.age), 14, 80),
     experienceLevel: (c.experienceLevel as ExperienceLevel) || 'intermediate',
     enhanced: !!c.enhanced,
     prepCount: Number.isFinite(Number(c.prepCount)) ? Math.max(0, Math.round(Number(c.prepCount))) : 0,
+    pedContext: c.pedContext && typeof c.pedContext === 'object' ? {
+      testMg: (c.pedContext as any).testMg != null ? Number((c.pedContext as any).testMg) : undefined,
+      trenMg: (c.pedContext as any).trenMg != null ? Number((c.pedContext as any).trenMg) : undefined,
+      nandMg: (c.pedContext as any).nandMg != null ? Number((c.pedContext as any).nandMg) : undefined,
+      ghIU: (c.pedContext as any).ghIU != null ? Number((c.pedContext as any).ghIU) : undefined,
+      insulinIU: (c.pedContext as any).insulinIU != null ? Number((c.pedContext as any).insulinIU) : undefined,
+      diuretic: !!(c.pedContext as any).diuretic,
+      t3Mcg: (c.pedContext as any).t3Mcg != null ? Number((c.pedContext as any).t3Mcg) : undefined,
+      anavarMg: (c.pedContext as any).anavarMg != null ? Number((c.pedContext as any).anavarMg) : undefined,
+    } : undefined,
+    prepWeeks: c.prepWeeks != null ? clamp(Number(c.prepWeeks), 1, 52) : undefined,
     showDate: String(c.showDate || ''),
     weeksOut: Number.isInteger(Number(c.weeksOut)) ? clamp(Number(c.weeksOut), 1, 4) : 3,
     trainingProtocol: (['bb', 'classic', 'pl'] as const).includes(c.trainingProtocol as PeakingProtocol) ? (c.trainingProtocol as PeakingProtocol) : 'bb',
@@ -1848,6 +1863,8 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate',
     },
     phases,
+    // @ts-ignore — храним исходный конфиг для обратного маппинга configFromPlan (age/pedContext/prepWeeks)
+    ...({} as any),
     trainingPlanId: opts.trainingPlanId,
     nutritionPlanId: opts.nutritionPlanId,
     testPeakWeekId: opts.testPeakWeekId,
@@ -1858,6 +1875,10 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       blockedProtocol,
     },
   };
+  (plan as any)._cfg = { ...cfg };
+  // also store age/pedContext directly for configFromPlan fallback if _cfg lost in serialization round-trip via JSON (needs to survive JSON.stringify)
+  (plan as any).age = cfg.age;
+  (plan as any).pedContext = cfg.pedContext;
   return plan;
 }
 
@@ -1987,20 +2008,34 @@ import type { MealPlanInput } from '../meal-plan-generator.engine';
 
 /** Обратная проекция плана в конфиг (для переиспользования функций пик-недели). */
 export function configFromPlan(plan: BBContestPrepPlan): BBContestPrepConfig {
+  // Пытаемся восстановить исходный конфиг из плана (если он хранился в __cfg), иначе дефолты
+  const anyPlan: any = plan as any;
+  const storedCfg: Partial<BBContestPrepConfig> | undefined = anyPlan._cfg || anyPlan.originalConfig;
   return {
     sex: plan.sex,
     category: plan.category,
     weightKg: plan.preparation.startingWeightKg,
-    experienceLevel: 'intermediate',
-    enhanced: false,
-    prepCount: 0,
+    bodyFatPct: storedCfg?.bodyFatPct,
+    age: storedCfg?.age,
+    experienceLevel: storedCfg?.experienceLevel || 'intermediate',
+    enhanced: storedCfg?.enhanced ?? false,
+    prepCount: storedCfg?.prepCount ?? 0,
+    pedContext: storedCfg?.pedContext,
+    prepWeeks: plan.preparation.weeks,
     showDate: plan.showDate,
     weeksOut: plan.taper.weeks,
-    trainingProtocol: 'bb',
+    trainingProtocol: storedCfg?.trainingProtocol || 'bb',
     carbLoadStrategy: plan.peakWeek.carbMode === 'high' ? 'front' : plan.peakWeek.carbMode === 'conservative' ? 'back' : 'moderate',
     waterStrategy: plan.peakWeek.waterMode === 'moderate' ? 'moderate' : 'minimal',
     sodiumStrategy: plan.peakWeek.sodiumMode === 'moderate' ? 'cut_2d' : 'constant',
     contraindications: plan.safety.contraindications,
+    competitions: storedCfg?.competitions,
+    mainCompetitionId: storedCfg?.mainCompetitionId,
+    specialization: storedCfg?.specialization,
+    preferLowFiberCarbs: storedCfg?.preferLowFiberCarbs,
+    creatineStrategy: storedCfg?.creatineStrategy,
+    confirmedManipulation: storedCfg?.confirmedManipulation,
+    schedule: storedCfg?.schedule,
   };
 }
 
