@@ -548,6 +548,7 @@ export const WEAK_TO_MUSCLE: Record<string, string> = {
   quads: 'quads', hamstrings: 'hamstrings', glutes: 'glutes', calves: 'calves',
   biceps: 'biceps', triceps: 'triceps', forearms: 'forearms',
   abs: 'abs', traps: 'traps',
+  lower_back: 'back', neck: 'traps',
 };
 
 /** Для каких мышц в BB-контексте ВСЕГДА брать только изоляцию (нет compound аналогов). */
@@ -1139,6 +1140,7 @@ export const DEFAULT_WORKMAX: Record<string, number> = {
   quads: 140, hamstrings: 100, glutes: 150, calves: 90, abs: 80, traps: 90,
   delt_front: 70, delt_mid: 70, delt_rear: 70, forearms: 45,
   biceps: 45, triceps: 50,
+  lower_back: 120, neck: 70,
 };
 export const defaultWorkMax = (key: string): number => {
   const collapsed = collapseKey(key);

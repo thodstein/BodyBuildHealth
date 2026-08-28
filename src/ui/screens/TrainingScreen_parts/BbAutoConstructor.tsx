@@ -1122,7 +1122,7 @@ export const BbAutoConstructor: React.FC = () => {
         setSelectedProgramId(cycle.meta.id.replace('prog_', ''));
         setSelectedCycleId(cycle.meta.id);
         setBbDays(cycle.meta.sessionsPerWeek);
-        setBbWeeks(cycle.meta.weeks);
+        setBbWeeks(Math.max(4, Math.min(24, Math.round(Number(cycle.meta.weeks) || 8))));
         setBbLevel(cycle.meta.level === 'novice' ? 'beginner' : cycle.meta.level === 'KMS-MS' || cycle.meta.level === 'MS-MSMK' ? 'advanced' : 'intermediate');
         setBbGoal(cycle.meta.period === 'strength' ? 'strength_mass' : 'mass');
         setBridgeMsg(`🔗 Программа загружена: ${cycle.meta.title}`);
@@ -1167,7 +1167,7 @@ export const BbAutoConstructor: React.FC = () => {
     setSelectedProgramId(program.id);
     setSelectedCycleId('prog_' + program.id);
     setBbDays(program.daysPerWeek);
-    setBbWeeks(program.durationWeeks);
+    setBbWeeks(Math.max(4, Math.min(24, Math.round(Number(program.durationWeeks) || 8))));
     setBbLevel(program.level === 'beginner' ? 'beginner' : program.level === 'advanced' ? 'advanced' : 'intermediate');
     const goalMap: Record<string, string> = {
       hypertrophy: 'mass', strength: 'strength_mass', bodybuilding: 'mass',
@@ -5708,7 +5708,7 @@ export const BbAutoConstructor: React.FC = () => {
             }
             setBbAnnualMacrocycle(source as BBMacrocycle);
             setPlanMode('generic_split');
-            setBbWeeks(source.totalWeeks);
+            setBbWeeks(Math.max(4, Math.min(24, Math.round(Number(source.totalWeeks) || 8))));
             setBbTrainingFocus(source.trainingFocus);
             setStep('params');
             }} onApplyCycle={() => {

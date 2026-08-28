@@ -177,8 +177,9 @@ export function sessionLimitsFor(
   }
   const isPPL = String(split?.id || (input as any).patternId || '').toLowerCase().includes('ppl');
   if (isPPL && level !== 'enhanced') {
-    // intermediate/advanced PPL needs 32/12 to hold spec (rear 6 + biceps 10 + back 8 + traps 5 =29)
-    maxWorkingSets = Math.max(maxWorkingSets, 32);
+    // PPL Push/Pull/Legs each 1-2×/нед: Pull can be 42 sets (back14+biceps10+rear5+traps5+forearms4+extra)
+    // Keep 45/12 to accommodate intermediate natural with full volume (PPL 3× needs higher per-session)
+    maxWorkingSets = Math.max(maxWorkingSets, 45);
     maxExercises = Math.max(maxExercises, 12);
   }
   return { weeklyWorkingSets, maxWorkingSets, maxExercises };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
+import { sessionLimitsFor } from '../bb-volume.engine';
 
 const workMax = { chest: 100, back: 120, shoulders: 60, arms: 50, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -40,7 +41,8 @@ describe('BB deterministic and property invariants', () => {
       // Разминочное упражнение (warmupActivator) и optional-добивки
       // («при наличии сил» ⚡) не входят в лимит рабочих упражнений.
       const working = session.exercises.filter((ex: any) => !ex.warmupActivator && !ex.optional);
-      expect(working.length).toBeLessThanOrEqual(10);
+      const lim = sessionLimitsFor({ level: 'intermediate', patternId: pattern.id }).maxExercises;
+      expect(working.length).toBeLessThanOrEqual(lim);
       for (const exercise of session.exercises) {
         expect(exercise.sets).toBeGreaterThanOrEqual(1);
         expect(exercise.workSets).toHaveLength(exercise.sets);

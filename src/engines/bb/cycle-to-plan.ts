@@ -52,6 +52,13 @@ function computeAcwrCyclePlan(): { ratio: number; zone: 'undertrained' | 'optima
   }
 }
 
+function addDaysISO(from: string, days: number): string {
+  const d = new Date(from + 'T00:00:00');
+  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 export type CycleSourceCycle = SRCycleTemplate;
 export type BBVolumeGoal = 'mev' | 'mav' | 'mrv';
 
@@ -929,11 +936,14 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   rationale.push(`🎯 Источник упражнений: ПРОФ-цикл с фиксированными упражнениями (не автоподбор)`);
   rationale.push(`🛡 BB-фильтр: ПЛ/олимпийские упражнения автозаменены на ББ-альтернативы (становая→тяга в наклоне, жим стоя→жим сидя)`);
 
-  // Build weeks
+  // Build weeks — per-week травмы (fix F): дата недели = planStartWeek + (w-1)*7
   const weeks: BBWeek[] = [];
   for (let w = 1; w <= totalWeeks; w++) {
     // Акценты НЕДЕЛИ по расписанию блоков специализации.
     const weekSpec = specResForWeekSchedule(specSchedule, w);
+    const weekDate = (input as any).planStartWeek ? addDaysISO((input as any).planStartWeek, (w - 1) * 7) : today;
+    const weekExcluded = w === 1 ? excludedMuscles : getExcludedMuscles(injuries, weekDate);
+    const weekGraded = w === 1 ? gradedInjuries : getGradedInjuries(injuries, weekDate);
     // L7: для каждой недели берём дословный набор дней из tpl.weeks[w-1], если есть.
     const currentWeekDays = (hasExplicitWeeks && (cycle as any).weeks[w - 1]) ? (cycle as any).weeks[w - 1] : week1Days;
     const sessions: BBSession[] = currentWeekDays.map((daySpec: any, dayIdx: number) => {
@@ -1021,8 +1031,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         if (!isPrimary && character === 'тяж') { character = 'памп'; }
         const workMaxVal = calcWorkMaxForEx(finalExName, workMax);
         const muscle = muscleGroupFromExName(finalExName, EXERCISE_CATALOG);
-        // Пропускаем упражнения на исключённые мышцы (травмы)
-        if (excludedMuscles.has(muscle)) return null as any;
+        // Пропускаем упражнения на исключённые мышцы (травмы) — per-week
+        if (weekExcluded.has(muscle)) return null as any;
         // Добавить в seen (дедупликация)
         seenNames.add(finalExName);
         // P0-3 (audit 2026-08): используем isWeak из bb-builder для маппинга гранулярных групп
@@ -1686,11 +1696,13 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     if (_labIntensityNoteProgram) rationale.push(`🧪 Интенсивность: ${_labIntensityNoteProgram}`);
   }
 
-  // Build weeks — все недели из program.weeks[] напрямую (faithful)
+  // Build weeks — все недели из program.weeks[] напрямую (faithful) — per-week травмы
   const weeks: BBWeek[] = [];
   for (let wIdx = 0; wIdx < program.weeks.length; wIdx++) {
     const pw = program.weeks[wIdx];
     const weekNum = pw.week || (wIdx + 1);
+    const weekDateProgram = (opts as any).planStartWeek ? addDaysISO((opts as any).planStartWeek, (weekNum - 1) * 7) : _todayProgram;
+    const weekExcludedProgram = wIdx === 0 ? excludedMuscles : getExcludedMuscles(opts.injuries || [], weekDateProgram);
     // Акценты НЕДЕЛИ по расписанию блоков специализации.
     const weekSpec = specResForWeekSchedule(specSchedule, weekNum);
     const isDeload = !!pw.deload;
@@ -1723,7 +1735,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       for (let eIdx = 0; eIdx < bbFiltered.length; eIdx++) {
         let ex = bbFiltered[eIdx];
         let muscle = muscleGroupFromExName(ex.name, EXERCISE_CATALOG);
-        if (excludedMuscles.has(muscle)) continue;
+        if (weekExcludedProgram.has(muscle)) continue;
 
         // L12: парсить `+` notation в суперсетах. Исходная запись `Суперсет: Жим + Тяга` —
         // ищется в EXERCISE_CATALOG целиком, не находится, выкидывается. Здесь:

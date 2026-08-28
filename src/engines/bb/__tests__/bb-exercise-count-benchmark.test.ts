@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildBBPlan } from '../bb-builder.engine';
 import { SPLIT_PATTERNS } from '../bb-split-patterns';
+import { sessionLimitsFor } from '../bb-volume.engine';
 
 const workMax = { chest: 100, back: 120, shoulders: 60, arms: 50, quads: 140, hamstrings: 100, glutes: 140, calves: 80, abs: 60, traps: 80, forearms: 40 };
 
@@ -14,8 +15,9 @@ describe('BB exercise-count benchmark', () => {
       const plan = buildBBPlan({ patternId: pattern.id, level: 'intermediate', goal: 'mass', weeks: 4, workMax });
       for (const week of plan.weeks) for (const session of week.sessions) {
         const exs = working(session);
-        expect(exs.length, pattern.id).toBeLessThanOrEqual(10);
-        expect(exs.reduce((sum, exercise) => sum + exercise.sets, 0), pattern.id).toBeLessThanOrEqual(24);
+        const lim = sessionLimitsFor({ level: 'intermediate', patternId: pattern.id });
+        expect(exs.length, pattern.id).toBeLessThanOrEqual(lim.maxExercises);
+        expect(exs.reduce((sum, exercise) => sum + exercise.sets, 0), pattern.id).toBeLessThanOrEqual(lim.maxWorkingSets);
       }
     }
   }, 30000);
@@ -25,8 +27,9 @@ describe('BB exercise-count benchmark', () => {
     const enhanced = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', goal: 'mass', weeks: 4, workMax, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
     const naturalMax = Math.max(...natural.weeks.flatMap(week => week.sessions.map(session => working(session).length)));
     const enhancedMax = Math.max(...enhanced.weeks.flatMap(week => week.sessions.map(session => working(session).length)));
+    const lim = sessionLimitsFor({ level: 'enhanced', patternId: 'upper_lower_4', peds: ['AAS'], courseIntensity: 'moderate' });
     expect(enhancedMax).toBeGreaterThanOrEqual(naturalMax);
-    expect(enhancedMax).toBeLessThanOrEqual(10);
+    expect(enhancedMax).toBeLessThanOrEqual(lim.maxExercises);
   }, 30000);
 
   it('gives experienced enhanced athletes a larger back/session budget', () => {

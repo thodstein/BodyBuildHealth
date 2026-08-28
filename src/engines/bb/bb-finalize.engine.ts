@@ -479,15 +479,15 @@ function ensureLegHeavyBlock(session: any, options: BBFinalizeOptions, muscle: s
   let items: any[] = session.exercises.filter((e: any) => e.muscle === muscle && !(e as any).warmupActivator);
   // Тяж-день: все существующие compound-упражнения мышцы становятся тяжёлыми
   // (6-10 reps, RIR ≤2); изоляции не трогаем (они — памп-добивка шага 3).
-  if (heavyQuads || true) {
-    for (const e of items) {
-      const p = classifyLegExercise(e.name).pattern;
-      const isCompound = p === 'compound_squat' || p === 'lunge' || p === 'belt_stepup' || p === 'sissy_lengthened' || p === 'rdl_hinge' || /присед|жим.*ног|leg.?press|хак|hack|выпад|lunge|румын|rdl|гудморнинг|мёртв/i.test(e.name);
-      if (!isCompound) continue;
-      e.character = 'тяж';
-      e.rir = Math.min(e.rir ?? 2, 2);
-      e.repsRange = [6, 10];
-    }
+  // heavyQuads — информативный флаг дня, тяжёлый характер ставится безусловно
+  // для вызванной мышцы (функция вызывается только для heavyMuscle).
+  for (const e of items) {
+    const p = classifyLegExercise(e.name).pattern;
+    const isCompound = p === 'compound_squat' || p === 'lunge' || p === 'belt_stepup' || p === 'sissy_lengthened' || p === 'rdl_hinge' || /присед|жим.*ног|leg.?press|хак|hack|выпад|lunge|румын|rdl|гудморнинг|мёртв/i.test(e.name);
+    if (!isCompound) continue;
+    e.character = 'тяж';
+    e.rir = Math.min(e.rir ?? 2, 2);
+    e.repsRange = [6, 10];
   }
   const used = (c: any) => options.excludedExercises?.includes(c.id) || options.excludedExercises?.includes(c.name);
   const equipmentOk = (c: any) => {
