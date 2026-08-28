@@ -41,11 +41,22 @@ describe('recipe-engine', () => {
       expect(items.some(i => i.id === 'broccoli')).toBe(true);
     });
 
-    it('добавляет молоко к завтраку если нет в ingredientIds', () => {
+    it('НЕ навязывает молоко завтраку, если его нет в порциях/ингредиентах (Aug 28: было искажение декомпозиции)', () => {
       const r = baseRecipe({
         meal: 'breakfast',
         ingredientIds: ['oats', 'whey_isolate'],
         portions: { oats: 80, whey_isolate: 30 },
+      });
+      const items = decomposeRecipe(r);
+      expect(items.some(i => i.id === 'milk')).toBe(false);
+    });
+
+    it('добавляет молоко, если оно явно заявлено в ингредиентах рецепта', () => {
+      const r = baseRecipe({
+        meal: 'breakfast',
+        ingredientIds: ['oats', 'whey_isolate'],
+        portions: { oats: 80, whey_isolate: 30 },
+        ingredients: ['Овсянка 80г', 'Молоко 200мл'],
       });
       const items = decomposeRecipe(r);
       expect(items.some(i => i.id === 'milk')).toBe(true);

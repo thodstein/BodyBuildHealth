@@ -418,7 +418,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Рис басмати с курицей карри': {
     ingredientIds: ['chicken_breast', 'rice_white', 'onion', 'coconut_oil'],
-    portions: { chicken_breast: 180, rice_white: 100, onion: 100, coconut_oil: 100 },
+    portions: { chicken_breast: 180, rice_white: 100, onion: 100, coconut_oil: 12 },
     difficulty: 'medium', batchFriendly: true, cookSkill: 'medium',
     flavorProfile: { spicy: 2, umami: 1 },
   },
@@ -472,7 +472,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Тыквенно-имбирный суп с креветками': {
     ingredientIds: ['squash_kabocha', 'seafood_shrimp_tiger', 'coconut_oil', 'onion'],
-    portions: { squash_kabocha: 300, seafood_shrimp_tiger: 120, coconut_oil: 100, onion: 50 },
+    portions: { squash_kabocha: 300, seafood_shrimp_tiger: 120, coconut_oil: 12, onion: 50 },
     difficulty: 'medium', batchFriendly: true, cookSkill: 'medium',
     flavorProfile: { salty: 1, umami: 1 },
   },
@@ -568,7 +568,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Индейка с ананасом и карри': {
     ingredientIds: ['turkey_breast', 'pineapple', 'coconut_oil', 'rice_white'],
-    portions: { turkey_breast: 200, pineapple: 100, coconut_oil: 80, rice_white: 50 },
+    portions: { turkey_breast: 200, pineapple: 100, coconut_oil: 12, rice_white: 50 },
     difficulty: 'medium', batchFriendly: false, cookSkill: 'medium',
     flavorProfile: { sweet: 2, spicy: 2, umami: 1 },
   },
@@ -652,7 +652,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Смузи-боул протеиновый «Красный бархат»': {
     ingredientIds: ['whey_isolate', 'beetroot', 'kefir', 'banana', 'dark_chocolate', 'coconut_oil'],
-    portions: { whey_isolate: 30, beetroot: 50, kefir: 200, banana: 50, dark_chocolate: 14, coconut_oil: 100 },
+    portions: { whey_isolate: 30, beetroot: 50, kefir: 200, banana: 50, dark_chocolate: 14, coconut_oil: 12 },
     difficulty: 'easy', batchFriendly: false, cookSkill: 'basic',
     flavorProfile: { sweet: 2 },
   },
@@ -784,7 +784,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Пудинг чиа с протеином и манго': {
     ingredientIds: ['coconut_oil', 'chia_seeds', 'whey_isolate', 'pineapple'],
-    portions: { coconut_oil: 200, chia_seeds: 30, whey_isolate: 30, pineapple: 100 },
+    portions: { coconut_oil: 12, chia_seeds: 30, whey_isolate: 30, pineapple: 100 },
     difficulty: 'easy', batchFriendly: false, cookSkill: 'basic',
     flavorProfile: { sweet: 2 },
   },
@@ -796,7 +796,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Банановые протеиновые панкейки': {
     ingredientIds: ['banana', 'egg_whole', 'whey_isolate', 'coconut_oil'],
-    portions: { banana: 100, egg_whole: 100, whey_isolate: 30, coconut_oil: 100 },
+    portions: { banana: 100, egg_whole: 100, whey_isolate: 30, coconut_oil: 12 },
     difficulty: 'easy', batchFriendly: false, cookSkill: 'basic',
     flavorProfile: { sweet: 2, umami: 1 },
   },
@@ -856,7 +856,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Рисовый пудинг с манго и протеином': {
     ingredientIds: ['rice_white', 'coconut_oil', 'whey_isolate', 'pineapple'],
-    portions: { rice_white: 60, coconut_oil: 210, whey_isolate: 25, pineapple: 100 },
+    portions: { rice_white: 60, coconut_oil: 12, whey_isolate: 25, pineapple: 100 },
     difficulty: 'medium', batchFriendly: false, cookSkill: 'medium',
     flavorProfile: { sweet: 2 },
   },
@@ -886,7 +886,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Тайский зелёный карри с курицей': {
     ingredientIds: ['chicken_breast', 'coconut_oil', 'rice_white', 'broccoli', 'sauce_fish_sauce'],
-    portions: { chicken_breast: 180, coconut_oil: 150, rice_white: 70, broccoli: 80, sauce_fish_sauce: 14 },
+    portions: { chicken_breast: 180, coconut_oil: 12, rice_white: 70, broccoli: 80, sauce_fish_sauce: 14 },
     difficulty: 'medium', batchFriendly: true, cookSkill: 'medium',
     flavorProfile: { spicy: 2, umami: 1 },
   },
@@ -1114,7 +1114,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Карри из нута с курицей': {
     ingredientIds: ['chicken_breast', 'chickpeas', 'coconut_oil', 'onion', 'spinach', 'rice_white'],
-    portions: { chicken_breast: 150, chickpeas: 150, coconut_oil: 150, onion: 50, spinach: 60, rice_white: 60 },
+    portions: { chicken_breast: 150, chickpeas: 150, coconut_oil: 12, onion: 50, spinach: 60, rice_white: 60 },
     difficulty: 'medium', batchFriendly: true, cookSkill: 'medium',
     flavorProfile: { spicy: 2, umami: 1 },
   },
@@ -1270,7 +1270,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Мангово-кокосовый смузи': {
     ingredientIds: ['pineapple', 'coconut_oil', 'whey_isolate', 'citrus'],
-    portions: { pineapple: 120, coconut_oil: 150, whey_isolate: 20, citrus: 100 },
+    portions: { pineapple: 120, coconut_oil: 12, whey_isolate: 20, citrus: 100 },
     difficulty: 'easy', batchFriendly: false, cookSkill: 'basic',
     flavorProfile: { sweet: 2 },
   },
@@ -1318,7 +1318,7 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
   },
   'Кокосово-манговый чиа пудинг': {
     ingredientIds: ['chia_seeds', 'coconut_oil', 'whey_isolate', 'pineapple'],
-    portions: { chia_seeds: 20, coconut_oil: 300, whey_isolate: 20, pineapple: 80 },
+    portions: { chia_seeds: 20, coconut_oil: 12, whey_isolate: 20, pineapple: 80 },
     difficulty: 'easy', batchFriendly: false, cookSkill: 'basic',
     flavorProfile: { sweet: 2 },
   },

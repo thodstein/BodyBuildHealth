@@ -38,6 +38,8 @@ export interface FlatRecipeOption {
   difficulty?: string;
   ingredientIds?: string[];
   portions?: Record<string, number>;
+  /** Масштаб порции рецепта к цели приёма (Aug 28, ×0.7-2.2) */
+  appliedScale?: number;
 }
 
 export interface PlanMealLike {
@@ -212,7 +214,7 @@ function flexMealIndex(meals: PlanMealLike[]): number {
   for (let i = meals.length - 1; i >= 0; i--) {
     if (!meals[i]?.recipeApplied) return i;
   }
-  return meals.length - 1;
+  return -1; // все приёмы из рецептов — вызывающий код создаст «Добор»
 }
 
 function maxDeviationPct(totals: PlanTotalsLike, t: DayMacroTargets): number {
@@ -248,6 +250,11 @@ export function rebalanceDayAfterRecipes(
     c: Number.isFinite(targets?.c) && (targets.c || 0) > 0 ? targets.c : 0,
   };
 
+  // Aug 28: анти-осцилляция — только что добавленный top-ап не режется на следующей
+  // итерации (иначе add/cut одной позиции сжигают maxIter, отклонение не падает).
+  let lastAddedMeal = -1;
+  let lastAddedId: string | null = null;
+
   for (let iter = 0; iter < maxIter; iter++) {
     const totals = sumDayTotals(work);
     const dev = maxDeviationPct(totals, validTargets);
@@ -257,6 +264,7 @@ export function rebalanceDayAfterRecipes(
     const dP = validTargets.p - totals.p;
     const dF = validTargets.f - totals.f;
     const dC = validTargets.c - totals.c;
+
 
     const dKcalEquiv = Math.max(
       dKcal > 0 ? dKcal : 0,
@@ -269,8 +277,14 @@ export function rebalanceDayAfterRecipes(
     // блокировать резку перебора.
     if (dKcalEquiv >= 120) {
       // ── Недобор: добавляем топ-ап в гибкий слот ──
-      const fi = flexMealIndex(work);
-      if (fi < 0 || !work[fi]) break;
+      let fi = flexMealIndex(work);
+      if (fi < 0 || !work[fi]) {
+        // Все приёмы из рецептов — создаём «Добор», чтобы не портить основные приёмы
+        // (раньше флекс падал на последний РЕЦЕПТУРНЫЙ приём и «ужимал» обед).
+        work.push({ label: 'Добор', time: '', items: [], totals: { kcal: 0, p: 0, f: 0, c: 0 } } as PlanMealLike);
+        fi = work.length - 1;
+        notes.push('➕ Добавлен приём «Добор» — основные приёмы собраны из рецептов');
+      }
       const relP = dP / Math.max(1, validTargets.p);
       const relF = dF / Math.max(1, validTargets.f);
       const relC = dC / Math.max(1, validTargets.c);
@@ -313,6 +327,8 @@ export function rebalanceDayAfterRecipes(
         }, grams);
         work[fi] = { ...work[fi], items: [...work[fi].items, item], totals: sumMealTotals([...work[fi].items, item]) };
         notes.push(`➕ Недобор закрыт: ${chosen.name} ${grams} г → «${work[fi].label || 'Приём'}»`);
+        lastAddedMeal = fi;
+        lastAddedId = chosen.id;
         continue;
       }
     }
@@ -410,9 +426,15 @@ export function rebalanceDayAfterRecipes(
     let bestCut: Cut | null = null;
     let bestDev = maxDeviationPct(totals, validTargets);
     work.forEach((m, mi) => {
-      if (m.recipeApplied) return; // авторские порции рецепта не трогаем
-      const isSnackish = /Перекус|Полдник|Второй завтрак|Перед сном/i.test(m.label || '');
+      // Aug 28: в рецептурных приёмах авторское ЯДРО не трогается, но САЙД-добивка
+      // (продукт не из ingredientIds рецепта) — сжимаема, иначе перебор неустраним.
+      // Без ingredientIds в данных — консервативно считаем ВСЁ ядром.
+      const coreIds = m.recipeApplied
+        ? new Set<string>(m.recipeAppliedData?.ingredientIds && m.recipeAppliedData.ingredientIds.length > 0 ? m.recipeAppliedData.ingredientIds : (m.items || []).map(i => i.id))
+        : null;
       (m.items || []).forEach((it, ii) => {
+        if (coreIds && coreIds.has(it.id)) return;
+        if (mi === lastAddedMeal && it.id === lastAddedId) return; // свежий top-ап не режем
         const a = it.amount || 0;
         if (a < 20) return;
         const steps = [...SHRINK_LADDER.filter(v => v < a && v >= 20), 0];
@@ -426,6 +448,7 @@ export function rebalanceDayAfterRecipes(
           };
           const dv = maxDeviationPct(nt as any, validTargets);
           if (dv >= bestDev - 0.0005) continue; // строгое улучшение — иначе осцилляции
+          const isSnackish = /Перекус|Полдник|Второй завтрак|Перед сном/i.test(m.label || '');
           const score = (isSnackish ? 0 : 1e6) + (1000 - Math.min(999, a - v));
           if (!bestCut || score < bestCut.score || (score === bestCut.score && v < bestCut.newAmount)) {
             bestDev = dv;
@@ -704,9 +727,23 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const dayUsedNames = new Set<string>();
   let appliedCount = 0;
 
-  meals.forEach(m => {
-    if (!isMainMealLabel((m as any).label)) return;
+  // Aug 28: снек-рецепты в режиме «по рецептам» — только на САМЫЙ БОЛЬШОЙ снек-слот дня
+  // (остальные перекусы остаются продуктовыми и служат гибкими слотами ребаланса).
+  const snackIdxs = meals
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => /Перекус|Полдник|Второй завтрак/i.test(m.label || ''))
+    .sort((a, b) => (b.m.target ? (b.m.target.p || 0) * 4 + (b.m.target.c || 0) * 4 + (b.m.target.f || 0) * 9 : 0) - (a.m.target ? (a.m.target.p || 0) * 4 + (a.m.target.c || 0) * 4 + (a.m.target.f || 0) * 9 : 0));
+  const hasSnackRecipes = pool.some(r => r.meal === 'snack');
+  const recipeSnackIdx = (hasSnackRecipes && snackIdxs.length > 0) ? snackIdxs[0].i : -1;
+
+  meals.forEach((m, mi) => {
     const mealAny = m as any;
+    const label = mealAny.label || '';
+    const isMain = isMainMealLabel(label);
+    // Снек-рецепт — только при явном target (в реальном потоке движок задаёт target
+    // снекам; приём без target — продуктовый, его не заменяем).
+    const isSnackSlot = (mi === recipeSnackIdx) && !!mealAny.target;
+    if (!isMain && !isSnackSlot) return;
     const tgt = mealAny.target || { p: mealAny.totals?.p ?? 30, c: mealAny.totals?.c ?? 40, f: mealAny.totals?.f ?? 15 };
     // Ккал-цель приёма: фактические тоталы, а для пустого приёма — формула из макро-цели
     // (раньше пустой приём скорился против дефолтных 300 ккал и ломал выбор рецепта).
@@ -715,7 +752,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       || 300;
     const excludeNames = new Set<string>([...(mealAny.recipeOptionNames || []), ...dayUsedNames, ...(usedNamesAcrossDays || [])]);
     const matchOpts: RecipeMatchOptions = {
-      mealType: mealTypeFromLabel(mealAny.label),
+      mealType: mealTypeFromLabel(label || undefined),
       targetKcal,
       targetProteinG: tgt.p || 30,
       targetCarbsG: tgt.c || 40,
@@ -730,22 +767,87 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // Шире сеть кандидатов — финальный отбор по фактической декомпозиции ниже
     const cands = pickRecipeOptions(pool, matchOpts, 6, excludeNames);
     if (cands.length === 0) return;
-    // Переранжирование по декомпозированным фактам (что реально окажется в приёме)
+    // Переранжирование по декомпозированным фактам С УЧЁТОМ масштабирования к цели приёма:
+    // рецепт 500 ккал при цели 1000 масштабируется ×2 → дистанция считается для масштаба.
+    // Масштаб дополнительно КАПИТСЯ по белку (≤1.25×цели), жиру (≤1.5×цели) и углям
+    // (≤1.25×цели) — иначе ккал-масштаб рецепта раздувал доминирующий макрос в 2+ раза.
+    const scaleFor = (kcal: number, p: number, f: number, c: number): number => {
+      let s = Math.max(0.7, Math.min(2.2, targetKcal / Math.max(50, kcal)));
+      if (p > 0) s = Math.min(s, (1.25 * (tgt.p || 30)) / p);
+      if (f > 0) s = Math.min(s, (1.5 * (tgt.f || 15)) / f);
+      if (c > 0) s = Math.min(s, (1.25 * (tgt.c || 40)) / c);
+      return Math.max(0.7, Math.round(s * 20) / 20);
+    };
     const ranked = cands
-      .map(r => ({ r, d: distOf(decomposedFacts(r).totals, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40) }))
+      .map(r => {
+        const t = decomposedFacts(r).totals;
+        const s = t && t.kcal > 0 ? scaleFor(t.kcal, t.p, t.f, t.c) : 1;
+        const scaled = t ? { kcal: t.kcal * s, p: t.p * s, f: t.f * s, c: t.c * s } : null;
+        return { r, d: distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40) };
+      })
       .sort((a, b) => a.d - b.d)
       .map(x => x.r);
     const flats: FlatRecipeOption[] = ranked.slice(0, 3).map(flattenRecipeOption);
     mealAny.recipeOptions = flats;
     mealAny.recipeOptionNames = flats.map(f => f.name);
-    // Автовыбор лучшего кандидата — авторские порции рецепта (не равный сплит)
+    // Автовыбор лучшего кандидата — авторские порции рецепта × масштаб к цели приёма.
+    // (жалоба «рецепты ужатые»: рецепт 500 ккал не дотягивал до обеда 1000 ккал, хвост
+    // выпадал голой курицей в перекус. Теперь порция масштабируется ×0.7-2.2, а остаток
+    // закрывается САЙДОМ в том же приёме.)
     const chosenFlat = flats[0];
     const items = buildRecipeMealItems(rebuildRecipeFromFlat(chosenFlat));
     if (!items || items.length === 0) return;
-    mealAny.items = items;
-    mealAny.totals = sumMealTotals(items);
+    const decompTot = sumMealTotals(items);
+    const s = scaleFor(decompTot.kcal || 1, decompTot.p, decompTot.f, decompTot.c);
+    let finalItems = (s !== 1)
+      ? items.map(it => scaleItem(it as PlanItemLike, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)))
+      : items as PlanItemLike[];
+    chosenFlat.appliedScale = s;
+    // Сайд-добивка В ТОТ ЖЕ приём: если после масштабирования приём недобирает >15% ккал,
+    // добавляем гарнир/жир по доминирующему дефициту макро (а не «хвост» в перекус).
+    let sideNote: string | null = null;
+    {
+      const tNow = sumMealTotals(finalItems);
+      const kcalNow = tNow.kcal || 0;
+      if (targetKcal > 0 && kcalNow < targetKcal * 0.85) {
+        const dP = (tgt.p || 0) - tNow.p;
+        const dC = (tgt.c || 0) - tNow.c;
+        const dF = (tgt.f || 0) - tNow.f;
+        const rel = (v: number, t: number) => v / Math.max(1, t);
+        const used = new Set(finalItems.map(i => i.id));
+        const sidePoolFor = (ids: string[]) => ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !used.has(f.id) && !excludedIds.has(f.id));
+        const dominant = Math.max(rel(dP, tgt.p || 30), rel(dC, tgt.c || 40), rel(dF, tgt.f || 15));
+        let pool: FoodItem[]; let macroOf: (f: FoodItem) => number; let dMacro: number; let role: string;
+        if (rel(dC, tgt.c || 40) >= rel(dP, tgt.p || 30) && rel(dC, tgt.c || 40) >= rel(dF, tgt.f || 15)) {
+          pool = sidePoolFor(['rice_white', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_basmati', 'bulgur']);
+          macroOf = f => f.carbs || 0; dMacro = dC; role = 'углеводы';
+        } else if (rel(dP, tgt.p || 30) >= rel(dF, tgt.f || 15)) {
+          pool = sidePoolFor(['chicken_breast', 'cottage_cheese_5', 'turkey_breast', 'egg_whole', 'tuna_fresh']);
+          macroOf = f => f.protein || 0; dMacro = dP; role = 'белок';
+        } else {
+          pool = sidePoolFor(['olive_oil', 'peanut_butter', 'avocado', 'walnuts']);
+          macroOf = f => f.fat || 0; dMacro = dF; role = 'жиры';
+        }
+        const ok = pool.filter(f => macroOf(f) > 5).sort((a, b) => macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1));
+        const side = ok[0];
+        if (side && dMacro > 8) {
+          let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, 300) / 10) * 10;
+          if (g >= 30) {
+            finalItems = [...finalItems, scaleItem({
+              name: side.name, id: side.id, amount: 100,
+              kcal: Math.round(side.kcal || 0), p: side.protein || 0, f: side.fat || 0, c: side.carbs || 0,
+              fiber: side.fiber || 0, role: role === 'углеводы' ? 'carb_slow' : role === 'белок' ? 'protein' : 'fat',
+            }, g)];
+            sideNote = `➕ Сайд к «${chosenFlat.name}»: ${side.name} ${g} г (${role}) — приём добран до своей доли без «хвоста» в перекус`;
+          }
+        }
+      }
+    }
+    mealAny.items = finalItems;
+    mealAny.totals = sumMealTotals(finalItems);
     mealAny.recipeApplied = chosenFlat.name;
     mealAny.recipeAppliedData = chosenFlat;
+    if (sideNote) mealAny.rationale = [...(mealAny.rationale || []), sideNote];
     dayUsedNames.add(chosenFlat.name);
     usedNamesAcrossDays?.add(chosenFlat.name);
     appliedCount++;

@@ -65,8 +65,12 @@ export function decomposeRecipe(recipe: Recipe): MealItem[] {
       items.push(item);
       used.add(fid);
     }
-    // Если порций мало и есть молоко (milk: true в завтраках) — добавим
-    if (items.length > 0 && recipe.meal === 'breakfast' && !used.has('milk')) {
+    // Если порций мало и есть молоко (milk: true в завтраках) — добавим ТОЛЬКО если
+    // пользователь явно указал молоко в ингредиентах (раньше 200 мл навязывались каждому
+    // завтраку → искажение декомпозиции и КБЖУ).
+    if (items.length > 0 && recipe.meal === 'breakfast' && !used.has('milk')
+      && ((recipe.portions && Object.prototype.hasOwnProperty.call(recipe.portions, 'milk'))
+        || (recipe.ingredients || []).some(i => /молок/i.test(i)))) {
       const milk = FOOD_DB.find(f => f.id === 'milk');
       if (milk) items.push(makeMealItem(milk, 200, 'liquid'));
     }
@@ -233,13 +237,17 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
   if (acceptableMeals.includes(recipe.meal)) score += 20;
   else { score -= 15; }  // непоходящий meal-тип — серьёзный штраф
 
-  // 2. КБЖУ-соответствие (±15% — отлично, ±30% — норм, >50% — большой штраф)
+  // 2. КБЖУ-соответствие (±15% — отлично, ±30% — норм).
+  // Aug 28: ветка >0.80 была МЕРТВА (перекрыта >0.50), а рецепты с девиацией >55% всё равно
+  // проходили порог 35-40 и выбирались («ужатые рецепты»). Теперь >55% — hardReject:
+  // масштабирование порции (scaleToMealTarget ×0.7-2.2) в режиме «по рецептам» всё равно
+  // вытянет рецепт к цели приёма, но за пределами ×2.2 это уже другой рецепт.
   const kcalRatio = recipe.kcal / Math.max(50, opts.targetKcal);
   const kcalDeviation = Math.abs(kcalRatio - 1);
   if (kcalDeviation < 0.15) score += 15;
   else if (kcalDeviation < 0.30) score += 8;
-  else if (kcalDeviation > 0.50) score -= 25;  // усиленный штраф (было -15)
-  else if (kcalDeviation > 0.80) score -= 40;
+  else if (kcalDeviation < 0.55) score -= 10;
+  else { hardReject = true; }
 
   const proteinRatio = recipe.protein / Math.max(10, opts.targetProteinG);
   if (Math.abs(proteinRatio - 1) < 0.25) score += 10;
@@ -329,7 +337,7 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
   }
   if (distN > 0) score -= Math.min(8, (distSum / distN) * 100 / 12);
 
-  if (hardReject) score = Math.min(score, 35);  // жёсткий reject — не выше 35
+  if (hardReject) score = 0;  // жёсткий reject (исключённый ингредиент / девиация >55%) — не кандидат
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
