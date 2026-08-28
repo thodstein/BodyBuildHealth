@@ -8,6 +8,13 @@
 import type { UserProgram, UserWeek } from '../user-program/user-program.types';
 import { analyzeManualVolume } from './manual-volume.engine';
 import { getVolumeLandmarks } from '../volume-landmarks.engine';
+import * as XLSX from 'xlsx';
+// QRCode dynamic import to avoid SSR issues — loaded on demand
+let QRCode: any = null;
+async function getQRCode() {
+  if (QRCode) return QRCode;
+  try { const mod = await import('qrcode'); QRCode = mod.default ?? mod; return QRCode; } catch { return null; }
+}
 
 function escCsv(v: unknown): string {
   const s = String(v ?? '');
@@ -89,6 +96,79 @@ export function downloadCsv(filename: string, csv: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/** XLSX (настоящий бинарник через xlsx lib). Лист "Программа" + лист "Сводка объёма". */
+export function buildProgramXlsx(program: UserProgram, level?: string): Uint8Array {
+  const headers = ['Неделя','Фаза','День','Упражнение','Группа','Сеты','Повт','RIR','кг','%1RM','м/с','Темп','Отдых с','Суперсет','Техника','Комментарий'];
+  const rows: (string|number)[][] = [headers];
+  const weeks: UserWeek[] = (program.bb?.weeks ?? (program.hybrid?.bbWeeks as UserWeek[] | undefined) ?? []) as UserWeek[];
+  const filtered = weeks;
+  if (filtered.length === 0 && program.pl?.customWeeks?.length) {
+    for (const w of program.pl.customWeeks) {
+      for (const d of w.days) for (const ex of d.exercises) for (const st of ex.sets) {
+        rows.push([w.week, w.phase, d.name, ex.name, ex.muscle || ex.lift, st.sets, st.reps, st.rir ?? '', '', typeof st.pct === 'number' ? Math.round(st.pct*100) : '', '', '', '', '', '', '']);
+      }
+    }
+  } else {
+    for (const w of filtered) for (const s of w.sessions) for (const b of s.blocks) {
+      if (!b.exerciseName) continue;
+      for (const st of b.sets) {
+        const pct = typeof (st as any).pctOf1RM === 'number' ? Math.round((st as any).pctOf1RM*100) : '';
+        const vel = typeof (st as any).velocityMs === 'number' ? (st as any).velocityMs : '';
+        rows.push([w.week, w.phase + (w.deload?' (deload)':''), s.name, b.exerciseName, b.muscle, b.sets.length, st.reps as any, st.rir, typeof st.weight==='number'? st.weight:'', pct, vel, st.tempo || b.tempoSpec || '', st.restSec ?? '', b.supersetWith?'да':'', st.technique||'', b.comment||'']);
+      }
+    }
+  }
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Ширины колонок
+  ws['!cols'] = [{wch:7},{wch:14},{wch:14},{wch:24},{wch:12},{wch:5},{wch:6},{wch:5},{wch:6},{wch:6},{wch:6},{wch:8},{wch:7},{wch:8},{wch:10},{wch:24}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Программа');
+  // Лист сводки объёма
+  try {
+    const ana = analyzeManualVolume(program, level || program.meta.level || 'intermediate');
+    const volHeaders = ['Мышца','Пик effective','MEV','MAV','MRV','Статус'];
+    const volRows: (string|number)[][] = [volHeaders];
+    for (const m of Object.keys(ana.peakEffective).sort()) {
+      const lm = getVolumeLandmarks(level || program.meta.level || 'intermediate', m);
+      const peak = Math.round(ana.peakEffective[m]||0);
+      const status = lm ? (peak > lm.mrv ? 'over' : peak >= lm.mav ? 'high' : peak >= lm.mev ? 'ok' : 'low') : '';
+      volRows.push([m, peak, lm?.mev ?? '', lm?.mav ?? '', lm?.mrv ?? '', status]);
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet(volRows);
+    ws2['!cols'] = [{wch:14},{wch:10},{wch:6},{wch:6},{wch:6},{wch:8}];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Сводка');
+  } catch {}
+  const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  return out as Uint8Array;
+}
+
+export function downloadXlsx(filename: string, xlsxData: Uint8Array): void {
+  const blob = new Blob([xlsxData as any], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename.endsWith('.xlsx') ? filename : filename + '.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/** QR: data URL (png) для payload. Возвращает Promise<string>. */
+export async function buildProgramQrDataUrl(program: UserProgram): Promise<string> {
+  const payload = buildProgramQrPayload(program);
+  const qr = await getQRCode();
+  if (qr && qr.toDataURL) {
+    try { return await qr.toDataURL(payload, { width: 320, margin: 1, errorCorrectionLevel: 'M' }); } catch {}
+  }
+  // Fallback: внешний API (требует сеть)
+  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(payload)}`;
+}
+
+export function buildQrImageUrlForPayload(payload: string): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(payload)}`;
 }
 
 /** JSON для тренера: enriched (meta + volume analysis + week dump + export date). */

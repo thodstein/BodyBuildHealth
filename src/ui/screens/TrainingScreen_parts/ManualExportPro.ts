@@ -6,9 +6,13 @@ export {
   buildProgramCsv,
   buildProgramCsvForWeek,
   downloadCsv,
+  buildProgramXlsx,
+  downloadXlsx,
   buildProgramJsonForCoach,
   downloadJson,
   buildProgramPrintHtmlFile,
   downloadHtml,
   buildProgramQrPayload,
+  buildProgramQrDataUrl,
+  buildQrImageUrlForPayload,
 } from '../../../engines/manual-constructor/manual-export-pro.engine';

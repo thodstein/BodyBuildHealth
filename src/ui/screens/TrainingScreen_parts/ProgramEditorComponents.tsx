@@ -924,6 +924,20 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
     if (!ok) return;
     onChange(blocks.filter(b=> !selected.has(b.id))); clearSel();
   };
+  const bulkTempo = (tempo: string) => onChange(blocks.map(b=> selected.has(b.id) ? { ...b, tempoSpec: tempo, sets: b.sets.map(s=> ({...s, tempo})) } : b));
+  const bulkRest = (sec: number) => onChange(blocks.map(b=> selected.has(b.id) ? { ...b, sets: b.sets.map(s=> ({...s, restSec: sec})) } : b));
+  const bulkLinkSuperset = () => {
+    const ids = blocks.filter(b=> selected.has(b.id)).map(b=>b.id);
+    if (ids.length<2) return;
+    // свяжем по кругу: 0→1, 1→2, ... last→0 (giant) или попарно
+    onChange(blocks.map(b=> {
+      if (!selected.has(b.id)) return b;
+      const idx = ids.indexOf(b.id);
+      const partner = ids[(idx+1)%ids.length];
+      return { ...b, supersetWith: partner, supersetKind: ids.length>2 ? 'giant' as const : 'superset' as const };
+    }));
+  };
+  const bulkUnlinkSuperset = () => onChange(blocks.map(b=> selected.has(b.id) ? { ...b, supersetWith: undefined, supersetKind: undefined } : b));
   // P0-3: быстрый старт — группа мышц → упражнения из движка подбора + поиск
   const [quickGroup, setQuickGroup] = useState<string | null>(null);
   const [quickSearch, setQuickSearch] = useState('');
@@ -1253,6 +1267,12 @@ const BlockList: React.FC<{ blocks: UserBlock[]; phase?: UserWeek['phase']; sess
               <button onClick={()=> bulkRir(1)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(96,165,250,0.25)', background:'rgba(96,165,250,0.08)', color:'#60a5fa', cursor:'pointer' }}>RIR +1</button>
               <button onClick={()=> bulkWeight(2.5)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(34,197,94,0.25)', background:'rgba(34,197,94,0.08)', color:'#22c55e', cursor:'pointer' }}>+2.5кг</button>
               <button onClick={()=> bulkWeight(-2.5)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(34,197,94,0.25)', background:'rgba(34,197,94,0.08)', color:'#22c55e', cursor:'pointer' }}>−2.5кг</button>
+              <button onClick={()=> bulkRest(60)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(245,158,11,0.25)', background:'rgba(245,158,11,0.08)', color:'#f59e0b', cursor:'pointer' }}>60с</button>
+              <button onClick={()=> bulkRest(180)} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(245,158,11,0.25)', background:'rgba(245,158,11,0.08)', color:'#f59e0b', cursor:'pointer' }}>180с</button>
+              <button onClick={()=> bulkTempo('3-1-1-0')} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(6,182,212,0.25)', background:'rgba(6,182,212,0.08)', color:'#06b6d4', cursor:'pointer' }}>3-1-1-0</button>
+              <button onClick={()=> bulkTempo('2-0-1-0')} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(6,182,212,0.25)', background:'rgba(6,182,212,0.08)', color:'#06b6d4', cursor:'pointer' }}>2-0-1-0</button>
+              <button onClick={bulkLinkSuperset} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(167,139,250,0.25)', background:'rgba(167,139,250,0.08)', color:'#a78bfa', cursor:'pointer' }}>⊕ Суперсет</button>
+              <button onClick={bulkUnlinkSuperset} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(255,255,255,0.08)', background:'transparent', color:DIM, cursor:'pointer' }}>✕ Развязать</button>
               <button onClick={bulkDelete} style={{ fontSize:10, padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.25)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer' }}>✕ Удалить</button>
             </>}
           </div>
