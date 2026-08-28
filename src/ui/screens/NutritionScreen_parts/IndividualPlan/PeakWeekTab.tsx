@@ -407,6 +407,19 @@ export const PeakWeekTab: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Чек-лист готовности (проф-UX) */}
+      {result && (
+        <div style={CARD}>
+          <div style={CARD_TITLE}>✅ Чек-лист готовности</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:10 }}>
+            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Вес записан сегодня (7д среднее)</label>
+            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Сон ≥7ч, готовность к пику — {result.readiness.verdict}</label>
+            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Питание по фазам — ккал/БЖУ/вода/Na</label>
+            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Тренировки — taper применён в ББ-авто</label>
+            <label style={{ display:'flex', gap:6, alignItems:'center' }}><input type="checkbox" /> Позирование 20-30 мин/день</label>
+          </div>
+        </div>
+      )}
 
       {result && (
         <>
