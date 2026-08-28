@@ -48,6 +48,21 @@ function migrateUserProgram(value: any): UserProgram | null {
     title: typeof program.meta.title === 'string' ? program.meta.title : 'Моя программа',
     daysPerWeek: Number.isFinite(program.meta.daysPerWeek) ? program.meta.daysPerWeek : 4,
     weeks: Number.isFinite(program.meta.weeks) ? program.meta.weeks : 4,
+    cycleLength: Number.isFinite((program.meta as any).cycleLength) ? (program.meta as any).cycleLength : 7,
+    engineVersion: typeof (program.meta as any).engineVersion === 'string' ? (program.meta as any).engineVersion : '1',
+  };
+  // Миграция спец-полей: weightMode по умолчанию
+  const migrateSets = (sets: any[]) => {
+    if (!Array.isArray(sets)) return sets;
+    for (const s of sets) {
+      if (s && typeof s === 'object' && !s.weightMode) {
+        if (typeof s.pctOf1RM === 'number') s.weightMode = 'pct';
+        else if (typeof s.velocityMs === 'number') s.weightMode = 'velocity';
+        else s.weightMode = 'kg';
+      }
+      if (s && typeof s.rir !== 'number') s.rir = Number.isFinite(Number(s.rir)) ? Number(s.rir) : 2;
+    }
+    return sets;
   };
   if (program.bb) {
     if (!Array.isArray(program.bb.weeks)) return null;
@@ -56,7 +71,15 @@ function migrateUserProgram(value: any): UserProgram | null {
       week: week.week || index + 1,
       phase: week.phase || 'accumulation',
       deload: Boolean(week.deload || week.phase === 'deload'),
-      sessions: Array.isArray(week.sessions) ? week.sessions : [],
+      sessions: Array.isArray(week.sessions) ? week.sessions.map((ses: any) => ({
+        ...ses,
+        dayOfWeek: Number.isFinite(ses.dayOfWeek) ? ses.dayOfWeek : ses.dayOfWeek,
+        phaseOverride: ses.phaseOverride,
+        blocks: Array.isArray(ses.blocks) ? ses.blocks.map((b: any) => ({
+          ...b,
+          sets: migrateSets(b.sets),
+        })) : [],
+      })) : [],
     }));
     program.bb = {
       ...program.bb,
@@ -65,6 +88,24 @@ function migrateUserProgram(value: any): UserProgram | null {
       progression: program.bb.progression || { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] },
       constraints: program.bb.constraints || { equipment: [] },
     };
+  }
+  if (program.pl?.customWeeks) {
+    for (const w of program.pl.customWeeks as any[]) {
+      for (const d of (w.days ?? [])) {
+        for (const ex of (d.exercises ?? [])) {
+          migrateSets(ex.sets);
+        }
+      }
+    }
+  }
+  if (program.hybrid?.bbWeeks) {
+    for (const w of program.hybrid.bbWeeks as any[]) {
+      for (const s of (w.sessions ?? [])) {
+        for (const b of (s.blocks ?? [])) {
+          migrateSets(b.sets);
+        }
+      }
+    }
   }
   return program;
 }
@@ -150,11 +191,49 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
     for (const w of bb.weeks) {
       const weekSets: Record<string, number> = {};
       for (const s of w.sessions) {
+        // dayCap 10 (как в bb-finalize enforceSessionExerciseLimit)
+        if (s.blocks.length > 10) {
+          issues.push({ level: 'error', code: 'DAY_CAP_EXCEEDED', message: `Нед ${w.week} ${s.name}: ${s.blocks.length} упражнений (лимит 10) — уберите лишние` });
+        }
+        // superset цикл и RIR/weight валидация
+        const blockIds = new Set(s.blocks.map(b => b.id));
         for (const b of s.blocks) {
           totalExercises++;
           const m = (b.muscle || 'other').toLowerCase();
           if (!m) continue;
           weekSets[m] = (weekSets[m] || 0) + (b.sets?.length || 0);
+          if (b.supersetWith && !blockIds.has(b.supersetWith)) {
+            issues.push({ level: 'warning', code: 'SUPERSET_ORPHAN', message: `Нед ${w.week} ${b.exerciseName}: supersetWith указывает на несуществующий блок` });
+          }
+          for (const st of (b.sets ?? [])) {
+            if (typeof st.rir === 'number' && (st.rir < 0 || st.rir > 5)) {
+              issues.push({ level: 'warning', code: 'RIR_RANGE', message: `${b.exerciseName}: RIR ${st.rir} вне 0-5` });
+            }
+            if (typeof st.weight === 'number' && st.weight < 0) {
+              issues.push({ level: 'warning', code: 'WEIGHT_NEG', message: `${b.exerciseName}: вес ${st.weight} < 0` });
+            }
+            if (typeof st.pctOf1RM === 'number' && (st.pctOf1RM < 0.3 || st.pctOf1RM > 1.1)) {
+              issues.push({ level: 'warning', code: 'PCT_RANGE', message: `${b.exerciseName}: %1RM ${st.pctOf1RM} вне 0.3-1.1` });
+            }
+          }
+        }
+        // superset cycle detection A→B→A
+        const graph: Record<string, string> = {};
+        for (const b of s.blocks) if (b.supersetWith) graph[b.id] = b.supersetWith;
+        const visited = new Set<string>();
+        const stack = new Set<string>();
+        const hasCycle = (id: string): boolean => {
+          if (stack.has(id)) return true;
+          if (visited.has(id)) return false;
+          visited.add(id); stack.add(id);
+          const nxt = graph[id];
+          if (nxt && hasCycle(nxt)) return true;
+          stack.delete(id);
+          return false;
+        };
+        for (const id of Object.keys(graph)) if (hasCycle(id)) {
+          issues.push({ level: 'warning', code: 'SUPERSET_CYCLE', message: `Нед ${w.week} ${s.name}: цикл суперсетов — проверьте связи` });
+          break;
         }
       }
       for (const [m, v] of Object.entries(weekSets)) {
@@ -177,6 +256,8 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
       for (const pm of q.perMuscle) {
         if (pm.status === 'over') {
           issues.push({ level: 'warning', code: 'MRV_EXCEED', message: `${pm.muscle}: ${pm.peakSets} сетов/нед (пик) превышает MRV (${pm.mrv})`, muscle: pm.muscle });
+        } else if (pm.status === 'low' && (pm.muscle === 'chest' || pm.muscle === 'back' || pm.muscle === 'legs')) {
+          // low для базовых — info, не спамим high для всех
         }
       }
     } catch {
@@ -188,6 +269,10 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
     }
     if (bb.weeks.length > 0 && bb.weeks[0].sessions.length !== meta.daysPerWeek) {
       issues.push({ level: 'info', code: 'DAYS_MISMATCH', message: `meta.daysPerWeek=${meta.daysPerWeek}, но в неделе ${bb.weeks[0].sessions.length} сессий. Нажмите «Дней/нед» чтобы синхронизировать.` });
+    }
+    // cycleLength 5-9
+    if ((meta as any).cycleLength && ![5,6,7,8,9].includes((meta as any).cycleLength)) {
+      issues.push({ level: 'warning', code: 'BAD_CYCLE_LENGTH', message: `cycleLength должен быть 5-9 (сейчас ${(meta as any).cycleLength})` });
     }
   }
 
@@ -207,7 +292,7 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
     }
   }
 
-  // 4. Проверка Hybrid
+  // 4. Проверка Hybrid — строже для PRO
   if (dir === 'hybrid') {
     if (!program.hybrid) {
       issues.push({ level: 'error', code: 'NO_HYBRID_BODY', message: 'Hybrid-программа не содержит тела программы' });
@@ -221,10 +306,10 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
       issues.push({ level: 'info', code: 'HYBRID_NO_BB', message: 'Hybrid без ББ-недель — добавьте ББ-аксессуары' });
       } else {
         if (typeof program.hybrid.weeksOverride === 'number' && program.hybrid.weeksOverride !== program.hybrid.bbWeeks.length) {
-          issues.push({ level: 'info', code: 'HYBRID_WEEKS_MISMATCH', message: `Hybrid weeksOverride=${program.hybrid.weeksOverride}, но bbWeeks ${program.hybrid.bbWeeks.length} — синхронизируйте` });
+          issues.push({ level: 'error', code: 'HYBRID_WEEKS_MISMATCH', message: `Hybrid weeksOverride=${program.hybrid.weeksOverride}, но bbWeeks ${program.hybrid.bbWeeks.length} — синхронизируйте (блокирует сохранение)` });
         }
         if (program.hybrid.bbWeeks.length !== meta.weeks) {
-          issues.push({ level: 'info', code: 'HYBRID_META_MISMATCH', message: `meta.weeks=${meta.weeks}, но hybrid bbWeeks ${program.hybrid.bbWeeks.length} — проверьте` });
+          issues.push({ level: 'warning', code: 'HYBRID_META_MISMATCH', message: `meta.weeks=${meta.weeks}, но hybrid bbWeeks ${program.hybrid.bbWeeks.length} — проверьте` });
         }
       }
     }

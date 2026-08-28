@@ -40,25 +40,64 @@ export function safeGetJSON<T>(key: string, fallback: T): T {
   }
 }
 
-/** Безопасная запись JSON — при QuotaExceeded чистит старые снапшоты программ и пробует снова. */
+/** Безопасная запись JSON — при QuotaExceeded чистит старые программы/дизайны/годовые сценарии и пробует снова. */
 export function safeSetJSON(key: string, value: unknown): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch (e) {
-    if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+    const isQuota = e instanceof DOMException && e.name === 'QuotaExceededError';
+    // В тестах jsdom QuotaExceeded может быть обычной Error — считаем любую ошибку записи поводом попробовать очистку
+    if (isQuota || e instanceof Error) {
       try {
-        // Пытаемся освободить место: урезаем he_user_programs до 20, чистим снапшоты дизайна
+        let freed = false;
+        // 1) he_user_programs: cap 20 (MRU)
         const raw = localStorage.getItem(MANUAL_STORAGE_KEYS.USER_PROGRAMS);
         if (raw) {
           const arr = JSON.parse(raw);
           if (Array.isArray(arr) && arr.length > 20) {
             localStorage.setItem(MANUAL_STORAGE_KEYS.USER_PROGRAMS, JSON.stringify(arr.slice(0, 20)));
-            localStorage.setItem(key, JSON.stringify(value));
-            return true;
+            freed = true;
           }
         }
+        // 2) he_macrocycle_designs: cap 10 (LRU — оставляем новые)
+        const rawDesigns = localStorage.getItem(MANUAL_STORAGE_KEYS.MACROCYCLE_DESIGNS);
+        if (rawDesigns) {
+          const arr = JSON.parse(rawDesigns);
+          if (Array.isArray(arr) && arr.length > 10) {
+            localStorage.setItem(MANUAL_STORAGE_KEYS.MACROCYCLE_DESIGNS, JSON.stringify(arr.slice(-10)));
+            freed = true;
+          }
+        }
+        // 3) he_annual_scenarios: cap 6
+        const rawScen = localStorage.getItem('he_annual_scenarios');
+        if (rawScen) {
+          const arr = JSON.parse(rawScen);
+          if (Array.isArray(arr) && arr.length > 6) {
+            localStorage.setItem('he_annual_scenarios', JSON.stringify(arr.slice(-6)));
+            freed = true;
+          }
+        }
+        // 4) чистка старых he_editor_history (оставляем 20)
+        const rawHist = localStorage.getItem(MANUAL_STORAGE_KEYS.EDITOR_HISTORY);
+        if (rawHist) {
+          try {
+            const hist = JSON.parse(rawHist);
+            if (hist && Array.isArray(hist.past) && hist.past.length > 20) {
+              hist.past = hist.past.slice(-20);
+              localStorage.setItem(MANUAL_STORAGE_KEYS.EDITOR_HISTORY, JSON.stringify(hist));
+              freed = true;
+            }
+          } catch { /* ignore hist parse */ }
+        }
+        if (freed) {
+          try {
+            localStorage.setItem(key, JSON.stringify(value));
+            return true;
+          } catch { /* still full */ }
+        }
       } catch { /* ignore */ }
+      if (isQuota) return false;
     }
     return false;
   }
@@ -79,4 +118,15 @@ export function storageBytesFor(keys: string[]): number {
     } catch { /* ignore */ }
   }
   return total;
+}
+
+/** Подписка на изменения ключей из другой вкладки (storage event). Возвращает unsubscribe. */
+export function subscribeStorage(keys: string[], cb: (key: string) => void): () => void {
+  const handler = (e: StorageEvent) => {
+    if (e.key && keys.includes(e.key)) cb(e.key);
+  };
+  try { window.addEventListener('storage', handler); } catch { /* ignore */ }
+  return () => {
+    try { window.removeEventListener('storage', handler); } catch { /* ignore */ }
+  };
 }

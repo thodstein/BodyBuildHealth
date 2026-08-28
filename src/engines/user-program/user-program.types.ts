@@ -43,6 +43,30 @@ export type BlockType = 'compound' | 'accessory' | 'isolation' | 'finisher' | 'p
 
 export type MuscleRole = 'primary' | 'accessory';
 
+/** Канонические мышцы ББ (совместимо с TAG_MUSCLES + гранулярные). Свободная строка сохранена для legacy, но новый код должен использовать BBMuscle. */
+export type BBMuscle =
+  | 'chest' | 'chest_upper' | 'chest_lower'
+  | 'back' | 'back_width' | 'back_thickness'
+  | 'quads' | 'hamstrings' | 'glutes' | 'calves'
+  | 'shoulders' | 'delt_front' | 'delt_mid' | 'delt_rear'
+  | 'biceps' | 'triceps' | 'forearms' | 'traps' | 'abs' | 'lower_back' | 'core' | 'other';
+
+export const BB_MUSCLES: readonly BBMuscle[] = [
+  'chest','chest_upper','chest_lower','back','back_width','back_thickness',
+  'quads','hamstrings','glutes','calves','shoulders','delt_front','delt_mid','delt_rear',
+  'biceps','triceps','forearms','traps','abs','lower_back','core','other',
+] as const;
+
+export function isBBMuscle(v: string): v is BBMuscle {
+  return (BB_MUSCLES as readonly string[]).includes(v);
+}
+
+/** Режим задания нагрузки в подходе. */
+export type WeightMode = 'kg' | 'pct' | 'rpe' | 'velocity';
+
+/** Длина микроцикла в днях (5-9 для cycle-based, 7 = недельный). */
+export type CycleLength = 5 | 6 | 7 | 8 | 9;
+
 /* ───────────────────────── Подход / Блок / Сессия ───────────────────────── */
 
 export interface UserSet {
@@ -50,6 +74,8 @@ export interface UserSet {
   rir: number;            // repetitions in reserve (0-5)
   weight?: number;        // кг (рабочий вес); для ПЛ может быть не задан → считается из %1RM
   pctOf1RM?: number;      // ПЛ-стиль: доля от предельного максимума (0.68 = 68%)
+  weightMode?: WeightMode; // как задан вес: кг / % / RPE / velocity
+  velocityMs?: number;    // VBT скорость штанги м/с (опционально, для авто-веса)
   technique?: IntensityTechnique;
   /** Мульти-выбор техник - можно комбинировать несколько */
   techniques?: IntensityTechnique[];
@@ -62,17 +88,21 @@ export interface UserSet {
   miniReps?: number;      // мини-повторения для myo_reps
   miniRestSec?: number;   // мини-отдых (сек) для myo_reps
   pauseSec?: number;      // пауза (сек) для pause_rep
+  /** First-class set types (Colossus): amrap / emom / cluster / dropset-steps — хранятся как technique + note, но флаг для экспорта/логгера. */
+  setKind?: 'normal' | 'amrap' | 'emom' | 'cluster' | 'dropset' | 'myo';
 }
 
 export interface UserBlock {
   id: string;
   type: BlockType;
   exerciseName: string;
-  muscle: string;          // первичная мышечная группа
+  muscle: string;          // первичная мышечная группа (BBMuscle, legacy — свободная строка)
   role: MuscleRole;
   sets: UserSet[];
   /** id блока-партнёра для суперсета/антагониста/pre-exhaust (скобка объединения). */
   supersetWith?: string;
+  /** Валидация суперсета: не допускать цикл A→B→A — проверяется в program-store validate. */
+  supersetKind?: 'superset' | 'giant' | 'pre_exhaust' | 'post_exhaust';
   /** Обоснование выбора (почему это упражнение) — прозрачность для пользователя. */
   rationale?: string;
   note?: string;
@@ -82,17 +112,25 @@ export interface UserBlock {
   repsRange?: [number, number];
   /** PRO-темп (из BBPlan.tempoSpec) — нотация "2-1-1-0". Также может жить в sets[].tempo. */
   tempoSpec?: string;
-  /** Схема разминки compounds (из BBPlan.warmupSets). */
+  /** Схема разминки compounds (из BBPlan.warmupSets). Пирамида bar×15→50%×10→70%×5→80%×3 как в BB-builder. */
   warmupSets?: { load: number; reps: number }[];
   /** Тренерский комментарий из BBPlan.comment (роль/слабые/фаза/нагрузка/⚠ Замена/⭐ Фокус). */
   comment?: string;
+  /** Угол/паттерн для multi-angle покрытия (ANGLE_CLASSES). */
+  angleClass?: string;
+  /** Длина мышцы в упражнении (lengthened bias). */
+  isLengthened?: boolean;
 }
 
 export interface UserSession {
   id: string;
   name: string;           // "День 1: Грудь / Трицепс"
-  /** 0-6 — день недели (необязательная привязка к календарю). */
+  /** 0-6 — день недели (необязательная привязка к календарю). Для cycleLength 5-9 раскладывается по календарю независимо от недели. */
   dayOfWeek?: number;
+  /** Переопределение фазы на уровне сессии (DUP внутри недели: тяж/лёг/памп). Если задано — переопределяет UserWeek.phase для этой сессии. */
+  phaseOverride?: Phase;
+  /** Характер сессии для DUP: 'тяж' | 'памп' | 'лёг' | null (вычисляется из phaseOverride/RIR). */
+  character?: 'тяж' | 'памп' | 'лёг' | null;
   focus: string;          // "Upper" / "Push" / список мышц
   blocks: UserBlock[];
   warmup?: string;
@@ -269,6 +307,14 @@ export interface ProgramMeta {
   /** Связь с дизайном периодизации (периодизационный дизайнер): id + имя + хэш содержимого.
    *  Хэш меняется при правке дизайна — по нему UI определяет «дизайн изменён» (stale). */
   designRef?: { id: string; name: string; hash: string };
+  /** Длина микроцикла в днях (5-9 для cycle-based, 7 = недельный). По умолчанию 7. */
+  cycleLength?: CycleLength;
+  /** Специализация (1-2 целевые мышцы) — для tradeoff. */
+  specialization?: string[];
+  /** Дозировки PED для учёта MRV (если enhanced). */
+  pedDoses?: { substance: string; dose: number }[];
+  /** Идентификатор версии движка (для миграций). */
+  engineVersion?: string;
 }
 
 export interface UserProgram {
