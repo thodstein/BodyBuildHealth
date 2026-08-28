@@ -170,11 +170,17 @@ export function getPedCap(ped: PED): number {
 /** Унифицированный парсер дозы: число → как есть; строка "500mg"/"1,5г" → число.
  *  P2-2: русская запятая "500,5" → "500.5" перед regex (иначе → 5005).
  *  P0-2: используется и для perPED.dose, и для aasDose (risk-threshold) —
- *  ранее aasDose использовал Number() который возвращал NaN для "500mg". */
+ *  ранее aasDose использовал Number() который возвращал NaN для "500mg".
+ *  Fix: г→мг ×1000, мкг остаётся мкг (порядок проверки: мкг → мг → г). */
 function parseDose(raw: unknown): number {
   if (typeof raw === 'number') return raw;
   if (raw != null) {
-    return parseFloat(String(raw).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
+    const s = String(raw).toLowerCase();
+    const num = parseFloat(s.replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
+    if (s.includes('мкг') || s.includes('mcg') || s.includes('μg')) return num;
+    if (s.includes('мг') || s.includes('mg')) return num;
+    if (s.includes('г') || s.includes('g')) return num * 1000;
+    return num;
   }
   return 0;
 }

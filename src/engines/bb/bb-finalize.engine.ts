@@ -2200,13 +2200,20 @@ function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): 
     if (isPPL && maxEx < 12) maxEx = 12;
   }
   for (const week of plan.weeks) {
+    const weekNum = (week as any).week ?? (plan.weeks.indexOf(week) + 1);
+    const weekSpec = options.specializationSchedule ? specResForWeekSchedule(options.specializationSchedule, weekNum) : null;
+    const isSpecTarget = (muscle: string) => {
+      if (!weekSpec || !weekSpec.active) return false;
+      const am = WEAK_TO_MUSCLE[muscle] || muscle;
+      return weekSpec.weak.includes(muscle) || weekSpec.weak.includes(am) || weekSpec.targets.includes(muscle) || weekSpec.targets.includes(am);
+    };
     for (const session of week.sessions) {
       const working = () => session.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
       if (working().length <= maxEx) continue;
       // Изоляции по имени (в спец-планах они primary — но дубли паттернов
       // всё равно лишние), затем accessory-не-изоляции; compound не трогаем.
       const isoRemovable = (ex: any) => iso(ex.name || '');
-      let candidates = working().filter(isoRemovable).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+      let candidates = working().filter(isoRemovable).filter((ex: any) => !isSpecTarget(ex.muscle)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
       for (const ex of candidates) {
         if (working().length <= maxEx) break;
         const count = working().filter((x: any) => x.muscle === ex.muscle).length;
@@ -2216,14 +2223,15 @@ function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): 
       if (working().length > maxEx) {
         // Изоляции с дублем мышцы исчерпаны — удаляем любые изоляции,
         // кроме мелких мышц (calves/abs/forearms/traps — у них нет compound).
-        candidates = working().filter((ex: any) => iso(ex.name || '') && !/calves|abs|forearms|traps/.test(ex.muscle)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        // Специализация — не удаляем цели блока.
+        candidates = working().filter((ex: any) => iso(ex.name || '') && !/calves|abs|forearms|traps/.test(ex.muscle) && !isSpecTarget(ex.muscle)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         for (const ex of candidates) {
           if (working().length <= maxEx) break;
           session.exercises = session.exercises.filter((x: any) => x !== ex);
         }
       }
       if (working().length > maxEx) {
-        candidates = working().filter((e: any) => e.role === 'accessory').sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+        candidates = working().filter((e: any) => e.role === 'accessory' && !isSpecTarget((e as any).muscle)).sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
         for (const ex of candidates) {
           if (working().length <= maxEx) break;
           const count = working().filter((x: any) => x.muscle === ex.muscle).length;
