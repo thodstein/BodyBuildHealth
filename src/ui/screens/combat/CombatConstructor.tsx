@@ -10,7 +10,7 @@ import { COMBAT_PATTERNS, recommendCombatPattern } from '../../../engines/combat
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { saveCombatPlan, loadCombatPlans } from '../../../engines/combat/combat-storage';
 import { applyCombatMesocycle } from '../../../engines/combat/combat-mesocycle';
-import { buildAnnualFromCB, buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs } from '../../../engines/combat/combat-annual';
+import { buildAnnualFromCB, buildAnnualATR, saveAnnualCB, loadAnnualCB, buildAnnualPrintHtml, buildAnnualIcs, addCompetitionToAnnual } from '../../../engines/combat/combat-annual';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
@@ -227,9 +227,7 @@ export const CombatConstructor: React.FC = () => {
     if(!annual || !competitionName || !competitionDate) { setMsg('Укажите название и дату боя'); return; }
     const ann = loadAnnualCB();
     if(!ann) return;
-    // import locally to avoid stale
-    const { addCompetitionToAnnual: addComp } = require('../../../engines/combat/combat-annual');
-    const next = addComp(ann, { id: `comp_${Date.now()}`, name: competitionName, date: competitionDate, weightClass: competitionWeight || undefined } as any);
+    const next = addCompetitionToAnnual(ann, { id: `comp_${Date.now()}`, name: competitionName, date: competitionDate, weightClass: competitionWeight || undefined } as any);
     saveAnnualCB(next); setAnnual(next); setMsg('Бой добавлен в годовой: ' + competitionName);
     setCompetitionName(''); setCompetitionDate(''); setCompetitionWeight('');
   };
