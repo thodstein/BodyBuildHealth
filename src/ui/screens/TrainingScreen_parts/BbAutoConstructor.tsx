@@ -624,6 +624,13 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepCreatineStop, setPrepCreatineStop] = useState(false);
   const [prepCompetitions, setPrepCompetitions] = useState<ContestEventEntry[] | undefined>(undefined);
   const [prepMainCompetitionId, setPrepMainCompetitionId] = useState<string | undefined>(undefined);
+  const [prepEnabled, setPrepEnabled] = useState<boolean>(() => {
+    try {
+      const g: any = (getProfile().settings as any)?.goals;
+      if (typeof g?.prepEnabled === 'boolean') return g.prepEnabled;
+      return !!g?.bbContestPrepPlan;
+    } catch { return false; }
+  });
   // 🏁 Режим подготовки (тренировочная логика недель подготовки): 1.0 = сохранение
   // (RIR 1–3, без отказа, объём как в плане), 0.85 = поддерживающий объём при дефиците.
   const [prepVolumeMode, setPrepVolumeMode] = useState<number>(1.0);
@@ -4294,6 +4301,34 @@ export const BbAutoConstructor: React.FC = () => {
           обычный; этот шаг накладывает фазы поверх него (копию) и генерирует дневные цели питания.
           Можно пропустить — план останется обычным.
         </div>
+        {/* Флаг изоляции обычного режима */}
+        <div style={{ display:'flex', gap:8, alignItems:'center', marginTop:8, padding:10, borderRadius:10, background: prepEnabled ? 'rgba(236,72,153,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${prepEnabled ? 'rgba(236,72,153,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+          <label style={{ display:'flex', gap:8, alignItems:'center', cursor:'pointer', fontSize:12, fontWeight:700, color: prepEnabled ? '#f472b6' : '#fff' }}>
+            <input type="checkbox" checked={prepEnabled} onChange={e => {
+              const v = e.target.checked;
+              setPrepEnabled(v);
+              try {
+                const cur = getProfile();
+                const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
+                if (!next.goals) next.goals = {};
+                next.goals.prepEnabled = v;
+                if (!v) {
+                  delete next.goals.bbContestPrepPlan;
+                  delete next.goals.bbPeakConfig;
+                  next.goals.peakWeek = false;
+                }
+                updateProfile({ settings: next });
+                if (!v) {
+                  setPrepPlan(null);
+                  setPrepApplied(false);
+                  window.dispatchEvent(new CustomEvent(CONTEST_PREP_UPDATED_EVENT, { detail: { source: 'clear' } }));
+                }
+              } catch {}
+            }} />
+            {prepEnabled ? '✅ Подготовка включена' : '⬜ Включить подготовку'}
+          </label>
+          <span style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginLeft:'auto' }}>{prepEnabled ? 'Тапер активен' : 'Обычный режим'}</span>
+        </div>
 
         {/* Параметры */}
         <div style={{ ...CARD, marginTop:10 }}>
@@ -4434,16 +4469,19 @@ export const BbAutoConstructor: React.FC = () => {
           </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
             <button
-              style={{ ...BTN, flex:1, background: 'linear-gradient(135deg,#ec4899,#db2777)', color:'#fff' }}
-              disabled={prepBusy || !builtPlan}
-              onClick={() => assembleContestPrep(true)}
+              style={{ ...BTN, flex:1, background: prepBusy ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg,#ec4899,#db2777)', color: prepBusy ? 'rgba(255,255,255,0.5)' : '#fff', opacity: prepBusy ? 0.6 : 1, cursor: prepBusy ? 'default' : 'pointer' }}
+              disabled={prepBusy}
+              onClick={() => {
+                if (!builtPlan) { flash('Сначала соберите план тренировок (шаги 1-4) — затем вернитесь сюда и нажмите снова. Настройки уже можно сохранить.'); return; }
+                assembleContestPrep(true);
+              }}
             >
               {prepBusy ? 'Собираю…' : prepApplied ? '🔄 Пересобрать и применить' : '🏁 Собрать contest prep и применить'}
             </button>
-            <button style={BTN_GHOST} onClick={() => assembleContestPrep(false)} disabled={prepBusy || !builtPlan}>💾 Только сохранить настройки</button>
+            <button style={{ ...BTN_GHOST, opacity: prepBusy ? 0.6 : 1 }} onClick={() => assembleContestPrep(false)} disabled={prepBusy}>💾 Только сохранить настройки</button>
             <button style={BTN_GHOST} onClick={() => setStep('adjust')}>Пропустить →</button>
           </div>
-          {!builtPlan && <div style={{ fontSize:11, color:'#ef4444', marginTop:6 }}>Сначала соберите план тренировок (шаги 1-4).</div>}
+          {!builtPlan && <div style={{ fontSize:11, color:'#f59e0b', marginTop:6, padding:8, borderRadius:8, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.2)' }}>ℹ️ План ещё не собран — вы можете настроить параметры и нажать «Только сохранить настройки», затем собрать план и вернуться для применения.</div>}
         </div>
 
         {/* Результат */}
@@ -5247,11 +5285,12 @@ export const BbAutoConstructor: React.FC = () => {
         {/* Шаги */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 10, flexWrap: 'wrap' }}>
           {steps.map((s, i) => (
-            <button key={s.id} onClick={() => { if (i < stepIdx) setPrepStep(s.id); }} style={{
-              padding: '6px 10px', borderRadius: 999, border: 'none', cursor: i < stepIdx ? 'pointer' : 'default',
+            <button key={s.id} onClick={() => setPrepStep(s.id)} style={{
+              padding: '6px 10px', borderRadius: 999, cursor: 'pointer',
               fontSize: 10, fontWeight: 800, minHeight: 32,
               background: prepStep === s.id ? 'linear-gradient(135deg,#ec4899,#be185d)' : 'rgba(255,255,255,0.05)',
-              color: prepStep === s.id ? '#fff' : '#fff',
+              color: prepStep === s.id ? '#fff' : 'rgba(255,255,255,0.7)',
+              border: prepStep === s.id ? '1px solid rgba(236,72,153,0.5)' : '1px solid rgba(255,255,255,0.08)',
             }}>{s.label}</button>
           ))}
         </div>
