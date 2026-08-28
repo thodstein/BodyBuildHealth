@@ -437,7 +437,11 @@ export function rebalanceDayAfterRecipes(
         if (mi === lastAddedMeal && it.id === lastAddedId) return; // свежий top-ап не режем
         const a = it.amount || 0;
         if (a < 20) return;
-        const steps = [...SHRINK_LADDER.filter(v => v < a && v >= 20), 0];
+        // Пери-приёмы функциональны (анаболическое окно) — не вырезаем до нуля,
+        // минимум 30% порции (раньше предтрен выпадал целиком при жир-переборе).
+        const isPeri = /предтрен|пост-трен|intra/i.test(m.label || '') || ['preworkout', 'postworkout', 'intra'].includes(String((m as any).type));
+        const floor = isPeri ? 30 : 20;
+        const steps = [...SHRINK_LADDER.filter(v => v < a && v >= floor), ...(isPeri ? [] : [0])];
         for (const v of steps) {
           const ratio = v / a;
           const nt = {
@@ -765,40 +769,55 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       goal: args.goal,
     };
     // Шире сеть кандидатов — финальный отбор по фактической декомпозиции ниже
-    const cands = pickRecipeOptions(pool, matchOpts, 6, excludeNames);
-    if (cands.length === 0) return;
-    // Переранжирование по декомпозированным фактам С УЧЁТОМ масштабирования к цели приёма:
-    // рецепт 500 ккал при цели 1000 масштабируется ×2 → дистанция считается для масштаба.
-    // Масштаб дополнительно КАПИТСЯ по белку (≤1.25×цели), жиру (≤1.5×цели) и углям
-    // (≤1.25×цели) — иначе ккал-масштаб рецепта раздувал доминирующий макрос в 2+ раза.
-    const scaleFor = (kcal: number, p: number, f: number, c: number): number => {
+    const scaleOf = (kcal: number, p: number, f: number, c: number): number => {
       let s = Math.max(0.7, Math.min(2.2, targetKcal / Math.max(50, kcal)));
       if (p > 0) s = Math.min(s, (1.25 * (tgt.p || 30)) / p);
       if (f > 0) s = Math.min(s, (1.5 * (tgt.f || 15)) / f);
       if (c > 0) s = Math.min(s, (1.25 * (tgt.c || 40)) / c);
       return Math.max(0.7, Math.round(s * 20) / 20);
     };
-    const ranked = cands
+    const rankCands = (candidatePool: Recipe[]): Recipe[] => candidatePool
       .map(r => {
         const t = decomposedFacts(r).totals;
-        const s = t && t.kcal > 0 ? scaleFor(t.kcal, t.p, t.f, t.c) : 1;
+        const s = t && t.kcal > 0 ? scaleOf(t.kcal, t.p, t.f, t.c) : 1;
         const scaled = t ? { kcal: t.kcal * s, p: t.p * s, f: t.f * s, c: t.c * s } : null;
         return { r, d: distOf(scaled, targetKcal, tgt.p || 30, tgt.f || 15, tgt.c || 40) };
       })
       .sort((a, b) => a.d - b.d)
       .map(x => x.r);
+    let cands = pickRecipeOptions(pool, matchOpts, 6, excludeNames);
+    // Aug 28: fallback — если скоринг с жёсткими гейтами опустошил выборку (экстремальные
+    // цели: hardReject по девиации отсеял всё), основной приём НЕ должен остаться пустым.
+    // Берём лучшие по макро-дистанции среди рецептов своего типа приёма (с ingredientIds).
+    if (cands.length === 0) {
+      const mealType = mealTypeFromLabel(label || undefined);
+      const sameType = pool.filter(r => r.meal === mealType && !excludeNames.has(r.name) && r.ingredientIds && r.ingredientIds.length > 0);
+      cands = rankCands(sameType).slice(0, 6);
+    }
+    if (cands.length === 0) return;
+    // Переранжирование по декомпозированным фактам С УЧЁТОМ масштабирования к цели приёма:
+    // рецепт 500 ккал при цели 1000 масштабируется ×2 → дистанция считается для масштаба.
+    // Масштаб дополнительно КАПИТСЯ по белку (≤1.25×цели), жиру (≤1.5×цели) и углям
+    // (≤1.25×цели) — иначе ккал-масштаб рецепта раздувал доминирующий макрос в 2+ раза.
+    const ranked = rankCands(cands);
     const flats: FlatRecipeOption[] = ranked.slice(0, 3).map(flattenRecipeOption);
     mealAny.recipeOptions = flats;
     mealAny.recipeOptionNames = flats.map(f => f.name);
     // Автовыбор лучшего кандидата — авторские порции рецепта × масштаб к цели приёма.
     // (жалоба «рецепты ужатые»: рецепт 500 ккал не дотягивал до обеда 1000 ккал, хвост
     // выпадал голой курицей в перекус. Теперь порция масштабируется ×0.7-2.2, а остаток
-    // закрывается САЙДОМ в том же приёме.)
-    const chosenFlat = flats[0];
-    const items = buildRecipeMealItems(rebuildRecipeFromFlat(chosenFlat));
-    if (!items || items.length === 0) return;
+    // закрывается САЙДОМ в том же приёме.) Если у кандидата ПУСТАЯ декомпозиция (легаси)
+    // — пробуем следующий, иначе приём остался бы пустым.
+    let chosenFlat: FlatRecipeOption | null = null;
+    let items: PlanItemLike[] | null = null;
+    for (const cand of ranked) {
+      const flat = flattenRecipeOption(cand);
+      const built = buildRecipeMealItems(rebuildRecipeFromFlat(flat));
+      if (built && built.length > 0) { chosenFlat = flat; items = built; break; }
+    }
+    if (!chosenFlat || !items || items.length === 0) return;
     const decompTot = sumMealTotals(items);
-    const s = scaleFor(decompTot.kcal || 1, decompTot.p, decompTot.f, decompTot.c);
+    const s = scaleOf(decompTot.kcal || 1, decompTot.p, decompTot.f, decompTot.c);
     let finalItems = (s !== 1)
       ? items.map(it => scaleItem(it as PlanItemLike, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)))
       : items as PlanItemLike[];

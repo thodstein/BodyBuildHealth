@@ -1005,21 +1005,23 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   useEffect(() => { try { updateSection('nutrition', { preferredByMeal }); } catch {} }, [preferredByMeal]);
   // D-28+: advanced preference states
   const [specificity, setSpecificity] = useState<Specificity>(() => {
+    // Aug 28: легаси-значения 'generic'/'specific' (не из типа 'everyday'|'varied'|'gourmet')
+    // делали настройку no-op — теперь маппим на канон: generic→varied, specific→gourmet.
     try {
       const v = (s as any)?.nutrition?.specificity;
-      if (v === 'generic' || v === 'specific') return v;
+      if (v === 'generic' || v === 'specific') return v === 'generic' ? 'varied' : 'gourmet';
+      if (v === 'everyday' || v === 'varied' || v === 'gourmet') return v;
     } catch {}
     try {
       const v = localStorage.getItem('he_specificity');
-      if (v === 'generic' || v === 'specific') return v;
+      if (v === 'generic' || v === 'specific') return v === 'generic' ? 'varied' : 'gourmet';
+      if (v === 'everyday' || v === 'varied' || v === 'gourmet') return v;
     } catch {}
     return 'varied';
   });
   useEffect(() => {
     try {
-      // Маппинг Specificity → UnifiedSettings.specificity: 'everyday' → 'generic', остальное → 'specific'
-      const mapped = specificity === 'everyday' ? 'generic' : 'specific';
-      updateSection('nutrition', { specificity: mapped as any });
+      updateSection('nutrition', { specificity });
     } catch {}
   }, [specificity]);
   const [intolerances, setIntolerances] = useState<Intolerances>(() => {
@@ -2563,9 +2565,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
-          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
+          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); lockedFoodIds.forEach((id: string) => s.add(id)); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
-          specificity, intolerances, tasteProfile,
+          // Aug 28: histamineSensitive теперь ЕДИНЫЙ источник с intolerances.lowHistamine —
+          // раньше кнопка «Чувствителен к гистамину» влияла только на отчёты, не на генерацию.
+          specificity, intolerances: (() => ({ ...(intolerances || {}), lowHistamine: !!(intolerances && (intolerances as any).lowHistamine) || !!histamineSensitive })), tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
           deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
