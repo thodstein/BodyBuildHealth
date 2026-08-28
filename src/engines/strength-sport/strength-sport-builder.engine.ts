@@ -131,9 +131,16 @@ function weightForExercise(id: string, input: StrengthSportInput, pct: number, w
   const wm = input.workMax || {};
   const base = basePmFor(id, wm);
   const pm = pmForWeek(base, week, input, id);
-  const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
-  // P0-4: double-dip убран — outside уже режет сеты, вес не трогаем (как в BB fix 2)
-  return Math.round((pm || base) * pct / 2.5) * 2.5;
+  // P2-2: без спец-снарядов вес стронг-ивентов скорректирован ×0.85 (замена йока→фермер)
+  const eq = (input.equipment || []).map((s: string) => String(s).toLowerCase());
+  const hasOther = eq.includes('other') || eq.includes('specialty') || eq.length === 0;
+  let w = Math.round((pm || base) * pct / 2.5) * 2.5;
+  if (!hasOther && isStrong(id)) w = Math.round(w * 0.85 / 2.5) * 2.5;
+  // P2-3: female overhead — 15% ниже из-за антропометрии (аналог BB femaleAdjust)
+  if ((input as any).sex === 'female' && (id.includes('press') || id.includes('ohp') || id.includes('log') || id === 'bench_bar')) {
+    w = Math.round(w * 0.88 / 2.5) * 2.5;
+  }
+  return w;
 }
 
 function buildWarmup(weight: number, id?: string): StrengthSportSet[] {

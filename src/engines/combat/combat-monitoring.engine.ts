@@ -100,3 +100,24 @@ export function combatHrvReport(): { grade:'optimal'|'caution'|'dangerous'; note
   const g = hrvGrade(h.last, h.mean, h.sd);
   return { ...g, mean: Math.round(h.mean), sd: Math.round(h.sd), last: h.last };
 }
+
+// P3: EWMA для HRV — устойчивее к выбросам (alpha 0.3)
+export function hrvEwma(history: number[], alpha = 0.3): number | null {
+  if (!Array.isArray(history) || history.length === 0) return null;
+  const vals = history.filter(v=> typeof v==='number' && v>10 && v<250);
+  if (vals.length===0) return null;
+  let ewma = vals[0];
+  for (let i=1;i<vals.length;i++) ewma = alpha*vals[i] + (1-alpha)*ewma;
+  return Math.round(ewma);
+}
+
+export function combatHrvReportEwma(): { grade:'optimal'|'caution'|'dangerous'; note:string; mean:number; sd:number; last:number; ewma:number } | null {
+  const hist = loadHrvHistory();
+  if (hist.length < 7) return null;
+  const h = hrvFromHistory(hist);
+  if (!h) return null;
+  const ew = hrvEwma(hist);
+  if (ew==null) return null;
+  const g = hrvGrade(h.last, ew, h.sd);
+  return { ...g, mean: Math.round(h.mean), sd: Math.round(h.sd), last: h.last, ewma: ew };
+}

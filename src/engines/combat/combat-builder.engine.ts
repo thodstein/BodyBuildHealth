@@ -207,13 +207,20 @@ function weightForCombatExercise(id: string, input: CombatInput, goal: string): 
   const outsideMult = outsideVolumeMultiplier(input.outsideLoad as OutsideLoad) || 1;
   const bodyweightIds = new Set(['pullup','gi_grip_pullup','towel_pullup','rope_climb','box_jump','depth_jump','broad_jump','deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','neck_bridge_wrestler','plate_pinch','wrist_roller','wrist_flexion','wrist_extension','band_external_rotation','band_pull_apart','ytw_raise']);
   if (bodyweightIds.has(id) || id.includes('pinch')) return 0;
-  return weightForCombatExerciseResolved(id, {
+  let w = weightForCombatExerciseResolved(id, {
     workMaxByExercise: (input as any).workMaxByExercise ?? null,
     workMax: (input as any).workMax ?? null,
     bodyweight: (input as any).bodyweight ?? null,
     goalMult,
     outsideMult,
   });
+  // P2-3 female — шея/хват 30% ниже, жим/тяга 12% ниже
+  if ((input as any).sex === 'female') {
+    if (id.includes('neck')) w = Math.round(w * 0.70 / 2.5) * 2.5;
+    else if (id.includes('grip') || id.includes('wrist') || id.includes('pinch')) w = Math.round(w * 0.80 / 2.5) * 2.5;
+    else if (id.includes('bench') || id.includes('ohp') || id.includes('press')) w = Math.round(w * 0.88 / 2.5) * 2.5;
+  }
+  return w;
 }
 
 function buildWorkSets(reps: [number, number], sets: number, rir: number, weight: number, isHeavy: boolean): CombatSet[] {

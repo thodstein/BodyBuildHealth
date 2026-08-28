@@ -34,8 +34,26 @@ export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
   const rows = strengthExportRows(plan);
   const header = `<tr>${['Нед','Фаза','День','Тренировка','Упражнение','Сеты×Повт','Вес','%','RIR','Темп','Отдых','Коммент'].map(h=>`<th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">${escHtml(h)}</th>`).join('')}</tr>`;
   const body = rows.map(r=> `<tr>${[r.week, escHtml(r.phase), r.day, escHtml(r.tag), escHtml(r.exercise), `${r.sets}×${escHtml(r.reps)}`, `${r.weight}кг`, r.pct?`${r.pct}%`:'', r.rir, escHtml(r.tempo), r.rest?`${r.rest}с`:'', escHtml(r.comment)].map(v=>`<td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${v}</td>`).join('')}</tr>`).join('');
+  let extra = '';
+  try {
+    const snap: any = plan.inputSnapshot || {};
+    if (snap.weightCutProtocolSS) extra += `<p><b>Весогонка ТА:</b> ${snap.weightCutProtocolSS.targetLossKg}кг · вода ${snap.weightCutProtocolSS.waterMode} · Na ${snap.weightCutProtocolSS.sodiumMode}</p>`;
+    if (snap.weakPoints && snap.weakPoints.length) extra += `<p><b>Слабые лифты:</b> ${snap.weakPoints.join(', ')} · объём ×1.15</p>`;
+    if (Array.isArray(snap.peds) && snap.peds.length) extra += `<p><b>PED:</b> ${snap.peds.join(', ')} · капы 1.35(весогонка)/1.70</p>`;
+    // попытки ТА
+    if (plan.mode==='weightlifting' && snap.snatch && snap.cleanJerk) {
+      try {
+        const mod: any = require('./strength-sport-attempts.engine');
+        if (mod.buildWLMeetPlan) {
+          const meet = mod.buildWLMeetPlan(snap.snatch || plan.workMax.snatch, snap.cleanJerk || plan.workMax.cleanJerk, 'balanced', { bodyweight: snap.bodyweight, sex: snap.sex });
+          if (meet) extra += `<p><b>Попытки:</b> рывок ${meet.snatch.opener}/${meet.snatch.second}/${meet.snatch.third} · толчок ${meet.cleanJerk.opener}/${meet.cleanJerk.second}/${meet.cleanJerk.third} · тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''}</p>`;
+        }
+      } catch {}
+    }
+    // Sinclair уже в report
+  } catch {}
   const summary = `<div style="margin:8px 0;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px"><b>${title}</b> · ${plan.weeksData.map(w=>`Н${w.week}:${w.phase}${w.deload?' дел':''} ${w.totalSets}сет`).join(' | ')}<br/>Бюджет: ${plan.rationale.join(' | ')}</div>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,Arial,sans-serif;padding:16px;color:#111} table{border-collapse:collapse;width:100%} @media print{body{padding:0}}</style></head><body><h2 style="margin:0 0 8px">${title}</h2>${summary}<table>${header}${body}</table><script>window.onload=()=> setTimeout(()=> window.print(), 300)</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,Arial,sans-serif;padding:16px;color:#111} table{border-collapse:collapse;width:100%} @media print{body{padding:0}}</style></head><body><h2 style="margin:0 0 8px">${title}</h2>${extra}${summary}<table>${header}${body}</table><script>window.onload=()=> setTimeout(()=> window.print(), 300)</script></body></html>`;
 }
 
 export function downloadStrengthCsv(plan: StrengthSportPlan){
