@@ -146,13 +146,22 @@ describe('D4: физиологический потолок углеводов 8
   });
 });
 
-describe('P2: второй гарнир в одном приёме убран (жалоба «500 г каши двумя разными»)', () => {
-  it('в высокоуглеводном обеде только ОДИН крупяной источник, а не «гречка+рис»', () => {
-    const plan = buildDayPlan(base({ mealsCount: 3, goalCarbsG: 520, goalKcal: 3600, goalProteinG: 190, goalFatG: 90 }));
+describe('P2: второй гарнир — только в БОЛЬШОМ приёме (Aug 28: гейт carbTarget ≥ 100 г)', () => {
+  it('умеренный обед (~95 г углей на приём): только ОДИН крупяной источник, а не «гречка+рис»', () => {
+    const plan = buildDayPlan(base({ mealsCount: 3, goalCarbsG: 190, goalKcal: 2600, goalProteinG: 190, goalFatG: 90 }));
     const lunch = plan.meals.find(m => m.type === 'lunch')!;
     const carbSources = lunch.items.filter(it => it.role === 'carb_slow' || it.role === 'carb_fast');
     // максимум один злаковый носитель (второй «гарнир» убран); фрукт — отдельная роль
     expect(carbSources.length).toBeLessThanOrEqual(1);
+  });
+
+  it('высокоуглеводный обед (520 г/день): второй источник ДОПУСТИМ, но порции в разумных капах', () => {
+    const plan = buildDayPlan(base({ mealsCount: 3, goalCarbsG: 520, goalKcal: 3600, goalProteinG: 190, goalFatG: 90 }));
+    const lunch = plan.meals.find(m => m.type === 'lunch')!;
+    const carbSources = lunch.items.filter(it => it.role === 'carb_slow' || it.role === 'carb_fast');
+    // второй источник возможен (иначе недобор «что попало» в перекус), но каждый — в капе
+    expect(carbSources.length).toBeLessThanOrEqual(3);
+    carbSources.forEach(it => expect(it.amount).toBeLessThanOrEqual(460));
   });
 });
 

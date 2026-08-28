@@ -13,7 +13,7 @@ import { updateSection } from "../../../../core/profile-manager";
 import { getWeightLog, saveWeightLog } from "../../../../engines/profile-store";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
-import { computePlannerTargets, computeDieteticCarbTarget } from "./planner-targets";
+import { computePlannerTargets, computeDieteticCarbTarget, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
@@ -113,6 +113,8 @@ export interface PlanCtx {
   effectiveP: number;
   effectiveF: number;
   effectiveC: number;
+  carbCapClipped: boolean;
+  carbCapGPerKg: number;
   kbjuMode: string; setKbjuMode: (v: any) => void;
   switchKbjuMode: (mode: any) => void;
   manualKcal: number | null; setManualKcal: (v: any) => void;
@@ -797,31 +799,66 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // движок (FAT_FLOOR_PER_KG) никогда не спускается ниже, а раньше цель в карточке (60 г для
   // 120 кг = 0.5 г/кг) была ниже пола → «разбег» жиров до 60%+. Поднимаем отображаемую цель до пола.
   const _baseF = kbjuMode === 'manual' && manualF !== null ? manualF : (kbjuMode === 'profile' ? profileTargets.fats : calcTargets.fats);
-  const effectiveF = kbjuMode === 'manual' ? Math.max(Math.round(weight * 0.8), _baseF) : Math.max(Math.round(weight * 0.8), Math.round(_baseF * _nutrMult));
+  let effectiveF = kbjuMode === 'manual' ? Math.max(Math.round(weight * 0.8), _baseF) : Math.max(Math.round(weight * 0.8), Math.round(_baseF * _nutrMult));
   // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом и ограничены
   // ДИЕТОЛОГИЧЕСКИМ потолком (computeDieteticCarbTarget). Цель углеводов — г/кг (межсезонье
   // 4-6 г/кг), а не абстрактный ×множитель (жалоба «120 кг на курсе → 900/814 г углеводов»).
   // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, до 8 г/кг). Применяется ко ВСЕМ
   // уровням (не только enhanced/max) — иначе на base/medium дисплей по-прежнему показывал бы 800+.
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
-  const effectiveC = (() => {
+  // Aug 28 2026 (жалоба «110 кг атлет — цель срезана»): потолок углей КОНТЕКСТНЫЙ —
+  // bulk с тренировочным объёмом ≥400 мин/нед получает 7-8 г/кг вместо плоских 5
+  // (см. contextualCarbCapGPerKg). Cut — 5 г/кг как раньше. Ручной режим — без капа.
+  const _wpwCtx = Math.max(0, trainingDays.filter(Boolean).length || 0);
+  const _avgMinCtx = (() => {
+    try {
+      const v = (s as any)?.training?.minutesPerSession || (s as any)?.avgWorkoutMinutes;
+      return typeof v === 'number' && v > 0 ? v : 60;
+    } catch { return 60; }
+  })();
+  const _weeklyTrainMin = _wpwCtx * _avgMinCtx;
+  const _carbCapGPerKg = contextualCarbCapGPerKg(plannerGoalCategory(goal), _weeklyTrainMin);
+  const _rawCPre = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
+  let effectiveC = (() => {
     if (kbjuMode === 'manual' && manualC !== null) return manualC;
     if (kbjuMode === 'manual' && manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
       return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
     }
     const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits });
+    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits, goalPhase: plannerGoalCategory(goal), trainingVolumeMinPerWeek: _weeklyTrainMin });
   })();
+  // UI-чип: потолок срезал «сырую» цель углеводов (rawC > капа) — пользователь должен
+  // видеть, почему ккал-цель ниже TDEE+профицит, и путь снять ограничение (ручной режим).
+  const carbCapClipped = kbjuMode !== 'manual' && _rawCPre > effectiveC + 5;
   // Kcal согласуем с фактическими макросами (Atwater) ВСЕГДА (для auto): display == генерация,
   // чтобы не было «разбега» между целью углеводов и собранным планом. Усиление уровня (nutrMult)
   // поднимает Б/Ж, а углеводы — в пределах диетологического потолка; kcal = сумма макросов.
-  const effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
+  let effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
     ? manualKcal
     : Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
   const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
+  // План-тип — РЕАЛЬНЫЕ макросы (раньше planType был только фильтром пулов: «кето»
+  // не была кето по КБЖУ — жалоба «кнопка не работает»). Кето: углеводы ≤6% ккал,
+  // жиры = остаток (пол 0.8 г/кг сохраняется). High-carb: угли до контекстного потолка
+  // +1 ступень, жиры = остаток. Manual не трогаем; Mediterranean/vegetarian — только пулы.
+  if (kbjuMode !== 'manual') {
+    const _kcalPre = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+    if (planType === 'keto') {
+      const _ketoC = Math.max(20, Math.min(effectiveC, Math.round(_kcalPre * 0.06 / 4)));
+      const _ketoF = Math.max(Math.round(weight * 0.8), Math.round((_kcalPre - effectiveP * 4 - _ketoC * 4) / 9));
+      effectiveF = _ketoF; effectiveC = _ketoC;
+    } else if (planType === 'highcarb') {
+      const _hcC = computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: Math.round(weight * (_carbCapGPerKg + 1)), insulinTotalUnits: _insulinUnits, carbGPerKg: Math.min(8, _carbCapGPerKg + 1), maxCarbGPerKg: 10, minCarbG: 50 });
+      if (_hcC > effectiveC) {
+        effectiveC = _hcC;
+        effectiveF = Math.max(Math.round(weight * 0.8), Math.round((_kcalPre - effectiveP * 4 - effectiveC * 4) / 9));
+      }
+    }
+    effectiveKcal = Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+  }
   const resultsRef = useRef<HTMLDivElement>(null);
   const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? _pf.budget : 'medium');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
@@ -4200,6 +4237,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern, isTrainDay,
     injectDrugTypes, calcTargets, profileTargets,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
+    carbCapClipped, carbCapGPerKg: _carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, nutrLevel, setNutrLevel,

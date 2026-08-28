@@ -58,24 +58,43 @@ export interface PlannerTargets {
   adjustment: number;
 }
 
-// ─── Диетологический потолок углеводов (П.4/П.1, Aug 22 2026) ─────────────
+// ─── Диетологический потолок углеводов (П.4/П.1, Aug 22 2026; контекст Aug 28 2026) ──
 // Цель углеводов НЕ должна раздуваться множителями уровня/циклинга до абсурда
-// (жалоба «120 кг на курсе → 900/814 г углеводов»). Межсезонный диапазон для набора
-// массы — 4–6 г/кг (Helms 2014, Slater 2019). Берём 5 г/кг — средняя граница, которую
-// РЕАЛЬНО можно съесть (1 гарнир на приём, без абсурдных 500-граммовых порций), т.е.
-// без «разбега» между целью в карточке и собранным планом.
+// (жалоба «120 кг на курсе → 900/814 г углеводов»).
+// Aug 28 2026 (жалоба «110 кг атлет — цель срезана»): потолок 5 г/кг для ВСЕХ целей
+// срезал bulk-план крупного атлета до ~4000 ккал при TDEE+профицит ~4800. Теперь потолок
+// КОНТЕКСТНЫЙ (если передан goalPhase): cut/дефицит → 5 г/кг (как раньше), recomp/health/
+// maintenance/strength → 6, bulk → по тренировочному объёму: ≥600 мин/нед → 8, ≥400 → 7,
+// иначе 6 (Helms 2014, Slater 2019: межсезонье 4-8 г/кг при высоком объёме). Без goalPhase
+// поведение прежнее (5 г/кг) — обратно-совместимо. Ручной режим (manual) капа не имеет
+// по определению ( Context передаёт manualC напрямую ).
 // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, но не более 8 г/кг) —
 // иначе высокие дозы не были бы обеспечены углеводами. Чистая функция: тестируемая.
+export function contextualCarbCapGPerKg(goalPhase?: string, trainingVolumeMinPerWeek?: number): number {
+  if (!goalPhase) return 5;
+  if (goalPhase === 'cut') return 5;
+  if (goalPhase === 'bulk') {
+    const vol = Math.max(0, Number(trainingVolumeMinPerWeek) || 0);
+    if (vol >= 600) return 8;
+    if (vol >= 400) return 7;
+    return 6;
+  }
+  // recomp / health / maintenance / strength — умеренный потолок
+  return 6;
+}
+
 export function computeDieteticCarbTarget(opts: {
   weightKg: number;
   rawCarbsG: number;
   insulinTotalUnits?: number;
-  carbGPerKg?: number;      // потолок г/кг (по умолчанию 5)
+  carbGPerKg?: number;      // потолок г/кг (по умолчанию: контекст goalPhase или 5)
   maxCarbGPerKg?: number;   // верхний предел при инсулине (по умолчанию 8)
   minCarbG?: number;        // нижний этаж (по умолчанию 50)
+  goalPhase?: string;       // 'bulk' | 'cut' | 'maintenance' | 'recomp' | 'health' | 'strength'
+  trainingVolumeMinPerWeek?: number; // минуты тренировок в неделю (для bulk 7-8 г/кг)
 }): number {
   const w = Math.max(1, opts.weightKg || 0);
-  const carbGPerKg = opts.carbGPerKg ?? 5;
+  const carbGPerKg = opts.carbGPerKg ?? contextualCarbCapGPerKg(opts.goalPhase, opts.trainingVolumeMinPerWeek);
   const maxCarbGPerKg = opts.maxCarbGPerKg ?? 8;
   const minCarbG = opts.minCarbG ?? 50;
   const insulinTotal = Math.max(0, opts.insulinTotalUnits || 0);
@@ -85,6 +104,11 @@ export function computeDieteticCarbTarget(opts: {
   const ceiling = Math.max(Math.round(w * carbGPerKg), floorCapped, minCarbG);
   const val = Math.max(floorCapped, Math.min(Math.max(opts.rawCarbsG || 0, minCarbG), ceiling));
   return Math.min(val, ceilingAbs);
+}
+
+// Категория цели для контекстных капов (GOAL_MAP вне computePlannerTargets).
+export function plannerGoalCategory(goal: string): string {
+  return GOAL_MAP[goal] || 'maintenance';
 }
 
 const PHASE_MULT: Record<string, { kcalMod: number; pAdd: number }> = {

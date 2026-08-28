@@ -80,6 +80,7 @@ export const IndividualPlanSettings: React.FC = () => {
     injUnit, setInjUnit, injType, setInjType, injEster, setInjEster,
     injectDrugTypes,
     calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC,
+    carbCapClipped, carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     budget, setBudget, nutrLevel, setNutrLevel,
@@ -260,6 +261,11 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ padding:7, borderRadius:8, background:'rgba(0,230,138,0.06)', border:'1px solid rgba(0,230,138,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#00e68a' }}>{effectiveKcal}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>ккал</div></div>
             <div style={{ padding:7, borderRadius:8, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)', textAlign:'center' }}><div style={{ fontSize:17, fontWeight:800, color:'#3b82f6' }}>Б {effectiveP} / Ж {effectiveF} / У {effectiveC}</div><div style={{ fontSize:8, color:'rgba(255,255,255,0.65)' }}>граммы в день</div></div>
           </div>
+          {carbCapClipped && (
+            <div style={{ fontSize:9, color:'#fbbf24', padding:'6px 8px', marginBottom:7, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:8, lineHeight:1.5 }}>
+              ⚠ Углеводы ограничены диетологическим потолком {carbCapGPerKg} г/кг — цель ккал ниже «TDEE + профицит». На массе потолок растёт с объёмом тренировок (7-8 г/кг). Снять ограничение можно в ручном режиме КБЖУ.
+            </div>
+          )}
           <div style={{ marginBottom:7 }}>
             <button onClick={() => switchKbjuMode(kbjuMode === 'manual' ? 'auto' : 'manual')} style={{ padding:'7px 10px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700, background: kbjuMode === 'manual' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.05)', border: kbjuMode === 'manual' ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(255,255,255,0.1)', color: kbjuMode === 'manual' ? '#f59e0b' : 'rgba(255,255,255,0.75)' }}>✏️ Ручное КБЖУ: {kbjuMode === 'manual' ? 'ВКЛ' : 'ВЫКЛ'}</button>
           </div>

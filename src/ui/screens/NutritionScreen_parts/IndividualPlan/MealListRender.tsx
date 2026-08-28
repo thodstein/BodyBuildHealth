@@ -219,7 +219,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                   {isPreWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(139,92,246,0.15)',color:'#a855f7',fontWeight:600}}>ДО</span>}
                   {isPostWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(245,158,11,0.15)',color:'#f59e0b',fontWeight:600}}>ПОСЛЕ</span>}
                   {isIntraWorkout&&<span style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(34,197,94,0.15)',color:'#22c55e',fontWeight:600}}>ВО ВРЕМЯ</span>}
-                  {(m.type==='snack'||m.type==='snack2'||m.type==='snack3'||m.type==='snack4')&&<span onClick={()=>addSnackComboToMeal(dayIdx, mi)} title="Добавить протеин-порошок + овсяные хлопья" style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(167,139,250,0.12)',border:'1px solid rgba(167,139,250,0.25)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🥣 Порошок+хлопья</span>}
+                  {(m.type==='snack'||m.type==='snack2'||m.type==='snack3'||m.type==='snack4'||m.type==='snack5'||m.type==='snack6')&&<span onClick={()=>addSnackComboToMeal(dayIdx, mi)} title="Добавить протеин-порошок + овсяные хлопья" style={{fontSize:10,padding:'1px 5px',borderRadius:4,background:'rgba(167,139,250,0.12)',border:'1px solid rgba(167,139,250,0.25)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🥣 Порошок+хлопья</span>}
                   {d.timingScores?.[mi] && (
                     <span style={{fontSize:10,padding:'1px 5px',borderRadius:4,fontWeight:600,
                       background:d.timingScores[mi].status==='ideal'?'rgba(34,197,94,0.1)':d.timingScores[mi].status==='good'?'rgba(245,158,11,0.1)':'rgba(239,68,68,0.08)',
