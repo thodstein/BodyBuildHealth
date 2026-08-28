@@ -534,7 +534,7 @@ export const IndividualPlanSettings: React.FC = () => {
             {[0,1,2,3,4,5,6].map(d => <option key={d} value={d}>Show: день {d}</option>)}
           </select>}
         </div>
-        <PopupNumber label="🍽 Голод/сытость (1–сыт, 10–голоден)" value={hungerLevel} min={1} max={10} suffix="/10" onChange={setHungerLevel} />
+        {/* Роунд-2 v5: hungerLevel удалён из генерации — шумовый сигнал (+10% белка при голоде) */}
       </GlassCard>
       )}
 

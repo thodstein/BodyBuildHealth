@@ -2526,7 +2526,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _peakTargets = bbPrepPlan && _inPrepWindow
           ? nutritionTargetsForPrepDate(_prepDate, bbPrepPlan, {
               kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
-              proteinG: Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
+              proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
               fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
               carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
               waterMl: 3000,
@@ -2535,7 +2535,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           : bbPrepConfig
             ? computePeakWeekNutritionTargets(_prepDate, {
                 kcal: Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
-                proteinG: Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
+                proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
                 fatG: Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
                 carbsG: Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
                 waterMl: 3000,
@@ -2554,7 +2554,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           // D-22: nutrMult folded into effective* above. Адаптация по дневнику: компенсация
           // вчерашнего отклонения применяется только к «сегодня» (offset === dayIdx).
           goalKcal: _applyPrepTargets ? _peakTargets.kcal : Math.round(Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0)),
-          goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) * (hungerLevel >= 8 ? 1.1 : 1) + (_diaryActive ? diaryComp.delta.p : 0)),
+          goalProteinG: _applyPrepTargets ? _peakTargets.proteinG : Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
           goalFatG: _applyPrepTargets ? _peakTargets.fatG : Math.round(Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0)),
           goalCarbsG: _applyPrepTargets ? _peakTargets.carbsG : Math.round(Math.max(50, baseGoalC * dayCarbMod) + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
           mealsCount: _effMealsCount, isTrainingDay: plannerModeRef.current === 'pro' ? isTrainDay(offset) : false,
@@ -2563,7 +2563,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
-          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); lockedFoodIds.forEach((id: string) => s.add(id)); return s; })(),
+          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); lockedFoodIds.forEach((id: string) => s.add(id)); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
           // Aug 28: histamineSensitive теперь ЕДИНЫЙ источник с intolerances.lowHistamine —
           // раньше кнопка «Чувствителен к гистамину» влияла только на отчёты, не на генерацию.
@@ -2607,8 +2607,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           };
         // #1 RED-S / Energy Availability: критично для женщин-спортсменок (EA < 30 ккал/кг FFM).
         const _ea = computeEnergyAvailability(input.goalKcal, weight, lbmKg, !!input.isTrainingDay, input.trainDurationMin || 60, (trainIntensity as any) || 'medium', sex);
-        // #2 Голод: высокий → белок/клетчатка/объхм; хронический → refeed.
-        const _hungerNote: string | undefined = hungerLevel >= 8 ? '🔥 Высокий голод: +белок (сытость), добавлены объхмные овощи/клетчатка. Если хронически — refeed/повышение калорий.' : hungerLevel >= 6 ? '🔥 Повышенный голод: акцент на объхмную плотность.' : undefined;
+        // Роунд-2 v5: hungerLevel удалён из генерации — шумовый сигнал, сыть контролируется
+        // белком/объёмом/клетчаткой структурно (жалобы «кнопка не влияет» устранены удалением).
         const _redSNote: string | undefined = _ea.note || undefined;
         const rawV2 = buildDayPlanV2(input);
         // D-28 П3: заметки спец-приёмов по дате (рефид/читмил/фастинг) — в proNotes плана.
@@ -2743,7 +2743,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           lifeStageNote: _lifeStageNote,
           redSNote: _redSNote,
           energyAvailability: _ea,
-          hungerNote: _hungerNote,
           healthScore: plannerModeRef.current === 'pro' ? { score: _healthScore, status: _healthStatus, micro: _microAvg, fiber: _fiberScore, mps: _mpsScore, ea: _eaScore, diversity: _divScore, conflicts: _conflicts } : null,
         };
       };
