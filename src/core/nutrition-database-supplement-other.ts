@@ -128,4 +128,9 @@ export const SUPPLEMENT_OTHER: FoodItem[] = [
   {id:"fastfood_kharcho",name:"Харчо (суп с говядиной и рисом)",category:"fast_food",kcal:110,protein:6,fat:4,carbs:13,fiber:0.8,gi:40,servingSize:"250 мл",tier:"basic",bestFor:["maintenance"],timing:"any",micros:{Na:520,K:280,Fe:1.2,Ca:20}},
   {id:"fastfood_ramen",name:"Рамен (лапша с бульоном и свининой)",category:"fast_food",kcal:280,protein:15,fat:12,carbs:30,fiber:1,gi:60,servingSize:"1 порция (400 мл)",tier:"mid",bestFor:["bulk"],timing:"any",micros:{Na:1200,K:200,Fe:1.8,VitB12:0.5}},
   {id:"fastfood_poke",name:"Поке с лососем и рисом",category:"fast_food",kcal:380,protein:22,fat:12,carbs:48,fiber:3,gi:50,servingSize:"1 порция (350 г)",tier:"max",bestFor:["recomp","maintenance"],timing:"any",micros:{Na:600,K:450,Fe:1.5,Omega3:1.2,VitA:80,VitC:15}},
+  // ─── Роунд-2 (Aug 28): масс-степлы, отсутствовавшие в БД (мёд! гранола, фисташки, тахини) ───
+  {id:"honey",name:"Мёд натуральный",category:"carb",kcal:304,protein:0.3,fat:0,carbs:82,fiber:0.2,gi:58,servingSize:"20 г",tier:"basic",bestFor:["bulk"],timing:"any",micros:{K:52,Fe:0.4,Mg:2,Ca:6,VitB6:0.1}},
+  {id:"granola",name:"Гранола с орехами",category:"grain",kcal:450,protein:10,fat:17,carbs:62,fiber:7,gi:48,servingSize:"50 г",tier:"mid",bestFor:["bulk"],timing:"breakfast",micros:{Mg:90,Fe:2.6,Zn:2.2,K:340,VitE:3}},
+  {id:"pistachios",name:"Фисташки",category:"fat",kcal:560,protein:20,fat:45,carbs:28,fiber:10,gi:15,servingSize:"30 г",tier:"mid",bestFor:["bulk","maintenance"],timing:"any",micros:{K:1025,Mg:121,Fe:3.9,Zn:2.2,VitB6:1.7}},
+  {id:"tahini",name:"Тахини (кунжутная паста)",category:"fat",kcal:595,protein:17,fat:54,carbs:21,fiber:9,gi:0,servingSize:"20 г",tier:"mid",bestFor:["bulk","maintenance"],timing:"any",micros:{Ca:426,Fe:8.9,Mg:95,Zn:4.6,K:264}},
 ];

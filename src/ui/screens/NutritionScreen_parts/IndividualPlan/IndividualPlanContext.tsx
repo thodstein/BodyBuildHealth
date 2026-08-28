@@ -1021,7 +1021,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   });
   useEffect(() => {
     try {
-      updateSection('nutrition', { specificity });
+      // UnifiedSettings.specificity типизирован legacy 'generic'|'specific' — канонические
+      // значения пишутся as any (функционально состояние уже канонизировано выше).
+      updateSection('nutrition', { specificity: specificity as any });
     } catch {}
   }, [specificity]);
   const [intolerances, setIntolerances] = useState<Intolerances>(() => {
@@ -2569,7 +2571,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
           // Aug 28: histamineSensitive теперь ЕДИНЫЙ источник с intolerances.lowHistamine —
           // раньше кнопка «Чувствителен к гистамину» влияла только на отчёты, не на генерацию.
-          specificity, intolerances: (() => ({ ...(intolerances || {}), lowHistamine: !!(intolerances && (intolerances as any).lowHistamine) || !!histamineSensitive })), tasteProfile,
+          specificity, intolerances: { ...(intolerances || {}), lowHistamine: !!(intolerances && (intolerances as any).lowHistamine) || !!histamineSensitive }, tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
           deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
