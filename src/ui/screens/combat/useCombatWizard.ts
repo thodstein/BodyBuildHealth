@@ -1,0 +1,83 @@
+/**
+ * useCombatWizard.ts — хук состояния визарда единоборств (вынесен из CombatConstructor для декомпозиции).
+ * Инкапсулирует: дисциплина/цель/уровень/недели/дни, весогонка, методика, DUP, периодизация, вне зала/спарринг, стиль, оборудование, травмы, мобильность, workMax, VBT, ACWR/HRV, pattern, history.
+ * CombatConstructor остаётся тонким оркестратором шагов.
+ */
+import { useState, useMemo } from 'react';
+import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
+import type { OutsideLoad } from '../../../engines/outside-load.engine';
+import { defaultOutsideLoadFor, computeOutsideMetrics } from '../../../engines/outside-load.engine';
+import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
+
+export type WizardStep = 'params' | 'outside' | 'split' | 'plan';
+
+export function useCombatWizard() {
+  const [step, setStep] = useState<WizardStep>('params');
+  const [discipline, setDiscipline] = useState<CombatInput['discipline']>('mma');
+  const [goal, setGoal] = useState<CombatInput['goal']>('power');
+  const [level, setLevel] = useState<CombatInput['level']>('intermediate');
+  const [weeks, setWeeks] = useState(6);
+  const [days, setDays] = useState(3);
+  const [weightCut, setWeightCut] = useState(0);
+  const [waterMode, setWaterMode] = useState<'stable'|'load_cut'>('stable');
+  const [sodiumMode, setSodiumMode] = useState<'stable'|'moderate_cut'>('stable');
+  const [carbMode, setCarbMode] = useState<'stable'|'deplete_reload'>('stable');
+  const [heatSessions, setHeatSessions] = useState(false);
+  const [methodology, setMethodology] = useState<CombatInput['methodology']>('compound_first');
+  const [dupMode, setDupMode] = useState<CombatInput['dupMode']>('off');
+  const [intensityTech, setIntensityTech] = useState<CombatInput['intensityTech']>('none');
+  const [periodizationModel, setPeriodizationModel] = useState<CombatInput['periodizationModel']>('atr_10');
+  const [conditioningMode, setConditioningMode] = useState<CombatInput['conditioningMode']>('auto');
+  const [outside, setOutside] = useState<OutsideLoad | null>(defaultOutsideLoadFor('mma'));
+  const [outsideEnabled, setOutsideEnabled] = useState(true);
+  const [sparringHard, setSparringHard] = useState(1);
+  const [sparringTech, setSparringTech] = useState(2);
+  const [sparringWrest, setSparringWrest] = useState(1);
+  const [sparringEnabled, setSparringEnabled] = useState(false);
+  const [fightStyle, setFightStyle] = useState<'striker'|'grappler'|'hybrid'>('hybrid');
+  const [avoidAxialLoad, setAvoidAxialLoad] = useState(false);
+  const [equipment, setEquipment] = useState<string[]>([]);
+  const [mobility, setMobility] = useState<string[]>([]);
+  const [injuries, setInjuries] = useState<any[]>([]);
+  const [injInput, setInjInput] = useState('');
+  const [injExclude, setInjExclude] = useState(false);
+  const [bodyweight, setBodyweight] = useState(80);
+  const [sex, setSex] = useState<'male'|'female'>('male');
+  const [age, setAge] = useState(28);
+  const [fightDate, setFightDate] = useState('');
+  const [taperWeeks, setTaperWeeks] = useState(2);
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0,10));
+  const [acwr, setAcwr] = useState<{ ratio:number; zone:string }|null>(null);
+  const [velocityLoss, setVelocityLoss] = useState(0);
+  const [vbtBest, setVbtBest] = useState(0);
+  const [vbtLast, setVbtLast] = useState(0);
+  const [hrvLine, setHrvLine] = useState<string|null>(null);
+  const [patternId, setPatternId] = useState('');
+  const [workMax, setWorkMax] = useState<Record<string,number>>({ bench:80, squat:90, deadlift:100, chest:80, back:70, quads:90, hamstrings:80, shoulders:50 });
+  const [workMaxByExercise, setWorkMaxByExercise] = useState<Record<string,number>>({});
+  const [showExactWM, setShowExactWM] = useState(false);
+  const [plan, setPlan] = useState<CombatPlan|null>(null);
+  const [history, setHistory] = useState<CombatPlan[]>([]);
+  const [msg, setMsg] = useState('');
+
+  const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
+
+  return {
+    // step
+    step, setStep,
+    discipline, setDiscipline, goal, setGoal, level, setLevel, weeks, setWeeks, days, setDays,
+    weightCut, setWeightCut, waterMode, setWaterMode, sodiumMode, setSodiumMode, carbMode, setCarbMode, heatSessions, setHeatSessions,
+    methodology, setMethodology, dupMode, setDupMode, intensityTech, setIntensityTech,
+    periodizationModel, setPeriodizationModel, conditioningMode, setConditioningMode,
+    outside, setOutside, outsideEnabled, setOutsideEnabled, sparringHard, setSparringHard, sparringTech, setSparringTech, sparringWrest, setSparringWrest, sparringEnabled, setSparringEnabled,
+    fightStyle, setFightStyle, avoidAxialLoad, setAvoidAxialLoad,
+    equipment, setEquipment, mobility, setMobility, injuries, setInjuries, injInput, setInjInput, injExclude, setInjExclude,
+    bodyweight, setBodyweight, sex, setSex, age, setAge,
+    fightDate, setFightDate, taperWeeks, setTaperWeeks, startDate, setStartDate,
+    acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, hrvLine, setHrvLine,
+    patternId, setPatternId,
+    workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
+    plan, setPlan, history, setHistory, msg, setMsg,
+    outsideMetrics,
+  };
+}
