@@ -1,7 +1,6 @@
 /**
- * StrengthSportConstructor.tsx — изолированный конструктор Силовой экстрим / ТА.
- * Полностью отделён от ББ/ПЛ: не импортирует их движки, каталоги, типы.
- * Только силовая часть зала. Внешняя нагрузка (поле) — декларация.
+ * StrengthSportConstructor.tsx — премиальный конструктор Стронгмен / ТА.
+ * Стекло + градиенты, современный мобильный стиль. Полностью изолирован.
  */
 import React, { useState, useMemo } from 'react';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
@@ -21,7 +20,7 @@ import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } f
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
-import { CARD, CARD_ACCENT, CARD_STRONG, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, INPUT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
+import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_GRAD, STRONG_GRAD, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
@@ -69,7 +68,6 @@ export const StrengthSportConstructor: React.FC = () => {
       if (Array.isArray(arr) && arr.length) {
         const week = arr.slice(-7).reduce((a:any, s:any)=> a + (s.load || s.sRPE || s.rpe || 0), 0);
         setDiaryLoad(week);
-        // P0-7 ACWR из sRPE (как в TrainingScreen)
         try{
           const daily: Record<string, number> = {};
           for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+(s.load||s.sRPE||s.rpe||0); }
@@ -94,13 +92,9 @@ export const StrengthSportConstructor: React.FC = () => {
       const p = JSON.parse(raw);
       const personal = p.personal || {};
       const training = p.training || p;
-      const lifestyle = p.lifestyle || {};
       const health = p.health || {};
       if (training.workMax) setWorkMax(s => ({ ...s, ...training.workMax }));
       if (personal.workMax) setWorkMax(s => ({ ...s, ...personal.workMax }));
-      if ((training.workMaxByExercise || personal.workMaxByExercise)) {
-        // workMaxByExercise → workMax маппинг (упрощённо берём chest/back как squat/press)
-      }
       if (training.level) setLevel(training.level);
       else if (personal.level) setLevel(personal.level);
       if (personal.sex) setSex(personal.sex === 'female' ? 'female' : 'male');
@@ -113,16 +107,14 @@ export const StrengthSportConstructor: React.FC = () => {
       else if (Array.isArray(personal.equipment)) setEquipment(personal.equipment);
       if (Array.isArray(health.mobilityRestrictions)) setMobility(health.mobilityRestrictions);
       else if (Array.isArray(training.mobilityRestrictions)) setMobility(training.mobilityRestrictions);
-      // lifestyle → sleep/hrv/stress позже в build пробросим
       const sport = (training.sportType || p.goals?.primaryGoal || '').toLowerCase();
       if (sport.includes('weightlifting') || sport.includes('та')) setOutside(defaultOutsideLoadFor('weightlifting'));
       else if (sport.includes('strongman') || sport.includes('стронг')) setOutside(defaultOutsideLoadFor('strongman'));
-      setMsg('Профиль подтянут: ' + (personal.sex || '') + ' ' + (personal.weight || '') + 'кг');
+      setMsg('✦ Профиль подтянут'); setTimeout(()=>setMsg(''), 2200);
     } catch {}
   };
 
   const build = () => {
-    // P0-12: тянем recovery/питание из профиля
     let extra: any = {};
     try{
       const raw = localStorage.getItem('he_profile_v2');
@@ -130,7 +122,6 @@ export const StrengthSportConstructor: React.FC = () => {
         const p = JSON.parse(raw);
         const personal = p.personal || {};
         const lifestyle = p.lifestyle || {};
-        const health = p.health || {};
         extra.bodyFat = typeof personal.bodyFat === 'number' ? personal.bodyFat : undefined;
         extra.leanMass = typeof personal.bodyFat === 'number' && typeof personal.weight === 'number' ? Math.round(personal.weight * (1 - personal.bodyFat/100)) : undefined;
         extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined;
@@ -138,12 +129,10 @@ export const StrengthSportConstructor: React.FC = () => {
         extra.stressLevel = typeof lifestyle.stressLevel === 'number' ? lifestyle.stressLevel : undefined;
         extra.calorieSurplus = typeof p.nutrition?.calorieSurplus === 'number' ? p.nutrition.calorieSurplus : undefined;
         extra.proteinPerKg = typeof p.nutrition?.proteinPerKg === 'number' ? p.nutrition.proteinPerKg : undefined;
-        // pharma
         const ph = p.pharma || {};
         if(Array.isArray(ph.currentSubstances) && ph.currentSubstances.length) extra.peds = ph.currentSubstances;
       }
     }catch{}
-    // P3 diary e1RM trend 28д (epley) — считываем логи как в BB
     let diaryTrend: any[] | null = null;
     try{
       const rawLog = localStorage.getItem('he_workout_log') || localStorage.getItem('he_training_log') || localStorage.getItem('he_workout_history') || '[]';
@@ -212,14 +201,13 @@ export const StrengthSportConstructor: React.FC = () => {
       const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks: 1 }) : buildAnnualFromSS(hist);
       saveAnnualSS(ann);
       setAnnual(ann);
-      // PRO: полная синк с общим годовым планом (MANUAL блоки)
       try { syncStrengthAnnualToGeneral(ann); } catch {}
       try {
         localStorage.setItem('he_strength_annual_sync_v1', JSON.stringify({ updatedAt: new Date().toISOString(), totalWeeks: ann.totalWeeks, blocks: ann.blocks.map(b=> ({ startWeek: b.startWeek, weeks: b.weeks, mode: b.mode })) }));
         window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: ann }));
       } catch {}
     } catch {}
-    setMsg('План сохранён · питание/кардио payload записан');
+    setMsg('✦ План собран'); setTimeout(()=>setMsg(''), 2200);
     setStep('plan');
   };
 
@@ -234,9 +222,8 @@ export const StrengthSportConstructor: React.FC = () => {
       const ex = sess.exercises.find(e => e.id === exId);
       if (!ex) return prev;
       if (patch.weight != null) {
-        if (patch.weight < 0 || patch.weight > 500) { setMsg('Вес вне диапазона 0-500'); return prev; }
+        if (patch.weight < 0 || patch.weight > 500) { setMsg('Вес 0–500'); setTimeout(()=>setMsg(''),1800); return prev; }
         ex.weight = patch.weight;
-        // P1: pct autosync — вес ↔ %ПМ (база из workMax)
         const wmAny: any = (prev as any)?.inputSnapshot?.workMax || workMax || {};
         let base = 100;
         const lid = ex.id;
@@ -255,7 +242,7 @@ export const StrengthSportConstructor: React.FC = () => {
         ex.workSets = ex.workSets.map(s => ({ ...s, reps: avg }));
       }
       if (patch.rir != null) {
-        if (patch.rir < 0 || patch.rir > 5) { setMsg('RIR 0-5'); return prev; }
+        if (patch.rir < 0 || patch.rir > 5) { setMsg('RIR 0–5'); setTimeout(()=>setMsg(''),1800); return prev; }
         ex.rir = patch.rir;
         ex.workSets = ex.workSets.map(s => ({ ...s, rir: patch.rir! }));
       }
@@ -273,7 +260,6 @@ export const StrengthSportConstructor: React.FC = () => {
       if(patch.weight!=null){
         if(patch.weight<0 || patch.weight>600) return prev;
         ex.workSets[setIdx].weight = patch.weight;
-        // также обновляем общий вес упражнения как среднее
         ex.weight = Math.round(ex.workSets.reduce((a,s)=>a+s.weight,0)/ex.workSets.length);
       }
       if(patch.reps!=null) ex.workSets[setIdx].reps = Math.max(1, Math.min(20, patch.reps));
@@ -308,216 +294,237 @@ export const StrengthSportConstructor: React.FC = () => {
       outside: plan.outsideMetrics,
       validation: plan.validation,
     };
-    try { saveUserProgram(prog); setMsg('Экспортировано в Библиотеку (he_user_programs) + he_last_strength_program'); } catch {}
+    try { saveUserProgram(prog); setMsg('✦ Экспортировано в библиотеку'); setTimeout(()=>setMsg(''),2200); } catch {}
     try { localStorage.setItem('he_last_strength_program', JSON.stringify(prog)); } catch {}
     try { navigator.clipboard?.writeText(JSON.stringify(prog, null, 2)); } catch {}
   };
 
   const stepIndex = (['params','outside','split','plan'] as Step[]).indexOf(step) + 1;
-  const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#3b82f6';
+  const modeColor = mode === 'weightlifting' ? '#00e68a' : mode === 'strongman' ? '#f59e0b' : '#0ea5e9';
+  const modeGrad = mode === 'weightlifting' ? ACCENT_GRAD : mode === 'strongman' ? STRONG_GRAD : 'linear-gradient(135deg, #0ea5e9, #6366f1)';
+  const SelectWrap: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <div style={{ position: 'relative' }}>{children}<span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'rgba(255,255,255,0.38)', fontSize: 12 }}>▾</span></div>
+  );
+
   return (
-    <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={mode === 'strongman' ? CARD_STRONG : CARD_ACCENT}>
+    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 860, margin: '0 auto' }}>
+      <style>{`input[type="range"]{ -webkit-appearance:none; appearance:none; height:6px; border-radius:999px; background:rgba(255,255,255,0.08); }
+        input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:2px solid #fff; box-shadow:0 2px 10px rgba(0,0,0,0.24); cursor:pointer; }
+        input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:${mode === 'strongman' ? '#f59e0b' : mode === 'hybrid' ? '#0ea5e9' : '#00e68a'}; border:2px solid #fff; cursor:pointer; }
+        input[type="date"]{ color-scheme: dark; }`}</style>
+
+      {/* HERO */}
+      <div style={mode === 'strongman' ? CARD_STRONG : CARD_HERO}>
+        <div style={{ position: 'absolute', top: -36, right: -36, width: 180, height: 180, borderRadius: '50%', background: `radial-gradient(circle, ${modeColor}22, transparent 70%)`, filter: 'blur(2px)', pointerEvents: 'none' }} />
         <div style={ROW}>
-          <span style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg,${modeColor},${modeColor}cc)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: modeColor === '#00e68a' ? '#000' : '#fff' }}>{mode === 'weightlifting' ? '🏋️' : mode === 'strongman' ? '🪨' : '🔀'}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{mode === 'weightlifting' ? 'Тяжёлая атлетика — PRO' : mode === 'strongman' ? 'Силовой экстрим — PRO' : 'Гибрид — PRO'}</div>
-            <div style={HINT_SM}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · попытки 92/97/102 · внезальная × — интегрировано</div>
+          <span style={{ width: 44, height: 44, borderRadius: 13, background: modeGrad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, color: mode === 'weightlifting' ? '#06281c' : '#fff', boxShadow: `0 6px 18px ${modeColor}33, inset 0 1px 0 rgba(255,255,255,0.22)`, flexShrink: 0 }}>{mode === 'weightlifting' ? '🏋️' : mode === 'strongman' ? '🪨' : '🔀'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: -0.3 }}>{mode === 'weightlifting' ? 'Тяжёлая атлетика — PRO' : mode === 'strongman' ? 'Силовой экстрим — PRO' : 'Гибрид — PRO'}</div>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.58)', lineHeight: 1.35, marginTop: 2 }}>Torokhtiy 3/3/3/1 · Prilepin · SINCLAIR 2025 · попытки 92/97/102</div>
           </div>
-          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}32`}>{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge>
+          <Badge color={modeColor} bg={`${modeColor}14`} border={`${modeColor}30`}>{stepIndex}/4 · {STEP_LABEL_RU[step]}</Badge>
         </div>
         <ProgressBar value={stepIndex} max={4} color={modeColor} />
         <SectionNav activeId={step} onSelect={(id)=> setStep(id as Step)} items={[{id:'params',label:'⚙️ Параметры'},{id:'outside',label:'🏃 Вне зала'},{id:'split',label:'🧩 Сплит'},{id:'plan',label:'📋 План'}]} />
         <div style={{ ...ROW, justifyContent:'space-between' }}>
           <div style={ROW}>
-            {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}24`}>План {plan.weeks}нед · {plan.patternId}</Badge>}
+            {plan && <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`}>План {plan.weeks}нед · {plan.patternId}</Badge>}
             {outsideMetrics && <Badge>Вне зала ×{outsideMetrics.volumeMultiplier}</Badge>}
-            {acwr && <Badge color={acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#f59e0b':'#00e68a'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)':'rgba(0,230,138,0.08)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
+            {acwr && <Badge color={acwr.zone==='dangerous'?'#fecaca': acwr.zone==='caution'?'#fde68a':'#86efac'} bg={acwr.zone==='dangerous'?'rgba(239,68,68,0.12)':'rgba(0,230,138,0.08)'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)}</Badge>}
           </div>
-          {msg && <span style={{ fontSize:11, color: mode==='strongman'?'#fcd34d':'#86efac', background: mode==='strongman'?'rgba(245,158,11,0.10)':'rgba(0,230,138,0.10)', border:`1px solid ${mode==='strongman'?'rgba(245,158,11,0.22)':'rgba(0,230,138,0.20)'}`, padding:'3px 8px', borderRadius:20 }}>{msg}</span>}
+          {msg && <span style={{ fontSize:11, fontWeight:800, color: mode==='strongman'?'#fcd34d':'#86efac', background: mode==='strongman'?'rgba(245,158,11,0.12)':'rgba(0,230,138,0.12)', border:`1px solid ${mode==='strongman'?'rgba(245,158,11,0.24)':'rgba(0,230,138,0.22)'}`, padding:'5px 10px', borderRadius:20 }}>{msg}</span>}
         </div>
-        </div>
+      </div>
 
       {step === 'params' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
-          <label style={{ color: '#fff', fontSize: 12 }}>Режим</label>
-          <select value={mode} onChange={e => setMode(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
-            <option value="weightlifting">Тяжёлая атлетика</option>
-            <option value="strongman">Силовой экстрим</option>
-            <option value="hybrid">Гибрид</option>
-          </select>
-          <label style={{ color: '#fff', fontSize: 12 }}>Цель</label>
-          <select value={goal} onChange={e => setGoal(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
-            <option value="strength">Сила</option>
-            <option value="hypertrophy">Масса</option>
-            <option value="technique">Техника</option>
-            <option value="peaking">Пик</option>
-            <option value="maintenance">Поддержание</option>
-          </select>
-          <label style={{ color: '#fff', fontSize: 12 }}>Уровень</label>
-          <select value={level} onChange={e => setLevel(e.target.value as any)} style={INPUT}>
-            <option value="beginner">Новичок</option>
-            <option value="intermediate">Средний</option>
-            <option value="advanced">Продвинутый</option>
-            <option value="enhanced">На курсе</option>
-          </select>
-          <div style={{ display: 'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
-            <label style={{ color: '#fff', fontSize: 11 }}>Пол: <select value={sex} onChange={e=> setSex(e.target.value as any)} style={{ ...INPUT, width:'100%' }}><option value="male">Мужской</option><option value="female">Женский</option></select></label>
-            <label style={{ color: '#fff', fontSize: 11 }}>Вес тела, кг: <input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={INPUT} /></label>
-            <label style={{ color: '#fff', fontSize: 11 }}>Возраст: <input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||30)} style={INPUT} /></label>
-            <label style={{ color: '#fff', fontSize: 11 }}>Дата пика: <input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={INPUT} /></label>
-          </div>
-          {goal==='peaking' && competitionDate && (
-            <Field label="Тапер">
-              <select value={taperWeeks} onChange={e=> setTaperWeeks(Number(e.target.value))} style={INPUT}><option value={1}>1 неделя</option><option value={2}>2 недели</option></select>
-              <div style={HINT_SM}>Объём ×0.55/0.45, интенсивность 92–95%</div>
-            </Field>
-          )}
-          {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</InfoBanner>}
-          <Field label={`Потеря скорости VBT: ${velocityLoss}% ${velocityLoss>20?'— снизьте объём':''}`}>
-            <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ width:'100%' }} />
-            <div style={HINT_SM}>VBT-контроль: &gt;20% — RIR+1, &gt;30% — стоп-подход.</div>
-          </Field>
-          {(() => {
-            const sn = workMax.snatch||0, cj = workMax.cleanJerk||workMax.clean||0, sq = workMax.backSquat||0, dl = workMax.deadlift||0;
-            const warns: string[] = [];
-            if(sn && cj && sn > cj) warns.push('Рывок > толчка — проверьте ПМ');
-            if(cj && sq && cj > sq) warns.push('Толчок > приседа — редко, проверьте');
-            if(sq && dl && sq > dl) warns.push('Присед > тяги — проверьте (обычно тяга выше)');
-            return warns.length ? <div style={{ fontSize: 10, color: '#f59e0b' }}>{warns.map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null;
-          })()}
-          <label style={{ color: '#fff', fontSize: 12 }}>Недель: {weeks}</label>
-          <input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} />
-          <label style={{ color: '#fff', fontSize: 12 }}>Дней/нед в зале: {days}</label>
-          <input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} />
-          <label style={{ color: '#fff', fontSize: 12 }}>Фокус зала (специализация)</label>
-          <select value={focus || ''} onChange={e => setFocus((e.target.value || null) as any)} style={{ padding: 6, borderRadius: 6 }}>
-            <option value="">Без фокуса (баланс)</option>
-            <option value="snatch">Рывок</option>
-            <option value="clean">Толчок/взятие</option>
-            <option value="squat">Присед</option>
-            <option value="overhead">Жим/лог</option>
-            <option value="carry">Переноски (фермер/йок)</option>
-            <option value="stone">Камни</option>
-          </select>
-          <label style={{ color: '#fff', fontSize: 12 }}>Методика порядка</label>
-          <select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
-            <option value="compound_first">База первой</option>
-            <option value="pre_exhaust">Предутомление</option>
-            <option value="post_exhaust">Постутомление</option>
-          </select>
-          <label style={{ color: '#fff', fontSize: 12 }}>DUP волны</label>
-          <select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
-            <option value="off">Выкл</option>
-            <option value="heavy_light">Тяж/лёг</option>
-            <option value="wave">Волна</option>
-          </select>
-          <label style={{ color: '#fff', fontSize: 12 }}>Интенс-техника</label>
-          <select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={{ padding: 6, borderRadius: 6 }}>
-            <option value="none">Нет</option>
-            <option value="cluster">Кластер (3×1)</option>
-          </select>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
-              <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={INPUT} placeholder="кг" /></Field>
-            ))}
-          </div>
-          {mode !== 'weightlifting' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-              {(['yokeWalk','farmersWalk','atlasStone','logPress'] as const).map(k => (
-                <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={INPUT} placeholder="кг" /></Field>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны">
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <Field label="Режим">
+                <SelectWrap><select value={mode} onChange={e => setMode(e.target.value as any)} style={SELECT}>
+                  <option value="weightlifting">🏋️ Тяжёлая атлетика</option>
+                  <option value="strongman">🪨 Силовой экстрим</option>
+                  <option value="hybrid">🔀 Гибрид</option>
+                </select></SelectWrap>
+              </Field>
+              <Field label="Цель блока">
+                <SelectWrap><select value={goal} onChange={e => setGoal(e.target.value as any)} style={SELECT}>
+                  <option value="strength">🏆 Сила</option>
+                  <option value="hypertrophy">💪 Масса</option>
+                  <option value="technique">🎯 Техника</option>
+                  <option value="peaking">🏁 Пик</option>
+                  <option value="maintenance">🛡️ Поддержание</option>
+                </select></SelectWrap>
+              </Field>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+              <Field label="Уровень"><SelectWrap><select value={level} onChange={e => setLevel(e.target.value as any)} style={SELECT}><option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Продвинутый</option><option value="enhanced">На курсе</option></select></SelectWrap></Field>
+              <Field label="Фокус зала">
+                <SelectWrap><select value={focus || ''} onChange={e => setFocus((e.target.value || null) as any)} style={SELECT}>
+                  <option value="">Без фокуса — баланс</option>
+                  <option value="snatch">⚡️ Рывок</option>
+                  <option value="clean">🏋️ Толчок / взятие</option>
+                  <option value="squat">🦵 Присед</option>
+                  <option value="overhead">🪵 Жим / лог</option>
+                  <option value="carry">🚜 Переноски</option>
+                  <option value="stone">🪨 Камни</option>
+                </select></SelectWrap>
+              </Field>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <Field label={`Недель · ${weeks}`}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} /><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:TEXT_3 }}><span>2</span><span>16</span></div></Field>
+              <Field label={`Дней/нед · ${days}`}><input type="range" min={2} max={6} value={days} onChange={e => setDays(Number(e.target.value))} /><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:TEXT_3 }}><span>2</span><span>6</span></div></Field>
+            </div>
+          </SectionCard>
+
+          <SectionCard icon="👤" title="Атлет">
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10 }}>
+              <Field label="Пол"><SelectWrap><select value={sex} onChange={e=> setSex(e.target.value as any)} style={SELECT}><option value="male">Мужской</option><option value="female">Женский</option></select></SelectWrap></Field>
+              <Field label="Вес, кг"><input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={INPUT} /></Field>
+              <Field label="Возраст"><input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||30)} style={INPUT} /></Field>
+              <Field label="Дата пика"><input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={INPUT} /></Field>
+            </div>
+            {goal==='peaking' && competitionDate && (
+              <Field label="Тапер"><SelectWrap><select value={taperWeeks} onChange={e=> setTaperWeeks(Number(e.target.value))} style={SELECT}><option value={1}>1 неделя</option><option value={2}>2 недели</option></select></SelectWrap></Field>
+            )}
+            {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</InfoBanner>}
+            <Field label={`VBT потеря · ${velocityLoss}%`}><input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} /></Field>
+            {(() => {
+              const sn = workMax.snatch||0, cj = workMax.cleanJerk||workMax.clean||0, sq = workMax.backSquat||0, dl = workMax.deadlift||0;
+              const warns: string[] = [];
+              if(sn && cj && sn > cj) warns.push('Рывок > толчка — проверьте ПМ');
+              if(cj && sq && cj > sq) warns.push('Толчок > приседа — редко');
+              if(sq && dl && sq > dl) warns.push('Присед > тяги — проверьте');
+              return warns.length ? <InfoBanner tone="warn">{warns.join(' · ')}</InfoBanner> : null;
+            })()}
+          </SectionCard>
+
+          <SectionCard icon="🧠" title="Методика и волны">
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+              <Field label="Порядок"><SelectWrap><select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={SELECT}><option value="compound_first">База первой</option><option value="pre_exhaust">Предутомление</option><option value="post_exhaust">Постутомление</option></select></SelectWrap></Field>
+              <Field label="DUP"><SelectWrap><select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={SELECT}><option value="off">Выкл</option><option value="heavy_light">Тяж/лёг</option><option value="wave">Волна</option></select></SelectWrap></Field>
+              <Field label="Техника"><SelectWrap><select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={SELECT}><option value="none">Нет</option><option value="cluster">Кластер 3×1</option></select></SelectWrap></Field>
+            </div>
+          </SectionCard>
+
+          <SectionCard icon="🏋️" title="Рабочие максимумы" subtitle="Олимпийка + сила · для стронга ниже">
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
+              {(['backSquat','frontSquat','deadlift','snatch','cleanJerk','overheadPress'] as const).map(k => (
+                <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || ''} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={INPUT} placeholder="кг" /></Field>
               ))}
             </div>
-          )}
-          <Field label="Слабые точки (специализация) — объём ×1.15 на целевые" hint="Выберите до 2 зон — добавит объём на коррекцию">
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {Object.entries(WL_WEAKPOINT_LABELS).slice(0,8).map(([k,label])=> (
-                <ChipToggle key={k} active={weakPoints.includes(k)} onClick={()=> setWeakPoints(s=> s.includes(k)? s.filter(x=>x!==k): s.length>=2?s:[...s,k])}>{label}</ChipToggle>
-              ))}
-            </div>
-          </Field>
-          <SectionCard title="🛠 Оборудование и ограничения">
-            <Field label="Доступное оборудование (пусто — всё доступно)">
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {(['barbell','dumbbell','machine','cable','other'] as const).map(eq => (
-                  <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{EQUIP_RU[eq]}</ChipToggle>
+            {mode !== 'weightlifting' && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
+                {(['yokeWalk','farmersWalk','atlasStone','logPress'] as const).map(k => (
+                  <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || ''} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={INPUT} placeholder="кг" /></Field>
                 ))}
               </div>
-            </Field>
-            <Field label="Травмы — щадящий режим (через запятую)" hint="Снижает вес ×0.6 и повышает RIR, фильтрует опасные движения">
-              <div style={{ display:'flex', gap:6 }}>
-                <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: колено, плечо" style={{ ...INPUT, flex:1 }} />
-                <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); setMsg(parts.length? 'Травмы применены':'Список очищен'); }} style={BTN_SMALL}>Применить</button>
-              </div>
-              {injuries.length>0 && <InfoBanner tone="warn">Щадящий режим: {injuries.map((j:any)=> j.location).join(', ')} — вес снижен</InfoBanner>}
-            </Field>
-            <Field label="Ограничения мобильности">
+            )}
+            <Field label="Слабые точки — объём ×1.15">
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {(['shoulder','hip','knee','ankle','wrist','lower_back'] as const).map(m => (
-                  <ChipToggle key={m} active={mobility.includes(m)} onClick={()=> setMobility(s=> s.includes(m)? s.filter(x=> x!==m): [...s,m])}>{MOBILITY_RU[m]}</ChipToggle>
+                {Object.entries(WL_WEAKPOINT_LABELS).slice(0,8).map(([k,label])=> (
+                  <ChipToggle key={k} active={weakPoints.includes(k)} onClick={()=> setWeakPoints(s=> s.includes(k)? s.filter(x=>x!==k): s.length>=2?s:[...s,k])}>{label}</ChipToggle>
                 ))}
               </div>
             </Field>
           </SectionCard>
-          <button onClick={pullFromProfile} style={{ padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>Подтянуть из профиля</button>
-          <button onClick={() => setStep('outside')} style={{ padding: '8px 12px', borderRadius: 8, background: '#00e68a', color: '#000', fontWeight: 700, cursor: 'pointer' }}>Далее → Вне зала</button>
+
+          <SectionCard icon="🛡️" title="Оборудование и здоровье">
+            <Field label="Оборудование">
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(['barbell','dumbbell','machine','cable','other'] as const).map(eq => (
+                  <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{(EQUIP_RU as any)[eq] || eq}</ChipToggle>
+                ))}
+              </div>
+            </Field>
+            <Field label="Травмы — щадящий режим" hint="Снижает вес ×0.6, фильтрует опасные движения">
+              <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: колено, плечо" style={{ ...INPUT, flex:1, minWidth:160 }} />
+                <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); setMsg(parts.length? '✦ Травмы применены':'Список очищен'); setTimeout(()=>setMsg(''),1800); }} style={BTN_SMALL}>Применить</button>
+              </div>
+              {injuries.length>0 && <InfoBanner tone="warn">Щадящий: {injuries.map((j:any)=> j.location).join(', ')}</InfoBanner>}
+            </Field>
+            <Field label="Мобильность">
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(['shoulder','hip','knee','ankle','wrist','lower_back'] as const).map(m => (
+                  <ChipToggle key={m} active={mobility.includes(m)} onClick={()=> setMobility(s=> s.includes(m)? s.filter(x=> x!==m): [...s,m])}>{(MOBILITY_RU as any)[m]}</ChipToggle>
+                ))}
+              </div>
+            </Field>
+          </SectionCard>
+
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={pullFromProfile} style={{ ...BTN, flex:1, background:'rgba(255,255,255,0.05)' }}>⟡ Из профиля</button>
+            <button onClick={() => setStep('outside')} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), flex:1.2 }}>Далее → Вне зала</button>
+          </div>
         </div>
       )}
 
       {step === 'outside' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
-          <label style={{ color: '#fff', fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
-            <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} /> Учитывать внезальную нагрузку
+        <SectionCard icon="🏃" title="Вне зала — поле / кроссфит" subtitle="ACWR и объём зала ×">
+          <label style={{ display:'flex', gap:8, alignItems:'center', fontSize:13, color:'#fff', fontWeight:800, background: outsideEnabled ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)', padding:'11px 12px', borderRadius:12, border:`1px solid ${outsideEnabled?'rgba(0,230,138,0.20)':'rgba(255,255,255,0.06)'}`, cursor:'pointer' }}>
+            <input type="checkbox" checked={outsideEnabled} onChange={e => setOutsideEnabled(e.target.checked)} style={{ width:18, height:18, accentColor:'#00e68a' }} /> Учитывать внезальную нагрузку
           </label>
           {outsideEnabled && outside && (
             <>
-              <label style={{ color: '#fff', fontSize: 11 }}>Сессий/нед вне зала: {outside.sessionsPerWeek}</label>
-              <input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} />
-              <label style={{ color: '#fff', fontSize: 11 }}>Длительность мин: {outside.avgDurationMin}</label>
-              <input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} />
-              <label style={{ color: '#fff', fontSize: 11 }}>RPE: {outside.avgSRPE}</label>
-              <input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} />
-              <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : 'info'}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём зала ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference==='high'?'высокая': outsideMetrics.interference==='medium'?'средняя': outsideMetrics.interference==='low'?'низкая': outsideMetrics.interference})` : 'Вне зала: нет данных — объём 100%'}</InfoBanner>
+              <Field label={`Сессий/нед · ${outside.sessionsPerWeek}`}><input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} /></Field>
+              <Field label={`Длительность · ${outside.avgDurationMin} мин`}><input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} /></Field>
+              <Field label={`RPE · ${outside.avgSRPE}`}><input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} /></Field>
+              <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : 'info'}>{outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference})` : 'Вне зала: нет данных — объём 100%'}</InfoBanner>
             </>
           )}
-          <button onClick={() => setStep('split')} style={{ padding: '8px 12px', borderRadius: 8, background: '#00e68a', color: '#000', fontWeight: 700, cursor: 'pointer' }}>Далее → Сплит</button>
-        </div>
+          <button onClick={() => setStep('split')} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%' }}>Далее → Сплит</button>
+        </SectionCard>
       )}
 
       {step === 'split' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
-          <div style={{ color: '#fff', fontSize: 12 }}>Рекомендуемый: <b style={{ color: '#00e68a' }}>{recommendStrengthSportPattern(mode, days, level).name}</b> {patternId ? `· выбран: ${STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name || patternId}` : ''}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div style={{ ...CARD, padding:14, gap:10 }}>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <span style={{ width:32, height:32, borderRadius:10, background: modeGrad, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14 }}>✨</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>Рекомендуем: <span style={{ color: modeColor }}>{recommendStrengthSportPattern(mode, days, level).name}</span></div>
+                <div style={{ fontSize:11, color:TEXT_3 }}>{patternId ? `Выбран: ${STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}` : 'Авто по режиму/дням/уровню'}</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {STRENGTH_SPORT_PATTERNS.filter(p => p.mode===mode || p.mode==='any').map(p => {
               const active = patternId ? patternId===p.id : p.id===recommendStrengthSportPattern(mode, days, level).id;
-              const preview = p.schedule.map((s,i)=> s.kind==='тренировка' ? (s.sessionTag||'тренировка').slice(0,4) : 'отд').join(' · ');
+              const preview = p.schedule.map(s=> s.kind==='тренировка' ? (s.sessionTag||'тренировка').slice(0,4) : 'отд').join(' · ');
               return (
-                <button key={p.id} onClick={()=> setPatternId(p.id)} style={{ textAlign: 'left', padding: 8, borderRadius: 8, background: active ? 'rgba(0,230,138,0.15)' : 'rgba(255,255,255,0.03)', border: active ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><b>{p.name}</b><span style={{ fontSize: 10, opacity: 0.7 }}>{p.sessionsPerRotation}×/нед</span></div>
-                  <div style={{ fontSize: 10, opacity: 0.7 }}>{p.description}</div>
-                  <div style={{ fontSize: 9, opacity: 0.5, marginTop: 2, fontFamily: 'monospace' }}>{preview}</div>
-                  {active && <div style={{ fontSize: 9, color: '#00e68a', marginTop: 2 }}>● выбран — предпросмотр: {p.schedule.filter(s=>s.kind==='тренировка').map(s=> s.sessionTag).join(', ')}</div>}
+                <button key={p.id} onClick={()=> setPatternId(p.id)} style={{
+                  textAlign:'left', padding:14, borderRadius:14, cursor:'pointer', transition:'all 0.18s ease',
+                  background: active ? (mode==='strongman' ? 'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(239,68,68,0.08))' : 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(14,165,233,0.08))') : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
+                  border: active ? `1px solid ${modeColor}36` : '1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:11,
+                  boxShadow: active ? `0 6px 20px ${modeColor}14, inset 0 1px 0 rgba(255,255,255,0.08)` : '0 4px 12px rgba(0,0,0,0.14)', backdropFilter:'blur(12px)'
+                }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><b style={{ fontSize:13, color: active? '#fff':'rgba(255,255,255,0.92)' }}>{p.name}</b><span style={{ fontSize:11, fontWeight:800, color: active? modeColor : 'rgba(255,255,255,0.38)', background: active?`${modeColor}18`:'rgba(255,255,255,0.06)', padding:'3px 8px', borderRadius:20, border:`1px solid ${active?`${modeColor}22`:'rgba(255,255,255,0.06)'}`}}>{p.sessionsPerRotation}×/нед</span></div>
+                  <div style={{ fontSize:11.5, color:'rgba(255,255,255,0.62)', marginTop:4, lineHeight:1.4 }}>{p.description}</div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,0.32)', marginTop:6, fontFamily:'ui-monospace, monospace', background:'rgba(0,0,0,0.16)', padding:'5px 8px', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>{preview}</div>
+                  {active && <div style={{ fontSize:11, color:modeColor, fontWeight:800, marginTop:8, display:'flex', alignItems:'center', gap:6 }}><span style={{ width:6, height:6, borderRadius:'50%', background:modeColor, boxShadow:`0 0 8px ${modeColor}`}} /> Выбран — {p.schedule.filter(s=>s.kind==='тренировка').map(s=> s.sessionTag).join(', ')}</div>}
                 </button>
               );
             })}
           </div>
-          <button onClick={build} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, cursor: 'pointer' }}>Собрать план {patternId ? `(${patternId})` : ''}</button>
+          <button onClick={build} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'14px 16px', fontSize:13, borderRadius:14 }}>✦ Собрать план {patternId ? `· ${patternId}` : ''}</button>
         </div>
       )}
 
       {step === 'plan' && plan && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ background: 'rgba(0,230,138,0.1)', padding: 10, borderRadius: 10, color: '#fff', fontSize: 11, whiteSpace: 'pre-wrap' }}>{buildStrengthSportReport(plan)}</div>
-          {/* PRO: попытки ТА / стронг */}
-          {plan.mode === 'weightlifting' && (plan.workMax.snatch || 0) > 0 && (plan.workMax.cleanJerk || plan.workMax.clean || 0) > 0 && (() => {
-            const meet = buildWLMeetPlan(plan.workMax.snatch as number, (plan.workMax.cleanJerk || plan.workMax.clean) as number, 'balanced', { bodyweight, sex });
+        <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+          <div style={{ background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(14,165,233,0.06), rgba(18,16,28,0.72))', border:'1px solid rgba(0,230,138,0.18)', borderRadius:16, padding:14, color:'#fff', fontSize:11, whiteSpace:'pre-wrap', boxShadow:'0 10px 28px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter:'blur(14px)' }}>
+            <div style={{ fontSize:10, fontWeight:900, letterSpacing:0.6, textTransform:'uppercase', color:'rgba(255,255,255,0.52)', marginBottom:6 }}>Сводка плана</div>
+            {buildStrengthSportReport(plan)}
+          </div>
+
+          {plan.mode === 'weightlifting' && (plan.workMax.snatch || 0) > 0 && (plan.workMax.cleanJerk || (plan.workMax as any).clean || 0) > 0 && (() => {
+            const meet = buildWLMeetPlan(plan.workMax.snatch as number, (plan.workMax.cleanJerk || (plan.workMax as any).clean) as number, 'balanced', { bodyweight, sex });
             return meet ? (
-              <div style={{ background: 'rgba(59,130,246,0.10)', padding: 8, borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)', color: '#fff', fontSize: 11 }}>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>🏋️ Попытки ТА (IWF 1кг):</div>
-                <div>Рывок: {meet.snatch.opener} / {meet.snatch.second} / {meet.snatch.third} кг</div>
-                <div>Толчок: {meet.cleanJerk.opener} / {meet.cleanJerk.second} / {meet.cleanJerk.third} кг · Тотал {meet.total}кг {meet.sinclair?`· Sinclair ${meet.sinclair}`:''} {(meet as any).robi?`· Robi ${(meet as any).robi}`:''}</div>
-                <div style={{ opacity: 0.7, fontSize: 10, marginTop: 4 }}>{wlAttemptRationale(meet).slice(2).join(' · ')}</div>
-                <div style={{ opacity: 0.6, fontSize: 10 }}>Разминка к опенеру: {meet.snatch.warmup.map(w=> `${w.weight}×${w.reps}`).join(' → ')} (рывок) / {meet.cleanJerk.warmup.map(w=> `${w.weight}×${w.reps}`).join(' → ')} (толчок)</div>
+              <div style={{ ...CARD, borderColor:'rgba(59,130,246,0.22)', background:'linear-gradient(180deg, rgba(59,130,246,0.10), rgba(18,16,28,0.62))' }}>
+                <CardHeader icon="🏋️" title="Попытки ТА · IWF 1кг" subtitle={`Тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''} ${(meet as any).robi?`· Robi ${(meet as any).robi}`:''}`} />
+                <div style={{ fontSize:11, color:'#fff' }}><b>Рывок:</b> {meet.snatch.opener} / {meet.snatch.second} / {meet.snatch.third} кг · <b>Толчок:</b> {meet.cleanJerk.opener} / {meet.cleanJerk.second} / {meet.cleanJerk.third} кг</div>
+                <div style={{ fontSize:10, color:TEXT_3 }}>{wlAttemptRationale(meet).slice(2).join(' · ')}</div>
               </div>
             ) : null;
           })()}
@@ -527,158 +534,115 @@ export const StrengthSportConstructor: React.FC = () => {
             const yPlan = yoke ? buildSMEventPlan('yoke_walk', yoke) : null;
             const lPlan = log ? buildSMEventPlan('log_press', log) : null;
             return (yPlan || lPlan) ? (
-              <div style={{ background: 'rgba(245,158,11,0.10)', padding: 8, borderRadius: 8, border: '1px solid rgba(245,158,11,0.2)', color: '#fff', fontSize: 11 }}>
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>🪨 Попытки стронг (шаг йок 10кг / лог 2.5кг):</div>
-                {yPlan && <div>Йок: {yPlan.attempts.opener} / {yPlan.attempts.second} / {yPlan.attempts.third} кг · {smEventRationale(yPlan)[2]}</div>}
-                {lPlan && <div>Лог: {lPlan.attempts.opener} / {lPlan.attempts.second} / {lPlan.attempts.third} кг · {smEventRationale(lPlan)[2]}</div>}
+              <div style={{ ...CARD_STRONG, padding:14 }}>
+                <CardHeader icon="🪨" title="Попытки стронг" subtitle="шаг йок 10кг / лог 2.5кг" strong />
+                {yPlan && <div style={{ fontSize:11, color:'#fff' }}>Йок: {yPlan.attempts.opener} / {yPlan.attempts.second} / {yPlan.attempts.third} кг</div>}
+                {lPlan && <div style={{ fontSize:11, color:'#fff' }}>Лог: {lPlan.attempts.opener} / {lPlan.attempts.second} / {lPlan.attempts.third} кг</div>}
               </div>
             ) : null;
           })()}
-          {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
-          <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Карта качества (подъёмы/нед vs MEV/MAV/MRV):</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {plan.weeksData.map(wk => {
-                const sn = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
-                const lm = getWL(plan.level,'snatch'); const st = lm ? (sn<lm.mev?'below': sn<=lm.mav?'optimal': sn<=lm.mrv?'high':'over') : 'optimal';
-                const col = st==='below'?'#f59e0b': st==='optimal'?'#00e68a': st==='high'?'#eab308':'#ef4444';
-                return <span key={wk.week} title={`${sn}/${lm?.mav}`} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {sn} рывков</span>;
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-              {plan.weeksData.map(wk => {
-                const cl = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['clean_and_jerk','hang_clean','power_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
-                const lm = getWL(plan.level,'cleanJerk'); const st = lm ? (cl<lm.mev?'below': cl<=lm.mav?'optimal': cl<=lm.mrv?'high':'over') : 'optimal';
-                const col = st==='below'?'#f59e0b': st==='optimal'?'#00e68a': st==='high'?'#eab308':'#ef4444';
-                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {cl} толчков</span>;
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-              {plan.weeksData.map(wk => {
-                const sq = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['back_squat','front_squat','squat','hack_squat','pause_squat'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
-                const lm = plan.mode==='strongman'? getStrong(plan.level,'squat'): getWL(plan.level,'squat'); const st = lm ? (sq<lm.mev?'below': sq<=lm.mav?'optimal': sq<=lm.mrv?'high':'over') : 'optimal';
-                const col = st==='below'?'#f59e0b': st==='optimal'?'#00e68a': st==='high'?'#eab308':'#ef4444';
-                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {sq} присед</span>;
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-              {plan.weeksData.map(wk => {
-                const carry = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint'].includes(e.id))).reduce((a,e)=> a+e.sets,0)*20;
-                const lm = getStrong(plan.level,'carry'); const st = lm ? (carry<lm.mev?'below': carry<=lm.mav?'optimal': carry<=lm.mrv?'high':'over') : 'optimal';
-                const col = st==='below'?'#f59e0b': st==='optimal'?'#00e68a': st==='high'?'#eab308':'#ef4444';
-                return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {carry}м carry</span>;
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-              {plan.weeksData.map(wk => {
-                const avgPct = (() => { const all = wk.sessions.flatMap(s=> s.exercises.flatMap(e=> e.workSets.map(ws=> ws.pct||70))); return all.length? Math.round(all.reduce((a,b)=>a+b,0)/all.length) : 0; })();
-                const zone = intensityZoneFor(avgPct/100);
-                const col = zone==='technique'?'#60a5fa': zone==='strength'?'#00e68a': zone==='heavy'?'#f59e0b':'#ef4444';
-                const label = zone==='technique'?'Тех' : zone==='strength'?'Сил' : zone==='heavy'?'Тяж':'Макс';
-                return <span key={wk.week} title={`${avgPct}%`} style={{ padding:'2px 6px', borderRadius:6, background:col+'22', border:`1px solid ${col}`, color:col, fontSize:10 }}>Н{wk.week}: {label} {avgPct}%</span>;
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-              {plan.weeksData.map(wk => {
-                const ton = wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000;
-                const col = ton<10?'#60a5fa': ton<20?'#00e68a': ton<30?'#f59e0b':'#ef4444';
-                return <span key={wk.week} style={{ padding:'2px 6px', borderRadius:6, background:col+'22', border:`1px solid ${col}`, color:col, fontSize:10 }}>Н{wk.week}: {ton.toFixed(1)}т</span>;
-              })}
-            </div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-              {plan.weeksData.map(wk => {
-                const avgPct = (() => { const all = wk.sessions.flatMap(s=> s.exercises.flatMap(e=> e.workSets.map(ws=> ws.pct||70))); return all.length? all.reduce((a,b)=>a+b,0)/all.length/100 : 0.75; })();
-                const vSn = (()=>{ try{ return estimate1RMFromVelocitySS(100, 0.85, 'snatch'); }catch{return 0}})();
-                // VBT zone via velocityLoss threshold: <10 stable, <20 strength, <25 hyper, else metabolic
-                const zone = wk.week % 3 === 0 ? 'скорость' : wk.week % 2 === 0 ? 'сила' : 'техника';
-                const col = zone==='техника'?'#60a5fa': zone==='сила'?'#00e68a':'#f59e0b';
-                return <span key={wk.week} title={`VBT ${zone}`} style={{ padding:'2px 6px', borderRadius:6, background:col+'22', border:`1px solid ${col}`, color:col, fontSize:10 }}>Н{wk.week}: {zone}</span>;
-              })}
-            </div>
-            {acwr && <div style={{ marginTop: 6, fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a' }}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} — объём скорректирован ×{acwr.zone==='dangerous'?0.65: acwr.zone==='caution'?0.85:1}</div>}
-          </div>
-          {diaryLoad != null && (
-            <div style={{ background: diaryLoad > 30 ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.03)', padding: 6, borderRadius: 6, border: `1px solid ${diaryLoad > 30 ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.06)'}`, color: diaryLoad > 30 ? '#f59e0b' : '#fff', fontSize: 10 }}>
-              Дневник (изолированно): нагрузка 7д ≈ {diaryLoad}{diaryLoad > 30 ? ' — высоко, рассмотрите лёгкую неделю' : ' — норма'} {acwr? `· ACWR ${acwr.ratio} · ${ruLabel(ZONE_RU, acwr.zone)}`:''}
-            </div>
-          )}
-          {plan.weeksData.map(wk => (
-            <div key={wk.week} style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8, border: wk.deload? '1px solid rgba(245,158,11,0.35)': (wk as any).taper?'1px solid rgba(59,130,246,0.35)' : '1px solid transparent' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: wk.deload? '#f59e0b' : (wk as any).taper? '#60a5fa' : '#00e68a', fontWeight: 700, fontSize: 12 }}>Неделя {wk.week} · {ruLabel(PHASE_RU, wk.phase)}{wk.deload ? ' · разгрузка' : (wk as any).taper? ' · тапер':''} · {wk.totalSets} сетов · {wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000 |0}т тоннаж</span>
-                <button onClick={() => {
-                  const txt = wk.sessions.map(s=> `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e=> `  ${e.name} ${e.sets}x${e.reps} ${e.weight}кг RIR${e.rir} ${e.tempo} отдых${e.restSeconds}с${e.comment? ' // '+e.comment:''}`).join('\n')).join('\n\n');
-                  navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n`+txt); setMsg(`Неделя ${wk.week} скопирована`);
-                }} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>Копировать неделю</button>
-              </div>
-              {wk.sessions.map(sess => (
-                <div key={sess.day} style={{ marginTop: 6, padding: 6, background: 'rgba(255,255,255,0.03)', borderRadius: 6 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>{sess.sessionTag} · {sess.character} · день {sess.day} · {sess.durationMin} мин</span>
-                    <span style={{ color: '#fff', fontSize: 10, opacity: 0.5 }}>⏱ {sess.exercises.reduce((a,e)=>a+ e.workSets.length* (e.restSeconds||90) ,0)/60 |0} мин отдыха</span>
-                  </div>
-                  {sess.exercises.map(ex => (
-                    <div key={ex.id} style={{ color: '#fff', fontSize: 11, marginLeft: 6, marginTop: 4, padding: '4px 6px', background: 'rgba(255,255,255,0.02)', borderRadius: 4 }}>
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span>{ex.name} — {ex.sets}×{ex.reps} @ {ex.weight}кг RIR{ex.rir} · {ex.tempo} · отдых {ex.restSeconds}с{ex.isCompetitionLift ? ' ★ соревн.' : ''}</span>
-                        <input aria-label="вес" type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ width: 58, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
-                        <input aria-label="повторы" type="text" value={ex.reps} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ width: 54, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
-                        <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ width: 44, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
-                        <span style={{ fontSize: 9, opacity: 0.5 }}>RPE {10 - ex.rir}</span>
-                        <button aria-label="вверх" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, -1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↑</button>
-                        <button aria-label="вниз" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, 1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↓</button>
-                      </div>
-                      {ex.comment && <div style={{ fontSize: 10, opacity: 0.7, marginLeft: 4, borderLeft: '2px solid rgba(0,230,138,0.3)', paddingLeft: 6 }}>{ex.comment}</div>}
-                      {ex.warmupSets && ex.warmupSets.length>0 && <div style={{ fontSize: 10, opacity: 0.5 }}>Разминка: {ex.warmupSets.map(s=> `${s.reps}×${s.weight}кг`).join(' → ')} → рабочие</div>}
-                      <div style={{ fontSize: 10, opacity: 0.45 }}>Сеты: {ex.workSets.map(s=> `${s.reps}×${s.weight}кг RIR${s.rir} ${s.pct?`(${s.pct}%)`:''}`).join(' | ')}</div>
-                      <div style={{ display:'flex', gap:4, flexWrap:'wrap', marginTop:4 }}>
-                        {ex.workSets.map((s,si)=> (
-                          <span key={si} style={{ display:'flex', gap:2, alignItems:'center', background:'rgba(255,255,255,0.04)', padding:'2px 4px', borderRadius:4, fontSize:9, color:'#fff' }}>
-                            #{si+1}
-                            <input aria-label={`вес сет ${si+1}`} type="number" value={s.weight} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{weight:Number(e.target.value)||0})} style={{width:44, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
-                            кг
-                            <input aria-label={`повторы сет ${si+1}`} type="number" value={s.reps} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{width:32, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
-                            ×
-                            <input aria-label={`RIR сет ${si+1}`} type="number" value={s.rir} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{width:28, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
-                            RIR ({10 - s.rir} RPE)
-                            <input aria-label={`скорость сет ${si+1}`} type="number" step="0.05" placeholder="м/с" value={vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`] ?? ''} onChange={e=> { const v=parseFloat(e.target.value); const k=`${wk.week}-${sess.day}-${ex.id}-${si}`; setVbtMap(m=> ({...m, [k]: Number.isFinite(v)?v:0})); }} style={{width:44, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
-                            {(() => { const v=vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`]; if(!v||v<=0) return null; const e1=estimate1RMFromVelocitySS(s.weight, v, ex.id); return e1? <span style={{ fontSize:8, opacity:0.6 }}>e1RM {Math.round(e1)}кг</span>:null; })()}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+
+          {plan.validation?.warnings.map((w,i) => <InfoBanner key={i} tone="warn">{w}</InfoBanner>)}
+
+          {/* Карта качества */}
+          <div style={CARD}>
+            <div style={{ fontSize:12, fontWeight:900, color:'#fff', display:'flex', alignItems:'center', gap:8 }}><span style={{ width:28, height:28, borderRadius:9, background: ACCENT_GRAD, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13 }}>✦</span>Карта качества</div>
+            {([
+              { key:'snatch', label:'Рывок', ids:['snatch','hang_snatch','power_snatch'], get:'snatch' },
+              { key:'cl', label:'Толчок', ids:['clean_and_jerk','hang_clean'], get:'cleanJerk' },
+              { key:'squat', label:'Присед', ids:['back_squat','front_squat'], get:'squat' },
+            ] as any).map((row:any)=> (
+              <div key={row.key} style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                <span style={{ fontSize:10, fontWeight:900, letterSpacing:0.5, textTransform:'uppercase', color:'#86efac', minWidth:52 }}>{row.label}</span>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap', flex:1 }}>
+                  {plan.weeksData.map(wk=>{
+                    const cnt = wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.some((id:string)=> e.id.includes(id)))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
+                    const lm = getWL(plan.level, row.get as any); const st = lm ? (cnt<lm.mev?'below': cnt<=lm.mav?'optimal': cnt<=lm.mrv?'high':'over') : 'optimal';
+                    const col = st==='below'?'#f59e0b': st==='optimal'?'#00e68a': st==='high'?'#eab308':'#ef4444';
+                    return <span key={wk.week} style={{ padding:'4px 8px', borderRadius:10, background:col+'14', border:`1px solid ${col}2e`, color:col, fontSize:10.5, fontWeight:800 }}>Н{wk.week}: {cnt}</span>;
+                  })}
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Недели */}
+          {plan.weeksData.map(wk => (
+            <div key={wk.week} style={{ ...CARD, padding:0, overflow:'hidden', borderColor: wk.deload? 'rgba(245,158,11,0.22)' : (wk as any).taper? 'rgba(59,130,246,0.22)' : 'rgba(0,230,138,0.12)' }}>
+              <div style={{ padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', background: wk.deload? 'rgba(245,158,11,0.06)' : (wk as any).taper? 'rgba(59,130,246,0.06)' : 'transparent' }}>
+                <span style={{ fontSize:13, fontWeight:900, color: wk.deload? '#f59e0b' : (wk as any).taper? '#60a5fa' : '#00e68a' }}>Неделя {wk.week} · {ruLabel(PHASE_RU, wk.phase)}{wk.deload? ' · разгрузка':(wk as any).taper?' · тапер':''} · {wk.totalSets} сетов · {Math.round(wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000)}т</span>
+                <button onClick={()=>{
+                  const txt = wk.sessions.map(s=> `${s.sessionTag} (${s.character}) д${s.day}:\n` + s.exercises.map(e=> `  ${e.name} ${e.sets}x${e.reps} ${e.weight}кг RIR${e.rir}`).join('\n')).join('\n\n');
+                  navigator.clipboard?.writeText(`Неделя ${wk.week} ${wk.phase}\n`+txt); setMsg(`Неделя ${wk.week} скопирована`); setTimeout(()=>setMsg(''),1800);
+                }} style={{ ...BTN_SMALL, background:'rgba(255,255,255,0.06)', color:'#fff' }}>⎙ Копировать</button>
+              </div>
+              <div style={{ padding:'0 12px 12px', display:'flex', flexDirection:'column', gap:10 }}>
+                {wk.sessions.map(sess => (
+                  <div key={sess.day} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:14, padding:10 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                      <span style={{ fontSize:12, fontWeight:900, color:'#fff' }}>{sess.sessionTag} <span style={{ fontWeight:600, color:TEXT_3 }}>· {sess.character} · день {sess.day} · {sess.durationMin} мин</span></span>
+                      <span style={{ fontSize:10, color:TEXT_3, background:'rgba(0,0,0,0.16)', padding:'3px 7px', borderRadius:20, border:'1px solid rgba(255,255,255,0.06)' }}>⏱ {Math.round(sess.exercises.reduce((a,e)=>a+ e.workSets.length* (e.restSeconds||90),0)/60)} мин</span>
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      {sess.exercises.map(ex => (
+                        <div key={ex.id} style={{ background:'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:10, display:'flex', flexDirection:'column', gap:7 }}>
+                          <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                            <span style={{ fontSize:12.5, fontWeight:900, color:'#fff', flex:'1 1 160px' }}>{ex.name} <span style={{ fontWeight:600, color:'rgba(255,255,255,0.58)' }}>— {ex.sets}×{ex.reps} · {ex.weight}кг · RIR{ex.rir}</span><span style={{ fontSize:10.5, color:TEXT_3, marginLeft:6 }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
+                          </div>
+                          <div style={{ display:'grid', gridTemplateColumns:'64px 64px 64px auto', gap:6, alignItems:'center' }}>
+                            <input type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'7px 8px', fontSize:12, textAlign:'center' }} />
+                            <input type="text" value={ex.reps} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ ...INPUT, padding:'7px 8px', fontSize:12, textAlign:'center' }} />
+                            <input type="number" value={ex.rir} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'7px 8px', fontSize:12, textAlign:'center' }} />
+                            <div style={{ display:'flex', gap:4 }}><button onClick={()=> moveEx(wk.week-1, sess.day, ex.id, -1)} style={{ width:32, height:32, borderRadius:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>↑</button><button onClick={()=> moveEx(wk.week-1, sess.day, ex.id, 1)} style={{ width:32, height:32, borderRadius:9, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', cursor:'pointer' }}>↓</button></div>
+                          </div>
+                          {ex.comment && <div style={{ fontSize:11, color:'rgba(255,255,255,0.58)', background: mode==='strongman'?'rgba(245,158,11,0.06)':'rgba(0,230,138,0.06)', borderLeft:`2px solid ${mode==='strongman'?'rgba(245,158,11,0.28)':'rgba(0,230,138,0.28)'}`, padding:'6px 8px', borderRadius:8 }}>{ex.comment}</div>}
+                          <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                            {ex.workSets.map((s,si)=> (
+                              <span key={si} style={{ display:'flex', gap:3, alignItems:'center', background:'rgba(255,255,255,0.04)', padding:'4px 6px', borderRadius:8, fontSize:10, color:'#fff', border:'1px solid rgba(255,255,255,0.06)' }}>
+                                #{si+1}
+                                <input type="number" value={s.weight} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{weight:Number(e.target.value)||0})} style={{ width:48, padding:'3px 4px', fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.10)', borderRadius:6, textAlign:'center' }} />кг
+                                <input type="number" value={s.reps} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{ width:34, padding:'3px 4px', fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.10)', borderRadius:6, textAlign:'center' }} />×
+                                <input type="number" value={s.rir} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{ width:30, padding:'3px 4px', fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.10)', borderRadius:6, textAlign:'center' }} />RIR
+                                <input type="number" step="0.05" placeholder="м/с" value={vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`] ?? ''} onChange={e=> { const v=parseFloat(e.target.value); const k=`${wk.week}-${sess.day}-${ex.id}-${si}`; setVbtMap(m=> ({...m, [k]: Number.isFinite(v)?v:0})); }} style={{ width:48, padding:'3px 4px', fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'1px solid rgba(255,255,255,0.10)', borderRadius:6, textAlign:'center' }} />
+                                {(() => { const v=vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`]; if(!v||v<=0) return null; const e1=estimate1RMFromVelocitySS(s.weight, v, ex.id); return e1? <span style={{ fontSize:9, color:TEXT_3 }}>e1RM {Math.round(e1)}кг</span>:null; })()}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
+
           {annual && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: 11 }}>Годовой план (изолирован): {annual.totalWeeks} нед · {annual.blocks.length} блоков</div>
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                {annual.blocks.map(b => <span key={b.id} style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(0,230,138,0.12)', border: '1px solid rgba(0,230,138,0.3)', color: '#00e68a', fontSize: 10 }}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}: {b.mode} ×{b.weeks}{b.competitionDate?` 🏁${b.competitionDate}`:''}</span>)}
+            <div style={{ ...CARD, borderColor:'rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>Годовой план · {annual.totalWeeks} нед · {annual.blocks.length} блоков</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {annual.blocks.map((b:any) => <span key={b.id} style={{ padding:'4px 8px', borderRadius:10, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', color:'#00e68a', fontSize:10, fontWeight:800 }}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}: {b.mode} ×{b.weeks}</span>)}
               </div>
-              <div style={{ display: 'flex', height: 14, borderRadius: 6, overflow: 'hidden', marginTop: 6, border: '1px solid rgba(255,255,255,0.08)' }}>
-                {annual.blocks.map(b=> {
+              <div style={{ display:'flex', height:14, borderRadius:10, overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)' }}>
+                {annual.blocks.map((b:any)=> {
                   const w = (b.weeks/annual.totalWeeks*100).toFixed(1);
                   const col = b.mode==='weightlifting'?'#00e68a': b.mode==='strongman'?'#f59e0b':'#3b82f6';
-                  return <div key={b.id} title={`${b.mode} ${b.weeks}нед`} style={{ width: `${w}%`, background: col, opacity: 0.85, borderRight: '1px solid rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#000', fontWeight: 700 }}>{b.weeks}</div>;
+                  return <div key={b.id} style={{ width: `${w}%`, background: col, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color: b.mode==='weightlifting'?'#06281c':'#fff', fontWeight:900 }}>{b.weeks}</div>;
                 })}
               </div>
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 2, display: 'flex', justifyContent: 'space-between' }}><span>Нед 1</span><span>Нед {annual.totalWeeks}</span></div>
             </div>
           )}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
-            <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>🖨 Печать (HTML)</button>
-            <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📊 CSV</button>
-            <button onClick={() => { downloadStrengthXlsx(plan); setMsg('XLS скачан (Excel)'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)', cursor: 'pointer' }}>📗 XLS</button>
-            <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📅 ICS</button>
-            <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест скопирован'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📋 Дайджест</button>
-            <button onClick={()=> { const url=buildStrengthTelegramUrl(plan); navigator.clipboard?.writeText(url); setMsg('Telegram ссылка скопирована'); try{ window.open(url,'_blank'); }catch{} }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,136,204,0.15)', color: '#2ca5e0', border: '1px solid rgba(0,136,204,0.3)', cursor: 'pointer' }}>✈ Telegram</button>
-            <button onClick={exportToUserProgram} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.15)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>Экспорт в программу</button>
+
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))', gap:8 }}>
+            <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); setTimeout(()=>setMsg(''),1800); }} style={BTN}>⎙ Копировать</button>
+            <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); } setMsg('Печать'); }} style={BTN}>🖨 Печать</button>
+            <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV'); }} style={BTN}>📊 CSV</button>
+            <button onClick={() => { downloadStrengthXlsx(plan); setMsg('XLS'); }} style={{ ...BTN, background:'rgba(34,197,94,0.12)', color:'#4ade80', border:'1px solid rgba(34,197,94,0.20)' }}>📗 XLS</button>
+            <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS'); }} style={BTN}>📅 ICS</button>
+            <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест'); }} style={BTN}>📋 Дайджест</button>
+            <button onClick={exportToUserProgram} style={BTN_PRIMARY}>✦ В программу</button>
           </div>
-          {msg && <div style={{ color: '#00e68a', fontSize: 11 }}>{msg}</div>}
+          {msg && <InfoBanner tone="ok">{msg}</InfoBanner>}
         </div>
       )}
     </div>
