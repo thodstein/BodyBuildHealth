@@ -4070,7 +4070,12 @@ export const BbAutoConstructor: React.FC = () => {
 
           </div>
         )}
-        <div style={{ ...H, marginBottom:8 }}>Качество и нагрузка плана</div>
+        <div style={{ marginBottom:8, padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.05))', border:'1px solid rgba(96,165,250,0.24)' }}>
+          <button type="button" onClick={() => setQualityOpen(v => !v)} aria-expanded={qualityOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', border:0, background:'transparent', color:'#fff', cursor:'pointer', fontSize:15, fontWeight:900, textAlign:'left' }}>
+            <span>📊 Качество и нагрузка плана</span><span>{qualityOpen ? '▲' : '▼'}</span>
+          </button>
+        </div>
+        <div style={{ display: qualityOpen ? 'block' : 'none' }}>
         {/* Фаза — факт из плана, а не синтетика distributePhases */}
         {(() => {
           const Wq = builtPlan.weeks;
@@ -4098,7 +4103,10 @@ export const BbAutoConstructor: React.FC = () => {
           return <>
             <div style={{ marginBottom:6, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
-                <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт недели {wkq.week} из {totalW}): {PHASE_LABELS[curPh]}</span>
+                <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт): {PHASE_LABELS[curPh]}</span>
+                <select aria-label="Выбрать неделю для анализа фазы" value={wkq.week} onChange={e => setBbWeekSel(Number(e.target.value))} style={{ padding:'4px 8px', borderRadius:8, border:`1px solid ${PHASE_COLORS[curPh]}55`, background:'rgba(0,0,0,0.2)', color:'#fff', fontSize:11 }}>
+                  {Wq.map(w => <option key={w.week} value={w.week}>Неделя {w.week}</option>)}
+                </select>
                 <span style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>RIR факт {avgRirFact.toFixed(1)} · Повт {repMin}-{repMax} · Темп {tempoFact} · Сетов {totalSetsWeek}</span>
               </div>
               <div style={{ marginTop:8, display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
@@ -4759,6 +4767,7 @@ export const BbAutoConstructor: React.FC = () => {
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
         </div>
         {renderActionRow(true)}
+        </div>
       </div>
     );
   };
