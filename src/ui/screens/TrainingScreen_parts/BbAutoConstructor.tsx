@@ -618,6 +618,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [safetyPreventionOpen, setSafetyPreventionOpen] = useState(true);
   const [safetyDistributionOpen, setSafetyDistributionOpen] = useState(true);
   const [safetyConclusionOpen, setSafetyConclusionOpen] = useState(true);
+  const [safetyFactorsOpen, setSafetyFactorsOpen] = useState(true);
   // specializationMode больше не выбирается в UI: специализация включается
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
@@ -4018,30 +4019,37 @@ export const BbAutoConstructor: React.FC = () => {
                       const diags = (safetyScore.details?.jointDiagnoses || []) as any[];
                       if (!diags || diags.length===0) return null;
                       return (
-                        <div>
-                          <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', letterSpacing:0.3, textTransform:'uppercase', marginBottom:6 }}>3 · Профилактика и точечная коррекция</div>
+                        <div style={{ borderRadius:10, overflow:'hidden', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(34,197,94,0.14)' }}>
+                          <button type="button" onClick={() => setSafetyPreventionOpen(v => !v)} aria-expanded={safetyPreventionOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', cursor:'pointer', background:'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.03))', border:'none', borderBottom: safetyPreventionOpen ? '1px solid rgba(34,197,94,0.14)' : 'none', textAlign:'left' }}>
+                            <span style={{ fontSize:10, fontWeight:800, color:'#22c55e', letterSpacing:0.3, textTransform:'uppercase' }}>3 · Профилактика и точечная коррекция — по каждому суставу ({diags.length})</span>
+                            <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.22)', color:'#22c55e', fontSize:11, transform: safetyPreventionOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                          </button>
+                          <div style={{ display: safetyPreventionOpen ? 'block' : 'none', padding:'8px 10px' }}>
+                          <div style={{ fontSize:9, color:'#fff', opacity:0.55, marginBottom:8, lineHeight:1.35 }}>Каждый нагруженный сустав расписан так же детально как колено/таз: опасные структуры, фаза, метод, ассисты и протокол. Плечо и остальные показаны наравне с нагруженными.</div>
                           <div style={{ display:'grid', gap:8 }}>
-                            {diags.slice(0,3).map((jd:any)=> (
+                            {diags.map((jd:any)=> (
                               <div key={jd.joint.id} style={{ padding:'9px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                                 <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4, flexWrap:'wrap' }}>
                                   <span style={{ fontSize:13 }}>{jd.joint.icon}</span>
                                   <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{jd.joint.label}</span>
                                   <span style={{ fontSize:10, padding:'2px 6px', borderRadius:6, background: jd.phase==='acute'?'rgba(239,68,68,0.14)': jd.phase==='subacute'?'rgba(245,158,11,0.14)': jd.phase==='chronic'?'rgba(96,165,250,0.14)':'rgba(34,197,94,0.12)', color: jd.phase==='acute'?'#ef4444': jd.phase==='subacute'?'#f59e0b': jd.phase==='chronic'?'#60a5fa':'#22c55e', fontWeight:700 }}>{jd.phase==='acute'?'острая': jd.phase==='subacute'?'подострая': jd.phase==='chronic'?'хроническая':'поддержание'}</span>
-                                  <span style={{ fontSize:10, color:'#fff', opacity:0.55, marginLeft:'auto' }}>{jd.joint.dangerous.slice(0,2).join(' · ')}</span>
+                                  <span style={{ fontSize:10, color:'#fff', opacity:0.55, marginLeft:'auto' }}>{jd.joint.dangerous.join(' · ')}</span>
                                 </div>
                                 <div style={{ fontSize:10, color:'#fff', opacity:0.75, lineHeight:1.35, marginBottom:6 }}>{jd.joint.description}</div>
+                                {jd.joint.relatedLifts?.length>0 && <div style={{ fontSize:9, color:'#fff', opacity:0.6, marginBottom:6 }}><b>Связанные движения:</b> {jd.joint.relatedLifts.join(', ')}</div>}
                                 {jd.options?.length>0 && (
                                   <div style={{ display:'grid', gap:6 }}>
-                                    {jd.options.slice(0,2).map((opt:any)=> {
+                                    {jd.options.map((opt:any)=> {
                                       const lvlRu = opt.level==='critical'?'критический': opt.level==='high'?'высокий': opt.level==='moderate'?'умеренный':'низкий';
                                       const lvlColor = opt.level==='critical'?'#ef4444': opt.level==='high'?'#f59e0b': opt.level==='moderate'?'#60a5fa':'#22c55e';
                                       return (
                                         <div key={opt.id} style={{ padding:'7px 8px', borderRadius:8, background: opt.level==='critical'?'rgba(239,68,68,0.07)': opt.level==='high'?'rgba(245,158,11,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${opt.level==='critical'?'rgba(239,68,68,0.14)': opt.level==='high'?'rgba(245,158,11,0.14)':'rgba(255,255,255,0.06)'}` }}>
-                                          <div style={{ fontSize:11, fontWeight:700, color: lvlColor, display:'flex', gap:6, alignItems:'center' }}><span>{opt.label}</span><span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:6, background:lvlColor+'18', border:`1px solid ${lvlColor}22` }}>{lvlRu}</span></div>
+                                          <div style={{ fontSize:11, fontWeight:700, color: lvlColor, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}><span>{opt.label}</span><span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:6, background:lvlColor+'18', border:`1px solid ${lvlColor}22` }}>{lvlRu}</span></div>
                                           <div style={{ fontSize:10, color:'#fff', opacity:0.8, marginTop:2, lineHeight:1.35 }}>{opt.description}</div>
                                           <div style={{ fontSize:10, color:'#00e68a', marginTop:3 }}><b>Метод:</b> {opt.method}</div>
-                                          {opt.assistance?.length>0 && <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}><b>Ассисты:</b> {opt.assistance.slice(0,3).join(', ')}</div>}
-                                          <div style={{ fontSize:10, color:'#fff', marginTop:3, padding:'3px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', display:'inline-block' }}>Протокол: {opt.protocol.sets}×{opt.protocol.reps} · RIR{opt.protocol.rir}{opt.protocol.tempo?` · ${opt.protocol.tempo}`:''}{opt.protocol.rest?` · ${opt.protocol.rest}`:''}{opt.protocol.note?` · ${opt.protocol.note}`:''}</div>
+                                          {opt.assistance?.length>0 && <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}><b>Ассисты:</b> {opt.assistance.join(', ')}</div>}
+                                          {opt.rationale && <div style={{ fontSize:9, color:'#fff', opacity:0.55, marginTop:2, fontStyle:'italic' }}>{opt.rationale}</div>}
+                                          <div style={{ fontSize:10, color:'#fff', marginTop:3, padding:'3px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', display:'inline-block' }}>Протокол: {opt.protocol.sets}×{opt.protocol.reps}{opt.protocol.pct?` @${opt.protocol.pct}%`:''} · RIR{opt.protocol.rir}{opt.protocol.tempo?` · ${opt.protocol.tempo}`:''}{opt.protocol.rest?` · ${opt.protocol.rest}`:''}{opt.protocol.note?` · ${opt.protocol.note}`:''}</div>
                                         </div>
                                       );
                                     })}
@@ -4050,17 +4058,23 @@ export const BbAutoConstructor: React.FC = () => {
                               </div>
                             ))}
                           </div>
+                          </div>
                         </div>
                       );
                     })()}
 
-                    {/* 4 · Распределение */}
+                    {/* 4 · Распределение — сворачиваемая */}
                     {(() => {
                       const ld = safetyScore.details?.loadDistribution as any;
                       if (!ld) return null;
                       return (
-                        <div>
-                          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase', marginBottom:6 }}>4 · Недельное распределение — восстановление суставов</div>
+                        <div style={{ borderRadius:10, overflow:'hidden', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(96,165,250,0.14)' }}>
+                          <button type="button" onClick={() => setSafetyDistributionOpen(v => !v)} aria-expanded={safetyDistributionOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 10px', cursor:'pointer', background:'linear-gradient(135deg, rgba(96,165,250,0.10), rgba(96,165,250,0.03))', border:'none', borderBottom: safetyDistributionOpen ? '1px solid rgba(96,165,250,0.14)' : 'none', textAlign:'left' }}>
+                            <span style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase' }}>4 · Недельное распределение — восстановление суставов</span>
+                            <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(96,165,250,0.12)', border:'1px solid rgba(96,165,250,0.22)', color:'#60a5fa', fontSize:11, transform: safetyDistributionOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                          </button>
+                          <div style={{ display: safetyDistributionOpen ? 'block' : 'none', padding:'8px 10px' }}>
+                          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase', marginBottom:6, display:'none' }}>4 · Недельное распределение — восстановление суставов</div>
                           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
                             {ld.weekPlan.map((d:any)=> (
                               <div key={d.day} style={{ padding:'6px 4px', borderRadius:8, textAlign:'center', background: d.difficulty==='hard'?'rgba(239,68,68,0.10)': d.difficulty==='medium'?'rgba(245,158,11,0.10)': d.difficulty==='light'?'rgba(96,165,250,0.10)': d.difficulty==='rehab'?'rgba(168,85,247,0.10)':'rgba(255,255,255,0.04)', border:`1px solid ${d.difficulty==='hard'?'rgba(239,68,68,0.16)': d.difficulty==='medium'?'rgba(245,158,11,0.14)': d.difficulty==='light'?'rgba(96,165,250,0.12)':'rgba(255,255,255,0.06)'}` }}>
@@ -4076,13 +4090,19 @@ export const BbAutoConstructor: React.FC = () => {
                             <div style={{ padding:'6px 8px', borderRadius:8, background: ld.hardDays>=4?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Тяж. дней</div><div style={{ fontSize:12, fontWeight:800, color: ld.hardDays>=4?'#ef4444':'#22c55e' }}>{ld.hardDays}</div></div>
                           </div>
                           {ld.warnings.length>0 && <div>{ld.warnings.map((w:string,i:number)=> <div key={i} style={{ fontSize:10, color:'#f59e0b', marginTop:2, lineHeight:1.3 }}>⚠ {w}</div>)}</div>}
+                          </div>
                         </div>
                       );
                     })()}
 
-                    {/* 5 · Вывод */}
-                    <div style={{ padding:'9px 10px', borderRadius:10, background: safetyScore.riskLevel==='dangerous'?'rgba(239,68,68,0.08)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${safetyScore.riskLevel==='dangerous'?'rgba(239,68,68,0.16)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.16)':'rgba(34,197,94,0.16)'}` }}>
-                      <div style={{ fontSize:11, fontWeight:800, color: safetyScore.riskLevel==='dangerous'?'#ef4444': safetyScore.riskLevel==='caution'?'#f59e0b':'#22c55e' }}>
+                    {/* 5 · Вывод — сворачиваемая */}
+                    <div style={{ borderRadius:10, overflow:'hidden', background: safetyScore.riskLevel==='dangerous'?'rgba(239,68,68,0.08)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.08)':'rgba(34,197,94,0.08)', border:`1px solid ${safetyScore.riskLevel==='dangerous'?'rgba(239,68,68,0.16)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.16)':'rgba(34,197,94,0.16)'}` }}>
+                      <button type="button" onClick={() => setSafetyConclusionOpen(v => !v)} aria-expanded={safetyConclusionOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 10px', cursor:'pointer', background: safetyScore.riskLevel==='dangerous'?'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(239,68,68,0.06))': safetyScore.riskLevel==='caution'?'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(245,158,11,0.06))':'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.06))', border:'none', borderBottom: safetyConclusionOpen ? `1px solid ${safetyScore.riskLevel==='dangerous'?'rgba(239,68,68,0.16)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.16)':'rgba(34,197,94,0.16)'}` : 'none', textAlign:'left' }}>
+                        <span style={{ fontSize:11, fontWeight:800, color: safetyScore.riskLevel==='dangerous'?'#ef4444': safetyScore.riskLevel==='caution'?'#f59e0b':'#22c55e' }}>{safetyScore.riskLevel==='dangerous'?'🚨 Требуется коррекция': safetyScore.riskLevel==='caution'?'⚠ На контроле — есть что улучшить':'✅ Суставы в порядке'} · 5 · Вывод</span>
+                        <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color: safetyScore.riskLevel==='dangerous'?'#ef4444': safetyScore.riskLevel==='caution'?'#f59e0b':'#22c55e', fontSize:11, transform: safetyConclusionOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                      </button>
+                      <div style={{ display: safetyConclusionOpen ? 'block' : 'none', padding:'9px 10px' }}>
+                      <div style={{ fontSize:11, fontWeight:800, color: safetyScore.riskLevel==='dangerous'?'#ef4444': safetyScore.riskLevel==='caution'?'#f59e0b':'#22c55e', display:'none' }}>
                         {safetyScore.riskLevel==='dangerous'?'🚨 Требуется коррекция': safetyScore.riskLevel==='caution'?'⚠ На контроле — есть что улучшить':'✅ Суставы в порядке'}
                       </div>
                       <div style={{ fontSize:11, color:'#fff', marginTop:4, lineHeight:1.45 }}>
@@ -4107,6 +4127,7 @@ export const BbAutoConstructor: React.FC = () => {
                         if (recs.length===0) recs.push('Профилактика: суставная разминка 5 мин, мобилити голеностопа/плеча, контроль RIR 2–3 в базе, сон ≥7 ч.');
                         return <div style={{ marginTop:6 }}>{recs.slice(0,4).map((r,i)=> <div key={i} style={{ fontSize:10, color:'#fff', marginTop:3, paddingLeft:7, borderLeft:`2px solid ${safetyScore.riskLevel==='dangerous'?'rgba(239,68,68,0.5)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.5)':'rgba(34,197,94,0.5)'}`, lineHeight:1.35 }}>{r}</div>)}</div>;
                       })()}
+                      </div>
                     </div>
                   </div>
                 </div>

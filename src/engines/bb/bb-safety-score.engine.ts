@@ -328,17 +328,21 @@ export function calculatePlanSafetyScore(
       });
     } catch { loadDistribution = null; }
 
-    // Joint diagnoses — топ 4 по стрессу/ограничениям
+    // Joint diagnoses — все нагруженные суставы (как таз/колено — так же детально для каждого)
     let jointDiagnoses: JointLoadDiagnosis[] = [];
     try {
-      const jointsToDiagnose: JointId[] = (Object.keys(byJointPeak) as JointId[]).sort((a,b)=> (byJointPeak[b]||0)-(byJointPeak[a]||0)).slice(0,4) as any;
-      // если нет стресса — берём из orthopedic blocked
-      const fallbackJoints: JointId[] = (orthopedic?.blockedPatterns.length ? (['spine','shoulder','knee','hip'] as JointId[]) : []) as any;
-      const targetJoints = jointsToDiagnose.length ? jointsToDiagnose : (fallbackJoints.length ? fallbackJoints : ['spine','shoulder','knee'] as any);
-      jointDiagnoses = targetJoints.slice(0,4).map((jid: JointId) => {
+      const sortedJoints = (Object.keys(byJointPeak) as JointId[]).sort((a,b)=> (byJointPeak[b]||0)-(byJointPeak[a]||0));
+      const lowThresh = STRESS_THRESHOLDS.low; // 15 — порог, выше которого сустав считается нагруженным
+      let jointsToDiagnose: JointId[] = sortedJoints.filter(j => (byJointPeak[j]||0) >= lowThresh);
+      if (jointsToDiagnose.length === 0 && sortedJoints.length > 0) {
+        jointsToDiagnose = sortedJoints.slice(0, Math.min(3, sortedJoints.length)) as any;
+      }
+      if (jointsToDiagnose.length > 7) jointsToDiagnose = jointsToDiagnose.slice(0,7) as any;
+      const fallbackJoints: JointId[] = (orthopedic?.blockedPatterns.length ? (['spine','shoulder','knee','hip','elbow','wrist','ankle'] as JointId[]) : []) as any;
+      const targetJoints = jointsToDiagnose.length ? jointsToDiagnose : (fallbackJoints.length ? fallbackJoints : ['spine','shoulder','knee','hip','elbow'] as any);
+      jointDiagnoses = targetJoints.slice(0,7).map((jid: JointId) => {
         try { return jointLoadDiagnosis({ joint: jid, injuries: injuriesToHistory(options.injuries as any), mobilityRestrictions: options.mobilityRestrictions || [], currentPain: options.currentPain || [], jointLimitations: buildJointLimitations(options.injuries as any, options.mobilityRestrictions||[]) as any }); } catch { return null as any; }
       }).filter(Boolean);
-      // если всё ещё пусто — хотя бы один джоинт
       if (jointDiagnoses.length===0) {
         try { jointDiagnoses = [jointLoadDiagnosis({ joint: 'spine', injuries: [], mobilityRestrictions: options.mobilityRestrictions||[], currentPain: [] } as any)]; } catch {}
       }
