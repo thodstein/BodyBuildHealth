@@ -66,7 +66,7 @@ export const CB_TIER: Record<string, 1|2|3|4> = {
 
 export function tierForCB(id: string): 1|2|3|4 { return CB_TIER[id] ?? 2; }
 
-export function filterByTierCB(pool: string[], level: string, hasCable?: boolean, allowExotic?: boolean): string[] {
+export function filterByTierCB(pool: string[], level: string, hasCable?: boolean, allowExotic?: boolean, hasSled?: boolean): string[] {
   let out = [...pool];
   const allowT4 = allowExotic || level === 'advanced' || level === 'enhanced';
   const allowT3 = level !== 'beginner';
@@ -87,9 +87,10 @@ export function filterByTierCB(pool: string[], level: string, hasCable?: boolean
   }
   if (!allowT4) out = out.filter(id => tierForCB(id) !== 4);
   else if (level === 'intermediate' && !allowExotic) out = out.filter(id => !['neck_bridge_wrestler','depth_jump'].includes(id));
-  if (!hasCable) out = out.filter(id => !['pallof_rotation_press','band_external_rotation','band_pull_apart'].includes(id));
-  const hasSled = hasCable;
-  if (!hasSled) out = out.filter(id => !['sled_push','sled_pull'].includes(id));
+  if (hasCable === false) out = out.filter(id => !['pallof_rotation_press','band_external_rotation','band_pull_apart'].includes(id));
+  // санки требуют sled/другое, не кабель — если hasSled не передан, считаем что есть (совместимость)
+  const sledAllowed = hasSled ?? true;
+  if (sledAllowed === false) out = out.filter(id => !['sled_push','sled_pull'].includes(id));
   // если фильтр вырезал всё — вернуть хотя бы tier1-2
   if (out.length === 0) return pool.filter(id => tierForCB(id) <= 2).slice(0, 3);
   return out;

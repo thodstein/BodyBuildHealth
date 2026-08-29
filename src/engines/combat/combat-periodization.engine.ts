@@ -4,8 +4,9 @@
  * Изолировано.
  * Источники: Issurin ATR 10нед, Vitruve Off/Pre/Camp, Performance MMA 4 фазы.
  */
+import type { CombatPhase } from './combat.types';
+export type { CombatPhase };
 export type CombatPeriodizationModel = 'atr_10' | 'linear_12' | 'conjugate' | 'camp_8' | 'linear';
-export type CombatPhase = 'accumulation' | 'transmutation' | 'realization' | 'gpp' | 'power' | 'taper' | 'deload' | 'conjugate';
 
 function clamp(n: number, min: number, max: number): number { return Math.max(min, Math.min(max, n)); }
 

@@ -23,7 +23,7 @@ export function sparringWeeklyLoad(s: SparringLoad): number {
   return Math.round(hard + tech + wrest + cond);
 }
 
-export function sparringToOutsideLoad(s: SparringLoad | null | undefined): OutsideLoad | null {
+export function sparringToOutsideLoad(s: SparringLoad | null | undefined, discipline?: string): OutsideLoad | null {
   if (!s) return null;
   const totalSessions = (s.hardSparSessions || 0) + (s.techSparSessions || 0) + (s.wrestlingSessions || 0) + (s.conditioningSessions || 0);
   if (totalSessions === 0) return null;
@@ -40,11 +40,19 @@ export function sparringToOutsideLoad(s: SparringLoad | null | undefined): Outsi
   }
   highDays = [...new Set(highDays.map(n=> Math.max(0, Math.min(6, Math.round(Number(n))))))].sort((a,b)=>a-b);
   const interference: OutsideLoad['interference'] = wl >= 1500 || (s.hardSparSessions||0) >= 2 ? 'high' : wl >= 800 ? 'medium' : 'low';
+  const type: OutsideLoad['type'] = (() => {
+    const d = (discipline||'').toLowerCase();
+    if (d.includes('box') || d.includes('kick')) return 'ring';
+    if (d.includes('mma') || d.includes('wrest') || d.includes('борь')) return 'mat';
+    // эвристика по составу: ударный спарринг без борьбы → ring
+    if ((s.hardSparSessions||0) > 0 && (s.wrestlingSessions||0) === 0) return 'ring';
+    return 'mat';
+  })();
   return {
     sessionsPerWeek: totalSessions,
     avgDurationMin: avgDuration,
     avgSRPE: Math.round(avgRPE * 10) / 10,
-    type: 'mat',
+    type,
     highIntensityDays: highDays,
     interference,
     note: `sparring hard${s.hardSparSessions||0}/tech${s.techSparSessions||0}/wrest${s.wrestlingSessions||0}`,

@@ -6,6 +6,8 @@
 export type CombatDiscipline = 'boxing' | 'mma' | 'wrestling' | 'kickboxing' | 'general';
 export type CombatGoal = 'power' | 'endurance' | 'maintenance' | 'camp' | 'weight_cut';
 export type CombatLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
+export type CombatPhase = 'accumulation' | 'transmutation' | 'realization' | 'gpp' | 'power' | 'taper' | 'deload' | 'conjugate';
+export type CombatFightStyle = 'striker' | 'grappler' | 'hybrid';
 
 export interface CombatInput {
   discipline: CombatDiscipline;
@@ -33,13 +35,18 @@ export interface CombatInput {
   intensityTech?: 'none' | 'rest_pause' | 'myo_reps' | 'cluster' | 'contrast';
   // Методика и периодизация
   methodology?: 'compound_first' | 'pre_exhaust' | 'post_exhaust';
-  periodizationModel?: 'atr_10' | 'linear_12' | 'conjugate';
+  periodizationModel?: 'atr_10' | 'linear_12' | 'conjugate' | 'camp_8' | 'linear';
   conditioningMode?: 'auto' | 'off' | 'alactic' | 'lactic' | 'aerobic';
   fightDate?: string | null; // ISO date боя — для тапера
   taperWeeks?: number; // 1 | 2
   workMax?: Record<string, number> | null; // групповой (chest/back/quads etc)
   workMaxByExercise?: Record<string, number> | null; // точный
   startDate?: string | null; // для годового
+  // Расширенные (ранее any)
+  fightStyle?: CombatFightStyle;
+  patternId?: string;
+  avoidAxialLoad?: boolean;
+  previousPlanId?: string | null;
   // Recovery / PED
   peds?: string[];
   pedDoses?: Record<string, number>;
@@ -94,7 +101,7 @@ export interface CombatSession {
 
 export interface CombatWeek {
   week: number;
-  phase: string; // gpp / power / endurance / taper / deload / accumulation / transmutation / realization
+  phase: CombatPhase; // gpp / power / endurance / taper / deload / accumulation / transmutation / realization
   deload?: boolean;
   taper?: boolean;
   sessions: CombatSession[];
@@ -117,6 +124,7 @@ export interface CombatPlan {
   rationale: string[];
   report?: any;
   inputSnapshot?: CombatInput;
+  version?: number;
 }
 
 export const COMBAT_LEVELS: CombatLevel[] = ['beginner', 'intermediate', 'advanced', 'enhanced'];

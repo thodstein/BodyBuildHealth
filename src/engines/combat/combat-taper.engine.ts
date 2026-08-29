@@ -12,10 +12,15 @@ export interface TaperConfig {
 export function fightWeekIndex(fightDate: string, startDate: string | null | undefined, totalWeeks: number): number {
   try {
     const f = new Date(fightDate).getTime();
-    const s = startDate ? new Date(startDate).getTime() : Date.now();
-    if (!Number.isFinite(f) || !Number.isFinite(s)) return totalWeeks;
+    if (!Number.isFinite(f)) return totalWeeks;
+    if (!startDate) {
+      // детерминированный fallback: если старт не задан — бой в конце плана (последняя неделя), не завязываемся на Date.now()
+      return totalWeeks;
+    }
+    const s = new Date(startDate).getTime();
+    if (!Number.isFinite(s)) return totalWeeks;
     const diffDays = Math.round((f - s) / 86400000);
-    // неделя 1 = дни 0-6, неделя 2 = 7-13 etc
+    // неделя 1 = дни 0-6, неделя 2 = 7-13 etc; если бой до старта — кламп к 1, если после — к totalWeeks
     const w = Math.floor(diffDays / 7) + 1;
     return Math.max(1, Math.min(totalWeeks, w));
   } catch {

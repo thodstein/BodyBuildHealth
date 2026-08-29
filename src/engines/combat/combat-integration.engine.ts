@@ -27,7 +27,7 @@ export function combatToNutritionPayload(plan: CombatPlan): { kcal: number | nul
   const bw = (plan.inputSnapshot as any)?.bodyweight || 80;
   const protein = Math.round(bw * ((plan.goal === 'weight_cut') ? 2.3 : 2.0));
   const carbs = Math.round(bw * ((plan.goal === 'weight_cut') ? 3 : 5));
-  return { kcal: null, proteinG: protein, carbsG: carbs, note: `Оценка под план ${plan.discipline} avg ${Math.round(avgSets)} сетов/нед — ккал считайте через TDEE+активность (${kcal} ориентир)` };
+  return { kcal, proteinG: protein, carbsG: carbs, note: `Оценка под план ${plan.discipline} avg ${Math.round(avgSets)} сетов/нед — ккал ${kcal} ориентир + TDEE` };
 }
 
 export function combatToCardioPayload(plan: CombatPlan): { zone2MinPerWeek: number; hiitSessions: number } | null {
