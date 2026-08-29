@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline } from '../metabolic-hub.engine';
-import { bmrCunningham, bmrOwen, bmrTenHaaf, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2 } from '../../core/metabolic-constants';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcTrendFromHistory, calcAdaptiveAdjustment, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap } from '../metabolic-hub.engine';
+import { bmrCunningham, bmrOwen, bmrTenHaaf, bmrHarrisRevised, bmrHenry, bmrLivingston, calcTEF as calcTEFConst, calcTrendWithConfidence as calcTrendConf2, energyDensityPerKg, hallAdaptationFactor, calcSweatElectrolytes, calcJPBodyFat, calcDurninBodyFat, computeBMR } from '../../core/metabolic-constants';
 
 const base = { weight: 80, height: 180, age: 30, sex: 'male' as const };
 
@@ -35,10 +35,12 @@ describe('metabolic-hub — calcWater', () => {
     const r = calcWater({ ...base, trainingDays:0, cardioMin:0 });
     expect(r.breakdown.base).toBe(80*35);
   });
-  it('lean40/жир20 экономит при ожирении', () => {
+  it('lean40/жир20 экономит при ожирении (baseLeanModel vs baseIOM)', () => {
     const lean = calcWater({ weight: 110, height:180, age:30, sex:'male', bodyFat:35, trainingDays:0, cardioMin:0 });
     const generic = calcWater({ weight:110, height:180, age:30, sex:'male', trainingDays:0, cardioMin:0 });
-    expect(lean.breakdown.base).toBeLessThan(generic.breakdown.base);
+    // Pro: IOM база одинакова, lean-модель экспериментальная — экономит (показываем отдельно)
+    expect(lean.breakdown.baseLeanModel).toBeLessThan(generic.breakdown.baseIOM);
+    expect(lean.baseIOM).toBe(generic.baseIOM);
   });
   it('климат hot +600 cold -150', () => {
     const t = calcWater({ ...base, climate:'temperate', trainingDays:0, cardioMin:0 });
@@ -306,12 +308,15 @@ describe('metabolic-hub PRO — BMR формулы', () => {
 });
 
 describe('metabolic-hub PRO — новые калькуляторы', () => {
-  it('EA: LEA <30', () => {
-    const eaLow = calcEnergyAvailability({ weight:70, bodyFat:10, height:180, intakeKcal:2200, eeeKcal:600 });
-    expect(eaLow.ea).not.toBeNull();
-    expect(eaLow.ea! < 30).toBeTruthy();
-    expect(eaLow.zone).toBe('low');
-    const eaOpt = calcEnergyAvailability({ weight:70, bodyFat:10, height:180, intakeKcal:3400, eeeKcal:400 });
+  it('EA: LEA sex-специфично (F <30, M <25 Mountjoy 2018)', () => {
+    // female LEA <30, male <25 — 2100 ккал → 23.8 <25 low для обоих, 2200 → 25.4 reduced для M но low для F
+    const eaLowF = calcEnergyAvailability({ weight:70, bodyFat:10, height:180, intakeKcal:2100, eeeKcal:600, sex:'female' } as any);
+    expect(eaLowF.ea).not.toBeNull();
+    expect(eaLowF.zone).toBe('low');
+    const eaReducedM = calcEnergyAvailability({ weight:70, bodyFat:10, height:180, intakeKcal:2200, eeeKcal:600, sex:'male' } as any);
+    // 25.4 >25 для M → reduced (граница), не low — проверяем sex-специфичность
+    expect(eaReducedM.zone).toBe('reduced');
+    const eaOpt = calcEnergyAvailability({ weight:70, bodyFat:10, height:180, intakeKcal:3400, eeeKcal:400, sex:'female' } as any);
     expect(eaOpt.zone).toBe('optimal');
   });
   it('алкоголь 40г = 284ккал + блок', () => {
@@ -333,11 +338,13 @@ describe('metabolic-hub PRO — новые калькуляторы', () => {
     expect(mf).not.toBeNull();
     expect(mf!.r2).toBeGreaterThan(0.2);
   });
-  it('goal timeline Hall', () => {
+  it('goal timeline Hall density (Pro)', () => {
     const gt=calcGoalTimeline({ weight:85, targetWeight:80, tdee:2800 });
     expect(gt).not.toBeNull();
-    expect(gt!.days).toBeGreaterThan(60);
+    // Hall density p*9400 теперь — 5кг при 85кг lean ≈44→48д, не 88д старым 7700
+    expect(gt!.days).toBeGreaterThan(35);
     expect(gt!.days).toBeLessThan(120);
+    expect((gt as any).model).toContain('Hall');
   });
   it('лютеин +250ккал', () => {
     const baseF={ weight:60, height:165, age:28, sex:'female' as const, menstrualPhase:'luteal' as const };
@@ -357,5 +364,128 @@ describe('metabolic-hub PRO — новые калькуляторы', () => {
     const humid=calcWater({ ...base, climate:'hot', humidity:85 });
     expect(humid.nat).toBeGreaterThan(dry.nat);
     expect(humid.sweatNaG).toBeGreaterThan(0);
+  });
+});
+
+describe('metabolic-hub PRO v2 — новые Pro-исправления', () => {
+  it('BMR: Harris/Henry/Livingston формулы работают + allMethods 8 ключей', () => {
+    expect(bmrHarrisRevised(80,180,30,'male')).toBeGreaterThan(1700);
+    expect(bmrHarrisRevised(80,180,30,'female')).toBeLessThan(bmrHarrisRevised(80,180,30,'male'));
+    expect(bmrHenry(80,30,'male')).toBeGreaterThan(1400); // Henry 11.4*80+541=1453
+    expect(bmrLivingston(110,40,'male')).toBeGreaterThan(1800);
+    const withBF = computeBMR({ weight:80, height:180, age:30, sex:'male', bodyFat:12 });
+    expect(withBF.method).toBe('cunningham'); // lean>60 → Cunningham, not age gate
+    expect(withBF.allMethods).toBeUndefined(); // с BF — allMethods не нужен
+    const noBF = computeBMR({ weight:80, height:180, age:30, sex:'male' });
+    expect(noBF.allMethods).toBeDefined();
+    expect(Object.keys(noBF.allMethods!).length).toBe(8);
+    expect(noBF.allMethods!.harris_revised).toBeGreaterThan(1500);
+    expect(noBF.allMethods!.livingston).toBeGreaterThan(1500);
+    expect(noBF.lean).toBeGreaterThan(50); // Deurenberg lean, not 15% fix
+  });
+  it('BMR default lean via Deurenberg, не фикс 15%', () => {
+    const noBF = computeBMR({ weight:100, height:180, age:35, sex:'male' });
+    // 100кг 180см 35л male BF Deurenberg ≈1.2*30.8+8-10.8-5.4≈27% → lean 73кг, не 85кг (15%)
+    expect(noBF.lean).toBeLessThan(80);
+    expect(noBF.lean).toBeGreaterThan(60);
+  });
+  it('FFMI cap 26.2 Helms (не 28) + continuous sarcopenia', () => {
+    const tall = computeBMR({ weight:110, height:190, age:65, sex:'male', bodyFat:8 });
+    // 110кг 8% lean 101кг FFMI ~28 → кламп к 26.2
+    expect(tall.lean).toBeLessThan(101);
+    const r50 = computeBMR({ weight:80, height:180, age:50, sex:'male', bodyFat:12 }).bmr;
+    const r65 = computeBMR({ weight:80, height:180, age:65, sex:'male', bodyFat:12 }).bmr;
+    expect(r65).toBeLessThan(r50); // continuous 15лет ×0.0015 = −2.25%
+    expect(r50 - r65).toBeGreaterThan(20);
+  });
+  it('PAL MET-калиброван 0.040 + very_high 1.95 + dlwBand', () => {
+    const low = calcSteps({ ...base, activityLevel:'low' });
+    const vh = calcSteps({ ...base, activityLevel:'very_high' as any });
+    expect(vh.tdeeNat).toBeGreaterThan(low.tdeeNat);
+    expect(vh.pal).toBeGreaterThan(1.75);
+    expect(vh.dlwBand.low).toBeLessThan(vh.tdeeNat);
+    expect(vh.dlwBand.high).toBeGreaterThan(vh.tdeeNat);
+  });
+  it('Hall density composition-зависим + maintenance AT', () => {
+    expect(energyDensityPerKg(10)).toBeLessThan(energyDensityPerKg(35));
+    expect(energyDensityPerKg(35)).toBeGreaterThan(5000);
+    const mfLean = calcMaintenanceFinder([{date:'2026-01-01',kg:70},{date:'2026-01-04',kg:69.8},{date:'2026-01-07',kg:69.6},{date:'2026-01-10',kg:69.4},{date:'2026-01-13',kg:69.2},{date:'2026-01-16',kg:69},{date:'2026-01-19',kg:68.8}], 2200, 10);
+    const mfFat = calcMaintenanceFinder([{date:'2026-01-01',kg:70},{date:'2026-01-04',kg:69.8},{date:'2026-01-07',kg:69.6},{date:'2026-01-10',kg:69.4},{date:'2026-01-13',kg:69.2},{date:'2026-01-16',kg:69},{date:'2026-01-19',kg:68.8}], 2200, 35);
+    expect(mfLean!.density).toBeLessThan(mfFat!.density);
+    expect(mfLean!.note).toContain('Hall');
+  });
+  it('Water Baker полный панель + IOM base', () => {
+    const w = calcWater({ ...base, bodyFat:15, trainingHours:1.2, sweatSodiumMgPerL:900 });
+    expect(w.electrolytes).toBeDefined();
+    expect(w.electrolytes.chlorideMg).toBeGreaterThan(w.electrolytes.sodiumMg);
+    expect(w.electrolytes.potassiumMg).toBeGreaterThan(100);
+    expect(w.baseIOM).toBe(80*35);
+    expect(w.baseLeanModel).toBeGreaterThan(0);
+    expect(w.sweatClG).toBeGreaterThan(w.sweatNaG);
+  });
+  it('BodyFat JP/Durnin/BIA + Deurenberg warn', () => {
+    const jp = calcJPBodyFat(50,30,'male');
+    expect(jp).not.toBeNull();
+    expect(jp!).toBeGreaterThan(8); expect(jp!).toBeLessThan(25);
+    const durn = calcDurninBodyFat(45,30,'male');
+    expect(durn).not.toBeNull();
+    const withJP = calcBodyFat({ ...base, waist:84, neck:39, skinfoldSum3:40 });
+    expect(withJP.jp).not.toBeNull();
+    expect(withJP.measured).toBe(withJP.jp);
+    const obese = calcBodyFat({ weight:100, height:170, age:30, sex:'male', waist:100, neck:40 });
+    expect(obese.deurenbergWarn).toContain('BMI');
+  });
+  it('Stress Load Index alias + дисклеймер E', () => {
+    const s = calcStressLoad({ ...base, stress:5, sleepHours:7, acwr:1 });
+    const c = calcCortisol({ ...base, stress:5, sleepHours:7, acwr:1 });
+    expect(s.nat).toBe(c.nat);
+    expect(s.note).toContain('эвристика');
+    expect(s.scaleNote).toContain('invented');
+  });
+  it('Protein timing plant DIAAS + ceiling + pre-sleep', () => {
+    const plant = calcProteinTiming(120,80,4, true);
+    const animal = calcProteinTiming(120,80,4, false);
+    expect(plant.leucinePerMeal).toBeLessThan(animal.leucinePerMeal);
+    expect(plant.plantNote).toContain('DIAAS');
+    const over = calcProteinTiming(220,70,4);
+    expect(over.perMealGPerKg).toBeGreaterThan(0.55);
+    expect(over.note).toContain('waste');
+    expect(over.preSleepG).toBe(35);
+  });
+  it('AT Trexler + Reverse MATADOR', () => {
+    const at = calcAdaptiveThermogenesis({ weight:80, height:180, age:30, sex:'male', bodyFat:12, deficitKcal:500, weeksInDeficit:6, weightLostKg:3 });
+    expect(at.atKcal).toBeGreaterThan(30);
+    expect(at.rmrPred).toBeGreaterThan(at.rmrMeasEst);
+    const rev = calcReverseDiet(2200,2600);
+    expect(rev.length).toBeGreaterThan(2);
+    expect(rev[0].kcal).toBe(2300);
+  });
+  it('NEAT Levine 2002', () => {
+    const n = calcNEAT({ weight:80, standingHours:6, fidgetLevel:3, steps:10000 });
+    expect(n.total).toBeGreaterThan(300);
+    expect(n.standing).toBe(240); // 6*40
+    const low = calcNEAT({ weight:80, standingHours:0, fidgetLevel:1, steps:2000 });
+    expect(n.total).toBeGreaterThan(low.total);
+  });
+  it('Thyroid Kim + HOMA-IR Wallace', () => {
+    const norm = calcThyroidImpact(17, undefined);
+    expect(norm.mult).toBe(1);
+    const hypo = calcThyroidImpact(10, undefined);
+    expect(hypo.mult).toBeLessThan(1);
+    const hyper = calcThyroidImpact(25, undefined);
+    expect(hyper.mult).toBeGreaterThan(1);
+    const homaOpt = calcHomaIRWrap(80,5); // 0.98 optimal
+    expect(homaOpt.zone).toBe('optimal');
+    const homaMid = calcHomaIRWrap(92,10); // ≈2.2 attention
+    expect(homaMid.zone).toBe('attention');
+    const homaIR = calcHomaIRWrap(110,22); // ≈5.99 ir
+    expect(homaIR.zone).toBe('ir');
+  });
+  it('Sweat electrolytes Baker + hallAdaptation continuous', () => {
+    const e = calcSweatElectrolytes(1200, 900);
+    expect(e.sodiumMg).toBe(1080);
+    expect(e.chlorideMg).toBe(1620);
+    expect(hallAdaptationFactor(21)).toBeGreaterThan(hallAdaptationFactor(60));
+    expect(hallAdaptationFactor(0)).toBe(1);
   });
 });
