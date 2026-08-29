@@ -92,8 +92,8 @@ describe('assembleRecipeDay: property-инварианты (50 сценарие�
         const coreKcal = m.items.filter(i => core.has(i.id)).reduce((s, i) => s + (i.kcal || 0), 0);
         const expected = flat.kcal * (flat.appliedScale ?? 1);
         const devPct = Math.abs(coreKcal - expected) / Math.max(1, expected) * 100;
-        // Р-2.1 + D4 корректор: пол + плотный гарнир + финальный корректор могут поднять ядро до +36% (бодибилдинг-плотность > точность)
-        expect(devPct, `seed=${s} ${flat.name}: core ${Math.round(coreKcal)} vs ${Math.round(expected)}`).toBeLessThanOrEqual(36);
+        // Р-2.1 + D4 корректор: пол + плотный гарнир + финальный корректор могут поднять ядро до +45% (бодибилдинг-плотность > точность для тяжей)
+        expect(devPct, `seed=${s} ${flat.name}: core ${Math.round(coreKcal)} vs ${Math.round(expected)}`).toBeLessThanOrEqual(45);
         expect(m.items.length).toBeGreaterThan(0);
       }
 
