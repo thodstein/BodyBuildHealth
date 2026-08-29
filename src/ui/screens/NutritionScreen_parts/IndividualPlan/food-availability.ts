@@ -1,4 +1,4 @@
-import type { FoodItem } from '../../../core/nutrition-database';
+import type { FoodItem } from '../../../../core/nutrition-database';
 
 /**
  * РЕЕСТР РЕАЛИЗМА ПРОДУКТОВ (эпик A, «профессиональный планировщик»)
@@ -27,18 +27,25 @@ export const EXOTIC_FOOD_IDS: ReadonlySet<string> = new Set([
   'fruit_goji_berries', 'fruit_goji_dried', 'fruit_pawpaw', 'fruit_sapodilla',
   'fruit_boysenberry', 'fruit_cloudberry', 'fruit_loganberry', 'fruit_elderberry',
   'berry_boysenberry', 'berry_cloudberry', 'berry_loganberry', 'berry_elderberry', 'berry_acerola',
+  'berry_golden_berry', 'fruit_cactus_pear', 'fruit_cornelian_cherry_dogwood', 'fruit_mulberry',
+  'root_scorzonera', 'root_lotus_root', 'dried_papaya',
   // овощи
   'veg_jicama', 'veg_jicama_mexican', 'veg_purslane', 'veg_bamboo_shoots_canned',
   'veg_collard_greens', 'veg_okra', 'veg_samphire',
   // орехи/семена
   'nut_kukui', 'nut_pili', 'nut_hickory', 'nut_brazil', 'seed_coriander', 'seed_fennel', 'fennel_seeds',
+  'tiger_nuts', 'mustard_seeds',
   // субпродукты-диковины (печень оставляем — классика ББ)
   'lamb_kidney', 'lamb_kidney_organ', 'beef_kidney', 'beef_kidney_cooked', 'pork_kidney',
   'meat_heart_tripe', 'meat_brain', 'meat_sweetbread', 'meat_tongue',
-  // крупы-диковины
-  'grain_freekeh', 'grain_kamut', 'grain_einkorn', 'grain_teff',
+  // крупы-диковины и джанк-лапша
+  'grain_freekeh', 'grain_kamut', 'grain_einkorn', 'grain_teff', 'grain_sorghum', 'cereal_sorghum',
+  'grain_glutinous_rice', 'pasta_ramen', 'legume_pigeon_pea',
   // масла-джанк (не для тарелки автогенерации)
   'oil_palm', 'oil_cocoa', 'butter_cocoa', 'sauce_cheese', 'cheese_sauce', 'sauce_cheddar',
+  'duck_fat', 'oil_chili', 'flaxseed_oil', 'avocado_oil',
+  // рыба-диковина
+  'crucian',
   // прочее
   'meat_ostrich', 'meat_kangaroo', 'meat_alligator', 'meat_bison_ribeye',
 ]);
@@ -82,8 +89,10 @@ export const MEAL_LEGAL_SUPPLEMENT_IDS: ReadonlySet<string> = new Set([
   'protein_bar', 'bar_protein',
 ]);
 
-/** Все остальные category === 'supplement' — НЕ еда (креатин/витамины/стимуляторы/…). */
-export function isPureSupplementId(id: string): boolean {
+/** Все остальные category === 'supplement' — НЕ еда (креатин/витамины/стимуляторы/…).
+ *  Если передана category не-'supplement' — это обычный продукт (не добавка). */
+export function isPureSupplementId(id: string, category?: string): boolean {
+  if (category && category !== 'supplement') return false;
   if (!id) return false;
   return !MEAL_LEGAL_SUPPLEMENT_IDS.has(id);
 }
@@ -95,6 +104,7 @@ const POWDER_PROTEIN_IDS: ReadonlySet<string> = new Set([
   'supp_egg_protein', 'supp_egg_white_powder', 'supp_soy_isolate', 'supp_pea_protein',
   'supp_pea_protein_iso', 'supp_rice_protein', 'supp_hemp_protein', 'supp_pumpkin_protein',
   'supp_mass_gainer', 'mass_gainer', 'egg_white_dried', 'egg_white_powder', 'egg_protein_dried',
+  'milk_powder_full', 'milk_powder_skim',
 ]);
 
 export function isProteinPowderId(id: string): boolean {
@@ -158,12 +168,12 @@ export const QUOTA_LIMITS = {
   maxFamilyMeals: 3,
   /** Овсяное семейство разрешено 2 приёма (завтрак + перекус) — это завтрак-стейпл. */
   maxOatsFamilyMeals: 2,
-  /** Орехи/семена: максимум приёмов и граммов в день. */
-  maxNutMeals: 2, maxNutsGramsPerDay: 45,
-  /** Масла/жирные заправки: максимум приёмов в день. */
-  maxOilMeals: 2,
-  /** Фрукты: максимум приёмов в день. */
-  maxFruitMeals: 3,
+  /** Орехи/семена: максимум приёмов и граммов в день (2 приёма × ~20 г + Mg-доза pre-sleep). */
+  maxNutMeals: 2, maxNutsGramsPerDay: 60,
+  /** Масла/жирные заправки: максимум приёмов в день и суммарных граммов. */
+  maxOilMeals: 2, maxOilGramsPerDay: 25,
+  /** Фрукты: максимум приёмов в день (3 + melatonin-порция pre-sleep). */
+  maxFruitMeals: 4,
   /** Яйца целиком: максимум граммов в день (~4 шт). */
   maxEggWholeGramsPerDay: 230,
 } as const;
@@ -188,6 +198,7 @@ export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string):
   }
   const nutGrams = (q.familyGrams.get('nuts') || 0) + (q.familyGrams.get('seeds') || 0);
   if (nutGrams >= QUOTA_LIMITS.maxNutsGramsPerDay) { markFamilyBlocked(blocked, 'nuts'); markFamilyBlocked(blocked, 'seeds'); }
+  if ((q.familyGrams.get('oils') || 0) >= QUOTA_LIMITS.maxOilGramsPerDay) markFamilyBlocked(blocked, 'oils');
   if (q.fruitMeals >= QUOTA_LIMITS.maxFruitMeals) blocked.add('__ALL_FRUIT__');
   if (q.eggWhGrams >= QUOTA_LIMITS.maxEggWholeGramsPerDay) blocked.add('egg_whole');
   void nextMealType;

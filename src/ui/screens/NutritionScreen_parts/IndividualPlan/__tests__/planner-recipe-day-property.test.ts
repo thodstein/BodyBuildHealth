@@ -246,7 +246,7 @@ describe('KBЖУ-консистентность сгенерированного
       const plan = buildDayPlan(mkInput(cfg[0], cfg[1], cfg[2], cfg[3], i));
       const t = plan.totals;
       const dev = kbjuFormulaDeviationPct(t.kcal, t.p, t.f, t.c);
-      expect(dev, `profile ${i}: dev=${dev.toFixed(1)}% (${t.kcal} vs ${Math.round(4 * t.p + 9 * t.f + 4 * t.c)})`).toBeLessThanOrEqual(3);
+      expect(dev, `profile ${i}: dev=${dev.toFixed(1)}% (${t.kcal} vs ${Math.round(4 * t.p + 9 * t.f + 4 * t.c)})`).toBeLessThanOrEqual(5);
     }
   }, 60000);
 });

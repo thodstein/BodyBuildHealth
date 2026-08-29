@@ -224,6 +224,8 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   refreshRecipeSuggestions: (dayIdx?: number) => void;
   /** ♻️ Пропуск приёма: удалить приём и пересобрать день (ребаланс ±3%), синк закупок/готовки. */
   removeMealRebalanced: (dayIdx: number, mealIdx: number) => void;
+  updateMealTime: (mealIdx: number, time: string) => void;
+  duplicateMeal: (mealIdx: number) => void;
   toggleAllergen: (id: string) => void;
   toggleHealthIssue: (id: string) => void;
   loadSavedPlan: (plan: SavedPlan) => void;
@@ -1786,6 +1788,61 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     if (typeof (window as any).showToast === 'function') (window as any).showToast('♻️ День пересобран без пропущенного приёма', 'success');
   };
 
+  // Эпик E: единые операции правки дня, синхронные в weekPlan при weekEditDay
+  // (раньше 🕒-время/дубль из MealListRender и QuickControls писали только dayPlan —
+  // правки недели терялись при возврате).
+  const updateMealTime = (mealIdx: number, time: string) => {
+    saveUndo();
+    const applyTime = (meals: any[]) => meals.map((m: any, i: number) => (i === mealIdx ? { ...m, time } : m));
+    setDayPlan((prev: any) => {
+      if (!prev?.meals?.[mealIdx]) return prev;
+      const meals = applyTime(prev.meals);
+      return { ...prev, meals, totals: sumDayTotals(meals as any) };
+    });
+    if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
+      const days = [...weekPlan.days];
+      const d = JSON.parse(JSON.stringify(days[weekEditDay]));
+      if (d?.meals?.[mealIdx]) {
+        d.meals = applyTime(d.meals);
+        d.totals = sumDayTotals(d.meals);
+        days[weekEditDay] = d;
+        setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+      }
+    }
+  };
+
+  const duplicateMeal = (mealIdx: number) => {
+    const src = dayPlan?.meals?.[mealIdx];
+    if (!src) return;
+    saveUndo();
+    const insertAfter = (meals: any[]): any[] => {
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.label = (copy.label || 'Приём') + ' (копия)';
+      const [h, m2] = (copy.time || '12:00').split(':').map(Number);
+      const t = h * 60 + m2 + 30;
+      copy.time = `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+      const out = meals.slice();
+      out.splice(Math.min(mealIdx + 1, out.length), 0, copy);
+      return out;
+    };
+    setDayPlan((prev: any) => {
+      if (!prev?.meals) return prev;
+      const meals = insertAfter(prev.meals);
+      return { ...prev, meals, totals: sumDayTotals(meals as any) };
+    });
+    if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
+      const days = [...weekPlan.days];
+      const d = JSON.parse(JSON.stringify(days[weekEditDay]));
+      if (d?.meals) {
+        d.meals = insertAfter(d.meals);
+        d.totals = sumDayTotals(d.meals);
+        days[weekEditDay] = d;
+        setWeekPlan({ ...weekPlan, days, totals: sumMultiTotals(days) });
+      }
+    }
+    if (typeof (window as any).showToast === 'function') (window as any).showToast('📋 Приём продублирован', 'success');
+  };
+
   const pickRecipeOption = (dayIdx: number, mealIdx: number, optionName: string) => {    saveUndo();
     if (dayIdx === 0) {
       const res = rebuildMealsWithRecipeOption(dayPlan?.meals || [], mealIdx, optionName);
@@ -3172,6 +3229,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     generationMode, setGenerationMode,
     favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe,
     pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced,
+    updateMealTime, duplicateMeal,
     weekEditDay, openWeekDayForEdit, switchPlanDays,
     addFoodToMeal, addSnackComboToMeal, undoLast,
     toggleAllergen, toggleHealthIssue, loadSavedPlan,
@@ -3212,6 +3270,6 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, periodizationEnabled, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, dietPauseMode, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, coconutOilBoost, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, cyclingMode, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
-  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, renderMealList, annualPhase]);
+  const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);
   return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
 };

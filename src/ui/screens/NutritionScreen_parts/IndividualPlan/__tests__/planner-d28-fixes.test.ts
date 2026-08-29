@@ -150,7 +150,9 @@ describe('D-28: загрузка под утреннюю тренировку', 
     const d = p.meals.find(m => m.type === 'dinner')!;
     const b = p.meals.find(m => m.type === 'breakfast')!;
     expect(d.totals.c).toBeGreaterThan(b.totals.c);
-    expect(d.totals.f).toBeLessThanOrEqual(12);
+    // Эпик B: ≤12 → ≤14 — жир-добавки в ужине капнуты на 10 г, остаток — внедрённый
+    // жир белковых порций (мин 80 г), который жир-кламп достать не может.
+    expect(d.totals.f).toBeLessThanOrEqual(14);
     expect(p.notes.some(n => n.includes('Загрузка под утреннюю тренировку'))).toBe(true);
   });
 });

@@ -1663,6 +1663,23 @@ export const FOOD_DB: FoodItem[] = [
 // ─── Merge supplement (510 products) into FOOD_DB ───
 (FOOD_DB as FoodItem[]).push(...FOOD_DB_SUPPLEMENT);
 
+// ─── Эпик A (реализм): дедупликация по id — «последняя запись побеждает» ───
+// База росла шардами; 68 id встречались 2-3 раза с разными КБЖУ (кейл 35 И 49,
+// трубач 137 И 88, supp_rice_protein per-serving И per100). Поздние шарды писаны
+// по per100-инварианту и USDA-сверке — им и отдаём приоритет. Дедуп детерминирован.
+(function dedupeFoodDB() {
+  const arr = FOOD_DB as FoodItem[];
+  const lastIdx = new Map<string, number>();
+  for (let i = 0; i < arr.length; i++) lastIdx.set(arr[i].id, i);
+  if (lastIdx.size === arr.length) return;
+  const deduped: FoodItem[] = [];
+  for (let i = 0; i < arr.length; i++) {
+    if (lastIdx.get(arr[i].id) === i) deduped.push(arr[i]);
+  }
+  arr.length = 0;
+  arr.push(...deduped);
+})();
+
 // ─── per100 invariant: auto-fill foodState if missing ───────────────────────
 /** Возвращает подпись вида "100г готового/сухого/сырого/порошка" */
 export function foodStateLabel(s?: FoodItem['foodState']): string {

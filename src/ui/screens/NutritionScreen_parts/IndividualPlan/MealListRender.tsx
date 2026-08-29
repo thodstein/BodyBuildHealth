@@ -24,11 +24,15 @@ const _dayMicrosCache = new WeakMap<object, { visibleMicros: any[] } | null>();
 // FIX week-perf: findSimilarFoods сканирует FOOD_DB+сортирует — кэш по объекту продукта
 const _similarFoodsCache = new WeakMap<object, any[]>();
 
-// Этап 3 (Пробел-1): редактирование времени — теперь через современный модал (без window.prompt)
-function useMealTimeEdit(plan: any, saveUndo: () => void, setDayPlan: (v:any)=>void) {
+// Этап 3 (Пробел-1): редактирование времени — через модал (без window.prompt).
+// Эпик E: запись через ctx.updateMealTime — синк в weekPlan при weekEditDay
+// (раньше писали только dayPlan, правки недели терялись).
+function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time: string) => void) {
+  const planRef = React.useRef<any>(null);
   const [edit, setEdit] = React.useState<{ idx:number; value:string } | null>(null);
-  const open = (idx:number) => {
-    const cur = plan?.meals?.[idx]?.time || '12:00';
+  const open = (idx:number, plan?: any) => {
+    planRef.current = plan;
+    const cur = (plan || planRef.current)?.meals?.[idx]?.time || '12:00';
     setEdit({ idx, value: cur });
   };
   const confirm = () => {
@@ -38,15 +42,7 @@ function useMealTimeEdit(plan: any, saveUndo: () => void, setDayPlan: (v:any)=>v
     if (mt.length !== 2) return;
     const h = parseInt(mt[0],10), mm = parseInt(mt[1],10);
     if (isNaN(h)||isNaN(mm)||h<0||h>23||mm<0||mm>59) return;
-    const nt = `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
-    saveUndo();
-    setDayPlan((prev:any)=>{
-      if(!prev) return prev;
-      const meals = prev.meals.slice();
-      if (meals[edit.idx]) meals[edit.idx] = Object.assign({}, meals[edit.idx], { time: nt });
-      const totals={kcal:meals.reduce((s:number,m:any)=>s+(m.totals?.kcal||0),0),p:meals.reduce((s:number,m:any)=>s+(m.totals?.p||0),0),f:meals.reduce((s:number,m:any)=>s+(m.totals?.f||0),0),c:meals.reduce((s:number,m:any)=>s+(m.totals?.c||0),0)};
-      return { ...prev, meals, totals };
-    });
+    applyTime(edit.idx, `${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
     setEdit(null);
   };
   const modal = edit ? (
@@ -70,7 +66,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
   const _proteinPreset = PROTEIN_PRESETS.find(p => p.id === (proteinPreset || nutrLevel))?.gPerKg || 2.0;
   const setDayPlan = _setDayPlan as any;
   const setEditAmount = _setEditAmount as any;
-  const timeEdit = useMealTimeEdit(dayPlan, saveUndo, setDayPlan);
+  const timeEdit = useMealTimeEdit(saveUndo, (typeof (ctx as any).updateMealTime === 'function' ? (ctx as any).updateMealTime : (_i: number, _t: string) => {}));
   // UX чипов: пресеты рецептов (масса = большое У, сушка, белок…)
   const [recipePreset, setRecipePreset] = useState<string | null>(null);
   const _planKeyRef = React.useRef<string>('');
@@ -233,7 +229,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:4}}>
                   <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{mealKcal} ккал</span>
-                  <span onClick={()=>timeEdit.open(mi)} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
+                  <span onClick={()=>timeEdit.open(mi, dayPlan)} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
                   <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
                   <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
                   <span onClick={()=>{ try { const date=new Date().toISOString().slice(0,10); const data=readDiaryV2(); if(!data[date]) data[date]={meals:{}}; const label=m.label||'Приём пищи'; if(!data[date].meals[label]) data[date].meals[label]=[]; (m.items||[]).forEach((it:any)=>{(data[date].meals[label] as any).push({ name:it.name, qty:`${it.amount||100} г` as any, kcal:Math.round(it.kcal||0), p:Math.round((it.p||0)*10)/10, f:Math.round((it.f||0)*10)/10, c:Math.round((it.c||0)*10)/10, category:it.category, foodId:it.id, micros:it.micros });}); writeDiaryV2(data); if(typeof (window as any).showToast==='function') (window as any).showToast(`📒 ${label} → дневник`); } catch {} }} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.06)',border:'1px solid rgba(0,230,138,0.2)',color:'#00e68a',cursor:'pointer',fontWeight:600}} title="Добавить приём в дневник">📒</span>

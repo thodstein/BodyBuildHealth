@@ -12,6 +12,54 @@ import type { PlannerMode } from "./types";
 
 type PlanTab = 'settings' | 'plan' | 'composer' | 'report' | 'organload' | 'peak';
 
+// ─── Эпик E1: глобальный toast-канал ─────────────────────────────────
+// window.showToast НИГДЕ не определялся: 7+ уведомлений планировщика («Рецепт применён»,
+// «Файл тренеру скачан»…) и профильных модалок умирали молча, 2 вызова падали в alert().
+// Определяем один раз (idempotent) + DOM-контейнер ниже в PlannerToastHost.
+export interface PlannerToast { id: number; msg: string; type: 'success' | 'warning' | 'error' | 'info' }
+type ToastListener = (t: PlannerToast) => void;
+const _toastListeners = new Set<ToastListener>();
+let _toastSeq = 1;
+if (typeof window !== 'undefined' && typeof (window as any).showToast !== 'function') {
+  (window as any).showToast = (msg: string, type: string = 'success') => {
+    const t: PlannerToast = { id: _toastSeq++, msg: String(msg || ''), type: (['success', 'warning', 'error', 'info'].includes(type) ? type : 'success') as PlannerToast['type'] };
+    _toastListeners.forEach(fn => { try { fn(t); } catch {} });
+  };
+}
+const subscribeToasts = (fn: ToastListener): (() => void) => {
+  _toastListeners.add(fn);
+  return () => _toastListeners.delete(fn);
+};
+
+const TOAST_COLORS: Record<PlannerToast['type'], { bg: string; border: string; text: string }> = {
+  success: { bg: 'rgba(16,185,129,0.14)', border: 'rgba(16,185,129,0.35)', text: '#6ee7b7' },
+  warning: { bg: 'rgba(245,158,11,0.14)', border: 'rgba(245,158,11,0.35)', text: '#fcd34d' },
+  error: { bg: 'rgba(239,68,68,0.14)', border: 'rgba(239,68,68,0.35)', text: '#fca5a5' },
+  info: { bg: 'rgba(59,130,246,0.14)', border: 'rgba(59,130,246,0.35)', text: '#93c5fd' },
+};
+
+/** Плавающие уведомления планировщика (забирают window.showToast из шины). */
+const PlannerToastHost: React.FC = () => {
+  const [toasts, setToasts] = useState<PlannerToast[]>([]);
+  React.useEffect(() => subscribeToasts((t) => {
+    setToasts(prev => [...prev.slice(-3), t]);
+    setTimeout(() => setToasts(prev => prev.filter(x => x.id !== t.id)), 3200);
+  }), []);
+  if (toasts.length === 0) return null;
+  return (
+    <div style={{ position: 'fixed', bottom: 84, left: '50%', transform: 'translateX(-50%)', zIndex: 2200, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', pointerEvents: 'none', width: 'min(92vw, 420px)' }}>
+      {toasts.map(t => {
+        const c = TOAST_COLORS[t.type] || TOAST_COLORS.success;
+        return (
+          <div key={t.id} role="status" style={{ width: '100%', padding: '10px 14px', borderRadius: 12, background: c.bg, border: `1px solid ${c.border}`, color: c.text, fontSize: 11, fontWeight: 700, boxShadow: '0 8px 24px rgba(0,0,0,0.35)', backdropFilter: 'blur(10px)', textAlign: 'center', wordBreak: 'break-word' }}>
+            {t.msg}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 type PlannerBoundaryState = { error: Error | null };
 
 class PlannerErrorBoundary extends React.Component<React.PropsWithChildren, PlannerBoundaryState> {
@@ -114,6 +162,7 @@ export const IndividualPlan: React.FC<{ profile: UserProfile | null; course?: an
     <PlannerErrorBoundary>
       <IndividualPlanProvider profile={profile} course={course} labs={labs} labAnalysis={labAnalysis}>
         <IndividualPlanInner />
+        <PlannerToastHost />
       </IndividualPlanProvider>
     </PlannerErrorBoundary>
   );

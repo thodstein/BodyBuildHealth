@@ -73,7 +73,23 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
     dayPlan, generated,
     saveUndo, setDayPlan, undoStack, setUndoStack,
     setRecipePickerMeal, setThreeDayPlan, setWeekPlan,
+    weekPlan, weekEditDay, removeMealRebalanced, duplicateMeal,
   } = ctx;
+
+  // Эпик E: операции QuickControls синхронно правят weekPlan при weekEditDay
+  // (раньше писали только dayPlan — правки недели терялись при возврате к неделе).
+  const syncToWeek = (mutate: (day: any) => void) => {
+    if (weekEditDay === null || !weekPlan?.days?.[weekEditDay]) return;
+    setWeekPlan((prev: any) => {
+      if (!prev?.days?.[weekEditDay]) return prev;
+      const days = prev.days.slice();
+      const d = JSON.parse(JSON.stringify(days[weekEditDay]));
+      mutate(d);
+      if (d.meals) d.totals = d.meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0);
+      days[weekEditDay] = d;
+      return { ...prev, days };
+    });
+  };
 
   const [popup, setPopup] = useState<{
     mode: 'recipe' | 'replace_product' | 'edit_weight' | 'add_product' | 'duplicate_meal' | 'delete_meal';
@@ -108,27 +124,31 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       return;
     }
     if (p.mode === 'duplicate_meal') {
-      saveUndo();
+      closePopup();
+      // Эпик E: дубль через ctx.duplicateMeal — синк в weekPlan при weekEditDay.
+      if (typeof duplicateMeal === 'function') { duplicateMeal(idx); return; }
       if (!meals[idx]) { closePopup(); return; }
-      const copy = JSON.parse(JSON.stringify(meals[idx]));
-      if (!copy) return;
+      saveUndo();
       setDayPlan((prev: any) => {
         if (!prev) return prev;
         const m = [...prev.meals];
         const insertAt = Math.min(idx + 1, m.length);
         const dup = {
-          ...copy,
-          label: copy.label + ' (копия)',
-          time: (() => { const [h, m2] = (copy.time || '12:00').split(':').map(Number); const t = h * 60 + m2 + 30; return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; })(),
+          ...JSON.parse(JSON.stringify(meals[idx])),
+          label: meals[idx].label + ' (копия)',
+          time: (() => { const [h, m2] = (meals[idx].time || '12:00').split(':').map(Number); const t = h * 60 + m2 + 30; return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`; })(),
         };
         m.splice(insertAt, 0, dup);
         const totals = { kcal: m.reduce((s: number, x: any) => s + (x.totals?.kcal || 0), 0), p: m.reduce((s: number, x: any) => s + (x.totals?.p || 0), 0), f: m.reduce((s: number, x: any) => s + (x.totals?.f || 0), 0), c: m.reduce((s: number, x: any) => s + (x.totals?.c || 0), 0) };
         return { ...prev, meals: m, totals };
       });
-      closePopup();
       return;
     }
     if (p.mode === 'delete_meal') {
+      closePopup();
+      // Эпик E: удаление = пропуск приёма (removeMealRebalanced): ребаланс ±3% + синк
+      // закупок/готовки + weekEditDay — паритет с ✕-иконкой в списке приёмов.
+      if (typeof removeMealRebalanced === 'function') { removeMealRebalanced(0, idx); return; }
       saveUndo();
       setDayPlan((prev: any) => {
         if (!prev) return prev;
@@ -136,7 +156,6 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
         const totals = { kcal: m.reduce((s: number, x: any) => s + (x.totals?.kcal || 0), 0), p: m.reduce((s: number, x: any) => s + (x.totals?.p || 0), 0), f: m.reduce((s: number, x: any) => s + (x.totals?.f || 0), 0), c: m.reduce((s: number, x: any) => s + (x.totals?.c || 0), 0) };
         return { ...prev, meals: m, totals };
       });
-      closePopup();
       return;
     }
     if (p.mode === 'replace_product' || p.mode === 'edit_weight') {
@@ -219,6 +238,10 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0) };
       return { ...prev, meals: meals2, totals };
     });
+    syncToWeek((d: any) => {
+      if (!d?.meals?.[mealIdx]?.items) return;
+      d.meals[mealIdx].items = d.meals[mealIdx].items.map((it: any, ii: number) => (ii !== itemIdx ? it : { ...it, name: '💊 ' + supp.name, id: supp.id, kcal: Math.round(supp.kcal || 0), p: Math.round(supp.protein || 0), f: Math.round(supp.fat || 0), c: Math.round(supp.carbs || 0), amount: Math.round(supp.doseG || 30) }));
+    });
     closePopup();
   };
 
@@ -253,6 +276,16 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0), fiber: meals2.reduce((s: number, m2: any) => s + (m2.totals?.fiber || 0), 0), leucine_mg: meals2.reduce((s: number, m2: any) => s + (m2.totals?.leucine_mg || 0), 0) };
       return { ...prev, meals: meals2, totals };
     });
+    syncToWeek((d: any) => {
+      if (!d?.meals?.[mealIdx]?.items) return;
+      d.meals[mealIdx].items = d.meals[mealIdx].items.map((it: any, ii: number) => {
+        if (ii !== itemIdx) return it;
+        const _p = Math.round(((newFood as any).protein ?? (newFood as any).p ?? 0) * ratio * 10) / 10;
+        const _f = Math.round(((newFood as any).fat ?? (newFood as any).f ?? 0) * ratio * 10) / 10;
+        const _c = Math.round(((newFood as any).carbs ?? (newFood as any).c ?? 0) * ratio * 10) / 10;
+        return { ...it, name: newFood.name || food.foodName, id: newFood.id || food.foodId, amount: grams, kcal: Math.round(4 * _p + 9 * _f + 4 * _c), p: _p, f: _f, c: _c, fiber: Math.round(((newFood as any).fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round(leuPer100 * ratio) };
+      });
+    });
     closePopup();
   };
 
@@ -281,6 +314,14 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0), fiber: meals2.reduce((s: number, m2: any) => s + (m2.totals?.fiber || 0), 0), leucine_mg: meals2.reduce((s: number, m2: any) => s + (m2.totals?.leucine_mg || 0), 0) };
       return { ...prev, meals: meals2, totals };
     });
+    syncToWeek((d: any) => {
+      if (!d?.meals?.[popup.selectedMealIdx]?.items) return;
+      d.meals[popup.selectedMealIdx].items = d.meals[popup.selectedMealIdx].items.map((it: any, ii: number) => {
+        if (ii !== popup.selectedItemIdx) return it;
+        const ratio = w / (it.amount || 100);
+        return { ...it, amount: w, kcal: Math.round((it.kcal || 0) * ratio), p: Math.round((it.p || 0) * ratio * 10) / 10, f: Math.round((it.f || 0) * ratio * 10) / 10, c: Math.round((it.c || 0) * ratio * 10) / 10, fiber: Math.round((it.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round((it.leucine_mg || 0) * ratio) };
+      });
+    });
     closePopup();
   };
 
@@ -305,6 +346,11 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       });
       const totals = { kcal: meals2.reduce((s: number, m2: any) => s + (m2.totals?.kcal || 0), 0), p: meals2.reduce((s: number, m2: any) => s + (m2.totals?.p || 0), 0), f: meals2.reduce((s: number, m2: any) => s + (m2.totals?.f || 0), 0), c: meals2.reduce((s: number, m2: any) => s + (m2.totals?.c || 0), 0), fiber: meals2.reduce((s: number, m2: any) => s + (m2.totals?.fiber || 0), 0), leucine_mg: meals2.reduce((s: number, m2: any) => s + (m2.totals?.leucine_mg || 0), 0) };
       return { ...prev, meals: meals2, totals };
+    });
+    syncToWeek((d: any) => {
+      if (!d?.meals) return;
+      const items = [...(d.meals[mealIdx]?.items || []), { name: result.foodName, id: result.foodId, amount, kcal: (() => { const p = Math.round(result.protein * amount / 100 * 10) / 10, f = Math.round(result.fat * amount / 100 * 10) / 10, c = Math.round(result.carbs * amount / 100 * 10) / 10; return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10, fiber: Math.round((result.fiber || 0) * amount / 100 * 10) / 10, leucine_mg: Math.round(leuPer100 * amount / 100) }];
+      d.meals[mealIdx] = { ...d.meals[mealIdx], items };
     });
     setPopup({ ...popup, step: 'search_product', searchQuery: '', searchResults: [], scoredResults: [] });
   };

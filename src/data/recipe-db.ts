@@ -31,6 +31,7 @@ import { RECIPE_DB_P28 } from './recipe-db-p28';
 import { RECIPE_DB_P29 } from './recipe-db-p29';
 import { RECIPE_DB_P30 } from './recipe-db-p30';
 import { RECIPE_DB_P31 } from './recipe-db-p31';
+import { RECIPE_DB_P32 } from './recipe-db-p32';
 import { enrichRecipes } from './recipe-enrichment';
 
 /**
@@ -90,6 +91,49 @@ function normalizeRecipeKcal(r: Recipe): Recipe {
   return out;
 }
 
+/**
+ * Эпик D1 (грамовки рецептов): санитайзер порций по ролям продуктов.
+ * Enrichment-генератор ставил безразмерным ингредиентам дефолт 100 г —
+ * «оливковое масло 100 г» (~884 ккал!) превращало «лёгкую треску 380 ккал»
+ * в 1115+ ккал после normalizeRecipeKcal (порции «авторитетны»).
+ * Пороги — кулинарные нормы (ст.л. масла = 8-10 г, лимон = 30-60 г).
+ */
+const PORTION_CAPS: Array<{ test: RegExp; cap: number }> = [
+  { test: /(^|_)(olive_oil|coconut_oil|flaxseed_oil)$|^(oil_|butter_)/, cap: 15 },
+  { test: /^(citrus|lemon|lime)$/, cap: 60 },
+  { test: /^(sauce_|mayonnaise|mayo_|ketchup|sour_cream)/, cap: 30 },
+  { test: /^(spice_|herb_|seed_cumin|seed_coriander)/, cap: 10 },
+];
+
+function sanitizeRecipePortions(r: Recipe): Recipe {
+  if (!r.portions || Object.keys(r.portions).length === 0) return r;
+  let changed = false;
+  const portions: Record<string, number> = { ...r.portions };
+  let ingredientIds: string[] | undefined;
+  // Эпик D2: рецепты пишут «хлопья 45-130 г» (СУХАЯ мера), а id 'oats' — варёная овсянка
+  // (71 ккал/100). Разбор занижал калорийность ×5 → normalize «легализовал» ошибки.
+  // Порция oats ≤150 г = сухая мера → ремап на oats_dry (367 ккал/100).
+  if (portions['oats'] !== undefined && portions['oats'] > 0 && portions['oats'] <= 150) {
+    portions['oats_dry'] = portions['oats'];
+    delete portions['oats'];
+    if (Array.isArray(r.ingredientIds)) {
+      ingredientIds = r.ingredientIds.map(id => id === 'oats' ? 'oats_dry' : id);
+    }
+    changed = true;
+  }
+  for (const [fid, g] of Object.entries(portions)) {
+    for (const { test, cap } of PORTION_CAPS) {
+      if (test.test(fid) && g > cap) {
+        portions[fid] = cap;
+        changed = true;
+        break;
+      }
+    }
+  }
+  if (!changed) return r;
+  return { ...r, portions, ...(ingredientIds ? { ingredientIds } : {}) } as Recipe;
+}
+
 export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P1,
   ...RECIPE_DB_P2,
@@ -122,4 +166,5 @@ export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P29,
   ...RECIPE_DB_P30,
   ...RECIPE_DB_P31,
-]).map(normalizeRecipeKcal);
+  ...RECIPE_DB_P32,
+]).map(sanitizeRecipePortions).map(normalizeRecipeKcal);

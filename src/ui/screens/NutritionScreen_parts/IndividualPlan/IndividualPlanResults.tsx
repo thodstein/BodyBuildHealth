@@ -380,8 +380,20 @@ export const IndividualPlanResults: React.FC = () => {
             {DAY_LABELS.map((label, idx) => {
               const isTrain = trainingDays[idx];
               const isSelected = planDays === 1 && selectedDayIndex === idx;
+              // Эпик E3: клик по дню = ПРОСМОТР существующего дня (из недели — без регенерации,
+              // иначе правки недели уничтожались); генерируем только если дня ещё нет.
+              const openDay = () => {
+                setPlanDays(1); setSelectedDayIndex(idx);
+                const weekDay = weekPlan?.days?.[idx];
+                const threeDay = planDays === 3 ? threeDayPlan?.days?.[idx] : null;
+                if (weekDay) { openWeekDayForEdit(idx); }
+                else if (threeDay) {
+                  try { setDayPlan(JSON.parse(JSON.stringify(threeDay))); } catch { setDayPlan(threeDay); }
+                }
+                else { generatePlan(1, undefined, idx); }
+              };
               return (
-                <button key={idx} onClick={() => { setPlanDays(1); setSelectedDayIndex(idx); generatePlan(1, undefined, idx); }} style={{
+                <button key={idx} onClick={openDay} style={{
                   display:'flex', flexDirection:'column', alignItems:'center', gap:4,
                   padding:'9px 4px 8px', borderRadius:14, cursor:'pointer', minHeight: 56, position:'relative', overflow:'hidden',
                   background: isSelected ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 52%, #00b894 100%)' : isTrain ? 'linear-gradient(180deg, rgba(34,197,94,0.16), rgba(34,197,94,0.06))' : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))',
