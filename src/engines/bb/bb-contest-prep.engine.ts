@@ -956,6 +956,25 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
   return days;
 }
 
+/** PRO spill риск: оценивает залив (carb >10г/кг + вода stable + light). */
+export function spillRiskScore(cfg: BBContestPrepConfig): { level: 'low'|'medium'|'high'; note: string } {
+  const profile = CATEGORY_PROFILES[cfg.category];
+  if (!profile) return { level:'low', note:'' };
+  const gap = cfg.bodyFatPct != null ? cfg.bodyFatPct - profile.targetBodyFatPct : 0;
+  const canonWater = canonicalWaterStrategy(cfg.waterStrategy);
+  const budgetMax = profile.carbTotalBudgetGPerKg[1];
+  const isHighBudget = budgetMax >= 9;
+  const isLight = profile.light;
+  if (gap > 3 && isHighBudget && canonWater === 'stable' && (cfg.carbLoadStrategy==='back' || cfg.carbLoadStrategy==='front')) {
+    return { level:'high', note:`Залив high: BF +${gap.toFixed(1)}% к цели + бюджет ${budgetMax}г/кг + ${cfg.carbLoadStrategy} → берите moderate/linear и trial.` };
+  }
+  if (gap > 2 && isLight) return { level:'medium', note:`Залив medium: BF +${gap.toFixed(1)}% + light категория → moderate/linear, stable вода.` };
+  return { level:'low', note:'Риск залива низкий.' };
+}
+
+/** Short cycle flag 4-6 нед → другой каскад (linear без final_preparation). */
+export function isShortCycle(totalWeeks: number): boolean { return totalWeeks>=4 && totalWeeks<=6; }
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Таймлайн дня шоу
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2133,13 +2152,20 @@ export function deserializeBBContestPrepPlan(str: string | null | undefined): BB
     weeksOut: Number.isInteger(Number(tp?.weeks)) ? clamp(Number(tp?.weeks), 1, 4) : 3,
     trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate',
-    waterStrategy: pk?.waterMode === 'moderate' ? 'moderate' : 'minimal',
-    sodiumStrategy: pk?.sodiumMode === 'moderate' ? 'cut_2d' : 'constant',
+    waterStrategy: pk?.waterMode === 'moderate' ? 'tapered' : pk?.waterMode === 'stable' ? 'stable' : 'stable',
+    sodiumStrategy: pk?.sodiumMode === 'moderate' ? 'tapered' : pk?.sodiumMode === 'stable' ? 'stable' : 'stable',
     contraindications: Array.isArray(sf?.contraindications) ? sf.contraindications.filter((x): x is string => typeof x === 'string') : undefined,
   };
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return null;
-  return p as unknown as BBContestPrepPlan;
+  // v1 -> v2 migration: bump version, keep data, mark migrated
+  const plan = p as unknown as BBContestPrepPlan;
+  if (plan.version === 1) {
+    plan.version = 2;
+    plan.algorithmVersion = 2;
+    (plan as any).migratedFromV1 = true;
+  }
+  return plan;
 }
 
 /**
@@ -2245,10 +2271,12 @@ export function nutritionTargetsForPrepDate(
   const proteinG = Math.round(w * clamp(profile?.proteinGPerKg ?? 2.2, 1.8, 2.8));
   const fatFloor = prepFatFloorGPerKg(plan.sex);
   const fatG = Math.max(isFemale ? 40 : 30, Math.round(w * fatFloor));
-  // Ступенчатая коррекция калорий по фазе: финальная подготовка −2-3%, тапер — поддержание.
+  // Ступенчатая коррекция калорий по фазе: финальная подготовка −2-3%, тапер — поддержание + posing TDEE.
   const phaseMult = phase.key === 'final_preparation' ? 0.97 : phase.key === 'taper' ? 1.0 : 1.0;
+  // PRO TDEE: позирование 3ккал/мин + шаги 0.04ккал/шаг (20мин позинг ≈60ккал, 8000 шагов ≈320ккал)
+  const posingExtra = phase.key === 'taper' ? 60 : phase.key === 'final_preparation' ? 30 : 0;
   // Женский калорийный пол выше (RED-S / энергетическая доступность): минимум 1400 ккал.
-  const kcal = Math.max(isFemale ? 1400 : 1200, Math.round(plan.preparation.currentCalories * phaseMult));
+  const kcal = Math.max(isFemale ? 1400 : 1200, Math.round(plan.preparation.currentCalories * phaseMult + posingExtra));
   const carbsG = Math.max(50, Math.round((kcal - proteinG * 4 - fatG * 9) / 4));
   const basePhaseNote = phase.key === 'taper'
     ? 'Объём снижается, калории стабильны — усталость падает, катаболизм не нужен.'
@@ -2693,6 +2721,9 @@ ${plan.phases.map(p => `<tr><td><b>${escHtml(p.label)}</b></td><td>${p.key === '
 <table><tr><th>Неделя</th><th>Объём</th><th>Интенсивность (вес)</th><th>RIR</th></tr>
 ${plan.taper.volumeProfile.map((v, i) => `<tr><td>${plan.taper.weeks - i}</td><td>${Math.round(v * 100)}%</td><td>${Math.round(plan.taper.intensityProfile[i] * 100)}%</td><td>${plan.taper.rirProfile[i]?.[0]}–${plan.taper.rirProfile[i]?.[1]}</td></tr>`).join('')}
 </table>
+
+<h2>💧 Carb Budget & SGLT1 (PRO)</h2>
+<div class="muted">Бюджет загрузки: ${(() => { const loads=peakWeek.filter(d=>d.phase.startsWith('load')); const total=loads.reduce((a,d)=>a+d.carbsG,0); const perKg=(total/plan.preparation.startingWeightKg).toFixed(1); const dist=loads.map(d=>d.carbsG).join('/'); return `total ${total}г (${perKg}г/кг) — распределение ${dist}г`; })()} · SGLT1: натрий держать stable до D-1, иначе карбы не всосутся. Гликоген тащит 2.7-3г воды/г. FODMAP low: рис/хлебцы/картофель/мёд/джем — без бобовых/лука/капусты.</div>
 
 <h2>🍚 Пик-неделя (по дням)</h2>
 <table><tr><th>День</th><th>Фаза</th><th>Ккал</th><th>Б/У/Ж</th><th>💧 Вода</th><th>Na мг</th><th>🏋️ Тренировка</th><th>🎭 Позы</th></tr>
