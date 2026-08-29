@@ -1,6 +1,8 @@
 /**
  * combat-loading.ts — зальная нагрузка для единоборств (изолировано).
+ * reps/rir — deprecated, делегируют в combat-periodization
  */
+import { repsForCombatPhase, rirForCombatPhase } from './combat-periodization.engine';
 export type DayCharacter = 'тяж' | 'памп' | 'лёг';
 export interface LoadingOut { reps: [number, number]; rir: number; tempo: string; rest: number; }
 
@@ -26,18 +28,12 @@ export function restForCB(isPrimary: boolean, character: DayCharacter, exId?: st
   if (exId && ['farmer_carry','suitcase_carry','sled_push','sled_pull'].includes(exId)) return 90;
   return isPrimary && character==='тяж' ? 150 : 75;
 }
+/** @deprecated — используйте repsForCombatPhase из combat-periodization */
 export function repsForCB(goal: string, character: DayCharacter): [number, number] {
-  if (goal==='power' || goal==='camp') return character==='тяж' ? [3,6] : [8,12];
-  if (goal==='endurance') return character==='тяж' ? [6,10] : [12,20];
-  if (goal==='weight_cut') return character==='тяж' ? [5,8] : [10,15];
-  if (goal==='maintenance') return character==='тяж' ? [5,8] : [10,15];
-  return [5,8];
+  const ph = goal === 'weight_cut' ? 'gpp' as const : goal === 'endurance' ? 'accumulation' as const : 'power' as const;
+  return repsForCombatPhase(ph as any, character, goal);
 }
+/** @deprecated — используйте rirForCombatPhase */
 export function rirForCB(goal: string, phase: string, character: DayCharacter): number {
-  if (goal==='weight_cut') return 4;
-  if (goal==='maintenance') return 3;
-  if (phase==='deload' || phase==='taper') return 4;
-  if (phase==='gpp') return character==='тяж' ? 2 : 3;
-  if (phase==='power') return character==='тяж' ? 2 : 3;
-  return 2;
+  return rirForCombatPhase(phase as any, character, goal);
 }

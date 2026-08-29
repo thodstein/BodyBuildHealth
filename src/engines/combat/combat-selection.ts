@@ -69,7 +69,6 @@ export function tierForCB(id: string): 1|2|3|4 { return CB_TIER[id] ?? 2; }
 export function filterByTierCB(pool: string[], level: string, hasCable?: boolean, allowExotic?: boolean, hasSled?: boolean): string[] {
   let out = [...pool];
   const allowT4 = allowExotic || level === 'advanced' || level === 'enhanced';
-  const allowT3 = level !== 'beginner';
   if (level === 'beginner') {
     out = out.filter(id => {
       const t = tierForCB(id);
@@ -77,16 +76,11 @@ export function filterByTierCB(pool: string[], level: string, hasCable?: boolean
       if (t === 3) return ['box_jump','broad_jump','kb_swing'].includes(id); // только безопасный плио
       return true;
     });
-  } else if (level === 'intermediate') {
-    out = out.filter(id => {
-      const t = tierForCB(id);
-      if (t === 4 && !allowT4) return !['neck_bridge_wrestler','depth_jump'].includes(id) ? true : false;
-      // intermediate без depth_jump/neck_bridge по умолчанию
-      return !['neck_bridge_wrestler','depth_jump'].includes(id);
-    });
+  } else {
+    // intermediate/advanced: tier4 только если allowT4, при этом intermediate без exotic — без neck_bridge/depth_jump
+    if (!allowT4) out = out.filter(id => tierForCB(id) !== 4);
+    else if (level === 'intermediate' && !allowExotic) out = out.filter(id => !['neck_bridge_wrestler','depth_jump'].includes(id));
   }
-  if (!allowT4) out = out.filter(id => tierForCB(id) !== 4);
-  else if (level === 'intermediate' && !allowExotic) out = out.filter(id => !['neck_bridge_wrestler','depth_jump'].includes(id));
   if (hasCable === false) out = out.filter(id => !['pallof_rotation_press','band_external_rotation','band_pull_apart'].includes(id));
   // санки требуют sled/другое, не кабель — если hasSled не передан, считаем что есть (совместимость)
   const sledAllowed = hasSled ?? true;
@@ -115,6 +109,34 @@ export function filterByInjuryCB(pool: string[], injuries: any[] | undefined): s
   return out;
 }
 
+export function ensureStrictCombatCoverage(pool: string[], chosen: string[], count: number, favorite: Set<string>): string[] {
+  const out = [...chosen];
+  for (const [g, ids] of Object.entries(CB_STRICT_GROUPS)) {
+    const poolHas = pool.some(id => ids.includes(id));
+    if (!poolHas) continue;
+    const chosenHas = out.some(id => ids.includes(id));
+    if (chosenHas) continue;
+    // нужен представитель группы — найти лучший в пуле (favorite first)
+    const cand = [...pool].sort((a, b) => (favorite.has(b) ? 1 : 0) - (favorite.has(a) ? 1 : 0)).find(id => ids.includes(id) && !out.includes(id));
+    if (!cand) continue;
+    // заменить самый низкий приоритет (последний) но не трогать уже покрытые группы если out < count
+    if (out.length < count) out.push(cand);
+    else {
+      // найдем заменяемый: последний не из критической группы, или просто последний
+      let replaceIdx = out.length - 1;
+      // не трогать если out[replaceIdx] единственный представитель своей группы
+      for (let i = out.length - 1; i >= 0; i--) {
+        const gr = cbStrictGroupFor(out[i]);
+        if (!gr) { replaceIdx = i; break; }
+        const cnt = out.filter(x => cbStrictGroupFor(x) === gr).length;
+        if (cnt > 1) { replaceIdx = i; break; }
+      }
+      out[replaceIdx] = cand;
+    }
+  }
+  return out.slice(0, count);
+}
+
 export function selectDiverseCB(pool: string[], tag: string, count: number, favorite: Set<string>): string[] {
   const classes = CB_ANGLE_CLASSES[tag];
   if (!classes) return pool.slice(0,count);
@@ -126,5 +148,7 @@ export function selectDiverseCB(pool: string[], tag: string, count: number, favo
     if (cand) chosen.push(cand);
   }
   for (const id of favFirst) { if (chosen.length>=count) break; if (!chosen.includes(id)) chosen.push(id); }
-  return chosen.slice(0,count);
+  // строгое покрытие — гарантируем представителя каждой доступной STRICT группы
+  const ensured = ensureStrictCombatCoverage(pool, chosen, count, favorite);
+  return ensured.slice(0,count);
 }

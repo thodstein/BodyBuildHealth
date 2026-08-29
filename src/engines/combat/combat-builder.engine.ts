@@ -166,7 +166,7 @@ function getExerciseMeta(id: string): { name: string; group: string; pattern: st
   return { ...m, technique: CB_TECHNIQUE[id] };
 }
 
-const COMBAT_FALLBACK: Record<string,string> = { pallof_rotation_press:'landmine_rotation', neck_bridge_wrestler:'neck_harness_ext', wrist_roller:'plate_pinch', gi_grip_pullup:'pullup', towel_pullup:'pullup', rope_climb:'pullup', fat_bar_row:'row_bar', landmine_press:'ohp', med_ball_rot_throw:'med_ball_throw', sledge_hammer:'landmine_rotation', battle_rope:'kb_swing', sled_push:'squat', sled_pull:'row_bar', nordic_curl:'rdl', glute_ham_raise:'rdl', trap_bar_dead:'deadlift' };
+const COMBAT_FALLBACK: Record<string,string> = { pallof_rotation_press:'landmine_rotation', neck_bridge_wrestler:'neck_harness_ext', wrist_roller:'plate_pinch', gi_grip_pullup:'pullup', towel_pullup:'pullup', rope_climb:'pullup', fat_bar_row:'row_bar', landmine_press:'ohp', med_ball_rot_throw:'med_ball_throw', sledge_hammer:'landmine_rotation', battle_rope:'kb_swing', sled_push:'squat', sled_pull:'row_bar', nordic_curl:'rdl', glute_ham_raise:'rdl', trap_bar_dead:'squat' };
 function filterPool(ids: string[], input: CombatInput): string[] {
   let out = [...ids];
   if (input.excludedExercises?.length) {
@@ -444,7 +444,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
 
   // conditioning (отдельно от зала, не ломает сессии)
   let conditioningPlan: any = null;
-  if ((input as any).conditioningMode !== 'off') {
+  if (input.conditioningMode !== 'off') {
     const sessionsPerWeek = weeksData.map(wk => conditioningSessionsForWeek(wk.week, wk.phase as any, goal, outsideSessions));
     conditioningPlan = { weeks, sessions: sessionsPerWeek };
   }
@@ -462,6 +462,38 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     rationale.push(...intRationale);
   }
 
+  // бюджет enforcement: если недельный объём > бюджета, режем accessory до floor 2
+  for (const wk of weeksData) {
+    let total = wk.totalSets || 0;
+    if (total > weeklyBudget) {
+      // собираем все упражнения недели, сортируем: accessory first, затем по убыванию sets
+      const allEx: Array<{ sess: CombatSession; ex: CombatExercise }> = [];
+      for (const sess of wk.sessions) for (const ex of sess.exercises) allEx.push({ sess, ex });
+      allEx.sort((a, b) => {
+        if (a.ex.role !== b.ex.role) return a.ex.role === 'accessory' ? -1 : 1;
+        return b.ex.sets - a.ex.sets;
+      });
+      let idx = 0;
+      while (total > weeklyBudget && idx < allEx.length * 3) {
+        const cur = allEx[idx % allEx.length];
+        if (cur.ex.sets > 2) {
+          cur.ex.sets -= 1;
+          cur.ex.workSets = cur.ex.workSets.slice(0, cur.ex.sets);
+          if (cur.ex.workSets.length < cur.ex.sets) {
+            while (cur.ex.workSets.length < cur.ex.sets) cur.ex.workSets.push({ reps: 5, rir: 2, weight: cur.ex.weight } as any);
+          }
+          total -= 1;
+          wk.totalSets = total;
+        }
+        idx++;
+        // защита от бесконечности
+        if (idx > 100) break;
+      }
+      // пересчёт тоннажа после обрезки
+      wk.totalTonnage = wk.sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + e.workSets.reduce((x, ws) => x + ws.weight * ws.reps, 0), 0), 0);
+    }
+  }
+
   const warnings: string[] = [];
   const errors: string[] = [];
   if (outsideMetrics && outsideMetrics.weeklyLoad > 1500 && pattern.sessionsPerRotation >= 4) {
@@ -473,7 +505,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   // проверка шеи: группа neck или id содержит neck
   const hasNeck = weeksData.some(w => w.sessions.some(s => s.exercises.some(e => e.group === 'neck' || e.id.includes('neck'))));
   if (!hasNeck) warnings.push('Шея не покрыта ни в одной сессии — добавьте neck_harness.');
-  // бюджет
+  // бюджет warning (после enforcement — если всё ещё over, предупредить)
   for (const wk of weeksData) {
     if ((wk.totalSets || 0) > weeklyBudget) {
       warnings.push(`Нед ${wk.week}: ${wk.totalSets} сетов > бюджета ${weeklyBudget}.`);

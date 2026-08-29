@@ -12,20 +12,38 @@ function clamp(n: number, min: number, max: number): number { return Math.max(mi
 
 // ATR: для totalWeeks >=8 — 50%/30%/20% (5/3/2 на 10нед)
 // для <8 — линейная 40%/40%/20% с делодом 3/1
+// Использует метод наибольшего остатка для точного распределения целых недель
+function largestRemainder(total: number, ratios: number[]): number[] {
+  const exact = ratios.map(r => total * r);
+  const floors = exact.map(v => Math.floor(v));
+  let remainder = total - floors.reduce((a, b) => a + b, 0);
+  const fractions = exact.map((v, i) => ({ i, frac: v - floors[i] })).sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < fractions.length && remainder > 0; k++) {
+    floors[fractions[k].i] += 1;
+    remainder--;
+  }
+  // гарантия минимум 1 для real (последний)
+  if (floors[floors.length - 1] < 1) {
+    // забрать у максимального
+    const maxIdx = floors.indexOf(Math.max(...floors.slice(0, -1)));
+    if (maxIdx >= 0 && floors[maxIdx] > 1) {
+      floors[maxIdx] -= 1;
+      floors[floors.length - 1] = 1;
+    }
+  }
+  return floors;
+}
 function atrBounds(totalWeeks: number): { accum: number; trans: number; real: number } {
   if (totalWeeks >= 9) {
-    const accum = Math.round(totalWeeks * 0.5);
-    const trans = Math.round(totalWeeks * 0.3);
-    const real = totalWeeks - accum - trans;
+    const [accum, trans, real] = largestRemainder(totalWeeks, [0.5, 0.3, 0.2]);
     return { accum, trans, real: Math.max(1, real) };
   }
   if (totalWeeks >= 6) {
-    const accum = Math.round(totalWeeks * 0.4);
-    const trans = Math.round(totalWeeks * 0.4);
-    const real = totalWeeks - accum - trans;
+    const [accum, trans, real] = largestRemainder(totalWeeks, [0.4, 0.4, 0.2]);
     return { accum, trans, real: Math.max(1, real) };
   }
-  return { accum: Math.round(totalWeeks * 0.5), trans: 0, real: totalWeeks - Math.round(totalWeeks * 0.5) };
+  const accum = Math.round(totalWeeks * 0.5);
+  return { accum, trans: 0, real: Math.max(1, totalWeeks - accum) };
 }
 
 export function isDeloadWeekATR(week: number, totalWeeks: number, model: CombatPeriodizationModel, goal: string): boolean {
