@@ -11,7 +11,8 @@ const CLASS_LABELS: Record<string, string> = {
   boldenone: 'Болденон', primobolan: 'Примоболан', oral_17aa: 'Оральные 17-α',
   sarm: 'SARM', peptide_ghrh: 'GHRH', peptide_ghrp: 'GHRP',
   igf1: 'IGF-1', mgf: 'МГФ', insulin: 'Инсулин',
-  drostanolone: 'Дростанолон',
+  drostanolone: 'Дростанолон', dht_inject: 'DHT-инъекционные',
+  dht_derivative: 'DHT-производные',
   peptide_gnrh: 'GnRH', peptide_fat_loss: 'Жиросжигающие', peptide_other: 'Прочие',
 };
 
@@ -20,13 +21,13 @@ const CLASS_COLORS: Record<string, string> = {
   boldenone: '#a855f7', primobolan: '#06b6d4', oral_17aa: '#f97316',
   sarm: '#8b5cf6', peptide_ghrh: '#14b8a6', peptide_ghrp: '#14b8a6',
   igf1: '#ec4899', mgf: '#ec4899', insulin: '#f59e0b',
-  drostanolone: '#f97316',
+  drostanolone: '#f97316', dht_inject: '#ec4899', dht_derivative: '#6366f1',
   peptide_gnrh: '#14b8a6', peptide_fat_loss: '#f97316', peptide_other: '#6b7280',
 };
 
 const CLASS_ICONS: Record<string, string> = {
   testosterone: '💉', trenbolone: '💉', nandrolone: '💉', boldenone: '💉',
-  primobolan: '💉', drostanolone: '💉', oral_17aa: '💊', sarm: '🧬',
+  primobolan: '💉', drostanolone: '💉', dht_inject: '💉', dht_derivative: '💊', oral_17aa: '💊', sarm: '🧬',
   peptide_ghrh: '🧪', peptide_ghrp: '🧪', peptide_gnrh: '🧪',
   peptide_fat_loss: '🧪', peptide_other: '🧪', igf1: '🔬', mgf: '🔬', insulin: '🩸',
 };
