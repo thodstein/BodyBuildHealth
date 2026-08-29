@@ -4166,6 +4166,104 @@ export const BbAutoConstructor: React.FC = () => {
           </button>
         </div>
         <div style={{ display: qualityOpen ? 'block' : 'none' }}>
+                {/* 🧠 Логика построения плана (только нужное) */}
+        {(() => {
+          const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
+          const goalRu: Record<string,string> = { mass:'масса', cut:'сушка', recomp:'рекомпозиция', maintenance:'поддержание', strength_mass:'сила+масса', strength:'сила' };
+          const focusRu: Record<string,string> = { hypertrophy:'гипертрофия', strength:'сила', endurance:'выносливость' };
+          const methRu: Record<string,string> = { compound_first:'база → изоляция', pre_exhaust:'предутомление', post_exhaust:'пост-утомление', antagonistic:'антагонисты', giant_sets:'гигант-сеты' };
+          const volRu: Record<string,string> = { mev:'минимум (MEV)', mav:'оптимум (MAV)', mrv:'максимум (MRV)' };
+          const stratRu: Record<string,string> = { double_progression:'двойная', linear:'линейная', wave:'волновая', rpe_based:'RPE-регуляция', undulating:'волновая', block:'блочная' };
+          const totalW = builtPlan.weeks.length;
+          const phaseGroups: Record<string, number[]> = {};
+          for (const w of builtPlan.weeks) { const p = ((w as any).phase || 'accumulation') as string; if (!phaseGroups[p]) phaseGroups[p]=[]; phaseGroups[p].push(w.week); }
+          const phaseRu: Record<string,string> = { accumulation:'накопление', intensification:'интенсификация', deload:'разгрузка', peaking:'пик' };
+          const phaseText = Object.entries(phaseGroups).map(([p,ws])=> `${phaseRu[p]||p} ${ws.length} нед`).join(' · ');
+          const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
+          const scoreText = sel ? `${sel.score}/${Math.max(...ranked.map(r=>r.score),1)}` : '—';
+          const topAlt = ranked.slice(0,3).map(r=> `${r.pattern.name} ${r.score}`).join(' · ');
+          const injText = injuries.length ? injuries.map(i=> `${i.muscle}${i.exclude?' (искл.)':' (щадящ.)'}`).join(', ') : 'нет';
+          const mobText = mobilityRestrictions.length ? mobilityRestrictions.join(', ') : 'нет';
+          const equipText = bbEquipment.length ? bbEquipment.slice(0,4).join(', ') : 'всё доступно';
+          const specText = specTargets.length ? specTargets.join(' + ') : 'баланс';
+          const pedMult = (pedAdapt as any).combinedMrvMultiplier ?? 1;
+          const pedLabel = pedMult>1 ? `MRV ×${Number(pedMult).toFixed(2)} · ${peds.join(', ')||'курс'}` : 'натурал';
+          return <CollapsibleCard title="🧠 Логика построения плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }}><div style={{ ...CARD, marginTop:8, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.38)' }}>
+              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(59,130,246,0.05))', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'none' }}>
+                <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>🧠 Логика построения плана</div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>Только ключевые решения — почему план именно такой для ваших параметров</div>
+              </div>
+              <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
+                {/* 1 вход */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase' }}>1 · Вход и цель</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    {[
+                      `уровень: ${levelRu[bbLevel]||bbLevel} (${bbTrainingYears} г)`,
+                      `цель: ${goalRu[bbGoal]||bbGoal}`,
+                      `фокус: ${focusRu[bbTrainingFocus]||bbTrainingFocus}`,
+                      `методика: ${methRu[bbMethodology]||bbMethodology}`,
+                      `объём: ${volRu[bbVolGoal]||bbVolGoal}${trainingVolumeMode==='high'?' · объёмный режим':''}`,
+                      `прогрессия: ${stratRu[loadStrategy]||loadStrategy} · RIR ${(getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir ?? '2–3'}→${(getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir ?? '1–2'}`,
+                    ].map((t,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>{t}</span>)}
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>
+                    Уровень задаёт капы подходов/упражнений и доступ к сложным техникам · цель меняет фазовый профиль (масса — больше накопления, сушка — ниже объём) · фокус меняет RIR/повторы/темп · методика — порядок упражнений в сессии.
+                  </div>
+                </div>
+                {/* 2 сплит */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#a78bfa', letterSpacing:0.3, textTransform:'uppercase' }}>2 · Сплит — почему выбран</div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', padding:'4px 8px', borderRadius:8 }}>{builtPlan.pattern?.name || '—'} · {bbDays}×/нед · {totalW} нед</span>
+                    <span style={{ fontSize:11, fontWeight:700, color: (sel ? (Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.8 ? '#22c55e' : Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.6 ? '#f59e0b' : '#ef4444') : '#fff') }}>скор {scoreText}</span>
+                  </div>
+                  {sel && <div style={{ fontSize:10, color:'#fff', opacity:0.78, lineHeight:1.35 }}><b>Подходит из-за:</b> {sel.rationale.slice(0,2).join(' · ') || 'баланс по дням и уровню'}</div>}
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.62, lineHeight:1.35 }}>Альтернативы топ-3: {topAlt || '—'} · слабые: {weakPoints.join(', ')||'баланс'} · специализация: {specText}</div>
+                  {sel?.warnings?.length ? <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ {sel.warnings.slice(0,2).join(' · ')}</div> : null}
+                </div>
+                {/* 3 периодизация */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', letterSpacing:0.3, textTransform:'uppercase' }}>3 · Периодизация — как меняется нагрузка</div>
+                  <div style={{ display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                    {builtPlan.weeks.map(w=>{ const p = ((w as any).phase || 'accumulation') as BBPhase; return <div key={w.week} title={`Нед ${w.week}: ${phaseRu[p]||p}`} style={{ flex:1, background: PHASE_COLORS[p]||'#fff', opacity:0.9 }} />; })}
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}><b>Фазы:</b> {phaseText} · <b>RIR:</b> накопление {String((getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir || '2–3')} → интенсификация {String((getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir || '1–2')} · <b>темп:</b> {getPhaseConfig('accumulation', bbTrainingFocus as any).tempo} → {getPhaseConfig('intensification', bbTrainingFocus as any).tempo}</div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.62 }}>Прогрессия весов: {stratRu[loadStrategy]||loadStrategy} · делод: {DELOAD_PROTOCOLS[deloadType]?.description || deloadType} · DUP {dupMode} · суперсеты {supersetMode} · схемы {volumeScheme}</div>
+                </div>
+                {/* 4 объём-стратегия (кратко) */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', letterSpacing:0.3, textTransform:'uppercase' }}>4 · Объём и восстановление — стратегия</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    <span style={{ fontSize:10, color:'#fff', background: pedMult>1?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', border:`1px solid ${pedMult>1?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)'}`, padding:'3px 7px', borderRadius:20 }}>{pedLabel}</span>
+                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>лимиты {builtPlan.maxWorkingSets} сетов / {builtPlan.maxExercises} упр. · режим {sessionLimitsFor({onCourse: pedMult>1, level: bbLevel, trainingYears: bbTrainingYears, trainingVolumeMode} as any).weeklyWorkingSets} в неделю</span>
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>Детализация по мышцам — в карточке «Тренировочный объём» ниже: там прямой/косвенный, недельный и общий, подмышцы и статус MEV/MAV/MRV.</div>
+                </div>
+                {/* 5 приоритеты */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#ec4899', letterSpacing:0.3, textTransform:'uppercase' }}>5 · Приоритеты</div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.45 }}>
+                    <div><b>Слабые:</b> {weakPoints.length? weakPoints.join(' · ') : 'баланс — без акцента'}</div>
+                    <div><b>Специализация:</b> {specText}{specTargets.length? ` · блоки: ${specTargets.length} (по ${Math.round(bbWeeks/Math.max(1,specTargets.length))} нед)` : ''}</div>
+                    {builtPlan.rationale?.some((r:string)=> /специализ|донор/i.test(r)) && <div style={{ opacity:0.75, marginTop:2 }}>Донорское перераспределение сохраняет косвенную нагрузку до MEV — прямой объём донора снижается, целевой растёт.</div>}
+                  </div>
+                </div>
+                {/* 6 безопасность */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#ef4444', letterSpacing:0.3, textTransform:'uppercase' }}>6 · Безопасность</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    <span style={{ fontSize:10, color:'#fff', background: injuries.length?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', border:`1px solid ${injuries.length?'rgba(239,68,68,0.18)':'rgba(34,197,94,0.16)'}`, padding:'3px 7px', borderRadius:20 }}>травмы: {injText}</span>
+                    <span style={{ fontSize:10, color:'#fff', background: mobilityRestrictions.length?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>мобильность: {mobText}</span>
+                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>оборудование: {equipText}</span>
+                    {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
+                    {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
+                  </div>
+                </div>
+              </div>
+            </div></CollapsibleCard>
+          ;
+        })()}
         <CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`${quality.score}/100 ${quality.label}`}>
           <div style={{ display:'grid', gap:8, fontSize:11 }}>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
@@ -4515,104 +4613,6 @@ export const BbAutoConstructor: React.FC = () => {
           )}
         </div>
         </CollapsibleCard>
-                {/* 🧠 Логика построения — PRO (только нужное) */}
-        {(() => {
-          const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
-          const goalRu: Record<string,string> = { mass:'масса', cut:'сушка', recomp:'рекомпозиция', maintenance:'поддержание', strength_mass:'сила+масса', strength:'сила' };
-          const focusRu: Record<string,string> = { hypertrophy:'гипертрофия', strength:'сила', endurance:'выносливость' };
-          const methRu: Record<string,string> = { compound_first:'база → изоляция', pre_exhaust:'предутомление', post_exhaust:'пост-утомление', antagonistic:'антагонисты', giant_sets:'гигант-сеты' };
-          const volRu: Record<string,string> = { mev:'минимум (MEV)', mav:'оптимум (MAV)', mrv:'максимум (MRV)' };
-          const stratRu: Record<string,string> = { double_progression:'двойная', linear:'линейная', wave:'волновая', rpe_based:'RPE-регуляция', undulating:'волновая', block:'блочная' };
-          const totalW = builtPlan.weeks.length;
-          const phaseGroups: Record<string, number[]> = {};
-          for (const w of builtPlan.weeks) { const p = ((w as any).phase || 'accumulation') as string; if (!phaseGroups[p]) phaseGroups[p]=[]; phaseGroups[p].push(w.week); }
-          const phaseRu: Record<string,string> = { accumulation:'накопление', intensification:'интенсификация', deload:'разгрузка', peaking:'пик' };
-          const phaseText = Object.entries(phaseGroups).map(([p,ws])=> `${phaseRu[p]||p} ${ws.length} нед`).join(' · ');
-          const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
-          const scoreText = sel ? `${sel.score}/${Math.max(...ranked.map(r=>r.score),1)}` : '—';
-          const topAlt = ranked.slice(0,3).map(r=> `${r.pattern.name} ${r.score}`).join(' · ');
-          const injText = injuries.length ? injuries.map(i=> `${i.muscle}${i.exclude?' (искл.)':' (щадящ.)'}`).join(', ') : 'нет';
-          const mobText = mobilityRestrictions.length ? mobilityRestrictions.join(', ') : 'нет';
-          const equipText = bbEquipment.length ? bbEquipment.slice(0,4).join(', ') : 'всё доступно';
-          const specText = specTargets.length ? specTargets.join(' + ') : 'баланс';
-          const pedMult = (pedAdapt as any).combinedMrvMultiplier ?? 1;
-          const pedLabel = pedMult>1 ? `MRV ×${Number(pedMult).toFixed(2)} · ${peds.join(', ')||'курс'}` : 'натурал';
-          return <CollapsibleCard title="🧠 Логика построения — PRO" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }}><div style={{ ...CARD, marginTop:8, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.38)' }}>
-              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(59,130,246,0.05))', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'none' }}>
-                <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>🧠 Логика построения — PRO</div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>Только ключевые решения — почему план именно такой для ваших параметров</div>
-              </div>
-              <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
-                {/* 1 вход */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase' }}>1 · Вход и цель</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    {[
-                      `уровень: ${levelRu[bbLevel]||bbLevel} (${bbTrainingYears} г)`,
-                      `цель: ${goalRu[bbGoal]||bbGoal}`,
-                      `фокус: ${focusRu[bbTrainingFocus]||bbTrainingFocus}`,
-                      `методика: ${methRu[bbMethodology]||bbMethodology}`,
-                      `объём: ${volRu[bbVolGoal]||bbVolGoal}${trainingVolumeMode==='high'?' · объёмный режим':''}`,
-                      `прогрессия: ${stratRu[loadStrategy]||loadStrategy} · RIR ${(getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir ?? '2–3'}→${(getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir ?? '1–2'}`,
-                    ].map((t,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>{t}</span>)}
-                  </div>
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>
-                    Уровень задаёт капы подходов/упражнений и доступ к сложным техникам · цель меняет фазовый профиль (масса — больше накопления, сушка — ниже объём) · фокус меняет RIR/повторы/темп · методика — порядок упражнений в сессии.
-                  </div>
-                </div>
-                {/* 2 сплит */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#a78bfa', letterSpacing:0.3, textTransform:'uppercase' }}>2 · Сплит — почему выбран</div>
-                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-                    <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', padding:'4px 8px', borderRadius:8 }}>{builtPlan.pattern?.name || '—'} · {bbDays}×/нед · {totalW} нед</span>
-                    <span style={{ fontSize:11, fontWeight:700, color: (sel ? (Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.8 ? '#22c55e' : Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.6 ? '#f59e0b' : '#ef4444') : '#fff') }}>скор {scoreText}</span>
-                  </div>
-                  {sel && <div style={{ fontSize:10, color:'#fff', opacity:0.78, lineHeight:1.35 }}><b>Подходит из-за:</b> {sel.rationale.slice(0,2).join(' · ') || 'баланс по дням и уровню'}</div>}
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.62, lineHeight:1.35 }}>Альтернативы топ-3: {topAlt || '—'} · слабые: {weakPoints.join(', ')||'баланс'} · специализация: {specText}</div>
-                  {sel?.warnings?.length ? <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ {sel.warnings.slice(0,2).join(' · ')}</div> : null}
-                </div>
-                {/* 3 периодизация */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', letterSpacing:0.3, textTransform:'uppercase' }}>3 · Периодизация — как меняется нагрузка</div>
-                  <div style={{ display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
-                    {builtPlan.weeks.map(w=>{ const p = ((w as any).phase || 'accumulation') as BBPhase; return <div key={w.week} title={`Нед ${w.week}: ${phaseRu[p]||p}`} style={{ flex:1, background: PHASE_COLORS[p]||'#fff', opacity:0.9 }} />; })}
-                  </div>
-                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}><b>Фазы:</b> {phaseText} · <b>RIR:</b> накопление {String((getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir || '2–3')} → интенсификация {String((getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir || '1–2')} · <b>темп:</b> {getPhaseConfig('accumulation', bbTrainingFocus as any).tempo} → {getPhaseConfig('intensification', bbTrainingFocus as any).tempo}</div>
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.62 }}>Прогрессия весов: {stratRu[loadStrategy]||loadStrategy} · делод: {DELOAD_PROTOCOLS[deloadType]?.description || deloadType} · DUP {dupMode} · суперсеты {supersetMode} · схемы {volumeScheme}</div>
-                </div>
-                {/* 4 объём-стратегия (кратко) */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', letterSpacing:0.3, textTransform:'uppercase' }}>4 · Объём и восстановление — стратегия</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    <span style={{ fontSize:10, color:'#fff', background: pedMult>1?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', border:`1px solid ${pedMult>1?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)'}`, padding:'3px 7px', borderRadius:20 }}>{pedLabel}</span>
-                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>лимиты {builtPlan.maxWorkingSets} сетов / {builtPlan.maxExercises} упр. · режим {sessionLimitsFor({onCourse: pedMult>1, level: bbLevel, trainingYears: bbTrainingYears, trainingVolumeMode} as any).weeklyWorkingSets} в неделю</span>
-                  </div>
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>Детализация по мышцам — в карточке «Тренировочный объём» ниже: там прямой/косвенный, недельный и общий, подмышцы и статус MEV/MAV/MRV.</div>
-                </div>
-                {/* 5 приоритеты */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#ec4899', letterSpacing:0.3, textTransform:'uppercase' }}>5 · Приоритеты</div>
-                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.45 }}>
-                    <div><b>Слабые:</b> {weakPoints.length? weakPoints.join(' · ') : 'баланс — без акцента'}</div>
-                    <div><b>Специализация:</b> {specText}{specTargets.length? ` · блоки: ${specTargets.length} (по ${Math.round(bbWeeks/Math.max(1,specTargets.length))} нед)` : ''}</div>
-                    {builtPlan.rationale?.some((r:string)=> /специализ|донор/i.test(r)) && <div style={{ opacity:0.75, marginTop:2 }}>Донорское перераспределение сохраняет косвенную нагрузку до MEV — прямой объём донора снижается, целевой растёт.</div>}
-                  </div>
-                </div>
-                {/* 6 безопасность */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#ef4444', letterSpacing:0.3, textTransform:'uppercase' }}>6 · Безопасность</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    <span style={{ fontSize:10, color:'#fff', background: injuries.length?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', border:`1px solid ${injuries.length?'rgba(239,68,68,0.18)':'rgba(34,197,94,0.16)'}`, padding:'3px 7px', borderRadius:20 }}>травмы: {injText}</span>
-                    <span style={{ fontSize:10, color:'#fff', background: mobilityRestrictions.length?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>мобильность: {mobText}</span>
-                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>оборудование: {equipText}</span>
-                    {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
-                    {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
-                  </div>
-                </div>
-              </div>
-            </div></CollapsibleCard>
-          ;
-        })()}
         {/* Прогноз по фазам — факт из плана */}
         {(() => {
           const peakWeek = W.reduce((best, w, i) => {
