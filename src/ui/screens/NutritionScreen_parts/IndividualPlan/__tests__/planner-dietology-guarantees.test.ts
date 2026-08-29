@@ -101,4 +101,43 @@ describe('F2: диетология бодибилдинга', () => {
     const corridor = plan.totals.kcal / 1000 * 14;
     expect(plan.totals.fiber).toBeGreaterThanOrEqual(corridor * 0.6);
   });
+
+  it('C3: лёгкая сессия <60 мин — отдельный шейк не строится, бюджет слит в ужин', () => {
+    const plan = buildDayPlan(train({ randomSalt: 2, trainDurationMin: 45, goalCarbsG: 400 }));
+    expect(plan.meals.some(m => m.type === 'postworkout'), 'пост-трен при 45-мин сессии должен быть слит с ужином').toBe(false);
+    expect(plan.notes.some(n => n.includes('слит с ужином'))).toBe(true);
+  });
+
+  it('C3: полная сессия ≥60 мин — пост-трен отдельным приёмом', () => {
+    const plan = buildDayPlan(train({ randomSalt: 2, trainDurationMin: 90 }));
+    expect(plan.meals.some(m => m.type === 'postworkout')).toBe(true);
+  });
+
+  it('C5: mpsSummary несёт по-приёмную разбивку + fiber-коридор', () => {
+    const plan = buildDayPlan(train({ randomSalt: 1 }));
+    const ms = plan.mpsSummary as any;
+    expect(Array.isArray(ms.meals)).toBe(true);
+    expect(ms.meals.length).toBeGreaterThan(0);
+    for (const mb of ms.meals) {
+      expect(typeof mb.label).toBe('string');
+      expect(typeof mb.proteinG).toBe('number');
+      expect(typeof mb.leucineG).toBe('number');
+    }
+    expect(ms.fiberG).toBeGreaterThanOrEqual(0);
+    expect(ms.fiberTargetG).toBeGreaterThanOrEqual(25);
+  });
+
+  it('B5: recentStapleFamilies ротирует гарниры между днями (rice вчера → сегодня другой при наличии)', () => {
+    const base = { weightKg: 90, lbmKg: 73.8, bodyFatPct: 18, sex: 'male' as const, goalKcal: 3200, goalProteinG: 190, goalFatG: 80, goalCarbsG: 400, mealsCount: 5, isTrainingDay: false, budget: 'medium' as const, cyclePhase: 'course' as const, variety: 'max' as const, eveningLowCarb: false };
+    // День 1: рис доминирует в углеводных слотах
+    const day1 = buildDayPlan({ ...base, dayOffset: 0, randomSalt: 7 } as any);
+    const riceDay1 = day1.meals.some(m => m.items.some(i => i.id === 'rice_white' || i.id === 'rice_brown' || i.id === 'rice_basmati'));
+    // День 2: рис в недавних семьях — мотор рисовых id должен упасть (не гарантия 0 —
+    // пул может быть мал, но выбор при ≥2 свежих альтернатив уходит от риса)
+    const day2 = buildDayPlan({ ...base, dayOffset: 1, randomSalt: 7, recentStapleFamilies: new Set(['rice']) } as any);
+    const riceCount2 = day2.meals.filter(m => m.items.some(i => /^rice/.test(i.id))).length;
+    if (riceDay1) {
+      expect(riceCount2, `день 2 при недавнем «rice»: рисовых слотов ${riceCount2}`).toBeLessThanOrEqual(1);
+    }
+  });
 });
