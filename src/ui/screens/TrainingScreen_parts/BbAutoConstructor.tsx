@@ -113,6 +113,46 @@ import { type BBMacrocycle } from '../../../engines/lms/macrocycle.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
 import { getWeightLog } from '../../../engines/profile-store';
 
+/* ── CollapsibleCard helper для шага 5 (заголовок-кнопка карточки) ── */
+const CollapsibleCard: React.FC<{
+  title: string;
+  defaultOpen?: boolean;
+  headerStyle?: React.CSSProperties;
+  badge?: string;
+  children: React.ReactNode;
+}> = ({ title, defaultOpen = false, headerStyle, badge, children }) => {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ ...CARD, padding: 0, overflow: 'hidden', marginTop: 8 }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '11px 12px',
+          cursor: 'pointer',
+          background: headerStyle?.background || 'linear-gradient(135deg, rgba(96,165,250,0.10), rgba(96,165,250,0.03))',
+          border: 'none',
+          borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none',
+          textAlign: 'left',
+          ...headerStyle,
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 800, color: headerStyle?.color || '#fff' }}>{title}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>{badge}</span>}
+          <span style={{ fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+        </span>
+      </button>
+      <div style={{ display: open ? 'block' : 'none', padding: '10px 12px' }}>{children}</div>
+    </div>
+  );
+};
+
 type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 type PlanMode = 'generic_split' | 'bb_cycle' | 'programs';
@@ -2216,7 +2256,7 @@ export const BbAutoConstructor: React.FC = () => {
   };
 
   const stepList: Step[] = planMode === 'programs' ? ['params','ped','plan','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','quality','adjust','contest','annual','tools'];
-  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'programs' ? '3 План' : '4 План', quality: planMode === 'programs' ? '4 Качество' : '5 Качество', adjust: planMode === 'programs' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'programs' ? '3 План' : '4 План', quality: planMode === 'programs' ? '4 Тренировочная нагрузка плана' : '5 Тренировочная нагрузка плана', adjust: planMode === 'programs' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
   const renderStepNav = () => {
     const groups: Record<string, string[]> = planMode === 'programs'
       ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
