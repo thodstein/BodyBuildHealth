@@ -105,7 +105,6 @@ import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feed
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
-import { WhatIfCard } from './WhatIfCard';
 import { MacrocyclePanel } from '../SRCBBScreen_parts/MacrocyclePanel';
 import { CardioLinkCard } from './CardioLinkCard';
 import { PlannerToolsPanel } from './PlannerToolsPanel';
@@ -4358,26 +4357,6 @@ export const BbAutoConstructor: React.FC = () => {
           })()}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-          {builtPlan.rotationReport && (
-            <ExpandableCard title="🔁 Ротация" icon="🔁" short={`${Object.keys(builtPlan.rotationReport.primaryByMuscle).length} групп`} full={
-              <div style={{ fontSize:10, color:'#fff' }}>{Object.entries(builtPlan.rotationReport.primaryByMuscle).slice(0,3).map(([m,names])=><div key={m}><b>{(MUSCLE_LABEL_RU as any)[m]||m}:</b> {(names as string[]).slice(0,2).join(', ')}</div>)}</div>
-            } />
-          )}
-          {builtPlan.fatigueReport && (
-            <ExpandableCard title="⚙️ Усталость" icon="⚙️" short={`${Math.round(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.timeSeconds,0)/60)} мин`} full={
-              <div style={{ fontSize:10, color:'#fff' }}>Системная {(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.systemic,0) || 0).toFixed(1)} · Осевая {(builtPlan.fatigueReport[0]?.sessions.reduce((s,ss)=>s+ss.axial,0) || 0).toFixed(1)}</div>
-            } />
-          )}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-          {builtPlan.report && (
-            <ExpandableCard title="📋 Отчёт" icon="📋" short={`${builtPlan.report.weeks}нед · ${builtPlan.report.peakWeek} пик`} full={
-              <div style={{ fontSize:10, color:'#fff', lineHeight:1.4 }}>
-                <div><b>Сплит:</b> {builtPlan.pattern.name} · <b>Объём:</b> {builtPlan.report.totalDirectSets} сетов</div>
-                <div><b>Фазы:</b> {Array.from(new Set(builtPlan.weeks.map((w:any)=>w.phase))).join(', ')}</div>
-              </div>
-            } />
-          )}
           {builtPlan.balanceReport && (
             <ExpandableCard title="⚖️ Баланс" icon="⚖️" short={`${builtPlan.balanceReport.press}ж/${builtPlan.balanceReport.pull}т`} full={
               <div style={{ fontSize:10, color:'#fff' }}>Тяги {builtPlan.balanceReport.pull} · Жимы {builtPlan.balanceReport.press} · Растянутая {builtPlan.balanceReport.lengthened}</div>
@@ -4726,15 +4705,14 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           )}
         </div>
-        {/* Дополнительно: прогрессия мезоцикла + сценарии — свернуто по умолчанию */}
+        {/* Дополнительно: прогрессия мезоцикла — свернуто по умолчанию */}
         <ExpandableCard
-          title="🔧 Дополнительно: прогноз прогрессии и сценарии"
+          title="🔧 Дополнительно: прогноз прогрессии"
           icon="🔧"
-          short="Прогрессия мезоцикла · сценарии «что если» (калории/сон/курс)"
+          short="Прогрессия мезоцикла"
           full={
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
-              <WhatIfCard baseRisk={quality?.score ? 100 - quality.score : 20} baseReadiness={Math.round((linked.readiness?.recovery ?? 80))} />
             </div>
           }
         />
