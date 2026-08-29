@@ -11,6 +11,7 @@ import { getExerciseById } from '../../core/exercise-catalog';
 import { filterByTier, filterByInjury, selectDiverse } from './strength-sport-selection';
 import { volumeMultForExercise } from './strength-sport-specialization';
 import { tempoForSS, restForSS, pctForSS, repsForSS } from './strength-sport-loading';
+import { WL_WEAKPOINT_CORRECTION } from './strength-sport-weakpoint';
 import { adaptForPEDsSS } from './strength-sport-ped-adaptation';
 import { filterByMobility, isAxialLoadExerciseSS } from './strength-sport-mobility';
 import { lengthenedBonus } from './strength-sport-bonus';
@@ -168,7 +169,7 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     const f = volumeMultForExercise(id, input.focus);
     sets = Math.max(2, Math.min(6, Math.round(sets * f)));
   }
-  // P0-2: weakPoints — спец-объём +1 на слабые лифты (как в BB isWeak ×1.15)
+  // PRO: weakPoints — спец-объём +1 на слабые лифты (generic + WLWeakPoint точечно)
   if (Array.isArray((input as any).weakPoints) && (input as any).weakPoints.length) {
     const wp = (input as any).weakPoints.map((s: any) => String(s).toLowerCase());
     let weakMult = 1;
@@ -179,7 +180,13 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     const isDl = id.includes('deadlift') || id.includes('pull') || id === 'rdl';
     const isCarry = id.includes('farmers') || id.includes('yoke') || id.includes('carry') || id.includes('sled');
     const isStone = id.includes('stone') || id.includes('sandbag') || id.includes('tire');
-    if (wp.some((w: string) => w.includes('snatch') && isSn)) weakMult = 1.15;
+    // WLWeakPoint точечная коррекция: если id в списке коррекции для любого wp
+    const isWeakCorrection = wp.some((w: string) => {
+      const corr = (WL_WEAKPOINT_CORRECTION as any)[w];
+      return Array.isArray(corr) && corr.includes(id);
+    });
+    if (isWeakCorrection) weakMult = 1.15;
+    else if (wp.some((w: string) => w.includes('snatch') && isSn)) weakMult = 1.15;
     else if (wp.some((w: string) => (w.includes('clean') || w.includes('jerk')) && isCj)) weakMult = 1.15;
     else if (wp.some((w: string) => w.includes('squat') && isSq)) weakMult = 1.15;
     else if (wp.some((w: string) => (w.includes('overhead') || w.includes('press') || w.includes('жим')) && isOh)) weakMult = 1.15;

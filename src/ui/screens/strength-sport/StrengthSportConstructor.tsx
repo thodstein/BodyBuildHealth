@@ -10,6 +10,8 @@ import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../..
 import { buildStrengthCsv, downloadStrengthCsv, buildStrengthPrintHtml, shareStrengthDigest, buildStrengthTelegramUrl, buildStrengthShareHash, downloadStrengthIcs } from '../../../engines/strength-sport/strength-sport-export';
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sport-weakpoint';
+import { buildWLMeetPlan, wlAttemptRationale } from '../../../engines/strength-sport/strength-sport-attempts.engine';
+import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -206,6 +208,11 @@ export const StrengthSportConstructor: React.FC = () => {
       const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks: 1 }) : buildAnnualFromSS(hist);
       saveAnnualSS(ann);
       setAnnual(ann);
+      // PRO: синк с общим годовым планом (he_annual_training_plan_v1) — bridge без мутации чужого движка
+      try {
+        localStorage.setItem('he_strength_annual_sync_v1', JSON.stringify({ updatedAt: new Date().toISOString(), totalWeeks: ann.totalWeeks, blocks: ann.blocks.map(b=> ({ startWeek: b.startWeek, weeks: b.weeks, mode: b.mode })) }));
+        window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: ann }));
+      } catch {}
     } catch {}
     setMsg('План сохранён · питание/кардио payload записан');
     setStep('plan');
@@ -496,6 +503,32 @@ export const StrengthSportConstructor: React.FC = () => {
       {step === 'plan' && plan && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ background: 'rgba(0,230,138,0.1)', padding: 10, borderRadius: 10, color: '#fff', fontSize: 11, whiteSpace: 'pre-wrap' }}>{buildStrengthSportReport(plan)}</div>
+          {/* PRO: попытки ТА / стронг */}
+          {plan.mode === 'weightlifting' && (plan.workMax.snatch || 0) > 0 && (plan.workMax.cleanJerk || plan.workMax.clean || 0) > 0 && (() => {
+            const meet = buildWLMeetPlan(plan.workMax.snatch as number, (plan.workMax.cleanJerk || plan.workMax.clean) as number, 'balanced', { bodyweight, sex });
+            return meet ? (
+              <div style={{ background: 'rgba(59,130,246,0.10)', padding: 8, borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)', color: '#fff', fontSize: 11 }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>🏋️ Попытки ТА (IWF 1кг):</div>
+                <div>Рывок: {meet.snatch.opener} / {meet.snatch.second} / {meet.snatch.third} кг</div>
+                <div>Толчок: {meet.cleanJerk.opener} / {meet.cleanJerk.second} / {meet.cleanJerk.third} кг · Тотал {meet.total}кг {meet.sinclair?`· Sinclair ${meet.sinclair}`:''} {(meet as any).robi?`· Robi ${(meet as any).robi}`:''}</div>
+                <div style={{ opacity: 0.7, fontSize: 10, marginTop: 4 }}>{wlAttemptRationale(meet).slice(2).join(' · ')}</div>
+                <div style={{ opacity: 0.6, fontSize: 10 }}>Разминка к опенеру: {meet.snatch.warmup.map(w=> `${w.weight}×${w.reps}`).join(' → ')} (рывок) / {meet.cleanJerk.warmup.map(w=> `${w.weight}×${w.reps}`).join(' → ')} (толчок)</div>
+              </div>
+            ) : null;
+          })()}
+          {plan.mode !== 'weightlifting' && (() => {
+            const yoke = (plan.workMax as any).yokeWalk || (plan.workMax as any).deadlift;
+            const log = (plan.workMax as any).logPress || (plan.workMax as any).overheadPress;
+            const yPlan = yoke ? buildSMEventPlan('yoke_walk', yoke) : null;
+            const lPlan = log ? buildSMEventPlan('log_press', log) : null;
+            return (yPlan || lPlan) ? (
+              <div style={{ background: 'rgba(245,158,11,0.10)', padding: 8, borderRadius: 8, border: '1px solid rgba(245,158,11,0.2)', color: '#fff', fontSize: 11 }}>
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>🪨 Попытки стронг (шаг йок 10кг / лог 2.5кг):</div>
+                {yPlan && <div>Йок: {yPlan.attempts.opener} / {yPlan.attempts.second} / {yPlan.attempts.third} кг · {smEventRationale(yPlan)[2]}</div>}
+                {lPlan && <div>Лог: {lPlan.attempts.opener} / {lPlan.attempts.second} / {lPlan.attempts.third} кг · {smEventRationale(lPlan)[2]}</div>}
+              </div>
+            ) : null;
+          })()}
           {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Карта качества (подъёмы/нед vs MEV/MAV/MRV):</div>
@@ -560,6 +593,7 @@ export const StrengthSportConstructor: React.FC = () => {
                         <input aria-label="вес" type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ width: 58, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                         <input aria-label="повторы" type="text" value={ex.reps} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ width: 54, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                         <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ width: 44, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
+                        <span style={{ fontSize: 9, opacity: 0.5 }}>RPE {10 - ex.rir}</span>
                         <button aria-label="вверх" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, -1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↑</button>
                         <button aria-label="вниз" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, 1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↓</button>
                       </div>
@@ -575,7 +609,7 @@ export const StrengthSportConstructor: React.FC = () => {
                             <input aria-label={`повторы сет ${si+1}`} type="number" value={s.reps} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{width:32, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
                             ×
                             <input aria-label={`RIR сет ${si+1}`} type="number" value={s.rir} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{width:28, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
-                            RIR
+                            RIR ({10 - s.rir} RPE)
                           </span>
                         ))}
                       </div>
