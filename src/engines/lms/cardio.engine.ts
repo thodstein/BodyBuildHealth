@@ -21,6 +21,8 @@ import {
   cardioMonotonyStrain,
   cardioAcwrEwma,
 } from './cardio-physiology.engine';
+import { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
+export { addDaysIso, todayLocalIso, toLocalIso } from './cardio-date-utils.engine';
 export type { HeartZone, VdotResult, CardioCtlPoint } from './cardio-physiology.engine';
 export {
   cardioHeartZones,
@@ -896,16 +898,7 @@ export function bbCardioTaperMult(dist: number): number {
   return BB_CARDIO_TAPER_CURVE[clamp(Math.round(dist), 1, 4)] ?? 0.6;
 }
 
-function addDaysIso(iso: string, days: number): string {
-  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
-  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-}
-
-function todayLocalIso(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
+/* addDaysIso / todayLocalIso теперь из cardio-date-utils.engine.ts */
 
 /** Фаза prep-плана для недели цикла (по ranges плана; null → данных нет). */
 function prepPhaseKeyForWeek(prep: CardioPrepPlanLike, week: number): string | null {

@@ -14,6 +14,7 @@ import type {
   CardioLevel,
 } from '../lms/cardio.engine';
 import { buildCardioCycle } from '../lms/cardio.engine';
+import { addDaysIso, todayLocalIso } from '../lms/cardio-date-utils.engine';
 import type { AnnualBlockKind, AnnualTrainingPlan } from './annual-training.types';
 
 /** Кардио-спека блока годового плана (производное от фазы макро + конфига блока). */
@@ -125,16 +126,7 @@ export interface AnnualCardioBuildOutcome {
   warnings: string[];
 }
 
-function addDaysIso(iso: string, days: number): string {
-  const d = new Date(iso.length === 10 ? iso + 'T00:00:00' : iso);
-  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-}
-
-function todayLocalIso(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
+/* addDaysIso / todayLocalIso — из cardio-date-utils.engine.ts */
 
 /** Собрать кардио-цикл на каждый блок годового плана (engine-only, без UI).
  *  Цикл выровнен на недели блока: startDate = reference + (startWeek−1)×7,
