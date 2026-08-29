@@ -20,7 +20,7 @@ import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } f
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
-import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_GRAD, STRONG_GRAD, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
+import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_GRAD, STRONG_GRAD, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
@@ -340,36 +340,35 @@ export const StrengthSportConstructor: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <SectionCard icon="🎯" title="Режим и цель" subtitle="Подбирает сплит, тоннаж и % зоны">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <Field label="Режим">
-                <SelectWrap><select value={mode} onChange={e => setMode(e.target.value as any)} style={SELECT}>
-                  <option value="weightlifting">🏋️ Тяжёлая атлетика</option>
-                  <option value="strongman">🪨 Силовой экстрим</option>
-                  <option value="hybrid">🔀 Гибрид</option>
-                </select></SelectWrap>
-              </Field>
-              <Field label="Цель блока">
-                <SelectWrap><select value={goal} onChange={e => setGoal(e.target.value as any)} style={SELECT}>
-                  <option value="strength">🏆 Сила</option>
-                  <option value="hypertrophy">💪 Масса</option>
-                  <option value="technique">🎯 Техника</option>
-                  <option value="peaking">🏁 Пик</option>
-                  <option value="maintenance">🛡️ Поддержание</option>
-                </select></SelectWrap>
-              </Field>
+              <StrengthPopupSelect label="Режим" value={mode} onChange={v=> setMode(v as any)} strong={mode==='strongman'} options={[
+                { id:'weightlifting', label:'🏋️ ТА', desc:'рывок/толчок/присед' },
+                { id:'strongman', label:'🪨 Стронг', desc:'йок/фермер/камни' },
+                { id:'hybrid', label:'🔀 Гибрид', desc:'микс' },
+              ]} />
+              <StrengthPopupSelect label="Цель блока" value={goal} onChange={v=> setGoal(v as any)} strong={mode==='strongman'} options={[
+                { id:'strength', label:'🏆 Сила', desc:'RIR 2-3, % 75-90' },
+                { id:'hypertrophy', label:'💪 Масса', desc:'RIR 3-4, объём' },
+                { id:'technique', label:'🎯 Техника', desc:'RIR 4, лёгкие' },
+                { id:'peaking', label:'🏁 Пик', desc:'taper, 92-97-102%' },
+                { id:'maintenance', label:'🛡️ Поддержание', desc:'минимум' },
+              ]} />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-              <Field label="Уровень"><SelectWrap><select value={level} onChange={e => setLevel(e.target.value as any)} style={SELECT}><option value="beginner">Новичок</option><option value="intermediate">Средний</option><option value="advanced">Продвинутый</option><option value="enhanced">На курсе</option></select></SelectWrap></Field>
-              <Field label="Фокус зала">
-                <SelectWrap><select value={focus || ''} onChange={e => setFocus((e.target.value || null) as any)} style={SELECT}>
-                  <option value="">Без фокуса — баланс</option>
-                  <option value="snatch">⚡️ Рывок</option>
-                  <option value="clean">🏋️ Толчок / взятие</option>
-                  <option value="squat">🦵 Присед</option>
-                  <option value="overhead">🪵 Жим / лог</option>
-                  <option value="carry">🚜 Переноски</option>
-                  <option value="stone">🪨 Камни</option>
-                </select></SelectWrap>
-              </Field>
+              <StrengthPopupSelect label="Уровень" value={level} onChange={v=> setLevel(v as any)} options={[
+                { id:'beginner', label:'Новичок', desc:'RIR 3-4' },
+                { id:'intermediate', label:'Средний', desc:'RIR 2-3' },
+                { id:'advanced', label:'Продвинутый', desc:'RIR 1-2' },
+                { id:'enhanced', label:'💊 На курсе', desc:'+объём' },
+              ]} />
+              <StrengthPopupSelect label="Фокус зала" value={focus || ''} onChange={v=> setFocus((v || null) as any)} options={[
+                { id:'', label:'Без фокуса — баланс' },
+                { id:'snatch', label:'⚡️ Рывок' },
+                { id:'clean', label:'🏋️ Толчок / взятие' },
+                { id:'squat', label:'🦵 Присед' },
+                { id:'overhead', label:'🪵 Жим / лог' },
+                { id:'carry', label:'🚜 Переноски' },
+                { id:'stone', label:'🪨 Камни' },
+              ]} />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <Field label={`Недель · ${weeks}`}><input type="range" min={2} max={16} value={weeks} onChange={e => setWeeks(Number(e.target.value))} /><div style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:TEXT_3 }}><span>2</span><span>16</span></div></Field>
@@ -377,15 +376,15 @@ export const StrengthSportConstructor: React.FC = () => {
             </div>
           </SectionCard>
 
-          <SectionCard icon="👤" title="Атлет">
+          <SectionCard icon="👤" title="Атлет" subtitle="Подсветка ключевых метрик">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:10 }}>
-              <Field label="Пол"><SelectWrap><select value={sex} onChange={e=> setSex(e.target.value as any)} style={SELECT}><option value="male">Мужской</option><option value="female">Женский</option></select></SelectWrap></Field>
+              <StrengthPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[{id:'male',label:'Мужской'},{id:'female',label:'Женский'}]} />
               <Field label="Вес, кг"><input type="number" value={bodyweight} onChange={e=> setBodyweight(Number(e.target.value)||80)} style={INPUT} /></Field>
               <Field label="Возраст"><input type="number" value={age} onChange={e=> setAge(Number(e.target.value)||30)} style={INPUT} /></Field>
               <Field label="Дата пика"><input type="date" value={competitionDate} onChange={e=> setCompetitionDate(e.target.value)} style={INPUT} /></Field>
             </div>
             {goal==='peaking' && competitionDate && (
-              <Field label="Тапер"><SelectWrap><select value={taperWeeks} onChange={e=> setTaperWeeks(Number(e.target.value))} style={SELECT}><option value={1}>1 неделя</option><option value={2}>2 недели</option></select></SelectWrap></Field>
+              <StrengthPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[{id:'1',label:'1 неделя',desc:'объём −45%'},{id:'2',label:'2 недели',desc:'−35% → −55%'}]} />
             )}
             {acwr && <InfoBanner tone={acwr.zone==='dangerous'?'warn': acwr.zone==='caution'?'warn':'info'}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60, RIR+2': acwr.zone==='caution'?'— объём ×0.85, RIR+1': ''}</InfoBanner>}
             <Field label={`VBT потеря · ${velocityLoss}%`}><input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} /></Field>
@@ -399,11 +398,11 @@ export const StrengthSportConstructor: React.FC = () => {
             })()}
           </SectionCard>
 
-          <SectionCard icon="🧠" title="Методика и волны">
+          <SectionCard icon="🧠" title="Методика и волны" subtitle="Подсветка зон RIR/веса">
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-              <Field label="Порядок"><SelectWrap><select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={SELECT}><option value="compound_first">База первой</option><option value="pre_exhaust">Предутомление</option><option value="post_exhaust">Постутомление</option></select></SelectWrap></Field>
-              <Field label="DUP"><SelectWrap><select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={SELECT}><option value="off">Выкл</option><option value="heavy_light">Тяж/лёг</option><option value="wave">Волна</option></select></SelectWrap></Field>
-              <Field label="Техника"><SelectWrap><select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={SELECT}><option value="none">Нет</option><option value="cluster">Кластер 3×1</option></select></SelectWrap></Field>
+              <StrengthPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[{id:'compound_first',label:'База первой',desc:'классика'},{id:'pre_exhaust',label:'Предутомление',desc:'изоляция → база'},{id:'post_exhaust',label:'Постутомление',desc:'база → изоляция'}]} />
+              <StrengthPopupSelect label="DUP" value={dupMode} onChange={v=> setDupMode(v as any)} options={[{id:'off',label:'Выкл',desc:'одна зона'},{id:'heavy_light',label:'Тяж/лёг',desc:'волна'},{id:'wave',label:'Волна',desc:'3-волны'}]} />
+              <StrengthPopupSelect label="Техника" value={intensityTech} onChange={v=> setIntensityTech(v as any)} options={[{id:'none',label:'Нет',desc:'чистые сеты'},{id:'cluster',label:'Кластер 3×1',desc:'база'}]} />
             </div>
           </SectionCard>
 

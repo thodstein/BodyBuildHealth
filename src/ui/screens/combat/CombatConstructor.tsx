@@ -23,7 +23,7 @@ import { useCombatWizard } from './useCombatWizard';
 import {
   CARD, CARD_ACCENT, CARD_HERO, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
   INPUT, SELECT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, ACCENT, ACCENT_GRAD, GLASS_BORDER, TEXT_3,
-  SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, CardHeader,
+  SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, CardHeader, Highlight, AccentText, CombatPopupSelect, CombatPopupNumber,
   EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel,
 } from './CombatUI';
 import { CombatPlanView } from './CombatPlanView';
@@ -361,34 +361,28 @@ export const CombatConstructor: React.FC = () => {
           {/* Дисциплина + Цель */}
           <SectionCard icon="🎯" title="Дисциплина и цель" subtitle="Подбирает акценты: шея/хват/ротация">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Дисциплина">
-                <SelectWrap><select value={discipline} onChange={e => setDiscipline(e.target.value as any)} style={SELECT}>
-                  <option value="boxing">🥊 Бокс — шея / кор / ротация</option>
-                  <option value="mma">🥋 ММА — шея / хват / тяга</option>
-                  <option value="wrestling">🤼 Борьба — шея / хват ×1.3</option>
-                  <option value="kickboxing">🦵 Кикбоксинг — ноги / ротация</option>
-                  <option value="general">🏋️ Общая</option>
-                </select></SelectWrap>
-              </Field>
-              <Field label="Цель зала">
-                <SelectWrap><select value={goal} onChange={e => setGoal(e.target.value as any)} style={SELECT}>
-                  <option value="power">⚡ Взрывная сила</option>
-                  <option value="endurance">🔥 Силовая выносливость</option>
-                  <option value="maintenance">🛡️ Поддержание</option>
-                  <option value="camp">🏕️ Кэмп к бою</option>
-                  <option value="weight_cut">⚖️ Весогонка</option>
-                </select></SelectWrap>
-              </Field>
+              <CombatPopupSelect label="Дисциплина" value={discipline} onChange={v=> setDiscipline(v as any)} options={[
+                { id:'boxing', label:'🥊 Бокс', desc:'шея / кор / ротация' },
+                { id:'mma', label:'🥋 ММА', desc:'шея / хват / тяга' },
+                { id:'wrestling', label:'🤼 Борьба', desc:'шея / хват ×1.3' },
+                { id:'kickboxing', label:'🦵 Кикбоксинг', desc:'ноги / ротация' },
+                { id:'general', label:'🏋️ Общая', desc:'баланс' },
+              ]} />
+              <CombatPopupSelect label="Цель зала" value={goal} onChange={v=> setGoal(v as any)} options={[
+                { id:'power', label:'⚡ Взрывная сила', desc:'пик мощности, RIR 2-3' },
+                { id:'endurance', label:'🔥 Выносливость', desc:'RIR 3-4, объём' },
+                { id:'maintenance', label:'🛡️ Поддержание', desc:'RIR 4, минимум' },
+                { id:'camp', label:'🏕️ Кэмп к бою', desc:'спец. подготовка' },
+                { id:'weight_cut', label:'⚖️ Весогонка', desc:'ISSN, дефицит' },
+              ]} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Уровень">
-                <SelectWrap><select value={level} onChange={e => setLevel(e.target.value as any)} style={SELECT}>
-                  <option value="beginner">Новичок</option>
-                  <option value="intermediate">Средний</option>
-                  <option value="advanced">Продвинутый</option>
-                  <option value="enhanced">💊 На курсе</option>
-                </select></SelectWrap>
-              </Field>
+              <CombatPopupSelect label="Уровень" value={level} onChange={v=> setLevel(v as any)} options={[
+                { id:'beginner', label:'Новичок', desc:'RIR 3-4, техника' },
+                { id:'intermediate', label:'Средний', desc:'RIR 2-3' },
+                { id:'advanced', label:'Продвинутый', desc:'RIR 1-2, taper' },
+                { id:'enhanced', label:'💊 На курсе', desc:'+объём, PED' },
+              ]} />
               <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
                 <Field label={`Недель · ${weeks}`}>
                   <input type="range" min={2} max={12} value={weeks} onChange={e => setWeeks(Number(e.target.value))} />
@@ -405,22 +399,20 @@ export const CombatConstructor: React.FC = () => {
           {/* Периодизация */}
           <SectionCard icon="📊" title="Периодизация и кондиция" accent>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Модель периодизации">
-                <SelectWrap><select value={periodizationModel} onChange={e => setPeriodizationModel(e.target.value as any)} style={SELECT}>
-                  <option value="atr_10">ATR 5/3/2 (Issurin) — 10 нед</option>
-                  <option value="linear_12">Linear 12</option>
-                  <option value="conjugate">Conjugate — short-notice</option>
-                </select></SelectWrap>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', lineHeight: 1.4 }}>ATR: 50% Accum 6-10/RIR2-3 → 30% Trans 3-6/RIR1-2 → 20% Real RIR4</div>
-              </Field>
-              <Field label="Кондиция зала">
-                <SelectWrap><select value={conditioningMode} onChange={e => setConditioningMode(e.target.value as any)} style={SELECT}>
-                  <option value="auto">Авто — alactic+lactic+aerobic</option>
-                  <option value="off">Выкл — только зал</option>
-                  <option value="aerobic">Только aerobic Zone2</option>
-                </select></SelectWrap>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.44)', lineHeight: 1.4 }}>Alactic 8×10с/50с · Lactic 5×3мин · Aerobic 40′ Zone2</div>
-              </Field>
+              <CombatPopupSelect label="Модель" value={periodizationModel} onChange={v=> setPeriodizationModel(v as any)} options={[
+                { id:'atr_10', label:'ATR 5/3/2 — 10 нед', desc:'Issurin: 50% Accum 6-10/RIR2-3 → 30% Trans → 20% Real' },
+                { id:'linear_12', label:'Linear 12', desc:'линейный прогресс объёма' },
+                { id:'conjugate', label:'Conjugate', desc:'short-notice, волна' },
+              ]} />
+              <CombatPopupSelect label="Кондиция" value={conditioningMode} onChange={v=> setConditioningMode(v as any)} options={[
+                { id:'auto', label:'Авто', desc:'alactic+lactic+aerobic' },
+                { id:'off', label:'Выкл', desc:'только зал' },
+                { id:'aerobic', label:'Aerobic Zone2', desc:'40′ low' },
+              ]} />
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:2 }}>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', background:'rgba(168,85,247,0.08)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(168,85,247,0.14)' }}><Highlight color="#a855f7">50% Accum</Highlight> 6-10/RIR2-3 → <Highlight>30% Trans</Highlight> 3-6/RIR1-2 → <Highlight>20% Real</Highlight> RIR4</span>
+              <span style={{ fontSize:10, color:'rgba(255,255,255,0.58)', background:'rgba(59,130,246,0.06)', padding:'4px 8px', borderRadius:8, border:'1px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#3b82f6">Lactic 5×3мин</Highlight> · <Highlight color="#3b82f6">Aerobic 40′</Highlight></span>
             </div>
           </SectionCard>
 
@@ -430,12 +422,10 @@ export const CombatConstructor: React.FC = () => {
               <Field label="Дата боя">
                 <input type="date" value={fightDate} onChange={e => setFightDate(e.target.value)} style={INPUT} />
               </Field>
-              <Field label="Длительность тапера">
-                <SelectWrap><select value={taperWeeks} onChange={e => setTaperWeeks(Number(e.target.value))} style={SELECT}>
-                  <option value={1}>1 нед — объём −45%</option>
-                  <option value={2}>2 нед — −35% → −55%</option>
-                </select></SelectWrap>
-              </Field>
+              <CombatPopupSelect label="Тапер" value={String(taperWeeks)} onChange={v=> setTaperWeeks(Number(v))} options={[
+                { id:'1', label:'1 нед', desc:'объём −45%' },
+                { id:'2', label:'2 нед', desc:'−35% → −55%' },
+              ]} />
               <Field label="Старт плана">
                 <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={INPUT} />
               </Field>
@@ -446,9 +436,10 @@ export const CombatConstructor: React.FC = () => {
           {/* Антропометрия */}
           <SectionCard icon="👤" title="Антропометрия">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-              <Field label="Пол">
-                <SelectWrap><select value={sex} onChange={e => setSex(e.target.value as any)} style={SELECT}><option value="male">Мужской</option><option value="female">Женский</option></select></SelectWrap>
-              </Field>
+              <CombatPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[
+                { id:'male', label:'Мужской' },
+                { id:'female', label:'Женский' },
+              ]} />
               <Field label="Вес тела, кг">
                 <input type="number" value={bodyweight} onChange={e => setBodyweight(Number(e.target.value) || 80)} style={INPUT} />
               </Field>
@@ -531,33 +522,27 @@ export const CombatConstructor: React.FC = () => {
           </SectionCard>
 
           {/* Методика */}
-          <SectionCard icon="🧠" title="Методика и интенсивность">
+          <SectionCard icon="🧠" title="Методика и интенсивность" subtitle="Подсвечены зоны RIR/веса">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label="Методика порядка">
-                <SelectWrap><select value={methodology} onChange={e => setMethodology(e.target.value as any)} style={SELECT}>
-                  <option value="compound_first">База первой — классика</option>
-                  <option value="pre_exhaust">Предутомление — изоляция → база</option>
-                  <option value="post_exhaust">Постутомление — база → изоляция</option>
-                </select></SelectWrap>
-              </Field>
-              <Field label="DUP-волны">
-                <SelectWrap><select value={dupMode} onChange={e => setDupMode(e.target.value as any)} style={SELECT}>
-                  <option value="off">Выкл — одна зона</option>
-                  <option value="power_endurance">Сила / выносливость</option>
-                  <option value="heavy_light">Тяж / лёг волна</option>
-                  <option value="conjugate">Сопряжённая система</option>
-                </select></SelectWrap>
-              </Field>
+              <CombatPopupSelect label="Порядок" value={methodology} onChange={v=> setMethodology(v as any)} options={[
+                { id:'compound_first', label:'База первой', desc:'классика RIR 2-3' },
+                { id:'pre_exhaust', label:'Предутомление', desc:'изоляция → база' },
+                { id:'post_exhaust', label:'Постутомление', desc:'база → изоляция' },
+              ]} />
+              <CombatPopupSelect label="DUP-волны" value={dupMode} onChange={v=> setDupMode(v as any)} options={[
+                { id:'off', label:'Выкл', desc:'одна зона' },
+                { id:'power_endurance', label:'Сила / выносливость', desc:'контраст' },
+                { id:'heavy_light', label:'Тяж / лёг', desc:'волна объёма' },
+                { id:'conjugate', label:'Сопряжённая', desc:'макс/динам/повтор' },
+              ]} />
             </div>
-            <Field label="Интенсивная техника">
-              <SelectWrap><select value={intensityTech} onChange={e => setIntensityTech(e.target.value as any)} style={SELECT}>
-                <option value="none">Нет — чистые сеты</option>
-                <option value="rest_pause">Rest-pause — аксессуары</option>
-                <option value="myo_reps">Myo-reps — хват</option>
-                <option value="cluster">Cluster 3×3 / 20с — база</option>
-                <option value="contrast">Contrast тяж+плио — power</option>
-              </select></SelectWrap>
-            </Field>
+            <CombatPopupSelect label="Техника" value={intensityTech} onChange={v=> setIntensityTech(v as any)} options={[
+              { id:'none', label:'Нет', desc:'чистые сеты' },
+              { id:'rest_pause', label:'Rest-pause', desc:'аксессуары' },
+              { id:'myo_reps', label:'Myo-reps', desc:'хват' },
+              { id:'cluster', label:'Cluster 3×3 / 20с', desc:'база' },
+              { id:'contrast', label:'Contrast тяж+плио', desc:'power' },
+            ]} />
           </SectionCard>
 
           {/* Весогонка */}
@@ -569,9 +554,9 @@ export const CombatConstructor: React.FC = () => {
             {weightCut > 0 && (
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                  <Field label="Вода"><SelectWrap><select value={waterMode} onChange={e => setWaterMode(e.target.value as any)} style={SELECT}><option value="stable">Стабильно 35мл/кг</option><option value="load_cut">Load 8л → 2л</option></select></SelectWrap></Field>
-                  <Field label="Натрий"><SelectWrap><select value={sodiumMode} onChange={e => setSodiumMode(e.target.value as any)} style={SELECT}><option value="stable">Стабильно 5г</option><option value="moderate_cut">5 → 3 → 1.5г</option></select></SelectWrap></Field>
-                  <Field label="Углеводы"><SelectWrap><select value={carbMode} onChange={e => setCarbMode(e.target.value as any)} style={SELECT}><option value="stable">Стабильно 4-5г/кг</option><option value="deplete_reload">1г → 8г рефид</option></select></SelectWrap></Field>
+                  <CombatPopupSelect label="Вода" value={waterMode} onChange={v=> setWaterMode(v as any)} options={[{id:'stable',label:'Стабильно 35мл/кг'},{id:'load_cut',label:'Load 8л → 2л',desc:'пиковая неделя'}]} />
+                  <CombatPopupSelect label="Натрий" value={sodiumMode} onChange={v=> setSodiumMode(v as any)} options={[{id:'stable',label:'Стабильно 5г'},{id:'moderate_cut',label:'5 → 3 → 1.5г',desc:'плавный срез'}]} />
+                  <CombatPopupSelect label="Углеводы" value={carbMode} onChange={v=> setCarbMode(v as any)} options={[{id:'stable',label:'Стабильно 4-5г/кг'},{id:'deplete_reload',label:'1г → 8г рефид',desc:'загрузка'}]} />
                 </div>
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: '#fff', fontWeight: 700, background: 'rgba(255,255,255,0.04)', padding: '9px 11px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer' }}>
                   <input type="checkbox" checked={heatSessions} onChange={e => setHeatSessions(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#a855f7' }} /> Сауна 15-20′ ×3/нед — heat acclimation

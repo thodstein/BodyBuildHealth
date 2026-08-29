@@ -380,3 +380,96 @@ export const CardHeader: React.FC<{ icon: string; title: string; subtitle?: stri
     {right}
   </div>
 );
+
+// ─── Выделения текста ───
+export const Highlight: React.FC<{ color?: string; children: React.ReactNode }> = ({ color = ACCENT, children }) => (
+  <span style={{ background: `${color}18`, border: `1px solid ${color}30`, color, padding: '1px 6px', borderRadius: 6, fontWeight: 800, fontSize: '0.95em' }}>{children}</span>
+);
+export const AccentText: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span style={{ color: ACCENT, fontWeight: 800 }}>{children}</span>
+);
+
+// ─── Красивые попапы (фиолетовая ветка) ───
+const POP_OVERLAY: React.CSSProperties = {
+  position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: 'rgba(8,6,16,0.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', padding: 16, animation: 'fadeIn 0.18s ease',
+};
+const POP_SHEET: React.CSSProperties = {
+  width: '100%', maxWidth: 420, maxHeight: '78vh', overflowY: 'auto', borderRadius: 20,
+  background: 'linear-gradient(180deg, #1e1a2e, #14101e)', border: '1px solid rgba(168,85,247,0.18)',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(168,85,247,0.08) inset', paddingBottom: 16,
+};
+const POP_TOPBAR: React.CSSProperties = { height: 3, background: ACCENT_GRAD, borderRadius: '20px 20px 0 0' };
+const popOption = (active: boolean): React.CSSProperties => ({
+  display: 'block', width: '100%', padding: '12px 14px', marginBottom: 6, borderRadius: 12, cursor: 'pointer', textAlign: 'left' as const,
+  fontSize: 13, fontWeight: active ? 800 : 600, background: active ? 'linear-gradient(135deg, rgba(168,85,247,0.16), rgba(236,72,153,0.10))' : 'rgba(255,255,255,0.04)',
+  border: active ? '1px solid rgba(168,85,247,0.38)' : '1px solid rgba(255,255,255,0.07)', color: active ? '#d8b4fe' : 'rgba(255,255,255,0.88)',
+  boxShadow: active ? '0 4px 16px rgba(168,85,247,0.16)' : 'none', transition: 'all 0.14s ease',
+});
+const popCardBtn = (active?: boolean): React.CSSProperties => ({
+  width: '100%', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', fontSize: 10, fontWeight: 700, textAlign: 'center', minHeight: 54,
+  display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
+  background: active ? 'linear-gradient(135deg, rgba(168,85,247,0.16), rgba(236,72,153,0.08))' : 'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))',
+  border: active ? '1px solid rgba(168,85,247,0.36)' : '1px solid rgba(255,255,255,0.07)', color: active ? '#d8b4fe' : 'rgba(255,255,255,0.72)',
+  boxShadow: active ? '0 4px 16px rgba(168,85,247,0.14)' : 'none', transition: 'all 0.16s ease',
+});
+
+export const CombatPopupSelect: React.FC<{ label: string; value: string | undefined; options: { id: string; label: string; desc?: string }[]; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => {
+  const [open, setOpen] = React.useState(false);
+  const sel = options.find(o => o.id === (value ?? ''));
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={popCardBtn(false)}>
+        <span style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
+        <span style={{ fontSize: 12, color: '#d8b4fe', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sel ? sel.label : 'Выбрать…'}</span>
+      </button>
+      {open && (
+        <div style={POP_OVERLAY} onClick={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={POP_SHEET}>
+            <div style={POP_TOPBAR} />
+            <div style={{ padding: '16px 16px 0' }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', letterSpacing: -0.2 }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginTop: 2, marginBottom: 14 }}>Выберите вариант</div>
+              {options.map(o => (
+                <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={popOption(value === o.id)}>
+                  <div>{o.label}{value === o.id ? ' ✓' : ''}</div>
+                  {o.desc && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.48)', marginTop: 3, lineHeight: 1.4 }}>{o.desc}</div>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export const CombatPopupNumber: React.FC<{ label: string; value: number; min?: number; max?: number; step?: number; suffix?: string; onChange: (v: number) => void }> = ({ label, value, min, max, step = 1, suffix = '', onChange }) => {
+  const [open, setOpen] = React.useState(false);
+  const [edit, setEdit] = React.useState(String(value));
+  React.useEffect(() => { if (!open) setEdit(String(value)); }, [value, open]);
+  return (
+    <>
+      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={popCardBtn(false)}>
+        <span style={{ fontSize: 8.5, color: 'rgba(255,255,255,0.42)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</span>
+        <span style={{ fontSize: 14, color: '#d8b4fe', fontWeight: 900 }}>{value}{suffix ? ` ${suffix}` : ''}</span>
+      </button>
+      {open && (
+        <div style={POP_OVERLAY} onClick={() => setOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={POP_SHEET}>
+            <div style={POP_TOPBAR} />
+            <div style={{ padding: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>{label}</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.42)', marginBottom: 12 }}>Ползунок или точный ввод</div>
+              <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: ACCENT, marginBottom: 12 }} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(168,85,247,0.22)', background: 'rgba(0,0,0,0.32)', color: '#fff', fontSize: 16, fontWeight: 800, textAlign: 'center', outline: 'none' }} />
+                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: ACCENT_GRAD, color: '#fff', fontWeight: 900, cursor: 'pointer' }}>OK</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
