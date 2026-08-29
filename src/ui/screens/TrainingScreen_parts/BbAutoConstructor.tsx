@@ -81,7 +81,7 @@ import {
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
   computeReadiness,
-  saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice,
+  saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice, recommendCarbStrategyFromTrial, liveAdjustForPeakDay,
   buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
   prepTrainingCompliance,
   type PrepAdjustment,
@@ -670,11 +670,17 @@ export const BbAutoConstructor: React.FC = () => {
       expYears >= 5 || bbLevel === 'advanced' ? 'advanced'
         : expYears < 2 || bbLevel === 'beginner' ? 'beginner'
           : 'intermediate';
+    const heightCm = Number(prof?.personal?.height) > 120 ? Number(prof.personal.height) : undefined;
+    const cycleDay = (() => { try { const v = Number(localStorage.getItem('he_cycle_day')); return Number.isFinite(v) && v>=1 && v<=35 ? v : undefined; } catch { return undefined; } })();
+    const hasTrial = (() => { try { const raw = localStorage.getItem('he_bb_test_peak_weeks'); if(!raw) return undefined; const arr=JSON.parse(raw); return Array.isArray(arr) && arr.length>0 ? true : undefined; } catch { return undefined; } })();
     const base: BBContestPrepConfig = {
       sex,
       category: peakWeekCategory,
       weightKg: Math.max(40, Math.min(200, Number(prof?.personal?.weight) || 80)),
+      heightCm,
       bodyFatPct: Number(prof?.personal?.bodyFat) > 0 ? Number(prof?.personal?.bodyFat) : undefined,
+      cycleDay,
+      hasTrialPeak: hasTrial,
       experienceLevel,
       enhanced: peds.length > 0,
       prepCount: 0,
@@ -692,6 +698,7 @@ export const BbAutoConstructor: React.FC = () => {
       competitions: prepCompetitions,
       mainCompetitionId: prepMainCompetitionId,
       schedule: { wake: '07:00', stage: '12:00' },
+      pedContext: peds.length>0 ? { ghIU: (pedDoses.GH ?? pedDoses.gh ?? 0) || undefined, trenMg: (pedDoses.tren ?? pedDoses.trenbolone ?? 0) || undefined, insulinIU: (pedDoses.insulin ?? 0) || undefined, diuretic: false } : undefined,
     };
     return base;
   };
@@ -5246,6 +5253,8 @@ export const BbAutoConstructor: React.FC = () => {
                     {lastTest.verdict === 'tested_ok' ? '✅ Протокол подходит (strategy: tested)' : lastTest.verdict === 'adjust' ? '⚠ Нужна коррекция' : '🔶 Консервативный режим'}
                   </div>
                   <div style={{ color:'#fff', marginTop:2 }}>{lastTest.recommendation}</div>
+                  <div style={{ color:'#a78bfa', marginTop:4 }}>PRO рекомендация загрузки: <b>{recommendCarbStrategyFromTrial(lastTest)}</b> (spill→back, flat→front, волна→undulating)</div>
+                  <div style={{ color:'#38bdf8', marginTop:2 }}>Live-adjust D-1: {liveAdjustForPeakDay(lastTest.responses.fullness, lastTest.responses.waterRetention<=2?5:1, lastTest.responses.waterRetention).note}</div>
                   {prepPlan.testPeakWeekId && (
                     <div style={{ color:'#fff', marginTop:4 }}>
                       Стратегия основной пик-недели: <b>{resolvePeakStrategy(prepPlan)}</b>

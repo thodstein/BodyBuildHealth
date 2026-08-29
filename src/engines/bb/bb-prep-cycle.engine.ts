@@ -29,7 +29,7 @@ import { applyDUPOverlay, type DUPMode } from './bb-dup.engine';
 import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, CATEGORY_PROFILES,
   isoToday, isoDiffDays, isoAddDays, prepPhaseForWeek, prepPhaseForDate, buildPeakWeek, configFromPlan,
-  prepWeightAdvice, prepTrainingCompliance,
+  prepWeightAdvice, prepTrainingCompliance, isMonotonicTaper,
   type PrepWeightAdvice, type PrepWeightStatus,
   type BBContestCategory, type BBContestPrepConfig, type BBContestPrepPlan,
   type BBPlanWithPrep, type CarbLoadStrategy, type ContestEventEntry,
@@ -428,6 +428,10 @@ export function buildPrepCycle(raw: PrepCycleConfig): PrepCycleResult {
   const warnings = [...v.warnings];
   if (prepWeeks < 4) {
     warnings.push(`⚠ Цикл короткий (${totalWeeks} нед): подготовка всего ${prepWeeks} нед (тапер ${taperWeeks}+пик). Рекомендуем ≥6 нед для осмысленной подготовки.`);
+  }
+  // PRO mono-check: гарантия монотонного тапера (каждая тапер-неделя ≤ предыдущей)
+  if (!isMonotonicTaper(bbPlanPrep.weeks as any)) {
+    warnings.push('⚠ Тапер не монотонный: проверьте объём — тапер должен снижаться к пику.');
   }
 
   return {
