@@ -1,5 +1,16 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Кардио: B1/B2 физиология + date-utils, FIT-магия, UI-полировка (Aug 29 2026, pushed ee44ddb40 + 61784979 + ddf4d1372)
+
+Продолжение полного аудита кардио-планировщика (god-file 3.4k). Эпики B/C/D/E/F — доведение до «отлично».
+
+- **B1 (архитектура)**: `cardio.engine.ts` 3.4k → выделен `cardio-physiology.engine.ts` (HeartZone/cardioHeartZones/lthrZones/runningVdot/banisterTrimp/CARDIO_TRIMP_FACTOR/sessionTrimpEstimate/weeklyTrimp/cardioCtlSeries/cardioMonotonyStrain/cardioAcwrEwma) — чистые физиологические хелперы. `cardio.engine.ts` теперь `import + re-export` (обратная совместимость 100% — 18 потребителей `from '../cardio.engine'` не менялись, `HeartZone` импортирован для `cardioSessionProtocol`). Дублирующие определения `HeartZone…weeklyTrimp + CTL` удалены из god-file.
+- **B2 (даты)**: NEW `cardio-date-utils.engine.ts` — единые `toLocalIso/parseLocalIso/addDaysIso/todayLocalIso/weekStartIso/dayOfWeekIso` (исправляет UTC-баг `toISOString`). `cardio.engine.ts` (`addDaysIso/todayLocalIso`) и `annual-training-cardio.engine.ts` теперь импортируют из него (дубль удалён, `re-export` для внешнего API).
+- **FIT/импорт (E2)**: `cardio-import.engine.ts` — `detectCardioFormat` теперь `isFitBuffer()` по байтам 8-12 `".FIT"` (`Uint8Array` для `ArrayBuffer`, строка для текста) вместо `head.includes('.FIT')`; `parseCardioImport` не считает любой `ArrayBuffer` FIT'ом (только `.fit` или magic), буфер TCX/GPX декодируется `TextDecoder`.
+- **UI-полировка (D/E)**: `CardioPreviewStep` — `ROW_H` динамический (hidden measure `getBoundingClientRect` вместо хардкода 118); `CardioAnalyticsDashboard` — `monotony/strain` (Foster) из 7-дневного лога + бейдж `warn >2/6000`; `CardioConstructor` — `fromProfile/saveToProfile` с `bodyFatPct` (FFM-расход).
+- **Проверено**: `tsc 0` по своим файлам, `vitest cardio 517/517` (18 файлов), чужие `BbAutoConstructor.tsx`/`planner-recipe-mode.ts` восстановлены из `HEAD` (WIP не тронут). Коммиты строго `pathspec`.
+- **Отложено (осознанно)**: `cardio-export` (ICS/TCX/print) остался в god-file — следующий шаг; полный `IndexedDB` для `he_cardio_sessions` (cap 500 → IDB) — stub `cardio-storage.engine.ts` с `safeSet`/quota-защитой, миграция требует `cloud-kv` синка как `labs_log`.
+
 ## Планировщик питания: раунд 2 «абсолютное выполнение» — все остатки закрыты (Aug 29 2026, pushed c074f1c88 + 6607415c + 447a29c6)
 
 Поверх эпиков A–F (9b9cb960 + 862a3404). Закрыто ВСЁ из хвост-аудита, кроме двух
