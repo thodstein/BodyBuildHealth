@@ -25,11 +25,11 @@ function migrateCombatPlan(raw: any): CombatPlan {
     const low = raw.discipline.toLowerCase();
     if (discMap[low]) raw.discipline = discMap[low];
   }
-  // phase remap: gpp→accumulation ТОЛЬКО для ATR (для linear gpp валиден)
+  // phase remap: gpp→accumulation для ATR (для linear gpp валиден). Для старых без модели — считаем ATR по умолчанию.
   const model = raw.inputSnapshot?.periodizationModel || raw.periodizationModel;
   if (Array.isArray(raw.weeksData)) {
     for(const w of raw.weeksData) {
-      if (w.phase === 'gpp' && (model === 'atr_10' || model === 'atr')) w.phase = 'accumulation';
+      if (w.phase === 'gpp' && (!model || model === 'atr_10' || model === 'atr')) w.phase = 'accumulation';
       // power оставляем как есть — для ATR он маппится в transmutation только при >=9нед, для linear — power валиден
     }
   }

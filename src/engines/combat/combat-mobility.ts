@@ -25,9 +25,11 @@ export function filterByMobilityCB(pool: string[], restrictions: string[] | unde
 
 const AXIAL_IDS_CB = new Set(['squat','front_squat','trap_bar_dead','zercher_squat','hang_clean','high_pull']);
 export function isAxialLoadExerciseCB(id: string): boolean {
+  // core явно не осевые — исключаем до проверки dead/squat
+  if (['deadbug','ab_wheel','hollow_hold','side_plank','copenhagen_plank','deadbug'].includes(id)) return false;
   if (AXIAL_IDS_CB.has(id)) return true;
-  // core/carry не осевые — исключаем deadbug/ab_wheel/carry
-  if (id.includes('squat') || id.includes('dead') || id.includes('yoke') || id.includes('stone')) return true;
+  // dead — но не deadbug (уже исключён)
+  if ((id.includes('squat') || id.includes('dead') || id.includes('yoke') || id.includes('stone')) && !id.includes('bug')) return true;
   if (id.includes('carry') && !['suitcase_carry','farmer_carry','deadbug','ab_wheel'].includes(id)) {
     // carry с нагрузкой может быть осевым, но suitcase/farmer — удержание, не осевая компрессия позвоночника как squat
     return id.includes('sled');
