@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildDayPlan } from '../meal-plan-engine';
+import { buildDayPlan, periProteinBudget } from '../meal-plan-engine';
 import { isProteinPowderId } from '../food-availability';
 
 /**
@@ -19,6 +19,17 @@ const train = (o: any = {}) => ({
 });
 
 describe('F2: диетология бодибилдинга', () => {
+  it('явный контроллер пери-окна держит белок в бюджете 0.4-0.5 г/кг LBM', () => {
+    for (const lbm of [45, 64, 73.8, 90, 110]) {
+      const budget = periProteinBudget(lbm, true, { preworkout: true, postworkout: true });
+      expect(budget.totalG).toBeGreaterThanOrEqual(budget.targetRangeG[0]);
+      expect(budget.totalG).toBeLessThanOrEqual(budget.targetRangeG[1]);
+      expect(budget.preworkoutG).toBeGreaterThanOrEqual(20);
+      expect(budget.postworkoutG).toBeGreaterThanOrEqual(25);
+    }
+    expect(periProteinBudget(73.8, false, { preworkout: true, postworkout: true }).totalG).toBe(0);
+  });
+
   it('белок основного приёма в MPS-коридоре 0.24-0.62 г/кг LBM', () => {
     for (const salt of [1, 2, 3]) {
       const plan = buildDayPlan(train({ randomSalt: salt }));

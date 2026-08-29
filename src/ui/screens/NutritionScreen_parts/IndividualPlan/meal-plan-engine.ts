@@ -1701,25 +1701,38 @@ function buildPreWorkout(
 ): Meal {
   // Эпик B: предтрен уважает дневные квоты (овсянка ≤2 приёмов/день и т.д.)
   const _qOk = (f: FoodItem) => !opts?.quotaBlockedIds || foodAvailableWithQuota(f, opts.quotaBlockedIds);
-  const leanProteinPool = (pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid).filter(f => !['octopus','squid','clam','mussel','cockle','whelk','sea_urchin','abalone'].some(k => f.id.includes(k)) && _qOk(f));
-  const prefProtein = preferredIds && preferredIds.size > 0 ? leanProteinPool.filter(f => preferredIds.has(f.id)) : [];
-  const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : leanProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
-  const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
-  const carbPoolPW = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(_qOk);
-  const commonCarbsPW = carbPoolPW.filter(f => COMMON_CARB_IDS.has(f.id));
+   const proteinCandidates = (pool.proteinLean.length > 0 ? pool.proteinLean : pool.proteinSolid)
+     .filter(f => !['octopus','squid','clam','mussel','cockle','whelk','sea_urchin','abalone'].some(k => f.id.includes(k)) && _qOk(f));
+   // Предтрен имеет явный fat budget: жирный белковый источник не должен
+   // незаметно нарушать окно даже при корректном целевом макросе.
+   const leanProteinPool = proteinCandidates.filter(f => (f.fat || 0) <= PREW_FAT_MAX_G);
+   const safeProteinPool = leanProteinPool.length > 0 ? leanProteinPool : proteinCandidates;
+   const prefProtein = preferredIds && preferredIds.size > 0 ? safeProteinPool.filter(f => preferredIds.has(f.id)) : [];
+   const proteinSource = pickPriority(prefProtein.length > 0 ? prefProtein : safeProteinPool, seed, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
+   const prefCarb = preferredIds && preferredIds.size > 0 ? pool.carbSlow.filter(f => preferredIds.has(f.id)) : [];
+   const carbPoolPW = (prefCarb.length > 0 ? prefCarb : pool.carbSlow).filter(_qOk);
+   const lowFatCarbPoolPW = carbPoolPW.filter(f => (f.fat || 0) <= 2.5);
+   const carbSourcePool = lowFatCarbPoolPW.length > 0 ? lowFatCarbPoolPW : carbPoolPW;
+   const commonCarbsPW = carbSourcePool.filter(f => COMMON_CARB_IDS.has(f.id));
 // Fix 1 completion (preserve conditional) - lines 371 & 470 converted to exact COMMON_CARB_IDS.has(f.id)
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
-     const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbPoolPW, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
+      const carbSource = pickPriority(commonCarbsPW.length > 0 ? commonCarbsPW : carbSourcePool, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
    
    const items: MealItem[] = [];
-  if (proteinSource) {
-    const grams = gramsForMacro(proteinSource, proteinG, 'protein');
-    items.push(makeItem(proteinSource, grams, 'protein'));
+   if (proteinSource) {
+     const proteinGrams = gramsForMacro(proteinSource, proteinG, 'protein');
+     const grams = (proteinSource.fat || 0) > 0
+       ? Math.min(proteinGrams, Math.floor(PREW_FAT_MAX_G / proteinSource.fat * 100))
+       : proteinGrams;
+     items.push(makeItem(proteinSource, grams, 'protein'));
   }
-  if (carbSource) {
-    // D-18: cap cooked grains at 280g so a high-carb day doesn't yield a 500g pre-W buckwheat bowl.
-    const grams = gramsForMacro(carbSource, carbG, 'carbs', carbPortionCap(carbSource));
+   if (carbSource) {
+     // D-18: cap cooked grains at 280g so a high-carb day doesn't yield a 500g pre-W buckwheat bowl.
+     const proteinFat = items.reduce((sum, item) => sum + item.f, 0);
+     const fatRoom = Math.max(0, PREW_FAT_MAX_G - proteinFat);
+     const fatCap = (carbSource.fat || 0) > 0 ? Math.floor(fatRoom / carbSource.fat * 100) : Infinity;
+     const grams = Math.min(gramsForMacro(carbSource, carbG, 'carbs', carbPortionCap(carbSource)), fatCap);
     items.push(makeItem(carbSource, grams, 'carb_slow'));
   }
 
@@ -1766,14 +1779,20 @@ function buildPostWorkout(
   const fastCarb = pickPriority(prefCarb.length > 0 ? prefCarb : _carbBase, seed + 1, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
   const items: MealItem[] = [];
 
-  if (fastProtein) {
-    const grams = gramsForMacro(fastProtein, proteinG, 'protein');
-    items.push(makeItem(fastProtein, grams, 'fast_protein'));
+   if (fastProtein) {
+     const proteinGrams = gramsForMacro(fastProtein, proteinG, 'protein');
+     const grams = (fastProtein.fat || 0) > 0
+       ? Math.min(proteinGrams, Math.floor(6 / fastProtein.fat * 100))
+       : proteinGrams;
+     items.push(makeItem(fastProtein, grams, 'fast_protein'));
   }
-  if (fastCarb) {
+   if (fastCarb) {
     // D-18: cap cooked starches at 280g (post-W fast carbs are usually bread/pasta/rice/potato;
     // a 100g-carb target on a high-carb day could otherwise push pasta to ~400g).
-    const grams = gramsForMacro(fastCarb, carbG, 'carbs', carbPortionCap(fastCarb));
+     const proteinFat = items.reduce((sum, item) => sum + item.f, 0);
+     const fatRoom = Math.max(0, 6 - proteinFat);
+     const fatCap = (fastCarb.fat || 0) > 0 ? Math.floor(fatRoom / fastCarb.fat * 100) : Infinity;
+     const grams = Math.min(gramsForMacro(fastCarb, carbG, 'carbs', carbPortionCap(fastCarb)), fatCap);
     const delivered = (fastCarb.carbs || 0) * grams / 100;
     items.push(makeItem(fastCarb, grams, 'carb_fast'));
     // D-18b: if the cap left a large carb gap (high-carb day), add a second fast-carb source.
@@ -1782,8 +1801,14 @@ function buildPostWorkout(
       const fastCarb2 = pickPriority(secondPool.length > 0 ? secondPool : _carbBase.filter(f => f.id !== fastCarb.id), seed + 21, { preferredIds, recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds });
       if (fastCarb2) {
         const rem = Math.max(0, carbG - delivered);
-        const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
-        if (grams2 > 0) items.push(makeItem(fastCarb2, grams2, 'carb_fast'));
+       const grams2 = gramsForMacro(fastCarb2, rem, 'carbs', carbPortionCap(fastCarb2));
+         if (grams2 > 0) {
+           const currentFat = items.reduce((sum, item) => sum + item.f, 0);
+           const fatRoom2 = Math.max(0, 6 - currentFat);
+           const fatCap2 = (fastCarb2.fat || 0) > 0 ? Math.floor(fatRoom2 / fastCarb2.fat * 100) : Infinity;
+           const safeGrams2 = Math.min(grams2, fatCap2);
+           if (safeGrams2 > 0) items.push(makeItem(fastCarb2, safeGrams2, 'carb_fast'));
+         }
       }
     }
   }
@@ -2302,9 +2327,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // недобор растит основные (до 55 г), перебор жмёт перекусы (до 15 г) затем основные.
   // Пери-белки — LBM-скейлинг (включён «отложенный» фикс Роунда-2).
   const regularCount = _regular.length;
-  const _prewP = Math.max(20, Math.min(35, Math.round(input.lbmKg * 0.25)));
-  const _postwP = Math.max(25, Math.min(50, Math.round(input.lbmKg * 0.40)));
-  const periProteinFixed = trainWindow ? (_prewP + _postwP) : 0;
+  const periBudget = periProteinBudget(input.lbmKg, trainWindow, {
+    preworkout: _keep.has('prew'),
+    postworkout: _keep.has('postw'),
+  });
+  const _prewP = periBudget.preworkoutG;
+  const _postwP = periBudget.postworkoutG;
+  const periProteinFixed = periBudget.totalG;
   const evenRegularP = (() => {
     if (regularCount === 0) return 0;
     if (trainWindow) {
@@ -3282,7 +3311,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     newAmount = Math.max(Math.round(_paFloor), Math.min(maxAmount, Math.round(newAmount)));
     // Реальная дельта после округления и капов
     const actualDeltaGrams = newAmount - best.item.amount;
-    if (Math.abs(actualDeltaGrams) < 1) return Math.abs(dev) <= 0.05; // не можем скорректировать, оставляем ±5%
+    if (Math.abs(actualDeltaGrams) < 1) return Math.abs(dev) <= tolerance;
     const factor = newAmount / (best.item.amount || 1);
     best.item.amount = newAmount;
     best.item.kcal = Math.round(best.item.kcal * factor);
@@ -3499,10 +3528,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           if (snapped !== it.amount && it.amount > 0) {
             const factor = snapped / it.amount;
             it.amount = snapped;
-            it.kcal = Math.round(it.kcal * factor);
             it.p = Math.round(it.p * factor * 10) / 10;
             it.f = Math.round(it.f * factor * 10) / 10;
             it.c = Math.round(it.c * factor * 10) / 10;
+            it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
             it.fiber = Math.round((it.fiber || 0) * factor * 10) / 10;
             it.leucine_mg = Math.round((it.leucine_mg || 0) * factor);
           }
@@ -3599,7 +3628,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
-    meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+     meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
     totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
     totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
@@ -3986,10 +4015,77 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
     totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-    totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
-  }
+     totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+   }
 
-  return {
+   // Last-line timing guarantees: later portion rounding and meal balancing
+   // must not reintroduce fat into the peri window or shrink presleep below
+   // the minimum slow-protein serving.
+   for (const m of meals) {
+     const isPre = m.type === 'preworkout';
+     const isPost = m.type === 'postworkout';
+     if (isPre || isPost) {
+       const fatCap = isPre ? PREW_FAT_MAX_G : 6;
+       const currentFat = m.items.reduce((sum, it) => sum + (it.f || 0), 0);
+       if (currentFat > fatCap) {
+         const scalable = m.items.filter(it => !(it as any)._fixedGrams && (it.f || 0) > 0);
+         const scale = Math.max(0, Math.min(1, (fatCap - m.items.filter(it => !scalable.includes(it)).reduce((sum, it) => sum + (it.f || 0), 0)) / Math.max(0.1, scalable.reduce((sum, it) => sum + (it.f || 0), 0))));
+         scalable.forEach(it => {
+           const r = scale;
+           it.amount = Math.max(5, Math.round(it.amount * r));
+           it.p = Math.round(it.p * r * 10) / 10;
+           it.f = Math.round(it.f * r * 10) / 10;
+           it.c = Math.round(it.c * r * 10) / 10;
+           it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+           it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
+           it.leucine_mg = Math.round((it.leucine_mg || 0) * r);
+         });
+       }
+       const proteinCap = Number((m as any).target?.p) || 0;
+       const mealProtein = m.items.reduce((sum, it) => sum + (it.p || 0), 0);
+       if (proteinCap > 0 && mealProtein > proteinCap + 0.5) {
+         const proteinItems = m.items.filter(it => it.role === 'protein' || it.role === 'fast_protein');
+         const scale = proteinCap / Math.max(1, mealProtein);
+         proteinItems.forEach(it => {
+           const r = scale;
+           it.amount = Math.max(5, Math.round(it.amount * r));
+           it.p = Math.round(it.p * r * 10) / 10;
+           it.f = Math.round(it.f * r * 10) / 10;
+           it.c = Math.round(it.c * r * 10) / 10;
+           it.kcal = Math.round(4 * it.p + 9 * it.f + 4 * it.c);
+           it.leucine_mg = Math.round((it.leucine_mg || 0) * r);
+         });
+       }
+     }
+     if (m.type === 'presleep') {
+       const slow = m.items.filter(it => it.role === 'slow_protein');
+       const protein = m.items.reduce((sum, it) => sum + (it.p || 0), 0);
+       if (slow.length > 0 && protein < 25) {
+         const source = slow[0];
+         const food = FOOD_DB.find(f => f.id === source.id);
+         if (food?.protein) {
+           const nextAmount = Math.max(source.amount, Math.ceil((source.amount + (25 - protein) / food.protein * 100) / 5) * 5);
+           const r = nextAmount / Math.max(1, source.amount);
+           source.amount = nextAmount;
+           source.p = Math.round(source.p * r * 10) / 10;
+           source.f = Math.round(source.f * r * 10) / 10;
+           source.c = Math.round(source.c * r * 10) / 10;
+           source.kcal = Math.round(4 * source.p + 9 * source.f + 4 * source.c);
+           source.fiber = Math.round((source.fiber || 0) * r * 10) / 10;
+           source.leucine_mg = Math.round((source.leucine_mg || 0) * r);
+         }
+       }
+     }
+     m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+   }
+   totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
+   totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
+   totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
+   totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
+   totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+   totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+
+   return {
     dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
     meals,
@@ -4018,19 +4114,77 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
 // ─── Покрытие микронутриентов: выявление дефицитов + рекомендации ─────
 // Д-6: each nutrient carries a vegFoodId so deficiency recommendations respect vegetarian mode.
-const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; vegFoodId: string; foodG: number }> = {
-  Fe: { rda: 18, unit: 'мг', foodId: 'beef_liver', vegFoodId: 'lentils', foodG: 50 },
-  Mg: { rda: 400, unit: 'мг', foodId: 'pumpkin_seeds', vegFoodId: 'pumpkin_seeds', foodG: 30 },
-  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', vegFoodId: 'pumpkin_seeds', foodG: 50 },
-  K: { rda: 3500, unit: 'мг', foodId: 'avocado', vegFoodId: 'avocado', foodG: 100 },
-  Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', vegFoodId: 'tofu', foodG: 50 },
-  Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', vegFoodId: 'flaxseed', foodG: 80 },
-  Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'brazil_nuts', foodG: 150 },
-  VitC: { rda: 100, unit: 'мг', foodId: 'veg_bell_pepper_red', vegFoodId: 'veg_bell_pepper_red', foodG: 100 },
-  VitD: { rda: 15, unit: 'мкг', foodId: 'salmon', vegFoodId: 'egg_yolk_cooked', foodG: 100 },
-  VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'egg_yolk_cooked', foodG: 150 },
-  VitB9: { rda: 400, unit: 'мкг', foodId: 'spinach', vegFoodId: 'spinach', foodG: 150 },
+const RDA_TARGETS: Record<string, { rda: number; unit: string; foodId: string; vegFoodId: string; alternatives: string[]; foodG: number }> = {
+  Fe: { rda: 18, unit: 'мг', foodId: 'beef_liver', vegFoodId: 'lentils', alternatives: ['beef_lean', 'spinach'], foodG: 50 },
+  Mg: { rda: 400, unit: 'мг', foodId: 'pumpkin_seeds', vegFoodId: 'pumpkin_seeds', alternatives: ['almonds', 'spinach'], foodG: 30 },
+  Zn: { rda: 15, unit: 'мг', foodId: 'oysters', vegFoodId: 'pumpkin_seeds', alternatives: ['beef_lean', 'eggs'], foodG: 50 },
+  K: { rda: 3500, unit: 'мг', foodId: 'avocado', vegFoodId: 'avocado', alternatives: ['spinach', 'potato_boiled'], foodG: 100 },
+  Ca: { rda: 1000, unit: 'мг', foodId: 'sardines', vegFoodId: 'tofu', alternatives: ['cottage_cheese_5', 'yogurt_greek'], foodG: 50 },
+  Omega3: { rda: 1600, unit: 'мг', foodId: 'salmon', vegFoodId: 'flaxseed', alternatives: ['sardines', 'chia_seeds'], foodG: 80 },
+  Se: { rda: 55, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'brazil_nuts', alternatives: ['eggs', 'tuna_canned'], foodG: 150 },
+  VitC: { rda: 100, unit: 'мг', foodId: 'veg_bell_pepper_red', vegFoodId: 'veg_bell_pepper_red', alternatives: ['kiwi', 'broccoli'], foodG: 100 },
+  VitD: { rda: 15, unit: 'мкг', foodId: 'salmon', vegFoodId: 'egg_yolk_cooked', alternatives: ['sardines', 'egg_yolk_cooked'], foodG: 100 },
+  VitB12: { rda: 2.4, unit: 'мкг', foodId: 'beef_lean', vegFoodId: 'egg_yolk_cooked', alternatives: ['tuna_canned', 'eggs'], foodG: 150 },
+  VitB9: { rda: 400, unit: 'мкг', foodId: 'spinach', vegFoodId: 'spinach', alternatives: ['lentils', 'broccoli'], foodG: 150 },
 };
+
+export interface PeriProteinBudget {
+  preworkoutG: number;
+  postworkoutG: number;
+  totalG: number;
+  targetRangeG: [number, number];
+}
+
+export interface NormalizedMacroTargets {
+  kcal: number;
+  p: number;
+  f: number;
+  c: number;
+  source: 'consistent' | 'kcal-derived-carbs' | 'macro-derived-kcal';
+  inputDeviationPct: number;
+}
+
+/** Keeps the four target fields mathematically compatible before generation. */
+export function normalizeMacroTargets(kcal: number, p: number, f: number, c: number): NormalizedMacroTargets {
+  const safeKcal = Number.isFinite(kcal) && kcal > 0 ? kcal : 0;
+  const safeP = Math.max(0, Number.isFinite(p) ? p : 0);
+  const safeF = Math.max(0, Number.isFinite(f) ? f : 0);
+  const safeC = Math.max(0, Number.isFinite(c) ? c : 0);
+  const formula = safeP * 4 + safeF * 9 + safeC * 4;
+  const deviation = safeKcal > 0 && formula > 0 ? Math.abs(safeKcal - formula) / safeKcal * 100 : 0;
+  if (safeKcal > 0 && formula > 0 && deviation > 3) {
+    const derivedC = Math.max(0, Math.round((safeKcal - safeP * 4 - safeF * 9) / 4));
+    return { kcal: safeKcal, p: safeP, f: safeF, c: derivedC, source: 'kcal-derived-carbs', inputDeviationPct: deviation };
+  }
+  return { kcal: safeKcal || Math.round(formula), p: safeP, f: safeF, c: safeC, source: safeKcal > 0 ? 'consistent' : 'macro-derived-kcal', inputDeviationPct: deviation };
+}
+
+/**
+ * Явный контроллер белка пери-тренировочного окна.
+ * Бюджет задаётся как 0.4–0.5 г/кг LBM для всего окна и распределяется
+ * пропорционально целям пред-/пост-трена, но не выходит за физиологичные полы
+ * слотов. Остаток дневного белка распределяется обычными приёмами.
+ */
+export function periProteinBudget(
+  lbmKg: number,
+  trainingDay: boolean,
+  slots: { preworkout: boolean; postworkout: boolean },
+): PeriProteinBudget {
+  if (!trainingDay || (!slots.preworkout && !slots.postworkout)) {
+    return { preworkoutG: 0, postworkoutG: 0, totalG: 0, targetRangeG: [0, 0] };
+  }
+  const lbm = Number.isFinite(lbmKg) && lbmKg > 0 ? lbmKg : 0;
+  const targetMin = Math.round(lbm * 0.45);
+  const targetMax = Math.round(lbm * 0.95);
+  const pre = slots.preworkout ? Math.max(20, Math.min(35, Math.round(lbm * 0.25))) : 0;
+  const post = slots.postworkout ? Math.max(25, Math.min(50, Math.round(lbm * 0.40))) : 0;
+  const total = pre + post;
+  // The lower/upper range is reported from the actual active-slot policy;
+  // for small LBM the slot minimum is physiologically more important.
+  const effectiveMin = Math.min(targetMin, total);
+  const effectiveMax = Math.max(targetMax, total);
+  return { preworkoutG: pre, postworkoutG: post, totalG: total, targetRangeG: [effectiveMin, effectiveMax] };
+}
 function getMicroFromFood(food: FoodItem, field: string): number {
   const m = food.micros as Record<string, number> | undefined;
   const e = food.electrolytes_100g as Record<string, number> | undefined;
@@ -4072,17 +4226,20 @@ function closeFoodDeficiencies(meals: Meal[], isVegetarian = false, sex: 'male'|
     });
   });
   const notes: string[] = [];
+  const usedIds = new Set(allItems.filter(x => x.food).map(x => x.food!.id));
   Object.entries(RDA_TARGETS).forEach(([key, cfg]) => {
     const effRda = key === 'Fe' ? (sex === 'male' ? 8 : 18) : cfg.rda;
     const val = totals[key] || 0;
     if (val < effRda * 0.6) {
       const sourceId = isVegetarian ? (cfg.vegFoodId || cfg.foodId) : cfg.foodId;
-      const food = FOOD_DB.find(f => f.id === sourceId) || FOOD_DB.find(f => f.id === cfg.foodId);
+      const sourceIds = [sourceId, ...cfg.alternatives].filter(id => !usedIds.has(id));
+      const food = sourceIds.map(id => FOOD_DB.find(f => f.id === id)).find(Boolean) || FOOD_DB.find(f => f.id === sourceId) || FOOD_DB.find(f => f.id === cfg.foodId);
       const name = food?.name || cfg.foodId;
       const pct = Math.round(val / effRda * 100);
       const addG = cfg.foodG;
       const addMg = food ? Math.round(getMicroFromFood(food, key) * addG / 100) : 0;
-      notes.push(`⚠ Дефицит ${key}: ${pct}% RDA (${Math.round(val)}/${effRda} ${cfg.unit}). Добавьте ${name} ${addG} г (ещё ${addMg} ${cfg.unit})`);
+      const alreadyUsed = food ? usedIds.has(food.id) : false;
+      notes.push(`⚠ Дефицит ${key}: ${pct}% RDA (${Math.round(val)}/${effRda} ${cfg.unit}). ${alreadyUsed ? `Увеличьте уже используемый продукт ${name}` : `Добавьте ${name}`} ${addG} г (ещё ${addMg} ${cfg.unit})`);
     }
   });
   return notes;

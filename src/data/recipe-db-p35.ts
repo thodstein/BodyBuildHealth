@@ -32,8 +32,8 @@ export const RECIPE_DB_P35: Recipe[] = [
   {
     name: 'На ночь: творожный крем с какао и вишней', meal: 'presleep', prepTimeMin: 5,
     kcal: 280, protein: 32, fat: 6, carbs: 22,
-    ingredientIds: ['cottage_cheese_0', 'dark_chocolate_90', 'fruit_cherry', 'honey'],
-    portions: { cottage_cheese_0: 200, dark_chocolate_90: 8, fruit_cherry: 80, honey: 10 },
+    ingredientIds: ['cottage_cheese_0', 'dark_chocolate_90', 'cherry', 'honey'],
+    portions: { cottage_cheese_0: 200, dark_chocolate_90: 8, cherry: 80, honey: 10 },
     ingredients: ['Творог 0% — 200 г', 'Какао-порошок — 8 г', 'Вишня — 80 г', 'Мёд — 10 г'],
     instructions: ['Пробейте творог с какао и мёдом.', 'Сверху вишня (можно замороженную, оттаявшую).'],
     tags: ['перед сном', 'без готовки', 'десерт', 'пп'], usefulness: 9,
@@ -142,8 +142,8 @@ export const RECIPE_DB_P35: Recipe[] = [
   {
     name: 'Dry-Ужин: индейка с рукколой и томатами', meal: 'dinner', prepTimeMin: 18,
     kcal: 400, protein: 50, fat: 9, carbs: 12,
-    ingredientIds: ['turkey_breast', 'veg_arugula', 'tomato', 'olive_oil', 'sauce_balsamic'],
-    portions: { turkey_breast: 260, veg_arugula: 100, tomato: 150, olive_oil: 6, sauce_balsamic: 10 },
+    ingredientIds: ['turkey_breast', 'arugula', 'tomato', 'olive_oil', 'sauce_balsamic'],
+    portions: { turkey_breast: 260, arugula: 100, tomato: 150, olive_oil: 6, sauce_balsamic: 10 },
     ingredients: ['Индейка (грудка) — 260 г', 'Руккола — 100 г', 'Томаты — 150 г', 'Оливковое масло — 6 г', 'Бальзамик — 10 г'],
     instructions: ['Обжарьте индейку 7 мин.', 'Салат с маслом и бальзамиком.'],
     tags: ['сушка', 'ужин', 'высокий белок', 'быстро'], usefulness: 8,

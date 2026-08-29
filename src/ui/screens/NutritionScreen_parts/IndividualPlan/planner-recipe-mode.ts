@@ -487,11 +487,11 @@ export function rebalanceDayAfterRecipes(
   let devFinal = maxDeviationPct(finalTotals, validTargets);
 
   // Финальная точная посадка: если после всех ходов всё ещё >3%, равномерно масштабируем
-  // items применённых рецептов в КУМУЛЯТИВНОМ коридоре ±8% (пропорции/вкус не меняются —
-  // это компенсация дрейфа декомпозиции, а не правка авторских пропорций).
+  // items применённых рецептов в КУМУЛЯТИВНОМ коридоре ±10% (пропорции/вкус не меняются —
+  // это компенсация небольшого дрейфа декомпозиции, а не правка авторских порций).
   if (devFinal > 3) {
     const cumScale = new Map<number, number>();
-    for (let iter = 0; iter < 8 && devFinal > 3; iter++) {
+      for (let iter = 0; iter < 8 && devFinal > 3; iter++) {
       let improved = false;
       for (let mi = 0; mi < work.length; mi++) {
         const m = work[mi];
