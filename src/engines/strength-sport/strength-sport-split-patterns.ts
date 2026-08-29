@@ -189,15 +189,23 @@ export function patternsForMode(mode: StrengthSportMode): StrengthSportPattern[]
   return STRENGTH_SPORT_PATTERNS.filter(p => p.mode === mode || p.mode === 'any');
 }
 
-export function recommendStrengthSportPattern(mode: StrengthSportMode, daysPerWeek: number, level: string): StrengthSportPattern {
+export function recommendStrengthSportPattern(mode: StrengthSportMode, daysPerWeek: number, level: string, goal?: string, equipment?: string[]): StrengthSportPattern {
   const pool = patternsForMode(mode);
-  const byDays = pool.filter(p => p.sessionsPerRotation === daysPerWeek);
-  if (byDays.length) {
-    const byLevel = byDays.find(p => p.level.includes(level));
-    if (byLevel) return byLevel;
-    return byDays[0];
-  }
-  // fallback: ближайший по дням
+  // PRO: goal учитывается (technique нужен 4×, peaking 3×), equipment без specialty не рекомендует SM 3×
+  let scored = pool.map(p => {
+    let score = 0;
+    if (p.sessionsPerRotation === daysPerWeek) score += 10;
+    else score -= Math.abs(p.sessionsPerRotation - daysPerWeek) * 2;
+    if (p.level.includes(level)) score += 5;
+    if (goal === 'technique' && p.sessionsPerRotation >= 4) score += 3;
+    if (goal === 'peaking' && p.sessionsPerRotation <= 4) score += 2;
+    const hasSpecialty = equipment?.includes('other') || equipment?.includes('specialty') || (equipment && equipment.length === 0);
+    if (!hasSpecialty && p.mode === 'strongman' && p.sessionsPerRotation >= 3) score -= 3;
+    if (hasSpecialty && p.mode === 'strongman') score += 1;
+    return { p, score };
+  });
+  scored.sort((a,b)=> b.score - a.score);
+  if (scored.length) return scored[0].p;
   let best = pool[0];
   let bestDiff = Math.abs(pool[0].sessionsPerRotation - daysPerWeek);
   for (const p of pool) {

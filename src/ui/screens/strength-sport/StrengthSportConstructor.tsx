@@ -7,8 +7,9 @@ import React, { useState, useMemo } from 'react';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
 import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../../engines/strength-sport/strength-sport-split-patterns';
-import { buildStrengthCsv, downloadStrengthCsv, buildStrengthPrintHtml, shareStrengthDigest, buildStrengthTelegramUrl, buildStrengthShareHash } from '../../../engines/strength-sport/strength-sport-export';
+import { buildStrengthCsv, downloadStrengthCsv, buildStrengthPrintHtml, shareStrengthDigest, buildStrengthTelegramUrl, buildStrengthShareHash, downloadStrengthIcs } from '../../../engines/strength-sport/strength-sport-export';
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
+import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -19,7 +20,7 @@ import { CARD, CARD_ACCENT, CARD_STRONG, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRI
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
-const WM_LABEL_RU: Record<string,string> = { backSquat:'Присед', frontSquat:'Фронт. присед', deadlift:'Тяга', snatch:'Рывок', cleanJerk:'Толчок', overheadPress:'Жим стоя' };
+const WM_LABEL_RU: Record<string,string> = { backSquat:'Присед', frontSquat:'Фронт. присед', deadlift:'Тяга', snatch:'Рывок', cleanJerk:'Толчок', overheadPress:'Жим стоя', yokeWalk:'Йок', farmersWalk:'Фермер', atlasStone:'Камень', axleDeadlift:'Аксель', logPress:'Лог' };
 
 export const StrengthSportConstructor: React.FC = () => {
   const [step, setStep] = useState<Step>('params');
@@ -32,7 +33,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [methodology, setMethodology] = useState<StrengthSportInput['methodology']>('compound_first');
   const [dupMode, setDupMode] = useState<StrengthSportInput['dupMode']>('off');
   const [intensityTech, setIntensityTech] = useState<StrengthSportInput['intensityTech']>('none');
-  const [workMax, setWorkMax] = useState<StrengthSportInput['workMax']>({ backSquat: 120, deadlift: 160, snatch: 70, cleanJerk: 90, overheadPress: 60 });
+  const [workMax, setWorkMax] = useState<StrengthSportInput['workMax']>({ backSquat: 120, deadlift: 160, snatch: 70, cleanJerk: 90, overheadPress: 60, yokeWalk: 200, farmersWalk: 140, atlasStone: 100 } as any);
   const [equipment, setEquipment] = useState<string[]>([]);
   const [mobility, setMobility] = useState<string[]>([]);
   const [injuries, setInjuries] = useState<any[]>([]);
@@ -47,6 +48,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
+  const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -180,6 +182,7 @@ export const StrengthSportConstructor: React.FC = () => {
       patternId: patternId || undefined,
       diaryTrend: diaryTrend || undefined,
       taperWeeks: goal==='peaking' ? taperWeeks : undefined,
+      weakPoints: weakPoints.length ? weakPoints : undefined,
       ...extra,
     } as any;
     try {
@@ -407,6 +410,20 @@ export const StrengthSportConstructor: React.FC = () => {
               <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={INPUT} placeholder="кг" /></Field>
             ))}
           </div>
+          {mode !== 'weightlifting' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              {(['yokeWalk','farmersWalk','atlasStone','logPress'] as const).map(k => (
+                <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || 0} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={INPUT} placeholder="кг" /></Field>
+              ))}
+            </div>
+          )}
+          <Field label="Слабые точки (специализация) — объём ×1.15 на целевые" hint="Выберите до 2 зон — добавит объём на коррекцию">
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {Object.entries(WL_WEAKPOINT_LABELS).slice(0,8).map(([k,label])=> (
+                <ChipToggle key={k} active={weakPoints.includes(k)} onClick={()=> setWeakPoints(s=> s.includes(k)? s.filter(x=>x!==k): s.length>=2?s:[...s,k])}>{label}</ChipToggle>
+              ))}
+            </div>
+          </Field>
           <SectionCard title="🛠 Оборудование и ограничения">
             <Field label="Доступное оборудование (пусто — всё доступно)">
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -587,7 +604,8 @@ export const StrengthSportConstructor: React.FC = () => {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
             <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>🖨 Печать (HTML)</button>
-            <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📊 CSV (Excel)</button>
+            <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📊 CSV</button>
+            <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📅 ICS</button>
             <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест скопирован'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📋 Дайджест</button>
             <button onClick={()=> { const url=buildStrengthTelegramUrl(plan); navigator.clipboard?.writeText(url); setMsg('Telegram ссылка скопирована'); try{ window.open(url,'_blank'); }catch{} }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,136,204,0.15)', color: '#2ca5e0', border: '1px solid rgba(0,136,204,0.3)', cursor: 'pointer' }}>✈ Telegram</button>
             <button onClick={exportToUserProgram} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.15)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.3)', cursor: 'pointer' }}>Экспорт в программу</button>

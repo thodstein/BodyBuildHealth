@@ -47,7 +47,8 @@ describe('P0-3 per-lift k', () => {
 describe('P0-2 Prilepin % single source', () => {
   it('snatch accumulation 0.75', () => {
     const p = buildStrengthSportPlan({ mode:'weightlifting', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ snatch:100, backSquat:150 } });
-    const snEx = p.weeksData[0].sessions.flatMap(s=> s.exercises).find(e=> e.id==='snatch');
+    const snDay = p.weeksData[0].sessions.find(s=> s.sessionTag==='snatch_day');
+    const snEx = snDay?.exercises.find(e=> e.id.includes('snatch'));
     expect(snEx?.workSets[0].pct).toBe(75);
     expect(snEx?.tempo).toBe('X-0-X-0');
   });
@@ -63,7 +64,7 @@ describe('P0-6 rest 5-8 for carry', () => {
     expect(restForSS('тяж', true, 'farmers_walk_heavy')).toBe(360);
     expect(restForSS('тяж', true, 'log_press')).toBe(240);
     expect(restForSS('тяж', true, 'back_squat')).toBe(180);
-    expect(restForSS('памп', false, 'yoke_walk')).toBe(300);
+    expect(restForSS('памп', false, 'yoke_walk')).toBe(120);
   });
   it('tempo deload oly keeps X-0-X-0', () => {
     expect(tempoForSS('snatch','тяж','deload')).toBe('X-0-X-0');

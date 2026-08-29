@@ -34,11 +34,20 @@ function curveInsulin(iu: number): number {
   return 1.05;
 }
 
+export const PED_T_EQ: Record<string, number> = { tren: 2.5, nand: 1.3, deca: 1.3, bold: 1.1, eq: 1.1, primo: 1.0, mast: 1.0, drol: 1.2, anavar: 0.9, winstrol: 1.0, stan: 1.0, oxan: 0.9, halo: 1.1, superdrol: 1.4 };
+export function getAasTeq(peds: string[] | undefined): number {
+  if (!peds || peds.length === 0) return 1.0;
+  const low = peds.map(p => p.toLowerCase());
+  if (low.some(p => p.includes('tren'))) return 2.5;
+  if (low.some(p => p.includes('nand') || p.includes('deca'))) return 1.3;
+  if (low.some(p => p.includes('bold') || p.includes('eq'))) return 1.1;
+  if (low.some(p => p.includes('drol') || p.includes('superdrol'))) return 1.2;
+  return 1.0;
+}
 export function adaptForPEDsSS(peds: string[] | undefined, pedDoses: PedDoses | undefined, courseIntensity?: string, isWeightCut?: boolean): { mrvMult: number; details: string } {
   const doses = pedDoses || {};
   const has = (k: string) => (peds || []).some(p => p.toLowerCase().includes(k.toLowerCase()));
-  // P1: tEq для тренболона 2.5 и нандролона 1.3 — как в bb-ped-adaptation
-  const aasTeq = has('tren') ? 2.5 : has('nand') || has('deca') ? 1.3 : has('bold') || has('eq') ? 1.1 : 1.0;
+  const aasTeq = getAasTeq(peds);
   // пробуем найти дозы по ключам — сумма всех AAS-подобных
   let aasDose = 0;
   const aasKeys = ['aas','test','tren','deca','nand','bold','eq','primo','mast','drol','anavar','winstrol','oxan','stan'];

@@ -133,12 +133,24 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     }
   }
 
-  // Deload — Helms: объём делода 45-50% среднего (P1), было 70% — ужесточаем до 60% с предупреждением
+  // Deload — Helms: объём делода 45-50% среднего — enforce до 50% если перебор
   for (const wk of plan.weeksData) {
     if (wk.deload) {
       const avg = plan.weeksData.filter(w => !w.deload).reduce((s, w) => s + (w.totalSets || 0), 0) / Math.max(1, plan.weeksData.filter(w => !w.deload).length);
       if ((wk.totalSets || 0) > avg * 0.60) {
         warnings.push(`Делод нед ${wk.week}: объём ${wk.totalSets} > 60% среднего ${Math.round(avg)} — делод должен быть легче (Helms 45-50%).`);
+      }
+      // enforce: если делод >50% среднего — режем accessory до 50%
+      const target = Math.round(avg * 0.50);
+      if (avg > 0 && (wk.totalSets || 0) > target) {
+        let cur = wk.totalSets || 0;
+        for (const sess of wk.sessions) {
+          for (let i = sess.exercises.length - 1; i >= 0 && cur > target; i--) {
+            const ex = sess.exercises[i];
+            if (ex.sets > 2) { ex.sets -= 1; ex.workSets = ex.workSets.slice(0, ex.sets); cur -= 1; }
+          }
+        }
+        wk.totalSets = wk.sessions.reduce((a, s) => a + s.exercises.reduce((x, e) => x + e.sets, 0), 0);
       }
     }
   }
@@ -172,6 +184,32 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     if (lmPress && liftsOverhead > lmPress.mrv) warnings.push(`Нед ${wk.week}: жим/лог ${liftsOverhead} сетов > MRV ${lmPress.mrv}.`);
     if (lmCarry && carryMeters > lmCarry.mrv) warnings.push(`Нед ${wk.week}: переноски ${carryMeters}м > MRV ${lmCarry.mrv}м.`);
     if (lmStone && stoneLifts > lmStone.mrv) warnings.push(`Нед ${wk.week}: камни ${stoneLifts} подъёмов > MRV ${lmStone.mrv}.`);
+    // PRO enforce: если перебор > MRV — режем accessory до MRV (как BB normalizeWeekMrv)
+    const enforceCategory = (ids: string[], current: number, mrv: number, isLifts: boolean) => {
+      if (current <= mrv) return;
+      let over = current - mrv;
+      for (const sess of wk.sessions) {
+        for (let i = sess.exercises.length - 1; i >= 0 && over > 0; i--) {
+          const ex = sess.exercises[i];
+          if (!ids.includes(ex.id)) continue;
+          if (ex.role !== 'accessory' && sess.exercises.filter(e => ids.includes(e.id) && e.role === 'primary').length <= 1) continue;
+          if (isLifts) {
+            // lifts — уменьшаем reps на 1 на сет (снижает lifts на sets)
+            for (const ws of ex.workSets) { if (ws.reps > 1) { ws.reps -= 1; over -= 1; if (over <= 0) break; } }
+            ex.reps = `${ex.workSets[0]?.reps || 1}-${ex.workSets[0]?.reps || 1}`;
+          } else {
+            if (ex.sets > 2) { ex.sets -= 1; ex.workSets = ex.workSets.slice(0, ex.sets); over -= 1; }
+          }
+        }
+      }
+      wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+    };
+    if (lmSq && liftsSquat > lmSq.mrv) enforceCategory(['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2','pause_squat','tempo_squat'], liftsSquat, lmSq.mrv, false);
+    if (lmPull && liftsPull > lmPull.mrv) enforceCategory(['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift','deficit_pull','pause_pull'], liftsPull, lmPull.mrv, false);
+    if (lmPress && liftsOverhead > lmPress.mrv) enforceCategory(['log_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar','pin_press'], liftsOverhead, lmPress.mrv, false);
+    if (lmCarry && carryMeters > lmCarry.mrv) enforceCategory(['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint'], carrySets, lmCarry.mrv / 20, false);
+    if (lmS && liftsSnatch > lmS.mrv) enforceCategory(['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_balance','overhead_squat_v2','deficit_snatch','block_snatch','pause_snatch'], liftsSnatch, lmS.mrv, true);
+    if (lmC && liftsClean > lmC.mrv) enforceCategory(['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull','deficit_clean','block_clean','pause_clean'], liftsClean, lmC.mrv, true);
     // P2: Joint JSI — тяжёлые йок/лог >2.2×BW риск поясницы/плеча
     const bwAny = (plan.inputSnapshot as any)?.bodyweight as number | undefined;
     if (typeof bwAny === 'number' && bwAny > 0) {

@@ -12,16 +12,35 @@ export interface DiaryTrendSS {
 }
 
 function epley(weight: number, reps: number): number {
+  // PRO: для ТА reps>5 невалидны — Epley завышает, используем Brzycki с cap 3 для oly
+  if (reps > 5) reps = 5;
   return weight * (1 + reps / 30);
+}
+function brzycki(weight: number, reps: number): number {
+  if (reps <= 1) return weight;
+  if (reps > 10) reps = 10;
+  return weight * (36 / (37 - reps));
+}
+function isOlyLift(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes('snatch') || n.includes('рывок') || n.includes('clean') || n.includes('толчок') || n.includes('jerk');
+}
+function epleyForLift(weight: number, reps: number, name: string): number {
+  // Oly: Brzycki с cap 3, силовые — Epley
+  if (isOlyLift(name) && reps > 3) return brzycki(weight, 3);
+  if (isOlyLift(name)) return brzycki(weight, reps);
+  return epley(weight, reps);
 }
 
 function liftKeyForExercise(name: string): string | null {
   const n = name.toLowerCase();
+  // порядок: специфичные перед общими (press до deadlift, snatch до pull)
   if (n.includes('snatch') || n.includes('рывок')) return 'snatch';
   if (n.includes('clean') || n.includes('толчок') || n.includes('jerk')) return 'clean';
-  if (n.includes('squat') || n.includes('присед') || n.includes('front_squat')) return 'squat';
-  if (n.includes('deadlift') || n.includes('тяга') || n.includes('rdl')) return 'deadlift';
+  if (n.includes('front_squat') || n.includes('back_squat') || n.includes('overhead_squat')) return 'squat';
+  if (n.includes('squat') || n.includes('присед')) return 'squat';
   if (n.includes('press') || n.includes('log') || n.includes('ohp') || n.includes('жим')) return 'overhead';
+  if (n.includes('deadlift') || n.includes('тяга') || n.includes('rdl')) return 'deadlift';
   if (n.includes('farmers') || n.includes('yoke') || n.includes('carry')) return 'carry';
   if (n.includes('stone') || n.includes('sandbag') || n.includes('tire')) return 'stone';
   return null;
@@ -41,10 +60,13 @@ export function buildDiaryTrendSS(logs: any[]): DiaryTrendSS[] | null {
       const key = liftKeyForExercise(n);
       if (key !== lift) continue;
       if (!Array.isArray(e.sets) || e.sets.length === 0) continue;
+      // PRO: игнорируем warmupSets если есть флаг isWarmup — берём только рабочие (weight > 40% e1RM)
+      const workSets = (e.sets as any[]).filter((s: any) => !s.isWarmup && Number(s.weight) > 0);
+      if (workSets.length === 0) continue;
       const d = String(e.date || '');
       const t = new Date(d).getTime();
       if (!Number.isFinite(t)) continue;
-      const maxE1 = Math.max(...(e.sets as any[]).map((s: any) => epley(Number(s.weight) || 0, Number(s.reps) || 0))).valueOf();
+      const maxE1 = Math.max(...workSets.map((s: any) => epleyForLift(Number(s.weight) || 0, Number(s.reps) || 0, n))).valueOf();
       if (!maxE1 || maxE1 <= 0) continue;
       const diff = now - t;
       if (diff >= 0 && diff <= 28 * dayMs) recentVals.push(maxE1);
@@ -55,11 +77,18 @@ export function buildDiaryTrendSS(logs: any[]): DiaryTrendSS[] | null {
       const maxP = Math.max(...prevVals);
       if (maxP > 0) {
         const changePct = Math.round(((maxR - maxP) / maxP * 100) * 10) / 10;
-        out.push({ lift, changePct, recentMax: Math.round(maxR), prevMax: Math.round(maxP) });
+        // PRO: plateau детекция: если changePct в [-2,2] и recentVals.length>=3 — plateau
+        const isPlateau = Math.abs(changePct) < 2 && recentVals.length >= 3;
+        out.push({ lift, changePct, recentMax: Math.round(maxR), prevMax: Math.round(maxP), plateau: isPlateau } as any);
       }
     }
   }
   return out.length ? out : null;
+}
+export function detectPlateau(logs: any[], lift: string): boolean {
+  const trend = buildDiaryTrendSS(logs);
+  const t = trend?.find(x => x.lift === lift);
+  return !!(t && Math.abs(t.changePct) < 2);
 }
 
 export function loadDiaryLogsSS(): any[] {

@@ -114,8 +114,8 @@ function gentleFactor(id: string, injuries: any[]|undefined): number {
 function repsFor(tag: string, phase: string, goal: string, isPrimary: boolean): [number, number] {
   return repsForSS(tag, phase, goal, isPrimary);
 }
-function pctFor(phase: string, goal: string): number {
-  return pctForSS(phase, goal);
+function pctFor(phase: string, goal: string, tag?: string): number {
+  return pctForSS(phase, goal, tag);
 }
 
 function basePmFor(id: string, wm: StrengthSportInput['workMax']): number {
@@ -158,7 +158,7 @@ function buildWarmup(weight: number, id?: string): StrengthSportSet[] {
 
 function buildExerciseSets(id: string, tag: string, phase: string, input: StrengthSportInput, isPrimary: boolean, week: number): { sets: number; reps: [number, number]; rir: number; weight: number; workSets: StrengthSportSet[] } {
   const reps = repsFor(tag, phase, input.goal, isPrimary);
-  const pct = pctFor(phase, input.goal);
+  const pct = pctFor(phase, input.goal, tag);
   const baseWeight = weightForExercise(id, input, pct, week);
   let sets = 3;
   if (isOly(id)) sets = phase === 'peaking' ? 5 : phase === 'deload' ? 3 : 5;
@@ -250,15 +250,16 @@ function computeRecMult(input: { bodyFat?: number; leanMass?: number; hrvMs?: nu
 function computeNutMult(input: { calorieSurplus?: number; proteinPerKg?: number; female?: boolean }): number {
   return computeNutritionMultiplier(input as any);
 }
-// P0-4: бюджет per level (begin 60, inter 85, adv 110, enh 135) — вместо магии 112
-function computeBudget(input: { level?: string; peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number; isWeightCut?: boolean }): number {
+// P1.1: бюджет per level с recovery (Helms) — parity BB (ped×lab×nut×recovery)
+function computeBudget(input: { level?: string; peds?: string[]; pedDoses?: Record<string, number>; courseIntensity?: string; calorieSurplus?: number; proteinPerKg?: number; labMrvMultiplier?: number; isWeightCut?: boolean; recoveryMult?: number }): number {
   const levelBase: Record<string, number> = { beginner: 60, intermediate: 85, advanced: 110, enhanced: 135 };
   const baseSets = levelBase[(input.level as string) || 'intermediate'] ?? 85;
   const ped = adaptForPEDsSS(input.peds, input.pedDoses as any, input.courseIntensity, !!input.isWeightCut);
   const base = Math.round(baseSets * ped.mrvMult);
   const lab = input.labMrvMultiplier ?? 1;
   const nut = computeNutMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
-  return Math.round(base * lab * nut);
+  const rec = input.recoveryMult ?? 1;
+  return Math.round(base * lab * nut * rec);
 }
 
 const SS_EX_META: Record<string, { name: string; group: string; pattern: string }> = {
@@ -418,10 +419,10 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   const mode = input.mode || 'weightlifting';
   const goal = input.goal || 'strength';
 
-  // pattern — patternId теперь типизирован
+  // pattern — PRO: учитываем goal и equipment
   let pattern: StrengthSportPattern | undefined = input.patternId ? getStrengthSportPattern(input.patternId) : undefined;
   if (!pattern || pattern.sessionsPerRotation !== daysPerWeek || pattern.mode !== mode) {
-    pattern = recommendStrengthSportPattern(mode, daysPerWeek, level);
+    pattern = recommendStrengthSportPattern(mode, daysPerWeek, level, goal, input.equipment);
   }
 
   const outsideMetrics = computeOutsideMetrics(input.outsideLoad as OutsideLoad);
@@ -436,16 +437,22 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   // P0 fix double count: weeklyBudget — базовый без ACWR/outside/VBT (сравниваем фактические сеты после редукции с базой)
   const acwrMult = input.acwr?.zone === 'dangerous' ? 0.60 : input.acwr?.zone === 'caution' ? 0.85 : input.acwr?.zone === 'undertrained' ? 1.10 : 1;
   const vbtMult = (input as any).velocityLossPct > 20 ? 0.90 : 1;
-  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier, isWeightCut }));
+  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier, isWeightCut, recoveryMult }));
   // P0-5 frequencyPenalty — если outside high + 5× зал, форсим 3×
   let effectiveDaysPerWeek = daysPerWeek;
   if (outsideFrequencyPenalty(input.outsideLoad as OutsideLoad) === 1 && daysPerWeek >= 4) {
     effectiveDaysPerWeek = 3;
   }
-  // если форсим дни — пересобираем pattern
+  // если форсим дни — пересобираем pattern с учётом WL low
   if (effectiveDaysPerWeek !== daysPerWeek) {
-    const forced = recommendStrengthSportPattern(mode, effectiveDaysPerWeek, level);
-    if (forced.sessionsPerRotation === effectiveDaysPerWeek) pattern = forced;
+    // PRO: для WL outside low не форсим 3× (WL интерференция низкая) — только high
+    const isWLLow = mode === 'weightlifting' && outsideMetrics?.interference === 'low';
+    if (!isWLLow) {
+      const forced = recommendStrengthSportPattern(mode, effectiveDaysPerWeek, level, goal, input.equipment);
+      if (forced.sessionsPerRotation === effectiveDaysPerWeek) pattern = forced;
+    } else {
+      effectiveDaysPerWeek = daysPerWeek;
+    }
   }
 
   const weeksData: StrengthSportWeek[] = [];
@@ -456,7 +463,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   if (Array.isArray((input as any).weakPoints) && (input as any).weakPoints.length) rationale.push(`Слабые лифты: ${(input as any).weakPoints.join(', ')} → объём ×1.15 на целевые`);
   if (wcProto) {
     rationale.push(`Весогонка ТА: −${wcProto.targetLossKg}кг за ${wcProto.weeksOut}нед · вода ${wcProto.waterMode} · Na ${wcProto.sodiumMode} · угли ${wcProto.carbMode}`);
-    const nutW1 = weightCutNutritionForWeekSS(1, weeks, wcProto, (input as any).bodyweight || 80);
+    const nutW1 = weightCutNutritionForWeekSS(1, weeks, wcProto, (input as any).bodyweight || 80, (input as any).sex || 'male');
     if (nutW1.kcal) rationale.push(`Питание W1: ${nutW1.kcal}ккал P${nutW1.proteinG}/C${nutW1.carbsG} · вода ${nutW1.waterMl}мл Na ${nutW1.sodiumMg}мг`);
     rationale.push(weightCutRehydrationNotesSS(wcProto.targetLossKg)[0]);
   }

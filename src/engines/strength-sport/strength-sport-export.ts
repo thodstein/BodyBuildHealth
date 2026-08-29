@@ -88,3 +88,30 @@ export function buildStrengthDigestWithHash(plan: StrengthSportPlan): string {
   const h = buildStrengthShareHash(plan);
   return `${shareStrengthDigest(plan)}\n\n#strength-${h}`;
 }
+
+export function buildStrengthIcs(plan: StrengthSportPlan, startDate?: string): string {
+  const start = startDate ? new Date(startDate) : new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const fmt = (d: Date) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T090000`;
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', `PRODID:-//BodyBuildHealth//Strength ${plan.mode}//RU`];
+  for (const wk of plan.weeksData) {
+    for (const sess of wk.sessions) {
+      const d = new Date(start); d.setDate(start.getDate() + (wk.week - 1) * 7 + (sess.day - 1));
+      const dt = fmt(d);
+      const summary = `${plan.mode} Н${wk.week} ${sess.sessionTag} (${sess.character})`;
+      const desc = sess.exercises.map(e => `${e.name} ${e.sets}x${e.reps} ${e.weight}кг`).join('\\n');
+      lines.push('BEGIN:VEVENT', `DTSTART:${dt}`, `DTEND:${dt}`, `SUMMARY:${summary}`, `DESCRIPTION:${desc}`, `UID:ss-${plan.id}-${wk.week}-${sess.day}@bbhealth`, 'END:VEVENT');
+    }
+  }
+  lines.push('END:VCALENDAR');
+  return lines.join('\r\n');
+}
+
+export function downloadStrengthIcs(plan: StrengthSportPlan, startDate?: string) {
+  try {
+    const ics = buildStrengthIcs(plan, startDate);
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `strength_${plan.mode}_${plan.weeks}w.ics`; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1000);
+  } catch {}
+}

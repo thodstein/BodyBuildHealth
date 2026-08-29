@@ -5,10 +5,10 @@ import { finalizeStrengthSportPlan } from '../strength-sport-finalize.engine';
 import { buildStrengthCsv, buildStrengthPrintHtml, buildStrengthShareHash } from '../strength-sport-export';
 
 describe('P4 Prilepin', () => {
-  it('WL <70% 3-5', () => expect(optimalRepsForPct(0.65, true)).toEqual([3,5]));
+  it('WL <70% 3-6', () => expect(optimalRepsForPct(0.65, true)).toEqual([3,6]));
   it('WL 90%+ 1-2', () => expect(optimalRepsForPct(0.92, true)).toEqual([1,2]));
   it('strength <70% 5-8', () => expect(optimalRepsForPct(0.65, false)).toEqual([5,8]));
-  it('repsForSS WL snatch primary 1-3', () => expect(repsForSS('snatch_day','accumulation','strength',true)).toEqual([1,3]));
+  it('repsForSS WL snatch primary 2-4', () => expect(repsForSS('snatch_day','accumulation','strength',true)).toEqual([2,4]));
   it('pctForSS technique 0.65', () => expect(pctForSS('accumulation','technique')).toBe(0.65));
 });
 
@@ -44,7 +44,7 @@ describe('P4 rest by pct', () => {
   it('90%+ yoke primary 480', () => expect(restForSS('тяж', true, 'yoke_walk', 0.92)).toBe(480));
   it('80% yoke primary 360', () => expect(restForSS('тяж', true, 'yoke_walk', 0.85)).toBe(360));
   it('памп always 75', () => expect(restForSS('памп', false, undefined, 0.92)).toBe(75));
-  it('памп yoke 300-360', () => expect(restForSS('памп', false, 'yoke_walk', 0.92)).toBe(360));
+  it('памп yoke 120-180', () => expect(restForSS('памп', false, 'yoke_walk', 0.92)).toBe(180));
   it('70% squat 180', () => expect(restForSS('тяж', true, 'back_squat', 0.75)).toBe(180));
 });
 

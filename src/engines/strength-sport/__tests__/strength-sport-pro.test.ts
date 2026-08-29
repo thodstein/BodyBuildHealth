@@ -59,7 +59,7 @@ describe('strength-sport PRO gym', () => {
     expect(tempoForSS('back_squat','тяж','deload')).toBe('3-1-1-0');
   });
   it('repsForSS', () => {
-    expect(repsForSS('snatch_day','accumulation','strength',true)).toEqual([1,3]);
-    expect(repsForSS('event_day','accumulation','strength',true)).toEqual([1,5]);
+    expect(repsForSS('snatch_day','accumulation','strength',true)).toEqual([2,4]);
+    expect(repsForSS('event_day','accumulation','strength',true)).toEqual([1,3]);
   });
 });

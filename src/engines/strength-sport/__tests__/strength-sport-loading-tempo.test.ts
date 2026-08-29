@@ -30,7 +30,7 @@ describe('strength-sport-loading tempo overrides', () => {
     expect(restForSS('памп', false)).toBe(75);
   });
   it('reps for technique', () => {
-    expect(repsForSS('snatch_day', 'accumulation', 'technique', true)).toEqual([1,3]);
+    expect(repsForSS('snatch_day', 'accumulation', 'technique', true)).toEqual([1,2]);
   });
   it('pct for peaking', () => {
     expect(pctForSS('peaking', 'strength')).toBeCloseTo(0.92);

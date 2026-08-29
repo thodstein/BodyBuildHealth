@@ -68,28 +68,33 @@ export function weightCutNutritionForWeekSS(
   totalWeeks: number,
   protocol: WeightCutProtocolSS | null,
   bodyweightKg?: number,
+  sex?: string,
 ): { kcal: number | null; proteinG: number | null; carbsG: number | null; waterMl: number | null; sodiumMg: number | null; notes: string[] } {
   if (!protocol || bodyweightKg == null || bodyweightKg <= 30) return { kcal: null, proteinG: null, carbsG: null, waterMl: null, sodiumMg: null, notes: [] };
   const ph = weightCutPhaseForWeekSS(week, totalWeeks, protocol);
   const notes: string[] = [];
   const protein = Math.round(bodyweightKg * (ph === 'taper' || ph === 'fight_week' ? 2.3 : 2.2));
   let carbs = Math.round(bodyweightKg * 4);
-  let water = Math.round(bodyweightKg * 35);
+  let water = Math.round(bodyweightKg * (sex === 'female' ? 30 : 35));
   let sodium = 5000;
   if (ph === 'taper') {
     carbs = protocol.carbMode === 'moderate_cut' ? Math.round(bodyweightKg * 2.5) : Math.round(bodyweightKg * 4);
-    water = protocol.waterMode === 'load_cut' ? 7000 : Math.round(bodyweightKg * 30);
+    const loadWater = Math.min(6000, Math.round(bodyweightKg * 40));
+    water = protocol.waterMode === 'load_cut' ? loadWater : Math.round(bodyweightKg * (sex === 'female' ? 28 : 30));
     sodium = protocol.sodiumMode === 'moderate_cut' ? 3000 : 4000;
     notes.push('Тапер: угли умеренно ↓, вода load перед сливом (для ТА мягче чем у единоборств)');
+    if (sex === 'female') notes.push('Female: вода 30мл/кг (vs male 35), Na стабильно, угли не <2г/кг');
   } else if (ph === 'fight_week') {
-    carbs = protocol.carbMode === 'moderate_cut' ? Math.round(bodyweightKg * 2) : Math.round(bodyweightKg * 3);
-    water = protocol.waterMode === 'load_cut' ? 2000 : Math.round(bodyweightKg * 22);
+    carbs = protocol.carbMode === 'moderate_cut' ? Math.max(Math.round(bodyweightKg * 2), 120) : Math.round(bodyweightKg * 3);
+    if (protocol.heatSessions && ph === 'fight_week') notes.push('⚠ Сауна НЕ в fight week — ЦНС риск, только в taper/camp');
+    water = protocol.waterMode === 'load_cut' ? 2000 : Math.round(bodyweightKg * (sex === 'female' ? 20 : 22));
     sodium = protocol.sodiumMode === 'moderate_cut' ? 2000 : 3000;
     notes.push('Fight week: вода 2л + Na 2г + угли ≥2г/кг (сохраняем ЦНС для техники) → взвешивание → рефид 4-5г/кг + 125% воды');
-    if (protocol.heatSessions) notes.push('Сауна 12-15′×2 — только при сгонке ≥3кг');
+    if (protocol.heatSessions && ph !== 'fight_week') notes.push('Сауна 12-15′×2 — только при сгонке ≥3кг, не в fight week');
   } else {
-    carbs = Math.round(bodyweightKg * 5);
-    water = Math.round(bodyweightKg * 35);
+    // camp: при сгонке 5кг угли 4г/кг уже, не 5
+    carbs = protocol.targetLossKg >= 5 ? Math.round(bodyweightKg * 4) : protocol.targetLossKg >= 3 ? Math.round(bodyweightKg * 4.5) : Math.round(bodyweightKg * 5);
+    water = Math.round(bodyweightKg * (sex === 'female' ? 30 : 35));
     sodium = 5000;
   }
   const fat = Math.round(bodyweightKg * 0.9);
@@ -109,5 +114,7 @@ export function validateWeightCutProtocolSS(p: WeightCutProtocolSS): string[] {
   if (p.targetLossKg > 8) errs.push('Сгонка >8кг — риск, требуется врач');
   if (p.targetLossKg / p.weeksOut > 1.2) errs.push(`Темп ${(p.targetLossKg / p.weeksOut).toFixed(1)}кг/нед >1.2 — агрессивно для ТА`);
   if (p.targetLossKg > 5 && p.weeksOut < 8) errs.push('При сгонке >5кг нужно ≥8 нед');
+  if (p.waterMode === 'load_cut' && (p.startWeightKg || 0) > 0 && (p.startWeightKg || 0) < 65) errs.push('Load_cut 6-7л для <65кг — риск гипонатриемии, используйте stable');
+  if (p.heatSessions && p.weeksOut <= 2) errs.push('Сауна в последние 2 нед — ЦНС риск');
   return errs;
 }
