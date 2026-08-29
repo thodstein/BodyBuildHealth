@@ -36,21 +36,55 @@ export function finalizeCombatPlan(plan: CombatPlan): CombatPlan {
   }
   for (const e of validateSyncCombat(plan)) warnings.push(e);
 
-  // Шея/хват/ротация vs landmarks + кап
+  // Шея/хват/ротация vs landmarks + кап + auto-trim до MRV
   for (const wk of plan.weeksData) {
     if (wk.deload) continue;
-    const neckSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
-    const gripSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')||e.id.includes('farmer')||e.id.includes('towel')).reduce((a, e) => a + e.sets, 0), 0);
-    const rotSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')||e.id.includes('sledge')||e.id.includes('battle')).reduce((a, e) => a + e.sets, 0), 0);
+    let neckSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
+    let gripSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')||e.id.includes('farmer')||e.id.includes('towel')).reduce((a, e) => a + e.sets, 0), 0);
+    let rotSets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')||e.id.includes('sledge')||e.id.includes('battle')).reduce((a, e) => a + e.sets, 0), 0);
     const coreAnti = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => ['deadbug','hollow_hold','side_plank','ab_wheel','copenhagen_plank','pallof_rotation_press','suitcase_carry'].includes(e.id)).reduce((a,e)=>a+e.sets,0),0);
     const lmN = getCombat(plan.level,'neck');
     const lmG = getCombat(plan.level,'grip');
     const lmR = getCombat(plan.level,'rotational');
-    if (lmN && neckSets > lmN.mrv) warnings.push(`Нед ${wk.week}: шея ${neckSets} > MRV ${lmN.mrv} — снизьте.`);
+    // auto-trim до MRV (мягкий кап, floor 2)
+    const trimToMRV = (getSets:()=>number, filterFn:(e:any)=>boolean, mrv:number) => {
+      let total = getSets();
+      if (total <= mrv) return;
+      const groupExs = wk.sessions.flatMap(s=> s.exercises.filter(filterFn)).sort((a,b)=> b.sets - a.sets);
+      let idx=0;
+      while (total > mrv && idx < groupExs.length*4) {
+        const ex = groupExs[idx % groupExs.length];
+        if (ex.sets > 2) {
+          ex.sets -= 1;
+          ex.workSets = ex.workSets.slice(0, ex.sets);
+          while (ex.workSets.length < ex.sets) ex.workSets.push({ reps: 5, rir: 2, weight: ex.weight } as any);
+          total -= 1;
+        }
+        idx++;
+        if (idx>120) break;
+      }
+    };
+    if (lmN && neckSets > lmN.mrv) {
+      trimToMRV(()=> wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('neck')).reduce((a,e)=>a+e.sets,0),0), e=> e.id.includes('neck'), lmN.mrv);
+      neckSets = wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('neck')).reduce((a,e)=>a+e.sets,0),0);
+      if (neckSets > lmN.mrv) warnings.push(`Нед ${wk.week}: шея ${neckSets} > MRV ${lmN.mrv} — снизьте.`);
+      else warnings.push(`Нед ${wk.week}: шея срезана до MRV ${lmN.mrv} (было >MRV).`);
+    }
+    if (lmG && gripSets > lmG.mrv) {
+      trimToMRV(()=> wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')||e.id.includes('farmer')||e.id.includes('towel')).reduce((a,e)=>a+e.sets,0),0), e=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')||e.id.includes('farmer')||e.id.includes('towel'), lmG.mrv);
+      gripSets = wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('grip')||e.id.includes('pinch')||e.id.includes('wrist')||e.id.includes('farmer')||e.id.includes('towel')).reduce((a,e)=>a+e.sets,0),0);
+      if (gripSets > lmG.mrv) warnings.push(`Нед ${wk.week}: хват ${gripSets} > MRV ${lmG.mrv}.`);
+    }
+    if (lmR && rotSets > lmR.mrv) {
+      trimToMRV(()=> wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')||e.id.includes('sledge')||e.id.includes('battle')).reduce((a,e)=>a+e.sets,0),0), e=> e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')||e.id.includes('sledge')||e.id.includes('battle'), lmR.mrv);
+      rotSets = wk.sessions.reduce((s, sess)=> s + sess.exercises.filter(e=> e.id.includes('landmine')||e.id.includes('pallof')||e.id.includes('med_ball')||e.id.includes('sledge')||e.id.includes('battle')).reduce((a,e)=>a+e.sets,0),0);
+      if (rotSets > lmR.mrv) warnings.push(`Нед ${wk.week}: ротация ${rotSets} > MRV ${lmR.mrv}.`);
+    }
+    // пересчёт totalSets/tonnage после trim
+    wk.totalSets = wk.sessions.reduce((s, sess)=> s + sess.exercises.reduce((a,e)=>a+e.sets,0),0);
+    (wk as any).totalTonnage = wk.sessions.reduce((s, sess)=> s + sess.exercises.reduce((a,e)=> a + e.workSets.reduce((x,ws)=> x + ws.weight*ws.reps,0),0),0);
     if (lmN && neckSets < lmN.mev) warnings.push(`Нед ${wk.week}: шея ${neckSets} < MEV ${lmN.mev} — недобор.`);
-    if (lmG && gripSets > lmG.mrv) warnings.push(`Нед ${wk.week}: хват ${gripSets} > MRV ${lmG.mrv}.`);
     if (lmG && gripSets < (lmG.mev||4)) warnings.push(`Нед ${wk.week}: хват ${gripSets} < MEV ${lmG.mev} — добавьте хват.`);
-    if (lmR && rotSets > lmR.mrv) warnings.push(`Нед ${wk.week}: ротация ${rotSets} > MRV ${lmR.mrv}.`);
     if (neckSets > 12) warnings.push(`Нед ${wk.week}: шея ${neckSets} сетов > 12 — риск.`);
     if (coreAnti < 4) warnings.push(`Нед ${wk.week}: core anti <4 сетов (${coreAnti}) — добавьте deadbug/side plank/pallof.`);
     // prehab: auto-добавка если <3 сетов на upper — вставляем face_pull 3×15 в первую upper/full сессию (изолировано, не ломает бюджет)
