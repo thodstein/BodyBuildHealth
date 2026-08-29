@@ -63,6 +63,24 @@ export function downloadStrengthCsv(plan: StrengthSportPlan){
   }catch{}
 }
 
+export function buildStrengthXlsxHtml(plan: StrengthSportPlan): string {
+  const rows = strengthExportRows(plan);
+  const esc = escHtml;
+  const header = ['Неделя','Фаза','День','Тренировка','Характер','Упражнение','Сеты','Повторы','Вес','%ПМ','RIR','Темп','Отдыхс','Комментарий'];
+  const th = header.map(h=> `<th>${esc(h)}</th>`).join('');
+  const tr = rows.map(r=> `<tr>${[r.week, esc(r.phase), r.day, esc(r.tag), esc(r.character), esc(r.exercise), r.sets, esc(r.reps), r.weight, r.pct, r.rir, esc(r.tempo), r.rest, esc(r.comment)].map(v=> `<td>${v}</td>`).join('')}</tr>`).join('');
+  // Excel-compatible HTML with BOM and meta
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Strength</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1"><tr>${th}</tr>${tr}</table></body></html>`;
+}
+export function downloadStrengthXlsx(plan: StrengthSportPlan): void {
+  try {
+    const html = buildStrengthXlsxHtml(plan);
+    const blob = new Blob(['\uFEFF' + html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `strength_${plan.mode}_${plan.weeks}w.xls`; document.body.appendChild(a); a.click(); setTimeout(()=> { URL.revokeObjectURL(url); a.remove(); }, 1000);
+  } catch {}
+}
+
 export function shareStrengthDigest(plan: StrengthSportPlan): string {
   const w1 = plan.weeksData[0];
   const s = w1 ? w1.sessions.map(sess=> `${sess.sessionTag} ${sess.exercises.map(e=> e.name).join(', ')}`).join(' | ') : '';

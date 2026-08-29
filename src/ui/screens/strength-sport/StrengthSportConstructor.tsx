@@ -7,7 +7,7 @@ import React, { useState, useMemo } from 'react';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
 import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../../engines/strength-sport/strength-sport-split-patterns';
-import { buildStrengthCsv, downloadStrengthCsv, buildStrengthPrintHtml, shareStrengthDigest, buildStrengthTelegramUrl, buildStrengthShareHash, downloadStrengthIcs } from '../../../engines/strength-sport/strength-sport-export';
+import { buildStrengthCsv, downloadStrengthCsv, downloadStrengthXlsx, buildStrengthPrintHtml, shareStrengthDigest, buildStrengthTelegramUrl, buildStrengthShareHash, downloadStrengthIcs } from '../../../engines/strength-sport/strength-sport-export';
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { buildWLMeetPlan, wlAttemptRationale } from '../../../engines/strength-sport/strength-sport-attempts.engine';
@@ -15,6 +15,7 @@ import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sp
 import { syncStrengthAnnualToGeneral } from '../../../engines/strength-sport/strength-sport-annual-bridge';
 import { estimate1RMFromVelocitySS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { assessPedRisk } from '../../../engines/ped-risk-matrix';
+import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -590,6 +591,22 @@ export const StrengthSportConstructor: React.FC = () => {
                 return <span key={wk.week} style={{ padding: '2px 6px', borderRadius: 6, background: col+'22', border: `1px solid ${col}`, color: col, fontSize: 10 }}>Н{wk.week}: {carry}м carry</span>;
               })}
             </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+              {plan.weeksData.map(wk => {
+                const avgPct = (() => { const all = wk.sessions.flatMap(s=> s.exercises.flatMap(e=> e.workSets.map(ws=> ws.pct||70))); return all.length? Math.round(all.reduce((a,b)=>a+b,0)/all.length) : 0; })();
+                const zone = intensityZoneFor(avgPct/100);
+                const col = zone==='technique'?'#60a5fa': zone==='strength'?'#00e68a': zone==='heavy'?'#f59e0b':'#ef4444';
+                const label = zone==='technique'?'Тех' : zone==='strength'?'Сил' : zone==='heavy'?'Тяж':'Макс';
+                return <span key={wk.week} title={`${avgPct}%`} style={{ padding:'2px 6px', borderRadius:6, background:col+'22', border:`1px solid ${col}`, color:col, fontSize:10 }}>Н{wk.week}: {label} {avgPct}%</span>;
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+              {plan.weeksData.map(wk => {
+                const ton = wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000;
+                const col = ton<10?'#60a5fa': ton<20?'#00e68a': ton<30?'#f59e0b':'#ef4444';
+                return <span key={wk.week} style={{ padding:'2px 6px', borderRadius:6, background:col+'22', border:`1px solid ${col}`, color:col, fontSize:10 }}>Н{wk.week}: {ton.toFixed(1)}т</span>;
+              })}
+            </div>
             {acwr && <div style={{ marginTop: 6, fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a' }}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} — объём скорректирован ×{acwr.zone==='dangerous'?0.65: acwr.zone==='caution'?0.85:1}</div>}
           </div>
           {diaryLoad != null && (
@@ -667,6 +684,7 @@ export const StrengthSportConstructor: React.FC = () => {
             <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>Копировать отчёт</button>
             <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); } else { navigator.clipboard?.writeText(html); setMsg('HTML скопирован'); } }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>🖨 Печать (HTML)</button>
             <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📊 CSV</button>
+            <button onClick={() => { downloadStrengthXlsx(plan); setMsg('XLS скачан (Excel)'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)', cursor: 'pointer' }}>📗 XLS</button>
             <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS скачан'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📅 ICS</button>
             <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест скопирован'); }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: '#fff', cursor: 'pointer' }}>📋 Дайджест</button>
             <button onClick={()=> { const url=buildStrengthTelegramUrl(plan); navigator.clipboard?.writeText(url); setMsg('Telegram ссылка скопирована'); try{ window.open(url,'_blank'); }catch{} }} style={{ padding: '8px 10px', borderRadius: 8, background: 'rgba(0,136,204,0.15)', color: '#2ca5e0', border: '1px solid rgba(0,136,204,0.3)', cursor: 'pointer' }}>✈ Telegram</button>
