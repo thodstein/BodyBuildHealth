@@ -71,7 +71,7 @@ export const PHASE_RU: Record<string,string> = { accumulation:'Накоплен�
 export const ZONE_RU: Record<string,string> = { optimal:'Оптимум', caution:'Внимание', dangerous:'Перегруз', undertrained:'Недотрен' };
 export const PERIODIZATION_RU: Record<string,string> = { atr_10:'ATR 5/3/2 (10 нед)', linear_12:'Линейная (12 нед)', conjugate:'Сопряжённая' };
 export const SESSION_TAG_RU: Record<string,string> = { upper_power:'Верх тяж', lower_power:'Низ тяж', full_power:'Фулбоди тяж', full_conditioning:'Фулбоди+конд.', snatch_day:'Рывок', clean_day:'Толчок', strength_day:'Сила' };
-export function ruLabel(map:Record<string,string>, key:string){ return (map as any)[key] ?? key; }
+export function ruLabel(map:Record<string,string>, key:string | undefined | null){ return key != null ? ((map as any)[key] ?? key) : ''; }
 
 // ─── Компоненты ───
 export const SectionCard: React.FC<{ id?: string; title?: React.ReactNode; right?: React.ReactNode; accent?: boolean; hint?: string; children: React.ReactNode }> = ({ id, title, right, accent, hint, children }) => (

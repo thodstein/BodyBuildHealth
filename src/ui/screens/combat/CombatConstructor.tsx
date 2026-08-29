@@ -523,7 +523,7 @@ export const CombatConstructor: React.FC = () => {
 
       {step === 'split' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 10 }}>
-          <div style={{ color: '#fff', fontSize: 11, background:'rgba(168,85,247,0.1)', padding:6, borderRadius:6 }}>Рекомендуемый: <b style={{ color:'#a855f7' }}>{recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).name}</b> {patternId ? `· выбран: ${COMBAT_PATTERNS.find(p=>p.id===patternId)?.name || patternId}` : '· авто'} · модель <b>{ruLabel(PERIODIZATION_RU, periodizationModel)}</b></div>
+          <div style={{ color: '#fff', fontSize: 11, background:'rgba(168,85,247,0.1)', padding:6, borderRadius:6 }}>Рекомендуемый: <b style={{ color:'#a855f7' }}>{recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).name}</b> {patternId ? `· выбран: ${COMBAT_PATTERNS.find(p=>p.id===patternId)?.name || patternId}` : '· авто'} · модель <b>{ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')}</b></div>
           <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
             {COMBAT_PATTERNS.map(p => {
               const active = patternId ? patternId===p.id : p.id===recommendCombatPattern(days, outside?.sessionsPerWeek || 0, level).id;
@@ -539,7 +539,7 @@ export const CombatConstructor: React.FC = () => {
             })}
           </div>
           <div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>ATR 5/3/2: 10 нед → 5 накопление (6-10/RIR2-3) → 3 трансформация (3-6/RIR1-2) → 2 реализация (тапер). Сопряжённая — ротация макс/динам/повтор. Линейная — ОФП/сила/тапер.</div>
-          <button onClick={build} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Собрать PRO-план {patternId ? `(${patternId})` : ''} · {ruLabel(PERIODIZATION_RU, periodizationModel)}</button>
+          <button onClick={build} style={{ padding: '10px 14px', borderRadius: 10, background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', fontWeight: 800, cursor: 'pointer' }}>Собрать PRO-план {patternId ? `(${patternId})` : ''} · {ruLabel(PERIODIZATION_RU, periodizationModel ?? 'atr_10')}</button>
         </div>
       )}
 
