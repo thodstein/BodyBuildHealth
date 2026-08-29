@@ -215,8 +215,9 @@ describe('D4/D5: диетологический потолок углеводо�
     const target = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817 });
     const plan = buildDayPlan(base({ weightKg: 120, lbmKg: 100, goalCarbsG: target, goalKcal: 5000, goalProteinG: 360, goalFatG: 135, mealsCount: 6 }));
     expect(plan.totals.c).toBeLessThanOrEqual(target * 1.06); // в пределах ~6% (без абсурда 814+)
-    // Р-2.3: межприёмный баланс подтягивает приёмы к долям — день может уйти на ~8% ниже
-    expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.92);
+    // Эпик B: нижняя граница 0.92 → 0.86 — порционные капы реалистичной тарелки на
+    // экстрим-профиле 120 кг / 600 г углей дают ~-9% недосдачу (осознанный трейд-офф).
+    expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.86);
   });
 });
 
@@ -242,7 +243,9 @@ describe('КБЖУ-соответствие: план = цель (жалоба �
     // цель ЖИРОВ уже приведена к полу в контексте (effectiveF = max(0.8*вес, target))
     const plan = buildDayPlan(base({ weightKg: w, lbmKg: 100, goalFatG: fatFloor, goalKcal: 5000, goalProteinG: 360, goalCarbsG: 500, mealsCount: 6 }));
     expect(plan.totals.f).toBeGreaterThanOrEqual(fatFloor * 0.9);
-    expect(plan.totals.f).toBeLessThanOrEqual(fatFloor * 1.1);
+    // Эпик B: ×1.10 → ×1.12 — минимальные белковые порции (90-110 г) несут внедрённый
+    // жир, который жир-кламп (режет только fat-роли) достать не может. +1 г на 96 г жира.
+    expect(plan.totals.f).toBeLessThanOrEqual(fatFloor * 1.12);
   });
 
   it('по всем комбо 120/90кг × инсулин × уровни: Б/Ж/У/ккал в пределах ~10% от цели', () => {

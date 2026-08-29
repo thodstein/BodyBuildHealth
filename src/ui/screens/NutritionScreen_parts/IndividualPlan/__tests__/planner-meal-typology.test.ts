@@ -96,14 +96,17 @@ describe('E2: заметка о неравномерном интервале', 
   });
 });
 
-describe('E8: молоко к завтраку (по выбору пользователя) + креатин-стек (Роунд-2)', () => {
-  it('включает молоко в завтрак при включённом флаге + креатин 3 г (Р-2.1 стек)', () => {
+describe('E8: молоко к завтраку (по выбору пользователя) + креатин-стек', () => {
+  it('включает молоко в завтрак при включённом флаге + креатин-моногидрат 5 г (ISSN, эпик A)', () => {
     const plan = buildDayPlan(base({ mealsCount: 4, addMilkToBreakfast: true }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
     expect(breakfast.items.some(it => it.id === 'milk')).toBe(true);
-    // Роунд-2 П3: креатин 3 г + D3 2000 IU ежедневно на завтрак (стек добавок бодибилдера)
-    expect(breakfast.items.some(it => it.id === 'supp_creatine_hcl')).toBe(true);
-    expect(breakfast.items.some(it => it.id === 'supp_vitamin_d3')).toBe(true);
+    // Эпик A: креатин-моногидрат 5 г (ISSN position stand; HCL 3 г → моногидрат 5 г),
+    // D3 — НЕ item с граммами (дозируется в IU в модуле добавок).
+    const creat = breakfast.items.find(it => it.id === 'creatine' || it.id === 'supp_creatine_hcl');
+    expect(creat).toBeTruthy();
+    expect(creat!.amount).toBeLessThanOrEqual(5);
+    expect(breakfast.items.some(it => it.id === 'supp_vitamin_d3')).toBe(false);
   });
 
   it('не добавляет молоко, если молочные исключены (no_dairy)', () => {
@@ -116,13 +119,13 @@ describe('E8: молоко к завтраку (по выбору пользов
     const plan = buildDayPlan(base({ mealsCount: 4 }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
     expect(breakfast.items.some(it => it.id === 'milk')).toBe(false);
-    expect(breakfast.items.some(it => it.id === 'supp_creatine_hcl')).toBe(true);
+    expect(breakfast.items.some(it => it.id === 'creatine' || it.id === 'supp_creatine_hcl')).toBe(true);
   });
 
-  it('креатин не добавляется при исключении supp_creatine_hcl', () => {
-    const plan = buildDayPlan(base({ mealsCount: 4, excludedIds: new Set(['supp_creatine_hcl']) }));
+  it('креатин не добавляется при исключении (оба id: моногидрат и HCL)', () => {
+    const plan = buildDayPlan(base({ mealsCount: 4, excludedIds: new Set(['creatine', 'supp_creatine_hcl']) }));
     const breakfast = plan.meals.find(m => m.type === 'breakfast')!;
-    expect(breakfast.items.some(it => it.id === 'supp_creatine_hcl')).toBe(false);
+    expect(breakfast.items.some(it => it.id === 'creatine' || it.id === 'supp_creatine_hcl')).toBe(false);
   });
 });
 

@@ -149,7 +149,10 @@ describe('планировщик: матрица качества (Этап 0)',
     // degenerate ≤ 8: recipe-fallback углы (w60 recipes) — залечивается в P0-продолжении
     expect(degenerateItems).toBeLessThanOrEqual(8);
     expect(mainShareBelow70).toBeLessThanOrEqual(24);
-    expect(worstDev).toBeLessThanOrEqual(40);
+    // Эпик B (реализм тарелки): минимальные «взрослые» порции (белок 90-110 г, гарнир)
+    // дают +1.6% на одной экстрим-ячейке worst-day-dev — осознанный трейд-офф против
+    // «дегустационных» порций; средняя сходимость не ухудшилась.
+    expect(worstDev).toBeLessThanOrEqual(45);
     expect(worstProteinOver).toBeLessThanOrEqual(80);
     expect(worstShare).toBeGreaterThanOrEqual(40);
   });
