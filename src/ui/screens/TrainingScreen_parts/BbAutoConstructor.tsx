@@ -619,6 +619,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [safetyDistributionOpen, setSafetyDistributionOpen] = useState(true);
   const [safetyConclusionOpen, setSafetyConclusionOpen] = useState(true);
   const [safetyFactorsOpen, setSafetyFactorsOpen] = useState(true);
+  const [jointAnalysisOpen, setJointAnalysisOpen] = useState(true);
   const [qualityVolumeOpen, setQualityVolumeOpen] = useState(true);
   const [qualityLogicOpen, setQualityLogicOpen] = useState(true);
   const [qualityForecastOpen, setQualityForecastOpen] = useState(true);
@@ -3892,10 +3893,14 @@ export const BbAutoConstructor: React.FC = () => {
             {(safetyScore.details?.jointStressDetails || safetyScore.details?.orthopedic || safetyScore.details?.loadDistribution || (safetyScore.details?.jointDiagnoses && safetyScore.details.jointDiagnoses.length>0)) && (
               <div style={{ padding:'8px 12px' }}>
                 <div style={{ ...CARD, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.42)' }}>
-                  {/* Шапка: общий риск */}
-                  <div style={{ padding:'10px 12px', background: safetyScore.details?.jointStressDetails?.overallRisk==='high' ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))' : safetyScore.details?.jointStressDetails?.overallRisk==='moderate' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))' : 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                  <button type="button" onClick={() => setJointAnalysisOpen(v=>!v)} aria-expanded={jointAnalysisOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', cursor:'pointer', background: safetyScore.details?.jointStressDetails?.overallRisk==='high' ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))' : safetyScore.details?.jointStressDetails?.overallRisk==='moderate' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))' : 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))', border:'none', borderBottom: jointAnalysisOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+                    <span style={{ fontSize:13, fontWeight:900, color:'#fff' }}>🦴 Суставная нагрузка — качественный анализ</span>
+                    <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, transform: jointAnalysisOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                  </button>
+                  <div style={{ display: jointAnalysisOpen ? 'block' : 'none' }}>
+                  <div style={{ padding:'10px 12px', background: safetyScore.details?.jointStressDetails?.overallRisk==='high' ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))' : safetyScore.details?.jointStressDetails?.overallRisk==='moderate' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))' : 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'none' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                      <span style={{ fontSize:13, fontWeight:900, color:'#fff' }}>🦴 Суставная нагрузка — качественный анализ</span>
+                      <span style={{ fontSize:13, fontWeight:900, color:'#fff', display:'none' }}>🦴 Суставная нагрузка — качественный анализ</span>
                       {(() => {
                         const r = safetyScore.details?.jointStressDetails?.overallRisk || 'low';
                         const label = r==='high'?'Высокий риск': r==='moderate'?'Умеренно':'Низкий риск';
@@ -4140,6 +4145,7 @@ export const BbAutoConstructor: React.FC = () => {
                       })()}
                       </div>
                     </div>
+                  </div>
                   </div>
                 </div>
               </div>
