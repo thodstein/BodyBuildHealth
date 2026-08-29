@@ -791,11 +791,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       athleteWeightKg: args.athleteWeightKg,
     };
     // Шире сеть кандидатов — финальный отбор по фактической декомпозиции ниже
+    // Для тяжей 100-120кг — масштабирование до 3.0 и 2-3 порции, иначе 14г каши
+    const heavyScaleMax = (args.athleteWeightKg ?? 80) >= 120 ? 3.0 : (args.athleteWeightKg ?? 80) >= 110 ? 2.8 : (args.athleteWeightKg ?? 80) >= 100 ? 2.5 : 2.2;
+    const heavyProteinCap = (args.athleteWeightKg ?? 80) >= 100 ? 1.5 : 1.25;
+    const heavyCarbCap = (args.athleteWeightKg ?? 80) >= 100 ? 1.5 : 1.25;
     const scaleOf = (kcal: number, p: number, f: number, c: number): number => {
-      let s = Math.max(0.7, Math.min(2.2, targetKcal / Math.max(50, kcal)));
-      if (p > 0) s = Math.min(s, (1.25 * (tgt.p || 30)) / p);
+      let s = Math.max(0.7, Math.min(heavyScaleMax, targetKcal / Math.max(50, kcal)));
+      if (p > 0) s = Math.min(s, (heavyProteinCap * (tgt.p || 30)) / p);
       if (f > 0) s = Math.min(s, (1.5 * (tgt.f || 15)) / f);
-      if (c > 0) s = Math.min(s, (1.25 * (tgt.c || 40)) / c);
+      if (c > 0) s = Math.min(s, (heavyCarbCap * (tgt.c || 40)) / c);
       return Math.max(0.7, Math.round(s * 20) / 20);
     };
     const rankCands = (candidatePool: Recipe[]): Recipe[] => candidatePool
@@ -861,12 +865,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       const _mealkT = (tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9;
       finalItems = applyRealisticFloors(finalItems.map(it => ({ ...it, role: (it.role as any) || 'protein' })) as any, !!mealAny.target && /Перекус|Полдник|Второй завтрак/i.test(label), _mealkT ? _mealkT * 1.03 : undefined, true) as any;
       // Сайд-добивка В ТОТ ЖЕ приём: если после масштабирования приём недобирает >15% ккал,
-      // добавляем гарнир/жир по доминирующему дефициту макро (а не «хвост» в перекус).
+      // добавляем гарнир/жир по доминирующему дефициту (для тяжей 100кг+ — до 2 сайдов, иначе пустой гарнир).
       let sideNote: string | null = null;
       {
-        const tNow = sumMealTotals(finalItems);
-        const kcalNow = tNow.kcal || 0;
-        if (targetKcal > 0 && kcalNow < targetKcal * 0.85) {
+        let tNow = sumMealTotals(finalItems);
+        let kcalNow = tNow.kcal || 0;
+        // Сайд добивка — пока <0.90 (для тяжей до 2 сайдов)
+        const maxSides = (args.athleteWeightKg ?? 80) >= 100 ? 2 : 1;
+        let sidesAdded = 0;
+        while (targetKcal > 0 && kcalNow < targetKcal * 0.90 && sidesAdded < maxSides) {
           const dP = (tgt.p || 0) - tNow.p;
           const dC = (tgt.c || 0) - tNow.c;
           const dF = (tgt.f || 0) - tNow.f;
@@ -886,17 +893,18 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
           }
           const ok = pool.filter(f => macroOf(f) > 5).sort((a, b) => macroOf(b) / Math.max(1, b.kcal || 1) - macroOf(a) / Math.max(1, a.kcal || 1));
           const side = ok[0];
-          if (side && dMacro > 8) {
-            let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, 300) / 10) * 10;
-            if (g >= 30) {
-              finalItems = [...finalItems, scaleItem({
-                name: side.name, id: side.id, amount: 100,
-                kcal: Math.round(side.kcal || 0), p: side.protein || 0, f: side.fat || 0, c: side.carbs || 0,
-                fiber: side.fiber || 0, role: role === 'углеводы' ? 'carb_slow' : role === 'белок' ? 'protein' : 'fat',
-              }, g)];
-              sideNote = `➕ Сайд к «${flat.name}»: ${side.name} ${g} г (${role}) — приём добран до своей доли без «хвоста» в перекус`;
-            }
-          }
+          if (!side || dMacro <= 8) break;
+          let g = Math.floor(Math.min(dMacro / macroOf(side) * 100, 300) / 10) * 10;
+          if (g < 30) break;
+          finalItems = [...finalItems, scaleItem({
+            name: side.name, id: side.id, amount: 100,
+            kcal: Math.round(side.kcal || 0), p: side.protein || 0, f: side.fat || 0, c: side.carbs || 0,
+            fiber: side.fiber || 0, role: role === 'углеводы' ? 'carb_slow' : role === 'белок' ? 'protein' : 'fat',
+          }, g)];
+          sideNote = sideNote ? sideNote + ` + ${side.name} ${g}г` : `➕ Сайд к «${flat.name}»: ${side.name} ${g} г (${role}) — приём добран до своей доли без «хвоста» в перекус`;
+          tNow = sumMealTotals(finalItems);
+          kcalNow = tNow.kcal || 0;
+          sidesAdded++;
         }
       }
       return { flat, items: finalItems, totals: sumMealTotals(finalItems), sideNote };

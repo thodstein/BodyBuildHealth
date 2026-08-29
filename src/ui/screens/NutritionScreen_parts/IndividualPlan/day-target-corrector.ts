@@ -119,7 +119,7 @@ export function correctDayToTargets(
     return { meals, withinTolerance: true, deviationPct: 0 };
   }
 
-  const maxCoreScale = opts?.allowCoreScale ? 1.15 : 1.10;
+  const maxCoreScale = opts?.allowCoreScale ? 1.20 : 1.15;
   for (let iter = 0; iter < maxIter; iter++) {
     // человечность: орехи/семена ≤85г и клетчатка ≤85г — режем перебор до сведения КБЖУ
     const nutG = currentNutGrams(meals);
