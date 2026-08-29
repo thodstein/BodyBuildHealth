@@ -572,6 +572,12 @@ export const BbAutoConstructor: React.FC = () => {
   const [collapsedExercises, setCollapsedExercises] = useState<Set<string>>(new Set());
   const [safetyOpen, setSafetyOpen] = useState(true);
   const [qualityOpen, setQualityOpen] = useState(true);
+  const [safetyMainOpen, setSafetyMainOpen] = useState(true);
+  const [safetyJointsOpen, setSafetyJointsOpen] = useState(true);
+  const [safetyOrthoOpen, setSafetyOrthoOpen] = useState(true);
+  const [safetyPreventionOpen, setSafetyPreventionOpen] = useState(true);
+  const [safetyDistributionOpen, setSafetyDistributionOpen] = useState(true);
+  const [safetyConclusionOpen, setSafetyConclusionOpen] = useState(true);
   // specializationMode больше не выбирается в UI: специализация включается
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
