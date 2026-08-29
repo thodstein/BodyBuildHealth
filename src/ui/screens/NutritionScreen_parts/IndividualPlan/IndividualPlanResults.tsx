@@ -2606,19 +2606,37 @@ const doImportPlan = (raw: string): boolean => {
                                   );
                                 })}
                                 <button onClick={() => {
+                                  // E7-фикс: «🔄 Все» собирает ВСЕ замены в ОДИН saveUndo и один setDayPlan
+                                  // (раньше каждая позиция мутировала план отдельно, а replaceFoodItem
+                                  // внутри forEach терял актуальный state — часть замен могла не примениться)
                                   const dayIdx = planDays === 7 ? selectedDayIndex + 7 : planDays === 3 ? selectedDayIndex + 1 : 0;
-                                  const activeMeal = planDays === 1 ? dayPlan?.meals?.[meal.mealIdx] : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx] : weekPlan?.days?.[selectedDayIndex]?.meals?.[meal.mealIdx]);
-                                  const allItems = activeMeal?.items || [];
-                                  allItems.forEach((it: any, i: number) => {
+                                  const activePlan = planDays === 1 ? dayPlan : (planDays === 3 ? threeDayPlan?.days?.[selectedDayIndex] : weekPlan?.days?.[selectedDayIndex]);
+                                  if (!activePlan?.meals?.[meal.mealIdx]) return;
+                                  saveUndo();
+                                  const mealItems = [...activePlan.meals[meal.mealIdx].items];
+                                  const suggestions = issue.suggestion || [];
+                                  mealItems.forEach((it: any, i: number) => {
                                     const similar = findSimilarFoods(it);
-                                    if (similar.length > 0) {
-                                      const targetFood = similar.find(f => issue.suggestion?.some(s => s.foodId === f.id));
-                                      if (targetFood) {
-                                        // FIX button-audit: replaceFoodItem сам вызывает saveUndo — убран дубль
-                                        replaceFoodItem(dayIdx, meal.mealIdx, i, targetFood);
-                                      }
-                                    }
+                                    if (similar.length === 0) return;
+                                    const targetFood = similar.find(f => suggestions.some(s => s.foodId === f.id));
+                                    if (!targetFood) return;
+                                    const ratio = (it.amount || 100) / 100;
+                                    mealItems[i] = {
+                                      ...it,
+                                      name: targetFood.name, id: targetFood.id,
+                                      amount: it.amount || 100,
+                                      kcal: Math.round((targetFood.kcal || 0) * ratio),
+                                      p: Math.round((targetFood.protein || 0) * ratio * 10) / 10,
+                                      f: Math.round((targetFood.fat || 0) * ratio * 10) / 10,
+                                      c: Math.round((targetFood.carbs || 0) * ratio * 10) / 10,
+                                    };
                                   });
+                                  const totals = { kcal: mealItems.reduce((s: number, x: any) => s + (x.kcal || 0), 0), p: mealItems.reduce((s: number, x: any) => s + (x.p || 0), 0), f: mealItems.reduce((s: number, x: any) => s + (x.f || 0), 0), c: mealItems.reduce((s: number, x: any) => s + (x.c || 0), 0) };
+                                  const newMeals = activePlan.meals.map((m: any, mi2: number) => (mi2 === meal.mealIdx ? { ...m, items: mealItems, totals } : m));
+                                  const apply = (p: any) => ({ ...p, meals: newMeals, totals: newMeals.reduce((s: number, m: any) => ({ kcal: s + (m.totals?.kcal || 0), p: s + (m.totals?.p || 0), f: s + (m.totals?.f || 0), c: s + (m.totals?.c || 0) }), { kcal: 0, p: 0, f: 0, c: 0 }) });
+                                  if (dayIdx === 0) setDayPlan((prev: any) => apply(prev));
+                                  else if (planDays === 3) setThreeDayPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days }; });
+                                  else setWeekPlan((prev: any) => { const days = [...prev.days]; days[selectedDayIndex] = apply(prev.days[selectedDayIndex]); return { ...prev, days }; });
                                   analyzePlanIssues();
                                 }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', background:'rgba(139,92,246,0.08)', border:'1px solid rgba(139,92,246,0.2)', color:'#a78bfa', fontWeight:600 }}>
                                   🔄 Все

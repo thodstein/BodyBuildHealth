@@ -2195,7 +2195,21 @@ export function planFromStored(
 //  белок 2.2-2.5 г/кг, жиры ≥ floor, вода/натрий стабильны)
 // ═══════════════════════════════════════════════════════════════════════════
 
-import type { MealPlanInput } from '../meal-plan-generator.engine';
+/** A6: локальная форма адаптера (meal-plan-generator.engine УДАЛЁН — мёртвый движок;
+ *  реальная генерация — IndividualPlan/meal-plan-engine.buildDayPlan). */
+export interface MealPlanInput {
+  targetKcal: number;
+  targetProtein: number;
+  targetFat: number;
+  targetCarbs: number;
+  days: number;
+  preferences?: {
+    excludePork?: boolean;
+    excludeFish?: boolean;
+    excludeDairy?: boolean;
+    highCarb?: boolean;
+  };
+}
 
 /** Обратная проекция плана в конфиг (для переиспользования функций пик-недели). */
 export function configFromPlan(plan: BBContestPrepPlan): BBContestPrepConfig {

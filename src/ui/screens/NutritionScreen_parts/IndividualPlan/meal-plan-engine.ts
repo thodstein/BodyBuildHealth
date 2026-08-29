@@ -649,18 +649,20 @@ function buildBreakfastFromTemplate(
     if (milk && !excludedIds.has(milk.id) && _ok(milk)) items.push(makeItem(milk, 200, 'liquid'));
   }
   // Aug 28 (жалоба «завтрак не масштабируется под атлета»): шаблон тянет свои порции к
-  // целевой ккал приёма (scale = clamp(target/base, 1, 1.8), округление до 5 г). Пропорции
-  // авторские, без «раздувания» одного продукта — масштаб равномерный по всем позициям.
+  // целевой ккал приёма. Эпик B-дополнение: масштаб ДВУСТОРОННИЙ (0.7-1.8) — раньше
+  // только вверх (k=min(1.8, …)), и шаблон не ужмётся мелкому атлету (женщине 58 кг
+  // доставался 700+ ккал завтрак на 1500-ккал сушке).
   if (targetKcal && targetKcal > 0 && items.length > 0) {
     const baseKcal = items.reduce((s, it) => s + it.kcal, 0);
     if (baseKcal > 0) {
-      const k = Math.max(1, Math.min(1.8, targetKcal / baseKcal));
-      if (k > 1.05) {
+      const k = Math.max(0.7, Math.min(1.8, targetKcal / baseKcal));
+      if (Math.abs(k - 1) > 0.05) {
         for (const it of items) {
           const food = FOOD_DB.find(f => f.id === it.id);
           const ng = Math.max(5, Math.round((it.amount * k) / 5) * 5);
           const r = ng / (it.amount || 1);
           it.amount = ng; it.kcal = Math.round(it.kcal * r); it.p = Math.round(it.p * r); it.f = Math.round(it.f * r); it.c = Math.round(it.c * r); it.fiber = Math.round((it.fiber || 0) * r); it.leucine_mg = Math.round((it.leucine_mg || 0) * r);
+          void food;
         }
       }
     }
@@ -2792,10 +2794,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       notes.push(`⚠ Перегрузка приёма: в «${names}» порция каши/крупы упёрлась в лимит ${grainCap} г. Углеводы дня не добиваются — увеличьте число приёмов пищи (сейчас ${input.mealsCount}, минимум ${Math.min(6, input.mealsCount + 1)}), чтобы распределить нагрузку.`);
     }
     // E2 (spacing note): слишком большие или слишком малые интервалы между белковыми приёмами.
-    const _times = meals.map(m => toMin(m.time)).filter((v): v is number => !isNaN(v)).sort((a, b) => a - b);
-    if (_times.length >= 2) {
+    // A6-фикс: _times отсортированы, indexOf по времени ловил ПЕРВОЕ совпадение — при двух
+    // приёмах в одну минуту имена промежутка были неверными. Теперь ходим парами meals.
+    const _timed = meals
+      .map(m => ({ label: m.label || '', min: toMin(m.time) }))
+      .filter(x => !isNaN(x.min))
+      .sort((a, b) => a.min - b.min);
+    if (_timed.length >= 2) {
       let minGap = Infinity, maxGap = 0, maxGapFrom = '', maxGapTo = '';
-      for (let i = 1; i < _times.length; i++) { const g = _times[i] - _times[i - 1]; if (g > 0) { if (g > maxGap) { maxGap = g; maxGapFrom = meals[_times.indexOf(_times[i - 1])]?.label || ''; maxGapTo = meals[_times.indexOf(_times[i])]?.label || ''; } minGap = Math.min(minGap, g); } }
+      for (let i = 1; i < _timed.length; i++) {
+        const g = _timed[i].min - _timed[i - 1].min;
+        if (g > 0) {
+          if (g > maxGap) { maxGap = g; maxGapFrom = _timed[i - 1].label; maxGapTo = _timed[i].label; }
+          minGap = Math.min(minGap, g);
+        }
+      }
       // D-28 fix (жалоба «6 часов между приёмами»): порог >5ч (5ч — верх MPS-окна 3–5ч,
       // штатный расклад завтрак→обед), имя промежутка добавлено.
       if (maxGap > 5 * 60) {

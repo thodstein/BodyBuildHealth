@@ -142,15 +142,17 @@ export const MealComposer: React.FC = () => {
     return result;
   }, [composerMode, dayProducts]);
 
-  // Sync dayPlan edits back to multi-day plan
+  // Sync dayPlan edits back to multi-day plan.
+  // E7-фикс: раньше ключ по totals терял правки без изменения сумм (замена 1:1 по ккал,
+  // перестановки). Теперь — содержательный JSON-ключ meals + multiDay-сравнение.
   const dayPlanKeyRef = useRef('');
   React.useEffect(() => {
     if (!planDays || planDays === 1 || !dayPlan || !dayPlan.meals) return;
     const multiDay = planDays === 3 ? threeDayPlan : weekPlan;
     if (!multiDay?.days?.[selectedDayIndex]) return;
-    const key = `${dayPlan.totals?.kcal}-${dayPlan.totals?.p}-${dayPlan.totals?.f}-${dayPlan.totals?.c}-${(dayPlan.meals||[]).length}`;
+    const key = JSON.stringify(dayPlan.meals.map((m: any) => ({ t: m.time, l: m.label, i: (m.items || []).map((x: any) => `${x.id}:${x.amount}`) })));
     if (key === dayPlanKeyRef.current) return;
-    const oldKey = `${multiDay.days[selectedDayIndex]?.totals?.kcal}-${multiDay.days[selectedDayIndex]?.totals?.p}-${multiDay.days[selectedDayIndex]?.totals?.f}-${multiDay.days[selectedDayIndex]?.totals?.c}`;
+    const oldKey = JSON.stringify((multiDay.days[selectedDayIndex]?.meals || []).map((m: any) => ({ t: m.time, l: m.label, i: (m.items || []).map((x: any) => `${x.id}:${x.amount}`) })));
     if (key === oldKey) { dayPlanKeyRef.current = key; return; }
     dayPlanKeyRef.current = key;
     const days = [...multiDay.days];
@@ -192,7 +194,9 @@ export const MealComposer: React.FC = () => {
       {!generated && (
         <div style={{ padding:16, textAlign:'center', background:'rgba(0,230,138,0.03)', borderRadius:12, border:'1px solid rgba(0,230,138,0.1)' }}>
           <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
-            <button onClick={() => { setGenerated(true); generatePlan(1); }} style={{
+            {/* E7-фикс: setGenerated ВНУТРИ generatePlan после успешной сборки, а не до
+                (раньше кнопка маскировала пустой план при ошибке генерации) */}
+            <button onClick={async () => { await generatePlan(1); setGenerated(true); }} style={{
               padding:'8px 16px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700,
               background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', color:'#000',
             }}>✨ Создать план</button>
@@ -293,15 +297,26 @@ export const MealComposer: React.FC = () => {
           <MealQuickControls mode={composerMode} advancedFilter={advancedFilter} gapResult={composerMode === 'targeting' ? gapResult : null} />
 
           <div style={{ display:'flex', gap:4, justifyContent:'center', flexWrap:'wrap' }}>
-            {DAY_LABELS.map((label: string, idx: number) => (
-              <button key={idx} onClick={() => { setPlanDays(1); setSelectedDayIndex(idx); generatePlan(1, undefined, idx); }} style={{
-                padding:'6px 10px', borderRadius:20, cursor:'pointer', fontSize:10,
-                border: planDays===1 && selectedDayIndex===idx ? '2px solid #00e68a' : '1px solid #3f3f46',
-                background: planDays===1 && selectedDayIndex===idx ? 'rgba(0,230,138,0.15)' : '#202023',
-                color: planDays===1 && selectedDayIndex===idx ? '#00e68a' : 'rgba(255,255,255,0.7)',
-                fontWeight: planDays===1 && selectedDayIndex===idx ? 700 : 500,
-              }}>{label}</button>
-            ))}
+            {DAY_LABELS.map((label: string, idx: number) => {
+              // E3-паритет: клик по дню = ПРОСМОТР существующего дня (неделя/3дн), регенерация только если дня нет
+              const openDay = () => {
+                setPlanDays(1); setSelectedDayIndex(idx);
+                const weekDay = weekPlan?.days?.[idx];
+                const threeDay = planDays === 3 ? threeDayPlan?.days?.[idx] : null;
+                if (weekDay) { try { setDayPlan(JSON.parse(JSON.stringify(weekDay))); } catch { setDayPlan(weekDay); } }
+                else if (threeDay) { try { setDayPlan(JSON.parse(JSON.stringify(threeDay))); } catch { setDayPlan(threeDay); } }
+                else { generatePlan(1, undefined, idx); }
+              };
+              return (
+                <button key={idx} onClick={openDay} style={{
+                  padding:'6px 10px', borderRadius:20, cursor:'pointer', fontSize:10,
+                  border: planDays===1 && selectedDayIndex===idx ? '2px solid #00e68a' : '1px solid #3f3f46',
+                  background: planDays===1 && selectedDayIndex===idx ? 'rgba(0,230,138,0.15)' : '#202023',
+                  color: planDays===1 && selectedDayIndex===idx ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                  fontWeight: planDays===1 && selectedDayIndex===idx ? 700 : 500,
+                }}>{label}</button>
+              );
+            })}
           </div>
 
           <div style={{ display:'flex', gap:6, justifyContent:'center', marginBottom:6 }}>

@@ -571,6 +571,8 @@ export const BbAutoConstructor: React.FC = () => {
   const [expandedMuscles, setExpandedMuscles] = useState<Set<string>>(new Set());
   const [collapsedDays, setCollapsedDays] = useState<Set<number>>(new Set());
   const [collapsedExercises, setCollapsedExercises] = useState<Set<string>>(new Set());
+  const [safetyOpen, setSafetyOpen] = useState(true);
+  const [qualityOpen, setQualityOpen] = useState(true);
   // specializationMode больше не выбирается в UI: специализация включается
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
@@ -1010,6 +1012,29 @@ export const BbAutoConstructor: React.FC = () => {
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Автосохранение выбранного сплита и последнего собранного плана.
+  useEffect(() => {
+    const persist = () => {
+      try {
+        localStorage.setItem('he_bb_auto_state_v1', JSON.stringify({
+          selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus,
+          bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy,
+          autoDeload, deloadType, specBlocks,
+        }));
+        if (builtPlan) localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: builtPlan, date: new Date().toISOString() }));
+      } catch { /* storage may be unavailable */ }
+    };
+    persist();
+    const onHidden = () => { if (document.visibilityState === 'hidden') persist(); };
+    window.addEventListener('beforeunload', persist);
+    document.addEventListener('visibilitychange', onHidden);
+    return () => {
+      persist();
+      window.removeEventListener('beforeunload', persist);
+      document.removeEventListener('visibilitychange', onHidden);
+    };
+  }, [selectedSplitId, bbDays, bbWeeks, bbLevel, bbGoal, bbTrainingFocus, bbMethodology, bbVolGoal, trainingVolumeMode, loadStrategy, autoDeload, deloadType, specBlocks, builtPlan]);
   // Кросс-синхронизация: правки из питания (saveContestPrepEverywhere source=planner) → обновить локальные состояния без пересборки плана
   useEffect(() => {
     const handler = () => {
@@ -1399,6 +1424,25 @@ export const BbAutoConstructor: React.FC = () => {
           setBbWeekSel(1);
           setStep('plan');
           applyAnnualBlockCtx(consumeAnnualBlockCtx());
+        }
+      }
+      const savedAutoState = localStorage.getItem('he_bb_auto_state_v1');
+      if (savedAutoState) {
+        const state = JSON.parse(savedAutoState);
+        if (state && typeof state === 'object') {
+          if (typeof state.selectedSplitId === 'string') setSelectedSplitId(state.selectedSplitId);
+          if (Number.isFinite(state.bbDays)) setBbDays(Math.max(2, Math.min(7, Math.round(state.bbDays))));
+          if (Number.isFinite(state.bbWeeks)) setBbWeeks(Math.max(1, Math.min(52, Math.round(state.bbWeeks))));
+          if (typeof state.bbLevel === 'string') setBbLevel(state.bbLevel);
+          if (typeof state.bbGoal === 'string') setBbGoal(state.bbGoal);
+          if (typeof state.bbTrainingFocus === 'string') setBbTrainingFocus(state.bbTrainingFocus as any);
+          if (typeof state.bbMethodology === 'string') setBbMethodology(state.bbMethodology as any);
+          if (typeof state.bbVolGoal === 'string') setBbVolGoal(state.bbVolGoal);
+          if (typeof state.trainingVolumeMode === 'string') setTrainingVolumeMode(state.trainingVolumeMode as any);
+          if (typeof state.loadStrategy === 'string') setLoadStrategy(state.loadStrategy as any);
+          if (typeof state.autoDeload === 'boolean') setAutoDeload(state.autoDeload);
+          if (typeof state.deloadType === 'string') setDeloadType(state.deloadType as any);
+          if (Array.isArray(state.specBlocks)) setSpecBlocks(state.specBlocks as any);
         }
       }
     } catch {}
@@ -4024,19 +4068,9 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
             )}
 
-            {/* All issues compact */}
-            <div style={{ padding:'8px 12px', background:'rgba(0,0,0,0.12)', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, marginBottom:4 }}>Все сигналы ({safetyScore.issues.length})</div>
-              {safetyScore.issues.slice(0,8).map((issue, index) => <div key={index} style={{ marginTop: 3, fontSize: 11, color: issue.includes('высокий')|| issue.includes('опасн')|| issue.includes('КРИТИЧНО')?'#ef4444':'#f59e0b', lineHeight:1.35 }}>⚠ {issue}</div>)}
-              {safetyScore.issues.length>8 && <div style={{ fontSize:10, color:'#fff', opacity:0.6, marginTop:4 }}>…и ещё {safetyScore.issues.length-8}</div>}
-            </div>
-            <div style={{ padding:'8px 12px', background:'rgba(34,197,94,0.06)', borderTop:'1px solid rgba(34,197,94,0.12)' }}>
-              <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', marginBottom:4 }}>Рекомендации ({safetyScore.recommendations.length})</div>
-              {safetyScore.recommendations.slice(0,6).map((r,i)=> <div key={i} style={{ fontSize:11, color:'#fff', marginTop:3, lineHeight:1.35, paddingLeft:6, borderLeft:'2px solid rgba(34,197,94,0.4)' }}>{r}</div>)}
-            </div>
           </div>
         )}
-        <div style={H}>📊 Шаг 5: Качество и нагрузка плана</div>
+        <div style={{ ...H, marginBottom:8 }}>Качество и нагрузка плана</div>
         {/* Фаза — факт из плана, а не синтетика distributePhases */}
         {(() => {
           const Wq = builtPlan.weeks;
@@ -4074,7 +4108,6 @@ export const BbAutoConstructor: React.FC = () => {
                   return <div key={w.week} title={`Нед ${w.week}: ${PHASE_LABELS[p] || p}`} style={{ flex:1, background: PHASE_COLORS[p] || '#fff', opacity: isCur?1:0.55, borderLeft: isCur?'1px solid #fff': 'none', borderRight: isCur?'1px solid #fff':'none' }} />
                 })}
               </div>
-              <div style={{ fontSize:10, color:'#fff', opacity:0.62, marginTop:4, lineHeight:1.35 }}>{distText} · всего {totalW} нед · логика: distributePhases(totalWeeks={totalW}, goal={bbGoal}, trainingFocus={bbTrainingFocus || 'hypertrophy'})</div>
               <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
                 <div style={{ padding:'8px 9px', borderRadius:8, background:'rgba(0,0,0,0.18)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontSize:10, fontWeight:800, color:PHASE_COLORS[curPh], marginBottom:4 }}>Конфиг фазы ({bbTrainingFocus || 'hypertrophy'})</div>
@@ -4102,7 +4135,6 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.7, display:'flex', flexWrap:'wrap', gap:8 }}>
                 <span>Уровень «{bbLevel}»</span><span>Цель «{bbGoal}»</span><span>Фокус «{bbTrainingFocus}»</span><span>Методика «{bbMethodology}»</span><span>Сплит «{builtPlan.pattern?.name || ''}»</span><span>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span><span>ACWR {acwrQ ? acwrQ.ratio.toFixed(2) : '—'}</span><span>Стадий {Object.keys(phaseGroups).length}</span>
               </div>
-              <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Логика: distributePhases(totalWeeks={totalW}, goal={bbGoal}, trainingFocus={bbTrainingFocus}) → {distText} · curPh из builtPlan.weeks[{wkq.week}].phase</div>
             </div>
             {needsDeloadQ && curPh !== 'deload' && (
               <div style={{ marginBottom:6, padding:8, borderRadius:10, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#ef4444', fontSize:11, fontWeight:600 }}>🚨 ACWR {acwrQ?.ratio.toFixed(2)} &gt; 1.3 — рекомендуется разгрузка (факт фаза {PHASE_LABELS[curPh]} не делод).</div>
@@ -4134,7 +4166,6 @@ export const BbAutoConstructor: React.FC = () => {
                 <b>Выбрано:</b> дней {bbDays}, цель {bbGoal}, слабые {weakPoints.join(', ')||'—'}, фокус —, оборудование {bbEquipment.slice(0,2).join(', ')||'все'}, травмы {injuries.length||'нет'} · <b>План:</b> {builtPlan.pattern?.schedule?.length||'?'} дн/ротацию
               </div>
               {sel?.warnings?.length ? <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>{sel.warnings.slice(0,2).map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null}
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>Формула: rankBBSplits(level, goal, days, weakPoints, focusGroup, donorMuscles, specialization, equipment, injuries, mobility, peds) → {sc} / max {maxSc}. Топ-3: {ranked.slice(0,3).map(r=>`${r.pattern.id} ${r.score}`).join(' · ')}</div>
             </div>
           );
         })()}

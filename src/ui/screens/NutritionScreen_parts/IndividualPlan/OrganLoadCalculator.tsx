@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { usePlanCtx } from "./IndividualPlanContext";
+import { FOOD_DB } from "../../../../core/nutrition-database";
 import {
   calcOrganLoad, compareScenarios, ORGAN_LABELS, ORGAN_KEYS,
   saveOrganLoadHistory, loadOrganLoadHistory, clearOrganLoadHistory,
@@ -170,8 +171,31 @@ export const OrganLoadCalculator: React.FC = () => {
   const sat     = useCtx ? (fat * planSatRatio) : manualSat;
   const trans   = useCtx ? (ctx?.budget === 'low' ? 1.5 : 0.5) : manualTrans;
   const sugar   = useCtx ? (carbs * 0.25) : manualSug;
-  const fiber   = useCtx ? 25 : manualFib;
-  const omega3  = useCtx ? 500 : manualO3;
+  // P2-fix + E7: fiber/omega3 из ФАКТИЧЕСКОГО плана (раньше жёстко 25/500 — «данные плана»
+  // врали: клетчатка реальная бывает 25-70 г, омега-3 зависит от рыбы в плане).
+  const _planFiber = useMemo(() => {
+    const p = ctx?.dayPlan;
+    if (!p?.totals?.fiber) return null;
+    return Math.round(p.totals.fiber);
+  }, [ctx?.dayPlan]);
+  const _planOmega3 = useMemo(() => {
+    const p = ctx?.dayPlan;
+    if (!p?.meals) return null;
+    let mg = 0;
+    (p.meals as any[]).forEach(m => (m.items || []).forEach((it: any) => {
+      const fd = FOOD_DB.find(f => f.id === it.id);
+      if (!fd) return;
+      const o3 = (fd.micros as any)?.Omega3;
+      if (typeof o3 === 'number' && o3 > 0) {
+        // БД хранит Omega3 в мг/100 г (соусы/рыба) или г? Инвариант БД: мг на 100 г
+        // (getMicroFromFood нормализует только чтение; здесь поле уже мг)
+        mg += o3 * (it.amount || 0) / 100;
+      }
+    }));
+    return Math.round(mg);
+  }, [ctx?.dayPlan]);
+  const fiber   = useCtx ? (_planFiber ?? 25) : manualFib;
+  const omega3  = useCtx ? (_planOmega3 ?? 500) : manualO3;
   const chol    = manualChol;
   const sodium  = manualNa;
   const potass  = manualK;

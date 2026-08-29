@@ -192,7 +192,7 @@ const MedicalDisclaimer: React.FC<{ onDismiss: () => void }> = ({ onDismiss }) =
 );
 
 const ReportTab: React.FC = () => {
-  const { generateFullNutritionReport, nutritionReport, plannerMode } = usePlanCtx();
+  const { generateFullNutritionReport, nutritionReport, plannerMode, dayPlan } = usePlanCtx();
   const [generated, setGenerated] = useState(false);
   const [microSearch, setMicroSearch] = useState('');
   const r = nutritionReport;
@@ -213,7 +213,9 @@ const ReportTab: React.FC = () => {
   });
   return (
     <div style={{ paddingBottom: 80 }}>
-      <button onClick={() => { generateFullNutritionReport?.(); setGenerated(true); }} style={{
+      {/* E7-фикс: явная передача dayPlan (раньше вызов без аргументов молча падал на ctx.dayPlan,
+          а при пустом плане архивировал пустоту); явный флаг archive=true — пользовательское действие */}
+      <button onClick={() => { generateFullNutritionReport?.(dayPlan || undefined, true); setGenerated(true); }} style={{
         padding:'8px 16px', borderRadius:8, cursor:'pointer', fontSize:10, fontWeight:700,
         background:'linear-gradient(135deg,#00e68a,#00c8a0)', border:'none', color:'#000', marginBottom:8,
       }}>📊 Сгенерировать отчёт</button>

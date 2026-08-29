@@ -275,7 +275,7 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   generateQualityReport: () => void;
   generateRiskReport: () => void;
   generateDrugCompatReport: () => void;
-  generateFullNutritionReport: () => void;
+  generateFullNutritionReport: (planArg?: any, archive?: boolean) => void;
   renderMealList: (dayData: any, editable?: boolean, dayIdx?: number) => React.ReactNode;
   /** п.18: активный блок года для сегодня ({ week, block } | null) — карточка «📍 текущий блок года». */
   annualPhase: { week: number; block: AnnualBlockState } | null;
