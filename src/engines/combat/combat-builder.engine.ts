@@ -21,6 +21,7 @@ import { weightForCombatExerciseResolved } from './combat-workmax';
 import { sparringToOutsideLoad, sparringWeeklyLoad, sparringSummary } from './combat-sparring.engine';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { COMBAT_LANDMARKS } from './combat-volume';
+import { vbtRecommendationCombat } from './combat-vbt.engine';
 import { coreWeeklyPlan } from './combat-core.engine';
 import type { CombatInput, CombatPlan, CombatWeek, CombatSession, CombatExercise, CombatSet, CombatPhase } from './combat.types';
 
@@ -280,7 +281,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   if (input.weightCutKg && input.weightCutKg > 0 && !wcProtocol) rationale.push(`Весогонка: −${input.weightCutKg} кг → объём ×0.85, без отказа`);
   if (wcProtocol) {
     rationale.push(`Протокол весогонки: ${wcProtocol.targetLossKg}кг за ${wcProtocol.weeksOut}нед · вода ${wcProtocol.waterMode} · Na ${wcProtocol.sodiumMode} · угли ${wcProtocol.carbMode}${wcProtocol.heatSessions?' · сауна':''}`);
-    const nut = weightCutNutritionForWeek(1, weeks, wcProtocol, input.bodyweight || 80);
+    const nut = weightCutNutritionForWeek(1, weeks, wcProtocol, input.bodyweight || 80, input.sex as any);
     if (nut.kcal) rationale.push(`Питание W1: ${nut.kcal}ккал P${nut.proteinG}/C${nut.carbsG} · вода ${nut.waterMl}мл Na ${nut.sodiumMg}мг`);
     rationale.push(weightCutRehydrationNotes(wcProtocol.targetLossKg)[0]);
   }
@@ -368,11 +369,19 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const gentle = gentleFactorCB(id, input.injuries as any);
         let weight = weightForCombatExercise(id, input, goal);
         if (gentle < 1) { weight = Math.round(weight * gentle / 2.5) * 2.5; rir = Math.min(4, rir + 1); reps = [reps[0]+1, reps[1]+1] as any; }
-        // ACWR / velocity корректировка RIR
+        // ACWR / velocity корректировка (VBT — через combat-vbt, вес тоже корректируем)
         const vLoss = input.velocityLossPct as number | undefined;
         if (input.acwr?.zone === 'dangerous') rir = Math.min(4, rir + 2);
         else if (input.acwr?.zone === 'caution') rir = Math.min(4, rir + 1);
-        else if (typeof vLoss === 'number' && vLoss > 25) rir = Math.min(4, rir + 1);
+        else if (typeof vLoss === 'number' && vLoss > 0) {
+          const rec = vbtRecommendationCombat(vLoss);
+          if (rec.rirAdd > 0) rir = Math.min(4, rir + rec.rirAdd);
+          // при потере >25% — вес -5%, при 20-25% — -3%
+          if (rec.volumeMult < 1 && weight > 0) {
+            const wMult = rec.volumeMult <= 0.85 ? 0.95 : 0.97;
+            weight = Math.round(weight * wMult / 2.5) * 2.5;
+          }
+        }
         const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
         const tempo = tempoForCB(id, isPrimary, effectiveCharacter as any);
         const rest = restForCB(isPrimary, effectiveCharacter as any, id);

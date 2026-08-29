@@ -63,19 +63,21 @@ export function weightCutNutritionForWeek(
   week: number,
   totalWeeks: number,
   protocol: WeightCutProtocol | null,
-  bodyweightKg?: number
+  bodyweightKg?: number,
+  sex?: 'male' | 'female'
 ): { kcal: number | null; proteinG: number | null; carbsG: number | null; waterMl: number | null; sodiumMg: number | null; notes: string[] } {
   if (!protocol || bodyweightKg == null || bodyweightKg <= 30) return { kcal: null, proteinG: null, carbsG: null, waterMl: null, sodiumMg: null, notes: [] };
   const ph = weightCutPhaseForWeek(week, totalWeeks, protocol);
   const notes: string[] = [];
-  // белок 2.2г/кг camp, 2.3г/кг taper (защита мышц)
-  const protein = Math.round(bodyweightKg * (ph === 'taper' || ph === 'fight_week' ? 2.3 : 2.2));
+  // белок 2.2г/кг camp, 2.3г/кг taper (защита мышц), female — 2.3 г/кг минимум
+  const proteinPerKg = ph === 'taper' || ph === 'fight_week' ? 2.3 : 2.2;
+  const protein = Math.round(bodyweightKg * proteinPerKg);
   let carbs = Math.round(bodyweightKg * 4); // camp
   let water = Math.round(bodyweightKg * 35); // 35мл/кг
   let sodium = 5000;
   if (ph === 'taper') {
     carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 1) : Math.round(bodyweightKg * 3);
-    water = protocol.waterMode === 'load_cut' ? 8000 : Math.round(bodyweightKg * 30);
+    water = protocol.waterMode === 'load_cut' ? Math.min(8000, Math.round(bodyweightKg * 100)) : Math.round(bodyweightKg * 30);
     sodium = protocol.sodiumMode === 'moderate_cut' ? 3000 : 4000;
     notes.push('Тапер: углеводы ↓, вода ↑ (load) перед сливом');
   } else if (ph === 'fight_week') {
@@ -90,9 +92,22 @@ export function weightCutNutritionForWeek(
     water = Math.round(bodyweightKg * 35);
     sodium = 5000;
   }
-  // ккал ~ 4*P+4*C+9*F (жиры остаток 0.8г/кг)
-  const fat = Math.round(bodyweightKg * 0.8);
-  const kcal = protein * 4 + carbs * 4 + fat * 9;
+  // жиры: female ≥0.8г/кг (мин 40г RED-S), male ≥0.6 (мин 30г)
+  const fatPerKg = sex === 'female' ? 0.8 : 0.8; // пока единый, но floor разный
+  let fat = Math.round(bodyweightKg * fatPerKg);
+  if (sex === 'female' && fat < 40) fat = 40;
+  if (sex !== 'female' && fat < 30) fat = 30;
+  let kcal = protein * 4 + carbs * 4 + fat * 9;
+  // RED-S floor: female 1400, male 1500 — если ниже, поднимаем угли
+  const floor = sex === 'female' ? 1400 : 1500;
+  if (sex && kcal < floor) {
+    const neededCarbs = Math.ceil((floor - protein * 4 - fat * 9) / 4);
+    if (neededCarbs > carbs) {
+      notes.push(`Ккал ${kcal} < floor ${floor} (RED-S) — угли подняты с ${carbs}г до ${neededCarbs}г`);
+      carbs = neededCarbs;
+      kcal = floor;
+    }
+  }
   return { kcal, proteinG: protein, carbsG: carbs, waterMl: water, sodiumMg: sodium, notes };
 }
 

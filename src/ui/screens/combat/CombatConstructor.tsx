@@ -18,6 +18,8 @@ import { getCombat } from '../../../engines/combat/combat-volume';
 import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
 import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cut.engine';
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
+import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
+import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
 import { CARD, CARD_ACCENT, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel } from './CombatUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
@@ -61,12 +63,16 @@ export const CombatConstructor: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
+  const [vbtBest, setVbtBest] = useState<number>(0);
+  const [vbtLast, setVbtLast] = useState<number>(0);
+  const [injExclude, setInjExclude] = useState<boolean>(false);
   const [hrvLine, setHrvLine] = useState<string | null>(null);
   const [patternId, setPatternId] = useState<string>('');
   const [workMax, setWorkMax] = useState<Record<string,number>>({ bench:80, squat:90, deadlift:100, chest:80, back:70, quads:90, hamstrings:80, shoulders:50 });
   const [workMaxByExercise, setWorkMaxByExercise] = useState<Record<string,number>>({});
   const [showExactWM, setShowExactWM] = useState(false);
   const [plan, setPlan] = useState<CombatPlan | null>(null);
+  const [history, setHistory] = useState<CombatPlan[]>([]);
   const [annual, setAnnual] = useState(() => loadAnnualCB());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
@@ -171,6 +177,10 @@ export const CombatConstructor: React.FC = () => {
     }catch{}
     const wcProtocol = weightCut>0 ? buildWeightCutProtocol(weightCut, { startWeightKg: bodyweight, waterMode, sodiumMode, carbMode, heatSessions } as any) : null;
     const sparringLoad = sparringEnabled ? { hardSparSessions: sparringHard, techSparSessions: sparringTech, wrestlingSessions: sparringWrest } as any : null;
+    let effectiveLoss: number | null = velocityLoss>0 ? velocityLoss : null;
+    if (vbtBest>0 && vbtLast>0) {
+      try { const d = diagnoseVelocityLossCombat(vbtBest, vbtLast, 20); effectiveLoss = d.lossPct; } catch {}
+    }
     let input: CombatInput = {
       discipline, goal, level, weeks, daysPerWeek: days,
       weightCutKg: weightCut, weightCutProtocol: wcProtocol as any, methodology, dupMode, intensityTech,
@@ -179,7 +189,7 @@ export const CombatConstructor: React.FC = () => {
       bodyweight, sex, age,
       workMax: workMax as any,
       workMaxByExercise: Object.keys(workMaxByExercise).length ? workMaxByExercise as any : undefined,
-      acwr: acwr as any, velocityLossPct: velocityLoss>0? velocityLoss : null,
+      acwr: acwr as any, velocityLossPct: effectiveLoss,
       outsideLoad: outsideEnabled && !sparringEnabled ? outside : null,
       sparringLoad,
       fightStyle: fightStyle as any,
@@ -205,9 +215,22 @@ export const CombatConstructor: React.FC = () => {
     setStep('plan');
   };
 
+  const pushHistory = (p: CombatPlan) => setHistory(h => [...h.slice(-9), JSON.parse(JSON.stringify(p))]);
+  const undo = () => {
+    setHistory(h => {
+      if (h.length===0) { setMsg('История пуста'); return h; }
+      const prev = h[h.length-1];
+      const rest = h.slice(0,-1);
+      setPlan(prev);
+      try { saveCombatPlan(prev); } catch {}
+      setMsg('↩ Отменено');
+      return rest;
+    });
+  };
   const updateEx = (wkIdx: number, day: number, exId: string, patch: Partial<{ weight: number; reps: string; rir: number }>) => {
     setPlan(prev => {
       if (!prev) return prev;
+      pushHistory(prev);
       const copy: CombatPlan = JSON.parse(JSON.stringify(prev));
       const wk = copy.weeksData[wkIdx];
       if (!wk) return prev;
@@ -216,7 +239,19 @@ export const CombatConstructor: React.FC = () => {
       const ex = sess.exercises.find(e => e.id === exId);
       if (!ex) return prev;
       if (patch.weight != null) { if (patch.weight<0||patch.weight>500) { setMsg('Вес 0-500'); return prev; } ex.weight = patch.weight; ex.workSets = ex.workSets.map(s=> ({...s, weight: patch.weight! })); }
-      if (patch.reps != null) { ex.reps = patch.reps; const [a,b]= patch.reps.split('-').map(n=> parseInt(n,10)); const avg = Math.round(((a||5)+(b||a||5))/2); ex.workSets = ex.workSets.map(s=> ({...s, reps: avg })); }
+      if (patch.reps != null) {
+        const raw = patch.reps.trim();
+        ex.reps = raw;
+        // holds: "30с" — не трогаем workSets reps, только строку
+        if (/с|c/i.test(raw)) {
+          // hold — оставляем workSets как есть (1 повтор = удержание)
+        } else {
+          const parts = raw.split('-').map(n=> parseInt(n,10));
+          const a = parts[0]; const b = parts[1];
+          const avg = Number.isFinite(a) && Number.isFinite(b) ? Math.round((a + b)/2) : (Number.isFinite(a) ? a : 5);
+          ex.workSets = ex.workSets.map(s=> ({...s, reps: avg }));
+        }
+      }
       if (patch.rir != null) { if (patch.rir<0||patch.rir>5) { setMsg('RIR 0-5'); return prev; } ex.rir = patch.rir; ex.workSets = ex.workSets.map(s=> ({...s, rir: patch.rir! })); }
       saveCombatPlan(copy);
       return copy;
@@ -225,6 +260,7 @@ export const CombatConstructor: React.FC = () => {
   const moveEx = (wkIdx: number, day: number, exId: string, dir: -1|1) => {
     setPlan(prev => {
       if (!prev) return prev;
+      pushHistory(prev);
       const copy: CombatPlan = JSON.parse(JSON.stringify(prev));
       const sess = copy.weeksData[wkIdx]?.sessions.find(s=> s.day===day);
       if (!sess) return prev;
@@ -236,6 +272,28 @@ export const CombatConstructor: React.FC = () => {
       sess.exercises[idx]=sess.exercises[nIdx];
       sess.exercises[nIdx]=tmp;
       saveCombatPlan(copy);
+      return copy;
+    });
+  };
+  const swapEx = (wkIdx: number, day: number, exId: string, newId: string) => {
+    setPlan(prev => {
+      if (!prev) return prev;
+      const metaMap: Record<string,{name:string;group:string;pattern:string}> = {
+        bench_bar:{name:'Жим лёжа',group:'chest',pattern:'horizontal_push'}, row_bar:{name:'Тяга штанги',group:'back',pattern:'horizontal_pull'}, ohp:{name:'Жим стоя',group:'shoulders',pattern:'vertical_push'}, pullup:{name:'Подтягивания',group:'back',pattern:'vertical_pull'}, neck_harness_ext:{name:'Шея с упряжью',group:'neck',pattern:'isolation'}, neck_lateral_flex:{name:'Шея боковая',group:'neck',pattern:'isolation'}, neck_bridge_wrestler:{name:'Борцовский мост',group:'neck',pattern:'isolation'}, neck_flexion:{name:'Шея сгибание',group:'neck',pattern:'isolation'}, neck_rotation:{name:'Шея ротация',group:'neck',pattern:'isolation'}, gi_grip_pullup:{name:'Подтягивания на кимоно',group:'back',pattern:'vertical_pull'}, face_pull:{name:'Тяга к лицу',group:'shoulders',pattern:'isolation'}, squat:{name:'Присед',group:'legs',pattern:'squat'}, front_squat:{name:'Фронт-присед',group:'legs',pattern:'squat'}, rdl:{name:'Румынская тяга',group:'legs',pattern:'hinge'}, bulgarian_split_heavy:{name:'Болгарский тяжёлый',group:'legs',pattern:'lunge'}, single_leg_rdl_combat:{name:'Румынка на одной',group:'legs',pattern:'hinge'}, cossack_squat:{name:'Казачий присед',group:'legs',pattern:'squat'}, calf_raise:{name:'Подъёмы на носки',group:'legs',pattern:'isolation'}, plate_pinch:{name:'Щипок блинов',group:'grip',pattern:'isolation'}, landmine_rotation:{name:'Лэндмайн ротация',group:'core',pattern:'rotation'}, landmine_180:{name:'Лэндмайн 180',group:'core',pattern:'rotation'}, pallof_rotation_press:{name:'Паллоф+ротация',group:'core',pattern:'anti_rotation'}, suitcase_carry:{name:'Чемодан',group:'core',pattern:'carry'}, med_ball_throw:{name:'Медбол бросок',group:'core',pattern:'plyo'}, wrist_roller:{name:'Валик',group:'grip',pattern:'isolation'}, hang_clean:{name:'Взятие с виса',group:'legs',pattern:'oly'}, high_pull:{name:'Высокая тяга',group:'back',pattern:'oly'}, push_press:{name:'Жимовой швунг',group:'shoulders',pattern:'vertical_push'}, trap_bar_dead:{name:'Трэп-тяга',group:'legs',pattern:'hinge'}, zercher_squat:{name:'Зерчер-присед',group:'legs',pattern:'squat'}, nordic_curl:{name:'Нордик',group:'legs',pattern:'hinge'}, glute_ham_raise:{name:'GHR',group:'legs',pattern:'hinge'}, step_up:{name:'Зашагивания',group:'legs',pattern:'lunge'}, hip_thrust:{name:'Ягодичный мост',group:'legs',pattern:'hinge'}, kb_swing:{name:'Мах гирей',group:'core',pattern:'hinge'}, box_jump:{name:'Прыжок на тумбу',group:'legs',pattern:'plyo'}, depth_jump:{name:'Глубинный прыжок',group:'legs',pattern:'plyo'}, broad_jump:{name:'Прыжок в длину',group:'legs',pattern:'plyo'}, med_ball_slam:{name:'Медбол слэм',group:'core',pattern:'plyo'}, med_ball_rot_throw:{name:'Медбол ротационный',group:'core',pattern:'rotation'}, farmer_carry:{name:'Фермер',group:'grip',pattern:'carry'}, sled_push:{name:'Сани толкание',group:'legs',pattern:'carry'}, sled_pull:{name:'Сани тяга',group:'back',pattern:'carry'}, fat_bar_row:{name:'Тяга толстым грифом',group:'back',pattern:'horizontal_pull'}, towel_pullup:{name:'Полотенце',group:'grip',pattern:'vertical_pull'}, rope_climb:{name:'Канат',group:'grip',pattern:'vertical_pull'}, wrist_flexion:{name:'Сгибания запястий',group:'grip',pattern:'isolation'}, wrist_extension:{name:'Разгибания запястий',group:'grip',pattern:'isolation'}, deadbug:{name:'Мёртвый жук',group:'core',pattern:'anti_extension'}, hollow_hold:{name:'Лодочка',group:'core',pattern:'anti_extension'}, side_plank:{name:'Боковая планка',group:'core',pattern:'anti_lateral'}, ab_wheel:{name:'Колесо',group:'core',pattern:'anti_extension'}, copenhagen_plank:{name:'Копенгаген',group:'core',pattern:'anti_lateral'}, band_external_rotation:{name:'Ротация плеча',group:'shoulders',pattern:'isolation'}, band_pull_apart:{name:'Разведения с резинкой',group:'shoulders',pattern:'isolation'}, ytw_raise:{name:'Y-T-W',group:'shoulders',pattern:'isolation'}, single_arm_row:{name:'Тяга гантели одной',group:'back',pattern:'horizontal_pull'}, landmine_press:{name:'Лэндмайн жим',group:'shoulders',pattern:'vertical_push'}, battle_rope:{name:'Канаты',group:'core',pattern:'conditioning'}, sledge_hammer:{name:'Кувалда',group:'core',pattern:'rotation'}
+      };
+      const meta = metaMap[newId] || { name: newId, group: 'core', pattern: 'unknown' };
+      pushHistory(prev);
+      const copy: CombatPlan = JSON.parse(JSON.stringify(prev));
+      const sess = copy.weeksData[wkIdx]?.sessions.find(s=> s.day===day);
+      if (!sess) return prev;
+      const ex = sess.exercises.find(e=> e.id===exId);
+      if (!ex) return prev;
+      ex.id = newId;
+      ex.name = meta.name;
+      ex.group = meta.group;
+      ex.pattern = meta.pattern;
+      saveCombatPlan(copy);
+      setMsg(`Заменено: ${newId} (STRICT ${cbStrictGroupFor(newId) || '—'})`);
       return copy;
     });
   };
@@ -302,11 +360,7 @@ export const CombatConstructor: React.FC = () => {
           </div>
           {msg && <span style={{ fontSize:11, color:'#c4b5fd', background:'rgba(168,85,247,0.10)', border:'1px solid rgba(168,85,247,0.20)', padding:'3px 8px', borderRadius:20 }}>{msg}</span>}
         </div>
-        <div style={{ display:'none' }}>
-          {(['params','outside','split','plan'] as Step[]).map(s => (
-            <ChipToggle key={s} active={step===s} onClick={() => setStep(s)}>{s}</ChipToggle>
-          ))}
-        </div>
+
       </div>
 
       {step === 'params' && (
@@ -380,9 +434,12 @@ export const CombatConstructor: React.FC = () => {
           </div>
           {acwr && <div style={{ fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#a855f7', background:'rgba(255,255,255,0.04)', padding:6, borderRadius:6 }}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} {acwr.zone==='dangerous'?'— объём ×0.60,RIR+2': acwr.zone==='caution'?'— ×0.85,RIR+1': acwr.zone==='undertrained'?'— добавить объём':''} · дневник sRPE 28д</div>}
           {hrvLine && <div style={{ fontSize: 10, color: hrvLine.includes('dangerous')?'#ef4444': hrvLine.includes('caution')?'#eab308':'#10b981', background:'rgba(255,255,255,0.04)', padding:6, borderRadius:6 }}>{hrvLine}</div>}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, background:'rgba(255,255,255,0.03)', padding:6, borderRadius:6 }}>
             <label style={{ color: '#fff', fontSize: 11 }}>VBT потеря: {velocityLoss}% <input type="range" min={0} max={40} value={velocityLoss} onChange={e=> setVelocityLoss(Number(e.target.value))} style={{ width:'100%' }} /></label>
-            <div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Vitruve: &gt;20% → RIR+1, &gt;30% → стоп сет. Влив в бюджет ×{velocityLoss>20?0.9:1}</div>
+            <div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Vitruve: &gt;20% → RIR+1+вес-3%, &gt;25% → вес-5%. Влив в бюджет ×{velocityLoss>20?0.9:1}</div>
+            <label style={{ color:'#fff', fontSize:10 }}>Best Vel м/с <input type="number" step={0.05} value={vbtBest||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtBest(v); if(v>0&&vbtLast>0){ const loss=Math.round((1 - vbtLast/v)*100); const d=diagnoseVelocityLossCombat(v, vbtLast, 20); setVelocityLoss(d.lossPct); } }} style={{ width:'100%', padding:2, borderRadius:4, fontSize:10 }} placeholder="0.8" /></label>
+            <label style={{ color:'#fff', fontSize:10 }}>Last Vel м/с <input type="number" step={0.05} value={vbtLast||''} onChange={e=> { const v=Number(e.target.value)||0; setVbtLast(v); if(vbtBest>0&&v>0){ const d=diagnoseVelocityLossCombat(vbtBest, v, 20); setVelocityLoss(d.lossPct); } }} style={{ width:'100%', padding:2, borderRadius:4, fontSize:10 }} placeholder="0.6" /></label>
+            {vbtBest>0 && vbtLast>0 && (()=>{ const d=diagnoseVelocityLossCombat(vbtBest, vbtLast, 20); return <div style={{ gridColumn:'1 / -1', fontSize:9, color: d.lossPct>25?'#ef4444': d.lossPct>20?'#f59e0b':'#10b981' }}>{d.lossPct}% · {d.zone} · {d.recommendation} {d.exceeded?'⚠️':''}</div>; })()}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
@@ -446,17 +503,18 @@ export const CombatConstructor: React.FC = () => {
           <SectionCard title="🛠 Оборудование и ограничения">
             <Field label="Доступное оборудование (пусто — всё доступно)">
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {(['barbell','dumbbell','machine','cable','other'] as const).map(eq => (
-                  <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{EQUIP_RU[eq]}</ChipToggle>
+                {(['barbell','dumbbell','machine','cable','sled','other'] as const).map(eq => (
+                  <ChipToggle key={eq} active={equipment.includes(eq)} onClick={()=> setEquipment(s=> s.includes(eq)? s.filter(x=>x!==eq): [...s,eq])}>{(EQUIP_RU as any)[eq] || eq}</ChipToggle>
                 ))}
               </div>
             </Field>
             <Field label="Травмы — щадящий режим (через запятую)" hint="Снижает вес ×0.6 и повышает RIR, фильтрует опасные движения">
-              <div style={{ display:'flex', gap:6 }}>
-                <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: шея, колено, плечо, кисть" style={{ ...INPUT, flex:1 }} />
-                <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: 'joint' }))); setMsg(parts.length? 'Травмы применены':'Список очищен'); }} style={BTN_SMALL}>Применить</button>
+              <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                <input value={injInput} onChange={e=> setInjInput(e.target.value)} placeholder="напр.: шея, колено, плечо, кисть" style={{ ...INPUT, flex:1, minWidth:160 }} />
+                <label style={{ color:'#fff', fontSize:10, display:'flex', gap:4, alignItems:'center' }}><input type="checkbox" checked={injExclude} onChange={e=> setInjExclude(e.target.checked)} /> ⛔ Исключить</label>
+                <button onClick={() => { const parts = injInput.split(',').map(s=> s.trim()).filter(Boolean); setInjuries(parts.map(p=> ({ location: p, type: injExclude? 'exclude':'joint', exclude: injExclude, mode: injExclude? 'exclude':'graded', severity: injExclude? 'high':'medium' } as any))); setMsg(parts.length? (injExclude? 'Исключены: ':'Щадящий: ')+parts.join(', '):'Список очищен'); }} style={BTN_SMALL}>Применить</button>
               </div>
-              {injuries.length>0 && <InfoBanner tone="warn">Щадящий режим: {injuries.map((j:any)=> j.location).join(', ')} — вес снижен</InfoBanner>}
+              {injuries.length>0 && <InfoBanner tone={injExclude? 'warn':'info'}>{injExclude? '⛔ Исключены: ':'⚡ Щадящий: '}{injuries.map((j:any)=> j.location).join(', ')} — {injExclude? 'убраны из пула':'вес ×0.6-0.7, RIR+1'}</InfoBanner>}
             </Field>
             <Field label="Ограничения мобильности">
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -490,6 +548,16 @@ export const CombatConstructor: React.FC = () => {
                     <Field label={`Сессий/нед вне зала: ${outside.sessionsPerWeek}`}><input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} style={{ width: '100%' }} /></Field>
                     <Field label={`Длительность мин: ${outside.avgDurationMin}`}><input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} style={{ width: '100%' }} /></Field>
                     <Field label={`RPE: ${outside.avgSRPE}`}><input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} style={{ width: '100%' }} /></Field>
+                    <Field label="Высокие дни (тяж ноги → лёг перед ними)" hint="Пн=0 … Вс=6, влияет на перенос тяж ног на памп" >
+                      <div style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
+                        {[0,1,2,3,4,5,6].map(d=> {
+                          const active = (outside.highIntensityDays||[]).includes(d);
+                          const label = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d];
+                          return <ChipToggle key={d} active={active} onClick={()=> setOutside(o=> o? {...o, highIntensityDays: active? (o.highIntensityDays||[]).filter(x=>x!==d): [...(o.highIntensityDays||[]), d].sort((a,b)=>a-b)}: o)}>{label}</ChipToggle>;
+                        })}
+                      </div>
+                      <div style={{ fontSize:9, color:'#fff', opacity:0.5, marginTop:2 }}>Выбрано: {(outside.highIntensityDays||[]).map(d=>['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][d]).join(', ') || '— авто'}</div>
+                    </Field>
                   </>
                 )}
                 {sparringEnabled && (
@@ -545,6 +613,10 @@ export const CombatConstructor: React.FC = () => {
 
       {step === 'plan' && plan && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+            <button onClick={undo} disabled={history.length===0} style={{ padding:'4px 10px', borderRadius:6, fontSize:11, background: history.length? 'rgba(168,85,247,0.18)':'rgba(255,255,255,0.06)', color: history.length? '#c4b5fd':'rgba(255,255,255,0.35)', cursor: history.length? 'pointer':'default', border:'1px solid rgba(168,85,247,0.25)' }}>↩ Отменить {history.length? `(${history.length})`:''}</button>
+            <span style={{ fontSize:10, color:'#fff', opacity:0.5 }}>История правок: {history.length}/10</span>
+          </div>
           <div style={{ background: 'rgba(168,85,247,0.12)', padding: 10, borderRadius: 10, color: '#fff', fontSize: 11, whiteSpace: 'pre-wrap' }}>{buildCombatReport(plan)}</div>
           {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
           {(plan as any).conditioning && (
@@ -608,6 +680,10 @@ export const CombatConstructor: React.FC = () => {
                         <input aria-label="вес" type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ width: 58, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                         <input aria-label="повторы" type="text" value={ex.reps} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { reps: e.target.value })} style={{ width: 54, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
                         <input aria-label="RIR" type="number" min={0} max={5} value={ex.rir} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { rir: Number(e.target.value)||0 })} style={{ width: 44, padding: '2px 4px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)' }} />
+                        <select aria-label="замена" value={ex.id} onChange={e=> { const v=e.target.value; if(v!==ex.id) swapEx(wk.week-1, sess.day, ex.id, v); }} style={{ padding:'2px 4px', borderRadius:4, fontSize:9, background:'rgba(168,85,247,0.08)', color:'#c4b5fd', border:'1px solid rgba(168,85,247,0.25)', maxWidth:110 }} title={`STRICT ${cbStrictGroupFor(ex.id)||'—'}: замена только внутри группы`}>
+                          <option value={ex.id}>{ex.id} ✓</option>
+                          {(cbStrictGroupFor(ex.id) ? CB_STRICT_GROUPS[cbStrictGroupFor(ex.id)!] : []).filter(id=> id!==ex.id).map(id=> <option key={id} value={id}>{id}</option>)}
+                        </select>
                         <button aria-label="вверх" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, -1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↑</button>
                         <button aria-label="вниз" onClick={()=> moveEx(wk.week-1, sess.day, ex.id, 1)} style={{ padding: '2px 6px', borderRadius: 4, fontSize: 10, background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}>↓</button>
                       </div>
