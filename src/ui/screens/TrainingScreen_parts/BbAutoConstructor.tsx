@@ -641,6 +641,7 @@ export const BbAutoConstructor: React.FC = () => {
   const prepCheckinDone = PREP_CHECKIN_ITEMS.filter((_, i) => prepCheckin[`${isoToday()}_${i}`]).length;
   const [prepConfirmedManip, setPrepConfirmedManip] = useState(false);
   const [prepBusy, setPrepBusy] = useState(false);
+  const [contestWizard, setContestWizard] = useState<1|2|3|4|5>(1);
   const prepContra = useMemo(() => {
     try {
       const health = (linked.profile?.settings as any)?.health as { chronicConditions?: string[]; contraindications?: Record<string, boolean> } | undefined;
@@ -4782,6 +4783,22 @@ export const BbAutoConstructor: React.FC = () => {
           Опциональный цикл: <b>подготовка → taper → peak week → show day</b>. План тренировок строится как
           обычный; этот шаг накладывает фазы поверх него (копию) и генерирует дневные цели питания.
           Можно пропустить — план останется обычным.
+        </div>
+        {/* PRO Wizard 5 шагов */}
+        <div style={{ display:'flex', gap:6, marginTop:10, flexWrap:'wrap' }}>
+          {[1,2,3,4,5].map(n => {
+            const labels=['1 Атлет','2 Кондиция','3 Стратегии','4 Trial','5 Preview'] as const;
+            const active=contestWizard===n;
+            const disabled=false;
+            return <button key={n} onClick={()=>setContestWizard(n as any)} disabled={disabled} style={{ flex:1, minWidth:70, padding:'6px 8px', borderRadius:8, fontSize:10, fontWeight: active?800:600, background: active?'rgba(236,72,153,0.2)':'rgba(255,255,255,0.04)', border: active?'1px solid #ec4899':'1px solid rgba(255,255,255,0.08)', color: active?'#ec4899':'#fff', cursor:'pointer' }}>{labels[n-1]}</button>;
+          })}
+        </div>
+        <div style={{ fontSize:9, color:'#fff', marginTop:4, textAlign:'center' }}>
+          {contestWizard===1 && 'Шаг 1: атлет, дата, категория, специализация'}
+          {contestWizard===2 && 'Шаг 2: кондиция BF gap, spillRisk, готовность'}
+          {contestWizard===3 && 'Шаг 3: стратегии вода/натрий/карбы (gate: BF>14% + light → не front/high)'}
+          {contestWizard===4 && 'Шаг 4: репетиция trial peak за 21-28д (фото/вес) → рекомендация'}
+          {contestWizard===5 && 'Шаг 5: preview taper curve, peakWeek, warnings, экспорт'}
         </div>
 
         {/* Параметры */}
