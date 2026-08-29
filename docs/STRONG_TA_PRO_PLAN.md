@@ -23,7 +23,7 @@
 - Strongman attempts `yoke 10 / log 2.5`, Sinclair 2024, ICS, rolling `3/1`
 
 ### PRO UI
-- WorkMax `yoke/farmers/stone/log`, `weakPoints` chips (2), `RPE {10-RIR}`, VBT per-set `м/с → e1RM`, PED 7 систем, попытки ТА/стронг, heatmap `intensityZone + tonnage`, `CSV/XLS/ICS`, annual bridge `he_strength_annual_sync_v1` + `he-annual-training-plan-updated`
+- WorkMax `yoke/farmers/stone/log`, `weakPoints` chips (2), `RPE {10-RIR}`, VBT per-set `м/с → e1RM`, попытки ТА/стронг, heatmap `intensityZone + tonnage` + `VBT zone`, `CSV/XLS/ICS`, annual bridge `MANUAL` в `he_annual_training_plan_v1` (85% натив), PED адаптация MRV `×1.0-1.7` **без рисков** (требование)
 
 ### PRO диагностика
 - `bar-path 5` (`forward/backward/loop/early_pull/soft_lockout`) + `asymmetry` (10% порог)
@@ -31,7 +31,7 @@
 
 ### Тесты
 - `311/311` (10 файлов), матрица `192` + property `weeklySets <= budget`
-- `strength-sport-phase6-pro.test.ts` 30: P0, VBT, weakpoint, attempts, Sinclair/Robi, ICS, Brzycki, mesocycle, PED
+- `strength-sport-phase6-pro.test.ts` 30: P0, VBT, weakpoint, attempts, Sinclair/Robi, ICS, Brzycki, mesocycle (PED риски исключены из планировщика)
 
 ### Файлы
 - `strength-sport-builder.engine.ts` (+weakpoint)

@@ -14,7 +14,6 @@ import { buildWLMeetPlan, wlAttemptRationale } from '../../../engines/strength-s
 import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
 import { syncStrengthAnnualToGeneral } from '../../../engines/strength-sport/strength-sport-annual-bridge';
 import { estimate1RMFromVelocitySS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
-import { assessPedRisk } from '../../../engines/ped-risk-matrix';
 import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
@@ -534,28 +533,6 @@ export const StrengthSportConstructor: React.FC = () => {
                 {lPlan && <div>Лог: {lPlan.attempts.opener} / {lPlan.attempts.second} / {lPlan.attempts.third} кг · {smEventRationale(lPlan)[2]}</div>}
               </div>
             ) : null;
-          })()}
-          {/* PRO: PED риски 7 систем */}
-          {(() => {
-            const snap: any = plan.inputSnapshot || {};
-            const hasPED = (Array.isArray(snap.peds) && snap.peds.length > 0) || (snap.pedDoses && Object.keys(snap.pedDoses).length > 0);
-            if (!hasPED) return null;
-            try {
-              const doses: any[] = [];
-              for (const id of snap.peds || []) doses.push({ id, mgPerWeek: Number(snap.pedDoses?.[id] ?? 500) });
-              for (const [k,v] of Object.entries(snap.pedDoses || {})) if (!snap.peds?.includes(k)) doses.push({ id:k, mgPerWeek: Number(v)||0 });
-              const r = assessPedRisk(doses as any, 'medium');
-              return (
-                <div style={{ background: 'rgba(239,68,68,0.10)', padding: 8, borderRadius: 8, border: '1px solid rgba(239,68,68,0.25)', color: '#fff', fontSize: 11 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ PED риски 7 систем (дозозависимо):</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10 }}>
-                    <span>Нейро: {r.neuroRisk}</span><span>Суставы: {r.jointsRisk}</span><span>Гемато: {r.hematoRisk}</span><span>Печень: {r.hepaticRisk}</span><span>Кардио: {r.cardioRisk}</span><span>Почки: {r.renalRisk}</span><span>Репро: {r.reproductiveRisk}</span>
-                  </div>
-                  {r.triggeredBy.length>0 && <div style={{ opacity:0.7, fontSize:10, marginTop:4 }}>{r.triggeredBy.slice(0,3).join(' · ')}</div>}
-                  {r.perSubstance.some(ps=> (ps.support||[]).length>0) && <div style={{ opacity:0.6, fontSize:10 }}>Поддержка: {Array.from(new Set(r.perSubstance.flatMap(ps=> (ps.support||[])))).slice(0,6).join(', ')}</div>}
-                </div>
-              );
-            } catch { return null; }
           })()}
           {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
