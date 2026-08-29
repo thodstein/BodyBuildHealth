@@ -1,5 +1,61 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Планировщик питания: раунд 2 «абсолютное выполнение» — все остатки закрыты (Aug 29 2026, pushed c074f1c88 + 6607415c + 447a29c6)
+
+Поверх эпиков A–F (9b9cb960 + 862a3404). Закрыто ВСЁ из хвост-аудита, кроме двух
+осознанных остатков (см. ниже).
+
+- **A6 (санитария)**: удалены мёртвые `pickRotation`/`preSleepP`/`tSnack2`; `_currentBudget`
+  сбрасывается в `finally`; инъекционные мини-приёмы (инсулин/ГР/ИГФ) регистрируются в
+  `markUsed`+quota (дубль whey с пост-треном устранён); лейблы snack2/3/4 → «Перекус 2/3/4»
+  (preferred-key fallback на «Перекус» сохранён); заметка «Полдник 15:30» → фактическое время;
+  `meal-plan-generator.engine.ts` помечен `@deprecated` (живой импорт — только тип в
+  bb-contest-prep; удаление после отвязки).
+- **B5**: `recentStapleFamilies` (семейства гарниров предыдущих дней) — Context собирает из
+  dayPlan/threeDayPlan, движок деприоритизирует рис-в-каждый-день при ≥2 свежих альтернатив.
+- **C3**: лёгкая сессия <60 мин → пост-трен НЕ строится, бюджет (белок+угли) сливается в ужин
+  (note «слит с ужином»); ≥60 мин — отдельный шейк (тесты на оба пути).
+- **C5**: `mpsSummary.meals[]` (label/proteinG/leucineG/triggersMps) + fiberG/fiberTargetG;
+  notes-подсказка «⚠ {приём}: N г белка — ниже MPS-порога, дополните творогом/сывороткой».
+- **D1**: `parseIngredient` безразмерные ингредиенты → дефолт по роли (масло 10 г, соус 20,
+  цитрус 30, специи 3, зелень 30, мёд 15, чеснок 10) — легаси-рецепты без ids больше не
+  получают «оливковое масло 100 г».
+- **D4**: порошковый лимит в рецептурном пути — `assembleRecipeDay` не ставит порошковые
+  рецепты (ingredientIds ∩ POWDER_PROTEIN_IDS) в 3-й+ приём дня (тест F3).
+- **D5**: `Recipe.baseWeightKg?` (derived из тегов: масса→110, сушка→80) ×
+  `RecipeMatchOptions.athleteWeightKg` — ±10 кг +8, ±20 кг 0, дальше −6 к скорингу;
+  Context передаёт `weight` в assembleRecipeDay.
+- **D3**: NEW `recipe-db-p33.ts` — 25 масс-обедов/ужинов/завтраков 780–950 ккал
+  (BB-Масса: плов, лазанья protein, чифан с лососем, овсянка-гейнер…);
+  NEW `recipe-db-p34.ts` — 10 суша-ужинов ≤440 ккал / белок ≥40 (треска+цветная,
+  креветочный вок, фаршированные кальмары…). Итого партия p32–p34: +65 рецептов.
+- **E2-хвост**: MealListRender inline «📋 дубль» → `ctx.duplicateMeal` (синк недели).
+- **E4**: месяц — повторная генерация недели 0 удалена (отображение из monthPlan[0]);
+  useEffect-синк weekPlan → monthPlan[selectedWeek] при weekEditDay-правках в режиме месяца.
+- **E5**: Results «↩ Отменить» → единый `ctx.undoLast` (восстановление + recommendations).
+- **E6**: `specialMealOverride` в движок — календарь спец-приёмов с `replaceMeal` и конфиг
+  спецприёма (custom-макросы) РЕАЛЬНО перестраивают целевой приём: cheat ×1.6У/×2Ж/0.8Б,
+  refeed ×1.8У/×0.5Ж, fast ×0.3, custom — явные Б/Ж/У (до usedP/residualP — честный остаток).
+- **E7**: `prompt()` → модалки (сохранение плана в Context, импорт в Results с валидацией
+  формы meals[]/items[]); UTC→локальная дата в «📒 в дневник» и `addPlanToDiary`;
+  чекбоксы закупок сбрасываются при новом плане (planKey-ref); Settings «Заполнить из
+  профиля» → единый `ctx.autofillFromProfile` (старый читал несуществующие поля — no-op);
+  `archve`→`archive`; placeholder-вызов в `moveFoodItem` удалён; мёртвый
+  `IndividualPlanHealth.tsx` (216 строк) удалён.
+- **F3**: NEW `planner-recipe-gates.test.ts` — капы ролей (масла ≤15, цитрус ≤60, соусы ≤30,
+  специи ≤10) на всей RECIPE_DB; oats>150 г запрещён (ремап на oats_dry); декомпозиция в
+  коридоре 0.6–1.6 шапки; порошковый лимит рецептурного дня ≤2.
+- **F4**: NEW `planner-ui-guarantees.test.tsx` — `window.showToast` определён и доставляет
+  в PlannerToastHost; инварианты времени приёмов.
+- **Проверено**: IndividualPlan **464/464** (39 файлов), tsc **0 по проекту**; коммиты
+  строго pathspec; чужой WIP (cardio-агент: cardio-import/cardio.engine/cardio-storage)
+  не тронут.
+- **Осознанные остатки**: (1) автокоррекция/скоринг полезности — dayPlan-only (multi-day
+  требует рефактора `autoCorrectPlan`/`handleCalcUsefulness` на активный день вида);
+  (2) `meal-plan-generator.engine.ts` физически не удалён (живой type-import в
+  bb-contest-prep) — помечен deprecated.
+
+
 ## Планировщик питания: полный аудит и «профессиональный уровень» — эпики A/B/C/D/E/F (Aug 29 2026, pushed 9b9cb960 + 862a3404)
 
 Полный разбор планировщика питания (движок 3.7k строк, 858 рецептов, 11 UI-файлов) по плану,
