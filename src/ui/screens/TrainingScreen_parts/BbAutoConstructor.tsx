@@ -80,7 +80,7 @@ import {
   buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, replanBBContestPrep,
   shiftBBContestPrepShowDate, serializeBBContestPrepPlan, nutritionTargetsForPrepDate,
   prepPhaseForDate, PREP_PHASE_LABELS, PREP_PHASE_COLORS,   buildShowTimeline, configFromPlan,
-  computeReadiness,
+  computeReadiness, spillRiskScore, isShortCycle,
   saveTestPeakWeekResult, latestTestPeakWeek, resolvePeakStrategy, planFromStored, prepWeightAdvice, recommendCarbStrategyFromTrial, liveAdjustForPeakDay,
   buildPostShowPlan, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson,
   prepTrainingCompliance,
@@ -420,6 +420,19 @@ export const BbAutoConstructor: React.FC = () => {
     window.addEventListener('he-annual-training-plan-updated', onUpd);
     return () => window.removeEventListener('he-annual-training-plan-updated', onUpd);
   }, []);
+  // PRO annualBlockId sync: если годовой план имеет contest prep блок — синкать дату шоу
+  useEffect(() => {
+    if (!annualPlan) return;
+    try {
+      const nowWeek = (() => { try { const w = (annualPlan as any).currentWeekIdx; return typeof w==='number'?w:1; } catch { return 1; } })();
+      const block = (annualPlan.blocks||[]).find((b:any)=>b.ref?.phase==='contest_prep' && b.status==='built');
+      if (block?.result?.showDate && block.result.showDate !== prepShowDate) {
+        // не перезаписываем если пользователь уже вручную менял в этом месяце
+        const isRecentManual = (()=>{ try{ const v=localStorage.getItem('he_contest_manual_date'); if(!v) return false; return Date.now() - Number(v) < 86400000*7; } catch{ return false; }})();
+        if (!isRecentManual) setPrepShowDate(block.result.showDate);
+      }
+    } catch {}
+  }, [annualPlan]);
   // Стаж + любимые/нелюбимые упражнения (синхронизируются с профилем тренированности).
   const [bbTrainingYears, setBbTrainingYears] = useState<number>(prof.trainingYears || 3);
   const [bbFavEx, setBbFavEx] = useState<string[]>(prof.favoriteExercises || []);
@@ -703,6 +716,8 @@ export const BbAutoConstructor: React.FC = () => {
     };
     return base;
   };
+  const spillRisk = useMemo(() => { try { return spillRiskScore(buildContestPrepConfig()); } catch { return { level:'low' as const, note:'' }; } }, [peakWeekCategory, prepWaterMode, prepSodiumMode, prepCarbMode, linked.profile?.settings]);
+  const readiness = useMemo(() => { try { return computeReadiness(buildContestPrepConfig()); } catch { return { verdict:'on_track' as const, gap:null, targetBf:null, note:'' }; } }, [peakWeekCategory, prepWaterMode, prepCarbMode, linked.profile?.settings]);
 
   /** Собрать единый prep-план, применить к текущему плану и сохранить в профиль. */
   const assembleContestPrep = (applyToPlan: boolean) => {
@@ -710,6 +725,11 @@ export const BbAutoConstructor: React.FC = () => {
     setPrepBusy(true);
     try {
       const cfg = buildContestPrepConfig();
+      // PRO gates
+      const risk = spillRiskScore(cfg);
+      if (risk.level==='high' && (cfg.carbLoadStrategy==='back' || cfg.carbLoadStrategy==='front')) { flash(`⛔ ${risk.note}`); setPrepBusy(false); return; }
+      if (cfg.waterStrategy==='high' && !cfg.hasTrialPeak) { flash('⛔ High water требует trial peak за 21-28д + confirm'); setPrepBusy(false); return; }
+      if (isShortCycle(prepWeeks + prepTaperWeeks + 1) && cfg.carbLoadStrategy==='back') { flash('⛔ ShortCycle 4-6 нед: берите linear/moderate, не back'); setPrepBusy(false); return; }
       const plan = buildBBContestPrepPlan(cfg, {
         prepWeeks: Math.min(52, Math.max(1, prepWeeks)),
         taperWeeks: Math.min(4, Math.max(1, prepTaperWeeks)),
@@ -765,6 +785,7 @@ export const BbAutoConstructor: React.FC = () => {
 
   /** Перенос даты шоу с пересчётом фаз (завершённые недели — с предупреждением). */
   const handleShiftPrepShowDate = (d: string) => {
+    try { localStorage.setItem('he_contest_manual_date', String(Date.now())); } catch {}
     if (!prepPlan) { setPrepShowDate(d); return; }
     const { plan, changedFrozen, warnings } = shiftBBContestPrepShowDate(prepPlan, d);
     setPrepPlan(plan);
@@ -4804,7 +4825,7 @@ export const BbAutoConstructor: React.FC = () => {
         {/* Параметры */}
         <div style={{ ...CARD, marginTop:10 }}>
           <div style={{ fontSize:12, fontWeight:800, color:'#ec4899', marginBottom:8 }}>📅 Параметры подготовки</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+          <div style={{ display: contestWizard===1 ? 'grid' : 'none', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
             <div>
               <div style={{ ...SMALL, marginBottom:4 }}>📆 Дата шоу</div>
               <input type="date" value={prepShowDate} onChange={e => handleShiftPrepShowDate(e.target.value)} style={{ ...IN, width:'100%' }} />
@@ -4835,8 +4856,16 @@ export const BbAutoConstructor: React.FC = () => {
               />
             </div>
           </div>
-          {/* Соревнования — единый словарь A/B/C */}
-          <div style={{ marginBottom:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
+          {/* Step 2 Кондиция — readiness + spillRisk (wizard) */}
+          <div style={{ display: contestWizard===2 ? 'block' : 'none', marginBottom:8, padding:8, borderRadius:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+            <div style={{ ...SMALL, color:'#60a5fa', fontWeight:700, marginBottom:4 }}>📊 Кондиция (BF gap, spill)</div>
+            <div style={{ fontSize:11, color: readiness.verdict==='behind' ? '#f87171' : readiness.verdict==='ahead' ? '#4ade80' : '#fff' }}>{readiness.note} {readiness.gap!=null ? `(gap ${readiness.gap}%)` : ''}</div>
+            <div style={{ fontSize:11, marginTop:4, color: spillRisk.level==='high' ? '#ef4444' : spillRisk.level==='medium' ? '#f59e0b' : '#4ade80' }}>Spill риск {spillRisk.level}: {spillRisk.note}</div>
+            {spillRisk.level==='high' && <div style={{ fontSize:9, color:'#ef4444', marginTop:4 }}>⛔ High: смените carb на moderate/linear, stable вода</div>}
+            {isShortCycle(prepWeeks + prepTaperWeeks + 1) && <div style={{ fontSize:9, color:'#fbbf24', marginTop:4 }}>⚠ ShortCycle 4-6 нед: linear/moderate без final каскада</div>}
+          </div>
+          {/* Соревнования — единый словарь A/B/C — wizard 3 */}
+          <div style={{ display: contestWizard===3 ? 'block' : 'none', marginBottom:8, padding:8, borderRadius:8, background:'rgba(239,68,68,0.06)', border:'1px solid rgba(239,68,68,0.15)' }}>
             <div style={{ ...SMALL, marginBottom:4, color:'#f87171', fontWeight:700 }}>🏁 Соревнования (необязательно)</div>
             {(prepCompetitions && prepCompetitions.length > 0) ? (
               <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:6 }}>
@@ -4855,6 +4884,7 @@ export const BbAutoConstructor: React.FC = () => {
             ) : <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', marginBottom:6 }}>Одно шоу — дата выше. Добавьте старты для мульти-пика A/B/C.</div>}
             <button onClick={() => setPrepCompetitions(prev => [...(prev||[]), { id:`comp_${Date.now().toString(36)}`, name:`Старт ${((prev||[]).length)+1}`, priority:'B' }])} style={{ fontSize:10, padding:'4px 8px', borderRadius:6, background:'rgba(239,68,68,0.1)', color:'#f87171', border:'1px dashed rgba(239,68,68,0.3)', cursor:'pointer' }}>＋ Добавить соревнование</button>
           </div>
+          <div style={{ display: contestWizard===3 ? 'block' : 'none' }}>
           <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
             <span style={{ ...SMALL }}>Недели подготовки:</span>
             <button style={BTN_GHOST} onClick={() => handleExtendPrep(-1)}>−</button>
@@ -4929,7 +4959,8 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
             </div>
           </div>
-          {(prepWaterMode === 'classic' || prepWaterMode === 'moderate' || prepSodiumMode !== 'constant') && (
+          </div>
+          {(prepWaterMode !== 'stable' || prepSodiumMode !== 'stable') && (
             <label style={{ display:'flex', gap:8, alignItems:'flex-start', marginBottom:8, fontSize:11, color:'#fbbf24', background:'rgba(245,158,11,0.08)', padding:10, borderRadius:8 }}>
               <input type="checkbox" checked={prepConfirmedManip} onChange={e => setPrepConfirmedManip(e.target.checked)} />
               <span>⚠ Я понимаю: умеренная модуляция воды/натрия допустима только при стабильном здоровье, без противопоказаний; диуретики не назначаются; при симптомах нарушения электролитов — план остановить. Подтверждаю выбор.</span>
@@ -4952,9 +4983,9 @@ export const BbAutoConstructor: React.FC = () => {
           {!builtPlan && <div style={{ fontSize:11, color:'#ef4444', marginTop:6 }}>Сначала соберите план тренировок (шаги 1-4).</div>}
         </div>
 
-        {/* Результат */}
+        {/* Результат — wizard 5 Preview */}
         {prepPlan && (
-          <div style={{ marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.2)' }}>
+          <div style={{ display: contestWizard===5 ? 'block' : 'none', marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.2)' }}>
             <div style={{ fontSize:13, fontWeight:800, color:'#ec4899', marginBottom:4 }}>
               🏁 Contest prep · шоу {prepPlan.showDate} · {CONTEST_CATEGORY_LABELS[prepPlan.category]}
             </div>
@@ -5224,8 +5255,8 @@ export const BbAutoConstructor: React.FC = () => {
               } catch { return null; }
             })()}
 
-            {/* 🧪 Test Peak Week */}
-            <div style={{ marginBottom:10, padding:10, borderRadius:10, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)' }}>
+            {/* 🧪 Test Peak Week — wizard 4 */}
+            <div style={{ display: contestWizard===4 ? 'block' : 'none', marginBottom:10, padding:10, borderRadius:10, background:'rgba(168,85,247,0.05)', border:'1px solid rgba(168,85,247,0.18)' }}>
               <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧪 Test Peak Week (не меняет основной план)</div>
               <div style={{ fontSize:10, color:'#fff', marginBottom:8 }}>
                 Прогоните протокол за 3–4 недели до шоу и зафиксируйте реакцию — результат сохраняется ({'testPeakWeekId'}) и влияет на стратегию основной пик-недели.
