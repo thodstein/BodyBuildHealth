@@ -7,7 +7,7 @@
  *  Канон — Питание, алиас — Тренировки/Интеллект.
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
 import { readDiaryV2, onDiaryChangeV2 } from '../NutritionScreen_parts/diary-storage-v2';
@@ -81,6 +81,9 @@ export const MetabolicHub: React.FC = () => {
   const [caffeineMg, setCaffeineMg] = useState(150);
   const [fiberG, setFiberG] = useState<number|undefined>(undefined);
   const [omega3G, setOmega3G] = useState<number|undefined>(undefined);
+  const [sfaG, setSfaG] = useState<number|undefined>(undefined);
+  const [tgMgDl2, setTgMgDl2] = useState<number|undefined>(undefined);
+  const [ggt, setGgt] = useState<number|undefined>(undefined);
   const [targetWeight, setTargetWeight] = useState<number|undefined>(undefined);
   const [weeksToGoal, setWeeksToGoal] = useState<number|undefined>(undefined);
   const [menstrualPhase, setMenstrualPhase] = useState<'follicular'|'luteal'|'none'>('none');
@@ -294,6 +297,9 @@ export const MetabolicHub: React.FC = () => {
         if(typeof s.targetWeight==='number') setTargetWeight(s.targetWeight);
         if(typeof s.weeksToGoal==='number') setWeeksToGoal(s.weeksToGoal);
         if(s.menstrualPhase) setMenstrualPhase(s.menstrualPhase);
+        if(typeof s.sfaG==='number') setSfaG(s.sfaG);
+        if(typeof s.tgMgDl2==='number') setTgMgDl2(s.tgMgDl2);
+        if(typeof s.ggt==='number') setGgt(s.ggt);
         if(typeof s.hct==='number') setHct(s.hct);
         if(typeof s.hgb==='number') setHgb(s.hgb);
         if(typeof s.ferritin==='number') setFerritin(s.ferritin);
@@ -355,8 +361,8 @@ export const MetabolicHub: React.FC = () => {
     }catch{}
   },[]);
   useEffect(()=>{
-    try{ localStorage.setItem(SNAP_KEY, JSON.stringify({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG})); }catch{}
-  }, [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG]);
+    try{ localStorage.setItem(SNAP_KEY, JSON.stringify({weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG})); }catch{}
+  }, [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,stress,sleepHours,sleepQuality,onAAS,aasDose,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,isPlantHeavy,deficitKcal,weeksInDeficit,weightLostKg,creatineUse,weeklyVolumeTons,targetWeight,weeksToGoal,menstrualPhase,sfaG,tgMgDl2,ggt,hct,hgb,ferritin,gfr,waterL,sodiumG,potassiumG]);
 
   const input: MetabolicInput = useMemo(()=> ({ weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,trainingHours: trainingDays*1.15, activityLevel: activityLevel as any, goal, onAAS, aasDose, stress, sleepHours, sleepQuality, acwr, climate, humidity, standingHours, fidgetLevel, sweatRate, sweatSodiumMgPerL: sweatSodium, weightHistory: weightHistory.length>=3 ? weightHistory : undefined, hct, hgb, ferritin, gfr, waterL, ironIntakeMg: undefined, alcoholG, caffeineMg, tsh, ft4, creatineUse, weeklyVolumeTons, menstrualPhase, targetWeight, fiberG, omega3G, skinfoldSum3, skinfoldSum4, biaResistanceOhm: biaResistance, glucoseMgDl, insulinMuMl, deficitKcal, weeksInDeficit }), [weight,height,age,sex,bodyFat,neck,waist,hip,steps,cardioMin,trainingDays,activityLevel,goal,onAAS,aasDose,stress,sleepHours,sleepQuality,acwr,climate,humidity,standingHours,fidgetLevel,sweatRate,sweatSodium,weightHistory,hct,hgb,ferritin,gfr,waterL,alcoholG,caffeineMg,tsh,ft4,glucoseMgDl,insulinMuMl,skinfoldSum3,skinfoldSum4,biaResistance,deficitKcal,weeksInDeficit,creatineUse,weeklyVolumeTons,menstrualPhase,targetWeight,fiberG,omega3G]);
 
@@ -374,6 +380,13 @@ export const MetabolicHub: React.FC = () => {
   }, [diaryAvgKcal, kbju]);
   const thyroid = useMemo(()=> calcThyroidImpact(ft4, tsh), [ft4,tsh]);
   const homa = useMemo(()=> calcHomaIRWrap(glucoseMgDl, insulinMuMl), [glucoseMgDl, insulinMuMl]);
+  const lipid = useMemo(()=> calcLipid(sfaG, fiberG, undefined), [sfaG, fiberG]);
+  const fli = useMemo(()=> {
+    const bmi = weight / (((height||180)/100)**2);
+    return calcFLIWrap({ bmi, waistCm: waist||84, tgMgDl: tgMgDl2, ggt });
+  }, [weight, height, waist, tgMgDl2, ggt]);
+  const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
+  const menstrual = useMemo(()=> calcMenstrualWater(menstrualPhase), [menstrualPhase]);
   const hematology = useMemo(()=>{
     let proteinPerKg: number|undefined; let fiberGV: number|undefined; let omega3GV: number|undefined;
     try{
@@ -571,14 +584,18 @@ export const MetabolicHub: React.FC = () => {
       </div>
 
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
-        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Pro-измерения — калипер / BIA (опц.)</div>
+        <div style={{ fontSize:10, fontWeight:800, letterSpacing:0.4, textTransform:'uppercase', color:'rgba(255,255,255,0.55)', marginBottom:8 }}>Pro-измерения — калипер / BIA / Липиды / FLI (опц.)</div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
           <PopupNumber label="JP3 сумма, мм" value={skinfoldSum3 ?? 30} min={8} max={150} onChange={v=> setSkinfoldSum3(v||undefined)} />
           <PopupNumber label="Durnin 4 сумма, мм" value={skinfoldSum4 ?? 40} min={10} max={200} onChange={v=> setSkinfoldSum4(v||undefined)} />
           <PopupNumber label="BIA R, Ом" value={biaResistance ?? 500} min={350} max={900} onChange={v=> setBiaResistance(v||undefined)} />
           <PopupSelect label="Белок plant-heavy?" value={isPlantHeavy?'yes':'no'} options={[{id:'no',label:'Животный/whey'},{id:'yes',label:'Растительный'}]} onChange={v=> setIsPlantHeavy(v==='yes')} />
+          <PopupNumber label="SFA, г/сут" value={sfaG ?? 25} min={5} max={80} onChange={v=> setSfaG(v||undefined)} />
+          <PopupNumber label="ТГ, мг/дл" value={tgMgDl2 ?? 120} min={40} max={400} onChange={v=> setTgMgDl2(v||undefined)} />
+          <PopupNumber label="GGT, Ед/л" value={ggt ?? 25} min={8} max={150} onChange={v=> setGgt(v||undefined)} />
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px', display:'flex', alignItems:'center' }}>SFA/fiber → LDL Mensink · FLI Bedogni (BMI+waist+TG+GGT) · {lipid? lipid.note.split('→')[1]??'—' : '—'} · FLI {fli ?? '—'}</div>
         </div>
-        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>JP3 1978 chest+abd+thigh(M) / tri+supra+thigh(F) ±3% Siri. Durnin 4-site ±4%. Kyle BIA 400-900 Ом. Plant leuc 0.07 vs 0.11.</div>
+        <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:6 }}>JP3 ±3% Siri · Durnin ±4% · BIA Kyle 400-900 Ом · Plant leuc 0.07 · Mensink 10г SFA +12 LDL / 10г fiber −5 · FLI Bedogni &lt;30 исключает стеатоз &gt;60 подтверждает.</div>
       </div>
 
       <div style={{ ...CARD, border:'1px solid rgba(255,255,255,0.07)', padding:10 }}>
@@ -1167,8 +1184,24 @@ export const MetabolicHub: React.FC = () => {
                   <div style={{ fontSize:9, color:'#fff' }}>{homa.note}</div>
                 </div>
               </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                <div style={{ padding:12, borderRadius:12, background: lipid && lipid.ldlDelta>10?'rgba(239,68,68,0.08)': lipid?'rgba(34,197,94,0.06)':'rgba(255,255,255,0.03)', border:`1px solid ${lipid && lipid.ldlDelta>10?'rgba(239,68,68,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
+                  <div style={{ fontSize:10, color: lipid && lipid.ldlDelta>10?'#ef4444':'#22c55e' }}>Lipid · Mensink 2003</div>
+                  <div style={{ fontSize:14, fontWeight:900, color: lipid && lipid.ldlDelta>10?'#ef4444':'#fff' }}>{lipid? `${lipid.ldlDelta>0?'+':''}${lipid.ldlDelta} LDL` : '—'}</div>
+                  <div style={{ fontSize:8, color:'#fff' }}>{lipid?.note ?? 'Введи SFA и fiber в Pro-измерениях'}</div>
+                </div>
+                <div style={{ padding:12, borderRadius:12, background: (fli!=null && fli>=60)?'rgba(239,68,68,0.08)': (fli!=null && fli>=30)?'rgba(245,158,11,0.08)': fli!=null?'rgba(34,197,94,0.06)':'rgba(255,255,255,0.03)', border:`1px solid ${(fli!=null && fli>=60)?'rgba(239,68,68,0.18)': (fli!=null && fli>=30)?'rgba(245,158,11,0.18)':'rgba(255,255,255,0.06)'}`, textAlign:'center' }}>
+                  <div style={{ fontSize:10, color: (fli!=null && fli>=60)?'#ef4444': (fli!=null && fli>=30)?'#f59e0b':'#22c55e' }}>FLI · Bedogni 2006 · {fli!=null ? `${fli}%` : '—'}</div>
+                  <div style={{ fontSize:14, fontWeight:900, color: fli==null?'#fff': fli>=60?'#ef4444': fli>=30?'#f59e0b':'#22c55e' }}>{fli==null?'—': fli<30?'Нет стеатоза': fli>=60?'Стеатоз': 'Серая зона'}</div>
+                  <div style={{ fontSize:8, color:'#fff' }}>{fli==null?'Введи waist/TG/GGT': fli<30?'Исключает NAFLD (&lt;30)': fli>=60?'Подтверждает ≥60':'30-60 серая зона'}</div>
+                </div>
+              </div>
+              <div style={{ marginTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
+                <span style={{ fontSize:8, padding:'4px 8px', borderRadius:8, background: psmf.risk?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', border:'1px solid rgba(255,255,255,0.06)', color: psmf.risk?'#ef4444':'#22c55e' }}>{psmf.note}</span>
+                <span style={{ fontSize:8, padding:'4px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>Menstrual: {menstrual.note} {menstrualPhase==='luteal' && `+${menstrual.kg}кг воды`}</span>
+              </div>
               <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)', fontSize:9, color:'#fff', lineHeight:1.4 }}>
-                Thyroid: Kim 2014 — 1 pmol FT4 ≈ +2.2% BMR (SD 8%). TSH &gt;4.5 → ×0.95. Введи FT4 в Pro-измерениях для точного BMR. HOMA-IR &lt;1.4 оптимально, 1.4-2.5 погранично (угли 3-4г/кг), ≥2.5 — IR (≤3г/кг, к врачу, метформин только по назначению).
+                Thyroid Kim 1 pmol FT4 ≈ +2.2% BMR. HOMA-IR &lt;1.4 оптимально · Mensink 10г SFA +12 LDL / 10г fiber −5 · FLI Bedogni &lt;30 нет стеатоза &gt;60 стеатоз · PSMF Blackburn EA&lt;15 · Mens+ FLI требуют лабы.
               </div>
             </div>
           )}
