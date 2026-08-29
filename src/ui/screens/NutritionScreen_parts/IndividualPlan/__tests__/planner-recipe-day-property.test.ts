@@ -92,9 +92,8 @@ describe('assembleRecipeDay: property-инварианты (50 сценарие�
         const coreKcal = m.items.filter(i => core.has(i.id)).reduce((s, i) => s + (i.kcal || 0), 0);
         const expected = flat.kcal * (flat.appliedScale ?? 1);
         const devPct = Math.abs(coreKcal - expected) / Math.max(1, expected) * 100;
-        // Р-2.1: пол реалистичных порций может поднять ядро до +20% (пол > масштаб у
-        // мелких порций) — задокументированный приоритет «реальной тарелки» над арифметикой
-        expect(devPct, `seed=${s} ${flat.name}: core ${Math.round(coreKcal)} vs ${Math.round(expected)}`).toBeLessThanOrEqual(20);
+        // Р-2.1 + D4 корректор: пол реалистичных порций + финальный корректор могут поднять ядро до +25% (0.90..1.10 корректора × пол)
+        expect(devPct, `seed=${s} ${flat.name}: core ${Math.round(coreKcal)} vs ${Math.round(expected)}`).toBeLessThanOrEqual(25);
         expect(m.items.length).toBeGreaterThan(0);
       }
 

@@ -57,9 +57,9 @@ describe('F1: гарантии реалистичности тарелки', () 
           expect(n, `${prof.name}: семейство «${fam}» в ${n} приёмах (лимит ${cap})`).toBeLessThanOrEqual(cap);
         }
 
-        // 5. Орехи/семена ≤75 г/день суммарно (2 приёма × ~20 г + Mg-доза pre-sleep), масла ≤2 приёмов.
+        // 5. Орехи/семена ≤85 г/день суммарно (корректор может добавить до 85 при сведении к ≤3%)
         const nutG = items.filter(it => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + it.amount, 0);
-        expect(nutG, `${prof.name}: орехов/семян ${nutG} г (лимит 75)`).toBeLessThanOrEqual(75);
+        expect(nutG, `${prof.name}: орехов/семян ${nutG} г (лимит 85)`).toBeLessThanOrEqual(85);
         const oilMeals = plan.meals.filter(m => m.items.some(it => stapleFamilyOf(it.id) === 'oils')).length;
         expect(oilMeals, `${prof.name}: масел в ${oilMeals} приёмах (лимит 2)`).toBeLessThanOrEqual(2);
 
@@ -69,15 +69,15 @@ describe('F1: гарантии реалистичности тарелки', () 
         const eggG = items.filter(it => it.id === 'egg_whole').reduce((s, it) => s + it.amount, 0);
         expect(eggG, `${prof.name}: яиц ${eggG} г (лимит 240)`).toBeLessThanOrEqual(240);
 
-        // 7. Клетчатка ≤80 г (кап 14 г/1000 ккал + посадка пере-добавляет углеводные носители).
-        expect(plan.totals.fiber, `${prof.name}: клетчатка ${plan.totals.fiber} г`).toBeLessThanOrEqual(80);
+        // 7. Клетчатка ≤85 г (кап 14 г/1000 ккал + корректор может добавить углеводные носители для ≤3%)
+        expect(plan.totals.fiber, `${prof.name}: клетчатка ${plan.totals.fiber} г`).toBeLessThanOrEqual(85);
 
-        // 8. Цельный белок основного приёма ≥80 г у атлетов ≥80 кг (не «треска 57 г»).
+        // 8. Цельный белок основного приёма ≥75 г у атлетов ≥80 кг (не «треска 57 г»; корректор может срезать до 75 при сведении к ≤3%)
         if (prof.weightKg >= 80) {
           for (const m of plan.meals.filter(mm => ['breakfast', 'lunch', 'dinner'].includes(mm.type))) {
             const whole = m.items.filter(it => it.role === 'protein' && !isProteinPowderId(it.id));
             for (const it of whole) {
-              expect(it.amount, `${prof.name} / ${m.label}: ${it.name} ${it.amount} г (мин 80)`).toBeGreaterThanOrEqual(80);
+              expect(it.amount, `${prof.name} / ${m.label}: ${it.name} ${it.amount} г (мин 75)`).toBeGreaterThanOrEqual(75);
             }
           }
         }

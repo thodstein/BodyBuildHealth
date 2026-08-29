@@ -38,6 +38,7 @@ import {
   createDailyQuota, blockedIdsForNextMeal, registerMealInQuota, foodAvailableWithQuota,
   QUOTA_LIMITS, stapleFamilyOf,
 } from "./food-availability";
+import { correctDayToTargets as _correctDayToTargets } from "./day-target-corrector";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
@@ -4078,15 +4079,54 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
      }
      m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
    }
-   totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
-   totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
-   totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
-   totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
-   totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-   totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+    totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
+    totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
+    totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
+    totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
+    totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+    totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
 
-   return {
-    dayIndex: (input.dayOffset ?? 0),
+    // ─── ЕДИНЫЙ КОРРЕКТОР ДНЕВНЫХ ЦЕЛЕЙ + ФИНАЛЬНЫЙ ПЕРЕСЧЁТ ПОСЛЕ КАПОВ ───
+    // После всех капов/полов/квот/санитарий доводим день до ≤3% по 4 осям.
+    // Единый источник для всех путей (simple/minimal/pro → buildDayPlan).
+    {
+      const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
+      const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
+      const _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: 40 });
+      if (_corr.meals && _corr.meals.length > 0) {
+        const _beforeDev = Math.max(
+          _targets.kcal ? Math.abs(totals.kcal - _targets.kcal) / _targets.kcal : 0,
+          _targets.p ? Math.abs(totals.p - _targets.p) / _targets.p : 0,
+          _targets.f ? Math.abs(totals.f - _targets.f) / _targets.f : 0,
+          _targets.c ? Math.abs(totals.c - _targets.c) / _targets.c : 0
+        );
+        const _afterTotals = _corr.meals.reduce((acc: any, m: any) => {
+          const t = (m.totals as any) || m.items.reduce((a: any, it: any) => ({ kcal: a.kcal + (it.kcal || 0), p: a.p + (it.p || 0), f: a.f + (it.f || 0), c: a.c + (it.c || 0) }), { kcal: 0, p: 0, f: 0, c: 0 });
+          return { kcal: acc.kcal + t.kcal, p: acc.p + t.p, f: acc.f + t.f, c: acc.c + t.c };
+        }, { kcal: 0, p: 0, f: 0, c: 0 });
+        const _afterDev = Math.max(
+          _targets.kcal ? Math.abs(_afterTotals.kcal - _targets.kcal) / _targets.kcal : 0,
+          _targets.p ? Math.abs(_afterTotals.p - _targets.p) / _targets.p : 0,
+          _targets.f ? Math.abs(_afterTotals.f - _targets.f) / _targets.f : 0,
+          _targets.c ? Math.abs(_afterTotals.c - _targets.c) / _targets.c : 0
+        );
+        if (_afterDev + 1e-9 < _beforeDev) {
+          meals.splice(0, meals.length, ...(_corr.meals as any));
+          meals.forEach((m: any) => { m.totals = m.items.reduce((a: any, it: any) => ({ kcal: a.kcal + it.kcal, p: a.p + it.p, f: a.f + it.f, c: a.c + it.c, fiber: a.fiber + (it.fiber || 0), leucine_mg: a.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+          totals.kcal = Math.round(_afterTotals.kcal);
+          totals.p = Math.round(_afterTotals.p * 10) / 10;
+          totals.f = Math.round(_afterTotals.f * 10) / 10;
+          totals.c = Math.round(_afterTotals.c * 10) / 10;
+          totals.fiber = Math.round((_corr.meals as any).reduce((s: number, m: any) => s + (m.totals?.fiber || m.items.reduce((a: number, it: any) => a + (it.fiber || 0), 0)), 0) * 10) / 10;
+          totals.leucine_mg = (_corr.meals as any).reduce((s: number, m: any) => s + (m.totals?.leucine_mg || m.items.reduce((a: number, it: any) => a + (it.leucine_mg || 0), 0)), 0);
+          if (_corr.deviationPct > 3) notes.push(`⚠ Корректор дневных целей: осталось отклонение ${_corr.deviationPct}% (>3%) — проверьте пулы/капы`);
+          else if (_beforeDev > 0.03) notes.push(`✓ Корректор дневных целей: сведено к ≤3% (было ${Math.round(_beforeDev * 100)}% → ${_corr.deviationPct}%)`);
+        }
+      }
+    }
+
+    return {
+     dayIndex: (input.dayOffset ?? 0),
     isTrainingDay: input.isTrainingDay,
     meals,
     totals,

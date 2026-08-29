@@ -20,6 +20,7 @@ import type { Recipe } from '../../../../engines/nutrition-periodization.engine'
 import { decomposeRecipe, pickRecipesForMeal } from './recipe-engine';
 import { isProteinPowderId } from './food-availability';
 import { applyRealisticFloors } from './meal-plan-engine';
+import { correctDayToTargets } from './day-target-corrector';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
 
 // ─── Типы формы плана (совместимо с форматом IndividualPlanContext) ────
@@ -244,7 +245,7 @@ export function rebalanceDayAfterRecipes(
   opts?: { excludedIds?: Set<string>; maxIter?: number },
 ): RebalanceResult {
   const notes: string[] = [];
-  const maxIter = opts?.maxIter ?? 16;
+  const maxIter = opts?.maxIter ?? 24;
   const work: PlanMealLike[] = meals.map(m => ({ ...m, items: [...(m.items || [])], totals: { ...(m.totals || { kcal: 0, p: 0, f: 0, c: 0 }) } }));
 
   const validTargets: DayMacroTargets = {
@@ -933,6 +934,22 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%.
   const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds });
   const notes = [...rb.notes];
+
+  // D4: единый корректор — после всех капов/ребелов доводим день до ≤3% по 4 осям.
+  // Ядро рецепта трогается только в крайнем случае (±10% кумулятивно), гибкие слоты — свободно.
+  const needCorr = !rb.withinTolerance || rb.deviationPct > 3;
+  if (needCorr) {
+    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 30 });
+    const corrDev = corr.deviationPct;
+    if (corrDev + 1e-9 < rb.deviationPct) {
+      if (corr.withinTolerance) {
+        return { meals: corr.meals as any, notes: [...notes, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}% (≤3%)`], withinTolerance: true, deviationPct: corrDev, appliedCount };
+      }
+      // улучшили, но не до ≤3% — отдаём лучшее с предупреждением (>3%)
+      return { meals: corr.meals as any, notes: [...notes, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}%`, `⚠ Режим «по рецептам»: дневное отклонение от целей ${corrDev}% (>3%) — попробуйте выбрать другие варианты рецептов.`], withinTolerance: false, deviationPct: corrDev, appliedCount };
+    }
+  }
+
   if (!rb.withinTolerance) {
     notes.push(`⚠ Режим «по рецептам»: дневное отклонение от целей ${rb.deviationPct}% (>3%) — попробуйте выбрать другие варианты рецептов.`);
   }

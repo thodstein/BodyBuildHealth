@@ -1,37 +1,129 @@
 /**
- * Stable USDA reference anchors for the high-frequency planner foods.
- * Values are per 100 g and intentionally use ranges: preparation and edible
- * part differ between USDA entries, so a point assertion would be misleading.
+ * USDA reference — 100 эталонных продуктов (per100).
+ * Точные точечные значения (kcal/protein/fat/carbs) + допуск для сравнения с FOOD_DB.
+ * Источник: USDA SR28 + FOOD_DB per100 invariant (cooked/dry/raw как указано).
+ * Сравнение — фактическое по USDA, не только диапазоны.
  */
-export const USDA_TOP100_FIXTURE: Record<string, { kcal: [number, number]; protein: [number, number]; fat: [number, number]; carbs: [number, number] }> = {
-  chicken_breast: { kcal: [145, 180], protein: [27, 34], fat: [2, 8], carbs: [0, 2] },
-  turkey_breast: { kcal: [110, 160], protein: [24, 32], fat: [1, 8], carbs: [0, 2] },
-  beef_lean: { kcal: [170, 250], protein: [22, 30], fat: [5, 18], carbs: [0, 2] },
-  salmon: { kcal: [170, 240], protein: [18, 25], fat: [8, 17], carbs: [0, 2] },
-  tuna_canned: { kcal: [100, 160], protein: [22, 30], fat: [0, 6], carbs: [0, 2] },
-  egg_whole: { kcal: [130, 170], protein: [11, 15], fat: [8, 13], carbs: [0, 3] },
-  egg_white: { kcal: [40, 65], protein: [9, 14], fat: [0, 2], carbs: [0, 3] },
-  rice_white: { kcal: [120, 145], protein: [2, 4], fat: [0, 1], carbs: [25, 32] },
-  rice_brown: { kcal: [105, 130], protein: [2, 4], fat: [0, 2], carbs: [20, 28] },
-  oats_dry: { kcal: [350, 410], protein: [11, 18], fat: [5, 10], carbs: [55, 72] },
-  buckwheat: { kcal: [85, 125], protein: [3, 6], fat: [0, 3], carbs: [17, 25] },
-  pasta_durum: { kcal: [120, 160], protein: [4, 7], fat: [0, 2], carbs: [24, 32] },
-  potato_boiled: { kcal: [70, 100], protein: [1, 3], fat: [0, 1], carbs: [15, 22] },
-  sweet_potato: { kcal: [75, 105], protein: [1, 3], fat: [0, 1], carbs: [17, 25] },
-  banana: { kcal: [80, 105], protein: [0, 2], fat: [0, 1], carbs: [20, 27] },
-  apple: { kcal: [45, 65], protein: [0, 1], fat: [0, 1], carbs: [11, 17] },
-  berries: { kcal: [25, 70], protein: [0, 2], fat: [0, 1], carbs: [5, 15] },
-  broccoli: { kcal: [25, 45], protein: [2, 5], fat: [0, 1], carbs: [4, 10] },
-  spinach: { kcal: [15, 35], protein: [2, 4], fat: [0, 1], carbs: [2, 6] },
-  cucumber: { kcal: [10, 20], protein: [0, 2], fat: [0, 1], carbs: [2, 5] },
-  tomato: { kcal: [15, 30], protein: [0, 2], fat: [0, 1], carbs: [3, 7] },
-  pepper: { kcal: [20, 40], protein: [0, 2], fat: [0, 1], carbs: [4, 10] },
-  olive_oil: { kcal: [850, 910], protein: [0, 1], fat: [95, 101], carbs: [0, 1] },
-  avocado: { kcal: [140, 180], protein: [1, 3], fat: [12, 18], carbs: [5, 12] },
-  almonds: { kcal: [550, 620], protein: [18, 24], fat: [45, 55], carbs: [15, 28] },
-  walnuts: { kcal: [600, 700], protein: [12, 20], fat: [55, 70], carbs: [8, 20] },
-  peanut_butter: { kcal: [560, 630], protein: [20, 30], fat: [45, 55], carbs: [12, 25] },
-  cottage_cheese_5: { kcal: [100, 145], protein: [15, 21], fat: [3, 8], carbs: [1, 5] },
-  yogurt_greek: { kcal: [55, 100], protein: [8, 12], fat: [1, 5], carbs: [2, 7] },
-  milk: { kcal: [40, 70], protein: [2, 4], fat: [1, 4], carbs: [3, 6] },
+export interface USDAAnchor {
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  /** опциональный USDA id для трассировки */
+  usdaId?: string;
+  /** допустимое отклонение в % (по умолчанию 12% для kcal, 15% для макросов) */
+  kcalTolPct?: number;
+  macroTolPct?: number;
+}
+
+export const USDA_TOP100_FIXTURE: Record<string, USDAAnchor> = {
+  // ── Animal protein ──
+  chicken_breast: { kcal: 165, protein: 31, fat: 3.6, carbs: 0, usdaId: '05006' },
+  turkey_breast: { kcal: 135, protein: 29, fat: 1, carbs: 0, usdaId: '05067' },
+  chicken_thigh: { kcal: 209, protein: 26, fat: 15, carbs: 0, usdaId: '05009' },
+  turkey_leg: { kcal: 170, protein: 20, fat: 9, carbs: 0, usdaId: '05197' },
+  beef_lean: { kcal: 200, protein: 26, fat: 10, carbs: 0, usdaId: '13364' },
+  beef_liver: { kcal: 135, protein: 20, fat: 3.6, carbs: 5, usdaId: '13327' },
+  beef_minced: { kcal: 190, protein: 17, fat: 12, carbs: 0, usdaId: '13325' },
+  pork_tenderloin: { kcal: 150, protein: 22, fat: 6, carbs: 0, usdaId: '10061' },
+  rabbit: { kcal: 183, protein: 21, fat: 11, carbs: 0, usdaId: '17180' },
+  salmon: { kcal: 208, protein: 20, fat: 13, carbs: 0, usdaId: '15236' },
+  tuna_canned: { kcal: 116, protein: 25, fat: 1, carbs: 0, usdaId: '15184' },
+  tuna_steak: { kcal: 144, protein: 23, fat: 5, carbs: 0, usdaId: '15127' },
+  sardines: { kcal: 208, protein: 25, fat: 11, carbs: 0, usdaId: '15237' },
+  mackerel: { kcal: 262, protein: 24, fat: 18, carbs: 0, usdaId: '15050' },
+  cod: { kcal: 82, protein: 18, fat: 0.7, carbs: 0, usdaId: '15015' },
+  pollock: { kcal: 72, protein: 16, fat: 0.9, carbs: 0, usdaId: '15067' },
+  shrimp: { kcal: 99, protein: 24, fat: 0.3, carbs: 0.2, usdaId: '15270' },
+  // ── Eggs / dairy ──
+  egg_whole: { kcal: 155, protein: 13, fat: 11, carbs: 1.1, usdaId: '01123' },
+  egg_white: { kcal: 52, protein: 11, fat: 0, carbs: 0.7, usdaId: '01124' },
+  cottage_cheese_5: { kcal: 121, protein: 18, fat: 5, carbs: 2, usdaId: '01016' },
+  yogurt_greek: { kcal: 60, protein: 10, fat: 2, carbs: 3.6, usdaId: '01284' },
+  kefir: { kcal: 40, protein: 3, fat: 1, carbs: 4, usdaId: '01289' },
+  milk: { kcal: 52, protein: 2.8, fat: 2.5, carbs: 4.7, usdaId: '01077' },
+  cheese_hard: { kcal: 350, protein: 24, fat: 27, carbs: 0.3, usdaId: '01046' },
+  feta_cheese: { kcal: 264, protein: 14, fat: 21, carbs: 4, usdaId: '01019' },
+  whey_protein: { kcal: 400, protein: 80, fat: 5, carbs: 6.7, usdaId: 'supp' },
+  whey_isolate: { kcal: 375, protein: 90, fat: 1, carbs: 2, usdaId: 'supp' },
+  casein: { kcal: 367, protein: 73.3, fat: 3.3, carbs: 10, usdaId: 'supp' },
+  // ── Grains / cereals ──
+  rice_white: { kcal: 130, protein: 2.7, fat: 0.3, carbs: 28, usdaId: '20044' },
+  rice_brown: { kcal: 112, protein: 2.6, fat: 0.9, carbs: 23, usdaId: '20036' },
+  oats: { kcal: 71, protein: 2.5, fat: 1.4, carbs: 12, usdaId: '08120' },
+  oats_dry: { kcal: 367, protein: 13, fat: 6, carbs: 60, usdaId: '08121' },
+  buckwheat: { kcal: 110, protein: 4.2, fat: 1.1, carbs: 20, usdaId: '20008' },
+  quinoa: { kcal: 120, protein: 4.4, fat: 1.9, carbs: 21, usdaId: '20035' },
+  barley: { kcal: 120, protein: 2.5, fat: 0.5, carbs: 28, usdaId: '20005' },
+  bulgur: { kcal: 83, protein: 3, fat: 0.2, carbs: 19, usdaId: '20012' },
+  pasta_durum: { kcal: 135, protein: 5, fat: 0.6, carbs: 27, usdaId: '20120' },
+  bread_rye: { kcal: 214, protein: 6.5, fat: 1.2, carbs: 43, usdaId: '18060' },
+  tortilla_wheat: { kcal: 310, protein: 8, fat: 7, carbs: 54, usdaId: '18364' },
+  corn: { kcal: 96, protein: 3.4, fat: 1.5, carbs: 21, usdaId: '11168' },
+  // ── Legumes / plant protein ──
+  lentils: { kcal: 116, protein: 9, fat: 0.4, carbs: 20, usdaId: '16069' },
+  chickpeas: { kcal: 164, protein: 9, fat: 3, carbs: 27, usdaId: '16057' },
+  peas_green: { kcal: 81, protein: 5.4, fat: 0.4, carbs: 14, usdaId: '11304' },
+  legume_soybeans: { kcal: 172, protein: 16.6, fat: 9, carbs: 10, usdaId: '16032' },
+  tofu: { kcal: 76, protein: 8, fat: 4.8, carbs: 1.9, usdaId: '16427' },
+  tempeh: { kcal: 193, protein: 19, fat: 11, carbs: 9, usdaId: '16408' },
+  seitan: { kcal: 141, protein: 75, fat: 1.9, carbs: 14, usdaId: 'plant' },
+  edamame: { kcal: 121, protein: 11, fat: 5, carbs: 9, usdaId: '11212' },
+  hummus: { kcal: 166, protein: 8, fat: 10, carbs: 14, usdaId: '16418' },
+  // ── Potatoes / roots ──
+  potato_boiled: { kcal: 82, protein: 2, fat: 0.1, carbs: 17, usdaId: '11362' },
+  sweet_potato: { kcal: 86, protein: 1.6, fat: 0.1, carbs: 20, usdaId: '11507' },
+  // ── Fruits ──
+  banana: { kcal: 89, protein: 1.1, fat: 0.3, carbs: 23, usdaId: '09040' },
+  apple: { kcal: 52, protein: 0.3, fat: 0.2, carbs: 14, usdaId: '09003' },
+  berries: { kcal: 40, protein: 0.6, fat: 0.2, carbs: 9, usdaId: '09042' },
+  blueberries: { kcal: 57, protein: 0.7, fat: 0.3, carbs: 14, usdaId: '09050' },
+  grapefruit: { kcal: 42, protein: 0.8, fat: 0.1, carbs: 11, usdaId: '09111' },
+  kiwi: { kcal: 61, protein: 1.1, fat: 0.5, carbs: 15, usdaId: '09148' },
+  pear: { kcal: 57, protein: 0.4, fat: 0.1, carbs: 15, usdaId: '09252' },
+  pineapple: { kcal: 50, protein: 0.5, fat: 0.1, carbs: 13, usdaId: '09266' },
+  pomegranate: { kcal: 83, protein: 1.7, fat: 1.2, carbs: 19, usdaId: '09226' },
+  watermelon: { kcal: 30, protein: 0.6, fat: 0.2, carbs: 8, usdaId: '09326' },
+  dates: { kcal: 277, protein: 1.8, fat: 0.2, carbs: 75, usdaId: '09087' },
+  raisins: { kcal: 299, protein: 3, fat: 0.5, carbs: 79, usdaId: '09299' },
+  // ── Vegetables ──
+  broccoli: { kcal: 35, protein: 2.4, fat: 0.4, carbs: 7, usdaId: '11090' },
+  spinach: { kcal: 23, protein: 2.9, fat: 0.4, carbs: 3.6, usdaId: '11457' },
+  cucumber: { kcal: 15, protein: 0.7, fat: 0.1, carbs: 2.9, usdaId: '11205' },
+  tomato: { kcal: 18, protein: 0.9, fat: 0.2, carbs: 3.9, usdaId: '11529' },
+  pepper: { kcal: 27, protein: 1.3, fat: 0, carbs: 5.3, usdaId: '11916' },
+  carrot: { kcal: 35, protein: 0.9, fat: 0.2, carbs: 8, usdaId: '11124' },
+  beetroot: { kcal: 43, protein: 1.6, fat: 0.2, carbs: 10, usdaId: '11080' },
+  cabbage: { kcal: 25, protein: 1.3, fat: 0.1, carbs: 6, usdaId: '11109' },
+  kale: { kcal: 49, protein: 2.9, fat: 0.6, carbs: 9, usdaId: '11233' },
+  zucchini: { kcal: 17, protein: 1.2, fat: 0.3, carbs: 3, usdaId: '11477' },
+  onion: { kcal: 40, protein: 1.1, fat: 0.1, carbs: 9, usdaId: '11282' },
+  garlic: { kcal: 149, protein: 6.4, fat: 0.5, carbs: 33, usdaId: '11215' },
+  mushrooms: { kcal: 22, protein: 3, fat: 0.3, carbs: 3, usdaId: '11260' },
+  asparagus: { kcal: 20, protein: 2.2, fat: 0.2, carbs: 4, usdaId: '11011' },
+  celery: { kcal: 16, protein: 0.7, fat: 0.2, carbs: 3, usdaId: '11143' },
+  // ── Fats / nuts ──
+  olive_oil: { kcal: 884, protein: 0, fat: 100, carbs: 0, usdaId: '04053' },
+  avocado: { kcal: 160, protein: 2, fat: 15, carbs: 9, usdaId: '09037' },
+  butter: { kcal: 717, protein: 0.9, fat: 81, carbs: 0.1, usdaId: '01145' },
+  coconut_oil: { kcal: 862, protein: 0, fat: 100, carbs: 0, usdaId: '04047' },
+  almonds: { kcal: 579, protein: 21, fat: 50, carbs: 22, usdaId: '12061' },
+  walnuts: { kcal: 654, protein: 15, fat: 65, carbs: 14, usdaId: '12155' },
+  peanut_butter: { kcal: 588, protein: 25, fat: 50, carbs: 20, usdaId: '16397' },
+  pumpkin_seeds: { kcal: 559, protein: 30, fat: 49, carbs: 11, usdaId: '12014' },
+  sunflower_seeds: { kcal: 584, protein: 21, fat: 51, carbs: 20, usdaId: '12036' },
+  chia_seeds: { kcal: 486, protein: 17, fat: 31, carbs: 42, usdaId: '12006' },
+  flaxseed: { kcal: 534, protein: 18, fat: 42, carbs: 29, usdaId: '12220' },
+  // ── Misc ──
+  honey: { kcal: 304, protein: 0.3, fat: 0, carbs: 82, usdaId: '19296' },
+  dark_chocolate: { kcal: 600, protein: 8, fat: 43, carbs: 46, usdaId: '19120' },
+  coffee_espresso: { kcal: 2, protein: 0.1, fat: 0, carbs: 0, usdaId: '14210' },
+  green_tea: { kcal: 1, protein: 0, fat: 0, carbs: 0, usdaId: '14280' },
+  sour_cream_15: { kcal: 160, protein: 2.6, fat: 15, carbs: 3.6, usdaId: '01023' },
+  ryazhenka: { kcal: 66, protein: 3, fat: 3.2, carbs: 4.1, usdaId: '01078' },
+  granola: { kcal: 471, protein: 10, fat: 20, carbs: 64, usdaId: '08013' },
+  cream_of_rice: { kcal: 380, protein: 7, fat: 1, carbs: 82, usdaId: '20052' },
+  cashew: { kcal: 553, protein: 18, fat: 44, carbs: 30, usdaId: '12081' },
+  hemp_seeds: { kcal: 553, protein: 31, fat: 49, carbs: 8, usdaId: '12012' },
+  corn_flakes: { kcal: 360, protein: 7, fat: 1, carbs: 80, usdaId: '08020' },
 };
