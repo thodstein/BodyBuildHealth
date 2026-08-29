@@ -427,24 +427,9 @@ export const IndividualPlanSettings: React.FC = () => {
           <PopupNumber label="🚶 Шагов/день" value={dailySteps} min={0} max={50000} step={500} suffix="шаг" onChange={setDailySteps} />
         </div>
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
-          <button onClick={() => {
-            setWeight(s?.weight || weight);
-            setHeight(s?.height || height);
-            setAge(s?.age || age);
-            setSex(s?.sex || sex);
-            setDailySteps(s?.dailySteps || dailySteps);
-            setBodyFatPct(s?.bodyFat || bodyFatPct);
-            setSleepHours(s?.baselineSleepHours || sleepHours);
-            setSleepQuality(s?.baselineSleepQuality || sleepQuality);
-            setStressLevel(s?.baselineStressLevel || stressLevel);
-            if (s?.primaryGoal) {
-              const goalMap: Record<string, any> = { bulk: 'mass', cut: 'fat_loss', maintenance: 'maintenance', strength: 'strength', recomposition: 'recomposition', rehab: 'rehab' };
-              setGoal(goalMap[s.primaryGoal] || 'maintenance');
-            }
-            if (s?.workoutsPerWeek) setMealsCount(Math.max(3, Math.min(10, s.workoutsPerWeek + 1)));
-            if (s?.bedtime) setBedTime(s.bedtime);
-            if (s?.wakeTime) setWakeTime(s.wakeTime);
-          }} style={{
+          {/* E7-fix: дубль «Заполнить из профиля» читал несуществующие поля (baselineSleepHours
+              и т.п. — фактически no-op). Теперь единый ctx.autofillFromProfile с честными путями. */}
+          <button onClick={() => { autofillFromProfile(); if (typeof (window as any).showToast === 'function') (window as any).showToast('📋 Данные из профиля загружены', 'success'); }} style={{
             flex: 1, padding:'6px 8px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:600,
             background:'rgba(96,165,250,0.08)', border:'1px solid rgba(96,165,250,0.2)', color:'#60a5fa',
           }}>👤 Заполнить из профиля</button>

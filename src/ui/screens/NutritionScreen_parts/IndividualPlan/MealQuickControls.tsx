@@ -292,6 +292,8 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
   const doUpdateWeight = () => {
     if (!popup || popup.selectedMealIdx === undefined || popup.selectedItemIdx === undefined || !popup.editWeight) return;
     saveUndo();
+    const mealIdx = popup.selectedMealIdx;
+    const itemIdx = popup.selectedItemIdx;
     let w = Number.isFinite(popup.editWeight) && popup.editWeight > 0
       ? Math.round(Math.min(2000, Math.max(10, popup.editWeight)))
       : 0;
@@ -315,9 +317,9 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       return { ...prev, meals: meals2, totals };
     });
     syncToWeek((d: any) => {
-      if (!d?.meals?.[popup.selectedMealIdx]?.items) return;
-      d.meals[popup.selectedMealIdx].items = d.meals[popup.selectedMealIdx].items.map((it: any, ii: number) => {
-        if (ii !== popup.selectedItemIdx) return it;
+      if (!d?.meals?.[mealIdx]?.items) return;
+      d.meals[mealIdx].items = d.meals[mealIdx].items.map((it: any, ii: number) => {
+        if (ii !== itemIdx) return it;
         const ratio = w / (it.amount || 100);
         return { ...it, amount: w, kcal: Math.round((it.kcal || 0) * ratio), p: Math.round((it.p || 0) * ratio * 10) / 10, f: Math.round((it.f || 0) * ratio * 10) / 10, c: Math.round((it.c || 0) * ratio * 10) / 10, fiber: Math.round((it.fiber || 0) * ratio * 10) / 10, leucine_mg: Math.round((it.leucine_mg || 0) * ratio) };
       });
@@ -348,8 +350,8 @@ export const MealQuickControls: React.FC<Props> = ({ mode = 'basic', advancedFil
       return { ...prev, meals: meals2, totals };
     });
     syncToWeek((d: any) => {
-      if (!d?.meals) return;
-      const items = [...(d.meals[mealIdx]?.items || []), { name: result.foodName, id: result.foodId, amount, kcal: (() => { const p = Math.round(result.protein * amount / 100 * 10) / 10, f = Math.round(result.fat * amount / 100 * 10) / 10, c = Math.round(result.carbs * amount / 100 * 10) / 10; return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10, fiber: Math.round((result.fiber || 0) * amount / 100 * 10) / 10, leucine_mg: Math.round(leuPer100 * amount / 100) }];
+      if (!d?.meals?.[mealIdx]) return;
+      const items = [...(d.meals[mealIdx].items || []), { name: result.foodName, id: result.foodId, amount, kcal: (() => { const p = Math.round(result.protein * amount / 100 * 10) / 10, f = Math.round(result.fat * amount / 100 * 10) / 10, c = Math.round(result.carbs * amount / 100 * 10) / 10; return Math.round(4 * p + 9 * f + 4 * c); })(), p: Math.round(result.protein * amount / 100 * 10) / 10, f: Math.round(result.fat * amount / 100 * 10) / 10, c: Math.round(result.carbs * amount / 100 * 10) / 10, fiber: Math.round((result.fiber || 0) * amount / 100 * 10) / 10, leucine_mg: Math.round(leuPer100 * amount / 100) }];
       d.meals[mealIdx] = { ...d.meals[mealIdx], items };
     });
     setPopup({ ...popup, step: 'search_product', searchQuery: '', searchResults: [], scoredResults: [] });

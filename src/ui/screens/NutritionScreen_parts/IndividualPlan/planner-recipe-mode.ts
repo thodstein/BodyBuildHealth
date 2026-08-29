@@ -18,6 +18,7 @@ import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { decomposeRecipe, pickRecipesForMeal } from './recipe-engine';
+import { isProteinPowderId } from './food-availability';
 import { applyRealisticFloors } from './meal-plan-engine';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
 
@@ -733,6 +734,20 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const { meals, pool, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
   const dayUsedNames = new Set<string>();
   let appliedCount = 0;
+  // D4 (эпик «реалистичная тарелка»): дневной лимит порошка в рецептурном пути —
+  // рецепты с сывороткой/казеином (decomposition содержит powder-id) не занимают
+  // больше 2 приёмов дня; далее выбираются рецепты на цельной еде.
+  const _powderMealsUsed = new Set<number>();
+  const _recipeHasPowder = (r: Recipe): boolean => (r.ingredientIds || []).some(fid => isProteinPowderId(fid));
+  const _powderCount = (): number => {
+    let n = 0;
+    for (const [mi, m] of meals.entries()) {
+      const _mealsAny = m as any;
+      if (_mealsAny.recipeAppliedData && _powderMealsUsed.has(mi)) n++;
+      else if (_mealsAny.items?.some?.((it: any) => isProteinPowderId(it.id || ''))) n++;
+    }
+    return n;
+  };
 
   // Aug 28: снек-рецепты в режиме «по рецептам» — только на САМЫЙ БОЛЬШОЙ снек-слот дня
   // (остальные перекусы остаются продуктовыми и служат гибкими слотами ребаланса).
@@ -798,6 +813,12 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       cands = rankCands(sameType).slice(0, 6);
     }
     if (cands.length === 0) return;
+    // D4: порошковый гейт — если 2 приёма дня уже с порошком (продуктом или рецептом),
+    // убираем порошковые рецепты из кандидатов (fallback: цельная еда).
+    if (_powderCount() >= 2) {
+      const _wholeFood = cands.filter(r => !_recipeHasPowder(r));
+      if (_wholeFood.length > 0) cands = _wholeFood;
+    }
     // Переранжирование по декомпозированным фактам С УЧЁТОМ масштабирования к цели приёма:
     // рецепт 500 ккал при цели 1000 масштабируется ×2 → дистанция считается для масштаба.
     // Масштаб дополнительно КАПИТСЯ по белку (≤1.25×цели), жиру (≤1.5×цели) и углям
@@ -901,6 +922,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     if (!chosen) mealAny.rationale = [...(mealAny.rationale || []), `⚠ Рецепт «${chosenFlat.name}» не закрывает приём точно (${Math.round(use.totals.kcal)} из ~${Math.round(targetKcal)} ккал) — проверьте варианты`];
     dayUsedNames.add(chosenFlat.name);
     usedNamesAcrossDays?.add(chosenFlat.name);
+    if (_recipeHasPowder(chosenFlat as unknown as Recipe)) _powderMealsUsed.add(mi);
     appliedCount++;
   });
 

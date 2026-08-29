@@ -122,7 +122,21 @@ function parseIngredient(ing: string): ParsedIngredient | null {
   // "Яйца 2 шт" → { foodName: "яйца", grams: 120 } (2 шт × 60г)
   // "Оливковое масло 1 ст.л." → { foodName: "оливковое масло", grams: 15 }
   const m = ing.match(/^(.+?)\s+(\d+(?:[.,]\d+)?)\s*(кг|г|гр|мл|шт|ст\.л\.|ч\.л\.|стакан)?/i);
-  if (!m) return { foodName: ing.replace(/\d+.*$/, '').trim(), grams: 100 };
+  // D1 (эпик «реалистичные грамовки»): безразмерный ингредиент получает дефолт ПО РОЛЕ
+  // (раньше всё без числа → 100 г: «оливковое масло 100 г» = 884 ккал в «лёгкой треске»).
+  const _lowerName = ing.toLowerCase();
+  const _defaultByRole = (): number => {
+    if (/масло|oil|маргарин/.test(_lowerName)) return 10;
+    if (/соус|соевый|кетчуп|горчица|майонез|sauce/.test(_lowerName)) return 20;
+    if (/лимон|лайм|цитрус|лимонный сок|lemon|lime/.test(_lowerName)) return 30;
+    if (/специ|приправ|корица|куркума|паприка|перец молотый|соль|орегано|базилик|тмин|специй|spice/.test(_lowerName)) return 3;
+    if (/зелень|петрушк|укроп|кинз|шпинат|салат|руккол|basil|herb/.test(_lowerName)) return 30;
+    if (/мёд|мед|сироп|сахар|джем/.test(_lowerName)) return 15;
+    if (/чеснок|имбирь/.test(_lowerName)) return 10;
+    if (/сода|разрыхлитель/.test(_lowerName)) return 5;
+    return 100;
+  };
+  if (!m) return { foodName: ing.replace(/\d+.*$/, '').trim(), grams: _defaultByRole() };
   const foodName = m[1].trim();
   const qty = parseFloat(m[2].replace(',', '.'));
   const unit = (m[3] || '').toLowerCase();

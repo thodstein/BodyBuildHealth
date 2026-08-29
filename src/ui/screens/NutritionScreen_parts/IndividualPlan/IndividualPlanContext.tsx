@@ -30,6 +30,7 @@ import type { FlatRecipeOption } from "./planner-recipe-mode";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
 import { buildDayPlan as buildDayPlanV2, snapPortionG, type DayPlanV2, type MealPlanInput, type BreakfastStyle, type BreakfastTemplateId } from "./meal-plan-engine";
+import { stapleFamilyOf } from "./food-availability";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
 import { getBBCategory, type BBCategory, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
@@ -629,6 +630,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [monthPlanMode, setMonthPlanMode] = useState(() => { try { return localStorage.getItem("he_plan_month_mode") === "true"; } catch { return false; } });
   const [monthPlan, setMonthPlan] = useState<any[]>(() => { try { const v = JSON.parse(localStorage.getItem("he_plan_month") || "[]"); return Array.isArray(v) ? v : []; } catch { return []; } });
   const [selectedWeek, setSelectedWeek] = useState(0);
+  // E4-sync: эффект объявлен НИЖЕ (после weekPlan/weekEditDay — TDZ-guard).
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
   const [phase, setPhase] = useState<PhaseId>((_pf.phase && (GOALS.some(g => g.id === _pf.phase) || PHASES.some(p => p.id === _pf.phase))) ? _pf.phase as PhaseId : 'course');
   const phaseToGoal: Record<PhaseId, GoalId> = { course: 'mass', bridge: 'maintenance', pct: 'maintenance', recovery: 'maintenance', cutting: 'cutting', maintenance: 'maintenance', recomp: 'recomposition', fat_loss: 'fat_loss', post_cut: 'post_cut' };
@@ -1451,7 +1453,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         finalMeals = mealsCopy;
       }
       const totals = calcMealTotals(finalMeals);
-      updateMultiDayPlan(threeDayPlan, resolved.day, 0, () => finalMeals[0].items); // placeholder to trigger setter via direct
+      // E7-фикс: placeholder-вызов updateMultiDayPlan удалён — он дублировал запись,
+      // которую делает setThreeDayPlan ниже (двойная запись — риск рассинхрона).
       // напрямую ставим threeDayPlan
       setThreeDayPlan((prev: any) => {
         if (!prev?.days?.[resolved.day]) return prev;
@@ -1541,6 +1544,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // FIX button-audit: при открытии дня недели для редактирования dayPlan становится копией
   // этого дня; правки синхронизируются обратно в weekPlan (раньше терялись при возврате к неделе).
   const [weekEditDay, setWeekEditDay] = useState<number | null>(null);
+  // E4-fix: правки недели (weekEditDay) в режиме месяца возвращаются в monthPlan[selectedWeek] —
+  // раньше возврат к «Списку недель» затирал правки, т.к. monthPlan хранит собственные копии недель.
+  // Генерация месяца не затрагивается: weekEditDay = null при генерации (сброс в generatePlan).
+  useEffect(() => {
+    if (!monthPlanMode || weekEditDay === null) return;
+    if (!weekPlan?.days?.length || !monthPlan?.length) return;
+    const wi = selectedWeek ?? 0;
+    if (!monthPlan[wi] || monthPlan[wi] === weekPlan) return;
+    setMonthPlan(prev => { const next = [...prev]; next[wi] = weekPlan; return next; });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekPlan, monthPlanMode, weekEditDay, selectedWeek]);
   const openWeekDayForEdit = (di: number) => {
     if (!weekPlan?.days?.[di]) return;
     try { setDayPlan(JSON.parse(JSON.stringify(weekPlan.days[di]))); } catch { setDayPlan(weekPlan.days[di]); }
@@ -2449,9 +2463,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         try { setAllergenExcludedCount(countExcludedByAllergens(FOOD_DB, allergens || [])); } catch {}
        const lockedIds = new Set<string>([...(lockedFoodIds || [])]);
        const recentFoodIds = new Set<string>();
+       // B5 (междневная ротация): семейства гарниров предыдущих дней текущей генерации —
+       // движок деприоритизирует «рис в каждый день», если есть ≥2 свежих альтернатив.
+       const recentStapleFamilies = new Set<string>();
        const collectFoods = (plan: any) => { if (plan?.meals) plan.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); })); if (plan?.days) plan.days.forEach((d: any) => d?.meals?.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) recentFoodIds.add(it.id); }))); };
-       if (days >= 3 && dayPlan) collectFoods(dayPlan);
-       if (days >= 7 && threeDayPlan) collectFoods(threeDayPlan);
+       const collectFamilies = (plan: any) => {
+         const addFrom = (items: any[]) => items.forEach((it: any) => { const fam = stapleFamilyOf(it.id || ''); if (fam) recentStapleFamilies.add(fam); });
+         if (plan?.meals) plan.meals.forEach((m: any) => addFrom(m.items || []));
+         if (plan?.days) plan.days.forEach((d: any) => d?.meals?.forEach((m: any) => addFrom(m.items || [])));
+       };
+       if (days >= 3 && dayPlan) { collectFoods(dayPlan); collectFamilies(dayPlan); }
+       if (days >= 7 && threeDayPlan) { collectFoods(threeDayPlan); collectFamilies(threeDayPlan); }
        if ((dietPrefs || []).includes('vegetarian')) {
          Object.entries(FOOD_ALLERGEN_DIET).forEach(([fid, tags]) => { if (tags.isVegetarian === false) excludedIds.add(fid); });
        }
@@ -2591,6 +2613,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // (he_special_meals: refeed/cheat_meal/fast) теперь реально перестраивают план на дату —
         // раньше записи только показывались в календаре, но не влияли на генерацию.
         const _specialNotes: string[] = [];
+        const _specialMealOverrides: { targetLabel: string; kind: 'cheat' | 'refeed' | 'fast' | 'custom'; p?: number; c?: number; f?: number }[] = [];
         let _fastingDay = false;
         try {
           const _sm = JSON.parse(localStorage.getItem('he_special_meals') || '[]');
@@ -2615,8 +2638,21 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
               dayKcalMod = Math.min(dayKcalMod, 0.75); dayCarbMod = Math.min(dayCarbMod, 0.7);
               _specialNotes.push('⏳ Фастинг по расписанию: калорийность снижена, приёмов меньше, первый приём позже (окно ~8 ч, напр. 12:00–20:00).');
             }
+            // E6 (спецприём → замена приёма): записи календаря с replaceMeal РЕАЛЬНО
+            // перестраивают целевой приём (раньше только баннер «замена: Ужин»).
+            for (const _s of _todaySpecial) {
+              if (!_s.replaceMeal) continue;
+              _specialMealOverrides.push({
+                targetLabel: _s.replaceMeal,
+                kind: _s.type === 'cheat_meal' ? 'cheat' : _s.type === 'refeed' ? 'refeed' : 'fast',
+              });
+            }
           }
         } catch {}
+        // E6: активная конфигурация спецприёма (модалка) с включённой заменой — явные макросы.
+        if (specialMealMode && specialMealReplaceMode && specialMealReplaceTarget) {
+          _specialMealOverrides.push({ targetLabel: specialMealReplaceTarget, kind: 'custom', p: specialMealProteinG, c: specialMealCarbsG, f: specialMealFatG });
+        }
         const _effMealsRaw = _fastingDay ? Math.max(3, (opts?.overrides?.mealsCount ?? mealsCount) - 1) : (opts?.overrides?.mealsCount ?? mealsCount);
         const _effMealsCount = _effMealsRaw;
         const _inPrepWindow = bbPrepPlan ? prepPhaseForDate(bbPrepPlan, _prepDate) !== null : false;
@@ -2668,6 +2704,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           categoryPref: { preferred: [], excluded: excludedCategories },
           deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
+          recentStapleFamilies: offset > 0 ? recentStapleFamilies : undefined,
+          specialMealOverride: _specialMealOverrides.length > 0 ? _specialMealOverrides : undefined,
           hardRecentIds: new Set(hardWindow.flat()),
           varietyStrictness,
           diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? { kcalDelta: diaryComp.delta.kcal, pDelta: diaryComp.delta.p, fDelta: diaryComp.delta.f, cDelta: diaryComp.delta.c, note: diaryComp.note, severity: diaryComp.severity } : undefined,
@@ -2933,6 +2971,8 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [specialMealTiming, setSpecialMealTiming] = useState('snack');
   const [specialMealReplaceMode, setSpecialMealReplaceMode] = useState(false);
   const [specialMealReplaceTarget, setSpecialMealReplaceTarget] = useState('Ужин');
+  // E7: модалка имени плана (замена window.prompt)
+  const [savePlanPrompt, setSavePlanPrompt] = useState<{ open: boolean; value: string } | null>(null);
   const [cheatMealPlan, setCheatMealPlan] = useState<any>(null);
   const [carbloadPlan, setCarbloadPlan] = useState<any>(null);
   const [butchPlan, setButchPlan] = useState<any>(null);
@@ -2963,8 +3003,12 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   useEffect(() => { if (generated && dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [Array.isArray(injections) ? injections.length : 0]);
 
   const saveCurrentPlan = () => {
-    const name = prompt('Название плана:', `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал`);
-    if (name === null) return;
+    // E7: prompt() → модалка (мобильный UX, нативный prompt блокировался в Telegram WebApp)
+    setSavePlanPrompt({ open: true, value: `${new Date().toLocaleDateString('ru-RU')} · ${Math.round(dayPlan?.totals?.kcal || 0)} ккал` });
+  };
+  const confirmSavePlan = () => {
+    const name = (savePlanPrompt?.value || '').trim() || `План ${new Date().toLocaleDateString('ru-RU')}`;
+    setSavePlanPrompt(null);
     const plan: SavedPlan = { id: Date.now(), date: new Date().toISOString().split('T')[0], name, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc };
     const updated = [plan, ...savedPlans.filter(p => p.id !== plan.id)].slice(0, 10);
     setSavedPlans(updated);
@@ -2974,6 +3018,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
       setErrorMsg('⚠️ Не удалось сохранить план: превышен лимит localStorage. Удалите старые планы или отчёты.');
     } else {
       setErrorMsg(null);
+      if (typeof (window as any).showToast === 'function') (window as any).showToast(`💾 План «${name}» сохранён`, 'success');
     }
   };
 
@@ -3078,7 +3123,9 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // При planDays===7/3 добавляет ВСЮ неделю/3 дня на последовательные даты (FatSecret-замена: недельный план разом)
   const addPlanToDiary = useCallback((dateISO?: string): boolean => {
     try {
-      const baseDate = dateISO || new Date().toISOString().slice(0, 10);
+      // E7: локальная дата (UTC-сдвиг уезжал на завтра вечером в UTC+3..+12)
+      const _now = new Date();
+      const baseDate = dateISO || `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
       const data = readDiaryV2();
       const addDay = (src: any, dateStr: string) => {
         if (!src?.meals || !Array.isArray(src.meals) || src.meals.length === 0) return 0;
@@ -3148,11 +3195,11 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const generateQualityReport = () => { if (!dayPlan) return; setQualityReport(generateQualityReportPure(dayPlan, budget, FOOD_DB)); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
   const generateRiskReport = () => { if (!dayPlan) return; setRiskReport(generateRiskReportPure(dayPlan, weight)); setActiveReports(prev => prev.includes('risk') ? prev : [...prev, 'risk']); };
   const generateDrugCompatReport = () => { const safeInjections = Array.isArray(injections) ? injections : []; if (!dayPlan || safeInjections.length === 0) return; setDrugCompatReport(generateDrugCompatReportPure({ dayPlan, injections: safeInjections, weight, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, phase, takenSupplements: Array.isArray(takenSupplements) ? takenSupplements : [] })); setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']); };
-  const generateFullNutritionReport = (planArg?: any, archve = true) => {
+  const generateFullNutritionReport = (planArg?: any, archive = true) => {
     const src = planArg || dayPlan; if (!src) return;
     try { const rep = generateNutritionReport({ meals: src.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: src.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode, goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&_trainDaysArr.some(Boolean)?trainStart:undefined });
       if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']);
-        if (archve) { try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); safeWriteJSON('he_nutrition_report_archive', arch.slice(0,50)); safeWriteJSON('he_nutrition_report_current', rep); try { safeWriteJSON('he_profile_nutrition_reports', arch.slice(0,20)); } catch {} } catch {} }
+        if (archive) { try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); safeWriteJSON('he_nutrition_report_archive', arch.slice(0,50)); safeWriteJSON('he_nutrition_report_current', rep); try { safeWriteJSON('he_profile_nutrition_reports', arch.slice(0,20)); } catch {} } catch {} }
       }
     } catch(e) { try { console.error('Report failed:', e); } catch {} }
   };
@@ -3271,5 +3318,29 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);
-  return <PlanContext.Provider value={finalCtx}>{children}</PlanContext.Provider>;
+  return (
+    <PlanContext.Provider value={finalCtx}>
+      {children}
+      {savePlanPrompt?.open && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', padding: 16 }} onClick={() => setSavePlanPrompt(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 360, padding: 18, borderRadius: 16, background: 'linear-gradient(135deg,#1a1c26,#18181b)', border: '1px solid rgba(139,92,246,0.25)', boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#a78bfa', marginBottom: 4 }}>💾 Сохранить план</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Название плана</div>
+            <input
+              value={savePlanPrompt.value}
+              onChange={e => setSavePlanPrompt({ open: true, value: e.target.value })}
+              onKeyDown={e => { if (e.key === 'Enter') confirmSavePlan(); }}
+              autoFocus
+              maxLength={60}
+              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 14, outline: 'none' }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={() => setSavePlanPrompt(null)} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontWeight: 600, cursor: 'pointer' }}>Отмена</button>
+              <button onClick={confirmSavePlan} style={{ flex: 1, padding: 10, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#8b5cf6,#a78bfa)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Сохранить</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </PlanContext.Provider>
+  );
 };

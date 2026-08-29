@@ -45,8 +45,9 @@ describe('Этап 2: intra/preSleep углеводы (БАГ-10)', () => {
     const snack2 = plan.meals.find(m => m.type === 'snack2');
     const snack = plan.meals.find(m => m.type === 'snack');
     // 8 приёмов на тренинге → snack не строится (только peri-workout), но snack2 тип различим.
+    // A6 (лейблы «Перекус N»): snack2/3/4 различимы в UI, preferred-key fallback сохранён.
     expect(snack2).toBeTruthy();
-    expect(snack2?.label).toBe('Перекус');
+    expect(snack2?.label).toBe('Перекус 2');
     expect(snack?.type).not.toBe('snack2');
   });
 

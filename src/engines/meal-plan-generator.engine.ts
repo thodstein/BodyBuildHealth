@@ -1,10 +1,15 @@
 /**
  * Meal Plan Generator — Weekly nutrition plans from macro targets.
  *
- * Generates daily meal plans (6 meals/day) matching calorie and macro goals.
- * Uses Russian food database with realistic portions.
+ * ⚠️ DEPRECATED (A6, эпик «Профессиональный планировщик», Aug 29 2026): ЭТОТ ДВИЖОК МЁРТВЫЙ.
+ * Реальная генерация идёт через `src/ui/screens/NutritionScreen_parts/IndividualPlan/meal-plan-engine.ts`
+ * → `buildDayPlan()` (V2-движок, 3800+ строк: квоты, диетология, посадка ±3%).
+ * Здесь: 30 захардкоженных продуктов + Math.random() без сидирования — ловушка для
+ * будущих вызовов. Живой импорт остался только как тип MealPlanInput в bb-contest-prep.
+ * НЕ ИСПОЛЬЗОВАТЬ для генерации. Удаление — после отвязки типа в bb-contest-prep.
  *
  * @module meal-plan-generator
+ * @deprecated Используйте IndividualPlan/meal-plan-engine.buildDayPlan
  */
 
 // ═══════════════════════════════════════════════════════════════════════════

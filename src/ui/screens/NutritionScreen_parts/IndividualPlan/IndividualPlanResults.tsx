@@ -54,7 +54,7 @@ export const IndividualPlanResults: React.FC = () => {
     userRecipes, setUserRecipes,
     shoppingList, setShoppingList, injections,
     recipePickerMeal, setRecipePickerMeal,
-    replaceMealWithRecipe, undoStack, setUndoStack,
+    replaceMealWithRecipe, undoStack, setUndoStack, undoLast,
     saveCurrentPlan, savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
     loadSavedPlan, weight, budget, age, sex, bodyFatPct, trainType,
     generateCheatMeal, cheatMealPlan, setCheatMealPlan,
@@ -88,6 +88,9 @@ export const IndividualPlanResults: React.FC = () => {
   } = usePlanCtx();
 
   const [showCalcPopup, setShowCalcPopup] = useState(false);
+  // E7: импорт плана — модалка (замена window.prompt)
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importText, setImportText] = useState('');
   const _monthRunningRef = useRef(false); // FIX button-audit: guard двойного клика «План на месяц»
   const [calcTab, setCalcTab] = useState<'day' | 'week'>('day');
   const [calcSelections, setCalcSelections] = useState<Set<string>>(new Set());
@@ -96,6 +99,16 @@ export const IndividualPlanResults: React.FC = () => {
   const [calcDailyReport, setCalcDailyReport] = useState<DailyDietReport | null>(null);
   // 🟠8 — Checked shopping items state (must be at top level — Rules of Hooks)
   const [checked, setChecked] = useState<Set<string>>(() => { try { const v = JSON.parse(localStorage.getItem('he_shopping_checked') || '[]'); return new Set(Array.isArray(v) ? v.filter((x: any) => typeof x === 'string') : []); } catch { return new Set<string>(); } });
+  // E7: чекбоксы закупок сбрасываются при новом плане (раньше галочки «переезжали» между
+  // разными списками — «молоко уже отмечено» в чужом рационе).
+  const _planKeyRef = useRef<string>('');
+  const _planKey = `${dayPlan ? JSON.stringify(dayPlan.totals || {}) + (dayPlan.meals?.length || 0) : ''}|${weekPlan ? (weekPlan.days?.length || 0) : ''}|${threeDayPlan ? (threeDayPlan.days?.length || 0) : ''}`;
+  React.useEffect(() => {
+    if (_planKey && _planKey !== _planKeyRef.current) {
+      if (_planKeyRef.current !== '') setChecked(new Set());
+      _planKeyRef.current = _planKey;
+    }
+  }, [_planKey]);
 
   const [showCorrectPopup, setShowCorrectPopup] = useState(false);
   const [correctIssues, setCorrectIssues] = useState<{ mealIdx: number; mealName: string; issues: { type: string; text: string; severity: 'low' | 'medium' | 'high'; suggestion?: { foodId: string; name: string; reason: string }[] }[] }[] | null>(null);
@@ -297,10 +310,32 @@ export const IndividualPlanResults: React.FC = () => {
       });
     }
 
-    const dailyReport = allMeals.length > 0 ? analyzeDailyDiet(allMeals, profile) : null;
-    setCalcResults(results);
-    setCalcDailyReport(dailyReport);
-  };
+  const dailyReport = allMeals.length > 0 ? analyzeDailyDiet(allMeals, profile) : null;
+  setCalcResults(results);
+  setCalcDailyReport(dailyReport);
+};
+
+// E7: импорт плана — модалка вместо prompt() + ВАЛИДАЦИЯ формы (раньше вставка мусора
+// с полем meals давала кривой план без предупреждения).
+const _validateImportedPlan = (p: any): boolean => {
+  if (!p || typeof p !== 'object' || !Array.isArray(p.meals) || p.meals.length === 0) return false;
+  return p.meals.every((m: any) => m && typeof m === 'object' && Array.isArray(m.items) && m.items.every((it: any) => it && typeof it === 'object' && typeof it.name === 'string' && (it.amount === undefined || typeof it.amount === 'number')));
+};
+const doImportPlan = (raw: string): boolean => {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!_validateImportedPlan(parsed)) { setErrorMsg('Неверная структура плана: ожидаются meals[] с items[] (name/amount).'); return false; }
+    setDayPlan(parsed);
+    setGenerated(true);
+    setPlanDays(1); // FIX button-audit: импорт всегда показывает 1-дневный план
+    setErrorMsg(null);
+    if (typeof (window as any).showToast === 'function') (window as any).showToast('📥 План импортирован', 'success');
+    return true;
+  } catch {
+    setErrorMsg('Неверный формат. Скопируйте план через кнопку «Копировать».');
+    return false;
+  }
+};
 
 
   // P0-3: Атомарная генерация месяца — явный async-цикл по 4 неделям с коротким yield для UI.
@@ -326,8 +361,10 @@ export const IndividualPlanResults: React.FC = () => {
       }
       await new Promise<void>(r => setTimeout(() => r(), 100));
       setSelectedWeek(0);
-      // Восстановление плана недели 0 для отображения в UI (после прохождения 4 недель)
-      try { await generatePlan(7, 0, undefined, { skipUndo: true, async: true }); } catch (e: any) { try { console.warn('[Planner] month week 0 restore failed:', e); } catch {} }
+      // E4-fix: НЕЛЬЗЯ перегенерировать неделю 0 — monthPlan[0] уже сгенерирован в цикле выше
+      // (повторный вызов с новой солью расходил отображаемую неделю и содержимое месяца).
+      // Отображаем неделю 0 прямо из monthPlan.
+      if (monthPlan[0]?.days?.length) setWeekPlan(monthPlan[0]);
     } finally {
       _monthRunningRef.current = false;
     }
@@ -492,14 +529,7 @@ export const IndividualPlanResults: React.FC = () => {
               const txt = dayPlan ? `🍽 План питания\n${(Array.isArray(dayPlan.meals) ? dayPlan.meals : []).map((m: any) => `${m.time} ${m.label}: ${(Array.isArray(m.items) ? m.items : []).map((it: any) => `${it.name} ${it.amount}г`).join(', ')}  [${Math.round(m.totals?.kcal || 0)}ккал]`).join('\n')}\n\n📊 Итого: ${Math.round(dayPlan.totals?.kcal || 0)} ккал, Б${Math.round(dayPlan.totals?.p || 0)}/Ж${Math.round(dayPlan.totals?.f || 0)}/У${Math.round(dayPlan.totals?.c || 0)}, клетчатка ${Math.round(dayPlan.totals?.fiber||0)}г${(dayPlan as any).healthScore ? `\n\n🩺 Health-score: ${(dayPlan as any).healthScore.score}/100 (${(dayPlan as any).healthScore.status}) — микро ${(dayPlan as any).healthScore.micro}/клетч ${(dayPlan as any).healthScore.fiber}/MPS ${(dayPlan as any).healthScore.mps}/EA ${(dayPlan as any).healthScore.ea}/диверс ${(dayPlan as any).healthScore.diversity}` : ''}${(dayPlan as any).energyAvailability ? `\n⚡ EA: ${(dayPlan as any).energyAvailability.ea} ккал/кг FFM (${(dayPlan as any).energyAvailability.status})` : ''}${(dayPlan as any).menstrualPhaseNote ? `\n🌸 ${(dayPlan as any).menstrualPhaseNote}` : ''}${(dayPlan as any).categoryNote ? `\n🏋 ${(dayPlan as any).categoryNote}` : ''}${(dayPlan as any).redSNote ? `\n⚠️ ${(dayPlan as any).redSNote}` : ''}${(dayPlan as any).peakWeekNote ? `\n🏆 ${(dayPlan as any).peakWeekNote}` : ''}` : '';
               try { void (navigator.clipboard?.writeText(txt)?.catch(() => setErrorMsg('Не удалось скопировать план.'))); } catch { setErrorMsg('Не удалось скопировать план.'); }
             }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>📤 Копировать</button>
-            <button onClick={() => {
-              const input = prompt('Вставьте план из буфера:');
-              if (!input) return;
-              try {
-                const parsed = JSON.parse(input);
-                if (parsed.meals) { setDayPlan(parsed); setGenerated(true); setPlanDays(1); } // FIX button-audit: импорт всегда показывает 1-дневный план
-              } catch { setErrorMsg('Неверный формат. Скопируйте план через кнопку «Копировать».'); }
-            }} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:10, fontWeight:600 }}>📥 Импорт</button>
+            <button onClick={() => setImportModalOpen(true)} style={{ flex:1, padding:'5px', borderRadius:6, cursor:'pointer', border:'1px solid rgba(249,115,22,0.2)', background:'rgba(249,115,22,0.06)', color:'#f97316', fontSize:10, fontWeight:600 }}>📥 Импорт</button>
           </div>
         </GlassCard>
       </>)}
@@ -1079,20 +1109,7 @@ export const IndividualPlanResults: React.FC = () => {
       )}
 
       {generated && undoStack.length > 0 && (
-        <button onClick={() => {
-          // P1-fix: functional updater для undoStack — избегаем stale closure при двойном клике
-          setUndoStack((prev: any[]) => {
-            if (prev.length === 0) return prev;
-            const snap = prev[0];
-            if (snap.dayPlan) setDayPlan(snap.dayPlan);
-            if (snap.threeDayPlan) setThreeDayPlan(snap.threeDayPlan);
-            if (snap.weekPlan) setWeekPlan(snap.weekPlan);
-            // P1-fix: восстанавливаем shoppingList/waterCalc/recommendations если есть в снапшоте
-            if (snap.shoppingList) setShoppingList(snap.shoppingList);
-            if (snap.waterCalc) setWaterCalc(snap.waterCalc);
-            return prev.slice(1);
-          });
-        }} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>
+        <button onClick={() => undoLast()} style={{ width:'100%', padding:'8px', borderRadius:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.2)', background:'rgba(96,165,250,0.06)', color:'#60a5fa', fontSize:10, fontWeight:600 }}>
           ↩ Отменить ({undoStack.length})
         </button>
       )}
@@ -2098,6 +2115,27 @@ export const IndividualPlanResults: React.FC = () => {
             );
           })}
         </GlassCard>
+      )}
+
+      {importModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(6px)', padding: 16 }} onClick={() => setImportModalOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, padding: 18, borderRadius: 16, background: 'linear-gradient(135deg,#1a1c26,#18181b)', border: '1px solid rgba(249,115,22,0.25)', boxShadow: '0 16px 40px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#f97316', marginBottom: 4 }}>📥 Импорт плана</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>Вставьте JSON плана (кнопка «📤 Копировать» выше)</div>
+            <textarea
+              value={importText}
+              onChange={e => setImportText(e.target.value)}
+              autoFocus
+              rows={6}
+              placeholder='{"meals": [...]}'
+              style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', fontSize: 11, fontFamily: 'monospace', outline: 'none', resize: 'vertical' }}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button onClick={() => { setImportModalOpen(false); setImportText(''); }} style={{ flex: 1, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontWeight: 600, cursor: 'pointer' }}>Отмена</button>
+              <button onClick={() => { if (doImportPlan(importText)) { setImportModalOpen(false); setImportText(''); } }} style={{ flex: 1, padding: 10, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Импортировать</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showCalcPopup && (
