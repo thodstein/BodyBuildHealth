@@ -196,9 +196,9 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
   glutamine: 15, supp_hmb: 6, supp_beta_alanine: 6, supp_citrulline_dl_malate: 12,
   supp_agmatine_sulfate: 2, supp_l_carnitine_tartrate: 4, supp_alpha_gpc: 2,
   amylopectin: 90, dextrose: 90, maltodextrin: 90, vitargo: 90, isoton: 90, isotonic: 90, drink_isotonic: 90, collagen_hydrolysate: 20,
-  // Р-2.3 (Aug 28): клетчаточные добавки — дозировки, не еда (порция 10 г; 300 г псиллиума
-  // = 240 г клетчатки — опасно для ЖКТ). ВСАМ им сюда: saf fiber-supplements.
-  psyllium_husk: 15, glucomannan: 10, inulin: 20, Benefiber: 20, wheat_bran_supplement: 30, cocoa: 30,
+  // Псиллиум и т.д. ≤10г/приём — жёстко (опасно >10г, сытность не за счёт клетчатки).
+  // Любая клетчатковая добавка — только добивка, не еда. 500г псиллиума = 400г клетчатки — абсурд.
+  psyllium_husk: 10, glucomannan: 10, inulin: 10, Benefiber: 10, wheat_bran_supplement: 10, cocoa: 10,
 };
 // Глобальный лимит на одну порцию любого продукта (г)
 // Этап 6: для уровня «Максимум»/enhanced лимиты выше, чтобы высококалорийные планы
@@ -313,8 +313,14 @@ export function applyRealisticFloors(items: MealItem[], isSnack: boolean, budget
     const amt = it.amount || 0;
     if (amt <= 0 || amt >= fl) continue;
     const floorKcal = Math.round((food.kcal || 0) * fl / 100);
-    // Белок неприкосновенен для бюджета (жалоба «курица 30 г в обеде») — всегда до пола
-    if (role !== 'protein' && sum() - (it.kcal || 0) + floorKcal > cap) continue; // нет калорийной комнаты
+    // Белок — всегда до пола; углеводы — плотный гарнир ≥50г даже если на 50% превышает бюджет (иначе 14г каши — пустой рацион, сытность важнее точности для бодибилдинга)
+    if (role === 'protein') {
+      // всегда поднимаем белок до пола, даже если превышает кап
+    } else if (role === 'carb_slow' || role === 'carb_fast') {
+      if (sum() - (it.kcal || 0) + floorKcal > cap * 1.5) continue;
+    } else {
+      if (sum() - (it.kcal || 0) + floorKcal > cap) continue; // нет калорийной комнаты
+    }
     const r = fl / amt;
     const p = Math.round((it.p || 0) * r * 10) / 10;
     const f = Math.round((it.f || 0) * r * 10) / 10;
@@ -984,12 +990,12 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   const isMeatFish = cat === 'protein';
   const isFruitVegFresh = cat === 'veg_fruit';
   const isDairy = cat === 'dairy';
-  // Р-2.3: клетчаточные добавки (псиллиум и др.) — сетка дозировок [5,10,15], не «тарелка»
+  // Псиллиум и т.д. ≤10г/приём — только добивка 5/10г, не тарелка (500г = абсурд)
   const isFiberSupp = cat === 'supplement' && (food.fiber || 0) >= 30;
   // Яйца целыми штуками: 1 яйцо ≈ 55 г съедобной части (55/110/165/220…)
   const isEggWhole = id === 'egg_whole' || id.startsWith('egg_whole');
   if (isEggWhole) { const eggs = Math.max(1, Math.round(base / 55)); base = eggs * 55; }
-  else if (isFiberSupp) base = snap(base, [5, 10, 15]);
+  else if (isFiberSupp) base = snap(base, [5, 10]);
   else if (isPorridge) base = snap(base, [50, 100, 125, 150, 200, 250]);
   else if (isLiquid) base = snap(base, [100, 150, 200, 250, 300, 400, 500, 750, 1000]);
   else if (isOil) base = snap(base, [5, 10, 15, 30]);
@@ -1017,12 +1023,12 @@ export function snapPortionG(food: FoodItem, grams: number): number {
   const isMeatFish = cat === 'protein';
   const isFruitVeg = cat === 'veg_fruit';
   const isDairy = cat === 'dairy';
-  // Р-2.3: клетчаточные добавки — сетка дозировок
+  // Псиллиум ≤10г — только 5/10г добивка
   const isFiberSupp = cat === 'supplement' && (food.fiber || 0) >= 30;
   let brackets: number[];
   const _isEggWholeSnap = id === 'egg_whole' || id.startsWith('egg_whole');
   if (_isEggWholeSnap) { const eggs = Math.max(1, Math.round(grams / 55)); return eggs * 55; }
-  if (isFiberSupp) brackets = [5, 10, 15];
+  if (isFiberSupp) brackets = [5, 10];
   else if (isPorridge) brackets = [50, 100, 125, 150, 200, 250];
   else if (isLiquid) brackets = [100, 150, 200, 250, 300, 400, 500, 750, 1000];
   else if (isOil) brackets = [5, 10, 15, 30];
@@ -1421,9 +1427,12 @@ function buildWholeMeal(
     // это ускоряет гликогеновый ре-синтез и снижает объём клетчатки в приёме.
     const _carbPool = (refeedDay && pool.carbFast.length > 0) ? pool.carbFast : pool.carbSlow;
     // E1: на завтраке отдаём предпочтение «завтрашним» углеводам (каши/хлопья), fallback — общий пул.
-    const carbPool = (snack && _snackPools && _snackPools.carbs.length > 0)
+    const carbPoolRaw = (snack && _snackPools && _snackPools.carbs.length > 0)
       ? _snackPools.carbs
       : (breakfast && _breakfastPools && _breakfastPools.carbs.length > 0) ? _breakfastPools.carbs : _carbPool;
+    // Сухофрукты/концентраты — только добивка, не основа (иначе 14г каши + 100г сухофруктов — пустой рацион)
+    const carbPoolNoConc = carbPoolRaw.filter(f => !isConcentrateFood(f));
+    const carbPool = carbPoolNoConc.length >= 2 ? carbPoolNoConc : carbPoolRaw;
     // Prefer common carbs (rice, oats, buckwheat, potato, pasta) over exotic ones
     const commonCarbs = carbPool.filter(f => COMMON_CARB_IDS.has(f.id));
     // GL-aware: при высокой углеводной цели (>=60g) выбираем источники с наименьшим GI,
@@ -1571,18 +1580,42 @@ function buildWholeMeal(
     }
   }
 
-  // 5. Жиры: остаточный принцип (если remF > 5) (предпочтение — preferred)
+  // 5. Жиры: остаточный принцип (если remF > 5) — орехи/семена ТОЛЬКО добивка 10-15г, не основной жир
   if (remF > 5) {
     const fatSourcePool = (snack && _snackNuts && _snackNuts.length > 0) ? _snackNuts : pool.fats;
-    // D-28 П4: любимые жиры fresh-first (не авокадо/миндаль в каждом приёме).
-    const prefFat = preferredIds && preferredIds.size > 0 ? fatSourcePool.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
-    const fatSource = pickPriority(prefFat.length > 0 ? prefFat : fatSourcePool, seed + 6, { lockedIds, recentIds, hardRecentIds });
+    const isNutId = (id: string) => /nut|almond|cashew|walnut|hazel|pistach|peanut|seed|chia|flax|hemp|pumpkin|sunflower/.test(id) || stapleFamilyOf(id) === 'nuts' || stapleFamilyOf(id) === 'seeds';
+    // Предпочитаем не-ореховые жиры (масло, авокадо) для основного закрытия, орехи — только топиинг
+    const nonNutPool = fatSourcePool.filter(f => !isNutId(f.id));
+    const prefNonNut = preferredIds && preferredIds.size > 0 ? nonNutPool.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
+    const prefFatNonNut = prefNonNut.length > 0 ? prefNonNut : nonNutPool;
+    // Сначала пробуем закрыть основным жиром (масло/авокадо)
+    let fatSource = prefFatNonNut.length > 0 ? pickPriority(prefFatNonNut, seed + 6, { lockedIds, recentIds, hardRecentIds }) : null;
+    // Фолбэк: если не-орехов нет, берём любой (орех) но капим до 15г
+    if (!fatSource) {
+      const prefFat = preferredIds && preferredIds.size > 0 ? fatSourcePool.filter(f => preferredIds.has(f.id) && !dayUsedPreferredIds?.has(f.id)) : [];
+      fatSource = pickPriority(prefFat.length > 0 ? prefFat : fatSourcePool, seed + 6, { lockedIds, recentIds, hardRecentIds });
+    }
     if (fatSource) {
       if (preferredIds?.has(fatSource.id)) dayUsedPreferredIds?.add(fatSource.id);
-      const grams = gramsForMacro(fatSource, remF, 'fat');
+      const isNut = isNutId(fatSource.id);
+      let grams = gramsForMacro(fatSource, remF, 'fat');
+      // Орехи/семена — только добивка 10-15г, не 40г тарелка орехов
+      if (isNut) grams = Math.min(15, grams);
       if (grams > 0) {
         const item = makeItem(fatSource, grams, 'fat');
         items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
+        // Если орех закрыл лишь часть и остался жир — добиваем маслом (не орехом)
+        if (isNut && remF > 5) {
+          const oilPool = pool.fats.filter(f => !isNutId(f.id) && !isHerbSpiceId(f.id));
+          const oil = oilPool.length > 0 ? pickPriority(oilPool, seed + 61, { lockedIds, recentIds, hardRecentIds }) : null;
+          if (oil) {
+            const oilGrams = gramsForMacro(oil, remF, 'fat');
+            if (oilGrams >= 5) {
+              const oilItem = makeItem(oil, oilGrams, 'fat');
+              items.push(oilItem); remP -= oilItem.p; remF -= oilItem.f; remC -= oilItem.c;
+            }
+          }
+        }
       }
     }
   }
@@ -2805,6 +2838,33 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const toMin = (t: string) => { const [h, m] = (t || '00:00').split(':').map(Number); return h * 60 + m; };
     return toMin(a.time) - toMin(b.time);
   });
+
+  // Плотный сытный рацион — псиллиум ≤10г, орехи ≤15г/приём (только добивка), гарнир ≥50г/30г (иначе 14г каши — пусто)
+  for (const m of meals) {
+    const isMainDense = ['breakfast','lunch','dinner'].includes((m as any).type);
+    const isSnackDense = (m as any).type?.startsWith('snack');
+    for (const it of m.items) {
+      if (['psyllium_husk','glucomannan','inulin','Benefiber','wheat_bran_supplement','cocoa'].includes(it.id) && it.amount > 10) {
+        const r = 10 / it.amount;
+        it.amount = 10; it.p = Math.round(it.p * r *10)/10; it.f = Math.round(it.f * r*10)/10; it.c = Math.round(it.c*r*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r);
+      }
+      const famDense = stapleFamilyOf(it.id);
+      if ((famDense === 'nuts' || famDense === 'seeds') && it.amount > 15) {
+        const r = 15 / it.amount;
+        it.amount = 15; it.p = Math.round(it.p*r*10)/10; it.f = Math.round(it.f*r*10)/10; it.c = Math.round(it.c*r*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r);
+      }
+    }
+    if (isMainDense || isSnackDense) {
+      const floorDense = isMainDense ? 50 : 30;
+      for (const it of m.items.filter(x=> x.role==='carb_slow' || x.role==='carb_fast')) {
+        if (it.amount >0 && it.amount < floorDense) {
+          const r = floorDense / it.amount;
+          it.amount = floorDense; it.p = Math.round(it.p*r*10)/10; it.f = Math.round(it.f*r*10)/10; it.c = Math.round(it.c*r*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r);
+        }
+      }
+    }
+    m.totals = m.items.reduce((acc,it)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+it.fiber,leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+  }
 
   // ─── E4: предупреждение перегрузки приёма + предложение увеличить приёмы ──
   // Если крупяная порция приёма упёрлась в кап (280/350 г), а углеводная цель дня

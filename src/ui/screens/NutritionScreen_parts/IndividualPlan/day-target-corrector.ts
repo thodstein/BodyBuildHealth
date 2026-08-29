@@ -119,7 +119,32 @@ export function correctDayToTargets(
     return { meals, withinTolerance: true, deviationPct: 0 };
   }
 
+  const maxCoreScale = opts?.allowCoreScale ? 1.15 : 1.10;
   for (let iter = 0; iter < maxIter; iter++) {
+    // человечность: орехи/семена ≤85г и клетчатка ≤85г — режем перебор до сведения КБЖУ
+    const nutG = currentNutGrams(meals);
+    const fibG = currentFiber(meals);
+    if (nutG > 85 || fibG > 85) {
+      const isNutOver = nutG > 85;
+      const cands = meals.flatMap((m, mi) => m.items.map((it, ii) => ({ mi, ii, it, m })))
+        .filter(x => !((x.it as any)._fixedGrams) && x.m.type !== 'presleep' && x.m.type !== 'intra')
+        .filter(x => {
+          const fam = stapleFamilyOf(x.it.id) || '';
+          if (isNutOver) return fam === 'nuts' || fam === 'seeds';
+          return (x.it.fiber || 0) > 1 && x.it.role !== 'protein' && x.it.role !== 'fast_protein' && x.it.role !== 'slow_protein';
+        })
+        .sort((a, b) => (b.it.fiber || 0) - (a.it.fiber || 0));
+      let cut = false;
+      for (const cand of cands) {
+        if ((cand.it.amount || 0) < 20) continue;
+        const newAmount = Math.max(15, Math.round(cand.it.amount * 0.85));
+        const before = cand.it.amount;
+        scaleItem(cand.it, newAmount);
+        recalcMealTotals(meals);
+        cut = true; break;
+      }
+      if (cut) continue;
+    }
     const totals = sumTotals(meals);
     const dev = maxDevPct(totals as DayTargets, safeTargets);
     if (dev <= 3) break;
@@ -167,7 +192,7 @@ export function correctDayToTargets(
         if (isCore && opts?.allowCoreScale === false) continue;
         const key = `${cand.mi}:${cand.it.id}`;
         const curScale = coreScale.get(key) ?? 1;
-        // реалистичный пол: белок основного приёма ≥80г, перекуса ≥60г, порошок ≥20г — иначе «омлет 78г» (для ЛЮБОГО среза, не только белка-перебора)
+        // реалистичный пол: белок 80/60, гарнир 50/30, иначе 14г каши — пустой рацион
         let floor = 15;
         if (cand.it.role === 'protein' || cand.it.role === 'fast_protein' || cand.it.role === 'slow_protein') {
           const mType = meals[cand.mi].type || '';
@@ -175,8 +200,14 @@ export function correctDayToTargets(
           const food = FOOD_DB.find(f => f.id === cand.it.id);
           const isPowder = food?.category === 'supplement';
           floor = isPowder ? 20 : (isMain ? 80 : 60);
+        } else if (cand.it.role === 'carb_slow' || cand.it.role === 'carb_fast') {
+          const mType = meals[cand.mi].type || '';
+          const isMain = ['breakfast', 'lunch', 'dinner'].includes(mType);
+          floor = isMain ? 50 : 30;
+        } else if (cand.it.role === 'fruit') {
+          floor = 30;
         }
-        const minAmount = isCore ? Math.max(floor, Math.round(cand.it.amount * 0.90 / curScale)) : Math.max(floor, 15);
+        const minAmount = isCore ? Math.max(floor, Math.round(cand.it.amount * minFactor / curScale)) : Math.max(floor, 15);
         // шаг — до 15% за итерацию
         const targetCutG = Math.min(cand.it.amount - minAmount, Math.ceil(Math.abs(need) / cand.per100 * 100 * 0.7));
         if (targetCutG < 5) continue;
@@ -215,7 +246,7 @@ export function correctDayToTargets(
           if (isCore) {
             const key = `${mi}:${it.id}`;
             const curScale = coreScale.get(key) ?? 1;
-            if (curScale >= 1.10) return; // ядро не выше 1.10
+            if (curScale >= maxCoreScale) return; // ядро не выше maxCoreScale
           }
           cands.push({ mi, ii, it, per100 });
         });
@@ -228,7 +259,7 @@ export function correctDayToTargets(
         const isCore = isCoreRecipeItem(meals[cand.mi], cand.it.id);
         const key = `${cand.mi}:${cand.it.id}`;
         const curScale = coreScale.get(key) ?? 1;
-        const maxAdd = isCore ? Math.round(cand.it.amount * (1.10 / curScale - 1)) : 150;
+        const maxAdd = isCore ? Math.round(cand.it.amount * (maxCoreScale / curScale - 1)) : 150;
         if (maxAdd < 5) continue;
         const needG = Math.ceil(need / cand.per100 * 100);
         let addG = Math.min(maxAdd, Math.max(10, Math.min(needG, 80)));
@@ -238,6 +269,13 @@ export function correctDayToTargets(
           addG = Math.max(0, 85 - currentNutGrams(meals));
           if (addG < 10) continue;
         }
+        // орехи/семена — только добивка 15г/приём
+        if (fam === 'nuts' || fam === 'seeds') {
+          const perItemCap = 15;
+          const maxByPerItem = perItemCap - cand.it.amount;
+          if (maxByPerItem <= 0) continue;
+          addG = Math.min(addG, maxByPerItem);
+        }
         const candFood = FOOD_DB.find(f => f.id === cand.it.id);
         if (candFood && currentFiber(meals) + (candFood.fiber || 0) * addG / 100 > 85) {
           const fiberRoom = 85 - currentFiber(meals);
@@ -246,10 +284,12 @@ export function correctDayToTargets(
           if (addG < 10) continue;
         }
         const newAmount = cand.it.amount + addG;
-        // капы: белок ≤300, фрукт ≤150, общие ≤600, зерно ≤ cap
+        // капы: белок ≤300, фрукт ≤150, клетчатка ≤10, общие ≤600
         let cap = 600;
-        if (eff === 'p' && (cand.it.role === 'protein' || cand.it.role === 'fast_protein' || cand.it.role === 'slow_protein')) cap = 300;
-        if (cand.it.role === 'fruit') cap = 150;
+        const isFiberSuppCap = candFood && candFood.category === 'supplement' && (candFood.fiber || 0) >= 30;
+        if (isFiberSuppCap) cap = 10;
+        else if (eff === 'p' && (cand.it.role === 'protein' || cand.it.role === 'fast_protein' || cand.it.role === 'slow_protein')) cap = 300;
+        else if (cand.it.role === 'fruit') cap = 150;
         if (newAmount > cap) continue;
         const beforeTotals = sumTotals(meals);
         const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
@@ -289,12 +329,15 @@ export function correctDayToTargets(
         grams = Math.min(grams, maxByFiber);
         if (grams < 15) break;
       }
+      // псиллиум и т.д. ≤10г — только добивка
+      const isFiberSuppBest = best.category === 'supplement' && (best.fiber || 0) >= 30;
+      if (isFiberSuppBest) grams = Math.min(grams, 10);
       // не выходить за 1.03× цели по этому макро
       const curMacro = eff === 'p' ? sumTotals(meals).p : eff === 'c' ? sumTotals(meals).c : sumTotals(meals).f;
       const maxMacro = (eff === 'p' ? safeTargets.p : eff === 'c' ? safeTargets.c : safeTargets.f) * 1.03;
       const over = curMacro + per100Best * grams / 100 - maxMacro;
       if (over > 0) grams = Math.max(0, grams - Math.ceil(over / per100Best * 100 / 10) * 10);
-      if (grams < 15) break;
+      if (grams < 10) break;
       // выбираем приём с минимальной долей ккал (недогруженный)
       let targetMeal = meals.filter(m => m.type !== 'presleep' && m.type !== 'intra' && m.type !== 'preworkout').reduce((a, b) => {
         const aShare = a.totals ? a.totals.kcal / Math.max(1, (a as any).target ? ((a as any).target.p * 4 + (a as any).target.c * 4 + (a as any).target.f * 9) : 500) : 0;

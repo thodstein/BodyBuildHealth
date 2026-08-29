@@ -936,10 +936,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const notes = [...rb.notes];
 
   // D4: единый корректор — после всех капов/ребелов доводим день до ≤3% по 4 осям.
-  // Ядро рецепта трогается только в крайнем случае (±10% кумулятивно), гибкие слоты — свободно.
+  // Ядро рецепта трогается только в крайнем случае (±15% кумулятивно), гибкие слоты — свободно.
   const needCorr = !rb.withinTolerance || rb.deviationPct > 3;
   if (needCorr) {
-    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 30 });
+    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 50 });
     const corrDev = corr.deviationPct;
     if (corrDev + 1e-9 < rb.deviationPct) {
       if (corr.withinTolerance) {
