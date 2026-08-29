@@ -29,9 +29,8 @@ import { calcBBPlanMetrics, type BBPlanMetrics } from '../../../engines/bb/bb-me
 import { buildBBMethodologySummary } from '../../../engines/bb/bb-report.engine';
 import { tempoExplain, buildExerciseInstructions } from '../../../engines/bb/bb-exercise-instructions.engine';
 import { analyzeProQuality } from '../../../engines/manual-constructor/pro-quality-analysis.engine';
-import { computeRegimeMrvMult, sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
+import { computeRegimeMrvMult, sessionLimitsFor, aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import { PlanFeedbackCard } from './PlanFeedbackCard';
-import { VolumeBudgetCard } from './VolumeBudgetCard';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { PATTERN_RU as SUMMARY_PATTERN_RU, SUBGROUP_MAP, SUBGROUP_LABEL_RU as SUMMARY_SUBGROUP_LABEL_RU } from '../../../engines/bb/bb-summary.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
@@ -4024,45 +4023,7 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
               </div>
             )}
-            {/* Volume & Frequency details */}
-            {safetyScore.details?.volumeDetails && (
-              <div style={{ padding:'0 12px 8px' }}>
-                <ExpandableCard
-                  title={`📊 MRV — ${safetyScore.details.volumeDetails.filter(v=>v.violation).length ? `${safetyScore.details.volumeDetails.filter(v=>v.violation).length} нарушений` : 'в норме'}`}
-                  icon="📊"
-                  short={`Допуск ×${safetyScore.details.volumeDetails[0]?.tolerance || 1.15} · ${safetyScore.details.volumeDetails.slice(0,4).map(v=> `${v.muscle} ${v.effectiveSets}/${v.allowed}${v.violation?'⚠':''}`).join(' · ')}`}
-                  full={
-                    <div style={{ display:'grid', gap:4 }}>
-                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:6 }}>Расчёт: effectiveSets (aggregateBBVolume) &gt; cap(mrvByMuscle||landmarks.mrv) × {safetyScore.details!.volumeDetails[0]?.tolerance || 1.15} → violation. Исключаем deload недели. Пиковая effective по мышце.</div>
-                      {safetyScore.details.volumeDetails.sort((a,b)=> (b.over||0)-(a.over||0)).slice(0,10).map(v=> (
-                        <div key={v.muscle} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'5px 8px', borderRadius:6, background: v.violation?'rgba(239,68,68,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${v.violation?'rgba(239,68,68,0.14)':'rgba(255,255,255,0.06)'}` }}>
-                          <span style={{ fontSize:11, fontWeight:700, color: v.violation?'#ef4444':'#fff' }}>{v.muscle}</span>
-                          <span style={{ fontSize:11, color:'#fff' }}>{v.effectiveSets} / {v.allowed} <span style={{ opacity:0.6, fontSize:10 }}>(cap {v.cap})</span>{v.violation && <span style={{ color:'#ef4444', fontWeight:800, marginLeft:6 }}>+{v.over} ⚠</span>}</span>
-                        </div>
-                      ))}
-                    </div>
-                  }
-                />
-              </div>
-            )}
-            {/* Frequency */}
-            {safetyScore.details?.frequencyDetails && safetyScore.details.frequencyDetails.some(f=>f.violation) && (
-              <div style={{ padding:'0 12px 8px' }}>
-                <ExpandableCard
-                  title={`🔁 Частота — ${safetyScore.details.frequencyDetails.filter(f=>f.violation).length} нарушений`}
-                  icon="🔁"
-                  short={safetyScore.details.frequencyDetails.filter(f=>f.violation).map(f=> `${f.muscle} ${f.days}/${f.required}`).join(' · ') || 'в норме'}
-                  full={
-                    <div style={{ display:'grid', gap:4 }}>
-                      <div style={{ fontSize:10, color:'#fff', opacity:0.6, padding:'4px 8px', background:'rgba(255,255,255,0.04)', borderRadius:6 }}>Малые мышцы (biceps/triceps/forearms/calves/abs) требуют ≥2×/нед, остальные ≥1×/нед. Низкая частота → объём концентрирован в одну сессию → выше утомление сустава.</div>
-                      {safetyScore.details.frequencyDetails.filter(f=>f.violation).map(f=> (
-                        <div key={f.muscle} style={{ padding:'5px 8px', borderRadius:6, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)', fontSize:11, color:'#fff' }}>{f.muscle}: {f.days} дней / {f.required} требуется ⚠</div>
-                      ))}
-                    </div>
-                  }
-                />
-              </div>
-            )}
+
             {/* All issues compact */}
             <div style={{ padding:'8px 12px', background:'rgba(0,0,0,0.12)', borderTop:'1px solid rgba(255,255,255,0.06)' }}>
               <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, marginBottom:4 }}>Все сигналы ({safetyScore.issues.length})</div>
@@ -4210,8 +4171,133 @@ export const BbAutoConstructor: React.FC = () => {
           )}
           <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Средний объём по мезо — в «Бюджете объёма», пик — здесь</div>
         </div>
-        {/* Бюджет объёма — единственный источник perMuscle (пиковая неделя) */}
-        {metrics && <VolumeBudgetCard metrics={metrics} mrvMultiplier={pedAdapt.combinedMrvMultiplier} />}
+        {/* 📊 Тренировочный объём — PRO (единственная карточка объёма, без дублей) */}
+        {metrics && (() => {
+          // — агрегаты по мезоциклу (все недели) для общего объёма
+          const totalAgg: Record<string, { direct:number; effective:number }> = {};
+          let totalDirectMeso = 0;
+          for (const w of W) {
+            const agg = aggregateBBVolume((w as any).sessions);
+            for (const [m, v] of Object.entries(agg as any)) {
+              if (!totalAgg[m]) totalAgg[m] = { direct:0, effective:0 };
+              totalAgg[m].direct += (v as any).directSets || 0;
+              totalAgg[m].effective += (v as any).effectiveSets || 0;
+            }
+            // totalDirectMeso — сумма прямых по неделе (без двойного учёта косвенного)
+            totalDirectMeso += Object.values(agg as any).reduce((s:number, vv:any)=> s + (vv.directSets||0), 0);
+          }
+          const totalWeeks = W.length || 1;
+          const avgWeeklyDirect = Math.round(totalDirectMeso / totalWeeks);
+          // пик-неделя уже в metrics (пиковая по effective)
+          const peakWeekDirect = metrics.totalSets;
+          const peakWeekEffective = Math.round(metrics.perMuscle.reduce((s,m)=> s + m.effectiveSets, 0));
+          // подгруппа спины (ширина/толщина) для пика и мезо
+          const backSubPeak: Record<string, number> = {};
+          const backSubTotal: Record<string, number> = {};
+          const peakIdx = (()=>{ let best=0, idx=0; W.forEach((w:any,i:number)=>{ const ts = (w.sessions as any[]).reduce((a:number,s:any)=> a + s.exercises.reduce((b:number,e:any)=> b + (e.sets||0),0),0); if(ts>best){best=ts; idx=i;}}); return idx; })();
+          const peakSessions = (W[peakIdx] as any)?.sessions || [];
+          for (const s of peakSessions) for (const e of (s as any).exercises) if (e.muscle==='back') { const sub=(e as any).backSubgroup||'back'; backSubPeak[sub]=(backSubPeak[sub]||0)+(e.sets||0); }
+          for (const w of W) for (const s of (w as any).sessions) for (const e of (s as any).exercises) if (e.muscle==='back') { const sub=(e as any).backSubgroup||'back'; backSubTotal[sub]=(backSubTotal[sub]||0)+(e.sets||0); }
+          const SUB_LABEL: Record<string,string> = { back_width:'ширина (латы)', back_thickness:'толщина (ромб/трап)', upper_back:'верх спины', traps:'трапеции', rear_delts:'задние дельты', erectors:'разгибатели' };
+          const GROUPS: Array<{ id:string; label:string; icon:string; muscles:string[] }> = [
+            { id:'chest', label:'Грудь', icon:'🧱', muscles:['chest'] },
+            { id:'back', label:'Спина', icon:'🦴', muscles:['back'] },
+            { id:'shoulders', label:'Плечи', icon:'🤸', muscles:['delt_front','delt_mid','delt_rear'] },
+            { id:'legs', label:'Ноги', icon:'🦵', muscles:['quads','hamstrings','glutes','calves'] },
+            { id:'arms', label:'Руки', icon:'💪', muscles:['biceps','triceps','forearms'] },
+            { id:'core', label:'Кор', icon:'🧘', muscles:['abs'] },
+          ];
+          const ru = (m:string)=> (MUSCLE_LABEL_RU as any)[m] || m;
+          const statusMeta: Record<string,{label:string;color:string}> = { below_mev:{label:'недотрен',color:'#60a5fa'}, optimal:{label:'оптимум',color:'#22c55e'}, approaching_mrv:{label:'около MRV',color:'#f59e0b'}, exceeding_mrv:{label:'перегруз',color:'#ef4444'} };
+          const order: Record<string,number> = { exceeding_mrv:0, approaching_mrv:1, below_mev:2, optimal:3 };
+          // сортировка внутри группы по статусу и объёму
+          return (
+            <div style={{ ...CARD, padding:0, overflow:'hidden', border:'1px solid rgba(0,230,138,0.22)', background:'rgba(6,22,18,0.42)', marginBottom:8 }}>
+              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.06))', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                  <span style={{ fontSize:12, fontWeight:900, color:'#fff' }}>📊 Тренировочный объём — PRO</span>
+                  <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'3px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.08)' }}>пик {peakWeekDirect} прям · {peakWeekEffective} эфф · среднее {avgWeeklyDirect}/нед · мезоцикл {totalDirectMeso} прям</span>
+                </div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.72, marginTop:4, lineHeight:1.35 }}>
+                  Пиковая неделя — максимум нагрузки · мезоцикл {totalWeeks} нед · прямой / косвенный / эффективный (с учётом вторичной работы) · подмышцы · частота · статус MEV/MAV/MRV
+                  {pedAdapt.combinedMrvMultiplier>1 && <span style={{ marginLeft:6, color:'#f59e0b', background:'rgba(245,158,11,0.10)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(245,158,11,0.18)' }}>MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span>}
+                </div>
+                <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap', fontSize:10, color:'#fff' }}>
+                  <span><span style={{ color:'#22c55e' }}>●</span> MEV минимум</span>
+                  <span><span style={{ color:'#f59e0b' }}>●</span> MAV оптимум</span>
+                  <span><span style={{ color:'#ef4444' }}>●</span> MRV максимум</span>
+                  <span style={{ opacity:0.6 }}>· пороги уже с учётом уровня, PED и восстановления</span>
+                </div>
+              </div>
+              <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
+                {GROUPS.map(g=>{
+                  const rows = g.muscles.map(mid=> metrics.perMuscle.find(mm=> mm.muscle===mid)).filter(Boolean) as any[];
+                  if (rows.length===0) return null;
+                  // сортировка внутри группы
+                  const sorted = [...rows].sort((a,b)=> (order[a.status]??9)-(order[b.status]??9) || b.effectiveSets - a.effectiveSets);
+                  return (
+                    <div key={g.id} style={{ border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, overflow:'hidden', background:'rgba(255,255,255,0.02)' }}>
+                      <div style={{ padding:'7px 10px', background:'rgba(255,255,255,0.03)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:6 }}>
+                        <span style={{ fontSize:12 }}>{g.icon}</span>
+                        <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{g.label}</span>
+                        <span style={{ fontSize:10, color:'#fff', opacity:0.6, marginLeft:'auto' }}>{sorted.length} мышцы</span>
+                      </div>
+                      <div style={{ display:'grid', gap:8, padding:'8px 10px' }}>
+                        {sorted.map((m:any)=>{
+                          const st = statusMeta[m.status] || statusMeta.optimal;
+                          const tot = totalAgg[m.muscle] || { direct:0, effective:0 };
+                          const indirectW = Math.max(0, Math.round((m.effectiveSets - m.directSets)*10)/10);
+                          const indirectT = Math.max(0, Math.round((tot.effective - tot.direct)*10)/10);
+                          const barMax = Math.max(m.mrv, m.effectiveSets, 1);
+                          const pct = (v:number)=> Math.max(0, Math.min(100, v/barMax*100));
+                          const тяжPct = m.totalSets>0 ? Math.round(m.тяжSets/m.totalSets*100) : 0;
+                          const isBack = m.muscle==='back';
+                          return (
+                            <div key={m.muscle} style={{ padding:'8px 9px', borderRadius:9, background:'rgba(0,0,0,0.14)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                                <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{ru(m.muscle)}</span>
+                                <span style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:20, background: st.color+'18', color: st.color, border:`1px solid ${st.color}22` }}>{st.label}</span>
+                              </div>
+                              <div style={{ marginTop:5, display:'flex', gap:6, flexWrap:'wrap', fontSize:10, color:'#fff', lineHeight:1.35 }}>
+                                <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }}>неделя: <b>{m.directSets}</b> прям · {indirectW} косв · <b>{m.effectiveSets}</b> эфф</span>
+                                <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }}>мезоцикл: {tot.direct} прям · {indirectT} косв · <b>{Math.round(tot.effective)}</b> эфф · средн. {Math.round(tot.effective/totalWeeks*10)/10}/нед</span>
+                              </div>
+                              <div style={{ position:'relative', height:10, borderRadius:5, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginTop:6 }}>
+                                <div style={{ position:'absolute', left:0, top:0, bottom:0, width: pct(m.effectiveSets)+'%', background: st.color, borderRadius:5, opacity:0.88 }} />
+                                <div title={`MEV ${m.mev}`} style={{ position:'absolute', left: pct(m.mev)+'%', top:-2, bottom:-2, width:2, background:'#22c55e' }} />
+                                <div title={`MAV ${m.mav}`} style={{ position:'absolute', left: pct(m.mav)+'%', top:-2, bottom:-2, width:2, background:'#f59e0b' }} />
+                                <div title={`MRV ${m.mrv}`} style={{ position:'absolute', left: pct(m.mrv)+'%', top:-2, bottom:-2, width:2, background:'#ef4444' }} />
+                              </div>
+                              <div style={{ display:'flex', justifyContent:'space-between', gap:8, fontSize:10, color:'#fff', marginTop:4, flexWrap:'wrap' }}>
+                                <span>MEV {m.mev} · MAV {m.mav} · MRV {m.mrv}</span>
+                                <span style={{ opacity:0.85 }}>{m.frequencyPerRotation}×/нед · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
+                              </div>
+                              <div style={{ fontSize:10, color: st.color, fontWeight:600, marginTop:4 }}>{(()=>{ const eff=m.effectiveSets; if(eff < m.mev) return `Недотрен: +${(m.mev - eff).toFixed(1)} эфф до MEV`; if(eff >= m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} эфф (выше MRV)`; if(eff > m.mav) return `Выше оптимума: ${m.mav}–${m.mrv}, можно держать или −${(eff - m.mav).toFixed(1)} до MAV`; if(eff < m.mav) return `Ниже оптимума: +${(m.mav - eff).toFixed(1)} эфф до MAV`; return 'Оптимум — в точке MAV'; })()}</div>
+                              {isBack && Object.keys(backSubPeak).length>0 && (
+                                <div style={{ marginTop:6, display:'grid', gap:4 }}>
+                                  <div style={{ fontSize:9, fontWeight:700, color:'#fff', opacity:0.6 }}>Подмышцы спины (пик / мезо):</div>
+                                  {Object.entries(backSubPeak).sort((a,b)=> (b[1] as number)-(a[1] as number)).slice(0,4).map(([sub, v])=> (
+                                    <div key={sub} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'3px 6px', borderRadius:6 }}>
+                                      <span>{SUB_LABEL[sub]||sub}</span>
+                                      <span>пик {v as number} · всего {backSubTotal[sub]||0} · средн. {Math.round((backSubTotal[sub]||0)/totalWeeks*10)/10}/нед</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize:9, color:'#fff', opacity:0.5, lineHeight:1.35, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>
+                  Прямой — сеты упражнений целевыми на мышцу · косвенный — от базы (жимы → трицепс/плечи, тяги → бицепс, приседы → ягодицы/бицепс бедра) · эффективный = прямой + косвенный · недельный — пиковая неделя, общий — сумма по всем неделям мезоцикла · статус по эффективному.
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {/* === Детальный анализ — перенесено из Step4, оптимизировано === */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
           {freqOptResult && freqOptResult.totalAdjustments > 0 && (
@@ -4259,60 +4345,101 @@ export const BbAutoConstructor: React.FC = () => {
             } />
           )}
         </div>
-                {/* Логика построения — ВСЕ пункты, без обрезки и EN-мусора */}
+                {/* 🧠 Логика построения — PRO (только нужное) */}
         {(() => {
-          const rationale = builtPlan.rationale || [];
-          if (rationale.length === 0) return null;
-          // Чистим EN-коды и технический мусор — полностью на русский, с привязкой к выбранным параметрам
-          const STRAT_RU_L: Record<string,string> = { double_progression:'двойная прогрессия', linear:'линейная', wave:'волновая', rpe_based:'RPE-авторегуляция', undulating:'волновая', block:'блочная' };
-          const clean = (r: string): string => {
-            let s = String(r || '');
-            s = s.replace(/double_progression|linear|wave|rpe_based|undulating|block/g, m => STRAT_RU_L[m] || m);
-            // Полная карта EN → RU для остатков rationale из движков
-            const MAP: Array<[RegExp,string]> = [
-              [/MEV coverage|Adaptive MEV/g, 'покрытие MEV'],
-              [/Experienced enhanced/g, 'опытный на курсе'],
-              [/Warmup activator/g, 'разминочная активация'],
-              [/back budget allocation/g, 'бюджет спины'],
-              [/direct residual volume after indirect overlap/g, 'остаточный прямой объём после косвенной нагрузки'],
-              [/Усталость и длительность budget:/g, 'Бюджет утомления:'],
-              [/Adaptive safety replacement/g, 'Замена по безопасности'],
-              [/Controlled rotation:/g, 'Контролируемая ротация:'],
-              [/S-MRV/g, 'С-MRV'],
-              [/Cross-mesocycle:/g, 'Межмезоцикл:'],
-              [/Per-muscle ACWR/g, 'Помышечный ACWR'],
-              [/Doнорское перераспределение/g, 'Донорское перераспределение'],
-              [/Due to|due to/g, 'из-за'],
-              [/volume/g, 'объём'],
-              [/sets/g, 'подходов'],
-              [/reps/g, 'повт'],
-              [/RIR/g, 'RIR'],
-              [/week/g, 'нед'],
-              [/day/g, 'день'],
-              [/exercise/g, 'упражнение'],
-              [/muscle/g, 'мышца'],
-              [/level/g, 'уровень'],
-              [/goal/g, 'цель'],
-              [/focus/g, 'фокус'],
-              [/methodology/g, 'методика'],
-              [/frequency/g, 'частота'],
-              [/intensity/g, 'интенсивность'],
-              [/recovery/g, 'восстановление'],
-            ];
-            for (const [re, ru] of MAP) s = s.replace(re, ru);
-            // Удаляем технический мусор, не несущий смысла для пользователя (оставляем факт)
-            s = s.replace(/MEV coverage|Adaptive MEV|Experienced enhanced|Warmup activator|back budget allocation|direct residual volume after indirect overlap/g, '');
-            s = s.replace(/\.\s*\./g, '.').replace(/\s{2,}/g, ' ').trim();
-            // Убираем остатки EN в скобках
-            s = s.replace(/\b[A-Z]{2,}\b/g, m => m.length<=3 ? m : m); // оставляем короткие аббр.
-            return s;
-          };
-          const shown = rationale.map(clean).filter(Boolean);
+          const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
+          const goalRu: Record<string,string> = { mass:'масса', cut:'сушка', recomp:'рекомпозиция', maintenance:'поддержание', strength_mass:'сила+масса', strength:'сила' };
+          const focusRu: Record<string,string> = { hypertrophy:'гипертрофия', strength:'сила', endurance:'выносливость' };
+          const methRu: Record<string,string> = { compound_first:'база → изоляция', pre_exhaust:'предутомление', post_exhaust:'пост-утомление', antagonistic:'антагонисты', giant_sets:'гигант-сеты' };
+          const volRu: Record<string,string> = { mev:'минимум (MEV)', mav:'оптимум (MAV)', mrv:'максимум (MRV)' };
+          const stratRu: Record<string,string> = { double_progression:'двойная', linear:'линейная', wave:'волновая', rpe_based:'RPE-регуляция', undulating:'волновая', block:'блочная' };
+          const totalW = builtPlan.weeks.length;
+          const phaseGroups: Record<string, number[]> = {};
+          for (const w of builtPlan.weeks) { const p = ((w as any).phase || 'accumulation') as string; if (!phaseGroups[p]) phaseGroups[p]=[]; phaseGroups[p].push(w.week); }
+          const phaseRu: Record<string,string> = { accumulation:'накопление', intensification:'интенсификация', deload:'разгрузка', peaking:'пик' };
+          const phaseText = Object.entries(phaseGroups).map(([p,ws])=> `${phaseRu[p]||p} ${ws.length} нед`).join(' · ');
+          const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
+          const scoreText = sel ? `${sel.score}/${Math.max(...ranked.map(r=>r.score),1)}` : '—';
+          const topAlt = ranked.slice(0,3).map(r=> `${r.pattern.name} ${r.score}`).join(' · ');
+          const injText = injuries.length ? injuries.map(i=> `${i.muscle}${i.exclude?' (искл.)':' (щадящ.)'}`).join(', ') : 'нет';
+          const mobText = mobilityRestrictions.length ? mobilityRestrictions.join(', ') : 'нет';
+          const equipText = bbEquipment.length ? bbEquipment.slice(0,4).join(', ') : 'всё доступно';
+          const specText = specTargets.length ? specTargets.join(' + ') : 'баланс';
+          const pedMult = (pedAdapt as any).combinedMrvMultiplier ?? 1;
+          const pedLabel = pedMult>1 ? `MRV ×${Number(pedMult).toFixed(2)} · ${peds.join(', ')||'курс'}` : 'натурал';
           return (
-            <div style={{ ...CARD, marginTop:8, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>🧠 Логика построения — почему план такой (все пункты)</div>
-              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                {shown.map((r,i) => <div key={i} style={{ marginBottom:3 }}>• {r}</div>)}
+            <div style={{ ...CARD, marginTop:8, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.38)' }}>
+              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(59,130,246,0.05))', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>🧠 Логика построения — PRO</div>
+                <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>Только ключевые решения — почему план именно такой для ваших параметров</div>
+              </div>
+              <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
+                {/* 1 вход */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase' }}>1 · Вход и цель</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    {[
+                      `уровень: ${levelRu[bbLevel]||bbLevel} (${bbTrainingYears} г)`,
+                      `цель: ${goalRu[bbGoal]||bbGoal}`,
+                      `фокус: ${focusRu[bbTrainingFocus]||bbTrainingFocus}`,
+                      `методика: ${methRu[bbMethodology]||bbMethodology}`,
+                      `объём: ${volRu[bbVolGoal]||bbVolGoal}${trainingVolumeMode==='high'?' · объёмный режим':''}`,
+                      `прогрессия: ${stratRu[loadStrategy]||loadStrategy} · RIR ${(getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir ?? '2–3'}→${(getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir ?? '1–2'}`,
+                    ].map((t,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>{t}</span>)}
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>
+                    Уровень задаёт капы подходов/упражнений и доступ к сложным техникам · цель меняет фазовый профиль (масса — больше накопления, сушка — ниже объём) · фокус меняет RIR/повторы/темп · методика — порядок упражнений в сессии.
+                  </div>
+                </div>
+                {/* 2 сплит */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#a78bfa', letterSpacing:0.3, textTransform:'uppercase' }}>2 · Сплит — почему выбран</div>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', padding:'4px 8px', borderRadius:8 }}>{builtPlan.pattern?.name || '—'} · {bbDays}×/нед · {totalW} нед</span>
+                    <span style={{ fontSize:11, fontWeight:700, color: (sel ? (Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.8 ? '#22c55e' : Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.6 ? '#f59e0b' : '#ef4444') : '#fff') }}>скор {scoreText}</span>
+                  </div>
+                  {sel && <div style={{ fontSize:10, color:'#fff', opacity:0.78, lineHeight:1.35 }}><b>Подходит из-за:</b> {sel.rationale.slice(0,2).join(' · ') || 'баланс по дням и уровню'}</div>}
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.62, lineHeight:1.35 }}>Альтернативы топ-3: {topAlt || '—'} · слабые: {weakPoints.join(', ')||'баланс'} · специализация: {specText}</div>
+                  {sel?.warnings?.length ? <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ {sel.warnings.slice(0,2).join(' · ')}</div> : null}
+                </div>
+                {/* 3 периодизация */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', letterSpacing:0.3, textTransform:'uppercase' }}>3 · Периодизация — как меняется нагрузка</div>
+                  <div style={{ display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                    {builtPlan.weeks.map(w=>{ const p = ((w as any).phase || 'accumulation') as BBPhase; return <div key={w.week} title={`Нед ${w.week}: ${phaseRu[p]||p}`} style={{ flex:1, background: PHASE_COLORS[p]||'#fff', opacity:0.9 }} />; })}
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}><b>Фазы:</b> {phaseText} · <b>RIR:</b> накопление {String((getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir || '2–3')} → интенсификация {String((getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir || '1–2')} · <b>темп:</b> {getPhaseConfig('accumulation', bbTrainingFocus as any).tempo} → {getPhaseConfig('intensification', bbTrainingFocus as any).tempo}</div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.62 }}>Прогрессия весов: {stratRu[loadStrategy]||loadStrategy} · делод: {DELOAD_PROTOCOLS[deloadType]?.description || deloadType} · DUP {dupMode} · суперсеты {supersetMode} · схемы {volumeScheme}</div>
+                </div>
+                {/* 4 объём-стратегия (кратко) */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', letterSpacing:0.3, textTransform:'uppercase' }}>4 · Объём и восстановление — стратегия</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    <span style={{ fontSize:10, color:'#fff', background: pedMult>1?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', border:`1px solid ${pedMult>1?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)'}`, padding:'3px 7px', borderRadius:20 }}>{pedLabel}</span>
+                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>лимиты {builtPlan.maxWorkingSets} сетов / {builtPlan.maxExercises} упр. · режим {sessionLimitsFor({onCourse: pedMult>1, level: bbLevel, trainingYears: bbTrainingYears, trainingVolumeMode} as any).weeklyWorkingSets} в неделю</span>
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>Детализация по мышцам — в карточке «Тренировочный объём» ниже: там прямой/косвенный, недельный и общий, подмышцы и статус MEV/MAV/MRV.</div>
+                </div>
+                {/* 5 приоритеты */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#ec4899', letterSpacing:0.3, textTransform:'uppercase' }}>5 · Приоритеты</div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.45 }}>
+                    <div><b>Слабые:</b> {weakPoints.length? weakPoints.join(' · ') : 'баланс — без акцента'}</div>
+                    <div><b>Специализация:</b> {specText}{specTargets.length? ` · блоки: ${specTargets.length} (по ${Math.round(bbWeeks/Math.max(1,specTargets.length))} нед)` : ''}</div>
+                    {builtPlan.rationale?.some((r:string)=> /специализ|донор/i.test(r)) && <div style={{ opacity:0.75, marginTop:2 }}>Донорское перераспределение сохраняет косвенную нагрузку до MEV — прямой объём донора снижается, целевой растёт.</div>}
+                  </div>
+                </div>
+                {/* 6 безопасность */}
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ fontSize:10, fontWeight:800, color:'#ef4444', letterSpacing:0.3, textTransform:'uppercase' }}>6 · Безопасность</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    <span style={{ fontSize:10, color:'#fff', background: injuries.length?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', border:`1px solid ${injuries.length?'rgba(239,68,68,0.18)':'rgba(34,197,94,0.16)'}`, padding:'3px 7px', borderRadius:20 }}>травмы: {injText}</span>
+                    <span style={{ fontSize:10, color:'#fff', background: mobilityRestrictions.length?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>мобильность: {mobText}</span>
+                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>оборудование: {equipText}</span>
+                    {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
+                    {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
+                  </div>
+                </div>
               </div>
             </div>
           );
