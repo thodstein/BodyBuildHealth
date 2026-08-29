@@ -12,6 +12,9 @@ import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '
 import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { buildWLMeetPlan, wlAttemptRationale } from '../../../engines/strength-sport/strength-sport-attempts.engine';
 import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
+import { syncStrengthAnnualToGeneral } from '../../../engines/strength-sport/strength-sport-annual-bridge';
+import { estimate1RMFromVelocitySS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { assessPedRisk } from '../../../engines/ped-risk-matrix';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -51,6 +54,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
+  const [vbtMap, setVbtMap] = useState<Record<string, number>>({});
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -208,7 +212,8 @@ export const StrengthSportConstructor: React.FC = () => {
       const ann = competitionDate ? buildAnnualWithTaper(hist, { competitionDate, taperWeeks: 1 }) : buildAnnualFromSS(hist);
       saveAnnualSS(ann);
       setAnnual(ann);
-      // PRO: синк с общим годовым планом (he_annual_training_plan_v1) — bridge без мутации чужого движка
+      // PRO: полная синк с общим годовым планом (MANUAL блоки)
+      try { syncStrengthAnnualToGeneral(ann); } catch {}
       try {
         localStorage.setItem('he_strength_annual_sync_v1', JSON.stringify({ updatedAt: new Date().toISOString(), totalWeeks: ann.totalWeeks, blocks: ann.blocks.map(b=> ({ startWeek: b.startWeek, weeks: b.weeks, mode: b.mode })) }));
         window.dispatchEvent(new CustomEvent('he-strength-annual-updated', { detail: ann }));
@@ -529,6 +534,27 @@ export const StrengthSportConstructor: React.FC = () => {
               </div>
             ) : null;
           })()}
+          {/* PRO: PED риски 7 систем */}
+          {(() => {
+            const snap: any = plan.inputSnapshot || {};
+            const hasPED = (Array.isArray(snap.peds) && snap.peds.length > 0) || (snap.pedDoses && Object.keys(snap.pedDoses).length > 0);
+            if (!hasPED) return null;
+            try {
+              const doses: any[] = [];
+              for (const id of snap.peds || []) doses.push({ id, mgPerWeek: Number(snap.pedDoses?.[id] ?? 500) });
+              for (const [k,v] of Object.entries(snap.pedDoses || {})) if (!snap.peds?.includes(k)) doses.push({ id:k, mgPerWeek: Number(v)||0 });
+              const r = assessPedRisk(doses as any, 'medium');
+              return (
+                <div style={{ background: 'rgba(239,68,68,0.10)', padding: 8, borderRadius: 8, border: '1px solid rgba(239,68,68,0.25)', color: '#fff', fontSize: 11 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ PED риски 7 систем (дозозависимо):</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10 }}>
+                    <span>Нейро: {r.neuroRisk}</span><span>Суставы: {r.jointsRisk}</span><span>Гемато: {r.hematoRisk}</span><span>Печень: {r.hepaticRisk}</span><span>Кардио: {r.cardioRisk}</span><span>Почки: {r.renalRisk}</span><span>Репро: {r.reproductiveRisk}</span>
+                  </div>
+                  {r.triggeredBy.length>0 && <div style={{ opacity:0.7, fontSize:10, marginTop:4 }}>{r.triggeredBy.slice(0,3).join(' · ')}</div>}
+                </div>
+              );
+            } catch { return null; }
+          })()}
           {plan.validation?.warnings.map((w,i) => <div key={i} style={{ color: '#f59e0b', fontSize: 11 }}>⚠ {w}</div>)}
           <div style={{ background: 'rgba(255,255,255,0.04)', padding: 8, borderRadius: 8 }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>Карта качества (подъёмы/нед vs MEV/MAV/MRV):</div>
@@ -610,6 +636,8 @@ export const StrengthSportConstructor: React.FC = () => {
                             ×
                             <input aria-label={`RIR сет ${si+1}`} type="number" value={s.rir} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{width:28, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
                             RIR ({10 - s.rir} RPE)
+                            <input aria-label={`скорость сет ${si+1}`} type="number" step="0.05" placeholder="м/с" value={vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`] ?? ''} onChange={e=> { const v=parseFloat(e.target.value); const k=`${wk.week}-${sess.day}-${ex.id}-${si}`; setVbtMap(m=> ({...m, [k]: Number.isFinite(v)?v:0})); }} style={{width:44, padding:'1px 2px', fontSize:9, background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:3}} />
+                            {(() => { const v=vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`]; if(!v||v<=0) return null; const e1=estimate1RMFromVelocitySS(s.weight, v, ex.id); return e1? <span style={{ fontSize:8, opacity:0.6 }}>e1RM {Math.round(e1)}кг</span>:null; })()}
                           </span>
                         ))}
                       </div>

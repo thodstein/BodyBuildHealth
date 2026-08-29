@@ -179,6 +179,35 @@ export const STRENGTH_SPORT_PATTERNS: StrengthSportPattern[] = [
     level: ['intermediate', 'advanced', 'enhanced'],
     description: 'Рывок / Толчок / Присед / Ивенты.',
   },
+  // ——— ROLLING (как BB 3/1) ———
+  {
+    id: 'wl_rolling_3_1',
+    name: 'ТА Rolling 3/1',
+    mode: 'weightlifting',
+    rotationDays: 4, sessionsPerRotation: 3,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'snatch_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'clean_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'strength_day' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['intermediate', 'advanced', 'enhanced'],
+    description: 'Rolling 3/1: 3 тяж → 1 отдых → циклом, без привязки к неделе.',
+  },
+  {
+    id: 'sm_rolling_3_1',
+    name: 'Стронг Rolling 3/1',
+    mode: 'strongman',
+    rotationDays: 4, sessionsPerRotation: 3,
+    schedule: [
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'overhead_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'deadlift_day' },
+      { kind: 'тренировка', character: 'тяж', sessionTag: 'event_day' },
+      { kind: 'отдых', character: null },
+    ],
+    level: ['intermediate', 'advanced', 'enhanced'],
+    description: 'Rolling 3/1 для стронга — ивенты каждые 4 дня.',
+  },
 ];
 
 export function getStrengthSportPattern(id: string): StrengthSportPattern | undefined {
