@@ -135,7 +135,7 @@ export const SESSION_TAG_RU: Record<string, string> = { snatch_day: 'Рывок'
 export function ruLabel(map: Record<string, string>, k: string) { return (map as any)[k] ?? k; }
 
 // ─── Компоненты ───
-export const SectionCard: React.FC<{ id?: string; title?: React.ReactNode; icon?: string; right?: React.ReactNode; accent?: boolean; strong?: boolean; hint?: string; children: React.ReactNode }> = ({ id, title, icon, right, accent, strong, hint, children }) => {
+export const SectionCard: React.FC<{ id?: string; title?: React.ReactNode; subtitle?: string; icon?: string; right?: React.ReactNode; accent?: boolean; strong?: boolean; hint?: string; children: React.ReactNode }> = ({ id, title, subtitle, icon, right, accent, strong, hint, children }) => {
   const base = strong ? CARD_STRONG : accent ? CARD_ACCENT : CARD;
   return (
     <div style={base} id={id}>
@@ -143,7 +143,10 @@ export const SectionCard: React.FC<{ id?: string; title?: React.ReactNode; icon?
       {title != null && (
         <div style={ROW}>
           {icon && <span style={{ width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: strong ? 'linear-gradient(135deg,#f59e0b,#ef4444)' : accent ? 'linear-gradient(135deg,#00e68a,#0ea5e9)' : 'rgba(255,255,255,0.06)', border: strong || accent ? 'none' : '1px solid rgba(255,255,255,0.07)', fontSize: 14, flexShrink: 0 }}>{icon}</span>}
-          <span style={{ fontSize: 13, fontWeight: 900, color: '#fff', letterSpacing: -0.2, flex: 1 }}>{title}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: '#fff', letterSpacing: -0.2 }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 11, color: TEXT_3, lineHeight: 1.2, marginTop: 1 }}>{subtitle}</div>}
+          </div>
           {right}
         </div>
       )}

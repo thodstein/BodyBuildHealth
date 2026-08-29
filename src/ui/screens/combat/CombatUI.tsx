@@ -177,12 +177,13 @@ export function ruLabel(map: Record<string, string>, key: string | undefined | n
 export const SectionCard: React.FC<{
   id?: string;
   title?: React.ReactNode;
+  subtitle?: string;
   icon?: string;
   right?: React.ReactNode;
   accent?: boolean;
   hint?: string;
   children: React.ReactNode;
-}> = ({ id, title, icon, right, accent, hint, children }) => (
+}> = ({ id, title, subtitle, icon, right, accent, hint, children }) => (
   <div style={accent ? CARD_ACCENT : CARD} id={id}>
     {/* верхняя светлая линия */}
     <div style={{ position: 'absolute', top: 0, left: 14, right: 14, height: 1, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)' }} />
@@ -196,7 +197,10 @@ export const SectionCard: React.FC<{
             fontSize: 14, flexShrink: 0,
           }}>{icon}</span>
         )}
-        <span style={{ fontSize: 13, fontWeight: 900, color: '#fff', letterSpacing: -0.2, flex: 1 }}>{title}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: '#fff', letterSpacing: -0.2 }}>{title}</div>
+          {subtitle && <div style={{ fontSize: 11, color: TEXT_3, lineHeight: 1.2, marginTop: 1 }}>{subtitle}</div>}
+        </div>
         {right}
       </div>
     )}
