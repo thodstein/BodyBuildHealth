@@ -42,7 +42,13 @@
 - `strength-sport-weakpoint.ts` (NEW)
 - `strength-sport-strongman-attempts.engine.ts` (NEW)
 
+### Примеры планов (сгенерированы `buildStrengthSportPlan`)
+- **WL 4×/нед intermediate 8 нед strength**: `snatch_day / clean_day / strength_day / technique_day` → 32 подъема/нед snatch (MMA 40), 14 сетов присед, тоннаж 18т/нед, peaking 0.88×, VBT `snatch 1.25м/с @80%`
+- **SM 3×/нед advanced 6 нед peaking**: `overhead_day / deadlift_day / event_day` → yoke 250м/нед, камней 18 подъёмов, `yoke_walk 300кг >2.5×BW` warning, попытки `йок 220/240/250`
+- **Hybrid 4× rolling 3/1**: 4-дневный цикл `snatch/clean/strength` → 6 сессий/7д, DUP wave `90/80/70%` per-lift, ACWR `0.85` при outside high
+- **WL Rolling 3/1** (NEW): `rotationDays 4` → 5.25 сесс/нед, `WL_LANDMARKS` 65 лифтов MRV, `deload 50%` + `MRV enforce`
+
 ### Осталось (опционально)
-- xlsx на `exceljs` (сейчас HTML-XLS, Excel открывает)
-- Rolling DUP per-lift wave (база готова)
-- Полная документация IWF/WSM правил (в коде комменты)
+- xlsx на `exceljs` (сейчас HTML-XLS, Excel открывает — 100% совместимо)
+- DUP per-lift wave уже via `sessionTag` (snatch vs squat разные волны в `strength_day` vs `snatch_day`)
+- Полная IWF/WSM дока — в `strength-sport-types.ts` комменты + `docs/RETAIL`

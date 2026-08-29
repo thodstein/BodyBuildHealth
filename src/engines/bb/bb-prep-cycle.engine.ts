@@ -816,6 +816,14 @@ export function buildPrepProgression(prepPlan: BBContestPrepPlan, cfg: PrepCycle
  *  снижение — только в финальном тапере (последние недели). Это НЕ режущий каскад с 1-й недели.
  *  Ориентир: 10–15 сетов/группу/нед × атлет-масштаб (Helms; Schoenfeld 2021; da Silveira 2025). */
 export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVolumePlan {
+  // Short cycle 4-6 нед → linear без final_preparation каскада (ISSA PRO: короткий цикл = без двойной резки)
+  if (prepWeeks <= 3) {
+    const deficitMult = prepDeficitMult(cfg);
+    const athleteMult = prepAthleteMult(cfg);
+    const recoveryMult = prepRecoveryMult(cfg);
+    const phases: PrepVolumePhase[] = [{ fromPct:0, toPct:1, volumeMult: clamp(deficitMult*athleteMult*recoveryMult,0.95,1.0), rir:[1,2] }];
+    return { phases, deficitMult, athleteMult, recoveryMult, targetSetsPerMusclePerWeek:[10,15] as [number,number], scaledTargetSetsPerMusclePerWeek:[Math.round(10*athleteMult),Math.round(15*athleteMult)] as [number,number], note:`shortCycle 4-6 нед: linear ×1.0 (без final каскада)` };
+  }
   const deficitMult = prepDeficitMult(cfg);
   const athleteMult = prepAthleteMult(cfg);
   const recoveryMult = prepRecoveryMult(cfg);

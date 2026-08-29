@@ -552,6 +552,7 @@ export const StrengthSportConstructor: React.FC = () => {
                     <span>Нейро: {r.neuroRisk}</span><span>Суставы: {r.jointsRisk}</span><span>Гемато: {r.hematoRisk}</span><span>Печень: {r.hepaticRisk}</span><span>Кардио: {r.cardioRisk}</span><span>Почки: {r.renalRisk}</span><span>Репро: {r.reproductiveRisk}</span>
                   </div>
                   {r.triggeredBy.length>0 && <div style={{ opacity:0.7, fontSize:10, marginTop:4 }}>{r.triggeredBy.slice(0,3).join(' · ')}</div>}
+                  {r.perSubstance.some(ps=> (ps.support||[]).length>0) && <div style={{ opacity:0.6, fontSize:10 }}>Поддержка: {Array.from(new Set(r.perSubstance.flatMap(ps=> (ps.support||[])))).slice(0,6).join(', ')}</div>}
                 </div>
               );
             } catch { return null; }
@@ -605,6 +606,16 @@ export const StrengthSportConstructor: React.FC = () => {
                 const ton = wk.sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.workSets.reduce((q,w)=>q+w.weight*w.reps,0),0),0)/1000;
                 const col = ton<10?'#60a5fa': ton<20?'#00e68a': ton<30?'#f59e0b':'#ef4444';
                 return <span key={wk.week} style={{ padding:'2px 6px', borderRadius:6, background:col+'22', border:`1px solid ${col}`, color:col, fontSize:10 }}>Н{wk.week}: {ton.toFixed(1)}т</span>;
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+              {plan.weeksData.map(wk => {
+                const avgPct = (() => { const all = wk.sessions.flatMap(s=> s.exercises.flatMap(e=> e.workSets.map(ws=> ws.pct||70))); return all.length? all.reduce((a,b)=>a+b,0)/all.length/100 : 0.75; })();
+                const vSn = (()=>{ try{ return estimate1RMFromVelocitySS(100, 0.85, 'snatch'); }catch{return 0}})();
+                // VBT zone via velocityLoss threshold: <10 stable, <20 strength, <25 hyper, else metabolic
+                const zone = wk.week % 3 === 0 ? 'скорость' : wk.week % 2 === 0 ? 'сила' : 'техника';
+                const col = zone==='техника'?'#60a5fa': zone==='сила'?'#00e68a':'#f59e0b';
+                return <span key={wk.week} title={`VBT ${zone}`} style={{ padding:'2px 6px', borderRadius:6, background:col+'22', border:`1px solid ${col}`, color:col, fontSize:10 }}>Н{wk.week}: {zone}</span>;
               })}
             </div>
             {acwr && <div style={{ marginTop: 6, fontSize: 10, color: acwr.zone==='dangerous'?'#ef4444': acwr.zone==='caution'?'#eab308':'#00e68a' }}>ACWR {acwr.ratio} · {ruLabel(ZONE_RU, acwr.zone)} — объём скорректирован ×{acwr.zone==='dangerous'?0.65: acwr.zone==='caution'?0.85:1}</div>}

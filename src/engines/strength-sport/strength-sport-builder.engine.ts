@@ -481,10 +481,9 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     const deload = phase === 'deload';
     const sessions: StrengthSportSession[] = [];
     let absoluteDay = 0;
-    // идём по ротации по дням недели (7 дней), берём pattern.schedule циклично
-    // Упростим: pattern уже 7 дней — берём 0..6
+    // PRO: поддержка rolling (rotationDays 4) → modulo, иначе 7
     for (let d = 0; d < 7; d++) {
-      const slot = (pattern as StrengthSportPattern).schedule[d];
+      const slot = (pattern as StrengthSportPattern).schedule[d % (pattern as StrengthSportPattern).rotationDays];
       if (!slot || slot.kind !== 'тренировка') continue;
       const tag = slot.sessionTag || 'strength_day';
       const character = slot.character as any;
