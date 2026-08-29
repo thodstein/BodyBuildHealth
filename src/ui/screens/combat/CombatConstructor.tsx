@@ -320,7 +320,7 @@ export const CombatConstructor: React.FC = () => {
     if(!annual || !competitionName || !competitionDate) { setMsg('Укажите название и дату боя'); return; }
     const ann = loadAnnualCB();
     if(!ann) return;
-    const next = addCompetitionToAnnual(ann, { id: `comp_${Date.now()}`, name: competitionName, date: competitionDate, weightClass: competitionWeight || undefined } as any);
+    const next = addCompetitionToAnnual(ann, { id: `comp_${Date.now()}`, name: competitionName, date: competitionDate, weightClass: competitionWeight || undefined } as any, startDate || null);
     saveAnnualCB(next); setAnnual(next); setMsg('Бой добавлен в годовой: ' + competitionName);
     setCompetitionName(''); setCompetitionDate(''); setCompetitionWeight('');
   };

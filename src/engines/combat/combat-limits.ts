@@ -3,9 +3,12 @@
  */
 export function sessionLimitsForCombat(level: string, onCourse?: boolean): { maxSets: number; maxExercises: number; perExerciseCap: number } {
   let maxSets: number; let maxExercises: number;
-  if (level === 'enhanced' || onCourse) { maxSets = 30; maxExercises = 10; }
-  else { maxSets = 22; maxExercises = 8; }
-  const perExerciseCap = 5;
+  const lvl = (level||'intermediate').toLowerCase();
+  if (lvl === 'enhanced' || onCourse) { maxSets = 30; maxExercises = 10; }
+  else if (lvl === 'advanced') { maxSets = 26; maxExercises = 9; }
+  else if (lvl === 'intermediate') { maxSets = 22; maxExercises = 8; }
+  else { maxSets = 18; maxExercises = 6; } // beginner
+  const perExerciseCap = lvl === 'beginner' ? 4 : 5;
   return { maxSets, maxExercises, perExerciseCap };
 }
 export function validateSyncCombat(plan: any): string[] {

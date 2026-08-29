@@ -21,33 +21,34 @@ export function buildAnnualFromCB(plans: CombatPlan[]): AnnualCB {
   });
   for(let i=0;i<blocks.length;i++){ blocks[i].startWeek=w; w+=blocks[i].weeks; }
   const disc = plans[0]?.discipline || 'mma';
-  return { id:`ann_cb_${Date.now()}`, totalWeeks:w-1, discipline: disc, blocks, competitions:[], createdAt:new Date().toISOString() };
+  const tot = w-1;
+  return { id:`ann_cb_${disc}_${tot}_${plans.length}`, totalWeeks:tot, discipline: disc, blocks, competitions:[], createdAt:new Date().toISOString() };
 }
 
 // ATR 10нед: 5 Accum /3 Trans /2 Real (+ transition 2-4нед после главного)
 export function buildAnnualATR(discipline: string, totalWeeks = 52, startDate?: string | null): AnnualCB {
   const tw = Math.max(8, Math.min(52, Math.round(totalWeeks)));
-  // пропорции ATR 50/30/20
+  // пропорции ATR 50/30/20 — используем largest remainder как в periodization
   const accum = Math.round(tw * 0.5);
   const trans = Math.round(tw * 0.3);
-  const real = tw - accum - trans;
+  const real = Math.max(1, tw - accum - trans);
   const blocks: AnnualCBBlock[] = [
-    { id:`atr_acc_${Date.now()}`, startWeek:1, weeks:accum, discipline, phase:'accumulation', status:'planned' },
-    { id:`atr_trans_${Date.now()+1}`, startWeek:accum+1, weeks:trans, discipline, phase:'transmutation', status:'planned' },
-    { id:`atr_real_${Date.now()+2}`, startWeek:accum+trans+1, weeks:real, discipline, phase:'realization', status:'planned' },
+    { id:`atr_acc_${discipline}_${tw}`, startWeek:1, weeks:accum, discipline, phase:'accumulation', status:'planned' },
+    { id:`atr_trans_${discipline}_${tw}`, startWeek:accum+1, weeks:trans, discipline, phase:'transmutation', status:'planned' },
+    { id:`atr_real_${discipline}_${tw}`, startWeek:accum+trans+1, weeks:real, discipline, phase:'realization', status:'planned' },
   ];
   // если 52 нед — добавляем transition 2 нед в конце для восстановления (как в Performance MMA)
   if (tw >= 40) {
     const transWeeks = 2;
     // урезаем realization на 2 для transition
     blocks[2].weeks = Math.max(1, blocks[2].weeks - transWeeks);
-    blocks.push({ id:`atr_transit_${Date.now()+3}`, startWeek: tw - transWeeks + 1, weeks: transWeeks, discipline, phase:'transition', status:'planned' });
+    blocks.push({ id:`atr_transit_${discipline}_${tw}`, startWeek: tw - transWeeks + 1, weeks: transWeeks, discipline, phase:'transition', status:'planned' });
     // пересчёт startWeek
     let cur=1; for(const b of blocks){ b.startWeek=cur; cur+=b.weeks; }
   } else {
     let cur=1; for(const b of blocks){ b.startWeek=cur; cur+=b.weeks; }
   }
-  return { id:`ann_atr_${Date.now()}`, totalWeeks: tw, discipline, blocks, competitions:[], createdAt:new Date().toISOString() };
+  return { id:`ann_atr_${discipline}_${tw}`, totalWeeks: tw, discipline, blocks, competitions:[], createdAt:new Date().toISOString() };
 }
 
 export function annualCBPhaseForWeek(annual: AnnualCB | null, week: number): AnnualCBPhase | null {
@@ -56,12 +57,13 @@ export function annualCBPhaseForWeek(annual: AnnualCB | null, week: number): Ann
   return null;
 }
 
-export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetition): AnnualCB {
+export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetition, startDate?: string | null): AnnualCB {
   const next: AnnualCB = { ...annual, competitions: [...annual.competitions, comp], updatedAt: new Date().toISOString(), blocks: annual.blocks.map(b=> ({...b})) } as AnnualCB;
   try {
     const d = new Date(comp.date).getTime();
-    const start = Date.now();
-    const w = Math.floor((d - start)/ (7*86400000)) +1;
+    // детерм: если передан startDate — считаем от него, иначе от сегодня (fallback)
+    const startRef = startDate ? new Date(startDate).getTime() : Date.now();
+    const w = Math.floor((d - startRef)/ (7*86400000)) +1;
     if (w>=1 && w<=annual.totalWeeks) {
       // P1-5: вставляем taper-блок 2нед перед боем (w-1..w) если влезает
       if (w >= 2 && w <= annual.totalWeeks) {
@@ -100,9 +102,13 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
 
 export function buildAnnualPrintHtml(annual: AnnualCB): string {
   const esc = (s:string)=> s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const rows = annual.blocks.map(b=> `<tr><td>${b.startWeek}-${b.startWeek+b.weeks-1}</td><td>${esc(b.phase)}</td><td>${esc(b.discipline)}</td><td>${b.weeks}нед</td><td>${b.status}</td><td>${b.fightDate? esc(b.fightDate):''}</td></tr>`).join('');
+  const phaseColor: Record<string,string> = { accumulation:'#3b82f6', transmutation:'#a855f7', realization:'#ef4444', transition:'#f59e0b', gpp:'#10b981', power:'#f97316', taper:'#06b6d4', deload:'#eab308', conjugate:'#6366f1' };
+  const rows = annual.blocks.map(b=>{
+    const col = phaseColor[b.phase] || '#6b7280';
+    return `<tr style="background:${col}14; border-left:4px solid ${col}"><td>${b.startWeek}-${b.startWeek+b.weeks-1}</td><td><span style="background:${col};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px">${esc(b.phase)}</span></td><td>${esc(b.discipline)}</td><td>${b.weeks}нед</td><td>${b.status}</td><td>${b.fightDate? esc(b.fightDate):''}</td></tr>`;
+  }).join('');
   const comps = annual.competitions.map(c=> `<li>${esc(c.name)} — ${esc(c.date)} ${c.weightClass? '('+esc(c.weightClass)+')':''}</li>`).join('');
-  return `<html><head><meta charset="utf-8"><title>Годовой план ${esc(annual.discipline)} ${annual.totalWeeks}нед</title></head><body><h1>${esc(annual.discipline.toUpperCase())} · ${annual.totalWeeks}нед · ATR</h1><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th>Недели</th><th>Фаза</th><th>Дисциплина</th><th>Длит.</th><th>Статус</th><th>Бой</th></tr>${rows}</table><h3>Соревнования (${annual.competitions.length})</h3><ul>${comps||'<li>нет</li>'}</ul></body></html>`;
+  return `<html><head><meta charset="utf-8"><title>Годовой план ${esc(annual.discipline)} ${annual.totalWeeks}нед</title><style>body{font-family:Inter,Arial,sans-serif;padding:16px}table th{background:#f3f4f6} h1{margin:0 0 8px}</style></head><body><h1>${esc(annual.discipline.toUpperCase())} · ${annual.totalWeeks}нед · ATR</h1><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th>Недели</th><th>Фаза</th><th>Дисциплина</th><th>Длит.</th><th>Статус</th><th>Бой</th></tr>${rows}</table><h3>Соревнования (${annual.competitions.length})</h3><ul>${comps||'<li>нет</li>'}</ul></body></html>`;
 }
 
 export function buildAnnualIcs(annual: AnnualCB, startDate?: string | null): string {

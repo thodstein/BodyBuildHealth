@@ -8,12 +8,15 @@ function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').rep
 function escCsv(v: any): string { const s = String(v ?? ''); if (/[",\n;]/.test(s)) return `"${s.replace(/"/g,'""')}"`; return s; }
 
 export function buildCombatPrintHtml(plan: CombatPlan): string {
+  const phaseColor: Record<string,string> = { accumulation:'#3b82f6', transmutation:'#a855f7', realization:'#ef4444', transition:'#f59e0b', gpp:'#10b981', power:'#f97316', taper:'#06b6d4', deload:'#eab308', conjugate:'#6366f1' };
   const weeks = plan.weeksData.map(w => {
+    const col = phaseColor[w.phase] || '#a855f7';
     const sessRows = w.sessions.map(s => {
       const exRows = s.exercises.map(e => `<tr><td>${escHtml(e.name)}</td><td>${e.sets}×${escHtml(e.reps)}</td><td>${e.weight}кг</td><td>RIR${e.rir}</td><td>${escHtml(e.tempo||'')}</td><td>${e.restSeconds||''}с</td><td>${escHtml(e.comment||'')}</td></tr>`).join('');
       return `<h4>День ${s.day} · ${escHtml(s.sessionTag)} · ${escHtml(s.character)} · ${s.durationMin||''} мин</h4><table border="1" cellpadding="4" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:11px"><tr><th>Упражнение</th><th>Сеты×Повт</th><th>Вес</th><th>RIR</th><th>Темп</th><th>Отдых</th><th>Коммент</th></tr>${exRows}</table>`;
     }).join('');
-    return `<h3>Неделя ${w.week} · ${escHtml(w.phase)}${w.deload?' · делод':''}${(w as any).taper?' · тапер':''} · ${w.totalSets||0} сетов${(w as any).totalTonnage?` · ${((w as any).totalTonnage/1000).toFixed(1)}т`:''}</h3>${sessRows}`;
+    const bg = col + '14';
+    return `<div style="background:${bg};border-left:4px solid ${col};padding:8px;margin:8px 0;border-radius:6px"><h3 style="margin:0 0 6px;color:${col}">Неделя ${w.week} · ${escHtml(w.phase)}${w.deload?' · делод':''}${(w as any).taper?' · тапер':''} · ${w.totalSets||0} сетов${(w as any).totalTonnage?` · ${((w as any).totalTonnage/1000).toFixed(1)}т`:''}</h3>${sessRows}</div>`;
   }).join('<hr/>');
   const cond = (plan as any).conditioning ? `<h3>Кондиция (3 системы)</h3><pre>${escHtml(JSON.stringify((plan as any).conditioning,null,2))}</pre>` : '';
   const sparr = (plan.inputSnapshot as any)?.sparringLoad ? `<p><b>Спарринг:</b> hard ${(plan.inputSnapshot as any).sparringLoad.hardSparSessions}× / tech ${(plan.inputSnapshot as any).sparringLoad.techSparSessions}× / борьба ${(plan.inputSnapshot as any).sparringLoad.wrestlingSessions}×</p>` : '';
