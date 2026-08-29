@@ -10,7 +10,7 @@ import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadW
 import { isTaperByFightDate, taperVolumeMultiplier, buildTaperRationale } from './combat-taper.engine';
 import { weightCutVolumeMultiplier, weightCutNutritionForWeek, weightCutRehydrationNotes, buildWeightCutProtocol, weightCutPhaseForWeek } from './combat-weight-cut.engine';
 import { buildConditioningRationale, conditioningSessionsForWeek } from './combat-conditioning.engine';
-import { filterByTierCB, filterByInjuryCB, selectDiverseCB } from './combat-selection';
+import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB } from './combat-selection';
 import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
@@ -323,7 +323,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       const primaryCount = effectiveCharacter === 'тяж' ? 3 : 2;
       const total = 5;
       const favSet = new Set((input.favoriteExercises || []).map(s=>s.toLowerCase()));
-      const chosen = selectDiverseCB(pool, tag, total, favSet);
+      let chosen = selectDiverseCB(pool, tag, total, favSet);
+      // methodology ordering: compound_first/post_exhaust → tier1 first, pre_exhaust → tier2+ first (изоляция перед базой)
+      if (input.methodology === 'pre_exhaust') {
+        chosen = [...chosen].sort((a,b)=> tierForCB(b) - tierForCB(a));
+      } else {
+        // compound_first / post_exhaust / default — база первой (tier1→4)
+        chosen = [...chosen].sort((a,b)=> tierForCB(a) - tierForCB(b));
+      }
       if (tag === 'full_conditioning' && !chosen.some(id => id.includes('neck'))) {
         if (!chosen.includes('neck_harness_ext')) { chosen.unshift('neck_harness_ext'); chosen.splice(total); }
       }
@@ -360,7 +367,11 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         else if (legacyWc < 1) effCut = legacyWc;
         else if (taper && !deload) effCut = tmult;
         if (effCut < 1) sets = Math.max(2, Math.round(sets * effCut));
-        if (outsideMult < 0.75 && sets > 2) sets -= 1;
+        // Wilson 2012: interference нога-специфична — вне зала бьёт по приседу/тяге, верх почти не трогает
+        if (outsideMult < 0.75 && sets > 2) {
+          const isLegs = tag.includes('lower') || tag.includes('full') || ['squat','front_squat','rdl','bulgarian','cossack','trap_bar','zercher','nordic','glute_ham','step_up','hip_thrust','calf_raise','sled_push','sled_pull'].some(k=> id.includes(k));
+          if (isLegs) sets = Math.max(2, sets - 1);
+        }
         // кондиция: компенсация доп нагрузки — 1 сет если есть конди-сессии, минимум 2 (фикc P0-2)
         if (condSessionsWeek.length > 0 && sets > 2) sets = Math.max(2, sets - 1);
         if (acwrMult < 1 && sets > 2) sets = Math.max(2, Math.round(sets * acwrMult));

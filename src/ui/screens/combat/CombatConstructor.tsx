@@ -19,6 +19,7 @@ import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cu
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
+import { getDiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
 import { useCombatWizard } from './useCombatWizard';
 import { CARD, CARD_ACCENT, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, CHIP, CHIP_ACTIVE, PHASE_COLOR, DISCIPLINE_COLOR, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, Stepper, ChipToggle, Field, Divider, EQUIP_RU, MOBILITY_RU, LEVEL_RU, PHASE_RU, ZONE_RU, PERIODIZATION_RU, SESSION_TAG_RU, ruLabel } from './CombatUI';
 
