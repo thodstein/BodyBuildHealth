@@ -84,24 +84,57 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
     setTodaySessions(t ? t.sessions.map(s => ({ type: s.type, durationMin: s.durationMin, targetHr: s.targetHr, equipment: s.equipment })) : []);
   }, [cycle]);
 
+  const deadlineRef = useRef<number | null>(null);
+  const pausedRemainingRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (!active || active.paused) return;
-    timerRef.current = window.setInterval(() => {
+    if (!active) { deadlineRef.current = null; pausedRemainingRef.current = null; return; }
+    if (active.paused) {
+      if (deadlineRef.current != null) {
+        pausedRemainingRef.current = active.remainingSec;
+        deadlineRef.current = null;
+      }
+      if (timerRef.current != null) window.clearInterval(timerRef.current);
+      return;
+    }
+    if (pausedRemainingRef.current != null) {
+      deadlineRef.current = Date.now() + pausedRemainingRef.current * 1000;
+      pausedRemainingRef.current = null;
+    } else if (deadlineRef.current == null) {
+      deadlineRef.current = Date.now() + active.remainingSec * 1000;
+    }
+    const tick = () => {
+      if (deadlineRef.current == null) return;
+      const remain = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000));
       setActive(prev => {
         if (!prev) return null;
-        if (prev.remainingSec <= 1) {
-          return null;
-        }
-        return { ...prev, remainingSec: prev.remainingSec - 1 };
+        if (remain <= 0) return { ...prev, remainingSec: 0 };
+        if (prev.remainingSec !== remain) return { ...prev, remainingSec: remain };
+        return prev;
       });
-    }, 1000);
-    return () => { if (timerRef.current != null) window.clearInterval(timerRef.current); };
-  }, [active?.paused, active?.type, active?.durationMin]);
+    };
+    timerRef.current = window.setInterval(tick, 1000);
+    const onVis = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      if (timerRef.current != null) window.clearInterval(timerRef.current);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [active?.paused, active?.type, active?.durationMin, active]);
 
   useEffect(() => {
     if (!active) return;
-    if (active.remainingSec <= 1) {
+    if (active.remainingSec <= 0) {
       if (timerRef.current != null) window.clearInterval(timerRef.current);
+      deadlineRef.current = null;
+      pausedRemainingRef.current = null;
+      beep(880, 300);
+      vibrate([120, 80, 120]);
+      setFinished({ type: active.type, durationMin: active.durationMin });
+      setActive(null);
+    } else if (active.remainingSec <= 1) {
+      if (timerRef.current != null) window.clearInterval(timerRef.current);
+      deadlineRef.current = null;
       beep(880, 300);
       vibrate([120, 80, 120]);
       setFinished({ type: active.type, durationMin: active.durationMin });
@@ -114,6 +147,8 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
 
   const start = (type: CardioType, durationMin: number, targetHr?: { min?: number; max?: number }) => {
+    deadlineRef.current = null;
+    pausedRemainingRef.current = null;
     setActive({ type, durationMin, remainingSec: durationMin * 60, paused: false, targetHr });
     setFinished(null);
   };
@@ -121,6 +156,8 @@ export const CardioSessionTimer: React.FC<{ cycle: CardioCycle | null; onSaved?:
   const finishNow = () => {
     if (!active) return;
     if (timerRef.current != null) window.clearInterval(timerRef.current);
+    deadlineRef.current = null;
+    pausedRemainingRef.current = null;
     beep(880, 220);
     vibrate(140);
     setFinished({ type: active.type, durationMin: active.durationMin });

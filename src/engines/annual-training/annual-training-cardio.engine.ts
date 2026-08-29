@@ -115,6 +115,7 @@ export interface AnnualCardioBuildOptions {
   recoveryLow?: boolean;
   legDays?: number[];
   bodyWeight?: number;
+  bodyFatPct?: number;
 }
 
 export interface AnnualCardioBuildOutcome {
@@ -152,6 +153,10 @@ export function buildAnnualCardioCycles(
     const competitions = s.competitionWeek != null
       ? [{ id: `annual-cardio-${s.blockKey}`, name: `Старт: ${s.description}`, week: s.competitionWeek, priority: 'B' as const }]
       : undefined;
+    const compWeek = s.competitionWeek != null ? Math.min(s.competitionWeek, s.weeks) : null;
+    const safeComps = compWeek != null
+      ? [{ id: `annual-cardio-${s.blockKey}`, name: `Старт: ${s.description}`, week: compWeek, priority: 'B' as const }]
+      : undefined;
     const input: CardioCycleInput = {
       goal: s.goal,
       totalWeeks: s.weeks,
@@ -159,8 +164,9 @@ export function buildAnnualCardioCycles(
       taperWeeks: s.taperWeeks,
       taper: s.taperWeeks > 0,
       peakWeek: s.peakWeek,
-      competitions,
+      competitions: safeComps,
       bodyWeight: opts.bodyWeight,
+      bodyFatPct: opts.bodyFatPct,
       daysAvailable: opts.daysAvailable,
       recoveryLow: opts.recoveryLow,
       level: opts.level,

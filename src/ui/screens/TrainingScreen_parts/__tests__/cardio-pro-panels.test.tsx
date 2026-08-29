@@ -635,11 +635,14 @@ describe('CardioDiaryStep — старт-контроль (5C)', () => {
     d.setDate(d.getDate() - 8); // цикл идёт 1+ недель
     const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 6, startDate: start, id: 'diary-step-sync' });
-    // Факт из прошлой недели — прошедшая неделя штрафуется только при наличии
-    // записей; DayCard показывает факт дня/нагрузку через log проп.
     saveCardioLogEntry({ id: 'day1', date: start, type: 'zone2', durationMin: 30, completed: true, calories: 210 });
-    const html = renderToStaticMarkup(<CardioDiaryStep cycle={c} recoveryLow={false} onChanged={() => {}} />);
-    // CardioDiaryStep передаёт log в дочерние виджеты — объём/факт из журнала видны.
-    expect(html).toContain('Дневник выполнения кардио');
+    const htmlSession = renderToStaticMarkup(<CardioDiaryStep cycle={c} recoveryLow={false} onChanged={() => {}} />);
+    // По умолчанию открыт таб Сегодня — факт дня/прогресс видны
+    expect(htmlSession).toContain('Сегодня');
+    // Переключаем на Журнал — заголовок дневника появляется
+    const { container } = render(<CardioDiaryStep cycle={c} recoveryLow={false} onChanged={() => {}} />);
+    const journalTab = Array.from(container.querySelectorAll('button')).find(b => (b.textContent ?? '').includes('Журнал'));
+    if (journalTab) fireEvent.click(journalTab);
+    expect(container.innerHTML).toContain('Дневник выполнения кардио');
   });
 });

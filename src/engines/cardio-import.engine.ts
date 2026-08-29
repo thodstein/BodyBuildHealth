@@ -183,9 +183,8 @@ export function parseCardioCsv(text: string, fileName = 'import.csv'): CardioImp
   const lines = cleaned.split(/\r?\n/).filter(l => l.trim().length > 0);
   if (lines.length < 2) return { entries: [], warnings: ['Нет данных (нужен заголовок + строки)'], format: 'csv' };
   const header = parseCsvLine(lines[0], delim);
-  const lowerHeader = header.map(h => String(h).toLowerCase());
   // эвристика: если заголовок — цифры/даты, то заголовка нет
-  const headerLooksLikeData = header.length > 0 && /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(header[0]) || /^\d+(?:[.,]\d+)?$/.test(header[0]);
+  const headerLooksLikeData = header.length > 0 && (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(header[0]) || /^\d+(?:[.,]\d+)?$/.test(header[0]));
   let dataStart = 1;
   let hdr = header;
   if (headerLooksLikeData) {

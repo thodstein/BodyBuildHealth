@@ -157,6 +157,8 @@ export const CardioAutoTunePanel: React.FC<{
 
   // Авто-режим: при изменении цикла/дневника — предпросмотр, а при
   // включённом авто-применении — сразу применение (с undo-версией).
+  // Guard против зацикливания: применяем только если cycle.id / acwr изменились.
+  const lastAutoCycleRef = useRef<string | null>(null);
   const previewTuneRef = useRef(previewTune);
   previewTuneRef.current = previewTune;
   const applyTuneRef = useRef(applyTune);
@@ -165,11 +167,14 @@ export const CardioAutoTunePanel: React.FC<{
   autoApplyRef.current = autoApply;
   useEffect(() => {
     if (autoMode && cycle) {
+      const key = `${cycle.id}:${String(acwr ?? 'null')}`;
+      if (lastAutoCycleRef.current === key) return;
+      lastAutoCycleRef.current = key;
       if (autoApplyRef.current) applyTuneRef.current();
       else previewTuneRef.current();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoMode, autoApply, cycle]);
+  }, [autoMode, autoApply, cycle, acwr]);
 
   const undoVersion = () => {
     if (!cycle) return;

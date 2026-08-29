@@ -107,7 +107,8 @@ export const CardioParamsStep: React.FC<{
   onSaveProfile: () => void;
   onFromDiaryHr: () => void;
   onReset: () => void;
-}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset }) => {
+  wizardMode?: 'simple' | 'pro';
+}> = ({ goal, setGoal, totalWeeks, setTotalWeeks, daysAvailable, setDaysAvailable, recoveryLow, setRecoveryLow, phaseSplit, setPhaseSplit, comps, bodyWeight, setBodyWeight, taperWeeks, setTaperWeeks, taperEnabled, setTaperEnabled, peakWeek, setPeakWeek, previewFactors, level, setLevel, equipment, setEquipment, lowImpact, setLowImpact, age, setAge, sex, setSex, restingHr, setRestingHr, legDays, setLegDays, factorsOn, onToggleFactor, factorsSummary, onFromProfile, onSaveProfile, onFromDiaryHr, onReset, wizardMode = 'pro' }) => {
   const preview: { cycle: CardioCycle | null; warnings: string[] } = useMemo(() => {
     const warnings: string[] = [];
     if (totalWeeks < 4) warnings.push('Цикл короче 4 недель — базовая фаза почти отсутствует.');
@@ -307,8 +308,8 @@ export const CardioParamsStep: React.FC<{
         )}
       </Accordion>
 
-      {/* ── 4. Оборудование и дни ног — всегда открыт для юзабилити ── */}
-      <SectionCard title="🏃 Оборудование и ограничения" id="sec-equip">
+      {/* ── 4. Оборудование и дни ног — в простом режиме скрыто ── */}
+      {wizardMode === 'pro' && <SectionCard title="🏃 Оборудование и ограничения" id="sec-equip">
         <div style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>Оборудование</div>
         <div style={ROW}>
           {CARDIO_EQUIPMENT_OPTIONS.map(e => (
@@ -331,10 +332,10 @@ export const CardioParamsStep: React.FC<{
           ))}
         </div>
         <div style={HINT_SM}>Zone2/MISS/HIIT не ставятся на эти дни; recovery — можно. {legDays.length > 0 ? `Выбрано: ${legDays.map(i => DAY_LABELS_RU[i]).join(', ')}` : ''}</div>
-      </SectionCard>
+      </SectionCard>}
 
-      {/* ── 5. Факторы — свёрнуто ── */}
-      <Accordion id="sec-factors" title="Факторы восстановления и курса" icon="📊" badge={factorsSummary.length > 0 ? <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.28)" color="#60a5fa">{factorsSummary.length} активно</Badge> : undefined}>
+      {/* ── 5. Факторы — свёрнуто (только в про) ── */}
+      {wizardMode === 'pro' && <Accordion id="sec-factors" title="Факторы восстановления и курса" icon="📊" badge={factorsSummary.length > 0 ? <Badge bg="rgba(96,165,250,0.13)" border="rgba(96,165,250,0.28)" color="#60a5fa">{factorsSummary.length} активно</Badge> : undefined}>
         <div style={ROW}>
           <button style={factorsOn.sleep ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('sleep')} aria-label="Фактор: сон">😴 Сон</button>
           <button style={factorsOn.stress ? CHIP_ACTIVE : CHIP} onClick={() => onToggleFactor('stress')} aria-label="Фактор: стресс">😣 Стресс</button>
@@ -348,7 +349,7 @@ export const CardioParamsStep: React.FC<{
           </div>
         )}
         <div style={HINT_SM}>Сон &lt;6ч ×0.9 · стресс ≥7 ×0.95+noHIIT · HRV&lt;25 ×0.9 · PED ×1.05 · суставы → lowImpact.</div>
-      </Accordion>
+      </Accordion>}
 
       {/* ── Hero Итог — всегда открыт ── */}
       <div style={CARD_HERO} id="sec-preview">

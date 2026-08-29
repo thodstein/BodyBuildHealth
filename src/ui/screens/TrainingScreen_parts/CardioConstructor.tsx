@@ -94,6 +94,8 @@ interface WizardState {
   factorJoints: boolean;
   variant: CardioVariant;
   comps: CardioCompetitionRef[];
+  wizardMode?: 'simple' | 'pro';
+  bodyFatPct?: number;
 }
 
 function loadWizard(): Partial<WizardState> {
@@ -114,6 +116,13 @@ function profileWeight(): number | undefined {
     const p = getProfile();
     const w = p?.settings?.personal?.weight;
     return typeof w === 'number' && w > 0 ? w : undefined;
+  } catch { return undefined; }
+}
+function profileBodyFat(): number | undefined {
+  try {
+    const p = getProfile();
+    const bf = p?.settings?.personal?.bodyFat;
+    return typeof bf === 'number' && bf >= 3 && bf <= 70 ? bf : undefined;
   } catch { return undefined; }
 }
 
@@ -198,6 +207,7 @@ export const CardioConstructor: React.FC = () => {
   const [daysAvailable, setDaysAvailable] = useState(wizard.daysAvailable ?? 5);
   const [recoveryLow, setRecoveryLow] = useState(wizard.recoveryLow ?? false);
   const [bodyWeight, setBodyWeight] = useState(wizard.bodyWeight ?? profileWeight() ?? 80);
+  const [bodyFatPct, setBodyFatPct] = useState<string>(String((wizard as WizardState).bodyFatPct ?? profileBodyFat() ?? ''));
   const [phaseSplit, setPhaseSplit] = useState<PhaseSplitState>({
     auto: wizard.phaseAuto ?? true,
     base: wizard.phaseBase ?? 0,
@@ -214,6 +224,7 @@ export const CardioConstructor: React.FC = () => {
   const [sex, setSex] = useState<'male' | 'female'>(wizard.sex ?? profileSex() ?? 'male');
   const [restingHr, setRestingHr] = useState(String(wizard.restingHr ?? profileRestingHr() ?? ''));
   const [variant, setVariant] = useState<CardioVariant>(wizard.variant ?? 'base');
+  const [wizardMode, setWizardMode] = useState<'simple' | 'pro'>((wizard as WizardState).wizardMode ?? 'pro');
   const [legDays, setLegDays] = useState<number[]>(wizard.legDays ?? []);
   const [comps, setComps] = useState<CardioCompetitionRef[]>(wizard.comps ?? []);
   const [compDraft, setCompDraft] = useState<CompDraft>({ name: '', week: '' });
@@ -307,11 +318,13 @@ export const CardioConstructor: React.FC = () => {
   const refreshActive = () => { setCycle(loadActiveCardioCycle()); reload(); };
 
   const build = () => {
+    const bf = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
     const base: CardioCycleInput = {
       goal,
       totalWeeks,
       daysAvailable,
       bodyWeight,
+      bodyFatPct: bf,
       competitions: comps,
       taperWeeks,
       taper: taperEnabled,
@@ -347,11 +360,13 @@ export const CardioConstructor: React.FC = () => {
   /** Живой пересчёт при выборе варианта нагрузки: вариант применяется сразу. */
   const selectVariant = (v: CardioVariant) => {
     setVariant(v);
+    const bf2 = Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined;
     const base: CardioCycleInput = {
       goal,
       totalWeeks,
       daysAvailable,
       bodyWeight,
+      bodyFatPct: bf2,
       competitions: comps,
       taperWeeks,
       taper: taperEnabled,
@@ -626,11 +641,11 @@ export const CardioConstructor: React.FC = () => {
         phaseAuto: phaseSplit.auto, phaseBase: phaseSplit.base, phaseBuild: phaseSplit.build, phaseMaint: phaseSplit.maintenance,
         level, equipment, lowImpact, age: Math.max(12, Math.min(90, Number(age) || 30)), sex, restingHr: Number(restingHr) > 0 ? Number(restingHr) : 0, legDays,
         factorSleep: factorsOn.sleep, factorStress: factorsOn.stress, factorHrv: factorsOn.hrv, factorPed: factorsOn.ped, factorJoints: factorsOn.joints,
-        variant, comps,
+        variant, comps, wizardMode,
       };
       localStorage.setItem(WIZARD_KEY, JSON.stringify({ ...s, version: 2 }));
     } catch { /* ignore */ }
-  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps]);
+  }, [goal, totalWeeks, daysAvailable, recoveryLow, bodyWeight, taperWeeks, taperEnabled, peakWeek, phaseSplit, level, equipment, lowImpact, age, sex, restingHr, legDays, factorsOn, variant, comps, wizardMode]);
 
   const renameCycle = (name: string) => {
     if (!cycle) return;
@@ -904,7 +919,15 @@ export const CardioConstructor: React.FC = () => {
 
       {flash && <div style={{ padding: '10px 14px', borderRadius: 12, background: 'linear-gradient(180deg, rgba(0,230,138,0.12), rgba(0,230,138,0.06))', border: '1px solid rgba(0,230,138,0.28)', color: '#4ade80', fontSize: 12, fontWeight: 750, boxShadow: '0 4px 14px rgba(0,230,138,0.14)' }} role="status">{flash}</div>}
 
-      {/* Шаги */}
+      {/* Переключатель простой/профи — только на шаге Параметры */}
+      {step === 'params' && (
+        <div style={{ display: 'flex', gap: 6, padding: 6, borderRadius: 12, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.72)', fontWeight: 700, marginLeft: 6 }}>Режим:</span>
+          <button onClick={() => setWizardMode('simple')} style={wizardMode === 'simple' ? { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.18)', color: '#00e68a', fontSize: 12, fontWeight: 800 } : { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }}>✨ Простой</button>
+          <button onClick={() => setWizardMode('pro')} style={wizardMode === 'pro' ? { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(0,230,138,0.5)', background: 'rgba(0,230,138,0.18)', color: '#00e68a', fontSize: 12, fontWeight: 800 } : { padding: '6px 12px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 12 }}>🛠 Профи</button>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginLeft: 6 }}>{wizardMode === 'simple' ? 'Только главное: цель, недели, дни, вес' : 'Все настройки: фазы, оборудование, факторы'}</span>
+        </div>
+      )}
       {step === 'params' && (
         <CardioParamsStep
           goal={goal} setGoal={setGoal}
@@ -927,6 +950,7 @@ export const CardioConstructor: React.FC = () => {
           factorsSummary={factorsSummary}
           onFromProfile={fromProfile} onSaveProfile={saveToProfile} onFromDiaryHr={fromDiaryHr}
           onReset={resetParams}
+          wizardMode={wizardMode}
         />
       )}
       {step === 'comps' && (

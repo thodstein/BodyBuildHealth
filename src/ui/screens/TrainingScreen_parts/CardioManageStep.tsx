@@ -141,6 +141,24 @@ export const CardioManageStep: React.FC<{
     } catch { /* ignore */ }
   };
 
+  const [libraryFilter, setLibraryFilter] = useState('');
+  const [librarySort, setLibrarySort] = useState<'date' | 'weeks' | 'kcal'>('date');
+  const [libraryPage, setLibraryPage] = useState(0);
+  const LIB_PAGE_SIZE = 6;
+  const filteredLibrary = library
+    .filter(c => {
+      if (!libraryFilter.trim()) return true;
+      const q = libraryFilter.toLowerCase();
+      return c.name.toLowerCase().includes(q) || c.goal.toLowerCase().includes(q) || CARDIO_GOAL_LABELS[c.goal].toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (librarySort === 'weeks') return b.totalWeeks - a.totalWeeks;
+      if (librarySort === 'kcal') return cardioCycleSummary(b).avgKcalPerWeek - cardioCycleSummary(a).avgKcalPerWeek;
+      return String(b.createdAt).localeCompare(String(a.createdAt));
+    });
+  const libraryPages = Math.max(1, Math.ceil(filteredLibrary.length / LIB_PAGE_SIZE));
+  const pagedLibrary = filteredLibrary.slice(libraryPage * LIB_PAGE_SIZE, (libraryPage + 1) * LIB_PAGE_SIZE);
+
   const [tab, setTab] = useState<'integrations' | 'export' | 'week' | 'library' | 'scenarios'>('integrations');
   const TABS = [
     { id: 'integrations', label: 'Интеграции', icon: '🔗' },
@@ -154,7 +172,7 @@ export const CardioManageStep: React.FC<{
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Tabs tabs={TABS as unknown as { id: string; label: string; icon?: string }[]} active={tab} onChange={v => setTab(v as typeof tab)} />
 
-      {true && (
+      {tab === 'integrations' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <SectionCard title="🔗 Силовой план (ссылка, не копия)">
             {cycle && (
@@ -254,7 +272,7 @@ export const CardioManageStep: React.FC<{
         </div>
       )}
 
-      {true && (
+      {tab === 'export' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {!cycle ? (
             <EmptyState icon="📤" title="Нет активного цикла" desc="Соберите цикл на шаге Предпросмотр, чтобы экспортировать." />
@@ -285,17 +303,28 @@ export const CardioManageStep: React.FC<{
         </div>
       )}
 
-      {true && (
+      {tab === 'week' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <CardioWeekEditor cycle={cycle} onChanged={onChanged} />
         </div>
       )}
 
-      {true && (
-        <SectionCard title={`📚 Библиотека (${library.length})`}>
+      {tab === 'library' && (
+        <SectionCard title={`📚 Библиотека (${filteredLibrary.length}/${library.length})`}>
           {library.length === 0 && <EmptyState icon="📚" title="Пока пусто" desc="Соберите первый цикл на шаге Предпросмотр." />}
+          {library.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input value={libraryFilter} onChange={e => { setLibraryFilter(e.target.value); setLibraryPage(0); }} placeholder="🔍 Поиск: имя/цель" style={{ flex: '1 1 160px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 12 }} />
+              <button onClick={() => setLibrarySort('date')} style={librarySort === 'date' ? { ...BTN_SMALL, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' } : BTN_SMALL}>📅 Дата</button>
+              <button onClick={() => setLibrarySort('weeks')} style={librarySort === 'weeks' ? { ...BTN_SMALL, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' } : BTN_SMALL}>⏱ Нед</button>
+              <button onClick={() => setLibrarySort('kcal')} style={librarySort === 'kcal' ? { ...BTN_SMALL, background: 'rgba(0,230,138,0.18)', border: '1px solid rgba(0,230,138,0.4)', color: '#00e68a' } : BTN_SMALL}>🔥 Ккал</button>
+              {filteredLibrary.length > LIB_PAGE_SIZE && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)' }}>{libraryPage + 1}/{libraryPages}</span>}
+              {libraryPage > 0 && <button style={BTN_SMALL} onClick={() => setLibraryPage(p => Math.max(0, p - 1))}>‹</button>}
+              {libraryPage + 1 < libraryPages && <button style={BTN_SMALL} onClick={() => setLibraryPage(p => p + 1)}>›</button>}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 8 }}>
-            {library.map(c => {
+            {pagedLibrary.map(c => {
               const s = cardioCycleSummary(c);
               const active = cycle?.id === c.id;
               return (
@@ -324,7 +353,7 @@ export const CardioManageStep: React.FC<{
         </SectionCard>
       )}
 
-      {true && (
+      {tab === 'scenarios' && (
         <SectionCard title={`📸 Сценарии (${scenarios.length}/6)`} right={<button style={BTN_PRIMARY} onClick={onSaveScenario}>💾 Сохранить сценарий</button>}>
           {scenarios.length === 0 && <EmptyState icon="📸" title="Сценариев нет" desc="Сохраните текущий цикл для сравнения вариантов." />}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 8 }}>

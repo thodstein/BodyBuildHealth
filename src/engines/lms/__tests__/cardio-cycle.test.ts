@@ -1104,7 +1104,7 @@ describe('buildCardioIcs — дни недели', () => {
 
 function dayStartPlus(dow: number, week: number): string {
   const ref = new Date(2026, 0, 5 + week * 7 + dow);
-  return `${ref.getFullYear()}${String(ref.getMonth() + 1).padStart(2, '0')}${String(ref.getDate()).padStart(2, '0')}Z`;
+  return `${ref.getFullYear()}${String(ref.getMonth() + 1).padStart(2, '0')}${String(ref.getDate()).padStart(2, '0')}T060000`;
 }
 
 describe('cardioNextSession', () => {

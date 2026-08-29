@@ -19,8 +19,8 @@ export async function connectBleHr(onHr: (hr: number) => void, onState: (s: BleH
   }
   try {
     const device = await nav.bluetooth.requestDevice({
-      filters: [{ services: ['heart_rate'] }],
-      optionalServices: ['battery_service'],
+      filters: [{ services: ['heart_rate'] }, { namePrefix: 'Polar' }, { namePrefix: 'Garmin' }, { namePrefix: 'Wahoo' }],
+      optionalServices: ['battery_service', 'heart_rate'],
     } as unknown);
     const server = await (device as unknown as { gatt?: { connect: () => Promise<BluetoothRemoteGATTServer> } }).gatt?.connect();
     if (!server) throw new Error('GATT connect failed');

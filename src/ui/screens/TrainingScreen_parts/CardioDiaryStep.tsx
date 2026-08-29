@@ -73,7 +73,7 @@ export const CardioDiaryStep: React.FC<{
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <Tabs tabs={TABS as unknown as { id: string; label: string; icon?: string }[]} active={tab} onChange={v => setTab(v as typeof tab)} />
 
-      {true && (
+      {tab === 'session' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 10 }}>
             <CardioDayCard cycle={localCycle} log={log} srpe={srpe} />
@@ -89,16 +89,14 @@ export const CardioDiaryStep: React.FC<{
           <CardioSessionTimer cycle={localCycle} onSaved={reloadLog} onReschedule={handleReschedule} />
         </div>
       )}
-      <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.72)', marginTop: 4 }}>📈 Аналитика</div>
-      {true && (
+      {tab === 'analytics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           <CardioVolumeChart cycle={localCycle} log={log} />
           <CardioAnalyticsDashboard cycle={localCycle} log={log} />
           <CardioAutoTunePanel cycle={localCycle} acwr={acwr} onChanged={reloadLog} />
         </div>
       )}
-      <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.72)', marginTop: 4 }}>📓 Журнал</div>
-      {true && (
+      {tab === 'log' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
           <CardioImportPanel onImported={reloadLog} />
           <CardioDiaryPanel cycle={localCycle} acwr={acwr} recoveryLow={recoveryLow} onApplyWeightAdjust={onApplyWeightAdjust} log={log} onLogChanged={reloadLog} />

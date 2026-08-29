@@ -229,6 +229,7 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Библиотека/ }));
     fireEvent.click(screen.getByRole('button', { name: /⇄ Сравнить/ }));
     expect(screen.getByText(/→/)).toBeTruthy();
   });
@@ -250,7 +251,11 @@ describe('CardioConstructor — CSR', () => {
     fireEvent.click(screen.getByRole('button', { name: /Собрать и сохранить цикл/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
     fireEvent.click(screen.getByRole('button', { name: /Далее/ }));
+    // Авто-режим на вкладке Аналитика
+    fireEvent.click(screen.getByRole('button', { name: /Аналитика/ }));
     expect(screen.getByRole('button', { name: /Подстроить сейчас/ })).toBeTruthy();
+    // Дневник на вкладке Журнал
+    fireEvent.click(screen.getByRole('button', { name: /Журнал/ }));
     expect(screen.getByText(/Дневник выполнения кардио/)).toBeTruthy();
   });
 

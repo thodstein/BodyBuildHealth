@@ -49,14 +49,15 @@ describe('buildCardioIcs', () => {
     expect(ics).toContain('BEGIN:VCALENDAR');
     expect(ics).toContain('BEGIN:VEVENT');
     expect(ics).toContain('SUMMARY:Кардио ZONE2');
-    expect(ics).toContain('UID:ics-1-w1-zone2@bbh');
+    expect(ics).toContain('UID:ics-1-w1-zone2-');
+    expect(ics).toContain('DTEND:');
     expect(ics).not.toContain('; тест');
   });
 
   it('даты событий лежат внутри соответствующих недель от reference', () => {
     const c = buildCardioCycle({ goal: 'health', totalWeeks: 2, id: 'd-1', daysAvailable: 7 });
     const ics = buildCardioIcs(c, '2026-01-05T00:00:00.000Z');
-    const starts = [...ics.matchAll(/DTSTART:(\d{8})Z/g)].map(m => m[1]);
+    const starts = [...ics.matchAll(/DTSTART:(\d{8})T/g)].map(m => m[1]);
     expect(starts.length).toBeGreaterThan(0);
     for (const st of starts) {
       const day = Number(st.slice(6, 8));
