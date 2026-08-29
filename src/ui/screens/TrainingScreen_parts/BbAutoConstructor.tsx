@@ -619,6 +619,17 @@ export const BbAutoConstructor: React.FC = () => {
   const [safetyDistributionOpen, setSafetyDistributionOpen] = useState(true);
   const [safetyConclusionOpen, setSafetyConclusionOpen] = useState(true);
   const [safetyFactorsOpen, setSafetyFactorsOpen] = useState(true);
+  const [qualityVolumeOpen, setQualityVolumeOpen] = useState(true);
+  const [qualityLogicOpen, setQualityLogicOpen] = useState(true);
+  const [qualityForecastOpen, setQualityForecastOpen] = useState(true);
+  const [qualityProOpen, setQualityProOpen] = useState(true);
+  const [qualityProgressionOpen, setQualityProgressionOpen] = useState(true);
+  const [qualityGarbageOpen, setQualityGarbageOpen] = useState(true);
+  const [qualityRecsOpen, setQualityRecsOpen] = useState(true);
+  const [qualityVolumeChartOpen, setQualityVolumeChartOpen] = useState(true);
+  const [qualityRirChartOpen, setQualityRirChartOpen] = useState(true);
+  const [qualityLoadOpen, setQualityLoadOpen] = useState(true);
+  const [qualityExtraOpen, setQualityExtraOpen] = useState(true);
   // specializationMode больше не выбирается в UI: специализация включается
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
@@ -4138,10 +4149,55 @@ export const BbAutoConstructor: React.FC = () => {
         )}
         <div style={{ marginBottom:8, padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.05))', border:'1px solid rgba(96,165,250,0.24)' }}>
           <button type="button" onClick={() => setQualityOpen(v => !v)} aria-expanded={qualityOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', border:0, background:'transparent', color:'#fff', cursor:'pointer', fontSize:15, fontWeight:900, textAlign:'left' }}>
-            <span>📊 Качество и нагрузка плана</span><span>{qualityOpen ? '▲' : '▼'}</span>
+            <span>🏋️ Тренировочная нагрузка плана</span><span>{qualityOpen ? '▲' : '▼'}</span>
           </button>
         </div>
         <div style={{ display: qualityOpen ? 'block' : 'none' }}>
+        <CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`${quality.score}/100 ${quality.label}`}>
+          <div style={{ display:'grid', gap:8, fontSize:11 }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+              <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.14)', color:'#a855f7' }}>{builtPlan.pattern?.name || '—'} · {W.length} нед · {builtPlan.weeks[0]?.sessions.length || bbDays}×/нед</span>
+              <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>Уровень {bbLevel} · Цель {bbGoal} · Фокус {bbTrainingFocus}</span>
+              <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>Методика {bbMethodology} · Объём {bbVolGoal}{trainingVolumeMode==='high'?' · объёмный':''}</span>
+              <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', color:'#fff' }}>Прогрессия {loadStrategy} · RIR {String((getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir ?? '2-3')}→{String((getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir ?? '1-2')}</span>
+              {peds.length>0 && <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.14)', color:'#f59e0b' }}>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} · {peds.join(', ')}</span>}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10, color:'#fff' }}>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Слабые:</b> {weakPoints.join(', ')||'— баланc'}</div>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Травмы:</b> {injuries.length? injuries.map(i=> `${i.muscle}${i.exclude?' (искл.)':''}`).join(', ') : 'нет'} · <b>Мобильность:</b> {mobilityRestrictions.join(', ')||'нет'}</div>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Оборудование:</b> {bbEquipment.slice(0,3).join(', ')||'всё'} · <b>Слабые:</b> {specTargets.join(' + ')||'баланс'}</div>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Сплит:</b> {builtPlan.pattern?.name || '—'} · скор {ranked.find(r=>r.pattern.id===builtPlan.pattern?.id)?.score ?? bestSplit?.score ?? 0} · {bbDays}×/нед</div>
+            </div>
+            <div style={{ fontSize:10, color:'#fff', opacity:0.6, display:'flex', flexWrap:'wrap', gap:6 }}>
+              <span>Уровень «{bbLevel}»</span><span>Цель «{bbGoal}»</span><span>Фокус «{bbTrainingFocus}»</span><span>Методика «{bbMethodology}»</span><span>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span><span>ACWR {ratio ? ratio.ratio.toFixed(2) : '—'}</span>
+            </div>
+          </div>
+        </CollapsibleCard>
+        <CollapsibleCard title="📊 Общие сведения о нагрузке" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${metrics.totalSets} сетов · тяж ${(metrics.тяжPct*100).toFixed(0)}% · памп ${(metrics.пампPct*100).toFixed(0)}%`}>
+          <div style={{ display:'grid', gap:8, fontSize:11 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.04)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Сетов пик</div><div style={{ fontSize:14, fontWeight:800, color:'#00e68a' }}>{metrics.totalSets}</div><div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>средн. {Math.round(W.reduce((a,w)=>a+w.sessions.reduce((b,s)=>b+s.exercises.reduce((c,e)=>c+e.sets,0),0),0)/W.length)}/нед</div></div>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(239,68,68,0.06)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Тяж</div><div style={{ fontSize:14, fontWeight:800, color:'#ef4444' }}>{(metrics.тяжPct*100).toFixed(0)}%</div><div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>RIR {metrics.avgRir.toFixed(1)}</div></div>
+              <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(96,165,250,0.06)', textAlign:'center' }}><div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Памп</div><div style={{ fontSize:14, fontWeight:800, color:'#60a5fa' }}>{(metrics.пампPct*100).toFixed(0)}%</div><div style={{ fontSize:9, color:'#fff', opacity:0.5 }}>{W.length} нед · {W[0]?.sessions.length || 0} дн/нед</div></div>
+            </div>
+            {(() => {
+              const proQ = (quality as any).proResult as any;
+              if (!proQ) return null;
+              return (
+                <div style={{ display:'grid', gap:6 }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, fontSize:10 }}>
+                    <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Паттерны:</b> {proQ.patterns.filter((p:any)=>p.ok).length}/{proQ.patterns.length} в норме {proQ.patterns.filter((p:any)=>!p.ok).map((p:any)=>p.issue).slice(0,1).join('; ')||'—'}</div>
+                    <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Углы:</b> {proQ.angles.filter((a:any)=>a.ok).length}/{proQ.angles.length} в норме {proQ.angles.filter((a:any)=>!a.ok).map((a:any)=>a.issue).slice(0,1).join('; ')||'—'}</div>
+                    <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Растяжка:</b> {proQ.stretches.filter((s:any)=>s.ok).length}/{proQ.stretches.length} в норме</div>
+                    <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Цель «{proQ.goalAlignment?.goal || bbGoal}» — объём {proQ.goalAlignment?.volumePctAvg || 0}% MRV · техники {proQ.technique.pct}% · растяжка {Math.round((proQ.goalAlignment?.stretchCoverage||0)*100)}% {proQ.goalAlignment?.ok ? '✅' : '⚠️ ' + (proQ.goalAlignment?.issue || '')}</div>
+                </div>
+              );
+            })()}
+            <div style={{ fontSize:10, color:'#fff', opacity:0.5 }}>Фаз: {Array.from(new Set(W.map((w:any)=>(w as any).phase || 'accumulation'))).length} · {W.map(w=>`${PHASE_LABELS[((w as any).phase || 'accumulation') as BBPhase] || (w as any).phase}`).join(' → ').slice(0,80)} · PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</div>
+          </div>
+        </CollapsibleCard>
         {/* Фаза — факт из плана, а не синтетика distributePhases */}
         {(() => {
           const Wq = builtPlan.weeks;
@@ -4166,8 +4222,7 @@ export const BbAutoConstructor: React.FC = () => {
           }
           const distText = Object.entries(phaseGroups).map(([p, weeks]) => `${PHASE_LABELS[p as BBPhase] || p}: нед ${weeks.join(',')}`).join(' · ');
           const totalSetsWeek = wkExs.reduce((a,e)=> a+ (e.sets||0),0);
-          return <>
-            <div style={{ marginBottom:6, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
+          return <CollapsibleCard title={`📌 Фаза (факт) — ${PHASE_LABELS[curPh] || curPh}`} defaultOpen={true} headerStyle={{ background: `linear-gradient(135deg, ${PHASE_COLORS[curPh]}18, ${PHASE_COLORS[curPh]}08)`, color: PHASE_COLORS[curPh] }}><div style={{ marginBottom:6, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
                 <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт): {PHASE_LABELS[curPh]}</span>
                 <select aria-label="Выбрать неделю для анализа фазы" value={wkq.week} onChange={e => setBbWeekSel(Number(e.target.value))} style={{ padding:'4px 8px', borderRadius:8, border:`1px solid ${PHASE_COLORS[curPh]}55`, background:'rgba(0,0,0,0.2)', color:'#fff', fontSize:11 }}>
@@ -4217,7 +4272,7 @@ export const BbAutoConstructor: React.FC = () => {
               const dp = DELOAD_PROTOCOLS[deloadType] || DELOAD_PROTOCOLS.pump;
               return <div style={{ marginBottom:8, padding:10, borderRadius:12, background:'rgba(34,197,94,0.06)', border:'1px solid rgba(34,197,94,0.2)' }}><div style={{ fontSize:12, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔋 Разгрузка — активное восстановление (параметры из DELOAD_PROTOCOLS['{deloadType}'])</div><div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:6, fontSize:11 }}><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Объём</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.volumeMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Интенсивность</div><div style={{ fontWeight:700, color:'#22c55e' }}>−{Math.round((1-dp.intensityMultiplier)*100)}%</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>RIR</div><div style={{ fontWeight:700, color:'#22c55e' }}>→{dp.rirTarget}</div></div><div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(34,197,94,0.06)' }}><div style={{ color:'#fff', fontSize:10 }}>Повторения</div><div style={{ fontWeight:700, color:'#22c55e' }}>{dp.repRange[0]}-{dp.repRange[1]}</div></div></div></div>;
             })()}
-          </>;
+          </CollapsibleCard>;
         })()}
         {/* 🧩 Оценка сплита — соответствие выбранным параметрам (скор) */}
         {(() => {
@@ -4226,8 +4281,7 @@ export const BbAutoConstructor: React.FC = () => {
           const maxSc = Math.max(...ranked.map(r=>r.score), 1);
           const pct = Math.round((sc/maxSc)*100);
           const color = pct>=80?'#22c55e': pct>=60?'#f59e0b':'#ef4444';
-          return (
-            <div style={{ ...CARD, background:`linear-gradient(135deg, ${color}14, transparent)`, border:`1px solid ${color}22`, marginTop:8 }}>
+          return <CollapsibleCard title={`🧩 Сплит: ${builtPlan.pattern?.name || '—'} · скор ${sc} (${pct}%)`} defaultOpen={true} headerStyle={{ background: `linear-gradient(135deg, ${color}14, transparent)`, color }}><div style={{ ...CARD, background:`linear-gradient(135deg, ${color}14, transparent)`, border:`1px solid ${color}22`, marginTop:8 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, flexWrap:'wrap', gap:6 }}>
                 <span style={{ fontSize:12, fontWeight:800, color }}>🧩 Сплит: {builtPlan.pattern?.name || '—'} · скор {sc} ({pct}%)</span>
                 <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>{bbDays}×/нед · {bbLevel} · {bbGoal} · {weakPoints.length?`слабые ${weakPoints.slice(0,2).join(',')}`:'баланс'}</span>
@@ -4240,16 +4294,16 @@ export const BbAutoConstructor: React.FC = () => {
                 <b>Выбрано:</b> дней {bbDays}, цель {bbGoal}, слабые {weakPoints.join(', ')||'—'}, фокус —, оборудование {bbEquipment.slice(0,2).join(', ')||'все'}, травмы {injuries.length||'нет'} · <b>План:</b> {builtPlan.pattern?.schedule?.length||'?'} дн/ротацию
               </div>
               {sel?.warnings?.length ? <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>{sel.warnings.slice(0,2).map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null}
-            </div>
-          );
+            </div></CollapsibleCard>
+          ;
         })()}
         {/* Legacy cycle info — для старых сохранённых bb_cycle планов */}
-        {(planMode === 'programs' || planMode === 'bb_cycle') && selectedCycleId && getCycleById(selectedCycleId) && (() => {
+        <CollapsibleCard title={`📋 ПРОФ-цикл: ${getCycleById(selectedCycleId)?.meta.title || '—'}`} defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.03))', color: '#00e68a' }}>{(planMode === 'programs' || planMode === 'bb_cycle') && selectedCycleId && getCycleById(selectedCycleId) && (() => {
           const c = getCycleById(selectedCycleId);
           if (!c) return null;
           return (
             <div style={{ ...CARD, marginBottom:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:4 }}>📋 ПРОФ-цикл: {c.meta.title}</div>
+              <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:4, display:'none' }}>📋 ПРОФ-цикл: {c.meta.title}</div>
               <div style={{ fontSize:11, color:'#fff' }}>
                 <div>Упражнения: заданы циклом ({c.week1.reduce((s, d) => s + d.exercises.length, 0)} упр/день)</div>
                 <div>Фазы: {c.meta.phases && c.meta.phases.length > 0 ? c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ') : 'RIR-прогрессия'}</div>
@@ -4257,10 +4311,9 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
             </div>
           );
-        })()}
-        {/* Score gauge — фактические фазы из плана */}
-        <div style={{ ...CARD, textAlign:'center', borderLeft:'3px solid ' + (quality.score >= 85 ? '#22c55e' : quality.score >= 65 ? '#eab308' : '#ef4444') }}>
-          <div style={{ fontSize:36, fontWeight:800, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.score}/100</div>
+        })()}</CollapsibleCard>
+        <CollapsibleCard title={`⭐ Оценка качества — ${quality.score}/100 ${quality.label}`} defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(168,85,247,0.03))', color: '#a855f7' }}><div style={{ ...CARD, textAlign:'center', borderLeft:'3px solid ' + (quality.score >= 85 ? '#22c55e' : quality.score >= 65 ? '#eab308' : '#ef4444') }}>
+          <div style={{ fontSize:36, fontWeight:800, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444', display:'none' }}>{quality.score}/100</div>
           <div style={{ fontSize:13, fontWeight:700, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.label}</div>
           <div style={{ marginTop:8, display:'flex', justifyContent:'center', gap:12, flexWrap:'wrap' }}>
             <div style={SMALL}>Всего сетов (пик): <b style={{ color:'#fff' }}>{metrics.totalSets}</b></div>
@@ -4275,7 +4328,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           )}
           <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Средний объём по мезо — в «Бюджете объёма», пик — здесь</div>
-        </div>
+        </div></CollapsibleCard>
         {/* 📊 Тренировочный объём — PRO (единственная карточка объёма, без дублей) */}
         {metrics && (() => {
           // — агрегаты по мезоциклу (все недели) для общего объёма
@@ -4318,23 +4371,25 @@ export const BbAutoConstructor: React.FC = () => {
           // сортировка внутри группы по статусу и объёму
           return (
             <div style={{ ...CARD, padding:0, overflow:'hidden', border:'1px solid rgba(0,230,138,0.22)', background:'rgba(6,22,18,0.42)', marginBottom:8 }}>
-              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.06))', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                  <span style={{ fontSize:12, fontWeight:900, color:'#fff' }}>📊 Тренировочный объём — PRO</span>
-                  <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'3px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.08)' }}>пик {peakWeekDirect} прям · {peakWeekEffective} эфф · среднее {avgWeeklyDirect}/нед · мезоцикл {totalDirectMeso} прям</span>
+              <button type="button" onClick={() => setQualityVolumeOpen(v=>!v)} aria-expanded={qualityVolumeOpen} style={{ width:'100%', display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', padding:'10px 12px', cursor:'pointer', background:'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.06))', border:'none', borderBottom: qualityVolumeOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+                <span style={{ fontSize:12, fontWeight:900, color:'#fff' }}>📊 Тренировочный объём — PRO</span>
+                <span style={{ marginLeft:'auto', fontSize:10, fontWeight:700, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'3px 8px', borderRadius:20, border:'1px solid rgba(255,255,255,0.08)' }}>пик {peakWeekDirect} прям · {peakWeekEffective} эфф · среднее {avgWeeklyDirect}/нед · мезоцикл {totalDirectMeso} прям</span>
+                <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, transform: qualityVolumeOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s', marginLeft:8 }}>▼</span>
+              </button>
+              <div style={{ display: qualityVolumeOpen ? 'block' : 'none' }}>
+                <div style={{ padding:'10px 12px', background:'rgba(255,255,255,0.02)', borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.72, lineHeight:1.35 }}>
+                    Пиковая неделя — максимум нагрузки · мезоцикл {totalWeeks} нед · прямой / косвенный / эффективный (с учётом вторичной работы) · подмышцы · частота · статус MEV/MAV/MRV · паттерны/углы/растяжка
+                    {pedAdapt.combinedMrvMultiplier>1 && <span style={{ marginLeft:6, color:'#f59e0b', background:'rgba(245,158,11,0.10)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(245,158,11,0.18)' }}>MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span>}
+                  </div>
+                  <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap', fontSize:10, color:'#fff' }}>
+                    <span><span style={{ color:'#22c55e' }}>●</span> MEV минимум</span>
+                    <span><span style={{ color:'#f59e0b' }}>●</span> MAV оптимум</span>
+                    <span><span style={{ color:'#ef4444' }}>●</span> MRV максимум</span>
+                    <span style={{ opacity:0.6 }}>· пороги уже с учётом уровня, PED и восстановления</span>
+                  </div>
                 </div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.72, marginTop:4, lineHeight:1.35 }}>
-                  Пиковая неделя — максимум нагрузки · мезоцикл {totalWeeks} нед · прямой / косвенный / эффективный (с учётом вторичной работы) · подмышцы · частота · статус MEV/MAV/MRV
-                  {pedAdapt.combinedMrvMultiplier>1 && <span style={{ marginLeft:6, color:'#f59e0b', background:'rgba(245,158,11,0.10)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(245,158,11,0.18)' }}>MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span>}
-                </div>
-                <div style={{ marginTop:6, display:'flex', gap:6, flexWrap:'wrap', fontSize:10, color:'#fff' }}>
-                  <span><span style={{ color:'#22c55e' }}>●</span> MEV минимум</span>
-                  <span><span style={{ color:'#f59e0b' }}>●</span> MAV оптимум</span>
-                  <span><span style={{ color:'#ef4444' }}>●</span> MRV максимум</span>
-                  <span style={{ opacity:0.6 }}>· пороги уже с учётом уровня, PED и восстановления</span>
-                </div>
-              </div>
-              <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
+                <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
                 {GROUPS.map(g=>{
                   const rows = g.muscles.map(mid=> metrics.perMuscle.find(mm=> mm.muscle===mid)).filter(Boolean) as any[];
                   if (rows.length===0) return null;
@@ -4378,6 +4433,21 @@ export const BbAutoConstructor: React.FC = () => {
                                 <span style={{ opacity:0.85 }}>{m.frequencyPerRotation}×/нед · тяж {тяжPct}% · RIR {m.avgRir.toFixed(1)}</span>
                               </div>
                               <div style={{ fontSize:10, color: st.color, fontWeight:600, marginTop:4 }}>{(()=>{ const eff=m.effectiveSets; if(eff < m.mev) return `Недотрен: +${(m.mev - eff).toFixed(1)} эфф до MEV`; if(eff >= m.mrv) return `Перегруз: −${(eff - m.mrv).toFixed(1)} эфф (выше MRV)`; if(eff > m.mav) return `Выше оптимума: ${m.mav}–${m.mrv}, можно держать или −${(eff - m.mav).toFixed(1)} до MAV`; if(eff < m.mav) return `Ниже оптимума: +${(m.mav - eff).toFixed(1)} эфф до MAV`; return 'Оптимум — в точке MAV'; })()}</div>
+                              {(() => {
+                                const proQ = (quality as any).proResult as any;
+                                if (!proQ) return null;
+                                const findPat = proQ.patterns.find((p:any)=> p.muscle===m.muscle || (m.muscle==='chest' && p.muscle==='chest') || (m.muscle==='back' && p.muscle==='back') || (['quads','hamstrings','glutes','calves'].includes(m.muscle) && p.muscle==='legs') || (['delt_front','delt_mid','delt_rear'].includes(m.muscle) && p.muscle==='shoulders') || (['biceps','triceps','forearms'].includes(m.muscle) && p.muscle==='arms') || (m.muscle==='abs' && p.muscle==='core'));
+                                const findAng = proQ.angles.find((a:any)=> a.muscle===m.muscle || (['quads','hamstrings','glutes'].includes(m.muscle) && a.muscle==='legs') || (['delt_front','delt_mid','delt_rear'].includes(m.muscle) && a.muscle==='shoulders') || (m.muscle==='chest' && a.muscle==='chest') || (m.muscle==='back' && a.muscle==='back'));
+                                const findStr = proQ.stretches.find((s:any)=> s.muscle===m.muscle);
+                                if (!findPat && !findAng && !findStr) return null;
+                                return (
+                                  <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', fontSize:10, color:'#fff', lineHeight:1.35 }}>
+                                    {findPat && <div><b>Паттерны:</b> {findPat.patterns.join(', ')||'—'} {findPat.ok ? '✅' : `⚠️ ${findPat.issue || ''}`} {findPat.expected?.length ? <span style={{ opacity:0.6 }}>(ожид: {findPat.expected.join(', ')})</span> : null}</div>}
+                                    {findAng && <div><b>Углы:</b> {findAng.angles.join(', ')||'—'} {findAng.ok ? '✅' : `⚠️ ${findAng.issue || ''}`} {findAng.expected?.length ? <span style={{ opacity:0.6 }}>(ожид: {findAng.expected.join(', ')})</span> : null} · покрытие {Math.round((findAng.coverage||0)*100)}%</div>}
+                                    {findStr && <div><b>Растяжка:</b> {findStr.hasStretch ? `✅ ${findStr.stretchExercises.slice(0,2).join(', ')}` : '❌ нет stretch-фазы'} {findStr.ok ? '' : '— добавьте'}</div>}
+                                  </div>
+                                );
+                              })()}
                               {isBack && Object.keys(backSubPeak).length>0 && (
                                 <div style={{ marginTop:6, display:'grid', gap:4 }}>
                                   <div style={{ fontSize:9, fontWeight:700, color:'#fff', opacity:0.6 }}>Подмышцы спины (пик / мезо):</div>
@@ -4400,10 +4470,11 @@ export const BbAutoConstructor: React.FC = () => {
                   Прямой — сеты упражнений целевыми на мышцу · косвенный — от базы (жимы → трицепс/плечи, тяги → бицепс, приседы → ягодицы/бицепс бедра) · эффективный = прямой + косвенный · недельный — пиковая неделя, общий — сумма по всем неделям мезоцикла · статус по эффективному.
                 </div>
               </div>
+              </div>
             </div>
           );
         })()}
-        {/* === Детальный анализ — перенесено из Step4, оптимизировано === */}
+        <CollapsibleCard title="🔍 Детальный анализ" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(96,165,250,0.03))', color: '#60a5fa' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
           {freqOptResult && freqOptResult.totalAdjustments > 0 && (
             <ExpandableCard title={`🔧 Частота ${freqOptResult.totalAdjustments}`} icon="🔧" short={`${freqOptResult.totalAdjustments} рекомендаций`} full={
@@ -4430,6 +4501,7 @@ export const BbAutoConstructor: React.FC = () => {
             } />
           )}
         </div>
+        </CollapsibleCard>
                 {/* 🧠 Логика построения — PRO (только нужное) */}
         {(() => {
           const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
@@ -4452,9 +4524,8 @@ export const BbAutoConstructor: React.FC = () => {
           const specText = specTargets.length ? specTargets.join(' + ') : 'баланс';
           const pedMult = (pedAdapt as any).combinedMrvMultiplier ?? 1;
           const pedLabel = pedMult>1 ? `MRV ×${Number(pedMult).toFixed(2)} · ${peds.join(', ')||'курс'}` : 'натурал';
-          return (
-            <div style={{ ...CARD, marginTop:8, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.38)' }}>
-              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(59,130,246,0.05))', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+          return <CollapsibleCard title="🧠 Логика построения — PRO" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }}><div style={{ ...CARD, marginTop:8, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.38)' }}>
+              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(59,130,246,0.05))', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'none' }}>
                 <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>🧠 Логика построения — PRO</div>
                 <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>Только ключевые решения — почему план именно такой для ваших параметров</div>
               </div>
@@ -4526,8 +4597,8 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
-          );
+            </div></CollapsibleCard>
+          ;
         })()}
         {/* Прогноз по фазам — факт из плана */}
         {(() => {
@@ -4539,9 +4610,8 @@ export const BbAutoConstructor: React.FC = () => {
           const hasDeload = actualDeloadWeeks.length > 0;
           const accWeeks = W.filter((w:any) => ((w as any).phase || 'accumulation') === 'accumulation');
           const intensWeeks = W.filter((w:any) => ((w as any).phase || '') === 'intensification');
-          return (
-            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6 }}>🔮 Прогноз по фазам</div>
+          return <CollapsibleCard title="🔮 Прогноз по фазам" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))', color: '#22c55e' }}><div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6, display:'none' }}>🔮 Прогноз по фазам</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:11 }}>
                 <div>
                   <span style={{ color:'#fff' }}>Пик объёма: </span>
@@ -4580,17 +4650,16 @@ export const BbAutoConstructor: React.FC = () => {
                   ⚠ Мезоцикл {W.length} нед без разгрузки — высокий риск перетрена. Добавьте разгрузочную неделю.
                 </div>
               )}
-            </div>
-          );
+            </div></CollapsibleCard>
+          ;
         })()}
         {/* Подробная таблица объёма по мышцам — убрана как дубль «Бюджета объёма» (Step 4 heatmap + Step 5 VolumeBudgetCard) */}
         {/* PRO Quality — отдельный блок, данные из единого quality.proResult */}
         {(() => {
           const proQ = (quality as any).proResult as ReturnType<typeof analyzeProQuality> | null;
           if (!proQ) return null;
-          return (
-            <div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6 }}>🧠 PRO-качество (паттерны/углы/растяжка)</div>
+          return <CollapsibleCard title="🧠 PRO-качество (паттерны/углы/растяжка)" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(168,85,247,0.03))', color: '#a855f7' }}><div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6, display:'none' }}>🧠 PRO-качество (паттерны/углы/растяжка)</div>
               <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Оценка техники/углов/растяжки из интеллектуальных тренировок. Скорректировала базовую оценку на {proQ.scoreDelta>0?'+':''}{proQ.scoreDelta}.</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
                 <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} в норме {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
@@ -4601,10 +4670,9 @@ export const BbAutoConstructor: React.FC = () => {
               {proQ.totalIssues.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss,i)=><div key={i}>• {iss}</div>)}</div>}
               {proQ.totalRecommendations.length > 0 && <div style={{ marginTop:4, fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec,i)=><div key={i}>→ {rec}</div>)}</div>}
               <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Изменение оценки: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включено в итог {quality.score}/100)</div>
-            </div>
-          );
+            </div></CollapsibleCard>
+          ;
         })()}
-
         {/* Прогрессия весов по неделям (основные упражнения) — факт из плана */}
         {(() => {
           const totalW = W.length;
@@ -4624,9 +4692,8 @@ export const BbAutoConstructor: React.FC = () => {
           if (primaryExs.size === 0) return null;
           const top = [...primaryExs.values()].filter(e => e.weights.some(w => w > 0)).slice(0, 6);
           if (top.length === 0) return null;
-          return (
-            <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>📈 Прогрессия весов (кг) по неделям — факт плана</div>
+          return <CollapsibleCard title="📈 Прогрессия весов (кг) — факт плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03))', color: '#f59e0b' }}><div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
+              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6, display:'none' }}>📈 Прогрессия весов (кг) по неделям — факт плана</div>
               <div style={{ overflowX:'auto' }}>
                 <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, minWidth: cols*40+120 }}>
                   <span style={{ fontWeight:700, color:'#fff' }}>Упражнение</span>
@@ -4661,10 +4728,10 @@ export const BbAutoConstructor: React.FC = () => {
                 <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span>
               </div>
               {totalW > 8 && <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Показаны первые 8 нед из {totalW}</div>}
-            </div>
-          );
+            </div></CollapsibleCard>
+          ;
         })()}
-        {/* Мусорный объём — полностью на русском, проверка с учётом всех выбранных параметров и плана */}
+        <CollapsibleCard title="🗑 Мусорный объём" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.03))', color: '#ef4444' }}>
         {(() => {
           const garbage = detectGarbageVolume(builtPlan.weeks, weakPoints, { level: bbLevel, trainingYears: bbTrainingYears, focusGroup: '', specialization: specializationMode, specializationTargets: specTargets });
           const ruMuscleG = (m: string) => (MUSCLE_LABEL_RU as any)[m] || m;
@@ -4722,18 +4789,17 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Формула: per session seenPatterns[day-muscle-pattern] → если дубль && !isWeak && !calvesByDesign → мусор. isWeak учитывает weakPoints+focusGroup+specializationTargets.</div>
             </div>
           );
-        })()}
+        })()}</CollapsibleCard>
         {/* Рекомендации — единственные, детали уже в них (quality.details убраны как дубль) */}
-        {quality.recommendations && quality.recommendations.length > 0 && (
+        <CollapsibleCard title="💡 Рекомендации по качеству плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03))', color: '#f59e0b' }}>{quality.recommendations && quality.recommendations.length > 0 && (
           <div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6 }}>💡 Рекомендации по качеству плана</div>
+            <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6, display:'none' }}>💡 Рекомендации по качеству плана</div>
             {quality.recommendations.map((r, i) => (
               <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:4, borderLeft:'2px solid #f59e0b' }}>{r}</div>
             ))}
           </div>
-        )}
-        {/* Volume chart */}
-        {(() => {
+        )}</CollapsibleCard>
+        <CollapsibleCard title="📊 Объём по неделям (сетов)" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(96,165,250,0.03))', color: '#60a5fa' }}>{(() => {
           const vdata: WeekVolume[] = W.map(w => {
             const muscles: Record<string, number> = {};
             w.sessions.forEach(s => s.exercises.forEach(e => { const m = e.muscle || 'other'; muscles[m] = (muscles[m] || 0) + e.sets; }));
@@ -4746,9 +4812,8 @@ export const BbAutoConstructor: React.FC = () => {
               <VolumeByWeekChart data={vdata} />
             </div>
           );
-        })()}
-        {/* RIR drift chart */}
-        {(() => {
+        })()}</CollapsibleCard>
+        <CollapsibleCard title="📉 Динамика RIR по неделям" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(168,85,247,0.03))', color: '#a855f7' }}>{(() => {
           const rdata: RirRecord[] = [];
           W.forEach(w => w.sessions.forEach(s => s.exercises.forEach(e => rdata.push({ week: w.week, exercise: e.name || e.muscle || '', rir: e.rir || 0 }))));
           if (rdata.length < 2) return null;
@@ -4758,10 +4823,9 @@ export const BbAutoConstructor: React.FC = () => {
               <RirDriftChart data={rdata} />
             </div>
           );
-        })()}
-        {/* Load assessment */}
-        <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📈 Оценка тренировочной нагрузки</div>
+        })()}</CollapsibleCard>
+        <CollapsibleCard title="📈 Оценка тренировочной нагрузки" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(96,165,250,0.03))', color: '#60a5fa' }}><div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6, display:'none' }}>📈 Оценка тренировочной нагрузки</div>
           {!ratio ? <div style={SMALL}>Недостаточно данных sRPE для расчёта ACWR. Ведите дневник тренировок.</div> : (
             <div>
               <div style={{ display:'flex', gap:12, alignItems:'center' }}>
@@ -4771,8 +4835,8 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ marginTop:6, ...SMALL }}>Хроническая нагрузка (28д) vs острая (7д). Цель: 0.8-1.3. Разгрузка при {`>`}1.5.</div>
             </div>
           )}
-        </div>
-        {/* Дополнительно: прогрессия мезоцикла — свернуто по умолчанию */}
+        </div></CollapsibleCard>
+        {/* Дополнительно: прогноз прогрессии — свернуто по умолчанию */}
         <ExpandableCard
           title="🔧 Дополнительно: прогноз прогрессии"
           icon="🔧"
@@ -4783,8 +4847,7 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           }
         />
-        {/* Экспорт — фактические параметры плана */}
-        {quality && (
+        <CollapsibleCard title="📤 Экспорт плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(96,165,250,0.03))', color: '#60a5fa' }}>{quality && (
           <div style={{ marginTop:8 }}>
             <PlanExportCard
               bbPlan={builtPlan}
@@ -4805,8 +4868,7 @@ export const BbAutoConstructor: React.FC = () => {
               meta={{ splitName: builtPlan.pattern?.name || 'BB-сплит', weeks: W.length, corrections: builtPlan.rationale }}
             />
           </div>
-        )}
-
+        )}</CollapsibleCard>
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
