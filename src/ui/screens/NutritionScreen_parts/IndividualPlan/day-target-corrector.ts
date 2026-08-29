@@ -207,6 +207,7 @@ export function correctDayToTargets(
         } else if (cand.it.role === 'fruit') {
           floor = 30;
         }
+        const minFactor = opts?.allowCoreScale ? 0.85 : 0.90;
         const minAmount = isCore ? Math.max(floor, Math.round(cand.it.amount * minFactor / curScale)) : Math.max(floor, 15);
         // шаг — до 15% за итерацию
         const targetCutG = Math.min(cand.it.amount - minAmount, Math.ceil(Math.abs(need) / cand.per100 * 100 * 0.7));

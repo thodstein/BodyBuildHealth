@@ -2308,7 +2308,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     let v = CARB_W[r] ?? 0.5;
     if (r === 'dinner' && input.eveningLowCarb) v *= 0.5;
     if (morningTrainLoad) {
-      if (r === 'dinner') v *= 2.0;      // вечер: много углеводов (сохраняет eveningLowCarb если был)
+      if (r === 'dinner') v *= 3.0;      // вечер: много углеводов (утренняя сессия — загрузка гликогена, вечер > завтрак)
       if (r === 'breakfast') v *= 0.5; // утро: меньше (сессия уже завтра)
       if (r === 'postw') v *= 1.5;          // сразу после утренней сессии — загрузка
     }
