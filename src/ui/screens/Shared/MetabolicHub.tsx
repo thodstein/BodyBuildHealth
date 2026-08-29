@@ -36,8 +36,9 @@ const MODE_DEFS: Array<{m:Mode; label:string; icon:string; desc:string; accent:s
   {m:'thyroid', label:'Щит', icon:'🦋', desc:'Thyroid/HOMA', accent:'#8b5cf6', hint:'Kim FT4 + HOMA-IR Wallace', evidence:'B (Kim/Wallace)'},
 ];
 
-const SNAP_KEY = 'he_metabolic_snapshot_v3';
-const SNAP_KEY_LEGACY = 'he_metabolic_snapshot_v2';
+const SNAP_KEY = 'he_metabolic_snapshot_v4';
+const SNAP_KEY_LEGACY = 'he_metabolic_snapshot_v3';
+const SNAP_KEY_V2 = 'he_metabolic_snapshot_v2';
 const SCENARIOS_KEY = 'he_metabolic_scenarios_v1';
 
 function Bar({v, max, color, label}:{v:number; max:number; color:string; label?:string}){
@@ -244,11 +245,11 @@ export const MetabolicHub: React.FC = () => {
     return ()=>{ clearInterval(id); window.removeEventListener('storage', onStorage); window.removeEventListener('focus', refreshLabs); };
   }, [refreshLabs]);
 
-  // init from snapshot v3 → v2 → profile v2 (расширенный)
+  // init from snapshot v4 → v3 → v2 → v1 → profile v2 (миграция v4: ft4/HOMA/JP/BIA/AT)
   useEffect(()=>{
     let loaded=false;
     try{
-      const raw = localStorage.getItem(SNAP_KEY) || localStorage.getItem(SNAP_KEY_LEGACY) || localStorage.getItem('he_metabolic_snapshot_v1');
+      const raw = localStorage.getItem(SNAP_KEY) || localStorage.getItem(SNAP_KEY_LEGACY) || localStorage.getItem(SNAP_KEY_V2) || localStorage.getItem('he_metabolic_snapshot_v1');
       if(raw){
         const s=JSON.parse(raw);
         if(typeof s.weight==='number') setWeight(s.weight);
@@ -533,8 +534,8 @@ export const MetabolicHub: React.FC = () => {
         </div>
         {sex==='female' && (
           <div style={{ marginTop:8, display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-            <PopupSelect label="Фаза цикла" value={menstrualPhase} options={[{id:'none',label:'—'},{id:'follicular',label:'Фолликулярная'},{id:'luteal',label:'Лютеиновая +250ккал'}]} onChange={v=> setMenstrualPhase(v as any)} />
-            <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', display:'flex', alignItems:'center', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px' }}>{kbju.lutealAdd? `+${kbju.lutealAdd}ккал лютеин`:'—'}</div>
+            <PopupSelect label="Фаза цикла" value={menstrualPhase} options={[{id:'none',label:'—'},{id:'follicular',label:'Фолликулярная'},{id:'luteal',label:'Лютеиновая +250ккал +1кг воды'}]} onChange={v=> setMenstrualPhase(v as any)} />
+            <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', display:'flex', alignItems:'center', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'8px 10px' }}>{kbju.lutealAdd? `+${kbju.lutealAdd}ккал +1.2кг воды Benton 2021`:'— фолликул'}</div>
           </div>
         )}
       </div>
@@ -851,6 +852,7 @@ export const MetabolicHub: React.FC = () => {
                   <Bar v={kbju.tefNat} max={kbju.nat.tdee} color="#a78bfa" label={`TEF ${kbju.tefNat}`} />
                 </div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.45)', marginTop:4 }}>TDEE {kbju.nat.tdee}= BMR{kbju.bmr}+NEAT{kbju.neat}+EAT{kbju.eat}+TEF{kbju.tefNat} (TEF ~10% внутри PAL, показан для наглядности)</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.35)', marginTop:3 }}>FAO 2004: BEE=BMR×1.10 (TEF), TEE=BEE×PAL. У нас TDEE=BMR×PAL — PAL FAO уже включает TEF; TEF отдельно информативен, BEE≈{kbju.bmr + kbju.tefNat}ккал</div>
               </div>
               {kbju.adaptive ? (
                 <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background: Math.abs(kbju.adaptive.adjustment)>120 ? 'rgba(245,158,11,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${Math.abs(kbju.adaptive.adjustment)>120 ? 'rgba(245,158,11,0.18)' : 'rgba(34,197,94,0.18)'}`, fontSize:10, color:'#fff', lineHeight:1.4 }}>
@@ -1027,6 +1029,7 @@ export const MetabolicHub: React.FC = () => {
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:7, color:'rgba(255,255,255,0.45)', marginTop:2 }}><span>0 LEA</span><span>30</span><span>45 opt</span><span>60</span></div>
               {goal==='health' && ea.zone==='low' && <div style={{ marginTop:8, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.18)', fontSize:10, color:'#f87171' }}>⚠ Цель Здоровье + LEA &lt;30 — підвись ккал +300 или снизь EEE (убери 1 трен/кардио). Проверь ферритин/витамин D.</div>}
+              {ea.ea!=null && ea.ea < 20 && <div style={{ marginTop:6, padding:'8px 10px', borderRadius:8, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', fontSize:9, color:'#f87171' }}>🚨 PSMF: EA &lt;20 (Blackburn) → FFM loss неизбежен даже с 2.8г/кг белка. EA {ea.ea} — срочно +300ккал. {ea.ea <15 && 'EA <15 — критично!'}</div>}
             </div>
           )}
           {mode==='alcohol' && (

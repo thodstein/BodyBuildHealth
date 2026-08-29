@@ -27,6 +27,10 @@ import {
   calcJPBodyFat,
   calcDurninBodyFat,
   calcBIAKyle,
+  estimateLipidImpact,
+  calcFLI,
+  checkPSMF,
+  menstrualWaterRetention,
   type WeightPoint as WeightPointBase,
 } from '../core/metabolic-constants';
 import { clinicalFloorsForLabs } from './risk-engine-tz-spec';
@@ -741,6 +745,10 @@ export function calcThyroidImpact(ft4?: number, tsh?: number): { mult:number; no
 
 // ——— HOMA-IR — Wallace 2004 ———
 export function calcHomaIRWrap(glucoseMgDl?: number, insulinMuMl?: number): { homa:number|null; zone:'unknown'|'optimal'|'attention'|'ir'; note:string } {
+  // экспортируем также Mensink/FLI/PSMF/menstrual для хаба
+  return _calcHomaIRWrap(glucoseMgDl, insulinMuMl);
+}
+function _calcHomaIRWrap(glucoseMgDl?: number, insulinMuMl?: number): { homa:number|null; zone:'unknown'|'optimal'|'attention'|'ir'; note:string } {
   const homa = calcHomaIR(glucoseMgDl, insulinMuMl);
   if (homa == null) return { homa: null, zone: 'unknown', note: 'Введи глюкозу (мг/дл) + инсулин (мкЕд/мл) натощак' };
   let zone: 'optimal'|'attention'|'ir' = 'optimal';
@@ -750,3 +758,7 @@ export function calcHomaIRWrap(glucoseMgDl?: number, insulinMuMl?: number): { ho
   } else { zone='ir'; note='HOMA-IR ≥2.5 — инсулинорезистентность, угли ≤3г/кг, метформин к врачу'; }
   return { homa, zone, note };
 }
+export const calcLipid = estimateLipidImpact;
+export const calcFLIWrap = calcFLI;
+export const checkPSMFWrap = checkPSMF;
+export const calcMenstrualWater = menstrualWaterRetention;

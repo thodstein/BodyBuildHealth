@@ -488,4 +488,19 @@ describe('metabolic-hub PRO v2 — новые Pro-исправления', () =>
     expect(hallAdaptationFactor(21)).toBeGreaterThan(hallAdaptationFactor(60));
     expect(hallAdaptationFactor(0)).toBe(1);
   });
+  it('P3 Lipid Mensink + FLI Bedogni + PSMF + menstrual', async () => {
+    const { estimateLipidImpact, calcFLI, checkPSMF, menstrualWaterRetention } = await import('../../core/metabolic-constants');
+    const lip = estimateLipidImpact(30, 15, 120);
+    expect(lip).not.toBeNull();
+    expect(lip!.ldlDelta).toBeGreaterThan(0);
+    const fli = calcFLI({ bmi: 28, waistCm: 102, tgMgDl: 180, ggt: 45 });
+    expect(fli).not.toBeNull();
+    expect(fli!).toBeGreaterThan(30); expect(fli!).toBeLessThan(100);
+    const fliLean = calcFLI({ bmi: 22, waistCm: 78, tgMgDl: 80, ggt: 15 });
+    expect(fliLean!).toBeLessThan(30);
+    expect(checkPSMF(12).risk).toBe(true);
+    expect(checkPSMF(25).risk).toBe(false);
+    expect(menstrualWaterRetention('luteal').kg).toBe(1.2);
+    expect(menstrualWaterRetention('follicular').kg).toBe(0);
+  });
 });

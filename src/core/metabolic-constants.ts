@@ -443,3 +443,36 @@ export function calcBIAKyle(weightKg: number, heightCm: number, age: number, sex
   }
   return null;
 }
+
+// ── Lipid Mensink 2003 + FLI Bedogni 2006 + PSMF + Menstrual ──
+export function estimateLipidImpact(sfaG?: number, fiberG?: number, baseLdl?: number): { ldlDelta:number; note:string } | null {
+  if (typeof sfaG !== 'number' || typeof fiberG !== 'number') return null;
+  // Mensink Am J Clin Nutr 2003: SFA 10г → LDL +12мг/дл, fiber 10г → −5мг/дл (упрощено 1.2 и 0.5)
+  const ldlDelta = Math.round(sfaG * 1.2 - fiberG * 0.5);
+  const base = typeof baseLdl === 'number' ? baseLdl : 120;
+  const note = ldlDelta > 10 ? `SFA ${sfaG}г + fiber ${fiberG}г → LDL ${base+ldlDelta} (+${ldlDelta}) — снизь SFA <10% ккал` : `LDL ~${base+ldlDelta} (Δ ${ldlDelta>=0?'+':''}${ldlDelta})`;
+  return { ldlDelta, note };
+}
+export function calcFLI(params: { bmi:number; waistCm:number; tgMgDl?:number; ggt?:number }): number | null {
+  // Bedogni BMC Gastro 2006 FLI: logit = 0.953*ln(TG)+0.139*BMI+0.718*ln(GGT)+0.053*waist -15.745
+  const { bmi, waistCm, tgMgDl, ggt } = params;
+  if (!isFinite(bmi) || !isFinite(waistCm) || bmi<12 || waistCm<50) return null;
+  const tg = tgMgDl ?? 120; // если нет — средний
+  const ggtV = ggt ?? 25;
+  if (tg <= 0 || ggtV <= 0) return null;
+  const logit = 0.953 * Math.log(tg) + 0.139 * bmi + 0.718 * Math.log(ggtV) + 0.053 * waistCm - 15.745;
+  const fli = (Math.exp(logit) / (1 + Math.exp(logit))) * 100;
+  return clamp(Math.round(fli), 0, 100);
+}
+export function checkPSMF(ea?: number | null): { risk:boolean; note:string } {
+  // Blackburn 1973: EA <15 → обязательная потеря FFM даже с белком 2.8г/кг
+  if (ea == null) return { risk:false, note:'EA неизвестна — введи ккал/EEE' };
+  if (ea < 15) return { risk:true, note:'PSMF риск: EA <15 → FFM loss неизбежен (Blackburn). +300ккал или снизь EEE' };
+  if (ea < 20) return { risk:true, note:'EA 15-20 — граница PSMF, белок 2.8г/кг + силовые обязательны' };
+  return { risk:false, note:'EA ≥20 — PSMF безопасен по FFM' };
+}
+export function menstrualWaterRetention(phase?: string): { kg:number; note:string } {
+  // Benton 2021: лютеин +1-2кг воды, Na-чувствительность ↑, Fe потеря
+  if (phase === 'luteal') return { kg: 1.2, note:'Лютеин: +1-2кг воды, +3.2ккал/кг BMR, Na осторожнее, Fe контроль' };
+  return { kg: 0, note:'Фолликул: без задержки воды' };
+}
