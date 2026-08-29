@@ -619,6 +619,7 @@ export const BbAutoConstructor: React.FC = () => {
   const [safetyDistributionOpen, setSafetyDistributionOpen] = useState(true);
   const [safetyConclusionOpen, setSafetyConclusionOpen] = useState(true);
   const [safetyFactorsOpen, setSafetyFactorsOpen] = useState(true);
+  const [generalSafetyLoadOpen, setGeneralSafetyLoadOpen] = useState(true);
   const [jointAnalysisOpen, setJointAnalysisOpen] = useState(true);
   const [qualityVolumeOpen, setQualityVolumeOpen] = useState(true);
   const [qualityLogicOpen, setQualityLogicOpen] = useState(true);
@@ -3860,7 +3861,13 @@ export const BbAutoConstructor: React.FC = () => {
     const ratio = acwrData;
     return (
       <div>
-        {safetyScore && (
+        <div style={{ ...CARD, padding:0, overflow:'hidden', marginBottom:8, border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.32)' }}>
+          <button type="button" onClick={() => setGeneralSafetyLoadOpen(v=>!v)} aria-expanded={generalSafetyLoadOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', cursor:'pointer', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(96,165,250,0.06))', border:'none', borderBottom: generalSafetyLoadOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+            <span style={{ fontSize:14, fontWeight:900, color:'#fff' }}>🛡️ Безопасность и нагрузка — общий обзор</span>
+            <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:13, transform: generalSafetyLoadOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+          </button>
+          <div style={{ display: generalSafetyLoadOpen ? 'block' : 'none', padding:'8px 12px' }}>
+            {safetyScore && (
           <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, borderRadius: 14, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)', overflow:'hidden' }}>
             {/* Header gauge + overall */}
             <div style={{ padding: 12, display:'flex', gap:12, alignItems:'center', background: `linear-gradient(135deg, ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.14)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.14)':'rgba(239,68,68,0.14)'}, transparent)`}}>
@@ -4880,6 +4887,8 @@ export const BbAutoConstructor: React.FC = () => {
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
         </div>
         {renderActionRow(true)}
+          </div>
+        </div>
         </div>
       </div>
     );
