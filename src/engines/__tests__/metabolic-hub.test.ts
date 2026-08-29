@@ -378,7 +378,7 @@ describe('metabolic-hub PRO v2 — новые Pro-исправления', () =>
     expect(withBF.allMethods).toBeUndefined(); // с BF — allMethods не нужен
     const noBF = computeBMR({ weight:80, height:180, age:30, sex:'male' });
     expect(noBF.allMethods).toBeDefined();
-    expect(Object.keys(noBF.allMethods!).length).toBe(8);
+    expect(Object.keys(noBF.allMethods!).length).toBe(9); // + henry_full
     expect(noBF.allMethods!.harris_revised).toBeGreaterThan(1500);
     expect(noBF.allMethods!.livingston).toBeGreaterThan(1500);
     expect(noBF.lean).toBeGreaterThan(50); // Deurenberg lean, not 15% fix

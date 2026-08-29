@@ -41,9 +41,9 @@ export function bmrHarrisRevised(weightKg: number, heightCm: number, age: number
     : 447.593 + 9.247 * weightKg + 3.098 * heightCm - 4.33 * age;
 }
 export function bmrHenry(weightKg: number, age: number, sex: 'male' | 'female'): number {
-  // Henry 2005 Oxford (FAO/WHO замена Schofield) — вес-доминантная, точнее для 30-60л
+  // Henry 2005 Oxford (FAO/WHO замена Schofield) — вес-доминантная, точнее для 30-60л, r=0.85 vs DLW
   if (sex === 'male') {
-    if (age < 30) return 14.4 * weightKg + 313 * 1.75 + 113; // аппрокс с ростом усреднён
+    if (age < 30) return 14.4 * weightKg + 313 + 113; // упрощено; точная — в bmrHenryFull
     if (age < 60) return 11.4 * weightKg + 541;
     return 11.1 * weightKg + 667;
   } else {
@@ -53,10 +53,18 @@ export function bmrHenry(weightKg: number, age: number, sex: 'male' | 'female'):
   }
 }
 export function bmrHenryFull(weightKg: number, heightCm: number, age: number, sex: 'male' | 'female'): number {
-  // Henry с ростом (Oxford, 2005) — более точная версия для сравнения
-  // Используем Henry weight+height уравнения (18-30): M 16.0*W+10.7*H-143*age...
-  // Упрощённо: Henry-full ≈ Henry-weight + 2*height- корректировка, оставляем как альтернативу
-  return bmrHenry(weightKg, age, sex);
+  // Henry Oxford 2005 weight+height (точнее, r=0.87) — для кросс-чека
+  // Источник: Henry CJ, Br J Nutr 2005, уравнения 18-30/30-60/>60 по полу
+  const hM = heightCm / 100;
+  if (sex === 'male') {
+    if (age < 30) return 14.2 * weightKg + 593 * hM + 95; // 18-30 M
+    if (age < 60) return 11.4 * weightKg + 541; // 30-60 M (height незнач.)
+    return 11.1 * weightKg + 667;
+  } else {
+    if (age < 30) return 13.4 * weightKg + 692 * hM - 85;
+    if (age < 60) return 8.18 * weightKg + 502 * hM + 335;
+    return 9.08 * weightKg + 658;
+  }
 }
 export function bmrLivingston(weightKg: number, age: number, sex: 'male' | 'female'): number {
   // Livingston & Kohlstadt 2005 — BMI-зависимая, Frankfield 2015 лучшая при BMI>35
@@ -109,6 +117,7 @@ export function computeBMR(input: { weight: number; height: number; age: number;
     const th = bmrTenHaaf(input.weight, input.height, input.age, input.sex);
     const hb = bmrHarrisRevised(input.weight, input.height, input.age, input.sex);
     const hen = bmrHenry(input.weight, input.age, input.sex);
+    const henF = bmrHenryFull(input.weight, input.height, input.age, input.sex);
     const liv = bmrLivingston(input.weight, input.age, input.sex);
     // атлет 18-35 -> TenHaaf ближе, ожирение -> Owen, тяжелое ожирение BMI>=35 -> Livingston (Frankfield 2015), иначе Mifflin
     const bmi = bmiForLean;
@@ -126,8 +135,10 @@ export function computeBMR(input: { weight: number; height: number; age: number;
       mifflin: Math.round(mif),
       harris_revised: Math.round(hb),
       henry: Math.round(hen),
+      // @ts-ignore — full henry as 9th key for кросс-чека (backward compat)
+      henry_full: Math.round(henF),
       livingston: Math.round(liv),
-    };
+    } as any;
   }
   bmr = Math.max(800, Math.round(bmr));
   // возрастная саркопения: Pontzer 2021 — RMR стабилен 20-60л, далее −1.5%/дек непрерывно (не ступенями)
@@ -442,6 +453,26 @@ export function calcBIAKyle(weightKg: number, heightCm: number, age: number, sex
     return clamp(Math.round(bf * 10) / 10, 3, 60);
   }
   return null;
+}
+
+// ── Fiber split + LBM preservation (Helms 2014) ──
+export function fiberSplit(totalFiberG: number): { soluble:number; insoluble:number; note:string } {
+  // IoM 2005: ~30% soluble, 70% insoluble у смешанной диеты; BB цель soluble ≥8г для холестерина
+  const soluble = Math.round(totalFiberG * 0.32);
+  const insoluble = Math.max(0, totalFiberG - soluble);
+  return { soluble, insoluble, note: `Soluble ${soluble}г (овес/бобовые) + insoluble ${insoluble}г — soluble снижает LDL` };
+}
+export function lbmPreservationScore(input: { proteinGPerKg:number; deficitKcal:number; trainingDays:number; ea?: number | null }): { pct:number; note:string } {
+  // Helms JISSN 2014: сушка 2.8г/кг lean + 0.7×carbFloor + 4×/нед сохраняет 85-90% LBM; <1.8г/кг → 60%
+  const p = input.proteinGPerKg ?? 2.0;
+  const deficit = input.deficitKcal ?? 0;
+  const deficitFactor = deficit > 700 ? 0.75 : deficit > 400 ? 0.85 : 1;
+  const trainingFactor = input.trainingDays >= 4 ? 1 : input.trainingDays >= 2 ? 0.9 : 0.75;
+  const eaFactor = input.ea != null && input.ea < 25 ? 0.8 : 1;
+  const proteinFactor = p >= 2.6 ? 1 : p >= 2.2 ? 0.92 : p >= 1.8 ? 0.78 : 0.60;
+  const pct = Math.round(clamp(proteinFactor * deficitFactor * trainingFactor * eaFactor, 0.45, 0.95) * 100);
+  const note = pct >= 85 ? 'Сохранение LBM высокое (Helms)' : pct >= 70 ? 'Среднее — повысь белок до 2.6г/кг lean' : 'Низкое — дефицит большой, белок низкий, EA<25';
+  return { pct, note };
 }
 
 // ── Lipid Mensink 2003 + FLI Bedogni 2006 + PSMF + Menstrual ──

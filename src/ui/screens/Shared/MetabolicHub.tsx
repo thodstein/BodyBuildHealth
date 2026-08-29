@@ -7,7 +7,7 @@
  *  Канон — Питание, алиас — Тренировки/Интеллект.
  */
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
+import { calcWater, calcSteps, calcKBJU, calcBodyFat, calcCortisol, calcStressLoad, calcHematology, calcEnergyAvailability, calcAlcohol, calcProteinTiming, calcMaintenanceFinder, calcGoalTimeline, calcAdaptiveThermogenesis, calcReverseDiet, calcNEAT, calcThyroidImpact, calcHomaIRWrap, calcLipid, calcFLIWrap, checkPSMFWrap, calcMenstrualWater, calcFiberSplit, calcLBMPreservation, AAS_EXPERIMENTAL_NOTE, type MetabolicInput } from '../../../engines/metabolic-hub.engine';
 import { getProfile } from '../../../core/profile-manager';
 import { getNutritionV2Data } from '../../../core/nutrition-v2-data';
 import { readDiaryV2, onDiaryChangeV2 } from '../NutritionScreen_parts/diary-storage-v2';
@@ -385,6 +385,7 @@ export const MetabolicHub: React.FC = () => {
     const bmi = weight / (((height||180)/100)**2);
     return calcFLIWrap({ bmi, waistCm: waist||84, tgMgDl: tgMgDl2, ggt });
   }, [weight, height, waist, tgMgDl2, ggt]);
+  const fiberSplit = useMemo(()=> calcFiberSplit(kbju.fiber.nat), [kbju]);
   const hematology = useMemo(()=>{
     let proteinPerKg: number|undefined; let fiberGV: number|undefined; let omega3GV: number|undefined;
     try{
@@ -403,6 +404,7 @@ export const MetabolicHub: React.FC = () => {
     const eee = weeklyVolumeTons ? Math.round(weeklyVolumeTons* 380) : (trainingDays* 320 + cardioMin*7);
     return calcEnergyAvailability({ weight, bodyFat, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eee, trainingDays, sex } as any);
   }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, diaryAvgKcal, sex]);
+  const lbmPres = useMemo(()=> calcLBMPreservation({ proteinGPerKg: kbju.nat.protPerKg, deficitKcal: kbju.nat.tdee - kbju.nat.kcal >0 ? kbju.nat.tdee - kbju.nat.kcal : 0, trainingDays, ea: ea?.ea }), [kbju, trainingDays, ea]);
   const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
   const menstrual = useMemo(()=> calcMenstrualWater(menstrualPhase), [menstrualPhase]);
   const alcohol = useMemo(()=> calcAlcohol(alcoholG, weight), [alcoholG, weight]);
@@ -1090,7 +1092,7 @@ export const MetabolicHub: React.FC = () => {
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>Train day: {kbju.periodization.trainDay.kcal}ккал Б{kbju.periodization.trainDay.p} Ж{kbju.periodization.trainDay.f} У{kbju.periodization.trainDay.c}</div>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', textAlign:'center', fontSize:9, color:'#fff' }}>Rest day: {kbju.periodization.restDay.kcal}ккал Б{kbju.periodization.restDay.p} Ж{kbju.periodization.restDay.f} У{kbju.periodization.restDay.c}</div>
               </div>
-              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>💡 {kbju.carbTiming} · Клетчатка {kbju.fiber.nat}г (14г/1000ккал = {kbju.fiber.nat}г). TEF {kbju.tefNat}ккал перс. (P25% C7% F3%).</div>
+              <div style={{ marginTop:6, fontSize:9, color:'rgba(255,255,255,0.55)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:8, padding:'7px 10px' }}>💡 {kbju.carbTiming} · Клетчатка {kbju.fiber.nat}г (soluble {fiberSplit.soluble} + insoluble {fiberSplit.insoluble} IoM) · TEF {kbju.tefNat}ккал перс. (P25% C7% F3%) · LBM save {lbmPres.pct}% {lbmPres.note}</div>
             </div>
           )}
           {mode==='maintenance' && (

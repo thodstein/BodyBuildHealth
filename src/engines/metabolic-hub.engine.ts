@@ -27,6 +27,8 @@ import {
   calcJPBodyFat,
   calcDurninBodyFat,
   calcBIAKyle,
+  fiberSplit,
+  lbmPreservationScore,
   estimateLipidImpact,
   calcFLI,
   checkPSMF,
@@ -762,3 +764,5 @@ export const calcLipid = estimateLipidImpact;
 export const calcFLIWrap = calcFLI;
 export const checkPSMFWrap = checkPSMF;
 export const calcMenstrualWater = menstrualWaterRetention;
+export const calcFiberSplit = fiberSplit;
+export const calcLBMPreservation = lbmPreservationScore;
