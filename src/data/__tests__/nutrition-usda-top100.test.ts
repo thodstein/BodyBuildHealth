@@ -27,12 +27,12 @@ describe('A3: USDA reference anchors for planner staples', () => {
         }
       } else {
         const anchor = ref as any;
-        // допуски: фактическое USDA сравнение — per100 вариативность готовки/усушки/сухой-варёный до ±40%
+        // допуски: фактическое USDA — per100 invariant, строгая сверка (≤12% kcal, ≤15% макросов) — fixture точен к FOOD_DB
         const checks: Array<{ field: string; value: number; expected: number; tolPct: number; absTol: number }> = [
-          { field: 'kcal', value: food.kcal, expected: anchor.kcal, tolPct: anchor.kcalTolPct ?? 45, absTol: 18 },
-          { field: 'protein', value: food.protein, expected: anchor.protein, tolPct: anchor.macroTolPct ?? 45, absTol: 3.0 },
-          { field: 'fat', value: food.fat, expected: anchor.fat, tolPct: anchor.macroTolPct ?? 45, absTol: 3.0 },
-          { field: 'carbs', value: food.carbs, expected: anchor.carbs, tolPct: anchor.macroTolPct ?? 45, absTol: 3.0 },
+          { field: 'kcal', value: food.kcal, expected: anchor.kcal, tolPct: anchor.kcalTolPct ?? 12, absTol: 8 },
+          { field: 'protein', value: food.protein, expected: anchor.protein, tolPct: anchor.macroTolPct ?? 15, absTol: 1.2 },
+          { field: 'fat', value: food.fat, expected: anchor.fat, tolPct: anchor.macroTolPct ?? 15, absTol: 1.0 },
+          { field: 'carbs', value: food.carbs, expected: anchor.carbs, tolPct: anchor.macroTolPct ?? 15, absTol: 1.2 },
         ];
         for (const { field, value, expected, tolPct, absTol } of checks) {
           if (expected === 0) {

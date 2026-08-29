@@ -12,7 +12,7 @@
 
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
-import { foodAvailableForPlan } from './food-availability';
+import { foodAvailableForPlan, stapleFamilyOf } from './food-availability';
 
 export interface DayTargets { kcal: number; p: number; f: number; c: number; }
 export interface CorrectorItem { id: string; name: string; amount: number; kcal: number; p: number; f: number; c: number; fiber?: number; leucine_mg?: number; role?: string; _fixedGrams?: number; }
@@ -86,6 +86,13 @@ function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>): FoodItem[] 
     if (lowGi.length >= 2) pool = lowGi;
   }
   return pool;
+}
+
+function currentNutGrams(meals: CorrectorMeal[]): number {
+  return meals.flatMap(m => m.items).filter(it => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + (it.amount || 0), 0);
+}
+function currentFiber(meals: CorrectorMeal[]): number {
+  return meals.flatMap(m => m.items).reduce((s, it) => s + (it.fiber || 0), 0);
 }
 
 /**
@@ -224,7 +231,20 @@ export function correctDayToTargets(
         const maxAdd = isCore ? Math.round(cand.it.amount * (1.10 / curScale - 1)) : 150;
         if (maxAdd < 5) continue;
         const needG = Math.ceil(need / cand.per100 * 100);
-        const addG = Math.min(maxAdd, Math.max(10, Math.min(needG, 80)));
+        let addG = Math.min(maxAdd, Math.max(10, Math.min(needG, 80)));
+        // кап орехов/семян 85г и клетчатки 85г — не превышаем
+        const fam = stapleFamilyOf(cand.it.id) || '';
+        if ((fam === 'nuts' || fam === 'seeds') && currentNutGrams(meals) + addG > 85) {
+          addG = Math.max(0, 85 - currentNutGrams(meals));
+          if (addG < 10) continue;
+        }
+        const candFood = FOOD_DB.find(f => f.id === cand.it.id);
+        if (candFood && currentFiber(meals) + (candFood.fiber || 0) * addG / 100 > 85) {
+          const fiberRoom = 85 - currentFiber(meals);
+          const maxByFiber = Math.floor(fiberRoom / Math.max(0.1, candFood.fiber || 1) * 100);
+          addG = Math.min(addG, maxByFiber);
+          if (addG < 10) continue;
+        }
         const newAmount = cand.it.amount + addG;
         // капы: белок ≤300, фрукт ≤150, общие ≤600, зерно ≤ cap
         let cap = 600;
@@ -257,6 +277,18 @@ export function correctDayToTargets(
       const per100Best = eff === 'p' ? (best.protein || 0) : eff === 'c' ? (best.carbs || 0) : (best.fat || 0);
       if (per100Best <= 0) break;
       let grams = Math.max(20, Math.min(200, Math.round(need / per100Best * 100 / 10) * 10));
+      // кап орехов/семян и клетчатки — не превышаем 85г
+      const bestFam = stapleFamilyOf(best.id) || '';
+      if ((bestFam === 'nuts' || bestFam === 'seeds') && currentNutGrams(meals) + grams > 85) {
+        grams = Math.max(0, 85 - currentNutGrams(meals));
+        if (grams < 15) break;
+      }
+      if (currentFiber(meals) + (best.fiber || 0) * grams / 100 > 85) {
+        const fiberRoom = 85 - currentFiber(meals);
+        const maxByFiber = Math.floor(fiberRoom / Math.max(0.1, best.fiber || 1) * 100);
+        grams = Math.min(grams, maxByFiber);
+        if (grams < 15) break;
+      }
       // не выходить за 1.03× цели по этому макро
       const curMacro = eff === 'p' ? sumTotals(meals).p : eff === 'c' ? sumTotals(meals).c : sumTotals(meals).f;
       const maxMacro = (eff === 'p' ? safeTargets.p : eff === 'c' ? safeTargets.c : safeTargets.f) * 1.03;
