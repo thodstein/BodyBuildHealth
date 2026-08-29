@@ -424,12 +424,11 @@ export const BbAutoConstructor: React.FC = () => {
   useEffect(() => {
     if (!annualPlan) return;
     try {
-      const nowWeek = (() => { try { const w = (annualPlan as any).currentWeekIdx; return typeof w==='number'?w:1; } catch { return 1; } })();
       const block = (annualPlan.blocks||[]).find((b:any)=>b.ref?.phase==='contest_prep' && b.status==='built');
-      if (block?.result?.showDate && block.result.showDate !== prepShowDate) {
+      if ((block?.result as any)?.showDate && (block?.result as any)?.showDate !== prepShowDate) {
         // не перезаписываем если пользователь уже вручную менял в этом месяце
         const isRecentManual = (()=>{ try{ const v=localStorage.getItem('he_contest_manual_date'); if(!v) return false; return Date.now() - Number(v) < 86400000*7; } catch{ return false; }})();
-        if (!isRecentManual) setPrepShowDate(block.result.showDate);
+        if (!isRecentManual) setPrepShowDate((block?.result as any)?.showDate);
       }
     } catch {}
   }, [annualPlan]);
@@ -655,6 +654,16 @@ export const BbAutoConstructor: React.FC = () => {
   const [prepConfirmedManip, setPrepConfirmedManip] = useState(false);
   const [prepBusy, setPrepBusy] = useState(false);
   const [contestWizard, setContestWizard] = useState<1|2|3|4|5>(1);
+  // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
+  const [peakWeekCategory, setPeakWeekCategory] = useState<BBContestCategory>('mens_physique');
+  // ⭐ Специализация (упор мышцы к старту) — из профильного конфига, с override в UI.
+  const [peakSpec, setPeakSpec] = useState<ContestSpecialization>(() => {
+    try {
+      const raw = (linked.profile?.settings as any)?.goals?.bbPeakConfig;
+      const cfg = raw ? deserializeBBPrepConfig(raw) : null;
+      return cfg?.specialization ?? 'none';
+    } catch { return 'none'; }
+  });
   const prepContra = useMemo(() => {
     try {
       const health = (linked.profile?.settings as any)?.health as { chronicConditions?: string[]; contraindications?: Record<string, boolean> } | undefined;
@@ -1044,17 +1053,6 @@ export const BbAutoConstructor: React.FC = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // P2-8 (audit 2026-08): категория peak week — ранее хардкод 'mens_physique'.
-  const [peakWeekCategory, setPeakWeekCategory] = useState<BBContestCategory>('mens_physique');
-  // ⭐ Специализация (упор мышцы к старту) — из профильного конфига, с override в UI.
-  const [peakSpec, setPeakSpec] = useState<ContestSpecialization>(() => {
-    try {
-      const raw = (linked.profile?.settings as any)?.goals?.bbPeakConfig;
-      const cfg = raw ? deserializeBBPrepConfig(raw) : null;
-      return cfg?.specialization ?? 'none';
-    } catch { return 'none'; }
-  });
-
   /** Конфиг тапера для кнопки «🎭 Peak week»: профиль (goals.bbPeakConfig/legacy)
    *  с переопределением категории и специализации выбранными в UI. */
   const buildPeakConfig = (): BBContestPrepConfig => {
