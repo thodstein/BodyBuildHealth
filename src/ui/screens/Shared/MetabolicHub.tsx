@@ -385,8 +385,6 @@ export const MetabolicHub: React.FC = () => {
     const bmi = weight / (((height||180)/100)**2);
     return calcFLIWrap({ bmi, waistCm: waist||84, tgMgDl: tgMgDl2, ggt });
   }, [weight, height, waist, tgMgDl2, ggt]);
-  const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
-  const menstrual = useMemo(()=> calcMenstrualWater(menstrualPhase), [menstrualPhase]);
   const hematology = useMemo(()=>{
     let proteinPerKg: number|undefined; let fiberGV: number|undefined; let omega3GV: number|undefined;
     try{
@@ -405,6 +403,8 @@ export const MetabolicHub: React.FC = () => {
     const eee = weeklyVolumeTons ? Math.round(weeklyVolumeTons* 380) : (trainingDays* 320 + cardioMin*7);
     return calcEnergyAvailability({ weight, bodyFat, height: height||180, heightCm: height, lean: kbju.nat.lean, intakeKcal: intake, eeeKcal: eee, trainingDays, sex } as any);
   }, [weight,bodyFat,height,kbju,trainingDays,weeklyVolumeTons,cardioMin, diaryAvgKcal, sex]);
+  const psmf = useMemo(()=> checkPSMFWrap(ea.ea), [ea.ea]);
+  const menstrual = useMemo(()=> calcMenstrualWater(menstrualPhase), [menstrualPhase]);
   const alcohol = useMemo(()=> calcAlcohol(alcoholG, weight), [alcoholG, weight]);
   const proteinTiming = useMemo(()=> calcProteinTiming(onAAS? kbju.aas.p: kbju.nat.p, weight, 4, isPlantHeavy), [kbju, weight, onAAS, isPlantHeavy]);
   const maintenance = useMemo(()=>{
