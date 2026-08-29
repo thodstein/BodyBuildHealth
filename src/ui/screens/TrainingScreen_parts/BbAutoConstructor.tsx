@@ -3810,7 +3810,7 @@ export const BbAutoConstructor: React.FC = () => {
                         const d = safetyScore.details?.jointStressDetails;
                         if (!d) return 'Оценка по фактическому плану: стресс суставов, ортопедические блоки, распределение по неделе и точечная профилактика.';
                         const peak = d.peakWeek ? `пик — нед ${d.peakWeek}` : 'пиковая неделя —';
-                        const avg = `среднен недельный стресс ${Math.round(d.avgWeeklyStress)}`;
+                        const avg = `средний нед. стресс ${Math.round(d.avgWeeklyStress)}`;
                         const most = d.mostLoadedJoint ? `лидер: ${(({ shoulder:'плечо', knee:'колено', hip:'таз', spine:'поясница', lower_back:'поясница', elbow:'локоть', wrist:'запястье', ankle:'голеностоп', neck:'шея'} as any)[d.mostLoadedJoint.joint] || d.mostLoadedJoint.joint)} · ${Math.round(d.mostLoadedJoint.stress)}` : 'лидер —';
                         const phase = safetyScore.details?.orthopedic?.phase;
                         const phaseRu = phase==='acute'?'острая': phase==='subacute'?'подострая': phase==='chronic'?'хроническая': phase==='maintenance'?'восстановление':'—';
