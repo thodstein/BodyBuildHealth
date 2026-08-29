@@ -17,7 +17,7 @@ import { lengthenedBonus } from './strength-sport-bonus';
 import { warmupRampFor } from './strength-sport-warmup';
 import { applyDUP } from './strength-sport-dup';
 import { applyIntensity } from './strength-sport-intensity';
-import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, weightCutNutritionForWeekSS, weightCutRehydrationNotesSS } from './strength-sport-weight-cut.engine';
+import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, weightCutNutritionForWeekSS, weightCutRehydrationNotesSS, validateWeightCutProtocolSS } from './strength-sport-weight-cut.engine';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
@@ -25,7 +25,7 @@ import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, Strength
 const POOL_BY_TAG: Record<string, string[]> = {
   snatch_day: ['snatch', 'hang_snatch', 'power_snatch', 'muscle_snatch', 'high_hang_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'snatch_pull', 'pause_pull', 'overhead_squat_v2', 'snatch_balance', 'back_squat', 'front_squat'],
   clean_day: ['clean_and_jerk', 'hang_clean', 'power_clean', 'muscle_clean', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'push_jerk', 'split_jerk', 'pause_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk', 'front_squat_clean_grip', 'front_squat'],
-  strength_day: ['squat', 'front_squat', 'back_squat', 'pause_squat', 'tempo_squat', 'deadlift', 'sumo_dl', 'rdl', 'bench_bar', 'bench_bar', 'ohp', 'pin_press'],
+  strength_day: ['squat', 'front_squat', 'back_squat', 'pause_squat', 'tempo_squat', 'deadlift', 'sumo_dl', 'rdl', 'bench_bar', 'db_press', 'ohp', 'pin_press'],
   technique_day: ['hang_snatch', 'hang_clean', 'high_hang_snatch', 'muscle_snatch', 'muscle_clean', 'snatch_balance', 'jerk_dip', 'overhead_squat_v2', 'pause_snatch', 'pause_clean', 'pause_jerk'],
   pull_day: ['snatch_pull', 'clean_pull', 'pause_pull', 'deficit_pull', 'rdl', 'deadlift', 'row_bar', 'pullup'],
   accessory_day: ['db_press', 'ohp', 'lateral_raise', 'face_pull', 'row_db', 'hip_thrust', 'pause_squat', 'tempo_squat'],
@@ -119,11 +119,20 @@ function pctFor(phase: string, goal: string): number {
 }
 
 function basePmFor(id: string, wm: StrengthSportInput['workMax']): number {
-  // точные + подстроковые для вариаций (deficit/block/pause/high_hang/low_block/tempo/pin)
-  if (['snatch','hang_snatch','power_snatch','high_hang_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2'].includes(id) || id.includes('snatch')) return wm.snatch || 60;
-  if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','low_block_clean','pause_clean','push_jerk','split_jerk','pause_jerk','clean_pull','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(id) || id.includes('clean') || id.includes('jerk')) return wm.cleanJerk || wm.clean || wm.frontSquat || 80;
+  // P0 fix: проверять pull-вариации ДО snatch/clean, иначе snatch_pull → snatch (занижение 2×)
+  // pull-вариации относятся к тяговому ПМ (deadlift), не к рывковому
+  if (['snatch_pull','pause_pull','deficit_pull','clean_pull'].includes(id)) return wm.deadlift || 120;
+  if (id.includes('pull') && (id.includes('snatch') || id.includes('clean') || id.includes('deficit') || id.includes('pause'))) return wm.deadlift || 120;
+  if (['snatch','hang_snatch','power_snatch','high_hang_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_balance','overhead_squat_v2'].includes(id) || id.includes('snatch')) return wm.snatch || 60;
+  if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','low_block_clean','pause_clean','push_jerk','split_jerk','pause_jerk','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(id) || id.includes('clean') || id.includes('jerk')) return wm.cleanJerk || wm.clean || wm.frontSquat || 80;
   if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip','pause_squat','tempo_squat','overhead_squat_v2'].includes(id) || id.includes('squat')) return wm.backSquat || wm.frontSquat || 100;
-  if (['deadlift','sumo_dl','axle_deadlift','rdl','deficit_pull','pause_pull'].includes(id) || id.includes('deadlift') || id.includes('pull') && id.includes('deficit')) return wm.deadlift || 120;
+  if (['deadlift','sumo_dl','axle_deadlift','rdl','deficit_pull','pause_pull'].includes(id) || id.includes('deadlift')) return wm.deadlift || 120;
+  // Strongman event-specific max (PRO): отдельный ввод, не фоллбэк через deadlift
+  if (id === 'yoke_walk') return (wm as any).yokeWalk || wm.deadlift || 180;
+  if (id === 'farmers_walk_heavy' || id === 'zercher_carry') return (wm as any).farmersWalk || wm.deadlift || 140;
+  if (id === 'atlas_stone_load' || id === 'stone_lift' || id === 'sandbag_shoulder') return (wm as any).atlasStone || wm.deadlift || 100;
+  if (id === 'axle_deadlift') return (wm as any).axleDeadlift || wm.deadlift || 120;
+  if (id === 'circus_db_press') return (wm as any).circusDbPress || wm.logPress || wm.overheadPress || 60;
   if (['ohp','push_press','log_press','circus_db_press','bench_bar','pin_press','jerk_recovery','behind_neck_jerk','pause_jerk'].includes(id) || id.includes('press') || id.includes('jerk')) return wm.overheadPress || wm.bench || wm.logPress || 60;
   return wm.backSquat || 80;
 }
@@ -409,8 +418,8 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   const mode = input.mode || 'weightlifting';
   const goal = input.goal || 'strength';
 
-  // pattern
-  let pattern: StrengthSportPattern | undefined = input.daysPerWeek ? getStrengthSportPattern((input as any).patternId) : undefined;
+  // pattern — patternId теперь типизирован
+  let pattern: StrengthSportPattern | undefined = input.patternId ? getStrengthSportPattern(input.patternId) : undefined;
   if (!pattern || pattern.sessionsPerRotation !== daysPerWeek || pattern.mode !== mode) {
     pattern = recommendStrengthSportPattern(mode, daysPerWeek, level);
   }
@@ -424,10 +433,10 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   const wcLossKg: number | null = typeof (input as any).weightCutKg === 'number' ? (input as any).weightCutKg : null;
   const wcProto: any = wcProtoInput || (wcLossKg ? buildWeightCutProtocolSS(wcLossKg, { startWeightKg: (input as any).bodyweight } as any) : null);
   const isWeightCut = !!wcProto;
-  // P0-7 ACWR + outside + VBT — полный объём (outside high 0.55, ACWR dangerous 0.60, VBT 30% 0.90 → ×0.30)
+  // P0 fix double count: weeklyBudget — базовый без ACWR/outside/VBT (сравниваем фактические сеты после редукции с базой)
   const acwrMult = input.acwr?.zone === 'dangerous' ? 0.60 : input.acwr?.zone === 'caution' ? 0.85 : input.acwr?.zone === 'undertrained' ? 1.10 : 1;
   const vbtMult = (input as any).velocityLossPct > 20 ? 0.90 : 1;
-  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier, isWeightCut }) * acwrMult * outsideMult * vbtMult);
+  const weeklyBudget = Math.round(computeBudget({ level, peds: input.peds, pedDoses: input.pedDoses as any, courseIntensity: input.courseIntensity as any, calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, labMrvMultiplier: input.labMrvMultiplier, isWeightCut }));
   // P0-5 frequencyPenalty — если outside high + 5× зал, форсим 3×
   let effectiveDaysPerWeek = daysPerWeek;
   if (outsideFrequencyPenalty(input.outsideLoad as OutsideLoad) === 1 && daysPerWeek >= 4) {
@@ -570,14 +579,8 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     if (hasStrongEx) warnings.push('Нет спец-снарядов (лог/йок/камни) — стронг-ивенты заменены на штангу/фермер.');
   }
   if (wcProto) {
-    // валидация протокола
-    try {
-      const mod: any = require('./strength-sport-weight-cut.engine');
-      if (typeof mod.validateWeightCutProtocolSS === 'function') {
-        const errs = mod.validateWeightCutProtocolSS(wcProto);
-        for (const e of errs) warnings.push(e);
-      }
-    } catch {}
+    const errs = validateWeightCutProtocolSS(wcProto);
+    for (const e of errs) warnings.push(e);
     if ((wcProto.targetLossKg || 0) > 5 && goal !== 'peaking') warnings.push(`Весогонка ${wcProto.targetLossKg}кг без цели peaking — объём снижен, но без тапера`);
   }
 

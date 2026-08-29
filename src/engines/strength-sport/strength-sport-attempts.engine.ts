@@ -2,14 +2,15 @@
  * strength-sport-attempts.engine.ts — план 6 попыток ТА (3 рывок + 3 толчок).
  * Изолировано от lms/competition-attempts (порт с WL-спецификой).
  * Источники: Catalyst Athletics (Greg Everett) — opener 88-92%, Torokhtiy 92/97/102%,
- * IWF техническ/тактика — шаг 2.5кг, Sinclair-прогноз.
+ * IWF техническ/тактика — шаг 1кг, Sinclair 2024 + Robi.
  */
+import { calcSinclair, getIWFCategory, calcRobi } from './strength-sport-finalize.engine';
 export type WLStrategy = 'conservative' | 'balanced' | 'aggressive';
 
 export const WL_STRATEGY_PCT: Record<WLStrategy, { opener: number; second: number; third: number }> = {
   conservative: { opener: 0.90, second: 0.95, third: 1.00 },
   balanced: { opener: 0.92, second: 0.97, third: 1.02 },
-  aggressive: { opener: 0.93, second: 0.98, third: 1.04 },
+  aggressive: { opener: 0.93, second: 0.98, third: 1.02 },
 };
 
 export const WL_STRATEGY_LABEL: Record<WLStrategy, string> = {
@@ -21,7 +22,7 @@ export const WL_STRATEGY_LABEL: Record<WLStrategy, string> = {
 export const WL_STRATEGY_PCT_LABEL: Record<WLStrategy, string> = {
   conservative: '90/95/100%',
   balanced: '92/97/102%',
-  aggressive: '93/98/104%',
+  aggressive: '93/98/102%',
 };
 
 export const WL_WARMUP_STEPS = [0.50, 0.65, 0.75, 0.85, 0.90];
@@ -64,21 +65,23 @@ export function buildWLMeetPlan(
   snatchPm: number,
   cleanJerkPm: number,
   strategy: WLStrategy = 'balanced',
-  opts?: { bodyweight?: number; sex?: string; age?: number },
+  opts?: { bodyweight?: number; sex?: string; age?: number; weighInHours?: number },
 ): WLMeetPlan | null {
   if (!Number.isFinite(snatchPm) || snatchPm <= 0) return null;
   if (!Number.isFinite(cleanJerkPm) || cleanJerkPm <= 0) return null;
-  const sn = wlAttemptsFor(snatchPm, strategy);
-  const cj = wlAttemptsFor(cleanJerkPm, strategy);
+  // weigh-in 2h → opener -2% (обезвоживание), 24h → без коррекции
+  let adjSn = snatchPm; let adjCj = cleanJerkPm;
+  if (opts?.weighInHours === 2) { adjSn = Math.round(snatchPm * 0.98); adjCj = Math.round(cleanJerkPm * 0.98); }
+  const sn = wlAttemptsFor(adjSn, strategy);
+  const cj = wlAttemptsFor(adjCj, strategy);
   const total = sn.target + cj.target;
   let sinclair: number | undefined;
+  let robi: number | undefined;
   let category: string | undefined;
   if (opts?.bodyweight && opts.bodyweight > 30) {
-    try {
-      const { calcSinclair, getIWFCategory } = require('./strength-sport-finalize.engine') as any;
-      if (typeof calcSinclair === 'function') sinclair = calcSinclair(total, opts.bodyweight, opts.sex || 'male');
-      if (typeof getIWFCategory === 'function') category = getIWFCategory(opts.bodyweight, opts.sex || 'male');
-    } catch {}
+    sinclair = calcSinclair(total, opts.bodyweight, opts.sex || 'male', true);
+    robi = calcRobi(total, opts.bodyweight, opts.sex || 'male');
+    category = getIWFCategory(opts.bodyweight, opts.sex || 'male');
   }
   return {
     strategy,
@@ -86,8 +89,18 @@ export function buildWLMeetPlan(
     cleanJerk: { ...cj, warmup: wlWarmupToOpener(cj.opener) },
     total,
     sinclair,
+    robi: robi as any,
     category,
-  };
+  } as any;
+}
+
+export function adjustAttemptsAfterMiss(attempts: { opener: number; second: number; third: number }, missed: 1 | 2): { opener: number; second: number; third: number } {
+  if (missed === 1) {
+    // miss opener → second -2кг
+    return { opener: attempts.opener, second: Math.max(attempts.opener + 1, attempts.second - 2), third: attempts.third - 1 };
+  }
+  // miss second → third -2кг
+  return { opener: attempts.opener, second: attempts.second, third: Math.max(attempts.second + 1, attempts.third - 2) };
 }
 
 export function wlAttemptRationale(plan: WLMeetPlan | null): string[] {

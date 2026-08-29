@@ -47,11 +47,14 @@ const LIFT_K_FACTOR: Record<string, number> = {
 function intensityK(input: StrengthSportInput): number {
   if (input.goal === 'technique') return 0.002;
   if (input.goal === 'peaking') return 0.008;
-  if (input.peds && input.peds.length > 0) {
+  const hasPED = (input.peds && input.peds.length > 0) || (input.pedDoses && Object.keys(input.pedDoses).length > 0);
+  if (hasPED) {
     if (input.courseIntensity === 'heavy') return 0.012;
     if (input.courseIntensity === 'moderate') return 0.009;
     return 0.007;
   }
+  // enhanced без PED = advanced (не быстрее)
+  if (input.level === 'enhanced') return LEVEL_K['advanced'] ?? 0.004;
   return LEVEL_K[input.level] ?? 0.007;
 }
 
@@ -167,7 +170,7 @@ export function phaseForWeek(week: number, totalWeeks: number, goal?: string): s
   return dist[Math.max(0, Math.min(totalWeeks - 1, week - 1))] || 'accumulation';
 }
 
-/** Привязка к дате старта: taper неделя перед competitionDate (P0-1) */
+/** Привязка к дате старта: taper неделя перед competitionDate (P0 fix: старта = peaking, не deload) */
 export function phaseForDate(week: number, totalWeeks: number, goal?: string, competitionDate?: string, startDate?: string): string {
   if (!competitionDate || !startDate) return phaseForWeek(week, totalWeeks, goal);
   try {
@@ -176,9 +179,9 @@ export function phaseForDate(week: number, totalWeeks: number, goal?: string, co
     const weekStart = new Date(start); weekStart.setDate(start.getDate() + (week - 1) * 7);
     const diffDays = Math.round((comp.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
     const diffWeeks = Math.floor(diffDays / 7);
-    if (diffWeeks === 0) return 'deload'; // неделя старта
-    if (diffWeeks === 1) return 'peaking';
-    if (goal === 'peaking' && diffWeeks <= 2) return 'peaking';
+    if (diffWeeks <= 1 && diffWeeks >= 0) return 'peaking'; // неделя старта и за 1 нед до — пик
+    if (goal === 'peaking' && diffWeeks <= 2 && diffWeeks >= 0) return 'peaking';
+    if (diffWeeks < 0) return phaseForWeek(week, totalWeeks, goal); // после старта — обычная периодизация
   } catch {}
   return phaseForWeek(week, totalWeeks, goal);
 }

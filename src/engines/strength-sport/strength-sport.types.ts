@@ -20,6 +20,12 @@ export interface StrengthSportWorkMax {
   overheadPress?: number;
   logPress?: number;
   bench?: number;
+  // Strongman event-specific max (PRO: отдельный ввод, не фоллбэк через deadlift)
+  yokeWalk?: number;
+  farmersWalk?: number;
+  atlasStone?: number;
+  axleDeadlift?: number;
+  circusDbPress?: number;
 }
 
 export interface StrengthSportInput {
@@ -35,7 +41,7 @@ export interface StrengthSportInput {
   age?: number;
   trainingYears?: number;
   equipment?: string[]; // barbell/dumbbell/machine/cable/specialty (yoke/log/stone/sandbag)
-  injuries?: any[];
+  injuries?: Array<{ location?: string; type?: string; exclude?: boolean; severity?: string; mode?: string } | string>;
   mobilityRestrictions?: string[];
   favoriteExercises?: string[];
   excludedExercises?: string[];
@@ -63,6 +69,7 @@ export interface StrengthSportInput {
   labMrvMultiplier?: number;
   calorieSurplus?: number;
   proteinPerKg?: number;
+  patternId?: string;
   // P0-1 + P0-7: соревнование и авторегуляция
   competitionDate?: string;
   startDate?: string;

@@ -8,17 +8,30 @@ import { sessionLimitsFor, validateSync } from './strength-sport-limits';
 import { calcDOTS, calcWilks, calcIPFGL } from '../pl-points.engine';
 import { outsideVolumeMultiplier } from '../outside-load.engine';
 
-// P3: Sinclair для ТА (IWF 2017-2020 коэффициенты, актуальны для сравнения)
-export const SINCLAIR = {
-  male: { A: 0.751945030, b: 175.508 },
-  female: { A: 0.783497476, b: 153.655 },
+// Sinclair 2024 (IWF 01.06.2025) — обновлённые коэффициенты, fallback 2017 для сравнения
+export const SINCLAIR_2024 = {
+  male: { A: 0.722762521, b: 193.609 },
+  female: { A: 0.787004341, b: 153.757 },
 };
-export function calcSinclair(total: number, bw: number, sex: string): number {
+export const SINCLAIR = SINCLAIR_2024;
+// Robi points (IWF) — A_m 1000, B_m, C_m для сравнения
+export const ROBI_COEFF = {
+  male: { A: 1000, B: 1.038, C: 0.009 },
+  female: { A: 1000, B: 0.829, C: 0.011 },
+};
+export function calcSinclair(total: number, bw: number, sex: string, use2024 = true): number {
   if (total <= 0 || bw <= 0) return 0;
-  const s = sex === 'female' ? SINCLAIR.female : SINCLAIR.male;
+  const s = (use2024 ? SINCLAIR_2024 : { male: { A: 0.751945030, b: 175.508 }, female: { A: 0.783497476, b: 153.655 } })[sex === 'female' ? 'female' : 'male'];
   const log = Math.log10(bw / s.b);
   const coeff = Math.pow(10, s.A * log * log);
   return Math.round(total * coeff);
+}
+export function calcRobi(total: number, bw: number, sex: string): number {
+  if (total <= 0 || bw <= 0) return 0;
+  // IWF Robi simplified: A * total / (B*BW + C*BW^2) — для сравнения
+  const c = sex === 'female' ? ROBI_COEFF.female : ROBI_COEFF.male;
+  const denom = c.B * bw + c.C * bw * bw;
+  return Math.round((c.A * total) / denom);
 }
 export function getIWFCategory(bw: number, sex: string): string {
   // IWF 2025 новые категории (с 01.06.2025): M 60/65/71/79/88/98/110/110+, W 48/53/58/63/69/77/86/86+

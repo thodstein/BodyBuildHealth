@@ -26,24 +26,23 @@ export function buildAnnualFromSS(plans: StrengthSportPlan[]): AnnualSS {
   return { id:`ann_ss_${Date.now()}`, totalWeeks: w-1, blocks, createdAt: new Date().toISOString() };
 }
 
-// P0-8: построить годовой с учётом competitionDate и taper (1 нед <65% перед стартом)
+// P0 fix: без мутации исходного plan — клонируем недели
 export function buildAnnualWithTaper(plans: StrengthSportPlan[], opts?: { competitionDate?: string; taperWeeks?: number }): AnnualSS {
   const base = buildAnnualFromSS(plans);
   if (!opts?.competitionDate) return base;
   const taperW = Math.max(1, Math.min(2, opts.taperWeeks ?? 1));
-  // если последний блок — peaking, помечаем taper недели (последняя неделя последнего плана — deload/taper)
   const last = base.blocks[base.blocks.length - 1];
   if (last && last.plan) {
     last.taperWeeks = taperW;
     last.competitionDate = opts.competitionDate;
-    // помечаем последнюю неделю как taper в плане
-    const pw = last.plan.weeksData;
-    if (pw.length >= taperW) {
-      for (let i = pw.length - taperW; i < pw.length; i++) {
-        pw[i].taper = true;
-        // volume уже срезан в builder deload; дополнительно помечаем
+    // клонируем weeksData чтобы не мутировать исходный plan из he_strength_sport_plans_v1
+    const cloned = JSON.parse(JSON.stringify(last.plan.weeksData));
+    if (cloned.length >= taperW) {
+      for (let i = cloned.length - taperW; i < cloned.length; i++) {
+        cloned[i].taper = true;
       }
     }
+    last.plan = { ...last.plan, weeksData: cloned };
   }
   return base;
 }
@@ -62,6 +61,18 @@ export function validateAnnualSS(annual: AnnualSS): { ok: boolean; warnings: str
 
 export function activeBlockForWeek(annual: AnnualSS, week: number): AnnualSSBlock | null {
   return annual.blocks.find(b=> week >= b.startWeek && week < b.startWeek + b.weeks) || null;
+}
+
+export function validateAnnualSSPhases(annual: AnnualSS): string[] {
+  const warns: string[] = [];
+  // 3× peaking подряд — методическая ошибка
+  let peakingStreak = 0;
+  for (const b of annual.blocks) {
+    const isPeaking = b.plan?.weeksData?.some(w => w.phase === 'peaking');
+    if (isPeaking) peakingStreak++; else peakingStreak = 0;
+    if (peakingStreak >= 3) warns.push(`Блоки ${b.id}: 3+ peaking подряд — риск перетренированности`);
+  }
+  return warns;
 }
 
 export function weeksUntilCompetition(annual: AnnualSS, competitionDate: string, startDate?: string): number | null {

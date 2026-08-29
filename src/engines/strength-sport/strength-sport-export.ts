@@ -3,6 +3,7 @@
  * CSV/HTML печать + текстовый отчёт. Без xlsx зависимости — CSV совместим с Excel.
  */
 import type { StrengthSportPlan } from './strength-sport.types';
+import { buildWLMeetPlan } from './strength-sport-attempts.engine';
 
 function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escCsv(s: string | number): string { const v = String(s).replace(/"/g,'""'); return /[",\n;]/.test(v) ? `"${v}"` : v; }
@@ -41,13 +42,10 @@ export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
     if (snap.weakPoints && snap.weakPoints.length) extra += `<p><b>Слабые лифты:</b> ${snap.weakPoints.join(', ')} · объём ×1.15</p>`;
     if (Array.isArray(snap.peds) && snap.peds.length) extra += `<p><b>PED:</b> ${snap.peds.join(', ')} · капы 1.35(весогонка)/1.70</p>`;
     // попытки ТА
-    if (plan.mode==='weightlifting' && snap.snatch && snap.cleanJerk) {
+    if (plan.mode==='weightlifting' && (snap.snatch || plan.workMax.snatch) && (snap.cleanJerk || plan.workMax.cleanJerk)) {
       try {
-        const mod: any = require('./strength-sport-attempts.engine');
-        if (mod.buildWLMeetPlan) {
-          const meet = mod.buildWLMeetPlan(snap.snatch || plan.workMax.snatch, snap.cleanJerk || plan.workMax.cleanJerk, 'balanced', { bodyweight: snap.bodyweight, sex: snap.sex });
-          if (meet) extra += `<p><b>Попытки:</b> рывок ${meet.snatch.opener}/${meet.snatch.second}/${meet.snatch.third} · толчок ${meet.cleanJerk.opener}/${meet.cleanJerk.second}/${meet.cleanJerk.third} · тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''}</p>`;
-        }
+        const meet = buildWLMeetPlan(snap.snatch || plan.workMax.snatch as number, snap.cleanJerk || plan.workMax.cleanJerk as number, 'balanced', { bodyweight: snap.bodyweight, sex: snap.sex });
+        if (meet) extra += `<p><b>Попытки:</b> рывок ${meet.snatch.opener}/${meet.snatch.second}/${meet.snatch.third} · толчок ${meet.cleanJerk.opener}/${meet.cleanJerk.second}/${meet.cleanJerk.third} · тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''} ${ (meet as any).robi?`· Robi ${(meet as any).robi}`:''}</p>`;
       } catch {}
     }
     // Sinclair уже в report
