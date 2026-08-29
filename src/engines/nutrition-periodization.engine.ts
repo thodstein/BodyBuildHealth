@@ -65,6 +65,8 @@ export interface Recipe {
   batchFriendly?: boolean;
   cookSkill?: 'basic' | 'medium' | 'advanced';
   sourceUrl?: string;
+  /** D5: на какую массу атлета рассчитана порция (г) — для prefer-матчинга по весу. */
+  baseWeightKg?: number;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

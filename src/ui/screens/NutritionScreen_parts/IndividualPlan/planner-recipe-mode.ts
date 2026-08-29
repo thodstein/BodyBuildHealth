@@ -687,6 +687,8 @@ export interface AssembleRecipeDayArgs {
   goal?: RecipeMatchOptions['goal'];
   /** Имена, уже использованные в других днях генерации (разнообразие) */
   usedNamesAcrossDays?: Set<string>;
+  /** D5: вес атлета — prefer-матчинг порционных якорей рецептов */
+  athleteWeightKg?: number;
 }
 
 export interface AssembleRecipeDayResult {
@@ -785,6 +787,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       maxPrepTimeMin: args.maxPrepTimeMin ?? 60,
       preferredRecipeNames: args.preferredRecipeNames,
       goal: args.goal,
+      athleteWeightKg: args.athleteWeightKg,
     };
     // Шире сеть кандидатов — финальный отбор по фактической декомпозиции ниже
     const scaleOf = (kcal: number, p: number, f: number, c: number): number => {

@@ -41,6 +41,8 @@ export interface RecipeMatchOptions {
   maxPrepTimeMin?: number;     // лимит времени на готовку (из cookProfile.timePerDayMin / mealsCount)
   preferredRecipeNames?: Set<string>;
   goal?: 'mass' | 'cut' | 'recomp' | 'maintenance' | 'bulk';
+  /** D5: вес атлета — prefer-матчинг порций (baseWeightKg рецепта ↔ вес). */
+  athleteWeightKg?: number;
 }
 
 // ─── Декомпозиция рецепта в MealItem[] ─────────────────────────────────
@@ -337,6 +339,23 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
     }
     if (has('бодибилдинг')) score += 5;
     if (has('пп')) score += 3;
+  }
+
+  // D5 (порционные якоря): рецепт рассчитан на определённую массу атлета
+  // (baseWeightKg; derived из тегов «масса»→110 кг / «сушка»→80 кг, если не задан явно).
+  // Крупный атлет на 110-кг порции — +8, на 80-кг суша-порции — −6 (и наоборот).
+  if (opts.athleteWeightKg && opts.athleteWeightKg > 0) {
+    const _tags = (recipe.tags || []).map(t => t.toLowerCase());
+    const _baseW = recipe.baseWeightKg
+      ?? (_tags.some(t => t.includes('масса') || t.includes('bulk')) ? 110
+        : _tags.some(t => t.includes('сушк') || t.includes('сушка')) ? 80
+        : undefined);
+    if (_baseW) {
+      const dw = Math.abs(opts.athleteWeightKg - _baseW);
+      if (dw <= 10) score += 8;
+      else if (dw <= 20) score += 0;
+      else score -= 6;
+    }
   }
 
   // Непрерывный тай-брейк: средняя дистанция макросов от цели слегка понижает скор,

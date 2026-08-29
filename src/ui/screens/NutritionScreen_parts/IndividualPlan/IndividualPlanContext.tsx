@@ -2818,6 +2818,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             preferredRecipeNames: favoriteRecipes.size > 0 ? favoriteRecipes : undefined,
             usedNamesAcrossDays: _usedRecipeNames,
             goal: goal === 'cutting' || goal === 'fat_loss' ? 'cut' : goal === 'maintenance' ? 'maintenance' : 'mass',
+            athleteWeightKg: weight,
           });
           meals.splice(0, meals.length, ...(_asm.meals as any[]));
           if (_asm.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._asm.notes];
