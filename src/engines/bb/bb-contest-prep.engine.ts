@@ -30,9 +30,11 @@ export type BBContestCategory =
   | 'mens_physique' | 'classic_physique' | 'mens_bb' | 'bb_212'
   | 'bikini' | 'figure' | 'wellness' | 'womens_physique' | 'womens_bb';
 
-export type CarbLoadStrategy = 'front' | 'moderate' | 'back';
-export type WaterStrategy = 'classic' | 'moderate' | 'minimal';
-export type SodiumStrategy = 'constant' | 'cut_2d' | 'cut_3d';
+export type CarbLoadStrategy = 'front' | 'moderate' | 'back' | 'undulating' | 'linear';
+/** WaterStrategy: legacy 'classic'/'moderate'/'minimal' kept for compat, canonical is 'stable'|'tapered'|'high' */
+export type WaterStrategy = 'classic' | 'moderate' | 'minimal' | 'stable' | 'tapered' | 'high';
+/** SodiumStrategy: legacy 'constant'/'cut_*' kept for compat, canonical is 'stable'|'tapered' */
+export type SodiumStrategy = 'constant' | 'cut_2d' | 'cut_3d' | 'stable' | 'tapered';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
 /** Специализация к соревнованиям — упор на мышцу/группу, которую подтягиваем к пику. */
@@ -83,6 +85,7 @@ export interface BBContestPrepConfig {
   sex: 'male' | 'female';
   category: BBContestCategory;
   weightKg: number;                 // 40..200
+  heightCm?: number;                // см — для BSA/воды (fallback 170/164)
   bodyFatPct?: number;              // текущий % жира — оценка готовности к пику
   age?: number;                     // лет — влияет на targetBodyFat/recovery/GFR
   experienceLevel: ExperienceLevel;
@@ -90,6 +93,10 @@ export interface BBContestPrepConfig {
   prepCount: number;                // сколько пиков уже пройдено (0 → консервативно)
   pedContext?: PEDContext;          // дозозависимые PED (GH→вода+20%, tren→Na+500, diuretic→blocked)
   prepWeeks?: number;               // недель подготовки (вынесено в профиль, иначе 12)
+  /** День менструального цикла 1..35 — для лютеиновой задержки воды (female). */
+  cycleDay?: number;
+  /** Использована ли пробная пик-неделя (trial peak) — разблокирует aggressive стратегии. */
+  hasTrialPeak?: boolean;
 
   // ── Тайминг ──
   showDate: string;                 // ISO yyyy-mm-dd (день 7 пик-недели; при соревнованиях — fallback)
@@ -102,9 +109,9 @@ export interface BBContestPrepConfig {
 
   // ── Стратегии ──
   trainingProtocol: PeakingProtocol;   // кривая тапера из Библиотеки (bb/classic/pl)
-  carbLoadStrategy: CarbLoadStrategy;  // front (D-4..D-2) / moderate (D-3..D-1) / back (D-2..D-1)
-  waterStrategy: WaterStrategy;        // classic (load+cut) / moderate / minimal
-  sodiumStrategy: SodiumStrategy;      // constant (современный) / cut_2d / cut_3d
+  carbLoadStrategy: CarbLoadStrategy;  // front/moderate/back/undulating/linear (8-12 г/кг total)
+  waterStrategy: WaterStrategy;        // stable (рекомендовано)/tapered/high(classic, gated)
+  sodiumStrategy: SodiumStrategy;      // stable (рекомендовано)/tapered (мягкий -30% за 48ч)
 
   // ── Безопасность и предпочтения ──
   contraindications?: string[];     // kidney/heart/hypertension → force minimal+constant
@@ -226,11 +233,13 @@ export interface PeakNutritionTargets {
 interface CategoryProfile {
   label: string;
   sex: 'male' | 'female';
-  /** Целевой % жира для stage condition. */
+  /** Целевой % жира для stage condition (Escalante 2021, скорректировано под судейство 2024). */
   targetBodyFatPct: number;
-  /** Гликогеновая загрузка: г/кг/день по стратегиям. */
+  /** Гликогеновая загрузка: г/кг/день по стратегиям (LEGACY — сохранён для compat, canonical — CARB_TOTAL_BUDGET). */
   carbLoadGPerKg: { front: [number, number]; moderate: [number, number]; back: [number, number] };
-  /** Карбс деплеции, г/кг/день. */
+  /** Суммарный карб-бюджет загрузки за 36-48ч (г/кг) — Escalante 8-12г/кг total, не в день! */
+  carbTotalBudgetGPerKg: [number, number];
+  /** Карбс деплеции, г/кг/день (современно 1.2-1.8, не 0.7 — Homer 2024). */
   depleteCarbsGPerKg: number;
   /** Белок, г/кг/день (постоянный всю пик-неделю). */
   proteinGPerKg: number;
@@ -238,16 +247,26 @@ interface CategoryProfile {
   light: boolean;
 }
 
+/** PRO-модель 2025: суммарный карб-бюджет за загрузку (36-48ч), а не в день. Escalante 8-12 total. */
 export const CATEGORY_PROFILES: Record<BBContestCategory, CategoryProfile> = {
-  mens_bb:          { label: 'Bodybuilding (открытая)', sex: 'male',   targetBodyFatPct: 4,  carbLoadGPerKg: { front: [7, 8], moderate: [6, 7], back: [4, 5] }, depleteCarbsGPerKg: 0.7, proteinGPerKg: 2.5, light: false },
-  bb_212:           { label: '212 Olympia',             sex: 'male',   targetBodyFatPct: 4,  carbLoadGPerKg: { front: [7, 8], moderate: [6, 7], back: [4, 5] }, depleteCarbsGPerKg: 0.7, proteinGPerKg: 2.5, light: false },
-  classic_physique: { label: 'Classic Physique',        sex: 'male',   targetBodyFatPct: 5,  carbLoadGPerKg: { front: [7, 8], moderate: [6, 7], back: [4, 5] }, depleteCarbsGPerKg: 0.7, proteinGPerKg: 2.4, light: false },
-  mens_physique:    { label: "Men's Physique",          sex: 'male',   targetBodyFatPct: 6,  carbLoadGPerKg: { front: [5, 6], moderate: [4, 5], back: [3, 4] }, depleteCarbsGPerKg: 0.8, proteinGPerKg: 2.3, light: false },
-  womens_bb:        { label: "Women's Bodybuilding",    sex: 'female', targetBodyFatPct: 6,  carbLoadGPerKg: { front: [5, 6], moderate: [4, 5], back: [3, 4] }, depleteCarbsGPerKg: 0.9, proteinGPerKg: 2.2, light: false },
-  womens_physique:  { label: "Women's Physique",        sex: 'female', targetBodyFatPct: 7,  carbLoadGPerKg: { front: [5, 6], moderate: [4, 5], back: [3, 4] }, depleteCarbsGPerKg: 0.9, proteinGPerKg: 2.2, light: false },
-  figure:           { label: 'Figure',                  sex: 'female', targetBodyFatPct: 9,  carbLoadGPerKg: { front: [4, 5], moderate: [3, 4], back: [2, 3] }, depleteCarbsGPerKg: 0.9, proteinGPerKg: 2.2, light: false },
-  bikini:           { label: 'Bikini',                  sex: 'female', targetBodyFatPct: 11, carbLoadGPerKg: { front: [3, 4], moderate: [2.5, 3], back: [2, 2.5] }, depleteCarbsGPerKg: 1.0, proteinGPerKg: 2.0, light: true },
-  wellness:         { label: 'Wellness',                sex: 'female', targetBodyFatPct: 12, carbLoadGPerKg: { front: [3, 4], moderate: [2.5, 3], back: [2, 2.5] }, depleteCarbsGPerKg: 1.0, proteinGPerKg: 2.0, light: true },
+  mens_bb:          { label: 'Bodybuilding (открытая)', sex: 'male',   targetBodyFatPct: 5,  carbLoadGPerKg: { front: [7, 8], moderate: [6, 7], back: [4, 5] }, carbTotalBudgetGPerKg: [9, 12], depleteCarbsGPerKg: 1.2, proteinGPerKg: 2.5, light: false },
+  bb_212:           { label: '212 Olympia',             sex: 'male',   targetBodyFatPct: 5,  carbLoadGPerKg: { front: [7, 8], moderate: [6, 7], back: [4, 5] }, carbTotalBudgetGPerKg: [9, 12], depleteCarbsGPerKg: 1.2, proteinGPerKg: 2.5, light: false },
+  classic_physique: { label: 'Classic Physique',        sex: 'male',   targetBodyFatPct: 6,  carbLoadGPerKg: { front: [7, 8], moderate: [6, 7], back: [4, 5] }, carbTotalBudgetGPerKg: [8, 11], depleteCarbsGPerKg: 1.3, proteinGPerKg: 2.4, light: false },
+  mens_physique:    { label: "Men's Physique",          sex: 'male',   targetBodyFatPct: 7,  carbLoadGPerKg: { front: [5, 6], moderate: [4, 5], back: [3, 4] }, carbTotalBudgetGPerKg: [6, 9], depleteCarbsGPerKg: 1.5, proteinGPerKg: 2.3, light: false },
+  womens_bb:        { label: "Women's Bodybuilding",    sex: 'female', targetBodyFatPct: 8,  carbLoadGPerKg: { front: [5, 6], moderate: [4, 5], back: [3, 4] }, carbTotalBudgetGPerKg: [6, 9], depleteCarbsGPerKg: 1.4, proteinGPerKg: 2.2, light: false },
+  womens_physique:  { label: "Women's Physique",        sex: 'female', targetBodyFatPct: 9,  carbLoadGPerKg: { front: [5, 6], moderate: [4, 5], back: [3, 4] }, carbTotalBudgetGPerKg: [5, 8], depleteCarbsGPerKg: 1.5, proteinGPerKg: 2.2, light: false },
+  figure:           { label: 'Figure',                  sex: 'female', targetBodyFatPct: 11, carbLoadGPerKg: { front: [4, 5], moderate: [3, 4], back: [2, 3] }, carbTotalBudgetGPerKg: [4.5, 7], depleteCarbsGPerKg: 1.6, proteinGPerKg: 2.2, light: false },
+  bikini:           { label: 'Bikini',                  sex: 'female', targetBodyFatPct: 13, carbLoadGPerKg: { front: [3, 4], moderate: [2.5, 3], back: [2, 2.5] }, carbTotalBudgetGPerKg: [3.5, 5.5], depleteCarbsGPerKg: 1.8, proteinGPerKg: 2.0, light: true },
+  wellness:         { label: 'Wellness',                sex: 'female', targetBodyFatPct: 14, carbLoadGPerKg: { front: [3, 4], moderate: [2.5, 3], back: [2, 2.5] }, carbTotalBudgetGPerKg: [3.5, 5.5], depleteCarbsGPerKg: 1.8, proteinGPerKg: 2.0, light: true },
+};
+
+/** Распределение суммарного карб-бюджета по load-дням (сумма=1.0). Pro: 5 стратегий, включая undulating. */
+export const CARB_DISTRIBUTION: Record<CarbLoadStrategy, number[]> = {
+  front: [0.42, 0.35, 0.23],          // ранняя загрузка 42% → 35% → 23% (время на коррекцию)
+  moderate: [0.25, 0.35, 0.40],       // классика нарастающая 25-35-40 (mid)
+  back: [0.15, 0.30, 0.55],           // поздняя 15-30-55 (прямо перед сценой, риск spill ниже при хорошей кондиции)
+  undulating: [0.30, 0.20, 0.50],     // волна 30-20-50 для непредсказуемых
+  linear: [0.33, 0.33, 0.34],         // ровно
 };
 
 export const CONTEST_CATEGORY_LABELS: Record<BBContestCategory, string> = Object.fromEntries(
@@ -299,14 +318,18 @@ export function resolveShowDate(cfg: BBContestPrepConfig): string {
   return cfg.showDate;
 }
 
-/** Фазы по дням (день 1 = D-6, день 7 = шоу). */
-const PHASES_BY_STRATEGY: Record<CarbLoadStrategy, PeakDayPhase[]> = {
+/** Фазы по дням (день 1 = D-6, день 7 = шоу). PRO: 5 стратегий, включая undulating. */
+export const PHASES_BY_STRATEGY: Record<CarbLoadStrategy, PeakDayPhase[]> = {
   // front: деплеция 2 дня (D-6, D-5) → загрузка 3 дня (D-4..D-2) → пик (D-1) → шоу.
   front: ['deplete_1', 'deplete_2', 'load_1', 'load_2', 'load_3', 'peak', 'show'],
   // moderate: классика 3/3 — деплеция (D-6..D-4) → загрузка (D-3..D-1) → шоу.
   moderate: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
   // back: деплеция 3 дня → переход (D-3) → загрузка 2 дня (D-2, D-1) → шоу.
   back: ['deplete_1', 'deplete_2', 'deplete_3', 'peak', 'load_1', 'load_2', 'show'],
+  // undulating: волна 30-20-50 для непредсказуемых (деплеция 3 → волна)
+  undulating: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
+  // linear: ровная загрузка 33-33-34
+  linear: ['deplete_1', 'deplete_2', 'deplete_3', 'load_1', 'load_2', 'load_3', 'show'],
 };
 
 export const PHASE_LABELS_RU: Record<PeakDayPhase, string> = {
@@ -332,21 +355,28 @@ export const PEAK_PHASE_COLORS: Record<PeakDayPhase, string> = {
   show: '#fbbf24',
 };
 
-/** Вода по дням (л) — множители от пика нагрузки. */
-const WATER_DAY_MULT: Record<WaterStrategy, number[]> = {
-  classic: [1, 1, 1, 1, 0.6, 0.35, 0.03],  // load → ступенчатый cut → глотки
-  moderate: [1, 1, 1, 1, 1, 0.5, 0.1],     // мягкий cut
-  minimal: [1, 1, 1, 1, 1, 1, 0.15],       // без манипуляций
+/** Вода по дням (л) — множители от базы. PRO: stable/tapered/high с гликоген-связкой. */
+export const WATER_DAY_MULT: Record<string, number[]> = {
+  // Legacy aliases
+  classic: [1, 1, 1, 1, 0.6, 0.35, 0.03],
+  moderate: [1, 1, 1, 1, 1, 0.5, 0.1],
+  minimal: [1, 1, 1, 1, 1, 1, 0.15],
+  // Canonical PRO (Escalante 2021): stable держит, tapered мягко таперит, high = классика gated
+  stable: [1, 1, 1, 1, 1, 1, 0.85],       // без Manipulation: 35 мл/кг → 30 мл/кг на сцене (не 0.25л!)
+  tapered: [1, 1, 1, 1, 0.85, 0.60, 0.45], // 100мл/кг load → 85%→60%→45% (3.6л→2.7л→1.9л при 4.2л базе)
+  high: [1, 1, 1, 1, 0.6, 0.35, 0.03],     // классика, gated behind trial+confirm
 };
 
-/** Натрий по дням (мг). */
-const SODIUM_DAY_MG: Record<SodiumStrategy, [number, number, number, number, number, number, number]> = {
+/** Натрий по дням (мг). PRO: stable + tapered (-30% за 48ч), legacy cut_* deprecated. */
+export const SODIUM_DAY_MG: Record<string, [number, number, number, number, number, number, number]> = {
   constant: [2800, 2800, 2800, 2800, 2800, 2800, 2000],
-  cut_2d:   [3000, 3000, 3000, 3000, 3000, 800, 600],
-  cut_3d:   [3000, 3000, 3000, 3000, 1500, 500, 500],
+  stable:   [2800, 2800, 2800, 2800, 2800, 2600, 2000], // держим, шоу - бамп опционально отдельно
+  tapered:  [3000, 3000, 3000, 3000, 3000, 2100, 1900], // мягкий -30% за 48ч (BellyProof/TeamUSA)
+  cut_2d:   [3000, 3000, 3000, 3000, 3000, 800, 600],   // legacy deprecated
+  cut_3d:   [3000, 3000, 3000, 3000, 1500, 500, 500],   // legacy deprecated
 };
 
-const KNOWN_CONTRAINDICATIONS = ['kidney', 'heart', 'hypertension'];
+export const KNOWN_CONTRAINDICATIONS = ['kidney', 'heart', 'hypertension'];
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Утилиты
@@ -355,11 +385,52 @@ const KNOWN_CONTRAINDICATIONS = ['kidney', 'heart', 'hypertension'];
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 const round1 = (v: number): number => Math.round(v * 10) / 10;
 
-function isValidIsoDate(s: string): boolean {
+export function isValidIsoDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const [y, m, d] = s.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return false;
+  // Use UTC to avoid timezone shifts and auto-rollover (2026-02-31 → 2026-03-03 must be invalid)
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/** Alias maps for legacy strategies (compat). */
+export function canonicalWaterStrategy(s: string): WaterStrategy {
+  const v = String(s || '').toLowerCase();
+  if (v === 'minimal' || v === 'stable') return 'stable';
+  if (v === 'moderate' || v === 'tapered') return 'tapered';
+  if (v === 'classic' || v === 'high') return 'high';
+  return 'stable';
+}
+export function canonicalSodiumStrategy(s: string): SodiumStrategy {
+  const v = String(s || '').toLowerCase();
+  if (v === 'constant' || v === 'stable') return 'stable';
+  if (v === 'tapered') return 'tapered';
+  if (v === 'cut_2d' || v === 'cut_3d') return 'tapered';
+  return 'stable';
+}
+export function canonicalCarbStrategy(s: string): CarbLoadStrategy {
+  const v = String(s || '').toLowerCase();
+  if (['front','moderate','back','undulating','linear'].includes(v)) return v as CarbLoadStrategy;
+  return 'moderate';
+}
+
+/** Carb tolerance multiplier from PED/context (insulin/GH enhances glycogen capacity +20-30%). */
+export function carbToleranceMult(cfg: BBContestPrepConfig): number {
+  let m = 1;
+  const ped = cfg.pedContext;
+  if (ped?.insulinIU && ped.insulinIU > 0) m += 0.20;
+  if (ped?.ghIU && ped.ghIU > 4) m += 0.15;
+  else if (ped?.ghIU && ped.ghIU > 0) m += 0.08;
+  if (cfg.enhanced) m += 0.05;
+  return clamp(m, 1, 1.35);
+}
+
+/** Detect luteal-phase water retention risk (female). Simple 28-day model. */
+export function isLutealPhase(cycleDay?: number): boolean {
+  if (cycleDay == null || !Number.isFinite(cycleDay)) return false;
+  const d = Math.round(cycleDay);
+  return d >= 15 && d <= 28;
 }
 
 /** Локальное «сегодня» в ISO (без UTC-сдвигов). */
@@ -399,6 +470,11 @@ function hasContraindication(cfg: BBContestPrepConfig, id: string): boolean {
     kidney: /kidney|kidneys|почк/,
     heart: /heart|серд/,
     hypertension: /hypertension|гипертон|давлен|blood.?pressure/,
+    diabetes: /diabetes|диабет/,
+    pregnancy: /pregnan|беремен/,
+    eating_disorder: /eating.?disorder|пищев|анорекс|булим/,
+    seizures: /seizure|обморок|судорог|syncope|epileps|эпилепс/,
+    electrolyte: /electrolyte|электролит|гипонатрием|hyp[o]?natr/,
   };
   const re = patterns[id];
   return re ? list.some(c => re.test(c)) : false;
@@ -429,9 +505,9 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   else if (daysBetween(new Date().toISOString().slice(0, 10), cfg.showDate) < 0) errors.push('Дата шоу в прошлом.');
   if (!Number.isInteger(cfg.weeksOut) || cfg.weeksOut < 1 || cfg.weeksOut > 4) errors.push(`weeksOut ${cfg.weeksOut} вне диапазона 1–4.`);
   if (!['bb', 'classic', 'pl'].includes(cfg.trainingProtocol)) errors.push(`Неизвестный тренировочный протокол: ${cfg.trainingProtocol}`);
-  if (!['front', 'moderate', 'back'].includes(cfg.carbLoadStrategy)) errors.push(`Неизвестная карб-стратегия: ${cfg.carbLoadStrategy}`);
-  if (!['classic', 'moderate', 'minimal'].includes(cfg.waterStrategy)) errors.push(`Неизвестная водная стратегия: ${cfg.waterStrategy}`);
-  if (!['constant', 'cut_2d', 'cut_3d'].includes(cfg.sodiumStrategy)) errors.push(`Неизвестная натриевая стратегия: ${cfg.sodiumStrategy}`);
+  if (!['front', 'moderate', 'back', 'undulating', 'linear'].includes(cfg.carbLoadStrategy)) errors.push(`Неизвестная карб-стратегия: ${cfg.carbLoadStrategy}`);
+  if (!['classic', 'moderate', 'minimal', 'stable', 'tapered', 'high'].includes(cfg.waterStrategy)) errors.push(`Неизвестная водная стратегия: ${cfg.waterStrategy}`);
+  if (!['constant', 'cut_2d', 'cut_3d', 'stable', 'tapered'].includes(cfg.sodiumStrategy)) errors.push(`Неизвестная натриевая стратегия: ${cfg.sodiumStrategy}`);
   if (!['beginner', 'intermediate', 'advanced'].includes(cfg.experienceLevel)) errors.push(`Неизвестный уровень: ${cfg.experienceLevel}`);
   if (!Number.isFinite(cfg.prepCount) || cfg.prepCount < 0) errors.push(`prepCount ${cfg.prepCount} некорректен.`);
   if (cfg.schedule && (cfg.schedule.wake != null || cfg.schedule.stage != null)) {
@@ -467,19 +543,33 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   // ── Принудительные безопасные моды по противопоказаниям ──
   for (const id of KNOWN_CONTRAINDICATIONS) {
     if (!hasContraindication(cfg, id)) continue;
-    const label = id === 'kidney' ? 'почки' : id === 'heart' ? 'сердце' : 'гипертония';
+    const labelMap: Record<string,string> = { kidney:'почки', heart:'сердце', hypertension:'гипертония', diabetes:'диабет', pregnancy:'беременность', eating_disorder:'РПП', seizures:'судороги', electrolyte:'электролиты' };
+    const label = labelMap[id] ?? id;
     warnings.push(`⚠ Противопоказание (${label}): агрессивные водные/натриевые манипуляции опасны.`);
-    if (cfg.waterStrategy !== 'minimal') {
-      forced.waterStrategy = 'minimal';
-      warnings.push('Водная стратегия принудительно переведена в «minimal» (без load/cut).');
+    const canonWater = canonicalWaterStrategy(cfg.waterStrategy);
+    const canonSodium = canonicalSodiumStrategy(cfg.sodiumStrategy);
+    if (canonWater !== 'stable') {
+      forced.waterStrategy = 'stable';
+      warnings.push('Водная стратегия принудительно переведена в «stable» (без load/cut).');
     }
-    if (cfg.sodiumStrategy !== 'constant') {
-      forced.sodiumStrategy = 'constant';
-      warnings.push('Натриевая стратегия принудительно переведена в «constant» (натрий не трогаем).');
+    if (canonSodium !== 'stable') {
+      forced.sodiumStrategy = 'stable';
+      warnings.push('Натриевая стратегия принудительно переведена в «stable» (натрий не трогаем).');
     }
-    if (cfg.carbLoadStrategy !== 'moderate') {
+    if (cfg.carbLoadStrategy !== 'moderate' && cfg.carbLoadStrategy !== 'linear') {
       forced.carbLoadStrategy = 'moderate';
       warnings.push('Карб-загрузка принудительно переведена в «moderate» (умеренная).');
+    }
+  }
+  // Диуретик — всегда force stable, даже без явных противопоказаний в списке
+  if (cfg.pedContext?.diuretic) {
+    if (canonicalWaterStrategy(cfg.waterStrategy) !== 'stable') {
+      forced.waterStrategy = 'stable';
+      warnings.push('⛔ Диуретик указан: водная стратегия принудительно «stable» — манипуляции с водой запрещены без врача.');
+    }
+    if (canonicalSodiumStrategy(cfg.sodiumStrategy) !== 'stable') {
+      forced.sodiumStrategy = 'stable';
+      warnings.push('⛔ Диуретик указан: натрий принудительно «stable».');
     }
   }
 
@@ -499,11 +589,25 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
   if (profile && cfg.bodyFatPct != null && cfg.bodyFatPct - profile.targetBodyFatPct > 2) {
     warnings.push(`⚠ Готовность: % жира ${cfg.bodyFatPct}% при цели ~${profile.targetBodyFatPct}% — до сухости не дожато. Карб-загрузка даст залив: выбирайте moderate/back и мягкий water cut.`);
   }
-  if (cfg.enhanced && cfg.waterStrategy === 'classic') {
+  if (cfg.enhanced && canonicalWaterStrategy(cfg.waterStrategy) === 'high') {
     warnings.push('⚠ Курс + классический water cut: диуретики — ТОЛЬКО по назначению врача. Контроль K/Mg обязателен (судороги, аритмия).');
   }
-  if (cfg.waterStrategy === 'classic') {
+  if (canonicalWaterStrategy(cfg.waterStrategy) === 'high') {
     warnings.push('⚠ Классический water load/cut — экстремальная манипуляция: контроль электролитов (K+ 3000–4700 мг, Mg 300–400 мг), риск гипонатриемии/судорог.');
+    if (!cfg.confirmedManipulation) warnings.push('⛔ High water требует явного подтверждения (confirmedManipulation) и пробного пика — иначе будет применён stable.');
+    if (!cfg.hasTrialPeak) warnings.push('💡 High water без пробного пика опасен: сделайте trial peak за 21-28 дней.');
+  }
+  if (canonicalWaterStrategy(cfg.waterStrategy) === 'tapered' && !cfg.confirmedManipulation) {
+    warnings.push('💡 Tapered вода — умеренная манипуляция: убедитесь что кондиция позволяет, иначе выбирайте stable.');
+  }
+  // SGLT1 guard: натрий срезается во время карб-загрузки — дросселирует SGLT1
+  const canonNa = canonicalSodiumStrategy(cfg.sodiumStrategy);
+  const isLoadingStrategy = ['front','moderate','back','undulating','linear'].includes(cfg.carbLoadStrategy);
+  if (isLoadingStrategy && canonNa !== 'stable' && cfg.carbLoadStrategy !== 'moderate') {
+    warnings.push('⚠ SGLT1: натрий срезается во время карб-загрузки — глюкоза (SGLT1) требует Na для транспорта. Держите натрий stable до D-1.');
+  }
+  if (isLutealPhase(cfg.cycleDay)) {
+    warnings.push('ℹ️ Лютеиновая фаза (15-28 день цикла): задержка воды +0.5-1кг ожидается — вода не ниже 2.5л, натрий не ниже 2000мг.');
   }
 
   return { ok: errors.length === 0, errors, warnings, forced };
@@ -607,43 +711,44 @@ interface DayTraining {
   details: string[];
 }
 
+/** PRO peak-week training: KISS — тот же диапазон 8-12, снижен объём 40-60%, RIR 2-3, last hard D-5 (Brad Rowe/Helms). */
 const TRAINING_BY_PHASE: Record<PeakDayPhase, DayTraining> = {
   deplete_1: {
-    type: 'Верх круговой (деплеция гликогена)',
-    minutes: 50,
+    type: 'Верх лёгкий (деплеция мягкая)',
+    minutes: 35,
     details: [
-      '3 круга: жим → тяга → плечи → руки, 12–15 повт, ~60–70% рабочего веса',
-      'Отдых между кругами 90–120 сек — метаболический стресс, не силовой',
-      'Без отказа: цель — исчерпать гликоген, не накопить повреждения',
+      '2 круга (не 3): жим/тяга/плечи — 8-12 повт, ~60% веса, RIR 2-3, пауза 90 сек',
+      'Без отказа и без новых упражнений — исчерпание умеренное (Homer 2024 без брутальной деплеции)',
+      'Цель — лёгкое опорожнение гликогена, не ЦНС-краш',
     ],
   },
   deplete_2: {
-    type: 'Низ круговой (деплеция гликогена)',
-    minutes: 50,
+    type: 'Низ лёгкий (деплеция мягкая)',
+    minutes: 35,
     details: [
-      '3 круга: присед-паттерн → RDL → сгибания ног → икры, 12–15 повт, ~60–70%',
-      'Отдых 90–120 сек между кругами',
-      'Держите технику — усталость растёт, риск травмы выше',
+      '2 круга: присед-паттерн/RDL/сгибания ног — 8-12 повт, ~60%, RIR 2-3',
+      'Техника приоритет, не памп. Last hard session не позже D-3 (CNS 3-5 дней)',
+      'При признаках перегруза — пропустите',
     ],
   },
   deplete_3: {
-    type: 'Full-body лёгкий (финальная деплеция)',
-    minutes: 30,
+    type: 'Full-body лёгкий / прогулка',
+    minutes: 20,
     details: [
-      '2 круга полного тела, только изоляция/тренажёры, 15–20 повт, лёгкий вес',
-      'Короткий отдых 60 сек — завершаем исчерпание',
+      '1-2 круга только изоляция/тренажёры, 12-15 повт, 50% веса, RIR 3',
+      'Альтернатива — прогулка 30 мин + позирование 15 мин',
     ],
   },
-  load_1: { type: 'Отдых', minutes: 0, details: ['Без тренировки — гликоген начинает наполняться. Лёгкая прогулка 20–30 мин.'] },
-  load_2: { type: 'Отдых', minutes: 0, details: ['Полный покой. Позирование и растяжка.'] },
-  load_3: { type: 'Отдых', minutes: 0, details: ['Полный покой. Проверка поз, прогон обязательной программы.'] },
-  peak: { type: 'Отдых / лёгкий памп по желанию', minutes: 15, details: ['Если «заливает» — 10–15 мин лёгкого пампа верх тела. Иначе — покой.'] },
+  load_1: { type: 'Отдых', minutes: 0, details: ['Без тренировки — гликоген наполняется. Лёгкая прогулка 20 мин + позирование 20 мин.'] },
+  load_2: { type: 'Отдых', minutes: 0, details: ['Полный покой. Позирование 25 мин, растяжка, сон 8-9ч.'] },
+  load_3: { type: 'Отдых', minutes: 0, details: ['Полный покой. Прогон обязательной программы 15 мин, ранний сон.'] },
+  peak: { type: 'Отдых / лёгкий памп 10 мин', minutes: 10, details: ['Только если «плоско»: 1 круг верх лёгкий 12-15 повт, 50%. Иначе — покой.'] },
   show: {
     type: 'Памп-рутина backstage',
-    minutes: 25,
+    minutes: 20,
     details: [
-      'Резинки/отжимания/лёгкие гантели: 15–20 повт, 2 круга, без усталости',
-      'Цель — налить мышцы кровью перед выходом',
+      'Резинки/отжимания/лёгкие гантели: 12-15 повт, 2 круга, без отказа, пауза 60 сек',
+      'Цель — налить мышцы кровью, не утомить. Между выходами — глотки воды, хлебцы 20г',
     ],
   },
 };
@@ -658,93 +763,163 @@ export function buildPeakWeek(cfg: BBContestPrepConfig): PeakWeekDayPlan[] {
   const profile = CATEGORY_PROFILES[eff.category];
   const isFemale = eff.sex === 'female';
   const w = eff.weightKg;
-  const phases = PHASES_BY_STRATEGY[eff.carbLoadStrategy];
+  // Strategy canonicalization (legacy compat)
+  const strat = canonicalCarbStrategy(eff.carbLoadStrategy) as CarbLoadStrategy;
+  const phases = PHASES_BY_STRATEGY[strat] ?? PHASES_BY_STRATEGY.moderate;
 
   const proteinG = Math.round(w * profile.proteinGPerKg);
   const potassiumMg = isFemale ? 3500 : 4000;
-  const depleteCarbs = clamp(Math.round(w * profile.depleteCarbsGPerKg), 40, 120);
-  const [carbLo, carbHi] = profile.carbLoadGPerKg[eff.carbLoadStrategy];
-  const carbMid = Math.round((carbLo + carbHi) / 2 * w);
-  const carbLoG = Math.round(carbLo * w);
-  const carbHiG = Math.round(carbHi * w);
-  const peakCarbs = clamp(Math.round(w * (isFemale ? 1.8 : 2.2)), 100, 260);
-  const showCarbs = clamp(Math.round(w * (isFemale ? 1.4 : 1.8)), 80, 220);
+
+  // ── PRO CARB MODEL: total budget 8-12 г/кг total за 36-48ч, распределённый по стратегии ──
+  // Escalante 2021: 8-12 total, не в день. Ранее было 21-24 total — гарантированный spill.
+  const tolMult = carbToleranceMult(eff);
+  const [budgetMin, budgetMax] = profile.carbTotalBudgetGPerKg;
+  // Бюджет total = среднее * вес * tolerance, кламп по категории
+  const budgetMidPerKg = (budgetMin + budgetMax) / 2;
+  const rawBudget = w * budgetMidPerKg * tolMult;
+  const totalBudget = clamp(Math.round(rawBudget), Math.round(w * budgetMin), Math.round(w * budgetMax * tolMult));
+  const distribution = CARB_DISTRIBUTION[strat] ?? CARB_DISTRIBUTION.moderate;
+  // load-дни: распределить бюджет по долям; деплеция — мягкая 1.2-1.8 г/кг (Homer 2024 без брутальной деплеции)
+  // Для новичков/без trial — повышенная деплеция (не ниже 1.5 для light), для опытных с trial — можно 0.9
+  const depleteBase = profile.depleteCarbsGPerKg;
+  // Если нет trial и beginner — поднимаем деплецию до минимум 1.5 для safety (не резать до 0.7)
+  const depleteBoost = (!eff.hasTrialPeak && (eff.experienceLevel === 'beginner' || eff.prepCount === 0)) ? 0.6 : 0;
+  const depleteCarbs = clamp(Math.round(w * (depleteBase + depleteBoost)), isFemale ? 60 : 80, isFemale ? 140 : 180);
+  // Peak/show — умеренные остатки, не загрузка: peak 1.8-2.2, show 1.4-1.8 (как было, но от tolerance)
+  const peakCarbs = clamp(Math.round(w * (isFemale ? 1.8 : 2.2) * Math.min(1.1, tolMult)), 90, 260);
+  const showCarbs = clamp(Math.round(w * (isFemale ? 1.4 : 1.8) * Math.min(1.1, tolMult)), 80, 220);
+  // Маппинг load_1..3 на долю бюджета
+  const loadBudgets: Record<string, number> = {};
+  const loadPhases = phases.filter(p => p.startsWith('load'));
+  loadPhases.forEach((p, i) => {
+    const share = distribution[i] ?? (1 / loadPhases.length);
+    loadBudgets[p] = Math.round(totalBudget * share);
+  });
 
   const carbsForPhase = (phase: PeakDayPhase): number => {
-    switch (phase) {
-      case 'deplete_1': case 'deplete_2': case 'deplete_3': return depleteCarbs;
-      case 'load_1': return carbLoG;
-      case 'load_2': return carbMid;
-      case 'load_3': return carbHiG;
-      case 'peak': return peakCarbs;
-      case 'show': return showCarbs;
-      default: return depleteCarbs;
-    }
+    if (phase.startsWith('deplete')) return depleteCarbs;
+    if (loadBudgets[phase] != null) return loadBudgets[phase];
+    if (phase === 'peak') return peakCarbs;
+    if (phase === 'show') return showCarbs;
+    return depleteCarbs;
   };
 
-  // Вода — по составу тела (leanMass/BSA), не только по массе
+  // ── PRO WATER MODEL: stable/tapered/high с учётом роста, leanMass/BSA, luteal, GH ──
+  const height = eff.heightCm && eff.heightCm > 120 && eff.heightCm < 230 ? eff.heightCm : (isFemale ? 164 : 178);
   const leanMass = eff.bodyFatPct ? w * (1 - eff.bodyFatPct / 100) : w * 0.85;
-  const bsa = eff.bodyFatPct ? Math.sqrt((w * 170) / 3600) : Math.sqrt((w * 170) / 3600); // Du Bois упрощённо, рост 170 по умолчанию
-  const waterFactor = eff.waterStrategy === 'classic' ? 0.115 : eff.waterStrategy === 'moderate' ? 0.075 : 0.04;
-  let waterBase = clamp(round1(w * waterFactor), eff.waterStrategy === 'classic' ? 6 : eff.waterStrategy === 'moderate' ? 4 : 2.5, eff.waterStrategy === 'classic' ? 10 : eff.waterStrategy === 'moderate' ? 6 : 4);
-  // Коррекция по leanMass/BSA: худым — меньше, тяжёлым — кап по BSA
-  if (leanMass < 55) waterBase = Math.max(2.5, round1(waterBase * 0.85));
-  if (bsa > 2.1) waterBase = Math.min(waterBase, 8.5);
-  // PED-коррекция
-  if (eff.pedContext?.ghIU && eff.pedContext.ghIU > 4) waterBase = round1(waterBase * 1.2);
-  const waterMults = WATER_DAY_MULT[eff.waterStrategy];
+  // Du Bois BSA = 0.007184 * W^0.425 * H^0.725, упрощённая: sqrt(W*H/3600)
+  const bsa = Math.sqrt((w * height) / 3600);
+  const canonWater = canonicalWaterStrategy(eff.waterStrategy);
+  // База: stable 35мл/кг (~2.8л при 80кг), tapered 55мл/кг (~4.4л), high 100мл/кг (~8л)
+  const waterFactorMap: Record<string, number> = { stable: 0.035, tapered: 0.055, high: 0.10, classic: 0.10, moderate: 0.055, minimal: 0.035 };
+  const factor = waterFactorMap[canonWater] ?? 0.035;
+  let waterBase = clamp(round1(w * factor), canonWater === 'high' ? 5.5 : 2.2, canonWater === 'high' ? 10 : canonWater === 'tapered' ? 6.5 : 4.2);
+  // Коррекция по leanMass/BSA: худым — меньше, высоким — кап по BSA (не лить 10л при 60кг)
+  if (leanMass < 52) waterBase = Math.max(2.0, round1(waterBase * 0.82));
+  if (bsa > 2.15) waterBase = Math.min(waterBase, canonWater === 'high' ? 9 : 5.5);
+  if (bsa < 1.55) waterBase = Math.min(waterBase, 4.0);
+  // Luteal phase: +0.5л воды, не резать ниже 2.5л (TeamUSA)
+  const lutealBoost = isLutealPhase(eff.cycleDay) ? 0.5 : 0;
+  if (lutealBoost > 0) waterBase = round1(waterBase + lutealBoost);
+  // PED-коррекция GH>4 → +15% удержания → +0.6л базы для компенсации
+  if (eff.pedContext?.ghIU && eff.pedContext.ghIU > 4) waterBase = round1(waterBase * 1.15);
+  // legacy compat key mapping
+  const waterKey = canonWater === 'stable' ? 'stable' : canonWater === 'tapered' ? 'tapered' : 'high';
+  const waterMults = WATER_DAY_MULT[waterKey] ?? WATER_DAY_MULT.stable;
+  // Гликоген-водная связка: каждый г гликогена 2.7-3г воды интра (Escalante). Карб-загрузка тащит ~1.0-1.5л интра.
+  // Питьевую воду не надо резать сильнее — иначе плоско. Добавляем +300мл на load-дни для транспорта (SGLT1).
+  const glycogenWaterBoost = (carbs: number) => Math.round(carbs * 0.0008 * 10) / 10; // ~0.8мл/г карб ≈ 0.3л при 400г
 
-  // Натрий — с учётом PED и пола/категории
-  const naRow = [...SODIUM_DAY_MG[eff.sodiumStrategy]];
-  // Tren → потоотделение: +500 мг в пик-неделе
-  if (eff.pedContext?.trenMg && eff.pedContext.trenMg > 200) {
-    for (let i = 4; i < naRow.length; i++) naRow[i] = Math.round(naRow[i] * 1.2);
+  // ── PRO SODIUM MODEL: stable vs tapered -30% за 48ч, SGLT1-guard ──
+  const canonNa = canonicalSodiumStrategy(eff.sodiumStrategy);
+  const naKey = canonNa === 'tapered' ? 'tapered' : 'stable';
+  // Отображаем старый ключ constant/cut → новый
+  const sodiumKeyLegacy = (eff.sodiumStrategy === 'constant' || eff.sodiumStrategy === 'stable') ? 'stable' : (eff.sodiumStrategy === 'tapered' ? 'tapered' : naKey);
+  const naRow = [...(SODIUM_DAY_MG[eff.sodiumStrategy] ?? SODIUM_DAY_MG[sodiumKeyLegacy] ?? SODIUM_DAY_MG.stable)];
+  // Если ключ не найден (high/old), маппим на tapered/stable
+  if (!SODIUM_DAY_MG[eff.sodiumStrategy]) {
+    const mapped = SODIUM_DAY_MG[naKey] ?? SODIUM_DAY_MG.stable;
+    for (let i=0;i<7;i++) (naRow as any)[i] = mapped[i];
   }
-  const naFloor = (profile.light || isFemale) ? 800 : 0;
-  const showNaFloor = 500;
+  // Tren → потоотделение: +15% Na в последние 3 дня (мягче чем было 20%)
+  if (eff.pedContext?.trenMg && eff.pedContext.trenMg > 200) {
+    for (let i = 4; i < naRow.length; i++) naRow[i] = Math.round(naRow[i] * 1.15);
+  }
+  // SGLT1 guard: Na не резать ниже 2600 во время load-дней (иначе глюкоза не всасывается)
+  // Применение ниже в цикле дней — кламп.
+  const naFloor = (profile.light || isFemale) ? 900 : 700;
+  const showNaFloor = isLutealPhase(eff.cycleDay) ? 1200 : 900;
+  // Для luteal — пол floor выше, не срезать сильно
+  if (isLutealPhase(eff.cycleDay)) {
+    for (let i=5;i<7;i++) naRow[i] = Math.max(naRow[i], 2100);
+  }
 
+  // PRO FIBER: low-residue — деплеция 18-22г, load 12-18г, show 8-12г (не 40г!) — вздутие
   const fiberFor = (phase: PeakDayPhase): number =>
-    phase.startsWith('deplete') ? 40 : phase === 'show' ? 15 : 25;
+    phase.startsWith('deplete') ? 20 : phase === 'show' ? 10 : phase === 'peak' ? 12 : 16;
 
   const fatGPerKg = (phase: PeakDayPhase): number => {
-    if (phase.startsWith('deplete')) return profile.light ? 0.8 : 0.9;
-    return profile.light ? 0.45 : 0.35;
+    if (phase.startsWith('deplete')) return profile.light ? 0.75 : 0.85;
+    // Load — жир минимум, чтобы не замедлять карбы (BellyProof): <50г, для light <40г
+    return profile.light ? 0.35 : 0.30;
   };
 
   const days: PeakWeekDayPlan[] = phases.map((phase, idx) => {
     const day = idx + 1;
-    const carbsG = carbsForPhase(phase);
-    const fatG = Math.max(30, Math.round(w * fatGPerKg(phase)));
+    let carbsG = carbsForPhase(phase);
+    let fatG = Math.max(profile.light ? 25 : 30, Math.round(w * fatGPerKg(phase)));
+    // На load — жир кап 45г (не больше), иначе SGLT1 и гликоген страдает
+    if (phase.startsWith('load')) fatG = Math.min(fatG, profile.light ? 38 : 45);
     const kcal = Math.round(proteinG * 4 + carbsG * 4 + fatG * 9);
-    const waterLiters = round1(Math.max(isFemale && day === 7 ? 0.5 : 0.25, waterBase * waterMults[idx]));
-    const sodiumMg = Math.max(day === 7 ? showNaFloor : naFloor, naRow[idx]);
+    // Вода: база * мульт + гликоген-бонус на load (SGLT1 транспорт требует воды) + luteal guard
+    let waterLiters = waterBase * waterMults[idx];
+    if (phase.startsWith('load')) waterLiters += glycogenWaterBoost(carbsG);
+    // SGLT1 guard floor: на load-днях вода не ниже 2.2л, иначе карбы не всосутся
+    if (phase.startsWith('load')) waterLiters = Math.max(waterLiters, isFemale ? 2.0 : 2.2);
+    waterLiters = round1(Math.max(isFemale && day === 7 ? 0.9 : (isFemale ? 0.7 : 0.6), waterLiters));
+    // Натрий: SGLT1 floor — на load не ниже 2600 (если tapered) / 2200 (если stable+карбы)
+    let sodiumMg = naRow[idx];
+    if (phase.startsWith('load') && sodiumMg < 2600 && canonNa === 'tapered') sodiumMg = 2600;
+    if (phase.startsWith('load') && sodiumMg < 2200) sodiumMg = 2200;
+    sodiumMg = Math.max(day === 7 ? showNaFloor : naFloor, sodiumMg);
 
     const carbSource = cfg.preferLowFiberCarbs
       ? 'Низковолокнистые карбс: белый рис, рисовые хлебцы, картофель, мёд, джем'
       : 'Карбс: белый рис, картофель, хлебцы, фрукты малыми порциями';
 
     const mealNotes: string[] = [];
+    // PRO meal guidance with low-FODMAP / familiar foods guard
+    const lowFodmapNote = 'Низкий FODMAP: избегать бобовые/лук/капуста/чеснок — вздутие. Только знакомые продукты из prep.';
     if (phase.startsWith('deplete')) {
-      mealNotes.push(`Белок ${proteinG} г распределить на 4–5 приёмов. Карбс — только вокруг тренировки и овощи.`);
-      mealNotes.push('Овощи с высоким объёмом (огурец, салат) — борьба с голодом без калорий.');
+      mealNotes.push(`Белок ${proteinG} г на 4–5 приёмов. Карбс ${carbsG} г — умеренно (не 0.7г/кг!). Только вокруг тренировки + овощи 1-2 порции.`);
+      mealNotes.push(`Овощи: огурец/салат/цукини — низкообъёмные, клетчатка ≤${fiberFor(phase)}г. ${lowFodmapNote}`);
+      // SGLT1 hint
+      if (canonNa !== 'stable') mealNotes.push('SGLT1: натрий держите стабильно во время деплеции — не резать, иначе карбы не всосутся на загрузке.');
     } else if (phase.startsWith('load')) {
-      mealNotes.push(`${carbSource}. ${carbsG} г карбс на 6–7 малых приёмов каждые 2–2.5 ч.`);
-      mealNotes.push(`Жиры минимум (${fatG} г) — жир замедляет всасывание карбс. Клетчатка ≤ 25 г.`);
+      const budgetNote = `Бюджет загрузки ${totalBudget}г total (${CARB_DISTRIBUTION[strat]?.map(v=>Math.round(v*100)+'%').join('/') ?? ''}), сегодня ${carbsG}г/${totalBudget}г.`;
+      mealNotes.push(`${carbSource}. ${carbsG} г карбс на 6–7 малых приёмов каждые 2–2.5 ч. ${budgetNote}`);
+      mealNotes.push(`Жиры минимум (${fatG} г) — <45г, клетчатка ≤${fiberFor(phase)}г. ${lowFodmapNote}`);
+      mealNotes.push('Вода стабильна на загрузке — карбы сами тащат воду интра (2.7-3г/г гликогена). Не резать воду во время карб-лоада.');
     } else if (phase === 'peak') {
-      mealNotes.push('Умеренные карбс, вода снижена. Последняя проверка формы: при заливе — не добавляйте соль.');
+      mealNotes.push(`Умеренные карбс ${carbsG}г, вода ${waterLiters}л (не резать до 0.25!). Последняя проверка: фото фронт/тыл. При заливе — не соль, а -150г карб и +0.3л вода.`);
+      mealNotes.push(`Клетчатка ≤${fiberFor(phase)}г. ${lowFodmapNote}`);
     } else {
-      mealNotes.push('Завтрак за 2.5 ч до выхода: рисовые хлебцы + мёд/джем, ½ банана, кофе при привычке.');
-      mealNotes.push('Далее карбс малыми порциями каждые 1.5–2 ч. Вода глотками.');
+      mealNotes.push(`Завтрак за 2.5 ч до выхода: рисовые хлебцы 40г + мёд 20г + ½ банана + кофе при привычке. Всего ${carbsG}г карбс на шоу-день (≈${Math.round(carbsG/w*10)/10}г/кг).`);
+      mealNotes.push(`Далее ${Math.round(carbsG/4)}г карбс каждые 1.5-2 ч (хлебцы/мармелад/рис). Вода ${waterLiters}л глотками, соль щепотка перед пампом (если stable). Клетчатка ≤${fiberFor(phase)}г.`);
+      if (day === 7 && canonWater === 'high') mealNotes.push('High water: на сцене глотки, не залпом — риск гипонатриемии.');
     }
     if (cfg.allergens?.length) mealNotes.push(`Исключить аллергены: ${cfg.allergens.join(', ')}.`);
+    if (eff.hasTrialPeak === false && eff.experienceLevel === 'beginner') mealNotes.push('Первый пик без trial — держите stable воду/натрий, не экспериментируйте.');
     // Женская грамотность пик-недели (лёгкие категории bikini/wellness/figure):
-    // железо при деплеции, кальций, цикл-задержка воды, мягче протокол.
     if (isFemale) {
       if (phase.startsWith('deplete')) mealNotes.push('Женщины: железо — красное мясо/печень/шпинат (дефицит типичен для сушки).');
       if (phase.startsWith('load') || phase === 'peak') mealNotes.push('Женщины: кальций 1000–1200 мг/день (молочные/обогащённые) — защита костей при низком % жира.');
-      if (phase !== 'show') mealNotes.push('Женщины: в лютеиновую фазу цикла возможна задержка воды +0.5–1 кг — это норма, не усиливайте дефицит.');
-      if (day === 7) mealNotes.push('Женщины: вода не ниже 0.5 л в день шоу; натрий не ниже 800 мг — риск гипонатриемии выше.');
+      if (phase !== 'show' && isLutealPhase(eff.cycleDay)) mealNotes.push('Лютеиновая фаза активна: вода +0.5л и натрий ≥2100мг уже учтены, не усиливайте дефицит.');
+      else if (phase !== 'show') mealNotes.push('Женщины: в лютеиновую фазу (15-28 день) возможна задержка воды +0.5–1 кг — это норма, не усиливайте дефицит.');
+      if (day === 7) mealNotes.push(`Женщины: вода не ниже 0.9 л на шоу; натрий не ниже ${showNaFloor}мг — гипонатриемия.`);
     }
+    // Carb tolerance note for enhanced
+    if (tolMult > 1.15 && phase.startsWith('load')) mealNotes.push(`Курс/PED: карб-толерантность ×${tolMult.toFixed(2)} (инсулин/GH) — бюджет повышен, spill-контроль фото каждые 4ч.`);
 
     const supplementNotes: string[] = [];
     supplementNotes.push(`Магний 300–400 мг/день (анти-судороги), калий ${potassiumMg} мг — не снижать.`);
@@ -1428,16 +1603,19 @@ export function deserializeBBPrepConfig(str: string | null | undefined): BBConte
     sex: c.sex === 'female' ? 'female' : 'male',
     category: (c.category as BBContestCategory) || 'mens_physique',
     weightKg: Number(c.weightKg),
+    heightCm: c.heightCm != null && Number.isFinite(Number(c.heightCm)) ? clamp(Number(c.heightCm), 120, 230) : undefined,
     bodyFatPct: c.bodyFatPct == null ? undefined : Number(c.bodyFatPct),
+    cycleDay: c.cycleDay != null && Number.isFinite(Number(c.cycleDay)) ? clamp(Math.round(Number(c.cycleDay)), 1, 35) : undefined,
+    hasTrialPeak: c.hasTrialPeak === true ? true : undefined,
     experienceLevel: (c.experienceLevel as ExperienceLevel) || 'intermediate',
     enhanced: !!c.enhanced,
     prepCount: Number.isFinite(Number(c.prepCount)) ? Math.max(0, Math.round(Number(c.prepCount))) : 0,
     showDate: String(c.showDate || ''),
     weeksOut: Number.isInteger(Number(c.weeksOut)) ? clamp(Number(c.weeksOut), 1, 4) : 3,
     trainingProtocol: (['bb', 'classic', 'pl'] as const).includes(c.trainingProtocol as PeakingProtocol) ? (c.trainingProtocol as PeakingProtocol) : 'bb',
-    carbLoadStrategy: (['front', 'moderate', 'back'] as const).includes(c.carbLoadStrategy as CarbLoadStrategy) ? (c.carbLoadStrategy as CarbLoadStrategy) : 'moderate',
-    waterStrategy: (['classic', 'moderate', 'minimal'] as const).includes(c.waterStrategy as WaterStrategy) ? (c.waterStrategy as WaterStrategy) : 'minimal',
-    sodiumStrategy: (['constant', 'cut_2d', 'cut_3d'] as const).includes(c.sodiumStrategy as SodiumStrategy) ? (c.sodiumStrategy as SodiumStrategy) : 'constant',
+    carbLoadStrategy: (['front', 'moderate', 'back', 'undulating', 'linear'] as const).includes(c.carbLoadStrategy as CarbLoadStrategy) ? (c.carbLoadStrategy as CarbLoadStrategy) : 'moderate',
+    waterStrategy: (['classic', 'moderate', 'minimal', 'stable', 'tapered', 'high'] as const).includes(c.waterStrategy as WaterStrategy) ? (c.waterStrategy as WaterStrategy) : 'stable',
+    sodiumStrategy: (['constant', 'cut_2d', 'cut_3d', 'stable', 'tapered'] as const).includes(c.sodiumStrategy as SodiumStrategy) ? (c.sodiumStrategy as SodiumStrategy) : 'stable',
     contraindications: Array.isArray(c.contraindications) ? c.contraindications.filter((x): x is string => typeof x === 'string') : undefined,
     allergens: Array.isArray(c.allergens) ? c.allergens.filter((x): x is string => typeof x === 'string') : undefined,
     preferLowFiberCarbs: !!c.preferLowFiberCarbs,
@@ -1515,6 +1693,7 @@ export function legacyConfigFromProfile(
     sex,
     category,
     weightKg: clamp(Number(personal?.weight) || 80, 40, 200),
+    heightCm: Number((personal as any)?.height) > 120 ? Number((personal as any).height) : undefined,
     experienceLevel: 'intermediate',
     enhanced: false,
     prepCount: 0,
@@ -1522,8 +1701,8 @@ export function legacyConfigFromProfile(
     weeksOut: 3,
     trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate',
-    waterStrategy: 'minimal',
-    sodiumStrategy: 'constant',
+    waterStrategy: 'stable',
+    sodiumStrategy: 'stable',
   };
 }
 
@@ -1622,8 +1801,8 @@ export interface BBContestPrepPlan {
   adjustments?: PrepAdjustment[];
 }
 
-export const PREP_PLAN_VERSION = 1;
-export const PREP_ALGORITHM_VERSION = 1;
+export const PREP_PLAN_VERSION = 2;
+export const PREP_ALGORITHM_VERSION = 2;
 /** Ключ хранения единого плана в профиле (goals.bbContestPrepPlan). */
 export const BB_PREP_PLAN_KEY = 'bbContestPrepPlan';
 
@@ -1768,10 +1947,14 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   const requiresReview = conditionLabels.length > 0;
   const confirmed = cfg.confirmedManipulation === true;
   // Агрессивные моды (не stable-вода/натрий) при противопоказаниях → протокол блокируется;
-  // без явного подтверждения (confirmedManipulation) классика/срезание недоступны — стабильные.
-  const manipulationRequested = cfg.waterStrategy !== 'minimal' || cfg.sodiumStrategy !== 'constant';
+  // PRO: canonical stable vs any manipulation; high/tapered требуют confirmed + trial
+  const canonWaterReq = canonicalWaterStrategy(cfg.waterStrategy);
+  const canonNaReq = canonicalSodiumStrategy(cfg.sodiumStrategy);
+  const manipulationRequested = canonWaterReq !== 'stable' || canonNaReq !== 'stable';
   const blockedProtocol = requiresReview && manipulationRequested;
   const allowedManipulation = confirmed && !blockedProtocol;
+  // High water без trial — блок
+  const highWithoutTrial = canonWaterReq === 'high' && !cfg.hasTrialPeak;
 
   const warnings = [...v.warnings];
   if (blockedProtocol) {
@@ -1780,7 +1963,10 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
   if (manipulationRequested && !confirmed) {
     warnings.push('⚠ Агрессивные режимы (water load/cut, срезание натрия) требуют явного подтверждения: используются стабильные вода и натрий.');
   }
-  if (cfg.waterStrategy === 'classic' && confirmed) {
+  if (highWithoutTrial && manipulationRequested) {
+    warnings.push('⛔ High water/tapered без пробного пика (trial peak) заблокирован: сделайте репетицию за 21-28 дней.');
+  }
+  if (canonWaterReq === 'high' && confirmed) {
     warnings.push('⚠ Классический water load/cut подтверждён: контроль электролитов обязателен, диуретики — только по назначению врача.');
   }
   // PED-дозозависимые корректировки
@@ -1843,9 +2029,9 @@ export function buildBBContestPrepPlan(rawCfg: BBContestPrepConfig, opts: BuildP
       strategy: cfg.experienceLevel === 'advanced' && cfg.prepCount > 0
         ? 'moderate'
         : 'conservative',
-      waterMode: allowedManipulation && (cfg.waterStrategy === 'classic' || cfg.waterStrategy === 'moderate') ? 'moderate' : 'stable',
-      sodiumMode: allowedManipulation && cfg.sodiumStrategy !== 'constant' ? 'moderate' : 'stable',
-      carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : 'moderate',
+      waterMode: allowedManipulation && canonicalWaterStrategy(cfg.waterStrategy) !== 'stable' ? 'moderate' : 'stable',
+      sodiumMode: allowedManipulation && canonicalSodiumStrategy(cfg.sodiumStrategy) !== 'stable' ? 'moderate' : 'stable',
+      carbMode: cfg.carbLoadStrategy === 'front' ? 'high' : cfg.carbLoadStrategy === 'back' ? 'conservative' : cfg.carbLoadStrategy === 'undulating' ? 'moderate' : cfg.carbLoadStrategy === 'linear' ? 'moderate' : 'moderate',
     },
     phases,
     trainingPlanId: opts.trainingPlanId,
@@ -1991,6 +2177,7 @@ export function configFromPlan(plan: BBContestPrepPlan): BBContestPrepConfig {
     sex: plan.sex,
     category: plan.category,
     weightKg: plan.preparation.startingWeightKg,
+    heightCm: (plan as any).heightCm,
     experienceLevel: 'intermediate',
     enhanced: false,
     prepCount: 0,
@@ -1998,8 +2185,8 @@ export function configFromPlan(plan: BBContestPrepPlan): BBContestPrepConfig {
     weeksOut: plan.taper.weeks,
     trainingProtocol: 'bb',
     carbLoadStrategy: plan.peakWeek.carbMode === 'high' ? 'front' : plan.peakWeek.carbMode === 'conservative' ? 'back' : 'moderate',
-    waterStrategy: plan.peakWeek.waterMode === 'moderate' ? 'moderate' : 'minimal',
-    sodiumStrategy: plan.peakWeek.sodiumMode === 'moderate' ? 'cut_2d' : 'constant',
+    waterStrategy: plan.peakWeek.waterMode === 'moderate' ? 'tapered' : 'stable',
+    sodiumStrategy: plan.peakWeek.sodiumMode === 'moderate' ? 'tapered' : 'stable',
     contraindications: plan.safety.contraindications,
   };
 }
@@ -2204,6 +2391,49 @@ export function resolvePeakStrategy(plan: BBContestPrepPlan): PrepPeakStrategy {
     }
   }
   return plan.peakWeek.strategy === 'tested' ? 'conservative' : plan.peakWeek.strategy;
+}
+
+/** PRO: Рекомендация стратегии загрузки из trial peak (spill vs flat). */
+export function recommendCarbStrategyFromTrial(t: TestPeakWeekResult | null): CarbLoadStrategy {
+  if (!t) return 'moderate';
+  const wr = t.responses.waterRetention; // 1=заливает, 5=сухо
+  const ft = t.responses.fullness;       // 1=плоско, 5=переполнено
+  const ct = t.responses.carbTolerance;
+  if (wr <= 2 || t.weightDeltaKg > 2 || ft >= 4) return 'back';      // spill-склонный → поздняя лёгкая загрузка
+  if (wr >= 4 && ft <= 2) return 'front';                             // flat-склонный → ранняя
+  if (ct <= 2 || wr === 3) return 'undulating';                       // непредсказуемый → волна
+  if (Math.abs(t.weightDeltaKg) <= 1 && wr >= 3) return 'linear';
+  return 'moderate';
+}
+
+/** PRO: Проверка монотонности тапера (каждая неделя ≤ предыдущей). */
+export function isMonotonicTaper(weeks: Array<{ contestPhase?: string; sessions: Array<{ exercises: Array<{ sets: number }> }> }>): boolean {
+  const taperWeeks = weeks.filter(w => w.contestPhase === 'taper');
+  for (let i = 1; i < taperWeeks.length; i++) {
+    const prev = taperWeeks[i - 1].sessions.reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+e.sets,0),0);
+    const cur = taperWeeks[i].sessions.reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+e.sets,0),0);
+    if (cur > prev) return false;
+  }
+  return true;
+}
+
+/** PRO: Live-adjust карточка утром D-1 (flat/spill чек-лист). */
+export interface LiveAdjustAdvice {
+  status: 'flat' | 'spill' | 'on_track';
+  carbDelta: number;
+  waterDelta: number;
+  sodiumDelta: number;
+  note: string;
+}
+export function liveAdjustForPeakDay(flatScore: number, spillScore: number, waterRetention: number): LiveAdjustAdvice {
+  // flatScore 1-5 (1=плоско), spillScore 1-5 (5=залито), waterRetention 1-5
+  if (flatScore <= 2 || waterRetention >= 4) {
+    return { status: 'flat', carbDelta: 75, waterDelta: 0.3, sodiumDelta: 400, note: 'Плоско: +75г карб +0.3л вода +400мг Na, +1 круг пампа верх, фото через 3ч.' };
+  }
+  if (spillScore >= 4 || waterRetention <= 2) {
+    return { status: 'spill', carbDelta: -100, waterDelta: -0.4, sodiumDelta: 0, note: 'Залито: -100г карб, -0.4л вода, +20 мин ходьба, без соли, фото через 4ч.' };
+  }
+  return { status: 'on_track', carbDelta: 0, waterDelta: 0, sodiumDelta: 0, note: 'На треке: держите план, глотки воды, позирование.' };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

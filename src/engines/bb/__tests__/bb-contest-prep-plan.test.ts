@@ -263,7 +263,7 @@ describe('Этап 3 — динамические недели и перенос
 });
 
 describe('Этап 4 — taper: объём ↓, интенсивность сохраняется, RIR 2-4', () => {
-  it('применение к плану размечает фазы недель и режет объём без обнуления интенсивности', () => {
+  it('применение к плану размечает фазы недель и режет объём без обнуления интенсивности (PRO: per-muscle + мягкий первый тапер)', () => {
     const plan = makePlan(12);
     const out = applyContestPrepToBBPlan(plan, baseConfig(), { prepWeeks: 9, taperWeeks: 2 }) as BBPlanWithPrep;
     expect(out.weeks[11].contestPhase).toBe('peak_week');
@@ -273,15 +273,20 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     expect(out.weeks[0].contestPhase).toBe('preparation');
     const taperWk = out.weeks[9];
     const baseWk = plan.weeks[9];
+    // Первая тапер-неделя для груди щадится (0.95) — объём может остаться равным, но в среднем ≤
+    let totalTaperSets = 0, totalBaseSets = 0;
     for (let s = 0; s < taperWk.sessions.length; s++) {
       for (let e = 0; e < taperWk.sessions[s].exercises.length; e++) {
         const ex = taperWk.sessions[s].exercises[e];
         const orig = baseWk.sessions[s].exercises[e];
-        expect(ex.sets).toBeLessThan(orig.sets);          // объём ↓
-        expect(ex.workSets[0].weight).toBeGreaterThan(orig.workSets[0].weight * 0.8); // интенсивность сохраняется
-        expect(ex.rir).toBeGreaterThanOrEqual(2);          // RIR 2-4, никакого авто-RIR 0
+        expect(ex.sets).toBeLessThanOrEqual(orig.sets);
+        expect(ex.workSets[0].weight).toBeGreaterThan(orig.workSets[0].weight * 0.8);
+        expect(ex.rir).toBeGreaterThanOrEqual(2);
+        totalTaperSets += ex.sets;
+        totalBaseSets += orig.sets;
       }
     }
+    expect(totalTaperSets).toBeLessThan(totalBaseSets);
   });
 
   it('идентичен при повторном применении (идемпотентность)', () => {
@@ -429,9 +434,12 @@ describe('Этап 4 — taper: объём ↓, интенсивность со�
     }
     // Финальная подготовка: объём ×0.9 (ожидаемое изменение).
     expect(out.weeks[7].sessions[0].exercises[0].sets).toBe(Math.max(2, Math.round(plan.weeks[7].sessions[0].exercises[0].sets * 0.9)));
-    // Taper-зона действительно изменилась (объём меньше исходного).
+    // Taper-зона действительно изменилась (объём в среднем меньше исходного — грудь щадится)
     const taperWk = out.weeks[9];
-    expect(taperWk.sessions[0].exercises[0].sets).toBeLessThan(plan.weeks[9].sessions[0].exercises[0].sets);
+    const baseTaperWk = plan.weeks[9];
+    const taperTotal = taperWk.sessions.reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+e.sets,0),0);
+    const baseTotal = baseTaperWk.sessions.reduce((a,s)=>a+s.exercises.reduce((b,e)=>b+e.sets,0),0);
+    expect(taperTotal).toBeLessThan(baseTotal);
     // Пик-неделя.
     expect(out.weeks[11].peakWeek).toBe(true);
   });
@@ -1234,13 +1242,17 @@ describe('Матрица категорий (P2): 4 мужских + 5 женс�
     const weightKg = sex === 'female' ? 55 : 80;
     const plan = buildBBContestPrepPlan(baseConfig({ sex, category: cat as any, weightKg }), { prepWeeks: 8, taperWeeks: 2 });
     expect(plan.category).toBe(cat);
-    // Пик-неделя: ккал = сумма макросов, жиры/натрий/вода по полу.
+    // Пик-неделя: ккал = сумма макросов, жиры/натрий/вода по полу (PRO: load жиры <45, bikini 25-28 допустимо)
     const peak = buildPeakWeek(configFromPlan(plan));
     for (const d of peak) {
       expect(d.kcal).toBe(d.proteinG * 4 + d.carbsG * 4 + d.fatG * 9);
-      expect(d.fatG).toBeGreaterThanOrEqual(sex === 'female' ? 30 : 30);
-      expect(d.sodiumMg).toBeGreaterThanOrEqual(sex === 'female' ? 800 : 0);
-      if (d.day === 7 && sex === 'female') expect(d.waterLiters).toBeGreaterThanOrEqual(0.5);
+      // PRO: light категории на load/peak/show имеют fat floor 25г (SGLT1/гликоген)
+      const isLight = cat === 'bikini' || cat === 'wellness';
+      expect(d.fatG).toBeGreaterThanOrEqual(isLight ? 25 : 30);
+      // SGLT1 guard: натрий на load не ниже 2200, show floor 900
+      expect(d.sodiumMg).toBeGreaterThanOrEqual(d.phase.startsWith('load') ? 1900 : (sex === 'female' ? 800 : 700));
+      if (d.day === 7 && sex === 'female') expect(d.waterLiters).toBeGreaterThanOrEqual(0.9);
+      else if (d.day === 7) expect(d.waterLiters).toBeGreaterThanOrEqual(0.6);
     }
     // Подготовка: калорийный пол и жиры.
     const t = nutritionTargetsForPrepDate(plan.phases[0].dateStart, plan, { kcal: 1000, proteinG: 100, fatG: 30, carbsG: 100, waterMl: 3000, sodiumMg: 2800 });

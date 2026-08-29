@@ -261,8 +261,8 @@ export function annualBlockCtxToPrepPatch(
     prepShowDate: cfg.showDate ?? isoAddDays(isoToday(), 8 * 7),
     prepTaperWeeks: Number.isFinite(cfg.weeksOut) ? Math.min(4, Math.max(1, Math.round(cfg.weeksOut!))) : 2,
     prepWeeks: ctx.weeks && ctx.weeks > 0 ? Math.min(52, Math.max(1, Math.round(ctx.weeks))) : 12,
-    prepWaterMode: (cfg.waterStrategy as WaterStrategy) || 'minimal',
-    prepSodiumMode: (cfg.sodiumStrategy as SodiumStrategy) || 'constant',
+    prepWaterMode: (cfg.waterStrategy as WaterStrategy) || 'stable',
+    prepSodiumMode: (cfg.sodiumStrategy as SodiumStrategy) || 'stable',
     prepCarbMode: (cfg.carbLoadStrategy as CarbLoadStrategy) || 'moderate',
     prepConfirmedManip: !!cfg.confirmedManipulation,
   };
@@ -616,8 +616,8 @@ export const BbAutoConstructor: React.FC = () => {
   });
   const [prepWeeks, setPrepWeeks] = useState<number>(12);
   const [prepTaperWeeks, setPrepTaperWeeks] = useState<number>(2);
-  const [prepWaterMode, setPrepWaterMode] = useState<WaterStrategy>('minimal');
-  const [prepSodiumMode, setPrepSodiumMode] = useState<SodiumStrategy>('constant');
+  const [prepWaterMode, setPrepWaterMode] = useState<WaterStrategy>('stable');
+  const [prepSodiumMode, setPrepSodiumMode] = useState<SodiumStrategy>('stable');
   const [prepCarbMode, setPrepCarbMode] = useState<CarbLoadStrategy>('moderate');
   const [prepTrainingProtocol, setPrepTrainingProtocol] = useState<PeakingProtocol>('bb');
   const [prepPreferLowFiber, setPrepPreferLowFiber] = useState(false);
@@ -924,8 +924,8 @@ export const BbAutoConstructor: React.FC = () => {
         setPrepWeeks(migrated.preparation.weeks);
         setPrepTaperWeeks(migrated.taper.weeks);
         setPeakWeekCategory(migrated.category);
-        setPrepWaterMode(migrated.peakWeek.waterMode === 'stable' ? 'minimal' : 'moderate' as WaterStrategy);
-        setPrepSodiumMode(migrated.peakWeek.sodiumMode === 'stable' ? 'constant' : 'cut_2d' as SodiumStrategy);
+        setPrepWaterMode(migrated.peakWeek.waterMode === 'stable' ? 'stable' : 'tapered' as WaterStrategy);
+        setPrepSodiumMode(migrated.peakWeek.sodiumMode === 'stable' ? 'stable' : 'tapered' as SodiumStrategy);
         setPrepCarbMode(migrated.peakWeek.carbMode === 'conservative' ? 'back' : migrated.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
         if (migrated.preparation.volumeMult != null) setPrepVolumeMode(migrated.preparation.volumeMult);
         setLastTest(migrated.testPeakWeekId ? latestTestPeakWeek(migrated.id) : null);
@@ -952,8 +952,8 @@ export const BbAutoConstructor: React.FC = () => {
       setPrepWeeks(stored.preparation.weeks);
       setPrepTaperWeeks(stored.taper.weeks);
       setPeakWeekCategory(stored.category);
-      setPrepWaterMode(stored.peakWeek.waterMode === 'stable' ? 'minimal' : 'moderate' as WaterStrategy);
-      setPrepSodiumMode(stored.peakWeek.sodiumMode === 'stable' ? 'constant' : 'cut_2d' as SodiumStrategy);
+      setPrepWaterMode(stored.peakWeek.waterMode === 'stable' ? 'stable' : 'tapered' as WaterStrategy);
+      setPrepSodiumMode(stored.peakWeek.sodiumMode === 'stable' ? 'stable' : 'tapered' as SodiumStrategy);
       setPrepCarbMode(stored.peakWeek.carbMode === 'conservative' ? 'back' : stored.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
       if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
       setLastTest(stored.testPeakWeekId ? latestTestPeakWeek(stored.id) : null);

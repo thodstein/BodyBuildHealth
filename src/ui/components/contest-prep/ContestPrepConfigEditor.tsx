@@ -51,9 +51,15 @@ const chip: React.CSSProperties = {
 };
 
 const WATER_HINTS: Record<string, string> = {
-  classic: 'Load 6–10 л → ступенчатый cut → глотки. Только опытные, здоровые почки.',
-  moderate: 'Мягкий cut: обычная вода + снижение в последние 2 дня.',
-  minimal: 'Обычный питьевой режим. Для новичков и первых пиков.',
+  stable: 'Рекомендовано PRO: 35мл/кг (~2.8л при 80кг), шоу 30мл/кг. Карбы тащат воду интра, не высушиванием. Для дебютантов.',
+  tapered: 'Умеренно: 55мл/кг load → -30% за 48ч (3.0→1.9л). Только с trial peak и confirm. Мягкий tapered TeamUSA.',
+  high: 'Классика high: 100мл/кг load (8л) → 0.03 на сцене. Только опыт + trial + врач. Риск гипонатриемии.',
+  classic: 'Legacy classic → high (8л). Требует trial+confirm, иначе stable.',
+  moderate: 'Legacy moderate → tapered (55мл/кг).',
+  minimal: 'Legacy minimal → stable (35мл/кг).',
+  constant: 'Не трогаем — современный stable 2800мг, SGLT1 сохранён.',
+  cut_2d: 'Legacy cut_2d → tapered -30% за 48ч.',
+  cut_3d: 'Legacy cut_3d → tapered.',
 };
 
 const MALE_CATS: BBContestCategory[] = ['mens_physique', 'classic_physique', 'mens_bb', 'bb_212'];
@@ -439,7 +445,32 @@ export const ContestPrepConfigEditor: React.FC<ContestPrepConfigEditorProps> = (
               onChange={v => patch({ bodyFatPct: v > 0 ? v : undefined })}
             />
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <Stepper
+              label="Рост (для BSA/воды)"
+              icon="📐"
+              value={draft.heightCm ?? 0}
+              min={0}
+              max={230}
+              suffix="см"
+              accent="#38bdf8"
+              onChange={v => patch({ heightCm: v > 120 ? v : undefined })}
+            />
+            <Stepper
+              label="День цикла (female 1-35)"
+              icon="🌸"
+              value={draft.cycleDay ?? 0}
+              min={0}
+              max={35}
+              suffix=""
+              accent="#ec4899"
+              onChange={v => patch({ cycleDay: v > 0 ? v : undefined })}
+            />
+          </div>
           <DateCard label="Дата шоу" value={draft.showDate} onChange={v => patch({ showDate: v })} />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <ToggleChip label="Trial peak за 21-28д (разблокирует high)" icon="🧪" value={!!draft.hasTrialPeak} onChange={v => patch({ hasTrialPeak: v || undefined })} />
+          </div>
           <SegGroup
             label="Уровень"
             icon="📶"
@@ -490,38 +521,39 @@ export const ContestPrepConfigEditor: React.FC<ContestPrepConfigEditorProps> = (
             onChange={v => patch({ weeksOut: Number(v) })}
           />
           <SegGroup
-            label="Карб-загрузка"
+            label="Карб-загрузка (PRO: бюджет 8-12г/кг total, не в день)"
             icon="🍚"
             value={draft.carbLoadStrategy}
             accent="#22c55e"
             options={[
-              { id: 'moderate', label: 'Классика 3/3', desc: '3 дня деплеции → 3 дня загрузки. Рекомендуется.' },
-              { id: 'front', label: 'Front-load', desc: 'Загрузка раньше (3 дня), день перед шоу — пик.' },
-              { id: 'back', label: 'Back-load', desc: 'Поздняя загрузка 2 дня — для тех, кого «заливает».' },
+              { id: 'moderate', label: 'Moderate 25/35/40', desc: 'Классика 3/3 — нагрузка нарастает к шоу. Рекомендуется.' },
+              { id: 'front', label: 'Front 42/35/23', desc: 'Ранняя — время на коррекцию, если spill.' },
+              { id: 'back', label: 'Back 15/30/55', desc: 'Поздняя — для spill-склонных, кондиция должна быть высокой.' },
+              { id: 'undulating', label: 'Undulating 30/20/50', desc: 'Волна — для непредсказуемых (проверьте trial).' },
+              { id: 'linear', label: 'Linear 33/33/34', desc: 'Ровно — простой, стабильный.' },
             ]}
             onChange={v => patch({ carbLoadStrategy: v as any })}
           />
           <SegGroup
-            label="Вода"
+            label="Вода (PRO: SGLT1 + glycogen-water 2.7г/г)"
             icon="💧"
             value={draft.waterStrategy}
             accent="#38bdf8"
             options={[
-              { id: 'minimal', label: 'Minimal', desc: WATER_HINTS.minimal },
-              { id: 'moderate', label: 'Moderate', desc: WATER_HINTS.moderate },
-              { id: 'classic', label: 'Classic (load+cut)', desc: WATER_HINTS.classic },
+              { id: 'stable', label: 'Stable 35мл/кг — рекомендовано', desc: WATER_HINTS.stable },
+              { id: 'tapered', label: 'Tapered 55мл/кг → -30%', desc: WATER_HINTS.tapered },
+              { id: 'high', label: 'High 100мл/кг gated', desc: WATER_HINTS.high },
             ]}
             onChange={v => patch({ waterStrategy: v as any })}
           />
           <SegGroup
-            label="Натрий"
+            label="Натрий (PRO: hold до D-2, SGLT1)"
             icon="🧂"
             value={draft.sodiumStrategy}
             accent="#f59e0b"
             options={[
-              { id: 'constant', label: 'Constant', desc: 'Не трогаем — современный подход, не ломает fill.' },
-              { id: 'cut_2d', label: 'Cut за 2 дня', desc: 'Ступенчатое снижение к шоу.' },
-              { id: 'cut_3d', label: 'Cut за 3 дня', desc: 'Классика: снижаем с D-3.' },
+              { id: 'stable', label: 'Stable 2800мг — рекомендовано', desc: 'Не трогаем до шоу, SGLT1 сохранён, bump 400мг опционально.' },
+              { id: 'tapered', label: 'Tapered -30% за 48ч', desc: 'Мягкий 3000→2100→1900, не 500мг!' },
             ]}
             onChange={v => patch({ sodiumStrategy: v as any })}
           />
@@ -539,7 +571,7 @@ export const ContestPrepConfigEditor: React.FC<ContestPrepConfigEditorProps> = (
               onChange={v => patch({ creatineStrategy: v ? 'stop' : 'continue' })}
             />
           </div>
-          {(draft.waterStrategy === 'classic' || draft.sodiumStrategy !== 'constant') && (
+          {(draft.waterStrategy !== 'stable' || draft.sodiumStrategy !== 'stable') && (
             <label
               style={{
                 display: 'flex',

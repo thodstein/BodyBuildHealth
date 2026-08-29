@@ -2,8 +2,10 @@
  * peaking-protocols.engine.ts — 3 протокола пиковой фазы.
  *
  * PL: 3-нед, RIR 1→0, объём −15%→−30%, интенсивность 90%→100%.
- * BB: 4-нед, RIR 0→0, объём −10%→−20%, пампинг/изоляция.
+ * BB: DEPRECATED — используйте BB_TAPER_CURVE в bb-contest-prep.engine.ts (RIR 2-4, объём 0.90→0.60, интенсивность 0.95→0.85).
+ *     BB_PROTOCOL сохранён для backward-compat тестов, но помечен как legacy с отказным RIR 0 (не PRO).
  * Classic (WF): 4-нед, 2 нед «перегрузка» + 2 нед суперкомпенсация.
+ * PRO 2025: BB taper каноничен в bb-contest-prep (Helms/Bosquet), не здесь.
  */
 export type PeakingProtocol = 'pl' | 'bb' | 'classic';
 
@@ -36,15 +38,19 @@ const PL_PROTOCOL: PeakingProtocolOutput = {
   ],
 };
 
+/**
+ * @deprecated — legacy BB_PROTOCOL с отказным RIR 0 (не PRO). Каноника: BB_TAPER_CURVE в bb-contest-prep.engine.ts
+ * (Helms/Bosquet: RIR 2-4, объём 0.90→0.60). Сохранён только для тестов обратной совместимости.
+ */
 const BB_PROTOCOL: PeakingProtocolOutput = {
-  name: 'Бодибилдинг (4-нед пик)',
+  name: 'Бодибилдинг (4-нед пик) — legacy',
   durationWeeks: 4,
-  description: 'Пик для бодибилдинга: гликогеновая загрузка, пампинг, снижение объёма для восстановления. RIR 0 — отказ в последнем подходе.',
+  description: 'LEGACY: пик для бодибилдинга с отказом (RIR 0). PRO-каноника в bb-contest-prep BB_TAPER_CURVE (RIR 2-4).',
   weeks: [
-    { week: 1, label: 'Наполнение 1', volumePct: 0.90, intensityPct: 0.80, rirMin: 0, rirMax: 1, focus: 'База + изоляция, пампинг', deloadBefore: true },
-    { week: 2, label: 'Наполнение 2', volumePct: 0.85, intensityPct: 0.85, rirMin: 0, rirMax: 1, focus: 'Увеличение углеводов, снижение КБ', deloadBefore: false },
-    { week: 3, label: 'Прорисовка', volumePct: 0.80, intensityPct: 0.90, rirMin: 0, rirMax: 0, focus: 'Дроп-сеты, пампинг-сеты, отказ', deloadBefore: false },
-    { week: 4, label: 'Шоу', volumePct: 0.70, intensityPct: 0.85, rirMin: 0, rirMax: 0, focus: 'Минимум объёма, пампинг перед выходом', deloadBefore: false },
+    { week: 1, label: 'Наполнение 1', volumePct: 0.90, intensityPct: 0.80, rirMin: 0, rirMax: 1, focus: 'LEGACY — используйте BB_TAPER_CURVE', deloadBefore: true },
+    { week: 2, label: 'Наполнение 2', volumePct: 0.85, intensityPct: 0.85, rirMin: 0, rirMax: 1, focus: 'LEGACY', deloadBefore: false },
+    { week: 3, label: 'Прорисовка', volumePct: 0.80, intensityPct: 0.90, rirMin: 0, rirMax: 0, focus: 'LEGACY', deloadBefore: false },
+    { week: 4, label: 'Шоу', volumePct: 0.70, intensityPct: 0.85, rirMin: 0, rirMax: 0, focus: 'LEGACY', deloadBefore: false },
   ],
 };
 

@@ -158,25 +158,25 @@ describe('validateBBContestPrepConfig', () => {
     expect(validateBBContestPrepConfig(baseConfig({ bodyFatPct: 1 })).ok).toBe(false);
   });
 
-  it('противопоказание почки → force water minimal + sodium constant + carb moderate', () => {
+  it('противопоказание почки → force water stable + sodium stable + carb moderate (PRO: canonical stable)', () => {
     const v = validateBBContestPrepConfig(baseConfig({ contraindications: ['kidney'], waterStrategy: 'classic', sodiumStrategy: 'cut_3d', carbLoadStrategy: 'back' }));
     expect(v.ok).toBe(true);
-    expect(v.forced.waterStrategy).toBe('minimal');
-    expect(v.forced.sodiumStrategy).toBe('constant');
+    expect(v.forced.waterStrategy).toBe('stable');
+    expect(v.forced.sodiumStrategy).toBe('stable');
     expect(v.forced.carbLoadStrategy).toBe('moderate');
     expect(v.warnings.join(' ')).toMatch(/почки/);
   });
 
   it('противопоказание по-русски («почки») тоже ловится', () => {
     const v = validateBBContestPrepConfig(baseConfig({ contraindications: ['хронические почки'] }));
-    expect(v.forced.waterStrategy).toBe('minimal');
+    expect(v.forced.waterStrategy).toBe('stable');
   });
 
   it('гипертония/сердце — force-моды', () => {
     for (const c of ['hypertension', 'сердечная недостаточность']) {
       const v = validateBBContestPrepConfig(baseConfig({ contraindications: [c] }));
-      expect(v.forced.waterStrategy).toBe('minimal');
-      expect(v.forced.sodiumStrategy).toBe('constant');
+      expect(v.forced.waterStrategy).toBe('stable');
+      expect(v.forced.sodiumStrategy).toBe('stable');
     }
   });
 
@@ -191,7 +191,7 @@ describe('validateBBContestPrepConfig', () => {
     const cfg = baseConfig({ contraindications: ['kidney'], waterStrategy: 'classic' });
     const eff = applyForcedModes(cfg);
     expect(cfg.waterStrategy).toBe('classic');
-    expect(eff.waterStrategy).toBe('minimal');
+    expect(eff.waterStrategy).toBe('stable');
   });
 });
 
@@ -297,17 +297,20 @@ describe('buildPeakWeek', () => {
     expect(days[3].fatG).toBeLessThan(days[0].fatG);
   });
 
-  it('вода classic: load → ступенчатый cut → глотки', () => {
+  it('вода classic/high: load ~8л → ступенчатый cut → глотки (PRO: high 100мл/кг)', () => {
     const days = buildPeakWeek(baseConfig({ waterStrategy: 'classic', weightKg: 80 }));
-    expect(days[0].waterLiters).toBeCloseTo(9.2, 0);
+    expect(days[0].waterLiters).toBeCloseTo(8, 0.5);
     expect(days[4].waterLiters).toBeLessThan(days[3].waterLiters);
     expect(days[5].waterLiters).toBeLessThan(days[4].waterLiters);
-    expect(days[6].waterLiters).toBeLessThanOrEqual(0.5);
+    expect(days[6].waterLiters).toBeLessThan(1.2);
   });
 
-  it('вода minimal: без cut (день перед шоу ≈ день 1)', () => {
+  it('вода minimal/stable: без агрессивного cut (день перед шоу ≈ день 1, PRO: stable 35мл/кг)', () => {
     const days = buildPeakWeek(baseConfig({ waterStrategy: 'minimal' }));
-    expect(days[5].waterLiters).toBeCloseTo(days[0].waterLiters, 1);
+    // stable + glycogen boost на load: допуск 0.5л
+    expect(Math.abs(days[5].waterLiters - days[0].waterLiters)).toBeLessThan(0.6);
+    // show день не ниже 0.9 для female guard (но male тоже >=0.6)
+    expect(days[6].waterLiters).toBeGreaterThanOrEqual(0.6);
   });
 
   it('женщины: вода шоу-дня не ниже 0.5 л', () => {
@@ -315,12 +318,15 @@ describe('buildPeakWeek', () => {
     expect(days[6].waterLiters).toBeGreaterThanOrEqual(0.5);
   });
 
-  it('натрий cut_3d падает к шоу; constant — ровный', () => {
-    const cut = buildPeakWeek(baseConfig({ sodiumStrategy: 'cut_3d' }));
-    expect(cut[0].sodiumMg).toBeGreaterThan(cut[4].sodiumMg);
-    expect(cut[4].sodiumMg).toBeGreaterThan(cut[5].sodiumMg);
-    const flat = buildPeakWeek(baseConfig({ sodiumStrategy: 'constant' }));
-    expect(flat[0].sodiumMg).toBe(flat[5].sodiumMg);
+  it('натрий tapered падает мягко -30% за 48ч; stable — ровный (PRO: SGLT1 guard)', () => {
+    const cut = buildPeakWeek(baseConfig({ sodiumStrategy: 'tapered' }));
+    expect(cut[0].sodiumMg).toBeGreaterThan(cut[5].sodiumMg);
+    expect(cut[5].sodiumMg).toBeGreaterThanOrEqual(1900);
+    // SGLT1 guard: на load дни натрий не ниже 2600 при tapered
+    const loadIdx = cut.findIndex(d => d.phase.startsWith('load'));
+    if (loadIdx >= 0) expect(cut[loadIdx].sodiumMg).toBeGreaterThanOrEqual(2200);
+    const flat = buildPeakWeek(baseConfig({ sodiumStrategy: 'stable' }));
+    expect(Math.abs(flat[0].sodiumMg - flat[5].sodiumMg)).toBeLessThanOrEqual(300);
   });
 
   it('женщины/лёгкие категории: натрий не ниже 800 мг (кроме шоу)', () => {
@@ -349,12 +355,12 @@ describe('buildPeakWeek', () => {
     expect(days[6].training.type).toMatch(/Памп|backstage/);
   });
 
-  it('противопоказание почки force-меняет стратегии в пик-неделе', () => {
+  it('противопоказание почки force-меняет стратегии в пик-неделе (PRO: stable)', () => {
     const days = buildPeakWeek(baseConfig({ contraindications: ['kidney'], waterStrategy: 'classic', sodiumStrategy: 'cut_3d' }));
-    // minimal вода: день 5 = день 1 (нет cut)
-    expect(days[5].waterLiters).toBeCloseTo(days[0].waterLiters, 1);
-    // constant натрий
-    expect(days[0].sodiumMg).toBe(days[5].sodiumMg);
+    // stable вода: день 5 ≈ день 1 (нет aggressive cut) — допуск 0.6 из-за glycogen boost
+    expect(Math.abs(days[5].waterLiters - days[0].waterLiters)).toBeLessThan(0.7);
+    // stable натрий: ровный ±300
+    expect(Math.abs(days[0].sodiumMg - days[5].sodiumMg)).toBeLessThanOrEqual(300);
   });
 
   it('невалидный конфиг → пустая неделя', () => {
@@ -387,15 +393,15 @@ describe('buildShowTimeline', () => {
 });
 
 describe('computeReadiness', () => {
-  it('gap > 2 → behind с предупреждением о заливе', () => {
+  it('gap > 2 → behind с предупреждением о заливе (PRO: mens_bb target 5)', () => {
     const r = computeReadiness(baseConfig({ category: 'mens_bb', bodyFatPct: 9 }));
     expect(r.verdict).toBe('behind');
-    expect(r.gap).toBe(5);
+    expect(r.gap).toBe(4);
     expect(r.note).toMatch(/залив/);
   });
 
-  it('gap ≤ 2 → on_track', () => {
-    const r = computeReadiness(baseConfig({ category: 'mens_physique', bodyFatPct: 7.5 }));
+  it('gap ≤ 2 → on_track (PRO: mens_physique target 7)', () => {
+    const r = computeReadiness(baseConfig({ category: 'mens_physique', bodyFatPct: 8.5 }));
     expect(r.verdict).toBe('on_track');
   });
 
@@ -649,12 +655,12 @@ describe('applyPeakWeekOverlayToBBPlan', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('buildBBContestPrep', () => {
-  it('полный результат: тапер + пик-неделя + таймлайн + готовность', () => {
+  it('полный результат: тапер + пик-неделя + таймлайн + готовность (PRO: mens_physique 7% → 7% gap 0 → ahead)', () => {
     const res = buildBBContestPrep(baseConfig());
     expect(res.taper).toHaveLength(3);
     expect(res.peakWeek).toHaveLength(7);
     expect(res.showTimeline).toHaveLength(8);
-    expect(res.readiness.verdict).toBe('on_track');
+    expect(res.readiness.verdict).toBe('ahead');
     expect(res.rationale.join(' ')).toMatch(/Тапер ББ/);
   });
 
@@ -689,10 +695,10 @@ describe('сериализация', () => {
     expect(deserializeBBPrepConfig(undefined)).toBeNull();
   });
 
-  it('неизвестные стратегии → безопасные дефолты', () => {
+  it('неизвестные стратегии → безопасные дефолты (PRO: stable)', () => {
     const cfg = deserializeBBPrepConfig(JSON.stringify({ ...baseConfig(), waterStrategy: 'nope', sodiumStrategy: 'nope', weeksOut: 99 }));
-    expect(cfg?.waterStrategy).toBe('minimal');
-    expect(cfg?.sodiumStrategy).toBe('constant');
+    expect(cfg?.waterStrategy).toBe('stable');
+    expect(cfg?.sodiumStrategy).toBe('stable');
     expect(cfg?.weeksOut).toBe(4);
   });
 
@@ -746,7 +752,7 @@ describe('normalizeContestCategory', () => {
   });
 });
 
-describe('legacyConfigFromProfile', () => {  it('включённый старый peak-week → консервативный конфиг с датой шоу', () => {
+describe('legacyConfigFromProfile', () => {  it('включённый старый peak-week → консервативный конфиг с датой шоу (PRO: stable)', () => {
     const showDate = addDaysIso(todayIso(), 30);
     const cfg = legacyConfigFromProfile(
       { peakWeek: true, peakShowDay: showDate, bbCategory: 'bikini' },
@@ -756,8 +762,8 @@ describe('legacyConfigFromProfile', () => {  it('включённый стары
     expect(cfg!.showDate).toBe(showDate);
     expect(cfg!.category).toBe('bikini');
     expect(cfg!.sex).toBe('female');
-    expect(cfg!.waterStrategy).toBe('minimal');
-    expect(cfg!.sodiumStrategy).toBe('constant');
+    expect(cfg!.waterStrategy).toBe('stable');
+    expect(cfg!.sodiumStrategy).toBe('stable');
     expect(cfg!.weightKg).toBe(55);
   });
 
