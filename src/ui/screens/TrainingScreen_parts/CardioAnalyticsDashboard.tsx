@@ -5,6 +5,7 @@
 import React, { useMemo } from 'react';
 import { CARD, ROW, LABEL, HINT_SM, Badge, StatTile } from './CardioUI';
 import { cardioLogStats, cardioHrCompliance } from '../../../engines/lms/cardio-diary.engine';
+import { cardioMonotonyStrain } from '../../../engines/lms/cardio.engine';
 import type { CardioCycle } from '../../../engines/lms/cardio.engine';
 import type { CardioLogEntry } from '../../../engines/lms/cardio-diary.engine';
 
@@ -49,6 +50,19 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
     return { pct, ok, label: `${100 - pct}/${pct} · ${ok ? '✓ 80/20' : '⚠ >20% интенсива'}` };
   }, [cycle]);
 
+  const monotony = useMemo(() => {
+    if (log.length < 7) return null;
+    const daily: number[] = [];
+    const map = new Map<string, number>();
+    for (const e of log.filter(x => x.completed)) map.set(e.date, (map.get(e.date) ?? 0) + e.durationMin * (e.rpe ? e.rpe / 5 : 1));
+    const dates = Array.from(map.keys()).sort();
+    const last7 = dates.slice(-7);
+    for (const d of last7) daily.push(map.get(d) ?? 0);
+    if (daily.length < 3) return null;
+    const m = cardioMonotonyStrain(daily);
+    return { ...m, warn: m.monotony > 2 || m.strain > 6000 };
+  }, [log]);
+
   return (
     <div style={CARD}>
       <div style={ROW}>
@@ -64,6 +78,11 @@ export const CardioAnalyticsDashboard: React.FC<{ cycle: CardioCycle | null; log
       </div>
       {hr?.advice && <div style={{ fontSize: 11, color: '#fff', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '6px 8px' }}>{hr.advice}</div>}
       {polarized && !polarized.ok && <div style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: 8, padding: '6px 8px' }}>⚠ Поляризация {polarized.pct}% интенсива — по Seiler держите ≤20% HIIT/MISS, остальное Zone2.</div>}
+      {monotony && (
+        <div style={{ fontSize: 11, color: monotony.warn ? '#f87171' : '#4ade80', background: monotony.warn ? 'rgba(239,68,68,0.08)' : 'rgba(0,230,138,0.08)', border: `1px solid ${monotony.warn ? 'rgba(239,68,68,0.24)' : 'rgba(0,230,138,0.24)'}`, borderRadius: 8, padding: '6px 8px' }}>
+          {monotony.warn ? '⚠' : '✓'} Monotony {monotony.monotony} · Strain {monotony.strain} {monotony.warn ? '— варьируйте нагрузку (Foster)' : '— вариативность в норме'}
+        </div>
+      )}
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 8, padding: '6px 8px' }}>🩸 При ferritin &lt;30 мкг/л — железо 18мг + витамин C, контроль Hb; RED-S &lt;30 ккал/кг FFM — объём не повышать.</div>
       <div style={HINT_SM}>TRIMP Banister (HRr×k·e^b·HRr) где есть HR, иначе фактор. Рост &gt;15% за неделю — риск перегруза. 80/20 — Seiler polarized.</div>
     </div>

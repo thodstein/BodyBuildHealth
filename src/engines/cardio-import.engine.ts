@@ -748,16 +748,33 @@ export function parseCardioFit(buffer: ArrayBuffer): CardioImportResult {
 }
 
 // ── Auto-detect + unified parse ──────────────────────────────────────────
-export function detectCardioFormat(fileName: string, content: string): 'csv' | 'tcx' | 'gpx' | 'apple_health' | 'json' | 'fit' | 'zip' | 'unknown' {
+function isFitBuffer(content: unknown): boolean {
+  try {
+    if (content instanceof ArrayBuffer) {
+      const u = new Uint8Array(content as ArrayBuffer);
+      if (u.length >= 12) {
+        const sig = String.fromCharCode(...Array.from(u.slice(8, 12)));
+        if (sig === '.FIT') return true;
+      }
+      return false;
+    }
+    const s = String(content || '');
+    if (s.length >= 12 && s.slice(8, 12) === '.FIT') return true;
+    if (s.slice(0, 12).includes('.FIT')) return true;
+    return false;
+  } catch { return false; }
+}
+export function detectCardioFormat(fileName: string, content: string | ArrayBuffer): 'csv' | 'tcx' | 'gpx' | 'apple_health' | 'json' | 'fit' | 'zip' | 'unknown' {
   const name = String(fileName || '').toLowerCase();
-  const head = String(content || '').slice(0, 4000).toLowerCase();
+  const isBuf = content instanceof ArrayBuffer;
+  const head = isBuf ? '' : String(content || '').slice(0, 4000).toLowerCase();
   if (name.endsWith('.zip')) return 'zip';
-  if (name.endsWith('.fit') || head.startsWith('') && content.length > 14 && content.slice(0, 12).includes('.FIT')) return 'fit';
+  if (name.endsWith('.fit') || isFitBuffer(content)) return 'fit';
   if (name.endsWith('.tcx') || head.includes('<trainingcenterdatabase') || head.includes('<activity') && head.includes('<lap')) return 'tcx';
   if (name.endsWith('.gpx') || head.includes('<gpx') || head.includes('<trk>')) return 'gpx';
   if (name.endsWith('.xml') && head.includes('<healthdata') && head.includes('<workout')) return 'apple_health';
-  if (name.endsWith('.json') || (head.trim().startsWith('{') || head.trim().startsWith('['))) {
-    try { const j = JSON.parse(content); if (Array.isArray(j) || Array.isArray(j?.workouts) || Array.isArray(j?.activities) || Array.isArray(j?.data)) return 'json'; } catch {}
+  if (!isBuf && (name.endsWith('.json') || (head.trim().startsWith('{') || head.trim().startsWith('[')))) {
+    try { const j = JSON.parse(String(content)); if (Array.isArray(j) || Array.isArray((j as { workouts?: unknown[] }).workouts) || Array.isArray((j as { activities?: unknown[] }).activities) || Array.isArray((j as { data?: unknown[] }).data)) return 'json'; } catch {}
   }
   // CSV fallback: содержит запятую/; и дату
   if (head.includes(',') || head.includes(';') || head.includes('\t')) return 'csv';
@@ -766,14 +783,19 @@ export function detectCardioFormat(fileName: string, content: string): 'csv' | '
 
 export function parseCardioImport(fileName: string, content: string | ArrayBuffer): CardioImportResult {
   const name = String(fileName || '').toLowerCase();
-  // ZIP / FIT — ArrayBuffer
+  const isBuf = content instanceof ArrayBuffer;
+  // ZIP / FIT — ArrayBuffer (FIT только если .fit или magic .FIT, не любой буфер)
   if (name.endsWith('.zip')) {
-    const buf = content instanceof ArrayBuffer ? content : new TextEncoder().encode(String(content)).buffer;
+    const buf = isBuf ? content as ArrayBuffer : new TextEncoder().encode(String(content)).buffer;
     return parseCardioZip(buf);
   }
-  if (name.endsWith('.fit') || content instanceof ArrayBuffer) {
-    const buf = content instanceof ArrayBuffer ? content : new TextEncoder().encode(String(content)).buffer;
+  if (name.endsWith('.fit') || (isBuf && isFitBuffer(content))) {
+    const buf = isBuf ? content as ArrayBuffer : new TextEncoder().encode(String(content)).buffer;
     return parseCardioFit(buf);
+  }
+  if (isBuf) {
+    // ArrayBuffer без FIT-сигнатуры — пробуем как текст (TCX/GPX/CSV могут прийти как буфер)
+    try { content = new TextDecoder().decode(content as ArrayBuffer); } catch { return { entries: [], warnings: ['Неверный формат файла'], format: 'unknown' }; }
   }
   const text = String(content || '');
   const fmt = detectCardioFormat(fileName, text);

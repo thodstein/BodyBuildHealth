@@ -130,11 +130,13 @@ export const CardioPreviewStep: React.FC<{
   };
 
   const visibleWeeks = showAllWeeks || (cycle?.totalWeeks ?? 0) <= 16 ? (cycle?.weeks ?? []) : (cycle?.weeks ?? []).slice(0, 12);
-  // Виртуализация для 52 нед — рендер только видимого окна
+  // Виртуализация для 52 нед — рендер только видимого окна (динамическая высота)
   const virtualRef = useRef<HTMLDivElement>(null);
   const [virtualScroll, setVirtualScroll] = useState(0);
+  const [rowH, setRowH] = useState(118);
+  const measureRef = useRef<HTMLDivElement>(null);
   const onVirtualScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => setVirtualScroll(e.currentTarget.scrollTop), []);
-  const ROW_H = 118; // высота карточки недели + gap
+  const ROW_H = rowH;
   const VIEW_H = 420;
 
   const previewImprove = () => {
@@ -433,8 +435,18 @@ export const CardioPreviewStep: React.FC<{
             </div>
             {showAllWeeks && (cycle.totalWeeks ?? 0) > 16 ? (
               <div ref={virtualRef} onScroll={onVirtualScroll} style={{ height: VIEW_H, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6, paddingRight: 4, scrollbarWidth: 'thin' }}>
+                <div ref={measureRef} style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none', width: 'calc(100% - 8px)' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: '3px solid #888', borderRadius: 10, padding: '8px 10px', minHeight: 92 }}>
+                    <div style={{ height: 18 }}>measure</div>
+                  </div>
+                </div>
                 {(() => {
                   const all = cycle.weeks;
+                  // динамическая высота — измеряем скрытый образец при маунте
+                  if (measureRef.current && rowH === 118) {
+                    const h = measureRef.current.firstElementChild?.getBoundingClientRect().height;
+                    if (h && Math.abs(h + 6 - rowH) > 4) setTimeout(() => setRowH(Math.round(h + 6)), 0);
+                  }
                   const startIdx = Math.max(0, Math.floor(virtualScroll / ROW_H) - 1);
                   const endIdx = Math.min(all.length, Math.ceil((virtualScroll + VIEW_H) / ROW_H) + 1);
                   const slice = all.slice(startIdx, endIdx);

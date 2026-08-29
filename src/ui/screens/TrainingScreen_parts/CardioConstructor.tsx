@@ -761,10 +761,12 @@ export const CardioConstructor: React.FC = () => {
     const a = profileAge();
     const s = profileSex();
     const r = profileRestingHr();
+    const bf = profileBodyFat();
     if (w != null) setBodyWeight(w);
     if (a != null) setAge(String(a));
     if (s != null) setSex(s);
     if (r != null) setRestingHr(String(r));
+    if (bf != null) setBodyFatPct(String(bf));
     flashMsg('📋 Параметры пользователя загружены из профиля');
   };
 
@@ -786,6 +788,7 @@ export const CardioConstructor: React.FC = () => {
         weight: Math.max(30, Math.min(300, Number(bodyWeight) || 80)),
         age: Math.max(12, Math.min(90, Number(age) || 30)),
         sex,
+        bodyFat: Number(bodyFatPct) > 0 ? Math.max(3, Math.min(70, Number(bodyFatPct))) : undefined,
       });
       const r = Number(restingHr) > 0 ? Number(restingHr) : 0;
       updateSection('lifestyle', { restingHR: r });
