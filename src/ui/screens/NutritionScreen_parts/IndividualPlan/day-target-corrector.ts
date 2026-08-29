@@ -102,11 +102,13 @@ function currentFiber(meals: CorrectorMeal[]): number {
 export function correctDayToTargets(
   mealsIn: CorrectorMeal[],
   targets: DayTargets,
-  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number },
+  opts?: { excludedIds?: Set<string>; allowCoreScale?: boolean; maxIter?: number; weightKg?: number },
 ): { meals: CorrectorMeal[]; withinTolerance: boolean; deviationPct: number } {
-  const maxIter = opts?.maxIter ?? 40;
+  const maxIter = opts?.maxIter ?? 80;
+  const weightKg = opts?.weightKg ?? 80;
+  const weightScaleCorr = Math.max(1, Math.min(1.6, weightKg / 80));
   const meals = cloneMeals(mealsIn);
-  // кумулятивная шкала ядра рецепта (не более ±10% от исходного)
+  // кумулятивная шкала ядра рецепта (не более ±25% для тяжей, иначе 7-12% разбег)
   const coreScale = new Map<string, number>(); // key = mealIdx:itemId
 
   const safeTargets: DayTargets = {
@@ -119,7 +121,7 @@ export function correctDayToTargets(
     return { meals, withinTolerance: true, deviationPct: 0 };
   }
 
-  const maxCoreScale = opts?.allowCoreScale ? 1.20 : 1.15;
+  const maxCoreScale = opts?.allowCoreScale ? 1.30 : 1.20;
   for (let iter = 0; iter < maxIter; iter++) {
     // человечность: орехи/семена ≤85г и клетчатка ≤85г — режем перебор до сведения КБЖУ
     const nutG = currentNutGrams(meals);
@@ -192,22 +194,22 @@ export function correctDayToTargets(
         if (isCore && opts?.allowCoreScale === false) continue;
         const key = `${cand.mi}:${cand.it.id}`;
         const curScale = coreScale.get(key) ?? 1;
-        // реалистичный пол: белок 80/60, гарнир 50/30, иначе 14г каши — пустой рацион
+        // реалистичный пол: белок 80/60*scale, гарнир 50/30*scale, иначе 14г каши — пусто
         let floor = 15;
         if (cand.it.role === 'protein' || cand.it.role === 'fast_protein' || cand.it.role === 'slow_protein') {
           const mType = meals[cand.mi].type || '';
           const isMain = ['breakfast', 'lunch', 'dinner'].includes(mType);
           const food = FOOD_DB.find(f => f.id === cand.it.id);
           const isPowder = food?.category === 'supplement';
-          floor = isPowder ? 20 : (isMain ? 80 : 60);
+          floor = isPowder ? 20 : Math.round((isMain ? 80 : 60) * weightScaleCorr);
         } else if (cand.it.role === 'carb_slow' || cand.it.role === 'carb_fast') {
           const mType = meals[cand.mi].type || '';
           const isMain = ['breakfast', 'lunch', 'dinner'].includes(mType);
-          floor = isMain ? 50 : 30;
+          floor = Math.round((isMain ? 50 : 30) * weightScaleCorr);
         } else if (cand.it.role === 'fruit') {
-          floor = 30;
+          floor = Math.round(30 * weightScaleCorr);
         }
-        const minFactor = opts?.allowCoreScale ? 0.85 : 0.90;
+        const minFactor = opts?.allowCoreScale ? 0.75 : 0.85;
         const minAmount = isCore ? Math.max(floor, Math.round(cand.it.amount * minFactor / curScale)) : Math.max(floor, 15);
         // шаг — до 15% за итерацию
         const targetCutG = Math.min(cand.it.amount - minAmount, Math.ceil(Math.abs(need) / cand.per100 * 100 * 0.7));

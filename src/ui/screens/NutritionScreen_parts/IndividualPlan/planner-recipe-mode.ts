@@ -863,7 +863,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       // Р-2.1: пол реалистичных порций в рецептурном ядре («18 г каши» — нет),
       // бюджет строго ×1.03 от цели приёма — пол не рушит сходимость дня ±3%.
       const _mealkT = (tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9;
-      finalItems = applyRealisticFloors(finalItems.map(it => ({ ...it, role: (it.role as any) || 'protein' })) as any, !!mealAny.target && /Перекус|Полдник|Второй завтрак/i.test(label), _mealkT ? _mealkT * 1.03 : undefined, true) as any;
+      finalItems = applyRealisticFloors(finalItems.map(it => ({ ...it, role: (it.role as any) || 'protein' })) as any, !!mealAny.target && /Перекус|Полдник|Второй завтрак/i.test(label), _mealkT ? _mealkT * 1.03 : undefined, true, args.athleteWeightKg ?? 80) as any;
       // Сайд-добивка В ТОТ ЖЕ приём: если после масштабирования приём недобирает >15% ккал,
       // добавляем гарнир/жир по доминирующему дефициту (для тяжей 100кг+ — до 2 сайдов, иначе пустой гарнир).
       let sideNote: string | null = null;
@@ -947,7 +947,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // Ядро рецепта трогается только в крайнем случае (±15% кумулятивно), гибкие слоты — свободно.
   const needCorr = !rb.withinTolerance || rb.deviationPct > 3;
   if (needCorr) {
-    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 50 });
+    const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 80, weightKg: args.athleteWeightKg ?? 80 });
     const corrDev = corr.deviationPct;
     if (corrDev + 1e-9 < rb.deviationPct) {
       if (corr.withinTolerance) {

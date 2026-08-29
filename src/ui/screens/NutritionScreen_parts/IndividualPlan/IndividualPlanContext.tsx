@@ -2128,6 +2128,30 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       setShoppingList(buildShoppingFromPlans(days));
       refreshRecipeCookingCardIfActive(resolved.plan === 'week' ? days[resolved.day] : dayPlan, resolved.plan === 'three' ? updated : threeDayPlan, resolved.plan === 'week' ? updated : weekPlan);
     }
+    // Пересобираем нижние карточки (recipeOptions) для всех приёмов — иначе после замены нижние не перестраиваются и нет второго выбора
+    try {
+      const allMealsForOptions = (dayIdx === 0 ? resMeals : null) || (dayIdx !== 0 ? ((): any => { const r = _resolvePlanDay(dayIdx); if (!r) return null; const p = r.plan==='three'? threeDayPlan : r.plan==='week'? weekPlan : null; return p?.days?.[r.day]?.meals; })() : null);
+      if (allMealsForOptions && Array.isArray(allMealsForOptions)) {
+        const poolForOptions = [...getRecipes(), ...(userRecipes||[])].filter(r=> !excludedIds.has(r.name));
+        for (let i=0; i<allMealsForOptions.length; i++) {
+          const m = allMealsForOptions[i];
+          if (i===mealIdx) continue; // заменённый уже имеет
+          if (!m || m.recipeApplied) continue; // уже выбранный рецепт — не трогаем
+          const label = m.label || '';
+          const isMainOpt = ['Завтрак','Обед','Ужин'].includes(label);
+          if (!isMainOpt && !/Перекус|Полдник/.test(label)) continue;
+          const tgt = (m as any).target || { p: m.totals?.p ?? 30, c: m.totals?.c ?? 40, f: m.totals?.f ?? 15 };
+          const tKcal = m.totals?.kcal || Math.round((tgt.p||0)*4 + (tgt.c||0)*4 + (tgt.f||0)*9) || 300;
+          const opts = { mealType: label==='Завтрак'?'breakfast': label==='Обед'?'lunch': label==='Ужин'?'dinner':'snack' as any, targetKcal:tKcal, targetProteinG:tgt.p||30, targetCarbsG:tgt.c||40, targetFatG:tgt.f||15, excludedIds, isVegetarian: dietPrefs.includes('vegetarian'), maxPrepTimeMin: 60 };
+          const picks = pickRecipesForMeal(poolForOptions as any, opts as any, 3);
+          if (picks.length>0) {
+            const flats = picks.map(r=> flattenRecipeOption(r));
+            (m as any).recipeOptions = flats;
+            (m as any).recipeOptionNames = flats.map(f=>f.name);
+          }
+        }
+      }
+    } catch {}
     if (typeof (window as any).showToast === 'function') (window as any).showToast('🍳 Рецепт применён — рацион перестроен', 'success');
     setTimeout(() => syncShoppingListFromPlans(), 0);
     setRecipePickerMeal(null);

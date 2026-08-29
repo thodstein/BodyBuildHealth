@@ -206,9 +206,9 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // Aug 28 2026 (жалоба «110 кг атлет — не соответствует»): капы масштабируются от ЦЕЛИ
 // приёма (scale = clamp(kcal приёма / 900, 1, 2)) — большой обед на массе больше не
 // упирается в кап «нормального» приёма. Фрукт/овощ НЕ масштабируются (объёмные добавки).
-function maxGramPerItem(budget?: string, scale = 1): number { return Math.round(((budget === 'max' || budget === 'enhanced') ? 600 : 500) * scale); }
-function maxGrainPerMeal(budget?: string, scale = 1): number { return Math.round(((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale); }
-function maxDryGrainPerMeal(budget?: string, scale = 1): number { return Math.round(((budget === 'max' || budget === 'enhanced') ? 200 : 150) * scale); }
+function maxGramPerItem(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 600 : 500) * scale * ws); }
+function maxGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale * ws); }
+function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 200 : 150) * scale * ws); }
 // Масштаб порционных капов от макро-цели приёма (p/c/f в граммах).
 function mealCapScale(pG: number, cG: number, fG: number): number {
   const kcal = (pG || 0) * 4 + (cG || 0) * 4 + (fG || 0) * 9;
@@ -273,21 +273,21 @@ export function isConcentrateFood(food: FoodItem): boolean {
  * Р-2.1: «человеческий» минимум порции по роли (г). Ниже — вырожденная позиция:
  * политику подъёма/замены см. applyRealisticFloors.
  */
-export function realisticFloorG(food: FoodItem, role: MealItem['role'], isSnack: boolean): number {
+export function realisticFloorG(food: FoodItem, role: MealItem['role'], isSnack: boolean, weightKg: number = 80): number {
   const cat = food.category;
+  const weightScale = Math.max(1, Math.min(1.6, weightKg / 80));
   if (role === 'protein') {
     if (cat === 'supplement') return 25;
-    // Эпик B: «взрослая» порция цельного белка — 110 г основного приёма / 80 г перекуса
-    // (110 г курицы ≈ 34 г белка; дегустационные 50-80 г при 90+ кг — не реальность).
-    return isSnack ? 80 : 110;
+    // Бодибилдерская тарелка без перегруза ЖКТ: 110г/80г — база для 80кг, для 120кг → 165г/120г (1.5×), но cap 300г
+    return Math.round((isSnack ? 80 : 110) * weightScale);
   }
   if (role === 'fast_protein' || role === 'slow_protein') return 25;
   if (role === 'carb_slow' || role === 'carb_fast') {
-    if ((food.carbs || 0) >= 55) return isSnack ? 30 : 50;   // сухие крупы/макароны
-    return isSnack ? 80 : 120;                                // готовые/средней плотности
+    if ((food.carbs || 0) >= 55) return Math.round((isSnack ? 30 : 50) * weightScale);   // сухие крупы: 50г→75г для 120кг
+    return Math.round((isSnack ? 80 : 120) * weightScale);                                // готовые: 120г→180г для 120кг
   }
-  if (role === 'veg') return 100;
-  if (role === 'fruit') return isConcentrateFood(food) ? 25 : 50;
+  if (role === 'veg') return Math.round(100 * weightScale);
+  if (role === 'fruit') return isConcentrateFood(food) ? 25 : Math.round(50 * weightScale);
   if (role === 'fat') return (cat === 'fat' && (food.fat || 0) >= 80) ? 5 : 10;
   return 0;
 }
@@ -298,7 +298,7 @@ export function realisticFloorG(food: FoodItem, role: MealItem['role'], isSnack:
  * (budgetKcal × 1.12); иначе позиция остаётся как есть (поднятие отдаётся
  * сайду/посадке). Возвращает НОВЫЙ массив (иммутабельно).
  */
-export function applyRealisticFloors(items: MealItem[], isSnack: boolean, budgetKcal?: number, softFloors?: boolean): MealItem[] {
+export function applyRealisticFloors(items: MealItem[], isSnack: boolean, budgetKcal?: number, softFloors?: boolean, weightKg: number = 80): MealItem[] {
   const cap = budgetKcal ?? Infinity;
   const sum = () => items.reduce((s, i) => s + (i.kcal || 0), 0);
   const out = items.map(it => ({ ...it }));
@@ -306,7 +306,7 @@ export function applyRealisticFloors(items: MealItem[], isSnack: boolean, budget
     const food = FOOD_DB.find(f => f.id === it.id);
     if (!food) continue;
     const role: MealItem['role'] = it.role || 'protein';
-    let fl = realisticFloorG(food, role, isSnack);
+    let fl = realisticFloorG(food, role, isSnack, weightKg);
     // Recipe-путь (мягкий режим): ядро рецепта не должно разъезжаться с шапкой >+20% —
     // полы белка мягче (80/60 г), гарниры/овощи — как в обычном режиме.
     if (softFloors && role === 'protein' && food.category !== 'supplement') fl = isSnack ? 60 : 80;
@@ -878,6 +878,7 @@ let _deprioritizedIds: Set<string> | undefined = undefined;
 let _categoryPref: any = undefined;
 let _qualityMode: 'full' | 'basic' = 'full';
 let _currentBudget: string = 'medium';
+let _currentWeightKg: number = 80;
 let _currentExcludedIds: Set<string> | undefined = undefined;
 
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
@@ -1481,10 +1482,11 @@ function buildWholeMeal(
      // Lines 371 & 470 now use exact Set membership check (removed substring.includes)
      // Debug: verify both lines use exact Set.has (UTF-8 safe)
      if (carbSource) {
-      // D-18: cap cooked starches at a realistic 280g portion (avoids 500g buckwheat bowls).
-      // Aug 28: кап масштабируется от цели приёма (scale до ×2) — большой обед не упирается.
-      // Р-2.1: пол гарнира — через полы резки (см. fixM), на сборке не поднимаем.
+      // Бодибилдерская тарелка: гарнир 60г/30г*scale (иначе 36г сухо — пусто), без перегруза ЖКТ
       let grams = gramsForMacro(carbSource, carbTarget, 'carbs', carbPortionCap(carbSource, _capScale));
+      const isMainCarbDense2 = breakfast || label === 'Обед' || label === 'Ужин';
+      const carbFloorDense2 = Math.round((isMainCarbDense2 ? 60 : 30) * Math.max(1, Math.min(1.6, _currentWeightKg / 80)));
+      if (grams > 0 && grams < carbFloorDense2) grams = carbFloorDense2;
       if (grams > 0) {
         const item = makeItem(carbSource, grams, 'carb_slow');
         items.push(item); remP -= item.p; remF -= item.f; remC -= item.c;
@@ -2055,6 +2057,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   _qualityMode = input.quality === 'basic' ? 'basic' : 'full';
   _currentBudget = input.budget || 'medium';
+  _currentWeightKg = Number.isFinite(input.weightKg) && input.weightKg > 0 ? input.weightKg : 80;
   _currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
@@ -2839,27 +2842,59 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     return toMin(a.time) - toMin(b.time);
   });
 
-  // Плотный сытный рацион — псиллиум ≤10г, орехи ≤15г/приём (только добивка), гарнир ≥50г/30г (иначе 14г каши — пусто)
+  // Плотный сытный рацион без перегруза ЖКТ: 350-600г/приём, гарнир 80-120г сухо для 100кг, псиллиум ≤10г, орехи ≤15г
   for (const m of meals) {
-    const isMainDense = ['breakfast','lunch','dinner'].includes((m as any).type);
-    const isSnackDense = (m as any).type?.startsWith('snack');
+    const weightScaleDense2 = Math.max(1, Math.min(1.6, _currentWeightKg / 80));
     for (const it of m.items) {
       if (['psyllium_husk','glucomannan','inulin','Benefiber','wheat_bran_supplement','cocoa'].includes(it.id) && it.amount > 10) {
         const r = 10 / it.amount;
         it.amount = 10; it.p = Math.round(it.p * r *10)/10; it.f = Math.round(it.f * r*10)/10; it.c = Math.round(it.c*r*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r);
       }
-      const famDense = stapleFamilyOf(it.id);
-      if ((famDense === 'nuts' || famDense === 'seeds') && it.amount > 15) {
+      const famDense2 = stapleFamilyOf(it.id);
+      if ((famDense2 === 'nuts' || famDense2 === 'seeds') && it.amount > 15) {
         const r = 15 / it.amount;
         it.amount = 15; it.p = Math.round(it.p*r*10)/10; it.f = Math.round(it.f*r*10)/10; it.c = Math.round(it.c*r*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r);
       }
     }
-    if (isMainDense || isSnackDense) {
-      const floorDense = isMainDense ? 50 : 30;
+    const isMainDense2 = ['breakfast','lunch','dinner'].includes((m as any).type);
+    const isSnackDense2 = (m as any).type?.startsWith('snack');
+    if (isMainDense2 || isSnackDense2) {
+      const baseFloor = isMainDense2 ? 50 : 30;
+      const floorDense2 = Math.round(baseFloor * weightScaleDense2);
       for (const it of m.items.filter(x=> x.role==='carb_slow' || x.role==='carb_fast')) {
-        if (it.amount >0 && it.amount < floorDense) {
-          const r = floorDense / it.amount;
-          it.amount = floorDense; it.p = Math.round(it.p*r*10)/10; it.f = Math.round(it.f*r*10)/10; it.c = Math.round(it.c*r*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r);
+        if (it.amount >0 && it.amount < floorDense2) {
+          const r = floorDense2 / it.amount;
+          it.amount = floorDense2; it.p = Math.round(it.p*r*10)/10; it.f = Math.round(it.f*r*10)/10; it.c = Math.round(it.c*r*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r);
+        }
+      }
+      // белок — тоже плотно: 110г/80г *scale, иначе 80г творога для 120кг — мало
+      const protFloorBase = isMainDense2 ? 110 : 80;
+      const protFloor2 = Math.round(protFloorBase * weightScaleDense2);
+      for (const it of m.items.filter(x=> x.role==='protein' && x.id !== 'creatine')) {
+        if (it.amount >0 && it.amount < protFloor2 && it.amount < 300) {
+          // не трогаем порошки, только цельный белок
+          const foodProt = FOOD_DB.find(f=>f.id===it.id);
+          if (foodProt && foodProt.category === 'supplement') continue;
+          const r2 = protFloor2 / it.amount;
+          // не превышаем кап 300г и не ломаем ЖКТ (>600г/приём)
+          const curWeight = m.items.reduce((s,x)=>s+x.amount,0);
+          if (curWeight * r2 > 650) continue;
+          it.amount = protFloor2; it.p = Math.round(it.p*r2*10)/10; it.f = Math.round(it.f*r2*10)/10; it.c = Math.round(it.c*r2*10)/10; it.kcal = Math.round(4*it.p+9*it.f+4*it.c); it.fiber = Math.round((it.fiber||0)*r2*10)/10; it.leucine_mg = Math.round((it.leucine_mg||0)*r2);
+        }
+      }
+      // добить вес до 350г овощами, если всё ещё пусто (<300г) — без перегруза (>650г)
+      let curW2 = m.items.reduce((s,x)=>s+x.amount,0);
+      if (curW2 >0 && curW2 < 300) {
+        const vegPoolDense = [{id:'broccoli', amount:100}, {id:'cucumber', amount:100}, {id:'tomato', amount:100}];
+        for (const v of vegPoolDense) {
+          if (curW2 >= 320) break;
+          const f = FOOD_DB.find(x=>x.id===v.id);
+          if (!f || m.items.some(x=>x.id===f.id)) continue;
+          const add = Math.min(80, 350 - curW2);
+          if (add <30) break;
+          const it2 = { id:f.id, name:f.name, amount:add, kcal:Math.round(f.kcal*add/100), p:Math.round(f.protein*add/100*10)/10, f:Math.round(f.fat*add/100*10)/10, c:Math.round(f.carbs*add/100*10)/10, fiber:Math.round(f.fiber*add/100*10)/10, leucine_mg:0, role:'veg' as const };
+          it2.kcal = Math.round(4*it2.p+9*it2.f+4*it2.c);
+          m.items.push(it2 as any); curW2 += add;
         }
       }
     }
@@ -4152,7 +4187,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     {
       const _norm = normalizeMacroTargets(input.goalKcal, input.goalProteinG, input.goalFatG, input.goalCarbsG);
       const _targets = { kcal: _norm.kcal, p: _norm.p, f: _norm.f, c: _norm.c };
-      const _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: 40 });
+      const _corr = _correctDayToTargets(meals as any, _targets as any, { excludedIds: combinedExcluded, allowCoreScale: false, maxIter: 40, weightKg: input.weightKg });
       if (_corr.meals && _corr.meals.length > 0) {
         const _beforeDev = Math.max(
           _targets.kcal ? Math.abs(totals.kcal - _targets.kcal) / _targets.kcal : 0,
@@ -4206,9 +4241,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     _categoryPref = undefined;
     _qualityMode = 'full';
     _currentExcludedIds = undefined;
-    // A6 (санитария): _currentBudget тоже сбрасывается — иначе протекал между вызовами
-    // (carbPortionCap/maxGramPerItem читали бюджет ПРЕДЫДУЩЕГО плана при исключении).
+    // A6 (санитария): _currentBudget/_currentWeight тоже сбрасывается — иначе протекал между вызовами
     _currentBudget = 'medium';
+    _currentWeightKg = 80;
   }
 }
 
