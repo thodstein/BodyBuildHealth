@@ -3,11 +3,13 @@
  * Инкапсулирует: дисциплина/цель/уровень/недели/дни, весогонка, методика, DUP, периодизация, вне зала/спарринг, стиль, оборудование, травмы, мобильность, workMax, VBT, ACWR/HRV, pattern, history.
  * CombatConstructor остаётся тонким оркестратором шагов.
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { CombatInput, CombatPlan } from '../../../engines/combat/combat.types';
 import type { OutsideLoad } from '../../../engines/outside-load.engine';
 import { defaultOutsideLoadFor, computeOutsideMetrics } from '../../../engines/outside-load.engine';
 import { combatACWR, combatHrvReport } from '../../../engines/combat/combat-monitoring.engine';
+import { loadAnnualCB } from '../../../engines/combat/combat-annual';
+import type { AnnualCB } from '../../../engines/combat/combat-annual';
 
 export type WizardStep = 'params' | 'outside' | 'split' | 'plan';
 
@@ -58,9 +60,42 @@ export function useCombatWizard() {
   const [showExactWM, setShowExactWM] = useState(false);
   const [plan, setPlan] = useState<CombatPlan|null>(null);
   const [history, setHistory] = useState<CombatPlan[]>([]);
+  const [annual, setAnnual] = useState<AnnualCB | null>(() => loadAnnualCB());
+  const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
   const [msg, setMsg] = useState('');
+  const [annualWeeks, setAnnualWeeks] = useState(52);
+  const [competitionName, setCompetitionName] = useState('');
+  const [competitionDate, setCompetitionDate] = useState('');
+  const [competitionWeight, setCompetitionWeight] = useState('');
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('he_srpe_sessions') || localStorage.getItem('he_training_log') || '[]';
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) {
+        const week = arr.slice(-7).reduce((a:any, s:any)=> a + (s.load || s.sRPE || s.rpe || 0), 0);
+        setDiaryLoad(week);
+        try{
+          const daily: Record<string, number> = {};
+          for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+(s.load||s.sRPE||s.rpe||0); }
+          const vals = Object.values(daily).slice(-28);
+          if(vals.length>=14){
+            const acute = vals.slice(-7).reduce((a,c)=>a+c,0)/7;
+            const chronic = vals.reduce((a,c)=>a+c,0)/vals.length;
+            const r = combatACWR(acute*7, chronic*7);
+            setAcwr({ ratio: r.ratio, zone: r.zone });
+          }
+        }catch{}
+      }
+      try{
+        const h = combatHrvReport();
+        if(h) setHrvLine(`HRV ${h.last}мс (ср ${h.mean}±${h.sd}) — ${h.grade}: ${h.note}`);
+        else setHrvLine(null);
+      }catch{ setHrvLine(null); }
+    } catch {}
+  }, [plan]);
 
   return {
     // step
@@ -77,7 +112,8 @@ export function useCombatWizard() {
     acwr, setAcwr, velocityLoss, setVelocityLoss, vbtBest, setVbtBest, vbtLast, setVbtLast, hrvLine, setHrvLine,
     patternId, setPatternId,
     workMax, setWorkMax, workMaxByExercise, setWorkMaxByExercise, showExactWM, setShowExactWM,
-    plan, setPlan, history, setHistory, msg, setMsg,
+    plan, setPlan, history, setHistory, annual, setAnnual, diaryLoad, setDiaryLoad, msg, setMsg,
+    annualWeeks, setAnnualWeeks, competitionName, setCompetitionName, competitionDate, setCompetitionDate, competitionWeight, setCompetitionWeight,
     outsideMetrics,
   };
 }
