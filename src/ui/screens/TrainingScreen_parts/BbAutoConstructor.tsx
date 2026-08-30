@@ -3940,6 +3940,86 @@ export const BbAutoConstructor: React.FC = () => {
                     {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
                   </div>
                 </CollapsibleCard>
+                <CollapsibleCard title="7 · Выбранные методики — детально" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', color: '#a78bfa' }} badge={`${[bbMethodology, loadStrategy, intensityTech, volumeScheme, supersetMode, dupMode, deloadType].filter(v=>v!=='none'&&v!=='standard'&&v!=='compound_first').length} активных`}>
+                  <div style={{ display:'grid', gap:8 }}>
+                    {(() => {
+                      const methRu: Record<string,string> = { compound_first:'База → изоляция', pre_exhaust:'Пред-истощение', post_exhaust:'Пост-истощение', antagonistic:'Антагонисты', giant_sets:'Гигант-сеты' };
+                      const stratRu: Record<string,string> = { double_progression:'Двойная прогрессия', linear:'Линейная', wave:'Волновая', rpe_based:'RPE-авто', undulating:'Волновая', block:'Блочная' };
+                      const techRu: Record<string,string> = { none:'—', drop_set:'Дроп-сет', rest_pause:'Рест-пауза', myo_rep:'Мио-репс', giant_set:'Гигант-сет', superset:'Суперсет' } as any;
+                      const schemeRu: Record<string,string> = { standard:'Стандарт', gvt:'GVT 10×10', fst7:'FST-7', gironda:'8×8 Жиронда' };
+                      const superRu: Record<string,string> = { none:'—', antagonist:'Антагонисты', same_muscle:'Одна группа', giant:'Гигант' };
+                      const dupRu: Record<string,string> = { none:'—', heavy_light:'Тяж/Лёг', strength_hypertrophy:'Сила/Гипер', full_dup:'Полный DUP' };
+                      const deloadRu: Record<string,string> = { pump:'Памп', strength:'Силовая', custom:'Кастом' } as any;
+                      const focusRu: Record<string,string> = { hypertrophy:'Гипертрофия', strength:'Сила', endurance:'Выносливость' };
+                      const p: any = builtPlan as any;
+                      const actualMeth = p.methodology || bbMethodology;
+                      const actualStrat = p.loadStrategy || loadStrategy;
+                      const actualScheme = p.volumeScheme || volumeScheme;
+                      const actualSuper = p.supersetMode || supersetMode;
+                      const actualDup = p.dupMode || dupMode;
+                      const actualDeload = p.deloadType || deloadType;
+                      const actualFocus = p.trainingFocus || bbTrainingFocus;
+                      const actualVolMode = p.trainingVolumeMode || trainingVolumeMode;
+                      const selItems: Array<{label:string, selected:string, actual:string, selectedRu:string, actualRu:string, changed:boolean}> = [
+                        { label:'Порядок упражнений', selected: bbMethodology, actual: actualMeth, selectedRu: methRu[bbMethodology]||bbMethodology, actualRu: methRu[actualMeth]||actualMeth, changed: bbMethodology!==actualMeth },
+                        { label:'Прогрессия нагрузки', selected: loadStrategy, actual: actualStrat, selectedRu: stratRu[loadStrategy]||loadStrategy, actualRu: stratRu[actualStrat]||actualStrat, changed: loadStrategy!==actualStrat },
+                        { label:'Интенсив-техника', selected: intensityTech, actual: (p.intensityTechnique||intensityTech||'none'), selectedRu: techRu[intensityTech]||intensityTech, actualRu: techRu[p.intensityTechnique||intensityTech||'none']|| (p.intensityTechnique||intensityTech), changed: intensityTech!==(p.intensityTechnique||intensityTech) },
+                        { label:'Схема объёма', selected: volumeScheme, actual: actualScheme, selectedRu: schemeRu[volumeScheme]||volumeScheme, actualRu: schemeRu[actualScheme]||actualScheme, changed: volumeScheme!==actualScheme },
+                        { label:'Суперсеты', selected: supersetMode, actual: actualSuper, selectedRu: superRu[supersetMode]||supersetMode, actualRu: superRu[actualSuper]||actualSuper, changed: supersetMode!==actualSuper },
+                        { label:'DUP', selected: dupMode, actual: actualDup, selectedRu: dupRu[dupMode]||dupMode, actualRu: dupRu[actualDup]||actualDup, changed: dupMode!==actualDup },
+                        { label:'Разгрузка', selected: deloadType, actual: actualDeload, selectedRu: deloadRu[deloadType]||deloadType, actualRu: deloadRu[actualDeload]||actualDeload, changed: deloadType!==actualDeload },
+                        { label:'Фокус', selected: bbTrainingFocus, actual: actualFocus, selectedRu: focusRu[bbTrainingFocus]||bbTrainingFocus, actualRu: focusRu[actualFocus]||actualFocus, changed: bbTrainingFocus!==actualFocus },
+                        { label:'Объёмный режим', selected: trainingVolumeMode, actual: actualVolMode, selectedRu: trainingVolumeMode==='high'?'Объёмный':'Стандарт', actualRu: actualVolMode==='high'?'Объёмный':'Стандарт', changed: trainingVolumeMode!==actualVolMode },
+                      ];
+                      const extraItems: Array<{label:string, value:string, active:boolean}> = [
+                        { label:'BFR', value: bfrMode ? 'Вкл' : 'Выкл', active: bfrMode },
+                        { label:'Blast/Cruise', value: blastCruiseEnabled ? `${blastWeeks}н/${cruiseWeeks}н` : 'Выкл', active: blastCruiseEnabled },
+                        { label:'Авто-разгрузка', value: autoDeload ? 'Вкл' : 'Выкл', active: autoDeload },
+                        { label:'Ротация', value: rotationMode, active: rotationMode!=='variety' },
+                        { label:'Меньше базы', value: fewerCompound ? 'Да' : 'Нет', active: fewerCompound },
+                        { label:'Силовые лифты', value: allowStrengthLifts ? 'Да' : 'Нет', active: allowStrengthLifts },
+                        { label:'Без осевой', value: avoidAxialLoadUi ? 'Да' : 'Нет', active: avoidAxialLoadUi },
+                        { label:'Эксцентрик', value: `×${eccentricMult}`, active: eccentricMult!==1 },
+                        { label:'PED', value: peds.length? peds.join(', '):'—', active: peds.length>0 },
+                      ];
+                      const methodsSummary = (()=>{ try{ return buildBBMethodologySummary(builtPlan); } catch{ return []; } })();
+                      return (
+                        <div style={{ display:'grid', gap:8 }}>
+                          <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>Показано что выбрал пользователь и что реально используется в плане. Если отличается — применена автокоррекция (уровень, травмы, оборудование).</div>
+                          <div style={{ display:'grid', gap:6 }}>
+                            {selItems.map((it,i)=> (
+                              <div key={i} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, padding:'6px 8px', borderRadius:8, background: it.changed? 'rgba(245,158,11,0.08)':'rgba(255,255,255,0.03)', border: it.changed? '1px solid rgba(245,158,11,0.18)':'1px solid rgba(255,255,255,0.05)' }}>
+                                <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{it.label}</span>
+                                <span style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', justifyContent:'flex-end' }}>
+                                  <span style={{ fontSize:10, color: it.changed? '#f59e0b':'#fff', background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, textDecoration: it.changed? 'line-through': undefined, opacity: it.changed?0.6:1 }}>{it.selectedRu}</span>
+                                  <span style={{ fontSize:10, color:'#fff', opacity:0.5 }}>→</span>
+                                  <span style={{ fontSize:10, fontWeight:800, color: it.changed? '#f59e0b':'#22c55e', background: it.changed? 'rgba(245,158,11,0.12)':'rgba(34,197,94,0.10)', padding:'2px 6px', borderRadius:6, border: it.changed? '1px solid rgba(245,158,11,0.22)':'1px solid rgba(34,197,94,0.18)' }}>{it.actualRu}{it.changed?' ⚠️':''}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:6 }}>
+                            {extraItems.map((it,i)=> (
+                              <div key={i} style={{ padding:'5px 7px', borderRadius:8, background: it.active? 'rgba(139,92,246,0.10)':'rgba(255,255,255,0.03)', border: it.active? '1px solid rgba(139,92,246,0.18)':'1px solid rgba(255,255,255,0.05)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                <span style={{ fontSize:10, color:'#fff', opacity:0.7 }}>{it.label}</span>
+                                <span style={{ fontSize:10, fontWeight:700, color: it.active? '#a78bfa':'#fff' }}>{it.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {methodsSummary.length>0 && (
+                            <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.12)' }}>
+                              <div style={{ fontSize:10, fontWeight:800, color:'#a78bfa', marginBottom:4 }}>🧩 Фактически применённые методики в плане:</div>
+                              {methodsSummary.map((m,idx)=> <div key={idx} style={{ fontSize:10, color:'#fff', marginBottom:2, paddingLeft:6, borderLeft:'2px solid rgba(139,92,246,0.3)' }}>{m}</div>)}
+                            </div>
+                          )}
+                          <div style={{ fontSize:9, color:'#fff', opacity:0.5, lineHeight:1.3, padding:'4px 6px', background:'rgba(255,255,255,0.02)', borderRadius:6, border:'1px solid rgba(255,255,255,0.04)' }}>
+                            Источник: `inputSnapshot` (выбор) vs `builtPlan` (факт) + `buildBBMethodologySummary` (анализ комментариев плана). Отличия — автокоррекция по уровню/травмам/оборудованию.
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </CollapsibleCard>
               </div>
             </div></CollapsibleCard>
           ;
@@ -4519,8 +4599,8 @@ export const BbAutoConstructor: React.FC = () => {
                                 <span style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:20, background: st.color+'18', color: st.color, border:`1px solid ${st.color}22` }}>{st.label}</span>
                               </div>
                               <div style={{ marginTop:5, display:'flex', gap:6, flexWrap:'wrap', fontSize:10, color:'#fff', lineHeight:1.35 }}>
-                                <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }}>неделя: <b>{m.directSets}</b> прям · {indirectW} косв · <b>{m.effectiveSets}</b> эфф</span>
-                                <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }}>мезоцикл: {tot.direct} прям · {indirectT} косв · <b>{Math.round(tot.effective)}</b> эфф · средн. {Math.round(tot.effective/totalWeeks*10)/10}/нед</span>
+                                <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }} title="Прямая / косвенная = эффективная">неделя: <b>{m.directSets}</b> / {indirectW} <span style={{ opacity:0.6 }}>(прям/косв)</span> · <b>{m.effectiveSets}</b> эфф {m.directSets===0 && indirectW>0 ? <span style={{ fontSize:9, color:'#60a5fa', background:'rgba(96,165,250,0.12)', padding:'1px 4px', borderRadius:4, marginLeft:4, border:'1px solid rgba(96,165,250,0.18)' }}>косвенная</span> : null}</span>
+                                <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }} title="Прямая / косвенная = эффективная">мезоцикл: {tot.direct} / {indirectT} <span style={{ opacity:0.6 }}>(прям/косв)</span> · <b>{Math.round(tot.effective)}</b> эфф · средн. {Math.round(tot.effective/totalWeeks*10)/10}/нед</span>
                               </div>
                               <div style={{ position:'relative', height:10, borderRadius:5, background:'rgba(255,255,255,0.06)', overflow:'hidden', marginTop:6 }}>
                                 <div style={{ position:'absolute', left:0, top:0, bottom:0, width: pct(m.effectiveSets)+'%', background: st.color, borderRadius:5, opacity:0.88 }} />
