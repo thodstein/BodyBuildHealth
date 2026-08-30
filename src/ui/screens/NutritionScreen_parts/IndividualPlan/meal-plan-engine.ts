@@ -168,6 +168,9 @@ export interface MealPlanInput {
   workStartMin?: number;
   workEndMin?: number;
   isWorkDay?: boolean;
+  // Aug 30 2026 (карб потолок 10г/кг): 0 = без потолка (явный запрос 10г/кг/день),
+  // число = кастомный потолок г/кг (перекрывает 8/10 логику). По умолчанию — авто.
+  carbCapGPerKg?: number;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
@@ -2249,12 +2252,21 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const fatFloorG = impossibleGoal ? Math.round(input.weightKg * (input.sex === 'female' ? 0.6 : 0.5)) : _floorFatG;   // higher fat floor for women on hard cut
   const carbFloorG = impossibleGoal ? 50 : _floorCarbG;                                // ketogenic-ish floor on hard cut
   // D-28+ fix (вопрос «120 кг на курсе → 900 г углеводов — много?»): физиологический ПОТОЛОК
-  // углеводов 8 г/кг/день. Это верхняя граница даже для профессионалов в межсезонье с инсулином
-  // (сверх неё нет доказанного анаболического эффекта, только жироотложение + гликемический риск).
-  // Защищает от КУМУЛЯТИВНОГО стэка множителей: nutrLevel×1.5 × cycling/рефид × surplus — которые
-  // иначе раздували цель до абсурда. Белок не трогаем (всегда приоритет).
-  const _carbCeiling = Math.max(50, Math.round(input.weightKg * 8));
-  const carbsTotal = Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);
+  // углеводов. Базово 8 г/кг (Helms 4-8 межсезонье), но для bulk + бюджет max/enhanced → 10 г/кг
+  // (Slater 12g/kg glycogen supercomp, бодибилдер на 10г/кг — реальный кейс). При
+  // carbCapGPerKg === 0 потолок снят полностью (явный «без потолка» от пользователя).
+  let _capPerKg = 8;
+  if (typeof input.carbCapGPerKg === 'number') {
+    if (input.carbCapGPerKg === 0) _capPerKg = Infinity as any;
+    else _capPerKg = Math.max(0, input.carbCapGPerKg);
+  } else {
+    const _isBulk = !input.isCutting && (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || !input.cyclePhase || input.cyclePhase === 'maintenance');
+    // bulk + max/enhanced бюджет → 10 г/кг (независимо от объёма — пользователь явно high-carb)
+    // также bulk + длинная тренировка ≥75 мин (прокси высокого недельного объёма) → 10
+    if (_isBulk && ((input.budget === 'max' || input.budget === 'enhanced') || (input.isTrainingDay && (input.trainDurationMin ?? 0) >= 75))) _capPerKg = 10;
+  }
+  const _carbCeiling = _capPerKg === Infinity ? Infinity : Math.max(50, Math.round(input.weightKg * _capPerKg));
+  const carbsTotal = _carbCeiling === Infinity ? Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG) : Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);
   // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
   // D-24: mealsCount-aware carb distribution (weight-based, lunch = main meal).
   // Веса нормируются к 100% по приёмам, которые РЕАЛЬНО будут построены → нет

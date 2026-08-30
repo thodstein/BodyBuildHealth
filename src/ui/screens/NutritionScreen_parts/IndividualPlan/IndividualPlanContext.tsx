@@ -812,6 +812,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // 4-6 г/кг), а не абстрактный ×множитель (жалоба «120 кг на курсе → 900/814 г углеводов»).
   // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, до 8 г/кг). Применяется ко ВСЕМ
   // уровням (не только enhanced/max) — иначе на base/medium дисплей по-прежнему показывал бы 800+.
+  const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? _pf.budget : 'medium');
+  const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
   const effectiveC = (() => {
     if (kbjuMode === 'manual' && manualC !== null) return manualC;
@@ -819,13 +821,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
     }
     const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits });
+    const vol = (() => { try { return trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60); } catch { return 0; } })();
+    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits, goalPhase: plannerGoalCategory(goal), trainingVolumeMinPerWeek: vol, budget });
   })();
   const _rawCForCap = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
   const carbCapGPerKg = (() => {
     try {
       const vol = trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60);
-      return contextualCarbCapGPerKg(plannerGoalCategory(goal), vol);
+      return contextualCarbCapGPerKg(plannerGoalCategory(goal), vol, budget);
     } catch { return 5; }
   })();
   const carbCapClipped = (() => {
@@ -841,8 +844,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
   const resultsRef = useRef<HTMLDivElement>(null);
-  const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? _pf.budget : 'medium');
-  const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
   // P1-fix: wakeTime/bedTime из Profile (UnifiedSettings.lifestyle.wakeTime/bedtime) + legacy
   const [wakeTime, setWakeTime] = useState<string>(() => {
     try {
@@ -2054,6 +2055,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         };
       });
     };
+    let _outerResMeals: any[] | null = null;
+    let _outerVisibleMealsForOptions: any[] | null = null;
     if (dayIdx === 0) {
       // Полное применение: приём = рецепт (авторские порции), затем ребаланс дня до ±3%
       // (рецепт помечается recipeApplied → защищён от резки), синк закупок и готовки.
@@ -2075,6 +2078,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       };
       const resMeals = applyRebalanced(dayPlan?.meals);
       if (!resMeals) return;
+      _outerResMeals = resMeals;
+      _outerVisibleMealsForOptions = resMeals;
       const newDay = { ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any) };
       // FIX button-audit: синхронизация правки обратно в недельный план
       let weekDaysUpdated: any[] | null = null;
@@ -2119,6 +2124,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       };
       const resMeals = applyRebalanced2(srcPlan.days[resolved.day].meals);
       if (!resMeals) return;
+      _outerResMeals = resMeals;
+      _outerVisibleMealsForOptions = resMeals;
       const days = [...srcPlan.days];
       days[resolved.day] = { ...srcPlan.days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any) };
       const updated = { ...srcPlan, days, totals: sumMultiTotals(days) };
@@ -2130,8 +2137,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     }
     // Пересобираем нижние карточки (recipeOptions) для всех приёмов — иначе после замены нижние не перестраиваются и нет второго выбора
     try {
-      const allMealsForOptions = (dayIdx === 0 ? resMeals : null) || (dayIdx !== 0 ? ((): any => { const r = _resolvePlanDay(dayIdx); if (!r) return null; const p = r.plan==='three'? threeDayPlan : r.plan==='week'? weekPlan : null; return p?.days?.[r.day]?.meals; })() : null);
+      const allMealsForOptions = _outerResMeals || _outerVisibleMealsForOptions || (dayIdx !== 0 ? ((): any => { const r = _resolvePlanDay(dayIdx); if (!r) return null; const p = r.plan==='three'? threeDayPlan : r.plan==='week'? weekPlan : null; return p?.days?.[r.day]?.meals; })() : null);
       if (allMealsForOptions && Array.isArray(allMealsForOptions)) {
+        const excludedIds = new Set<string>(excludedFoods || []);
         const poolForOptions = [...getRecipes(), ...(userRecipes||[])].filter(r=> !excludedIds.has(r.name));
         for (let i=0; i<allMealsForOptions.length; i++) {
           const m = allMealsForOptions[i];

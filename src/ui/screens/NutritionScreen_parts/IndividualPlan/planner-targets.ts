@@ -70,11 +70,17 @@ export interface PlannerTargets {
 // по определению ( Context передаёт manualC напрямую ).
 // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, но не более 8 г/кг) —
 // иначе высокие дозы не были бы обеспечены углеводами. Чистая функция: тестируемая.
-export function contextualCarbCapGPerKg(goalPhase?: string, trainingVolumeMinPerWeek?: number): number {
+// Aug 30 2026 (задача «карб потолок убираем в некоторых случаях и по 10г/кг бывает»):
+// bulk + экстремальный объём ≥800 мин/нед ИЛИ бюджет max/enhanced + bulk → 10 г/кг
+// (Slater 2011 up to 12g/kg glycogen supercomp, Helms 10g/kg peak load day). При
+// carbGPerKg === 0 потолок снят полностью (явный запрос пользователя/budget enhanced).
+export function contextualCarbCapGPerKg(goalPhase?: string, trainingVolumeMinPerWeek?: number, budget?: string): number {
   if (!goalPhase) return 5;
   if (goalPhase === 'cut') return 5;
   if (goalPhase === 'bulk') {
     const vol = Math.max(0, Number(trainingVolumeMinPerWeek) || 0);
+    const isHighBudget = budget === 'max' || budget === 'enhanced';
+    if (vol >= 800 || (isHighBudget && vol >= 500)) return 10;
     if (vol >= 600) return 8;
     if (vol >= 400) return 7;
     return 6;
@@ -87,15 +93,20 @@ export function computeDieteticCarbTarget(opts: {
   weightKg: number;
   rawCarbsG: number;
   insulinTotalUnits?: number;
-  carbGPerKg?: number;      // потолок г/кг (по умолчанию: контекст goalPhase или 5)
-  maxCarbGPerKg?: number;   // верхний предел при инсулине (по умолчанию 8)
+  carbGPerKg?: number;      // потолок г/кг (по умолчанию: контекст goalPhase или 5); 0 = без потолка
+  maxCarbGPerKg?: number;   // верхний предел при инсулине (по умолчанию 8, для bulk/high vol 10)
   minCarbG?: number;        // нижний этаж (по умолчанию 50)
   goalPhase?: string;       // 'bulk' | 'cut' | 'maintenance' | 'recomp' | 'health' | 'strength'
   trainingVolumeMinPerWeek?: number; // минуты тренировок в неделю (для bulk 7-8 г/кг)
+  budget?: string;          // 'low'|'medium'|'max'|'enhanced' — влияет на потолок
 }): number {
   const w = Math.max(1, opts.weightKg || 0);
-  const carbGPerKg = opts.carbGPerKg ?? contextualCarbCapGPerKg(opts.goalPhase, opts.trainingVolumeMinPerWeek);
-  const maxCarbGPerKg = opts.maxCarbGPerKg ?? 8;
+  // 0 = явный запрос «без потолка» (бодибилдер на 10г/кг) — не каппим
+  if (opts.carbGPerKg === 0 || opts.maxCarbGPerKg === 0) return Math.max(opts.minCarbG ?? 50, opts.rawCarbsG || 0);
+  const carbGPerKg = opts.carbGPerKg ?? contextualCarbCapGPerKg(opts.goalPhase, opts.trainingVolumeMinPerWeek, opts.budget);
+  // bulk + high vol → 10 г/кг absolute max
+  const defaultMax = (opts.goalPhase === 'bulk' && (opts.trainingVolumeMinPerWeek || 0) >= 600) ? 10 : 8;
+  const maxCarbGPerKg = opts.maxCarbGPerKg ?? defaultMax;
   const minCarbG = opts.minCarbG ?? 50;
   const insulinTotal = Math.max(0, opts.insulinTotalUnits || 0);
   const insulinFloor = Math.round(insulinTotal * 10); // ~10 г на 1 ЕД
