@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { saveCustomFood, loadCustomFoods, deleteCustomFood, saveCustomTargets, loadCustomTargets, type CustomFoodEntry } from '../../../engines/meal-tier-generator.engine';
+import { saveCustomFood, loadCustomFoods, deleteCustomFood, saveCustomTargets, loadCustomTargets, type CustomFoodEntry } from '../../../engines/meal-custom-food';
 import type { FoodItem } from '../../../core/nutrition-database';
 
 const CATEGORIES: { value: string; label: string }[] = [

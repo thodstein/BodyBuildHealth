@@ -1,5 +1,5 @@
 import { FOOD_DB, type FoodItem } from '../core/nutrition-database';
-import { loadCustomFoods, type CustomFoodEntry } from './meal-tier-generator.engine';
+import { loadCustomFoods, type CustomFoodEntry } from './meal-custom-food';
 
 export interface NutrientTarget {
   nutrient: string;

@@ -15,6 +15,7 @@ import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrit
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
 import { buildDayTargets } from "./planner-day-targets";
+import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
@@ -3061,64 +3062,49 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   };
 
   const autoCorrectPlan = () => {
-    if (!dayPlan || !dayPlan.meals) return;
-    // P1-fix: добавлен saveUndo — раньше автокоррекция была неотменяемой
+    // B6 (Эпик B): автокоррекция через ЕДИНЫЙ корректор correctDayToTargets.
+    // Было: плоская ratio-подгонка только недобора (перебор max(0,…)=0 резал все приёмы
+    // ×0.3), ломала консистентность kcal=4Б+9Ж+4У, не работала для 3/7-дневных планов.
+    // Теперь: корректор движка (полы порций, ядро рецепта, Atwater), день ± цели, плюс
+    // синхронная правка выбранного дня 3/7-дневного плана и закупок.
+    const targets = { kcal: effectiveKcal, p: effectiveP, f: effectiveF, c: effectiveC };
+    if (!targets.kcal && !targets.p) return;
     saveUndo();
-    const remaining = {
-      kcal: Math.max(0, effectiveKcal - (dayPlan.totals?.kcal || 0)),
-      p: Math.max(0, effectiveP - (dayPlan.totals?.p || 0)),
-      f: Math.max(0, effectiveF - (dayPlan.totals?.f || 0)),
-      c: Math.max(0, effectiveC - (dayPlan.totals?.c || 0))
+    const applyTo = (plan: any): any => {
+      if (!plan?.meals || !Array.isArray(plan.meals) || plan.meals.length === 0) return null;
+      const res = correctDayToTargets(plan.meals, targets, { weightKg: weight, maxIter: 60 });
+      const meals = res.meals.map((m: any) => ({
+        ...m,
+        totals: { kcal: m.totals?.kcal || 0, p: m.totals?.p || 0, f: m.totals?.f || 0, c: m.totals?.c || 0, fiber: m.totals?.fiber || 0 },
+      }));
+      const totals = meals.reduce((acc: any, m: any) => ({
+        kcal: acc.kcal + m.totals.kcal, p: acc.p + m.totals.p, f: acc.f + m.totals.f, c: acc.c + m.totals.c, fiber: (acc.fiber || 0) + m.totals.fiber,
+      }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
+      return { ...plan, meals, totals };
     };
-    const futureMeals = dayPlan.meals.filter((m: any) => !m.label.includes('Завтрак') && !m.label.includes('Предтрен'));
-    if (futureMeals.length === 0) return;
-    const perMeal = {
-      kcal: Math.round(remaining.kcal / futureMeals.length),
-      p: Math.round(remaining.p / futureMeals.length),
-      f: Math.round(remaining.f / futureMeals.length),
-      c: Math.round(remaining.c / futureMeals.length)
-    };
-    setDayPlan((prev: any) => {
-      if (!prev) return prev;
-      const meals = prev.meals.map((m: any) => {
-        if (m.label.includes('Завтрак') || m.label.includes('Предтрен')) return m;
-        // P1-fix: per-macro ratios вместо единого ratio по kcal.
-        // Раньше один ratio применялся ко всем макросам, что не работало при
-        // смешанном дисбалансе (жир выше, углеводы ниже).
-        const ratioP = Math.max(0.3, Math.min(1.7, perMeal.p / Math.max(1, m.totals?.p || 1)));
-        const ratioF = Math.max(0.3, Math.min(1.7, perMeal.f / Math.max(1, m.totals?.f || 1)));
-        const ratioC = Math.max(0.3, Math.min(1.7, perMeal.c / Math.max(1, m.totals?.c || 1)));
-        const ratioK = Math.max(0.3, Math.min(1.7, perMeal.kcal / Math.max(1, m.totals?.kcal || 1)));
-        const items = m.items.map((it: any) => {
-          // Белковые продукты масштабируем по ratioP, жировые — по ratioF, углеводные — по ratioC
-          const isProteinDom = (it.p || 0) >= (it.f || 0) && (it.p || 0) >= (it.c || 0);
-          const isFatDom = (it.f || 0) > (it.p || 0) && (it.f || 0) > (it.c || 0);
-          const ratio = isProteinDom ? ratioP : isFatDom ? ratioF : ratioC;
-          return {
-            ...it,
-            amount: Math.round(it.amount * ratio),
-            kcal: Math.round(it.kcal * ratioK),
-            p: Math.round(it.p * ratioP * 10) / 10,
-            f: Math.round(it.f * ratioF * 10) / 10,
-            c: Math.round(it.c * ratioC * 10) / 10
-          };
-        });
-        const totals = {
-          kcal: items.reduce((s: number, i: any) => s + i.kcal, 0),
-          p: items.reduce((s: number, i: any) => s + i.p, 0),
-          f: items.reduce((s: number, i: any) => s + i.f, 0),
-          c: items.reduce((s: number, i: any) => s + i.c, 0)
-        };
-        return { ...m, items, totals };
-      });
-      const totals = {
-        kcal: meals.reduce((s: number, m: any) => s + (m.totals?.kcal || 0), 0),
-        p: meals.reduce((s: number, m: any) => s + (m.totals?.p || 0), 0),
-        f: meals.reduce((s: number, m: any) => s + (m.totals?.f || 0), 0),
-        c: meals.reduce((s: number, m: any) => s + (m.totals?.c || 0), 0)
-      };
-      return { ...prev, meals, totals };
-    });
+    const correctedDay = applyTo(dayPlan);
+    if (correctedDay) setDayPlan(correctedDay);
+    // B6: мультидневность — правим выбранный день 3/7-дневного плана (если виден).
+    const _idx = weekEditDay ?? selectedDayIndex ?? 0;
+    if (planDays >= 7 && weekPlan?.days?.length) {
+      const i = Math.min(_idx, weekPlan.days.length - 1);
+      const corrected = applyTo(weekPlan.days[i]);
+      if (corrected) setWeekPlan((prev: any) => { const days = [...prev.days]; days[i] = corrected; return { ...prev, days }; });
+    }
+    if (planDays === 3 && threeDayPlan?.days?.length) {
+      const i = Math.min(_idx, threeDayPlan.days.length - 1);
+      const corrected = applyTo(threeDayPlan.days[i]);
+      if (corrected) setThreeDayPlan((prev: any) => { const days = [...prev.days]; days[i] = corrected; return { ...prev, days }; });
+    }
+    // Синк закупок из фактических планов (добавки корректора должны попасть в список).
+    try {
+      const allPlans: any[] = [];
+      if (correctedDay) allPlans.push(correctedDay);
+      if (planDays === 3 && threeDayPlan?.days) allPlans.push(...threeDayPlan.days);
+      if (planDays >= 7 && weekPlan?.days) allPlans.push(...weekPlan.days);
+      if (allPlans.length > 0) setShoppingList(buildShoppingFromPlans(allPlans));
+    } catch {}
+    try { if (typeof (window as any).showToast === 'function') (window as any).showToast('📊 Рацион скорректирован к целям КБЖУ', 'success'); } catch {}
   };
 
   const [mealPrepPlan, setMealPrepPlan] = useState<{ steps: MealPrepStep[]; totalTime: number; containers: number } | null>(null);

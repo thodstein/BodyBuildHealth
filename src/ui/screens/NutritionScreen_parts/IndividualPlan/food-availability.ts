@@ -153,10 +153,20 @@ export interface DailyQuotaState {
   familyGrams: Map<string, number>; // семейство → сумма граммов за день
   fruitMeals: number;       // приёмы с фруктом
   eggWhGrams: number;       // суммарные граммы яиц (egg_whole)
+  /** B8 (Эпик B): масштаб грамм-лимитов от веса (80 кг = 1.0, кламп 0.75–1.6).
+   *  120+ кг атлет на 5000+ ккал не должен упираться в орехово-масляный потолок 80-кг атлета. */
+  weightScale: number;
 }
 
-export function createDailyQuota(): DailyQuotaState {
-  return { powderMeals: 0, familyUses: new Map(), familyGrams: new Map(), fruitMeals: 0, eggWhGrams: 0 };
+/** B8: масштаб квот от веса. Без веса/некорректный вес → 1.0 (обратно-совместимо). */
+export function quotaWeightScale(weightKg?: number): number {
+  const w = Math.max(0, Number(weightKg) || 0);
+  if (!w) return 1;
+  return Math.max(0.75, Math.min(1.6, w / 80));
+}
+
+export function createDailyQuota(weightKg?: number): DailyQuotaState {
+  return { powderMeals: 0, familyUses: new Map(), familyGrams: new Map(), fruitMeals: 0, eggWhGrams: 0, weightScale: quotaWeightScale(weightKg) };
 }
 
 // ── Лимиты (доказательная база: см. план «Профессиональный планировщик») ──
@@ -184,6 +194,11 @@ export const QUOTA_LIMITS = {
  */
 export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string): Set<string> {
   const blocked = new Set<string>();
+  // B8: грамм-лимиты масштабируются от веса атлета (приём-лимиты — нет).
+  const sc = (q as DailyQuotaState).weightScale || 1;
+  const nutCapG = Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * sc);
+  const oilCapG = Math.round(QUOTA_LIMITS.maxOilGramsPerDay * sc);
+  const eggCapG = Math.round(QUOTA_LIMITS.maxEggWholeGramsPerDay * sc);
   // Один слот порошка резервируется под post-workout (трен-день) — перекусы не съедают оба.
   const _powderCap = nextMealType === 'postworkout' ? QUOTA_LIMITS.maxPowderMeals : QUOTA_LIMITS.maxPowderMeals - 1;
   if (q.powderMeals >= _powderCap) {
@@ -197,10 +212,10 @@ export function blockedIdsForNextMeal(q: DailyQuotaState, nextMealType: string):
     if (uses >= cap) markFamilyBlocked(blocked, fam);
   }
   const nutGrams = (q.familyGrams.get('nuts') || 0) + (q.familyGrams.get('seeds') || 0);
-  if (nutGrams >= QUOTA_LIMITS.maxNutsGramsPerDay) { markFamilyBlocked(blocked, 'nuts'); markFamilyBlocked(blocked, 'seeds'); }
-  if ((q.familyGrams.get('oils') || 0) >= QUOTA_LIMITS.maxOilGramsPerDay) markFamilyBlocked(blocked, 'oils');
+  if (nutGrams >= nutCapG) { markFamilyBlocked(blocked, 'nuts'); markFamilyBlocked(blocked, 'seeds'); }
+  if ((q.familyGrams.get('oils') || 0) >= oilCapG) markFamilyBlocked(blocked, 'oils');
   if (q.fruitMeals >= QUOTA_LIMITS.maxFruitMeals) blocked.add('__ALL_FRUIT__');
-  if (q.eggWhGrams >= QUOTA_LIMITS.maxEggWholeGramsPerDay) blocked.add('egg_whole');
+  if (q.eggWhGrams >= eggCapG) blocked.add('egg_whole');
   void nextMealType;
   return blocked;
 }
@@ -259,4 +274,21 @@ export function foodPlannable(
   if (!foodAvailableForPlan(f, opts.preferredIds)) return false;
   if (opts.blocked && !foodAvailableWithQuota(f, opts.blocked, opts.allowIds)) return false;
   return true;
+}
+
+// ─── B3/B8 (Эпик B): единые катчелл-потолки ──────────────────────────────
+// Раньше лимит орехов существовал в ТРЁХ вариантах (квота 60 / катчелл 70 / тест 75),
+// масел — в двух (25/30). Теперь катчелл = квота × масштаб веса + фиксированный запас
+// (пост-коррекции идут мимо квот, запас нужен на сведение ≤3%).
+/** Катчелл-потолок орехов/семян за день (г). */
+export function nutCatchupCap(weightScale: number): number {
+  return Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * (weightScale || 1)) + 10;
+}
+/** Катчелл-потолок масел за день (г). */
+export function oilCatchupCap(weightScale: number): number {
+  return Math.round(QUOTA_LIMITS.maxOilGramsPerDay * (weightScale || 1)) + 5;
+}
+/** Катчелл-потолок цельных яиц за день (г). */
+export function eggCatchupCap(weightScale: number): number {
+  return Math.round(QUOTA_LIMITS.maxEggWholeGramsPerDay * (weightScale || 1)) + 10;
 }

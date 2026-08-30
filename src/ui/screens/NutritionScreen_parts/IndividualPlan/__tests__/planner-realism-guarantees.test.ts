@@ -1,7 +1,7 @@
 ﻿import { describe, it, expect } from 'vitest';
 import { buildDayPlan } from '../meal-plan-engine';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
-import { EXOTIC_FOOD_IDS, isHerbSpiceId, isPureSupplementId, isProteinPowderId, stapleFamilyOf, QUOTA_LIMITS } from '../food-availability';
+import { EXOTIC_FOOD_IDS, isHerbSpiceId, isPureSupplementId, isProteinPowderId, stapleFamilyOf, QUOTA_LIMITS, nutCatchupCap, oilCatchupCap, eggCatchupCap, quotaWeightScale } from '../food-availability';
 
 const catOf = (id: string): string => FOOD_DB.find(f => f.id === id)?.category || '';
 
@@ -57,17 +57,19 @@ describe('F1: гарантии реалистичности тарелки', () 
           expect(n, `${prof.name}: семейство «${fam}» в ${n} приёмах (лимит ${cap})`).toBeLessThanOrEqual(cap);
         }
 
-        // 5. Орехи/семена ≤85 г/день суммарно (корректор может добавить до 85 при сведении к ≤3%)
+        // 5. Орехи/семена ≤ катчелл-потолка (B3/B8: квота × масштаб веса + запас 10 г).
         const nutG = items.filter(it => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + it.amount, 0);
-        expect(nutG, `${prof.name}: орехов/семян ${nutG} г (лимит 85)`).toBeLessThanOrEqual(85);
+        const _nutCap = nutCatchupCap(quotaWeightScale(prof.weightKg));
+        expect(nutG, `${prof.name}: орехов/семян ${nutG} г (лимит ${_nutCap})`).toBeLessThanOrEqual(_nutCap);
         const oilMeals = plan.meals.filter(m => m.items.some(it => stapleFamilyOf(it.id) === 'oils')).length;
         expect(oilMeals, `${prof.name}: масел в ${oilMeals} приёмах (лимит 2)`).toBeLessThanOrEqual(2);
 
-        // 6. Фрукты ≤4 приёмов (3 + мелатонин-порция pre-sleep); яйца ≤240 г/день.
+        // 6. Фрукты ≤4 приёмов (3 + мелатонин-порция pre-sleep); яйца ≤ катчелл-потолка.
         const fruitMeals = plan.meals.filter(m => m.items.some(it => it.role === 'fruit')).length;
         expect(fruitMeals, `${prof.name}: фруктов в ${fruitMeals} приёмах (лимит 4)`).toBeLessThanOrEqual(4);
         const eggG = items.filter(it => it.id === 'egg_whole').reduce((s, it) => s + it.amount, 0);
-        expect(eggG, `${prof.name}: яиц ${eggG} г (лимит 240)`).toBeLessThanOrEqual(240);
+        const _eggCap = eggCatchupCap(quotaWeightScale(prof.weightKg));
+        expect(eggG, `${prof.name}: яиц ${eggG} г (лимит ${_eggCap})`).toBeLessThanOrEqual(_eggCap);
 
         // 7. Клетчатка ≤85 г (кап 14 г/1000 ккал + корректор может добавить углеводные носители для ≤3%)
         expect(plan.totals.fiber, `${prof.name}: клетчатка ${plan.totals.fiber} г`).toBeLessThanOrEqual(85);

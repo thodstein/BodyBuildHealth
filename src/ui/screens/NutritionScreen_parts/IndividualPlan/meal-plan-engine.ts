@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * meal-plan-engine.ts — профессиональный движок генерации рациона бодибилдера.
  *
@@ -36,7 +35,7 @@ import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine
 import {
   foodAvailableForPlan, isHerbSpiceId, isPureSupplementId, isProteinPowderId,
   createDailyQuota, blockedIdsForNextMeal, registerMealInQuota, foodAvailableWithQuota,
-  QUOTA_LIMITS, stapleFamilyOf,
+  QUOTA_LIMITS, stapleFamilyOf, nutCatchupCap, oilCatchupCap,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets } from "./day-target-corrector";
 import { computeEA } from "./planner-ea.engine";
@@ -199,8 +198,30 @@ const INTRA_CARB_G_PER_H = 40;
 // мелких атлетов (LBM 45-50: женщины/лёгкие веса) давали перебор белка дня, который
 // P4-коррекция «лечила» урезанием белка до 10 г = вырожденные порции («18 г каши»).
 // Для LBM 72: prew 23 (≈25), postw 36 (≈35) — крупные атлеты не меняются.
-function prewProteinFor(lbmKg: number): number { return Math.max(15, Math.round((lbmKg || 60) * 0.32)); }
-function postwProteinFor(lbmKg: number): number { return Math.max(20, Math.round((lbmKg || 60) * 0.5)); }
+// B5 (Эпик B): мёртвые prewProteinFor/postwProteinFor удалены (коэффициенты 0.32/0.5
+// расходились с живым periProteinBudget 0.25/0.40 — единый источник в periProteinBudget).
+
+// B4 (Эпик B): ЕДИНЫЙ пересчёт totals — раньше reduce-копии были размножены 30+ раз,
+// что дало класс багов «stale fiber/leucine» (проход забывал обновить поле).
+export interface EngineTotals { kcal: number; p: number; f: number; c: number; fiber: number; leucine_mg: number; }
+function mealTotalsOf(items: any[]): EngineTotals {
+  return items.reduce((acc: EngineTotals, it: any) => ({
+    kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c,
+    fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
+  }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+}
+function recalcMealTotals(meals: any[]): void {
+  for (const m of meals) m.totals = mealTotalsOf(m.items || []);
+}
+function recalcDayTotals(meals: any[], totals: any): void {
+  totals.kcal = meals.reduce((s: number, m: any) => s + m.totals.kcal, 0);
+  totals.p = Math.round(meals.reduce((s: number, m: any) => s + m.totals.p, 0) * 10) / 10;
+  totals.f = Math.round(meals.reduce((s: number, m: any) => s + m.totals.f, 0) * 10) / 10;
+  totals.c = Math.round(meals.reduce((s: number, m: any) => s + m.totals.c, 0) * 10) / 10;
+  totals.fiber = Math.round(meals.reduce((s: number, m: any) => s + (m.totals.fiber || 0), 0) * 10) / 10;
+  totals.leucine_mg = meals.reduce((s: number, m: any) => s + (m.totals.leucine_mg || 0), 0);
+}
+
 // Максимально допустимые порции для добавок (г) — защита от абсурдных доз
 const SUPPLEMENT_MAX_G: Record<string, number> = {
   creatine: 10, whey_isolate: 60, whey_protein: 60, whey_concentrate: 60,
@@ -275,7 +296,7 @@ const isMeatId = (id: string): boolean => {
 // ─── Р-2.1 (Aug 28): Реалистичность состава приёма («18 г каши и 100 г сухофруктов») ──
 // «Концентраты» — углеводные носители с плотностью ≥55 г углей/100 г (сухофрукты/джем):
 // ДОБАВКА, а не основа — кап 50 г на приём (100 г изюма = 65 г сахаров одним пунктом).
-const CONCENTRATE_IDS = ['dates', 'raisins', 'dried_apricots', 'dried_figs', 'dried_apples', 'jam', 'honey'];
+const CONCENTRATE_IDS = ['dates', 'raisins', 'dried_apricots', 'dried_apple_rings', 'honey'];
 export function isConcentrateFood(food: FoodItem): boolean {
   if (CONCENTRATE_IDS.includes(food.id)) return true;
   return (food.category === 'veg_fruit' || food.category === 'carb') && (food.carbs || 0) >= 55 && (food.fiber || 0) <= 15;
@@ -554,7 +575,7 @@ const PROTEIN_ROTATION: { label: string; ids: string[]; note: string }[] = [
 // A6 (санитария): pickRotation удалён — используется pickRotationsForDay (мультиротация дня).
 
 // ─── Preference: common bodybuilding carbs get selection bonus ───
-const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_boiled','pasta_durum','quinoa','barley','cereal','millet','couscous','noodle','bulgur','chickpea','lentil','beans','corn','bread','oats','oats_dry']);
+const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_boiled','pasta_durum','quinoa','barley','cereal_rye_flakes','millet','couscous','rice_noodles','bulgur','chickpeas','lentils','legume_soybeans','corn','whole_grain_bread','oats','oats_dry']);
 
 // Эпик B: овощи, «притворяющиеся» фруктами по макросам (лук/чеснок/порей/кабачок и т.п.)
 // не должны попадать во фруктовые/быстрые углеводные пулы («лук 70 г в полднике»).
@@ -570,12 +591,14 @@ const BREAKFAST_FRUIT_KEYWORDS = ['ягод','банан','черник','клу
 // курируемый fallback «завтрашних» углеводов — если по ключевым словам ничего не нашлось,
 // НЕ льём весь пул медленных углеводов (туда входят макароны/рис-гарниры/кус-кус).
 // Используем только явно «завтрашние» id (каши/хлопья/мюсли/рисовый крем/тост).
-const BREAKFAST_CARB_FALLBACK_IDS = ['oats','oats_dry','rice_cream','cereal','muesli','buckwheat','cereal_oat_bran','bread_white','bread_rye','bread_protein','rice_brown','millet','grain_spelt','grain_kamut','grain_einkorn','cream_of_rice','porridge_oat','porridge_buckwheat'];
+// B7 (Эпик B): из курируемых fallback-списков убраны экзотические id (grain_kamut,
+// grain_einkorn, fruit_goji_berries — из EXOTIC_FOOD_IDS, в пулах всё равно фильтровались).
+const BREAKFAST_CARB_FALLBACK_IDS = ['oats','oats_dry','rice_cream','cereal_rye_flakes','muesli','buckwheat','cereal_oat_bran','bread_white','bread_rye','bread_protein','rice_brown','millet','grain_spelt','cream_of_rice'];
 // Курируемый fallback «завтрашних» фруктов (ягоды/банан/сухофрукты), а не весь плодовый пул.
-const BREAKFAST_FRUIT_FALLBACK_IDS = ['banana','apple','berries','blueberries','strawberries','raspberries','blackberries','gooseberries','cranberries','kiwi','dried_apricots','dates','raisins','prunes','dried_berries','fruit_goji_berries'];
+const BREAKFAST_FRUIT_FALLBACK_IDS = ['banana','apple','berries','blueberries','strawberry','raspberry','fruit_blackberry','berry_gooseberry','dried_cranberry','kiwi','dried_apricots','dates','raisins','prunes'];
 // D-28 fix (жалоба «логика завтрака не читается»): «завтрашний» белок —
 // яйца/творог/греческий йогурт/сыворотка/тофу, а НЕ рыба/мясо (ротация обедов/ужинов).
-const BREAKFAST_PROTEIN_IDS = ['egg_whole','egg_white','omelet','cottage_cheese_5','cottage_cheese_2','cottage_cheese_0','yogurt_greek','yogurt','milk','kefir','whey_protein','whey_isolate','tofu','supp_pea_protein','supp_soy_isolate','supp_rice_protein'];
+const BREAKFAST_PROTEIN_IDS = ['egg_whole','egg_white','omelette','cottage_cheese_5','cottage_cheese_0','yogurt_greek','yogurt_natural','milk','kefir','whey_protein','whey_isolate','tofu','supp_pea_protein','supp_soy_isolate','supp_rice_protein'];
 // N1: профиль вкуса завтрака — сужает углеводную основу под выбор пользователя.
 export type BreakfastStyle = 'auto' | 'porridge' | 'flakes' | 'eggs' | 'cottage';
 const BREAKFAST_STYLE_CARBS: Record<Exclude<BreakfastStyle, 'auto'>, string[]> = {
@@ -1867,7 +1890,7 @@ function buildPostWorkout(
     fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0),
   }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
   return {
-    label, time, items, totals, type: 'postworkout', target: { p: proteinG, c: POSTW_FAST_CARB_G, f: 0 },
+    label, time, items, totals, type: 'postworkout', target: { p: proteinG, c: carbG, f: 0 },
     rationale: [
       `Post-workout +60 мин: сывороточный белок ${proteinG} г — пик аминокислот в крови через 60 мин`,
       // P2-fix: используем фактический carbG вместо захардкоженной константы POSTW_FAST_CARB_G
@@ -2053,14 +2076,30 @@ function pickRotationsForDay(dayOffset: number, randomSalt: number, count: numbe
 }
 
 // Vegetable rotation: different color groups for lunch vs dinner
+// B7 (Эпик B): из цветовых групп овощей убраны ФРУКТЫ (citrus/lemon/orange/grapefruit/
+// papaya/green_apple/kiwi — «цитрус как овощ») и specialty-водоросли (nori/wakame/kelp —
+// недоступны без предпочтения). Цветовая ротация = только овощи.
 const VEG_COLOR_GROUPS = [
-  { ids: ['broccoli','spinach','asparagus','green_bean','celery','cabbage','kale','bok_choy','brussels','cauliflower','watercress','arugula','endive'], label: 'зелёные' },
-  { ids: ['tomato','veg_bell_pepper_red','beetroot','radish','red_cabbage','rhubarb','red_onion'], label: 'красные' },
-  { ids: ['carrot','pumpkin','sweet_potato','butternut','squash','yam'], label: 'оранжевые' },
-  { ids: ['cucumber','zucchini','eggplant','mushrooms','champignon','fennel','turnip','parsnip'], label: 'белые/фиолетовые' },
-  { ids: ['seaweed_nori','seaweed','wakame','kelp','edamame','peas_green','green_apple','kiwi'], label: 'зелёно-синие' },
-  { ids: ['pepper','veg_bell_pepper','paprika','citrus','lemon','orange','grapefruit','papaya'], label: 'жёлто-оранжевые' },
+  { ids: ['broccoli','spinach','asparagus','green_bean','celery','cabbage','kale','veg_bok_choy','brussels_sprouts','veg_cauliflower','greens_watercress','arugula','veg_endive'], label: 'зелёные' },
+  { ids: ['tomato','veg_bell_pepper_red','beetroot','radish','veg_cabbage_red','veg_rhubarb','veg_onion_red'], label: 'красные' },
+  { ids: ['carrot','pumpkin','sweet_potato','butternut','squash_kabocha'], label: 'оранжевые' },
+  { ids: ['cucumber','zucchini','eggplant','mushrooms','veg_fennel_bulb','veg_turnip','veg_parsnip'], label: 'белые/фиолетовые' },
+  { ids: ['edamame','peas_green','veg_artichoke','leek'], label: 'зелёно-белые' },
+  { ids: ['pepper','veg_bell_pepper_green','veg_bell_pepper_yellow','corn'], label: 'жёлтые' },
 ];
+
+// B7 (Эпик B): агрегатор всех хардкод-пулов id — единая точка для теста id-безопасности
+// (planner-id-safety.test.ts): каждый id должен существовать в FOOD_DB и не быть экзотикой.
+export const HARDCODED_ID_POOLS: Record<string, string[]> = {
+  proteinRotation: PROTEIN_ROTATION.flatMap(r => r.ids),
+  commonCarbs: [...COMMON_CARB_IDS],
+  breakfastCarbFallback: BREAKFAST_CARB_FALLBACK_IDS,
+  breakfastFruitFallback: BREAKFAST_FRUIT_FALLBACK_IDS,
+  breakfastProtein: BREAKFAST_PROTEIN_IDS,
+  vegColorGroups: VEG_COLOR_GROUPS.flatMap(g => g.ids),
+  breakfastTemplates: BREAKFAST_TEMPLATES.flatMap(t => t.foods),
+  concentrates: CONCENTRATE_IDS,
+};
 
 // ─── ОСНОВНОЙ ВХОД: построить дневной план ───────────────────────────
 export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
@@ -2146,10 +2185,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const combinedExcluded = new Set([...(input.excludedIds || []), ...labAdj.restrictFoodIds]);
   const combinedPreferred = new Set([...(input.preferredIds || []), ...labAdj.preferFoodIds]);
 
-  const pool = (() => {
-    // FIX week-perf: пулы продуктов идентичны для всех дней одной генерации (семена
-    // перемешивания — константы, разнообразие дней даёт pickPriority по seedBase).
-    // Кэш по сигнатуре входов избавляет от 7× полных сканов FOOD_DB (~1100 продуктов).
+  // B2 (Эпик B): let — при carbGiPref='low' заменяется на копию с фильтрованным carbSlow
+  // (кэшированный объект не мутируется).
+  let pool = (() => {
     try {
       const key = JSON.stringify([
         [...combinedExcluded].sort(), !!input.isVegetarian, input.budget, varietyPoolSize,
@@ -2160,6 +2198,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         input.quality || 'full',
         // D-28: portableMode (еда на работе) — иначе кэш вернул бы не-портативные пулы.
         !!input.portableMode,
+        // B2 (Эпик B): carbGiPref (менструальный low-GI) влияет на carbSlow — должен быть
+        // в сигнатуре кэша, иначе строгий low-GI пул протекал бы в другие дни/пресеты.
+        input.carbGiPref || null,
       ]);
       const cached = _poolCache.get(key);
       if (cached) return cached;
@@ -2280,8 +2321,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // (Slater 12g/kg glycogen supercomp, бодибилдер на 10г/кг — реальный кейс). При
   // carbCapGPerKg === 0 потолок снят полностью (явный «без потолка» от пользователя).
   let _capPerKg = 8;
+  let _capDisabled = false; // B: carbCapGPerKg === 0 — явный «без потолка» (вместо Infinity-хака)
   if (typeof input.carbCapGPerKg === 'number') {
-    if (input.carbCapGPerKg === 0) _capPerKg = Infinity as any;
+    if (input.carbCapGPerKg === 0) { _capDisabled = true; _capPerKg = 8; }
     else _capPerKg = Math.max(0, input.carbCapGPerKg);
   } else {
     const _isBulk = !input.isCutting && (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || !input.cyclePhase || input.cyclePhase === 'maintenance');
@@ -2289,7 +2331,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // также bulk + длинная тренировка ≥75 мин (прокси высокого недельного объёма) → 10
     if (_isBulk && ((input.budget === 'max' || input.budget === 'enhanced') || (input.isTrainingDay && (input.trainDurationMin ?? 0) >= 75))) _capPerKg = 10;
   }
-  const _carbCeiling = _capPerKg === Infinity ? Infinity : Math.max(50, Math.round(input.weightKg * _capPerKg));
+  const _carbCeiling = _capDisabled ? Infinity : Math.max(50, Math.round(input.weightKg * _capPerKg));
   let _baseCarbsTotal = _carbCeiling === Infinity ? Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG) : Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);
   // Auto carb periodization (train vs rest): Helms 2014 / Slater 2011 — train 4-6 g/kg, rest 2-3 g/kg.
   // Applied as ±12% around base (train +12%, rest -12%) while respecting floor/ceiling and refeedDay override.
@@ -2409,10 +2451,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // fat distribution учитывает pre-sleep (~8г жира) — снижаем долю ужина.
   const preSleepFatG = (_keep.has('preSleep') && wantPreSleep) ? 8 : 0;
   // #5 Менструальный low-GI: в лютеиновую/менструацию строго низкий GI (≤50).
-  // P2-fix: не мутируем pool.carbSlow напрямую (влияет на завтрак и другие приёмы), используем копию
+  // B2 (Эпик B): НИКОГДА не мутируем кэшированный pool (pool.carbSlow присваивание
+  // протекало в кэш и «заражало» все последующие дни генерации) — работаем с копией.
   if (input.carbGiPref === 'low' && pool.carbSlow.length > 0) {
     const _strictLowGi = pool.carbSlow.filter((f: FoodItem) => (f.gi || 0) <= 50);
-    if (_strictLowGi.length >= 3) pool.carbSlow = [..._strictLowGi];
+    if (_strictLowGi.length >= 3) pool = { ...pool, carbSlow: _strictLowGi };
   }
   // ИНВАРИАНТ БЕЛКА — по Schoenfeld & Aragon 2018 (PMID 29497353): 0.4–0.55 г/кг LBM
   // на приём (основные), перекусы 0.25–0.35 г/кг. Перенормировка к дневной цели:
@@ -2516,16 +2559,17 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Эпик B: дневные квоты реалистичной тарелки — порошок ≤2 приёма, гарнир-семейство
   // ≤1 приёма (овсянка ≤2), орехи/семена ≤2 приёмов ≤45 г, масла ≤2 приёмов, фрукты ≤3,
   // яйца ≤230 г. Блок-лист вычисляется перед КАЖДЫМ приёмом, после сборки — регистрация.
-  const quota = createDailyQuota();
+  const quota = createDailyQuota(input.weightKg);
   // Гейт семейств для пост-сборочных добавок (посадка/omega-fallback): они идут
-  // мимо пуловых фильтров — квоты семейств проверяем напрямую.
+  // мимо пуловых фильтров — квоты семейств проверяем напрямую. B8: грамм-лимиты ×масштаб веса.
   const _quotaFamilyOk = (id: string): boolean => {
     const fam = stapleFamilyOf(id);
     if (!fam) return true;
     const uses = quota.familyUses.get(fam) || 0;
     const grams = quota.familyGrams.get(fam) || 0;
-    if (fam === 'nuts' || fam === 'seeds') return uses < QUOTA_LIMITS.maxNutMeals && grams < QUOTA_LIMITS.maxNutsGramsPerDay;
-    if (fam === 'oils') return uses < QUOTA_LIMITS.maxOilMeals && grams < QUOTA_LIMITS.maxOilGramsPerDay;
+    const _sc = quota.weightScale || 1;
+    if (fam === 'nuts' || fam === 'seeds') return uses < QUOTA_LIMITS.maxNutMeals && grams < Math.round(QUOTA_LIMITS.maxNutsGramsPerDay * _sc);
+    if (fam === 'oils') return uses < QUOTA_LIMITS.maxOilMeals && grams < Math.round(QUOTA_LIMITS.maxOilGramsPerDay * _sc);
     if (fam === 'oats') return uses < QUOTA_LIMITS.maxOatsFamilyMeals;
     return uses < QUOTA_LIMITS.maxFamilyMeals;
   };
@@ -2953,7 +2997,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
-    m.totals = m.items.reduce((acc,it)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+it.fiber,leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+    m.totals = mealTotalsOf(m.items);
   }
 
   // ─── E4: предупреждение перегрузки приёма + предложение увеличить приёмы ──
@@ -3015,7 +3059,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const pN = Math.round((fb.protein||0)*r), fN = Math.round((fb.fat||0)*r), cN = Math.round((fb.carbs||0)*r);
         const it: MealItem = { id: fb.id, name: fb.name, amount: grams, role: 'carb_slow' as const, kcal: Math.round(4*pN+9*fN+4*cN), p: pN, f: fN, c: cN, fiber: Math.round((fb.fiber||0)*r), leucine_mg: Math.round(getLeucine(fb)*r) };
         m.items.push(it);
-        m.totals = m.items.reduce((acc:any, it:any)=>({kcal:acc.kcal+it.kcal,p:acc.p+it.p,f:acc.f+it.f,c:acc.c+it.c,fiber:acc.fiber+(it.fiber||0),leucine_mg:acc.leucine_mg+(it.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
+        m.totals = mealTotalsOf(m.items);
       }
     }
   }
@@ -3135,7 +3179,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
           lunchMeal.totals = lunchMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
           // Recalculate day totals
-          totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+          recalcDayTotals(meals, totals); // B4
           notes.push('🐟 Омега-3 буст: лосось заменяет белок в обеде (EPA/DHA ~2.2г) — противовоспалительный жир');
         }
       }
@@ -3157,7 +3201,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             allFoodsUsed.push(vegOmega.id);
           }
           lunchMeal.totals = lunchMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-          totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+          recalcDayTotals(meals, totals); // B4
           notes.push('🌱 Омега-3 буст (веган): семена льна заменяют жир в обеде (ALA ~4.5г) — растительный омега-3');
         }
       }
@@ -3202,9 +3246,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
-        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        recalcMealTotals(meals);
         // P2-fix: добавлены fiber и leucine_mg в day totals (были stale после fat scaling)
-        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+        recalcDayTotals(meals, totals); // B4
       }
     }
   }
@@ -3235,9 +3279,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           item.amount = newAmount;
           item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
-        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        recalcMealTotals(meals);
         // P2-fix: добавлены fiber и leucine_mg (были stale после protein scaling)
-        totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+        recalcDayTotals(meals, totals); // B4
       }
     }
   }
@@ -3261,8 +3305,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
-        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+        recalcMealTotals(meals);
+        recalcDayTotals(meals, totals); // B4
       }
     }
   }
@@ -3308,9 +3352,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
-        meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+        recalcMealTotals(meals);
         // P2-fix: добавлены fiber и leucine_mg (были stale после iterative correction)
-        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+        recalcDayTotals(meals, totals); // B4
       }
     }
   }
@@ -3380,8 +3424,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     fixM(['carb_slow','carb_fast','fruit'], dC, 10);
     fixM(['fat'], dF, 5);
     // Recalculate
-    meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+    recalcMealTotals(meals);
+    recalcDayTotals(meals, totals); // B4
   }
 
   // ─── Этап 2: Точная подгонка ≤2% — точечная коррекция одного гибкого item ───
@@ -3423,7 +3467,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
               const newItem = makeItem(fatFood, startG, 'fat');
               targetMeal.items.push(newItem);
               targetMeal.totals = targetMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-              totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+              recalcDayTotals(meals, totals); // B4
               return true;
             }
           }
@@ -3505,7 +3549,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // Пересчёт meal totals
     best.meal.totals = best.meal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
     // Пересчёт day totals
-    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + m.totals.fiber, 0); totals.leucine_mg = meals.reduce((s, m) => s + m.totals.leucine_mg, 0);
+    recalcDayTotals(meals, totals); // B4
     return true;
   };
 
@@ -3546,7 +3590,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     : { note: null };
   if (microBoost.note) {
     notes.push('🧬 ' + microBoost.note);
-    totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+    recalcDayTotals(meals, totals); // B4
   }
   // D-28 П10: микро-добавка (напр. лосось 100 г = ~20 г белка) добавляется ПОСЛЕ preciseAdjust,
   // поэтому могла раздувать дневной белок за цель (жалоба «белок не распределён»). Если белок
@@ -3567,7 +3611,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       const r = newAmount / (item.it.amount || 1);
       item.it.amount = newAmount; item.it.kcal = Math.round(item.it.kcal * r); item.it.p = Math.round(item.it.p * r); item.it.f = Math.round(item.it.f * r); item.it.c = Math.round(item.it.c * r); item.it.fiber = Math.round((item.it.fiber || 0) * r); item.it.leucine_mg = Math.round((item.it.leucine_mg || 0) * r);
       item.m.totals = item.m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-      totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber || 0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+      recalcDayTotals(meals, totals); // B4
       devP2 = (totals.p - goalP2) / Math.max(1, goalP2);
     }
   }
@@ -3603,7 +3647,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _isoG = Math.min(25, SUPPLEMENT_MAX_G[pool.isotonic.id] ?? 25);
         _targetMeal.items.push(makeItem(pool.isotonic, _isoG, 'liquid'));
         _targetMeal.totals = _targetMeal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-        totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber || 0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+        recalcDayTotals(meals, totals); // B4
         notes.push(`⚡ Дефицит натрия/электролитов (${Math.round(_naNow)} мг Na) на тренировочном дне — добавлен изотоник (${pool.isotonic.name}) ${_isoG} г: Na/K/Mg + углеводы, регидратация.`);
       }
     }
@@ -3732,14 +3776,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
             it.leucine_mg = Math.round((it.leucine_mg || 0) * factor);
           }
         }
-        m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+        m.totals = mealTotalsOf(m.items);
       }
-      totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+      recalcDayTotals(meals, totals); // B4: единый пересчёт (было 1 строк reduce)
       totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
       totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
       totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
       totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-      totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+      recalcDayTotals(meals, totals); // B4
   }
 
   // ─── Р-2.3 (Aug 28): МЕЖПРИЁМНЫЙ БАЛАНС — жалоба «полдник 52%, завтрак/обед по 12%» ──
@@ -3781,14 +3825,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       it.fiber = Math.round((it.fiber || 0) * r * 10) / 10;
       it.leucine_mg = Math.round((it.leucine_mg || 0) * r);
     });
-    m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+    m.totals = mealTotalsOf(m.items);
   }
-  totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+  recalcDayTotals(meals, totals); // B4: единый пересчёт (было 1 строк reduce)
   totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
   totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
   totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
   totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-  totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+  recalcDayTotals(meals, totals); // B4
 
   // ─── Эпик B: ДНЕВНЫЕ КАТЧЕЛЛЫ реалистичности (перед посадкой — она пересчитает) ───
   // Коррекции/договы идут мимо пуловых квот, поэтому финальные инварианты гарантируем тут:
@@ -3809,8 +3853,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
     const _nutG = meals.flatMap(m => m.items).filter(it => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + it.amount, 0);
-    if (_nutG > 70) {
-      const _cutShare = Math.min(0.6, (_nutG - 70) / _nutG);
+    // B3/B8: единый катчелл-потолок = квота × масштаб веса + запас (было хардкод 70).
+    const _nutCap = nutCatchupCap(quota.weightScale || 1);
+    if (_nutG > _nutCap) {
+      const _cutShare = Math.min(0.6, (_nutG - _nutCap) / _nutG);
       for (const m of meals) {
         for (const it of m.items) {
           const fam = stapleFamilyOf(it.id);
@@ -3824,13 +3870,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
-     meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+     recalcMealTotals(meals);
+    recalcDayTotals(meals, totals); // B4: единый пересчёт (было 1 строк reduce)
     totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
     totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-    totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+    recalcDayTotals(meals, totals); // B4
   }
 
   // ─── Эпик B: клетчаточный кап = 14 г/1000 ккал (Reynolds 2022, Lancet), коридор 25–50 г (was 70 too high) ───
@@ -3872,14 +3918,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         _excessF -= _cutFiberG;
       }
       for (const m of meals) {
-        m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+        m.totals = mealTotalsOf(m.items);
       }
-      totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+      recalcDayTotals(meals, totals); // B4: единый пересчёт (было 1 строк reduce)
       totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
       totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
       totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
       totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-      totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+      recalcDayTotals(meals, totals); // B4
     }
   }
 
@@ -3932,8 +3978,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
       });
       if (!cutAny4b) break;
-      meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + it.fiber, leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-      totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+      recalcMealTotals(meals);
+      recalcDayTotals(meals, totals); // B4
       devP4b = (totals.p - goalP4b) / Math.max(1, goalP4b);
     }
   }
@@ -3957,7 +4003,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       biggest.item.amount = newAmount4c;
       biggest.item.kcal = Math.round(biggest.item.kcal * factor4c); biggest.item.p = Math.round(biggest.item.p * factor4c); biggest.item.f = Math.round(biggest.item.f * factor4c); biggest.item.c = Math.round(biggest.item.c * factor4c); biggest.item.fiber = Math.round((biggest.item.fiber || 0) * factor4c); biggest.item.leucine_mg = Math.round((biggest.item.leucine_mg || 0) * factor4c);
       biggest.meal.totals = biggest.meal.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
-      totals.p = meals.reduce((s, m) => s + m.totals.p, 0); totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0); totals.f = meals.reduce((s, m) => s + m.totals.f, 0); totals.c = meals.reduce((s, m) => s + m.totals.c, 0); totals.fiber = meals.reduce((s, m) => s + (m.totals.fiber||0), 0); totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg||0), 0);
+      recalcDayTotals(meals, totals); // B4
       overF = totals.f - _fatCeil;
     }
   }
@@ -4141,12 +4187,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
         targetMeal.totals = targetMeal.items.reduce((acc:any,x:any)=>({kcal:acc.kcal+x.kcal,p:acc.p+x.p,f:acc.f+x.f,c:acc.c+x.c,fiber:acc.fiber+(x.fiber||0),leucine_mg:acc.leucine_mg+(x.leucine_mg||0)}),{kcal:0,p:0,f:0,c:0,fiber:0,leucine_mg:0});
       }
-      totals.kcal = meals.reduce((s:any,m:any)=>s+m.totals.kcal,0);
+      recalcDayTotals(meals, totals); // B4: единый пересчёт (было 1 строк reduce)
     totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
     totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-    totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+    recalcDayTotals(meals, totals); // B4
   }
   }
 
@@ -4175,17 +4221,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           }
         }
       }
-      m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+      m.totals = mealTotalsOf(m.items);
     }
-    // Эпик B: орехи/семена ≤70 г и масла ≤30 г ПОСЛЕ посадки (договы идут мимо квот).
+    // Эпик B: орехи/семена и масла ПОСЛЕ посадки (договы идут мимо квот).
+    // B3/B8: единые катчелл-потолки (квота × масштаб веса + запас; было 70/30).
+    const _nutCapFinal = nutCatchupCap(quota.weightScale || 1);
     const _nutGFinal = meals.flatMap(m => m.items).filter(it => ['nuts', 'seeds'].includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + it.amount, 0);
-    if (_nutGFinal > 70) {
-      const _cut = Math.min(0.55, (_nutGFinal - 70) / _nutGFinal);
+    if (_nutGFinal > _nutCapFinal) {
+      const _cut = Math.min(0.55, (_nutGFinal - _nutCapFinal) / _nutGFinal);
       for (const m of meals) {
         for (const it of m.items) {
           const fam = stapleFamilyOf(it.id);
           if (fam !== 'nuts' && fam !== 'seeds') continue;
-          const _ng = Math.max(8, Math.round(it.amount * (1 - _cut)));
+          // floor: round() при малой доле реза не менял кратные 5 г порции (79 г > 78 капа)
+          const _ng = Math.max(8, Math.floor(it.amount * (1 - _cut)));
           if (_ng >= it.amount) continue;
           const _r = _ng / (it.amount || 1);
           it.amount = _ng; it.kcal = Math.round(it.kcal * _r); it.p = Math.round(it.p * _r); it.f = Math.round(it.f * _r); it.c = Math.round(it.c * _r);
@@ -4193,13 +4242,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
+    const _oilCapFinal = oilCatchupCap(quota.weightScale || 1);
     const _oilGFinal = meals.flatMap(m => m.items).filter(it => stapleFamilyOf(it.id) === 'oils').reduce((s, it) => s + it.amount, 0);
-    if (_oilGFinal > 30) {
-      const _cut = Math.min(0.6, (_oilGFinal - 30) / _oilGFinal);
+    if (_oilGFinal > _oilCapFinal) {
+      const _cut = Math.min(0.6, (_oilGFinal - _oilCapFinal) / _oilGFinal);
       for (const m of meals) {
         for (const it of m.items) {
           if (stapleFamilyOf(it.id) !== 'oils') continue;
-          const _ng = Math.max(5, Math.round(it.amount * (1 - _cut)));
+          const _ng = Math.max(5, Math.floor(it.amount * (1 - _cut)));
           if (_ng >= it.amount) continue;
           const _r = _ng / (it.amount || 1);
           it.amount = _ng; it.kcal = Math.round(it.kcal * _r); it.p = Math.round(it.p * _r); it.f = Math.round(it.f * _r); it.c = Math.round(it.c * _r);
@@ -4207,13 +4257,13 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     }
-    meals.forEach(m => { m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
-    totals.kcal = meals.reduce((s, m) => s + m.totals.kcal, 0);
+    recalcMealTotals(meals);
+    recalcDayTotals(meals, totals); // B4: единый пересчёт (было 1 строк reduce)
     totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
     totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-     totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+     recalcDayTotals(meals, totals); // B4
    }
 
    // Last-line timing guarantees: later portion rounding and meal balancing
@@ -4274,14 +4324,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
          }
        }
      }
-     m.totals = m.items.reduce((acc, it) => ({ kcal: acc.kcal + it.kcal, p: acc.p + it.p, f: acc.f + it.f, c: acc.c + it.c, fiber: acc.fiber + (it.fiber || 0), leucine_mg: acc.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 });
+     m.totals = mealTotalsOf(m.items);
    }
     totals.p = Math.round(meals.reduce((s, m) => s + m.totals.p, 0) * 10) / 10;
     totals.f = Math.round(meals.reduce((s, m) => s + m.totals.f, 0) * 10) / 10;
     totals.c = Math.round(meals.reduce((s, m) => s + m.totals.c, 0) * 10) / 10;
     totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
     totals.fiber = Math.round(meals.reduce((s, m) => s + (m.totals.fiber || 0), 0) * 10) / 10;
-    totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
+    recalcDayTotals(meals, totals); // B4
 
     // ─── ЕДИНЫЙ КОРРЕКТОР ДНЕВНЫХ ЦЕЛЕЙ + ФИНАЛЬНЫЙ ПЕРЕСЧЁТ ПОСЛЕ КАПОВ ───
     // После всех капов/полов/квот/санитарий доводим день до ≤3% по 4 осям.
@@ -4309,7 +4359,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         );
         if (_afterDev + 1e-9 < _beforeDev) {
           meals.splice(0, meals.length, ...(_corr.meals as any));
-          meals.forEach((m: any) => { m.totals = m.items.reduce((a: any, it: any) => ({ kcal: a.kcal + it.kcal, p: a.p + it.p, f: a.f + it.f, c: a.c + it.c, fiber: a.fiber + (it.fiber || 0), leucine_mg: a.leucine_mg + (it.leucine_mg || 0) }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0, leucine_mg: 0 }); });
+          recalcMealTotals(meals);
           totals.kcal = Math.round(_afterTotals.kcal);
           totals.p = Math.round(_afterTotals.p * 10) / 10;
           totals.f = Math.round(_afterTotals.f * 10) / 10;

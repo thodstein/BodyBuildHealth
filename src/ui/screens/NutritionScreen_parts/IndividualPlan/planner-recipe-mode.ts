@@ -200,9 +200,10 @@ function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
   };
 }
 
-const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein'];
-const TOPUP_CARB_IDS = ['rice_white', 'oats', 'banana', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati'];
-const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
+// B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
+export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein'];
+export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'banana', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati'];
+export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
 
 function topupFoods(ids: string[], excludedIds?: Set<string>): FoodItem[] {
   return ids
