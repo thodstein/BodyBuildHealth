@@ -2728,6 +2728,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           trainStartMin: linkToTraining && isTrainDay(offset) && plannerModeRef.current === 'pro' ? toMin(trainStart) : undefined,
           allowIntraWorkout: intraWorkoutEnabled && trainIntensity !== 'low' && plannerModeRef.current === 'pro',
           trainDurationMin: (s?.avgWorkoutMinutes || 60),
+          trainIntensity: (trainIntensity as any) || 'medium',
+          carbAutoCycle: (carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch' || (carbPeriodization as any) === 'auto'),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
           preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
