@@ -39,6 +39,7 @@ import {
   QUOTA_LIMITS, stapleFamilyOf,
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets } from "./day-target-corrector";
+import { computeEA } from "./planner-ea.engine";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
@@ -171,12 +172,20 @@ export interface MealPlanInput {
   // Aug 30 2026 (карб потолок 10г/кг): 0 = без потолка (явный запрос 10г/кг/день),
   // число = кастомный потолок г/кг (перекрывает 8/10 логику). По умолчанию — авто.
   carbCapGPerKg?: number;
+  // EA: intensity for RED-S calc (optional, default medium)
+  trainIntensity?: 'low' | 'medium' | 'high';
+  // Carb periodization auto ±12% train/rest (Helms train-matched) — opt-in via flag
+  carbAutoCycle?: boolean;
 }
 
 // ─── Константы (клинические ориентиры) ─────────────────────────────────
+// Morton 2018 + Schoenfeld & Aragon 2018 + Jäger 2017 ISSN: MPS оптимально 0.40-0.55 г/кг/приём
+// на ОБЩУЮ массу (не LBM). Переводим: 0.40 young, 0.45 enhanced/course. LBM-коэфф сохранён для совместимости.
 const LEU_THRESHOLD_MG = 2500;
-const MPS_LBM_LOW = 0.3;
-const MPS_LBM_HIGH = 0.4;
+const MPS_LBM_LOW = 0.3; // legacy LBM coeff (kept)
+const MPS_LBM_HIGH = 0.4; // legacy
+const MPS_WEIGHT_OPT = 0.40; // Schoenfeld 0.40-0.55 g/kg total weight per meal (optimal)
+const MPS_WEIGHT_HIGH = 0.45; // enhanced/course
 const FAT_FLOOR_PER_KG = 0.8;
 const CARB_FLOOR_G = 130;
 const PREW_PROTEIN_G = 25;
@@ -1905,7 +1914,7 @@ function buildIntraWorkout(time: string, seed: number, pool: ReturnType<typeof b
 }
 
 // ─── МЕТОД: pre-sleep казеиновый приём ───────────────────────────────
-function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; preferredIds?: Set<string>; excludedIds?: Set<string>; allergenTags?: Set<string> }): Meal {
+function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof buildFoodPools>, residualP: number, opts?: { lockedIds?: Set<string>; recentIds?: Set<string>; hardRecentIds?: Set<string>; preferredIds?: Set<string>; excludedIds?: Set<string>; allergenTags?: Set<string>; quotaBlockedIds?: Set<string> }): Meal {
   // Prioritize low-carb casein: pure powder first (0g carbs), then cottage cheese, yogurt last.
   // Pre-sleep target is 0g carbs — dairy/fruit/nuts contribute incidental carbs only.
   const caseinPowder = pool.slowProtein.length > 0 ? pool.slowProtein.find(f => f.id === 'casein' || f.id === 'casein_micellar') : undefined;
@@ -1962,9 +1971,11 @@ function buildPreSleep(time: string, seed: number, pool: ReturnType<typeof build
   if (mgSource) items.push(makeItem(mgSource, 10, 'fat'));
   // Мелатонин-источник: киви/вишня/ягоды — ротация, reduced to 50g (was 100g)
   // Эпик A: гейт доступности (годжи/specialty не проходят) + только НАСТОЯЩИЕ фрукты.
+  // Quota: не добавляем фрукт если уже 4 фруктовых приёма (DailyQuota maxFruitMeals)
   const melPool = FOOD_DB.filter(f => (f.id === 'kiwi' || f.id === 'cherry' || (f.id.includes('berries') && !VEG_LOOKALIKE_PAT.test(f.id))) && _exclOk(f) && foodAvailableForPlan(f));
+  const _fruitBlocked = !!(opts?.quotaBlockedIds && opts.quotaBlockedIds.has('__ALL_FRUIT__'));
   const melSource = pickPriority(melPool as any as FoodItem[], seed + 2, { recentIds: opts?.recentIds, lockedIds: opts?.lockedIds, hardRecentIds: opts?.hardRecentIds }) as any || melPool[0];
-  if (melSource) items.push(makeItem(melSource, 50, 'fruit'));
+  if (melSource && !_fruitBlocked) items.push(makeItem(melSource, 50, 'fruit'));
 
 
   const totals = items.reduce((acc, it) => ({
@@ -2057,6 +2068,11 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // приводя к тихой генерации только 3 базовых приёмов без pre/post-workout.
   if (!input.mealsCount || typeof input.mealsCount !== 'number' || isNaN(input.mealsCount) || input.mealsCount < 3) {
     input = { ...input, mealsCount: 5 };
+  }
+  if (input.mealsCount > 8) input = { ...input, mealsCount: 8 };
+  // Light athletes cannot realistically eat 7-8 full meals without degenerate <40g protein / <15g carb portions
+  if (input.weightKg <= 70 && input.mealsCount >= 7) {
+    // keep as requested but note degeneracy will be flagged in matrix; no auto-clamp to preserve user intent
   }
   _qualityMode = input.quality === 'basic' ? 'basic' : 'full';
   _currentBudget = input.budget || 'medium';
@@ -2188,11 +2204,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // ─── Распределение макросов по приёмам (MPS-based) ───────────────────
   // ptm уже объявлен выше (перед lab adjustments)
-  // Д-13: MPS per meal scales with the cycle phase. Advanced/androgenic phases (course, recovery)
-  // raise nitrogen retention and benefit from a higher per-meal MPS dose (0.4 g/kg LBM); default 0.3.
-  const mpsLbm = (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || input.cyclePhase === 'pct')
-    ? MPS_LBM_HIGH : MPS_LBM_LOW;
-  const mpsPerMeal = Math.round(input.lbmKg * mpsLbm * (ptm.pMult || 1.0));
+  // Д-13: MPS per meal — Schoenfeld & Aragon 2018 (0.40-0.55 g/kg TOTAL mass) + Jäger 2017 leucine 2-3g.
+  // Legacy LBM-коэфф сохранён как fallback для совместимости, но приоритет — вес.
+  // Enhanced/course → 0.45 g/kg, обычный → 0.40 g/kg.
+  const _mpsWeightCoeff = (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || input.cyclePhase === 'pct')
+    ? MPS_WEIGHT_HIGH : MPS_WEIGHT_OPT;
+  // Mix: 70% weight-based + 30% lbm-based (smoothing for high BF% where weight overestimates)
+  const _mpsWeightBased = Math.round(input.weightKg * _mpsWeightCoeff * (ptm.pMult || 1.0));
+  const _mpsLbmBased = Math.round(input.lbmKg * (input.cyclePhase === 'course' ? MPS_LBM_HIGH : MPS_LBM_LOW) * (ptm.pMult || 1.0));
+  const mpsPerMeal = Math.max(_mpsWeightBased, Math.round(_mpsWeightBased * 0.7 + _mpsLbmBased * 0.3), 20);
   // A6 (санитария): мёртвый preSleepP удалён — pre-sleep бюджет задаёт роль-модель (28 г фикс).
   const trainWindow = input.isTrainingDay && input.trainStartMin != null;
   // Пери-тренировочные времена (относительно старта и ДЛИТЕЛЬНОСТИ сессии):
@@ -2244,12 +2264,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Д-7: Detect physiologically-impossible kcal goals (below protein + min fat/carb floors).
   // When impossible, lower the fat/carb floors toward safe minimums so the plan gets as close
   // to the user's goal as possible WITHOUT sacrificing protein (protein is always preserved).
+  // Trexler 2023 / Whittaker & Wu 2021 / Soltani 2025: hormone floor = max(0.5g/kg, 20%TEI, 20g EFA)
+  // (≥20% TEI preserves T in men SMD -0.38 below 20%; 0.5g/kg + 20g covers EFA). Optimal 0.8-1.0 g/kg
+  // remains via target, floor is minimum — allows carbs on hard cut.
   const _goalP = adjustedProteinG || input.goalProteinG;
-  const _floorFatG = Math.round(input.weightKg * FAT_FLOOR_PER_KG);
+  const _floorFatG_Trexler = Math.max(Math.round(input.weightKg * 0.5), Math.round(input.goalKcal * 0.20 / 9), 20);
+  const _floorFatG = Math.max(_floorFatG_Trexler, Math.round(input.weightKg * 0.5)); // keep 0.5 as base, but 20%TEI dominates on high kcal
   const _floorCarbG = Math.max(50, Math.round(CARB_FLOOR_G * ptm.cMult));
   const _minKcal = Math.round(_goalP * 4 + _floorFatG * 9 + _floorCarbG * 4);
   const impossibleGoal = input.goalKcal < _minKcal * 0.9;
-  const fatFloorG = impossibleGoal ? Math.round(input.weightKg * (input.sex === 'female' ? 0.6 : 0.5)) : _floorFatG;   // higher fat floor for women on hard cut
+  const fatFloorG = impossibleGoal ? _floorFatG_Trexler : _floorFatG;
   const carbFloorG = impossibleGoal ? 50 : _floorCarbG;                                // ketogenic-ish floor on hard cut
   // D-28+ fix (вопрос «120 кг на курсе → 900 г углеводов — много?»): физиологический ПОТОЛОК
   // углеводов. Базово 8 г/кг (Helms 4-8 межсезонье), но для bulk + бюджет max/enhanced → 10 г/кг
@@ -2266,7 +2290,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (_isBulk && ((input.budget === 'max' || input.budget === 'enhanced') || (input.isTrainingDay && (input.trainDurationMin ?? 0) >= 75))) _capPerKg = 10;
   }
   const _carbCeiling = _capPerKg === Infinity ? Infinity : Math.max(50, Math.round(input.weightKg * _capPerKg));
-  const carbsTotal = _carbCeiling === Infinity ? Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG) : Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);
+  let _baseCarbsTotal = _carbCeiling === Infinity ? Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG) : Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);
+  // Auto carb periodization (train vs rest): Helms 2014 / Slater 2011 — train 4-6 g/kg, rest 2-3 g/kg.
+  // Applied as ±12% around base (train +12%, rest -12%) while respecting floor/ceiling and refeedDay override.
+  // Opt-in via carbAutoCycle flag (UI carbPeriodization auto) — default off to keep matrix stable.
+  let carbsTotal = _baseCarbsTotal;
+  if ((input as any).carbAutoCycle && !impossibleGoal && !input.refeedDay) {
+    if (input.isTrainingDay === true) {
+      const _trainCarbs = Math.round(_baseCarbsTotal * 1.12);
+      carbsTotal = _carbCeiling === Infinity ? Math.max(carbFloorG, _trainCarbs) : Math.min(_carbCeiling, Math.max(carbFloorG, _trainCarbs));
+    } else if (input.isTrainingDay === false) {
+      const _restCarbs = Math.round(_baseCarbsTotal * 0.88);
+      carbsTotal = Math.max(carbFloorG, Math.min(_baseCarbsTotal, _restCarbs));
+    }
+  }
   // Д-2: Peri-workout carbs must SCALE with the daily carb budget (not hardcoded 40/60g),
   // D-24: mealsCount-aware carb distribution (weight-based, lunch = main meal).
   // Веса нормируются к 100% по приёмам, которые РЕАЛЬНО будут построены → нет
@@ -2322,6 +2359,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     if (r === 'preSleep') return 0;
     let v = CARB_W[r] ?? 0.5;
     if (r === 'dinner' && input.eveningLowCarb) v *= 0.5;
+    if (r === 'intra') {
+      const d = input.trainDurationMin ?? 60;
+      if (d >= 120) v *= 2.5; // 0.4→1.0 (30-60g/h guideline Kerksick #4)
+      else if (d >= 90) v *= 2.0; // 0.4→0.8
+      else if (d >= 75) v *= 1.5; // 0.4→0.6
+    }
     if (morningTrainLoad) {
       if (r === 'dinner') v *= 3.0;      // вечер: много углеводов (утренняя сессия — загрузка гликогена, вечер > завтрак)
       if (r === 'breakfast') v *= 0.5; // утро: меньше (сессия уже завтра)
@@ -2766,7 +2809,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const _poolPresleep = _powderCapReached
     ? { ...pool, slowProtein: pool.slowProtein.filter((f: FoodItem) => !isProteinPowderId(f.id)), fastProtein: [] as FoodItem[] } as ReturnType<typeof buildFoodPools>
     : pool;
-  const preSleep = (_keep.has('preSleep') && wantPreSleep && Math.max(residualP, evenRegularP) > 10) ? buildPreSleep(tPreSleep, preSleepSeed, _poolPresleep, _preSleepBudgetP, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags }) : null;
+  const preSleep = (_keep.has('preSleep') && wantPreSleep && Math.max(residualP, evenRegularP) > 10) ? buildPreSleep(tPreSleep, preSleepSeed, _poolPresleep, _preSleepBudgetP, { lockedIds: input.lockedIds, recentIds: effRecentIds(), hardRecentIds: effHardRecentIds, preferredIds: effectivePreferred, excludedIds: combinedExcluded, allergenTags: input.allergenTags, quotaBlockedIds: blockedIdsForNextMeal(quota, 'presleep') }) : null;
   if (preSleep) { meals.push(preSleep); markUsed(preSleep); notes.push('Pre-sleep: казеин + Mg + мелатонин-источник для ночного восстановления'); }
 
   // ─── Этап 4: синхронизация приёмов с инъекциями (инсулин/ГР/ИГФ) ─────
@@ -3009,8 +3052,25 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     prePostWindow: meals.some(m => m.type === 'preworkout') && meals.some(m => m.type === 'postworkout'),
     meals: mealsBreakdown,
     fiberG: Math.round(totals.fiber),
-    fiberTargetG: Math.max(25, Math.min(70, Math.round(input.goalKcal / 1000 * 14))),
+    // Reynolds 2019 Lancet + USDA 14g/1000kcal: optimal 25-29g, dose-response >30 benefit, cap 50g to avoid GI (was 70 too high).
+    // Peak week: if fiberCapG <25 (e.g. 20g loading day per Helms), honour it as target.
+    fiberTargetG: (() => {
+      const base = Math.max(25, Math.min(50, Math.round(input.goalKcal / 1000 * 14)));
+      if (typeof input.fiberCapG === 'number' && input.fiberCapG < base) return Math.max(15, Math.round(input.fiberCapG));
+      return base;
+    })(),
   } as Record<string, any>;
+  // Mamerow et al. even distribution: CV protein across meals >40% → -25% 24h MPS vs even
+  {
+    const _protVals = meals.filter(m => !['intra','presleep'].includes(m.type)).map(m => m.totals.p || 0).filter(v => v > 0);
+    if (_protVals.length >= 3) {
+      const _mean = _protVals.reduce((a,b)=>a+b,0)/_protVals.length;
+      const _sd = Math.sqrt(_protVals.reduce((a,b)=>a+Math.pow(b-_mean,2),0)/_protVals.length);
+      const _cv = _mean > 0 ? _sd/_mean : 0;
+      (mpsSummary as any).proteinCV = Math.round(_cv*100)/100;
+      if (_cv > 0.40) notes.push(`⚠ Белок распределён скошенно (CV ${Math.round(_cv*100)}% >40%): равномерное 0.40-0.55 г/кг ×4 (≈${Math.round(input.weightKg*0.40)}г) даёт +25% суточного MPS vs скошенно (Mamerow).`);
+    }
+  }
 
   const uniqueFoods = new Set(allFoodsUsed).size;
   const categories: Record<string, number> = {};
@@ -3025,6 +3085,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // delivered plan gets as close to goal as possible; protein is always preserved.
   if (impossibleGoal) {
     notes.push(`⚠ Цель ${input.goalKcal} ккал физиологически невозможна (минимум без ущерба белку: ${_minKcal} ккал). Белок сохранён, жиры/углеводы снижены до безопасных этажей (0.5 г/кг жир, ≥50 г углеводы). План неизбежно превысит цель — снизите белок или пересмотрите дефицит.`);
+  }
+  // EA RED-S screening (Mountjoy 2018 IOC): EA = (EI - EEE)/FFM; <30 risk, <20 severe
+  {
+    try {
+      const eaRes = computeEA({ intakeKcal: input.goalKcal, weightKg: input.weightKg, lbmKg: input.lbmKg, bodyFatPct: input.bodyFatPct, isTrainingDay: input.isTrainingDay, trainDurationMin: input.trainDurationMin || 60, trainIntensity: (input as any).trainIntensity || 'medium', sex: (input.sex as any) || 'male', goalKcal: input.goalKcal });
+      (mpsSummary as any).ea = eaRes.ea;
+      (mpsSummary as any).eaStatus = eaRes.status;
+      (mpsSummary as any).eaEee = eaRes.eee;
+      if (eaRes.note) notes.push(eaRes.note);
+    } catch {}
+  }
+  // Peak week: fiber cap ≤20 → habitual water/sodium ±10%, trial mandatory (Helms, Escalante)
+  if (typeof input.fiberCapG === 'number' && input.fiberCapG <= 20) {
+    notes.push('🏁 Peak load: клетчатка ≤20г — держите воду/натрий привычными ±10% (не 10-12л load/<1л restrict без trial). Пробный прогон при соревновательной сухости обязателен (Helms 2014, Escalante 2021).');
   }
   // Omega-3 boost: ensure at least one omega-3 source per day
   // Aug 28: добавка уважает аллергены/непереносимости/категории (раньше только excludedIds —
@@ -3600,16 +3674,16 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
   }
   if (phaseNotes.length > 0) notes.push(...phaseNotes);
-  // #4 MPS-интервал: проверка gap между белковыми приёмами (MPS окно 3-5ч).
+  // #4 MPS-интервал: проверка gap между белковыми приёмами (Areta 20g/3h, MPS окно 3-4ч optimal, 5ч max).
   {
     const toMin = (s: string) => { if (!s || !s.includes(':')) return -1; const [h,m] = s.split(':').map(Number); return h*60 + m; };
     const feedings = meals.filter(m => (m.totals.p || 0) >= 25 && toMin(m.time) >= 0).map(m => ({ t: toMin(m.time), label: m.label })).sort((a,b) => a.t - b.t);
     if (feedings.length >= 2) {
       let maxGap = 0, gapFrom = '', gapTo = '';
       for (let i = 1; i < feedings.length; i++) { const g = feedings[i].t - feedings[i-1].t; if (g > maxGap) { maxGap = g; gapFrom = feedings[i-1].label; gapTo = feedings[i].label; } }
-      if (maxGap > 300) {
+      if (maxGap > 240) {
         const h = (maxGap / 60).toFixed(1);
-        notes.push(`⏰ MPS gap ${h}ч между «${gapFrom}» и «${gapTo}» — превышено окно 3-5ч. Добавьте белковый перекус (≥25г) в промежуток для поддержания синтеза.`);
+        notes.push(`⏰ MPS gap ${h}ч между «${gapFrom}» и «${gapTo}» — превышено окно 3-4ч (optimal, Areta 20g/3h). Добавьте белковый перекус (≥25г, лейцин ≥2.5г) в промежуток для поддержания синтеза.`);
       }
     }
     // #5 Pre-sleep warning: длинный awake + последний белок рано → ночной катаболизм.
@@ -3620,6 +3694,20 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (gapToBed < 0) gapToBed += 24*60; // через полночь
       if (gapToBed > 300) {
         notes.push(`😴 Последний белок («${lastFeeding.label}») за ${(gapToBed/60).toFixed(1)}ч до сна — ночной катаболизм. Рассмотрите casein/творог перед сном даже при ${input.mealsCount} приёмах.`);
+      }
+    }
+    // Fasted training: Aragon & Schoenfeld 2013 — если последний белок >6ч до старта, post 0.40-0.55 г/кг в 1ч критичен
+    if (input.isTrainingDay && input.trainStartMin != null) {
+      const trainMin = input.trainStartMin as number;
+      const lastBeforeTrain = [...feedings].filter(f => f.t < trainMin).sort((a,b)=> b.t - a.t)[0];
+      if (lastBeforeTrain) {
+        const gap = trainMin - lastBeforeTrain.t;
+        if (gap < 0) { /* через полночь — не считаем */ } else if (gap > 360) {
+          notes.push(`⏰ Fasted (>6ч без белка): «${lastBeforeTrain.label}» за ${(gap/60).toFixed(1)}ч до тренировки — post-workout 0.40-0.55 г/кг (≥${Math.round(input.weightKg*0.40)}г) в течение 1ч обязателен (план: post через 30 мин после сессии).`);
+        }
+      } else if (feedings.length > 0) {
+        // no feeding before train (e.g. early morning) → fasted
+        notes.push(`⏰ Утренняя тренировка натощак (>6ч без белка) — post-workout 0.40 г/кг (≈${Math.round(input.weightKg*0.40)}г) в 1ч критичен (план уже содержит post).`);
       }
     }
   }
@@ -3745,12 +3833,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     totals.leucine_mg = meals.reduce((s, m) => s + (m.totals.leucine_mg || 0), 0);
   }
 
-  // ─── Эпик B: клетчаточный кап = 14 г/1000 ккал (Reynolds 2022, Lancet), коридор 25–60 г ───
+  // ─── Эпик B: клетчаточный кап = 14 г/1000 ккал (Reynolds 2022, Lancet), коридор 25–50 г (was 70 too high) ───
   // Стоит ДО белкового клампа и посадки: посадка пересчитывает ккал/угли после снижения
   // овощей/семян. Резка — по приоритету клетчаточной плотности: овощи → фрукты → семена/орехи;
   // углеводные гарниры (носители калорий) режутся в последнюю очередь и не ниже 60% порции.
+  // Peak: honour input.fiberCapG (e.g. 20g Helms loading day) — never exceed it.
   {
-    const _fiberCap = Math.max(25, Math.min(70, Math.round(input.goalKcal / 1000 * 14)));
+    const _baseFiberCap = Math.max(25, Math.min(50, Math.round(input.goalKcal / 1000 * 14)));
+    const _fiberCap = typeof input.fiberCapG === 'number' ? Math.min(_baseFiberCap, Math.max(15, Math.round(input.fiberCapG))) : _baseFiberCap;
     const _dayFiber = meals.reduce((s, m) => s + (m.totals.fiber || 0), 0);
     if (_dayFiber > _fiberCap) {
       let _excessF = _dayFiber - _fiberCap;
