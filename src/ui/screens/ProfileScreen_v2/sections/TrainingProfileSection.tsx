@@ -140,7 +140,7 @@ export const TrainingProfileSection: React.FC = React.memo(function TrainingProf
           label="⭐ Любимые упражнения"
           ids={training.favoriteExercises || []}
           onChange={ids => updateTraining({ favoriteExercises: ids })}
-          accent="#00e68a"
+          accent="#34d399"
         />
         <PopupExerciseList
           label="✕ Не любимые упражнения"

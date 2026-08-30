@@ -231,7 +231,7 @@ const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDism
         <button
           onClick={onUndo}
           style={{
-            background: 'linear-gradient(135deg, #00e68a, #00c478)',
+            background: 'linear-gradient(135deg, #34d399, #22c55e)',
             border: 'none',
             color: '#04120c',
             padding: '7px 14px',
@@ -240,7 +240,7 @@ const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDism
             fontWeight: 800,
             cursor: 'pointer',
             minHeight: 36,
-            boxShadow: '0 3px 12px rgba(0,230,138,0.3)',
+            boxShadow: '0 3px 12px rgba(52,211,153,0.3)',
             flexShrink: 0,
           }}
         >
@@ -272,14 +272,14 @@ const Snackbar: React.FC<{ action: UndoAction | null; onUndo: () => void; onDism
           overflow: 'hidden',
         }}
       >
-        <div
-          style={{
-            height: '100%',
-            borderRadius: 999,
-            background: 'linear-gradient(90deg, #00e68a, #60a5fa)',
-            animation: `snackbar-shrink ${Math.max(200, remaining)}ms linear forwards`,
-          }}
-        />
+<div
+            style={{
+              height: '100%',
+              borderRadius: 999,
+              background: 'linear-gradient(90deg, #34d399, #3b82f6)',
+              animation: `snackbar-shrink ${Math.max(200, remaining)}ms linear forwards`,
+            }}
+          />
       </div>
     </div>
   );
@@ -2011,7 +2011,7 @@ const exportAllDiariesPdf = () => {
               width: 54,
               height: 54,
               borderRadius: 16,
-              background: fabOpen ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg, #00e68a, #00c478)',
+              background: fabOpen ? 'rgba(255,255,255,0.12)' : 'linear-gradient(135deg, #34d399, #22c55e)',
               border: fabOpen ? '1px solid rgba(255,255,255,0.2)' : 'none',
               color: fabOpen ? colors.text : '#04120c',
               fontSize: 28,
