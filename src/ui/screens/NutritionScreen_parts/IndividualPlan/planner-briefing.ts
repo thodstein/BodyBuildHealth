@@ -22,8 +22,7 @@ export interface BriefingArgs {
   /** Норма воды дня, л */
   waterL?: number;
   /** Факт из дневника питания за сегодня (что реально съедено), опционально */
-  fact?: { kcal: number; p: number } | null;
-}
+  fact?: { kcal: number; p: number } | null;}
 
 export interface DayBriefing {
   /** Что готовить сегодня: уникальные выбранные рецепты в порядке приёмов */
@@ -42,6 +41,10 @@ export interface DayBriefing {
   factVsPlanPct: number | null;
   /** Осталось до цели по ккал (факт учтён), может быть отрицательным */
   remainingKcalToGoal: number | null;
+  /** G3 (Эпик G): факт/план по БЕЛКУ, % (null — в дневнике нет белка) */
+  factProteinVsPlanPct: number | null;
+  /** G3: осталось белка до цели с учётом факта, г (null — нет факта) */
+  remainingProteinG: number | null;
 }
 
 const toMin = (hhmm?: string): number => {
@@ -97,13 +100,25 @@ export function buildDayBriefing(args: BriefingArgs): DayBriefing {
   // Факт из дневника: % от плана + остаток до цели
   let factVsPlanPct: number | null = null;
   let remainingKcalToGoal: number | null = null;
+  // G3 (Эпик G): факт по БЕЛКУ — главный макрос бодибилдера, раньше в брифинге был только ккал
+  let factProteinVsPlanPct: number | null = null;
+  let remainingProteinG: number | null = null;
   const factKcal = fact?.kcal ?? 0;
+  const factP = fact?.p ?? 0;
   if (factKcal > 0) {
     const planK = Math.max(1, totals.kcal || goalK);
     factVsPlanPct = Math.round(factKcal / planK * 100);
     remainingKcalToGoal = Math.round(goalK - factKcal);
     if (factVsPlanPct >= 115) {
       tips.push(`🍽 Факт уже ${factVsPlanPct}% плана (${Math.round(factKcal)} ккал) — остаток дня держите лёгким`);
+    }
+  }
+  if (factP > 0) {
+    const planP = Math.max(1, totals.p || goals.p || 1);
+    factProteinVsPlanPct = Math.round(factP / planP * 100);
+    remainingProteinG = Math.round((goals.p || 0) - factP);
+    if (remainingProteinG > 0) {
+      tips.push(`🥩 Факт: ${Math.round(factP)} г белка (${factProteinVsPlanPct}% плана) — осталось ~${remainingProteinG} г`);
     }
   }
 
@@ -116,5 +131,7 @@ export function buildDayBriefing(args: BriefingArgs): DayBriefing {
     dayTypeLabel: isTrainingDay ? '🏋️ Тренировочный день' : '😴 День отдыха',
     factVsPlanPct,
     remainingKcalToGoal,
+    factProteinVsPlanPct,
+    remainingProteinG,
   };
 }
