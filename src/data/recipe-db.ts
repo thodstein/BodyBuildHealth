@@ -22,6 +22,9 @@ import { RECIPE_DB_P32 } from './recipe-db-p32';
 import { RECIPE_DB_P33 } from './recipe-db-p33';
 import { RECIPE_DB_P34 } from './recipe-db-p34';
 import { RECIPE_DB_P35 } from './recipe-db-p35';
+import { RECIPE_DB_P36 } from './recipe-db-p36';
+import { RECIPE_DB_P37 } from './recipe-db-p37';
+import { RECIPE_DB_P38 } from './recipe-db-p38';
 import { enrichRecipes } from './recipe-enrichment';
 
 /**
@@ -147,4 +150,9 @@ export const RECIPE_DB: Recipe[] = enrichRecipes([
   ...RECIPE_DB_P33,
   ...RECIPE_DB_P34,
   ...RECIPE_DB_P35,
+  // C4 (Эпик C): контент-пакеты «качественный рацион» — масс-завтраки 650-950,
+  // снеки 300-500 + суша-обеды, low-carb + веган (все — по формуле kcal).
+  ...RECIPE_DB_P36,
+  ...RECIPE_DB_P37,
+  ...RECIPE_DB_P38,
 ]).map(sanitizeRecipePortions).map(normalizeRecipeKcal);

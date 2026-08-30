@@ -18,7 +18,7 @@ import { FOOD_DB } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
 import { decomposeRecipe, pickRecipesForMeal } from './recipe-engine';
-import { isProteinPowderId } from './food-availability';
+import { createDailyQuota, registerMealInQuota, blockedIdsForNextMeal, foodAvailableWithQuota, isProteinPowderId, stapleFamilyOf } from './food-availability';
 import { applyRealisticFloors } from './meal-plan-engine';
 import { correctDayToTargets } from './day-target-corrector';
 import type { RecipeMatchOptions, CookProfile } from './recipe-engine';
@@ -205,6 +205,13 @@ export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_is
 export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'banana', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
 
+// C5 (Эпик C): субротация фиксированных пулов по seed дня — иначе каждый недобор
+// закрывается ПЕРВОЙ позицией списка («рис/гречка/оливковое масло» в каждом дне).
+function subrot(ids: string[], seed?: number): string[] {
+  const s = Math.abs(Math.round(seed ?? 0)) % Math.max(1, ids.length);
+  return [...ids.slice(s), ...ids.slice(0, s)];
+}
+
 function topupFoods(ids: string[], excludedIds?: Set<string>): FoodItem[] {
   return ids
     .map(id => FOOD_DB.find(f => f.id === id))
@@ -243,10 +250,11 @@ function maxDeviationPct(totals: PlanTotalsLike, t: DayMacroTargets): number {
 export function rebalanceDayAfterRecipes(
   meals: PlanMealLike[],
   targets: DayMacroTargets,
-  opts?: { excludedIds?: Set<string>; maxIter?: number },
+  opts?: { excludedIds?: Set<string>; maxIter?: number; seed?: number },
 ): RebalanceResult {
   const notes: string[] = [];
   const maxIter = opts?.maxIter ?? 24;
+  const _sub = (ids: string[]) => subrot(ids, opts?.seed);
   const work: PlanMealLike[] = meals.map(m => ({ ...m, items: [...(m.items || [])], totals: { ...(m.totals || { kcal: 0, p: 0, f: 0, c: 0 }) } }));
 
   const validTargets: DayMacroTargets = {
@@ -298,9 +306,9 @@ export function rebalanceDayAfterRecipes(
       if (dominant <= 0) break; // все дефициты закрыты — дальше резаем перебор
       // Выбор роли доминирующего дефицита
       let rolePool: FoodItem[]; let chosenRole: 'p' | 'c' | 'f';
-      if (relP >= relC && relP >= relF) { rolePool = topupFoods(TOPUP_PROTEIN_IDS, opts?.excludedIds); chosenRole = 'p'; }
-      else if (relC >= relF) { rolePool = topupFoods(TOPUP_CARB_IDS, opts?.excludedIds); chosenRole = 'c'; }
-      else { rolePool = topupFoods(TOPUP_FAT_IDS, opts?.excludedIds); chosenRole = 'f'; }
+      if (relP >= relC && relP >= relF) { rolePool = topupFoods(_sub(TOPUP_PROTEIN_IDS), opts?.excludedIds); chosenRole = 'p'; }
+      else if (relC >= relF) { rolePool = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds); chosenRole = 'c'; }
+      else { rolePool = topupFoods(_sub(TOPUP_FAT_IDS), opts?.excludedIds); chosenRole = 'f'; }
       if (rolePool.length === 0) break;
       const macroOf = (f: FoodItem) => chosenRole === 'p' ? (f.protein || 0) : chosenRole === 'c' ? (f.carbs || 0) : (f.fat || 0);
       const dMacro = chosenRole === 'p' ? dP : chosenRole === 'c' ? dC : dF;
@@ -351,7 +359,7 @@ export function rebalanceDayAfterRecipes(
         const ppk = (it.p || 0) / Math.max(1, it.kcal || 1);
         if (ppk < worst) { worst = ppk; wi = ii; }
       });
-      const pfPool = topupFoods(TOPUP_PROTEIN_IDS, opts?.excludedIds).sort((a, b) => (b.protein || 0) / Math.max(1, b.kcal || 1) - (a.protein || 0) / Math.max(1, a.kcal || 1));
+      const pfPool = topupFoods(_sub(TOPUP_PROTEIN_IDS), opts?.excludedIds).sort((a, b) => (b.protein || 0) / Math.max(1, b.kcal || 1) - (a.protein || 0) / Math.max(1, a.kcal || 1));
       const pf = pfPool[0];
       if (wi >= 0 && pf && worst < 0.06) { // продукт почти без белка на ккал — меняем
         const freed = items[wi].kcal || 0;
@@ -381,7 +389,7 @@ export function rebalanceDayAfterRecipes(
         const role: 'p' | 'c' | 'f' = (dP > 0 && dP * 4 >= Math.max(dF > 0 ? dF * 9 : 0, dC > 0 ? dC * 4 : 0)) ? 'p'
           : (dC > 0 && dC * 4 >= (dF > 0 ? dF * 9 : 0)) ? 'c' : 'f';
         const dMacro = role === 'p' ? dP : role === 'c' ? dC : dF;
-        const ids = role === 'p' ? TOPUP_PROTEIN_IDS : role === 'c' ? TOPUP_CARB_IDS : TOPUP_FAT_IDS;
+        const ids = role === 'p' ? _sub(TOPUP_PROTEIN_IDS) : role === 'c' ? _sub(TOPUP_CARB_IDS) : _sub(TOPUP_FAT_IDS);
         const poolFit = topupFoods(ids, opts?.excludedIds);
         const macroOf = (f: FoodItem) => role === 'p' ? (f.protein || 0) : role === 'c' ? (f.carbs || 0) : (f.fat || 0);
         const fitPool = poolFit.filter(f => macroOf(f) > 0 && (f.kcal || 0) > 0);
@@ -701,6 +709,10 @@ export interface AssembleRecipeDayArgs {
   usedNamesAcrossDays?: Set<string>;
   /** D5: вес атлета — prefer-матчинг порционных якорей рецептов */
   athleteWeightKg?: number;
+  /** C2 (Эпик C): тренировочный день? — peri-рецепты (p32: preworkout/postworkout) только в трен-день */
+  trainDay?: boolean;
+  /** C5 (Эпик C): seed дня — субротация TOPUP-пулов (анти-однообразие доборов) */
+  seed?: number;
 }
 
 export interface AssembleRecipeDayResult {
@@ -723,13 +735,13 @@ export interface AssembleRecipeDayResult {
 // Кэш декомпозиции: разбор детерминирован по объекту рецепта
 const decompCache = new WeakMap<object, { items: ReturnType<typeof buildRecipeMealItems>; totals: ReturnType<typeof sumMealTotals> | null }>();
 
-function decomposedFacts(r: Recipe): { totals: ReturnType<typeof sumMealTotals> | null } {
+function decomposedFacts(r: Recipe): { items: PlanItemLike[] | null; totals: ReturnType<typeof sumMealTotals> | null } {
   const hit = decompCache.get(r as any);
-  if (hit) return { totals: hit.totals };
+  if (hit) return { items: hit.items, totals: hit.totals };
   const items = buildRecipeMealItems(r);
   const totals = items && items.length > 0 ? sumMealTotals(items) : null;
   decompCache.set(r as any, { items, totals });
-  return { totals };
+  return { items, totals };
 }
 
 function distOf(totals: { kcal: number; p: number; f: number; c: number } | null, tgtKcal: number, tp: number, tf: number, tc: number): number {
@@ -748,9 +760,55 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   const { meals, pool, targets, excludedIds, cookProfile, usedNamesAcrossDays } = args;
   const dayUsedNames = new Set<string>();
   let appliedCount = 0;
-  // D4 (эпик «реалистичная тарелка»): дневной лимит порошка в рецептурном пути —
-  // рецепты с сывороткой/казеином (decomposition содержит powder-id) не занимают
-  // больше 2 приёмов дня; далее выбираются рецепты на цельной еде.
+  // C1 (Эпик C): дневные квоты реалистичной тарелки ДЕЙСТВУЮТ на рецептурный путь.
+  // Раньше assembleRecipeDay ограничивал только порошок — семейство гарниров (рис ×3+),
+  // орехи ≤60 г, масла ≤25 г, яйца ≤230 г игнорировались.
+  const quota = createDailyQuota(args.athleteWeightKg);
+  meals.forEach(m => {
+    if (m.recipeApplied || !m.items?.length) return;
+    try { registerMealInQuota(quota, m.items as any); } catch {}
+  });
+  // Финальный грамм-трим орехов/масел/яиц после корректора (он идёт мимо квот).
+  const trimQuotaOverflow = (ms: PlanMealLike[]): string[] => {
+    const out: string[] = [];
+    const _sc = quota.weightScale || 1;
+    const trimByFam = (fams: string[], cap: number, minG: number, label: string) => {
+      let total = ms.flatMap(m => m.items).filter(it => fams.includes(stapleFamilyOf(it.id) || '')).reduce((s, it) => s + (it.amount || 0), 0);
+      if (total <= cap) return;
+      const cutShare = Math.min(0.6, (total - cap) / total);
+      for (const m of ms) {
+        for (let ii = 0; ii < (m.items || []).length; ii++) {
+          const it = m.items[ii];
+          if (!fams.includes(stapleFamilyOf(it.id) || '')) continue;
+          const ng = Math.max(minG, Math.floor((it.amount || 0) * (1 - cutShare)));
+          if (ng >= (it.amount || 0)) continue;
+          const r = ng / (it.amount || 1);
+          m.items[ii] = scaleItem(it, ng);
+          total -= (it.amount || 0) * (1 - r);
+        }
+      }
+      out.push(`⚖️ ${label}: приведено к квоте ${cap} г/день`);
+    };
+    trimByFam(['nuts', 'seeds'], Math.round(60 * _sc), 8, 'Орехи/семена');
+    trimByFam(['oils'], Math.round(25 * _sc), 5, 'Масла');
+    const eggs = ms.flatMap(m => m.items).filter(it => it.id === 'egg_whole').reduce((s, it) => s + (it.amount || 0), 0);
+    const eggCap = Math.round(230 * _sc);
+    if (eggs > eggCap) {
+      const cutShare = Math.min(0.5, (eggs - eggCap) / eggs);
+      for (const m of ms) {
+        for (let ii = 0; ii < (m.items || []).length; ii++) {
+          const it = m.items[ii];
+          if (it.id !== 'egg_whole') continue;
+          const ng = Math.max(50, Math.floor((it.amount || 0) * (1 - cutShare)));
+          if (ng >= (it.amount || 0)) continue;
+          m.items[ii] = scaleItem(it, ng);
+        }
+      }
+      out.push(`⚖️ Яйца: приведено к квоте ${eggCap} г/день`);
+    }
+    return out;
+  };
+  // D4 (эпик «реалистичная тарелка»): дневной лимит порошка в рецептурном пути.
   const _powderMealsUsed = new Set<number>();
   const _recipeHasPowder = (r: Recipe): boolean => (r.ingredientIds || []).some(fid => isProteinPowderId(fid));
   const _powderCount = (): number => {
@@ -762,6 +820,16 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     }
     return n;
   };
+
+  // C2 (Эпик C): peri-слоты по рецептам. Раньше 38 peri-рецептов (p32/p35) были
+  // НЕДОСТИЖИМЫ автогенерацией — слот-разметка ставила рецепты только в
+  // Завтрак/Обед/Ужин/один снек, при том что V2-движок строит предтрен/пост-трен/
+  // перед сном продуктами в 100% дней.
+  const PERI_LABEL_TYPES: Record<string, 'preworkout' | 'postworkout' | 'presleep'> = {
+    'Предтрен': 'preworkout', 'Пост-трен': 'postworkout', 'Перед сном': 'presleep',
+  };
+  // C2: пери-рецепты не должны красться ОБЫЧНЫМИ слотами (ужин = «PostW-шейкер» — нет).
+  const PERI_TYPES_SET = new Set<string>(['preworkout', 'postworkout', 'presleep']);
 
   // Aug 28: снек-рецепты в режиме «по рецептам» — только на САМЫЙ БОЛЬШОЙ снек-слот дня
   // (остальные перекусы остаются продуктовыми и служат гибкими слотами ребаланса).
@@ -776,10 +844,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const mealAny = m as any;
     const label = mealAny.label || '';
     const isMain = isMainMealLabel(label);
+    const periType = PERI_LABEL_TYPES[label] || null;
+    // C2: peri-рецепт ставим только если тип доступен в пуле; пред/пост-трен — только в трен-день.
+    const isPeriSlot = !!periType
+      && pool.some(r => r.meal === periType)
+      && ((periType !== 'preworkout' && periType !== 'postworkout') || !!args.trainDay);
     // Снек-рецепт — только при явном target (в реальном потоке движок задаёт target
     // снекам; приём без target — продуктовый, его не заменяем).
     const isSnackSlot = (mi === recipeSnackIdx) && !!mealAny.target;
-    if (!isMain && !isSnackSlot) return;
+    if (!isMain && !isSnackSlot && !isPeriSlot) return;
     const tgt = mealAny.target || { p: mealAny.totals?.p ?? 30, c: mealAny.totals?.c ?? 40, f: mealAny.totals?.f ?? 15 };
     // Ккал-цель приёма: фактические тоталы, а для пустого приёма — формула из макро-цели
     // (раньше пустой приём скорился против дефолтных 300 ккал и ломал выбор рецепта).
@@ -787,8 +860,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       || Math.round((tgt.p || 0) * 4 + (tgt.c || 0) * 4 + (tgt.f || 0) * 9)
       || 300;
     const excludeNames = new Set<string>([...(mealAny.recipeOptionNames || []), ...dayUsedNames, ...(usedNamesAcrossDays || [])]);
+    // C2: peri-слот матчится своим типом (breakfast/lunch/dinner/snak — прежнее поведение).
+    const matchMealType: RecipeMatchOptions['mealType'] = periType ?? mealTypeFromLabel(label || undefined);
     const matchOpts: RecipeMatchOptions = {
-      mealType: mealTypeFromLabel(label || undefined),
+      mealType: matchMealType,
       targetKcal,
       targetProteinG: tgt.p || 30,
       targetCarbsG: tgt.c || 40,
@@ -823,21 +898,38 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       .sort((a, b) => a.d - b.d)
       .map(x => x.r);
     let cands = pickRecipeOptions(pool, matchOpts, 6, excludeNames);
+    // C2: обычные слоты НЕ получают peri-рецепты; peri-слот — только свой тип.
+    if (periType) cands = cands.filter(r => r.meal === periType);
+    else cands = cands.filter(r => !PERI_TYPES_SET.has(r.meal));
     // Aug 28: fallback — если скоринг с жёсткими гейтами опустошил выборку (экстремальные
     // цели: hardReject по девиации отсеял всё), основной приём НЕ должен остаться пустым.
     // Берём лучшие по макро-дистанции среди рецептов своего типа приёма (с ingredientIds).
     if (cands.length === 0) {
-      const mealType = mealTypeFromLabel(label || undefined);
+      const mealType = periType ?? mealTypeFromLabel(label || undefined);
       const sameType = pool.filter(r => r.meal === mealType && !excludeNames.has(r.name) && r.ingredientIds && r.ingredientIds.length > 0);
       cands = rankCands(sameType).slice(0, 6);
     }
     if (cands.length === 0) return;
     // D4: порошковый гейт — если 2 приёма дня уже с порошком (продуктом или рецептом),
     // убираем порошковые рецепты из кандидатов (fallback: цельная еда).
-    if (_powderCount() >= 2) {
+    // C2: пост-трен — зарезервированный порошковый слот (как в продуктовом движке).
+    if (_powderCount() >= 2 && periType !== 'postworkout') {
       const _wholeFood = cands.filter(r => !_recipeHasPowder(r));
       if (_wholeFood.length > 0) cands = _wholeFood;
     }
+    // C1: гейт квот дня — кандидаты, чья декомпозиция нарушает квоту следующего приёма
+    // (семейство гарнира исчерпано, орехи/масла/яйца на лимите), уходят из выборки.
+    const _quotaBlocked = blockedIdsForNextMeal(quota, String(matchMealType));
+    const quotaViolates = (r: Recipe): boolean => {
+      const its = decomposedFacts(r).items;
+      if (!its || its.length === 0) return false;
+      return its.some(it => {
+        const fd = FOOD_DB.find(f => f.id === it.id);
+        return !foodAvailableWithQuota({ id: it.id, category: fd?.category, carbs: it.c, fiber: it.fiber } as any, _quotaBlocked);
+      });
+    };
+    const _okQuota = cands.filter(r => !quotaViolates(r));
+    if (_okQuota.length > 0) cands = _okQuota;
     // Переранжирование по декомпозированным фактам С УЧЁТОМ масштабирования к цели приёма:
     // рецепт 500 ккал при цели 1000 масштабируется ×2 → дистанция считается для масштаба.
     // Масштаб дополнительно КАПИТСЯ по белку (≤1.25×цели), жиру (≤1.5×цели) и углям
@@ -922,12 +1014,15 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     };
     let chosen: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null = null;
     let fallback: { flat: FlatRecipeOption; items: PlanItemLike[]; totals: PlanTotalsLike; sideNote: string | null } | null = null;
+    // C5 (Эпик C): ккал-гейт приёмки ±25% пропускал ПОЛОВИННЫЙ недобор (рецепт = 50%
+    // приёма, остальное — сайды) — снижаем до ±15% (перекусы ±20%: их догоняет ребаланс).
+    const kcalTol = isSnackSlot ? 0.20 : 0.15;
     for (const cand of ranked) {
       const built = tryBuild(cand);
       if (!built) continue;
       if (!fallback) fallback = built;
       const tk = built.totals.kcal || 1;
-      const passes = Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= 0.25
+      const passes = Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= kcalTol
         && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
         && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
         && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5;
@@ -946,6 +1041,9 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     dayUsedNames.add(chosenFlat.name);
     usedNamesAcrossDays?.add(chosenFlat.name);
     if (_recipeHasPowder(chosenFlat as unknown as Recipe)) _powderMealsUsed.add(mi);
+    // C1: выбранный рецепт (с сайдами) регистрируется в дневных квотах —
+    // следующий приём видит актуальный блок-лист семейств/грамм-лимитов.
+    try { registerMealInQuota(quota, finalItems as any); } catch {}
     appliedCount++;
   });
 

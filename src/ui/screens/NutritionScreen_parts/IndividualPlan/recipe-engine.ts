@@ -13,9 +13,25 @@
  */
 
 import type { Recipe } from '../../../../engines/nutrition-periodization.engine';
-import { FOOD_DB } from '../../../../core/nutrition-database';
+import { FOOD_DB, FOOD_ALLERGEN_DIET } from '../../../../core/nutrition-database';
 import type { FoodItem } from '../../../../core/nutrition-database';
 import type { MealItem } from './meal-plan-engine';
+
+// C3 (Эпик C): кэш декомпозиции легаси-рецептов (парсинг строк дорогой — гейт аллергенов
+// вызывает его на каждый скоринг; WeakMap кэш делает это O(1) после первого прохода).
+const _legacyDecompCache = new WeakMap<object, string[] | null>();
+function legacyDecompIds(recipe: Recipe): string[] | null {
+  const hit = _legacyDecompCache.get(recipe as any);
+  if (hit !== undefined) return hit;
+  let ids: string[] | null = null;
+  try {
+    const items = decomposeRecipe(recipe);
+    ids = items.map(i => i.id).filter(Boolean);
+    if (ids.length === 0) ids = null;
+  } catch { ids = null; }
+  _legacyDecompCache.set(recipe as any, ids);
+  return ids;
+}
 
 export type CookSkill = 'basic' | 'medium' | 'advanced';
 export type CookFrequency = 'daily' | 'every_3_days' | 'weekly';
@@ -298,16 +314,28 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
   }
 
   // 6. Исключения/аллергены — проверяем через декомпозицию
-  if (recipe.ingredientIds) {
-    for (const fid of recipe.ingredientIds) {
-      if (opts.excludedIds.has(fid)) { hardReject = true; break; }
+  // C3 (Эпик C): гейт распространяется на 100% БД — легаси-рецепты без ingredientIds
+  // раньше НЕ проверялись по аллергенам вовсе (строковый вег-фолбэк был единственной
+  // защитой): decomposeRecipe парсит строки → FOOD_DB ids → гейт по excludedIds.
+  {
+    let allIds: string[] | null = null;
+    if (recipe.ingredientIds && recipe.ingredientIds.length > 0) {
+      allIds = recipe.ingredientIds;
+    } else {
+      allIds = legacyDecompIds(recipe);
     }
-  } else {
-    // Проверяем по ингредиентам-строкам (менее точно)
-    for (const ing of recipe.ingredients) {
-      const lower = ing.toLowerCase();
-      if (opts.isVegetarian && ['кури','говядин','свин','баран','индей','утка','гусь','кролик','телятин','печен','сердце','язык','мозг','ножки','крылыш','бедро','фарш','рыб','лосос','форел','тунец','скумбри','сельд','сард','кревет','миди','кальмар','осьмин','устриц','икра','угорь'].some(k => lower.includes(k))) {
-        hardReject = true; break;
+    if (allIds && allIds.some(fid => opts.excludedIds.has(fid))) hardReject = true;
+    if (!hardReject && opts.isVegetarian && allIds) {
+      // C3: вег-гейт по каноническому FOOD_ALLERGEN_DIET (isVegetarian === false).
+      if (allIds.some(fid => FOOD_ALLERGEN_DIET[fid]?.isVegetarian === false)) hardReject = true;
+    }
+    if (!hardReject && !(recipe.ingredientIds && recipe.ingredientIds.length > 0)) {
+      // Строковый фолбэк для НЕраспознанных декомпозицией ингредиентов (менее точно)
+      for (const ing of recipe.ingredients) {
+        const lower = ing.toLowerCase();
+        if (opts.isVegetarian && ['кури','говядин','свин','баран','индей','утка','гусь','кролик','телятин','печен','сердце','язык','мозг','ножки','крылыш','бедро','фарш','рыб','лосос','форел','тунец','скумбри','сельд','сард','кревет','миди','кальмар','осьмин','устриц','икра','угорь'].some(k => lower.includes(k))) {
+          hardReject = true; break;
+        }
       }
     }
   }
