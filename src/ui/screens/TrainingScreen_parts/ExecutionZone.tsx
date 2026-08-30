@@ -15,7 +15,11 @@ import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
 import { generateWarmup, warmupLabel, warmupSpecificLabel, upsertWarmupLog } from '../../../engines/warmup.engine';
 import { groupsFromExercises } from '../../../engines/warmup-day.engine';
+import { calculatePlates } from '../../../engines/gym-competition.engine';
+import { hapticImpact, hapticNotify } from '../../../core/telegram';
 import type { TrainingTab } from './shared';
+
+const isDumbbellEx = (n?: string) => !!(n && /гантел|dumbbell/i.test(n));
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
 type PlRuntime = { days: PlayerDay[]; focus: string; week: number; track: string };
@@ -58,13 +62,46 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const [restTimer, setRestTimer] = React.useState(0);
   const [restTarget, setRestTarget] = React.useState(90);
   const restTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  // Rest timer effect
+  // Rest timer effect + haptic/voice при завершении
   React.useEffect(() => {
     if (restTimer > 0) {
-      restTimerRef.current = setTimeout(() => setRestTimer(prev => prev - 1), 1000);
+      restTimerRef.current = setTimeout(() => setRestTimer(prev => {
+        if (prev <= 1) {
+          try { hapticNotify('success'); } catch {}
+          try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch {}
+          try {
+            if ('speechSynthesis' in window) {
+              const u = new SpeechSynthesisUtterance('Отдых завершён');
+              u.lang = 'ru-RU'; u.rate = 1; window.speechSynthesis.speak(u);
+            }
+          } catch {}
+        }
+        return prev - 1;
+      }), 1000);
       return () => { if (restTimerRef.current) clearTimeout(restTimerRef.current); };
     }
   }, [restTimer]);
+  // Wake Lock — экран не гаснет в зале
+  React.useEffect(() => {
+    let lock: any = null;
+    let released = false;
+    const request = async () => {
+      try {
+        if (runtimeStarted && 'wakeLock' in navigator) {
+          // @ts-ignore
+          lock = await (navigator as any).wakeLock.request('screen');
+        }
+      } catch {}
+    };
+    if (runtimeStarted) request();
+    const onVis = () => { if (document.visibilityState === 'visible' && runtimeStarted && !lock) request(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      released = true;
+      document.removeEventListener('visibilitychange', onVis);
+      try { lock?.release?.(); } catch {}
+    };
+  }, [runtimeStarted]);
   // Безопасные производные: если currentMicrocycle null или days пустой — fallback на [].
   // Это предотвращает падения "Cannot read 'filter' of undefined" в UI при пустом/неполном плане.
   const trainingDaysList: any[] = (() => {
@@ -770,40 +807,83 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       </div>
                     )}
 
-                    {/* Set input form (if not completed) */}
+                    {/* Gym-удобный ввод сета — крупные степперы, блины, один тап */}
                     {!log.completed && (
-                      <div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 6 }}>
-                          <div>
-                            <label style={{ fontSize: 10, color: '#fff' }}>Вес (кг)</label>
-                            <input type="number" value={runtimeSetW} disabled={isBWExercise(ex)} onChange={e => setRuntimeSetW(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: isBWExercise(ex) ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box', opacity: isBWExercise(ex) ? 0.5 : 1 }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {/* Вес + повторы — крупные карточки со степперами */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          {/* Вес */}
+                          <div style={{ background: isBWExercise(ex) ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 10, opacity: isBWExercise(ex) ? 0.55 : 1 }}>
+                            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 6 }}>Вес {isDumbbellEx(ex.name) ? '×2 гант.' : ''}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <button type="button" disabled={isBWExercise(ex)} onClick={() => { hapticImpact('light'); setRuntimeSetW(v => Math.max(0, Math.round((v - 2.5) * 10) / 10)); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, cursor: isBWExercise(ex) ? 'not-allowed' : 'pointer', flexShrink: 0 }}>−</button>
+                              <input type="number" inputMode="decimal" value={runtimeSetW} disabled={isBWExercise(ex)} onChange={e => setRuntimeSetW(parseFloat(e.target.value) || 0)} style={{ flex: 1, minWidth: 0, padding: '8px 4px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 22, fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }} />
+                              <button type="button" disabled={isBWExercise(ex)} onClick={() => { hapticImpact('light'); setRuntimeSetW(v => Math.round((v + 2.5) * 10) / 10); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, cursor: isBWExercise(ex) ? 'not-allowed' : 'pointer', flexShrink: 0 }}>+</button>
+                            </div>
+                            <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'center' }}>
+                              {[-5, 5].map(d => (
+                                <button key={d} type="button" disabled={isBWExercise(ex)} onClick={() => { hapticImpact('light'); setRuntimeSetW(v => Math.max(0, Math.round((v + d) * 10) / 10)); }} style={{ flex: 1, padding: '5px 0', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 700, cursor: isBWExercise(ex) ? 'not-allowed' : 'pointer' }}>{d > 0 ? `+${d}` : d}</button>
+                              ))}
+                            </div>
+                            {/* Визуализация блинов для зала */}
+                            { !isBWExercise(ex) && runtimeSetW > 0 && (() => {
+                              const handle = isDumbbellEx(ex.name) ? 2 : 20;
+                              const r = calculatePlates(runtimeSetW, handle);
+                              if (r.platesPerSide.length === 0) return <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 6 }}>гриф {handle} кг — блины не нужны</div>;
+                              return (
+                                <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                  <div style={{ display: 'flex', gap: 2, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    {r.platesPerSide.map((p, idx) => (
+                                      <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 6px', borderRadius: 20, background: p.plate >= 20 ? 'rgba(239,68,68,0.15)' : p.plate >= 10 ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)', border: `1px solid ${p.plate >= 20 ? 'rgba(239,68,68,0.25)' : p.plate >= 10 ? 'rgba(245,158,11,0.25)' : 'rgba(59,130,246,0.25)'}`, color: p.plate >= 20 ? '#f87171' : p.plate >= 10 ? '#fbbf24' : '#60a5fa', fontSize: 10, fontWeight: 700 }}>{p.plate}×{p.count}</span>
+                                    ))}
+                                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginLeft: 4 }}>{isDumbbellEx(ex.name) ? `на гантель ${handle}кг` : `на гриф ${handle}кг`}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
-                          <div>
-                            <label style={{ fontSize: 10, color: '#fff' }}>Повторения</label>
-                            <input type="number" value={runtimeSetR} onChange={e => setRuntimeSetR(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box' }} />
+                          {/* Повторы */}
+                          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 14, padding: 10 }}>
+                            <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.5, textTransform: 'uppercase', textAlign: 'center', marginBottom: 6 }}>Повторы</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <button type="button" onClick={() => { hapticImpact('light'); setRuntimeSetR(v => Math.max(1, v - 1)); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>−</button>
+                              <input type="number" inputMode="numeric" value={runtimeSetR} onChange={e => setRuntimeSetR(Math.max(1, Math.round(parseFloat(e.target.value) || 0)))} style={{ flex: 1, minWidth: 0, padding: '8px 4px', borderRadius: 10, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.10)', color: '#fff', fontSize: 22, fontWeight: 800, textAlign: 'center', boxSizing: 'border-box' }} />
+                              <button type="button" onClick={() => { hapticImpact('light'); setRuntimeSetR(v => v + 1); }} style={{ width: 42, height: 42, borderRadius: 10, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 18, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>+</button>
+                            </div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 6 }}>цель {ex.reps} · RIR {ex.rir ?? '—'}</div>
                           </div>
-                          <div>
-                            <label style={{ fontSize: 10, color: '#fff' }}>RPE (1-10)</label>
-                            <input type="number" min={1} max={10} value={runtimeSetRP} onChange={e => setRuntimeSetRP(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box' }} />
+                        </div>
+                        {/* RPE / RIR — пилюли для быстрого тапа в зале */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 8 }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textAlign: 'center', marginBottom: 6 }}>RPE</div>
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                              {[6, 7, 8, 9, 10].map(v => (
+                                <button key={v} type="button" onClick={() => { hapticImpact('light'); setRuntimeSetRP(v); setRuntimeSetRI(Math.max(0, 10 - v)); }} style={{ minWidth: 36, height: 36, borderRadius: 10, border: runtimeSetRP === v ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: runtimeSetRP === v ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)', color: runtimeSetRP === v ? '#00e68a' : '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{v}</button>
+                              ))}
+                            </div>
                           </div>
-                          <div>
-                            <label style={{ fontSize: 10, color: '#fff' }}>RIR</label>
-                            <input type="number" min={0} max={5} value={runtimeSetRI} onChange={e => setRuntimeSetRI(parseFloat(e.target.value) || 0)}
-                              style={{ width: '100%', padding: '6px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 13, boxSizing: 'border-box' }} />
+                          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 8 }}>
+                            <div style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', textAlign: 'center', marginBottom: 6 }}>RIR</div>
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                              {[0, 1, 2, 3, 4].map(v => (
+                                <button key={v} type="button" onClick={() => { hapticImpact('light'); setRuntimeSetRI(v); setRuntimeSetRP(Math.max(1, 10 - v)); }} style={{ minWidth: 36, height: 36, borderRadius: 10, border: runtimeSetRI === v ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: runtimeSetRI === v ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)', color: runtimeSetRI === v ? '#00e68a' : '#fff', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>{v}</button>
+                              ))}
+                            </div>
                           </div>
                         </div>
                         <button onClick={() => {
+                          hapticImpact('medium');
                           const newLog = { ...log, sets: [...log.sets, { weight: runtimeSetW, reps: runtimeSetR, rpe: runtimeSetRP, rir: runtimeSetRI }] };
                           setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
                           setRestTimer(restTarget);
+                          try { hapticNotify('success'); } catch {}
                         }} style={{
-                          width: '100%', padding: 8, borderRadius: 6, border: 'none', cursor: 'pointer',
-                          background: 'var(--accent)', color: '#000', fontWeight: 600, fontSize: 12,
+                          width: '100%', padding: '14px 12px', borderRadius: 14, border: 'none', cursor: 'pointer',
+                          background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 800, fontSize: 15, minHeight: 52,
+                          boxShadow: '0 6px 18px rgba(0,230,138,0.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                           marginBottom: 4,
-                        }}>✓ Записать подход {currentSet}/{totalSets}</button>
+                        }}>✓ Записать подход {currentSet}/{totalSets} · {runtimeSetW}×{runtimeSetR}</button>
                         <button onClick={() => {
                           const newLog = { ...log, completed: true };
                           setRuntimeLogs({ ...runtimeLogs, [ex.exerciseId || ex.name]: newLog });
@@ -834,6 +914,26 @@ export const ExecutionZone: React.FC<Props> = (p) => {
           )}
         </div>
         </InfoErrorBoundary>
+      )}
+      {/* Липкий нижний таймер для зала — поверх контента, всегда виден */}
+      {tab === 'runtime' && runtimeStarted && restTimer > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 'calc(var(--nav-height) + 14px)', left: 12, right: 12, zIndex: 45,
+          display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16,
+          background: restTimer <= 10 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #00e68a, #00c853)',
+          color: restTimer <= 10 ? '#fff' : '#000', boxShadow: '0 10px 28px rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.18)',
+          backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        }}>
+          <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.14)', fontSize: 16, fontWeight: 800, flexShrink: 0 }}>⏱</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, lineHeight: 1 }}>Отдых · {restTimer <= 10 ? 'готовьтесь!' : 'восстановление'}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(restTimer / 60)).padStart(2, '0')}:{String(restTimer % 60).padStart(2, '0')}</div>
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
+              <div style={{ width: `${Math.max(0, Math.min(100, ((restTarget - restTimer) / Math.max(1, restTarget)) * 100))}%`, height: '100%', background: restTimer <= 10 ? '#fff' : '#000', transition: 'width 1s linear' }} />
+            </div>
+          </div>
+          <button onClick={() => { hapticImpact('light'); setRestTimer(0); }} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: restTimer <= 10 ? '#fff' : '#000', color: restTimer <= 10 ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 40 }}>Пропустить</button>
+        </div>
       )}
       {tab === 'timers' && <InfoErrorBoundary label="Таймеры"><TimersTab initialSettings={timerInitialSettings} /></InfoErrorBoundary>}
     </>

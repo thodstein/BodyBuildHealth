@@ -92,11 +92,31 @@ const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; l
           <button type="button" style={{ ...BTN, flex: 1, minWidth: 120 }} onClick={() => { onSkip(reason); setOpen(false); }}>
             Пропустить
           </button>
-        </div>
-      )}
-    </div>
-  );
-};
+</div>
+        )}
+        {/* Липкий нижний таймер для зала (SessionPlayer) */}
+        {phase === 'main' && timerRunning && timerSec > 0 && (
+          <div style={{
+            position: 'fixed', bottom: 'calc(var(--nav-height) + 14px)', left: 12, right: 12, zIndex: 45,
+            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16,
+            background: timerSec <= 10 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #00e68a, #00c853)',
+            color: timerSec <= 10 ? '#fff' : '#000', boxShadow: '0 10px 28px rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.18)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          }}>
+            <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.14)', fontSize: 16, fontWeight: 800, flexShrink: 0 }}>⏱</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, lineHeight: 1 }}>Отдых · {timerSec <= 10 ? 'готовьтесь!' : 'восстановление'}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}</div>
+              <div style={{ height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
+                <div style={{ width: `${Math.max(0, Math.min(100, ((currentRestSec - timerSec) / Math.max(1, currentRestSec)) * 100))}%`, height: '100%', background: timerSec <= 10 ? '#fff' : '#000', transition: 'width 1s linear' }} />
+              </div>
+            </div>
+            <button onClick={() => { hapticImpact('light'); setTimerRunning(false); setTimerSec(0); }} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: timerSec <= 10 ? '#fff' : '#000', color: timerSec <= 10 ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 40 }}>Пропустить</button>
+          </div>
+        )}
+      </div>
+    );
+  };
 const IN: React.CSSProperties = { background: 'var(--input-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '4px 0 2px' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
@@ -330,9 +350,26 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
        });
      }, 1000);
      return () => { if (interExTimerRef.current !== null) { window.clearTimeout(interExTimerRef.current); interExTimerRef.current = null; } };
-   }, [interExTimerRunning, interExTimerSec]);
+    }, [interExTimerRunning, interExTimerSec]);
 
-  const getRestTime = useCallback((ei: number): number => {
+    // Wake Lock для зала — экран не гаснет во время основной фазы тренировки
+    useEffect(() => {
+      let lock: any = null;
+      const req = async () => {
+        try {
+          if (phase === 'main' && 'wakeLock' in navigator) {
+            // @ts-ignore
+            lock = await (navigator as any).wakeLock.request('screen');
+          }
+        } catch {}
+      };
+      if (phase === 'main') req();
+      const onVis = () => { if (document.visibilityState === 'visible' && phase === 'main' && !lock) req(); };
+      document.addEventListener('visibilitychange', onVis);
+      return () => { document.removeEventListener('visibilitychange', onVis); try { lock?.release?.(); } catch {} };
+    }, [phase]);
+
+   const getRestTime = useCallback((ei: number): number => {
      if (timerPreset === 'custom') return customRestSec;
      const ex = day?.exercises[ei];
      if (!ex) return 90;
@@ -1520,18 +1557,38 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                           🏋️ {formatPlates(t.weight, ex.name)}
                         </span>
                       )}
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                        <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
-                        <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
-                         <input style={{ ...IN, width: 44 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 } })) }} aria-label="RPE" />
-                        <input style={{ ...IN, width: 48 }} type="number" step="0.01" placeholder="v" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
-                        <button style={logged ? BTN_GHOST : BTN} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
-                        {!logged && (
-                          <button style={{ ...BTN_GHOST, fontSize: 10, padding: '4px 8px' }} onClick={() => {
-                            setActual(p => ({ ...p, [k]: { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) } }));
-                            logOne(ei, si);
-                          }}>Быстро</button>
-                        )}
+                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                        {/* Вес + повторы — крупные степперы для зала */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: Math.max(0, Math.round((a.weight - 2.5) * 10) / 10), reps: a.reps, rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
+                            <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="decimal" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: Math.round((a.weight + 2.5) * 10) / 10, reps: a.reps, rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
+                          </div>
+                          <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: a.weight, reps: Math.max(1, a.reps - 1), rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
+                            <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="numeric" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
+                            <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps + 1, rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(0,230,138,0.22)', background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>+</button>
+                          </div>
+                        </div>
+                        {/* RPE пилюли + VBT + кнопки */}
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center', flex: 1 }}>
+                            {[6, 7, 8, 9, 10].map(v => (
+                              <button key={v} type="button" aria-pressed={a.rpe === v} onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: v } })); }} style={{ minWidth: 32, height: 32, borderRadius: 8, border: a.rpe === v ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', background: a.rpe === v ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)', color: a.rpe === v ? '#00e68a' : 'rgba(255,255,255,0.70)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>{v}</button>
+                            ))}
+                            <input style={{ ...IN, width: 44, textAlign: 'center', padding: '6px 2px', fontSize: 11 }} type="number" min={0} max={10} placeholder="RPE" value={a.rpe || ""} onChange={e => { const v = +e.target.value; setActual(p => ({ ...p, [k]: { weight: a.weight, reps: a.reps, rpe: Number.isFinite(v) ? Math.max(0, Math.min(10, v)) : 0 } })) }} aria-label="RPE" />
+                          </div>
+                          <input style={{ ...IN, width: 56, textAlign: 'center', padding: '6px 4px', fontSize: 11 }} type="number" step="0.01" placeholder="v м/с" value={vel[k] ?? ""} onChange={e => setVel(p => ({ ...p, [k]: +e.target.value }))} aria-label="скорость м/с" />
+                          <button style={{ ...(logged ? BTN_GHOST : { ...BTN, background: 'linear-gradient(135deg,#00e68a,#00c853)', boxShadow: '0 4px 14px rgba(0,230,138,0.28)', minHeight: 36, padding: '8px 14px', borderRadius: 10, fontSize: 13 }), flexShrink: 0, minWidth: 64 }} onClick={() => logOne(ei, si)}>{logged ? '✓' : 'OK'}</button>
+                          {!logged && (
+                            <button style={{ ...BTN_GHOST, fontSize: 11, padding: '8px 10px', borderRadius: 10, minHeight: 36 }} onClick={() => {
+                              hapticImpact('light');
+                              setActual(p => ({ ...p, [k]: { weight: t.weight, reps: t.reps, rpe: Math.max(1, 10 - t.rir) } }));
+                              setTimeout(() => logOne(ei, si), 30);
+                            }}>⚡ Быстро</button>
+                          )}
+                        </div>
                       </div>
                       {/* кнопка пропуска упражнения */}
                       {(() => {
