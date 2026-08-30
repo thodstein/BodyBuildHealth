@@ -636,7 +636,7 @@ export const BbAutoConstructor: React.FC = () => {
   // автоматически при выборе 1-2 отстающих мышц (specTargets).
   const specializationMode = specTargets.length > 0;
   const [editMode, setEditMode] = useState<{ dayIdx: number; exIdx: number } | null>(null);
-  const [exerciseEdits, setExerciseEdits] = useState<Record<string, { sets: number; reps: number; weight: number }>>({});
+  const [exerciseEdits, setExerciseEdits] = useState<Record<string, { sets: number; reps: number; weight: number; rir?: number; tempo?: string; technique?: string; supersetWith?: string }>>({});
   const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number; sessionIdx: number } | null>(null);
   const [exSwapModal, setExSwapModal] = useState<{ si: number; ei: number; muscle: string; currentName: string } | null>(null);
   const [exSwapSearch, setExSwapSearch] = useState('');
@@ -1922,7 +1922,7 @@ export const BbAutoConstructor: React.FC = () => {
           const editKey = `${si}-${ei}`;
           const edit = exerciseEdits[editKey];
           if (!edit) return e;
-          return {
+          const edited = {
             ...e,
             sets: edit.sets,
             workSets: (e.workSets || []).map((ws, i) =>
@@ -1933,6 +1933,19 @@ export const BbAutoConstructor: React.FC = () => {
             repsRange: [edit.reps, edit.reps] as [number, number],
             comment: (e.comment || '') + ' | ✏️ inline-правка',
           };
+          if (edit.rir != null && Number.isFinite(edit.rir)) edited.rir = edit.rir;
+          if (edit.tempo) (edited as any).tempoSpec = edit.tempo;
+          if (edit.technique && edit.technique !== 'none') {
+            (edited as any).technique = edit.technique;
+            if (!(edited as any).intensityTechUsed) (edited as any).intensityTechUsed = true;
+          } else if (edit.technique === 'none') {
+            delete (edited as any).technique;
+          }
+          if (edit.supersetWith && edit.supersetWith !== 'none') {
+            (edited as any).supersetWith = edit.supersetWith;
+            (edited as any).comment = (edited.comment || '') + ` | 🔗 Суперсет с «${edit.supersetWith}»`;
+          }
+          return edited;
         }),
       })),
     }));
@@ -3303,18 +3316,22 @@ export const BbAutoConstructor: React.FC = () => {
           };
           const findLandmark = (m: string) => lm.find((l: any) => l.group === m || l.label === m);
           return (
-            <div style={{ marginTop:8, padding:12, borderRadius:12, background:'rgba(59,130,246,0.06)', border:'1px solid rgba(59,130,246,0.15)' }}>
-              <div style={{ fontSize:12, fontWeight:800, color:'#60a5fa', marginBottom:8 }}>🔥 Тепловая карта объёма</div>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(100px, 1fr))', gap:6 }}>
+            <CollapsibleCard title="🔥 Тепловая карта объёма" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge={`${muscles.length} мышц · прям/косв`}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(118px, 1fr))', gap:6 }}>
                 {muscles.sort((a,b) => (vol[b]||0) - (vol[a]||0)).map(m => {
-                  const sets = vol[m] || 0;
+                  const mm = metrics.perMuscle.find((x:any)=> x.muscle===m);
+                  const direct = mm ? Math.round(((mm as any).directSets ?? (vol[m]||0))*10)/10 : (vol[m]||0);
+                  const effective = mm ? Math.round(((mm as any).effectiveSets ?? (vol[m]||0))*10)/10 : (vol[m]||0);
+                  const indirect = Math.max(0, Math.round((effective - direct)*10)/10);
+                  const sets = effective > 0 ? effective : (vol[m]||0);
                   const landmark = findLandmark(m);
                   const color = colorFor(sets, landmark);
                   const pct = landmark ? Math.min(100, Math.round((sets / (landmark.mrv || sets || 1)) * 100)) : 50;
                   return (
                     <div key={m} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:`2px solid ${color}` }}>
                       <div style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{MUSCLE_RU_H[m]}</div>
-                      <div style={{ fontSize:16, fontWeight:800, color }}>{sets}</div>
+                      <div style={{ fontSize:16, fontWeight:800, color }}>{direct}</div>
+                      <div style={{ fontSize:9, color:'#60a5fa' }}>косв +{indirect} · эфф {effective}</div>
                       <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.1)', marginTop:4 }}>
                         <div style={{ height:'100%', borderRadius:2, background:color, width:`${pct}%` }} />
                       </div>
@@ -3329,8 +3346,9 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
               <div style={{ marginTop:6, fontSize:9, color:'#fff', display:'flex', gap:12, flexWrap:'wrap' }}>
                 <span>🟢 MEV–MAV (оптимум)</span><span>🟡 Выше оптимума</span><span>🔴 Перегруз (выше максимума)</span><span>🔵 Ниже минимума</span>
+                <span style={{ opacity:0.65 }}>· большое число — прямой объём · косв — вклад базы (жимы→трицепс/плечи, тяги→бицепс, присед→ягодицы/б.б.) · цвет — по эффективному</span>
               </div>
-            </div>
+            </CollapsibleCard>
           );
         })()}
 
@@ -3391,8 +3409,7 @@ export const BbAutoConstructor: React.FC = () => {
         </div>
 
         {/* Calendar with phase colors */}
-        <div style={{ marginTop:8, padding:8, borderRadius:10, background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:6 }}>📅 Календарь мезоцикла (цвет = фаза)</div>
+        <CollapsibleCard title="📅 Календарь мезоцикла (цвет = фаза)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a78bfa' }} badge={`${W.length} нед`}>
           <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
             {W.map(w => {
               const ph = phaseForWeek(w.week, bbWeeks);
@@ -3408,7 +3425,7 @@ export const BbAutoConstructor: React.FC = () => {
               );
             })}
           </div>
-        </div>
+        </CollapsibleCard>
 
         {/* Фактическая нагрузка из дневника (sRPE/ACWR) */}
         {(() => {
@@ -3424,8 +3441,7 @@ export const BbAutoConstructor: React.FC = () => {
           const zoneColor = acwrData.zone === 'dangerous' ? '#ef4444' : acwrData.zone === 'caution' ? '#f59e0b' : '#22c55e';
           const zoneLabel = acwrData.zone === 'dangerous' ? '⛔ опасная' : acwrData.zone === 'caution' ? '⚠ осторожно' : '✅ оптимально';
           return (
-            <div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>📊 Твоя фактическая нагрузка (из дневника)</div>
+            <CollapsibleCard title="📊 Твоя фактическая нагрузка (из дневника)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge={`${zoneLabel}`}>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, fontSize:11 }}>
                 <div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(96,165,250,0.06)' }}>
                   <div style={{ color:'#fff', fontSize:10 }}>Сессий (7д)</div>
@@ -3441,7 +3457,7 @@ export const BbAutoConstructor: React.FC = () => {
                 </div>
               </div>
               {acwrData.ratio > 1.3 && <div style={{ marginTop:6, fontSize:10, color:'#f59e0b' }}>⚠ Восстановление недостаточно — план учитывает авторегуляцию.</div>}
-            </div>
+            </CollapsibleCard>
           );
         })()}
 
@@ -3498,8 +3514,7 @@ export const BbAutoConstructor: React.FC = () => {
           const maxSets = Math.max(1, ...wkStats.map(x => x.sets));
           const maxTon = Math.max(1, ...wkStats.map(x => x.tonnage));
           return (
-            <div style={{ marginTop:10, padding:'8px 10px', borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6 }}>📈 ПРОГРЕССИЯ ПО НЕДЕЛЯМ: RIR / ОБЪЁМ / ТОННАЖ</div>
+            <CollapsibleCard title="📈 Прогрессия по неделям: RIR / объём / тоннаж" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04))', color: '#22c55e' }} badge={`${W.length} нед`}>
               <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
                 {wkStats.map(x => {
                   const barW = 220;
@@ -3530,7 +3545,7 @@ export const BbAutoConstructor: React.FC = () => {
                 <span><span style={{ width:8, height:8, borderRadius:2, background:'#60a5fa', display:'inline-block', marginRight:2 }} /> тоннаж</span>
                 <span>RIR: 🟢3+ 🟡1-2 🔴0</span>
               </div>
-            </div>
+            </CollapsibleCard>
           );
         })()}
 
@@ -4062,6 +4077,9 @@ export const BbAutoConstructor: React.FC = () => {
                             <div style={{ fontSize:10, color:'#fff', opacity:0.68, marginTop:4, lineHeight:1.35, fontFamily:'ui-monospace, SFMono-Regular, monospace' }}>{f.calculation}</div>
                           </div>
                         ))}
+                        <div style={{ padding:'7px 9px', borderRadius:8, background:'rgba(96,165,250,0.05)', border:'1px solid rgba(96,165,250,0.12)', fontSize:9, color:'#fff', opacity:0.78, lineHeight:1.45 }}>
+                          <b style={{ color:'#60a5fa' }}>Почему «Суставной стресс» и «Баланс» почти всегда показывают полный балл:</b> оба фактора вычитаются ТОЛЬКО при выявленной проблеме. Суставной стресс −20/−10 лишь если риск высокий/умеренный — при низком риске это 20, а детали по каждому суставу (пик/среднее/пороги) видны в карточке «🦴 Суставная нагрузка» ниже. Баланс −2 за каждую проблему антагонистов/симметрии (analyzeBBBalance) — если нарушений нет, честно остаётся 10. Полный балл ≠ «не считается», это «нарушений нет».
+                        </div>
                       </div>
                     </div>
                   )}
@@ -4340,9 +4358,32 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           </div>
         )}
-        <div style={{ marginBottom:8, padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.05))', border:'1px solid rgba(96,165,250,0.24)' }}>
-          <button type="button" onClick={() => setQualityOpen(v => !v)} aria-expanded={qualityOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', border:0, background:'transparent', color:'#fff', cursor:'pointer', fontSize:15, fontWeight:900, textAlign:'left' }}>
-            <span>🏋️ Тренировочная нагрузка плана</span><span>{qualityOpen ? '▲' : '▼'}</span>
+        <CollapsibleCard title="📤 Экспорт плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="PDF · CSV · тренеру">{quality && (
+          <div style={{ marginTop:8 }}>
+            <PlanExportCard
+              bbPlan={builtPlan}
+              profile={{
+                level: bbLevel,
+                goal: bbGoal,
+                daysPerWeek: bbDays,
+                bodyWeight: prof.bodyWeight,
+                pmSquat: prof.pmSquat,
+                pmBench: prof.pmBench,
+                pmDead: prof.pmDead,
+                weakPoints,
+                onCourse: peds.length > 0,
+              }}
+              level={bbLevel}
+              weakPoints={weakPoints}
+              hasDeload={(quality as any).hasDeloadActual ?? autoDeload}
+              meta={{ splitName: builtPlan.pattern?.name || 'BB-сплит', weeks: W.length, corrections: builtPlan.rationale }}
+            />
+          </div>
+        )}</CollapsibleCard>
+        <div style={{ ...CARD, padding:0, overflow:'hidden', marginBottom:8, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(6,22,18,0.32)' }}>
+          <button type="button" onClick={() => setQualityOpen(v => !v)} aria-expanded={qualityOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', cursor:'pointer', background:'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.06))', border:'none', borderBottom: qualityOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+            <span style={{ fontSize:14, fontWeight:900, color:'#fff' }}>🏋️ Тренировочная нагрузка плана</span>
+            <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:13, transform: qualityOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
           </button>
         </div>
         <div style={{ display: qualityOpen ? 'block' : 'none' }}>
@@ -4806,39 +4847,12 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           )}
         </div></CollapsibleCard>
-        {/* Дополнительно: прогноз прогрессии — свернуто по умолчанию */}
-        <ExpandableCard
-          title="🔧 Дополнительно: прогноз прогрессии"
-          icon="🔧"
-          short="Прогрессия мезоцикла"
-          full={
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" hideApply />
-            </div>
-          }
-        />
-        <CollapsibleCard title="📤 Экспорт плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(96,165,250,0.03))', color: '#60a5fa' }}>{quality && (
-          <div style={{ marginTop:8 }}>
-            <PlanExportCard
-              bbPlan={builtPlan}
-              profile={{
-                level: bbLevel,
-                goal: bbGoal,
-                daysPerWeek: bbDays,
-                bodyWeight: prof.bodyWeight,
-                pmSquat: prof.pmSquat,
-                pmBench: prof.pmBench,
-                pmDead: prof.pmDead,
-                weakPoints,
-                onCourse: peds.length > 0,
-              }}
-              level={bbLevel}
-              weakPoints={weakPoints}
-              hasDeload={(quality as any).hasDeloadActual ?? autoDeload}
-              meta={{ splitName: builtPlan.pattern?.name || 'BB-сплит', weeks: W.length, corrections: builtPlan.rationale }}
-            />
+        {/* Дополнительно: прогноз прогрессии — карточка в стиле всех карточек шага */}
+        <CollapsibleCard title="🔧 Дополнительно: прогноз прогрессии" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.10), rgba(59,130,246,0.03))', color: '#60a5fa' }} badge={`${W.length} нед`}>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" hideApply />
           </div>
-        )}</CollapsibleCard>
+        </CollapsibleCard>
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
           <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
@@ -4862,8 +4876,7 @@ export const BbAutoConstructor: React.FC = () => {
         {(() => {
           const fb = getPlanFeedback();
           return fb.reasons.length > 0 && fb.avgRpe > 0 ? (
-            <div style={{ ...CARD, marginBottom:10, background:'rgba(139,92,246,0.06)', border:'1px solid rgba(139,92,246,0.2)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a78bfa', marginBottom:6 }}>📊 Фидбэк план→выполнение</div>
+            <CollapsibleCard title="📊 Фидбэк план → выполнение" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.14), rgba(139,92,246,0.05))', color: '#a78bfa' }} badge={fb.deloadRecommended ? 'разгрузка' : undefined}>
               {fb.deloadRecommended && <div style={{ padding:'4px 8px', borderRadius:8, background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:11, fontWeight:700, marginBottom:6 }}>⛔ РЕКОМЕНДОВАНА РАЗГРУЗКА</div>}
               {fb.reasons.map((r,i) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, padding:'3px 0' }}>{r}</div>)}
               <div style={{ display:'flex', gap:8, marginTop:6 }}>
@@ -4871,12 +4884,11 @@ export const BbAutoConstructor: React.FC = () => {
                 {fb.rirShift !== 0 && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:11, background:'rgba(245,158,11,0.1)', color:'#f59e0b' }}>RIR {fb.rirShift > 0 ? '+':''}{fb.rirShift}</span>}
                 {fb.volumeMultiplier !== 1 && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:11, background:'rgba(34,197,94,0.1)', color:'#22c55e' }}>Объём ×{fb.volumeMultiplier}</span>}
               </div>
-            </div>
+            </CollapsibleCard>
           ) : null;
         })()}
         <PlanFeedbackCard plan={builtPlan} workMax={bbWorkMax} strategy={loadStrategy} onApply={setBuiltPlan} />
-        <div style={{ ...CARD, background:'rgba(96,165,250,0.06)', border:'1px solid rgba(96,165,250,0.15)', marginBottom:10 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'#60a5fa', marginBottom:6 }}>🔧 Инструменты коррекции</div>
+        <CollapsibleCard title="🔧 Инструменты коррекции" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="объём · вес · пик · сравнение">
             <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
               {builtPlan.validation && !builtPlan.validation.valid && <div style={{ width:'100%', fontSize:11, color:'#f59e0b' }}>⚠ Есть предупреждения валидации — сохранение доступно, но проверьте замечания.</div>}
              <button style={BTN_GHOST} onClick={() => adjustVolume(0.8)}>📦 Объём -20%</button>
@@ -5032,11 +5044,11 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>↩ — загрузить вариант · ✕ — удалить · максимум 8 вариантов</div>
             </div>
           )}
-        </div>
+        </CollapsibleCard>
         {/* Per-exercise editing zone */}
-        <div style={{ marginTop:10 }}>
+        <CollapsibleCard title={`✏️ Редактор упражнений — неделя ${bbWeekSel}`} defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${wk.sessions.length} дн · ${W.length} нед`}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-            <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>Редактор упражнений (неделя {bbWeekSel})</span>
+            <span style={{ fontSize:11, color:'#fff', opacity:0.7 }}>Выберите неделю для правки упражнений</span>
             <div style={{ display:'flex', gap:4 }}>
               {W.map(w => {
                 const ph = phaseForWeek(w.week, bbWeeks);
@@ -5066,10 +5078,28 @@ export const BbAutoConstructor: React.FC = () => {
                       <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }))} style={{ width:45, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
                       <div><span style={{ ...SMALL, fontSize:11 }}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }))} style={{ width:45, ...IN }} /></div>
                       <div><span style={{ ...SMALL, fontSize:11 }}>Вес, кг</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } }))} style={{ width:55, ...IN }} /></div>
-                      <div><span style={{ ...SMALL, fontSize:11 }}>RIR</span><span style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginLeft:4 }}>{e.rir}</span></div>
+                      <div><span style={{ ...SMALL, fontSize:11 }}>RIR</span><input type="number" value={edit.rir ?? (e as any).rir ?? 2} min={0} max={10} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, rir: parseInt(e2.target.value) || 0 } }))} style={{ width:45, ...IN }} /></div>
                       <button onClick={() => setExSwapModal({ si, ei, muscle: e.muscle, currentName: e.name })} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'#fff' }}>🔄 Заменить</button>
                       <button onClick={() => handleMoveExercise(si, ei, -1)} disabled={ei === 0} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===0?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===0?'transparent':'rgba(96,165,250,0.06)', color:ei===0?'rgba(255,255,255,0.2)':'#60a5fa' }}>↑</button>
                       <button onClick={() => handleMoveExercise(si, ei, 1)} disabled={ei === s.exercises.length - 1} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===s.exercises.length-1?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===s.exercises.length-1?'transparent':'rgba(96,165,250,0.06)', color:ei===s.exercises.length-1?'rgba(255,255,255,0.2)':'#60a5fa' }}>↓</button>
+                    </div>
+                    <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
+                      <span style={{ ...SMALL, fontSize:11, fontWeight:800, color:'#c084fc' }}>⚙️ Фичи и методики</span>
+                      <select value={edit.technique ?? ((e as any).technique || 'none')} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, technique: e2.target.value } }))} style={{ ...IN, fontSize:11, width:'auto' }}>
+                        <option value="none">— интенсив-техника —</option>
+                        <option value="drop_set">💥 Дроп-сет</option>
+                        <option value="rest_pause">⏱ Рест-пауза</option>
+                        <option value="myo_rep">🧬 Мио-репс</option>
+                        <option value="negative">⬇️ Негативы</option>
+                        <option value="21s">2️⃣1️⃣ 21s</option>
+                      </select>
+                      <select value={edit.supersetWith ?? ((e as any).supersetWith || 'none')} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, supersetWith: e2.target.value } }))} style={{ ...IN, fontSize:11, width:'auto' }}>
+                        <option value="none">— суперсет —</option>
+                        <option value="антагонист">🔗 Антагонист</option>
+                        <option value="та же группа">🔗 Та же группа</option>
+                      </select>
+                      <div style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ ...SMALL, fontSize:11 }}>Темп</span><input type="text" defaultValue={(e as any).tempoSpec || edit.tempo || ''} onBlur={e2 => { const v=e2.target.value.trim(); setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, tempo: v || undefined } })); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} /></div>
+                      {(edit.technique && edit.technique !== 'none') || (edit.supersetWith && edit.supersetWith !== 'none') ? <span style={{ fontSize:9, color:'#f59e0b' }}>⚠ применяется при «💾 Сохранить план» / экспорте</span> : null}
                     </div>
                     {(editSetLines.length > 0 || editSetChain) && (
                       <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.07)', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
@@ -5084,7 +5114,7 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
             } />
           ))}
-        </div>
+        </CollapsibleCard>
         <div style={{ display:'flex', gap:8, marginTop:12 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('contest')}>Далее: Contest prep →</button>
           <button style={BTN_GHOST} onClick={() => setStep('quality')}>← Назад</button>
