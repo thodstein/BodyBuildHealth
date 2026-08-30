@@ -4025,79 +4025,80 @@ export const BbAutoConstructor: React.FC = () => {
           ;
          })()}
         <div style={{ ...CARD, padding:0, overflow:'hidden', marginBottom:8, border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.32)' }}>
-          <button type="button" onClick={() => setGeneralSafetyLoadOpen(v=>!v)} aria-expanded={generalSafetyLoadOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', cursor:'pointer', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(96,165,250,0.06))', border:'none', borderBottom: generalSafetyLoadOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
-            <span style={{ fontSize:14, fontWeight:900, color:'#fff' }}>🛡️ Безопасность и нагрузка — общий обзор</span>
+          <button type="button" onClick={() => setGeneralSafetyLoadOpen(v=>!v)} aria-expanded={generalSafetyLoadOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', cursor:'pointer', background:'linear-gradient(135deg, rgba(239,68,68,0.16), rgba(96,165,250,0.06))', border:'none', borderBottom: generalSafetyLoadOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+             <span style={{ fontSize:14, fontWeight:900, color:'#fff' }}>🛡️ Безопасность плана</span>
             <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:13, transform: generalSafetyLoadOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
           </button>
           <div style={{ display: generalSafetyLoadOpen ? 'block' : 'none', padding:'8px 12px' }}>
             {safetyScore && (
-          <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, borderRadius: 14, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)', overflow:'hidden' }}>
-            <button type="button" onClick={() => setSafetyOpen(v=>!v)} aria-expanded={safetyOpen} style={{ width:'100%', display:'flex', gap:12, alignItems:'center', padding:12, cursor:'pointer', background: `linear-gradient(135deg, ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.14)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.14)':'rgba(239,68,68,0.14)'}, transparent)`, border:'none', borderBottom: safetyOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
-              <div style={{ width:62, height:62, borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center', background: safetyScore.riskLevel==='safe'?'#22c55e': safetyScore.riskLevel==='caution'?'#f59e0b':'#ef4444', color:'#000', fontWeight:900, fontSize:22, boxShadow:'0 4px 12px rgba(0,0,0,0.25)' }}>{safetyScore.score}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
-                <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Формула каждого фактора — ниже</div>
-              </div>
-              <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:13, transform: safetyOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
-            </button>
-            <div style={{ display: safetyOpen ? 'block' : 'none' }}>
-            {/* Factor breakdown — сворачиваемая карточка с кнопкой */}
-            {safetyScore.details?.factorBreakdown && (
-              <div style={{ padding:0, overflow:'hidden', background:'rgba(0,0,0,0.08)', borderBottom:'1px solid rgba(255,255,255,0.06)', borderRadius:8 }}>
-                <button type="button" onClick={() => setSafetyFactorsOpen(v=>!v)} aria-expanded={safetyFactorsOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', cursor:'pointer', background:'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))', border:'none', borderBottom: safetyFactorsOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
-                  <span style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, letterSpacing:0.3, textTransform:'uppercase' }}>🧮 Расчёт по факторам — откуда баллы</span>
-                  <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, transform: safetyFactorsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+              <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, borderRadius: 14, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)', overflow:'hidden' }}>
+                <button type="button" onClick={() => setSafetyOpen(v=>!v)} aria-expanded={safetyOpen} style={{ width:'100%', display:'flex', gap:12, alignItems:'center', padding:12, cursor:'pointer', background: `linear-gradient(135deg, ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.14)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.14)':'rgba(239,68,68,0.14)'}, transparent)`, border:'none', borderBottom: safetyOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+                  <div style={{ width:62, height:62, borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center', background: safetyScore.riskLevel==='safe'?'#22c55e': safetyScore.riskLevel==='caution'?'#f59e0b':'#ef4444', color:'#000', fontWeight:900, fontSize:22, boxShadow:'0 4px 12px rgba(0,0,0,0.25)' }}>{safetyScore.score}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
+                    <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
+                    <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Формула каждого фактора — ниже</div>
+                  </div>
+                  <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:13, transform: safetyOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
                 </button>
-                <div style={{ display: safetyFactorsOpen ? 'grid' : 'none', padding:'8px 12px', gridTemplateColumns:'1fr', gap:6 }}>-
-                {safetyScore.details.factorBreakdown.map(f=> (
-                  <div key={f.key} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                      <span style={{ fontSize:11, fontWeight:700, color: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444' }}>{f.label}</span>
-                      <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{f.score}/{f.max}</span>
+                <div style={{ display: safetyOpen ? 'block' : 'none' }}>
+                  {/* Factor breakdown — сворачиваемая карточка с кнопкой */}
+                  {safetyScore.details?.factorBreakdown && (
+                    <div style={{ padding:0, overflow:'hidden', background:'rgba(0,0,0,0.08)', borderBottom:'1px solid rgba(255,255,255,0.06)', borderRadius:8 }}>
+                      <button type="button" onClick={() => setSafetyFactorsOpen(v=>!v)} aria-expanded={safetyFactorsOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', cursor:'pointer', background:'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))', border:'none', borderBottom: safetyFactorsOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+                        <span style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, letterSpacing:0.3, textTransform:'uppercase' }}>🧮 Расчёт по факторам — откуда баллы</span>
+                        <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, transform: safetyFactorsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                      </button>
+                      <div style={{ display: safetyFactorsOpen ? 'grid' : 'none', padding:'8px 12px', gridTemplateColumns:'1fr', gap:6 }}>
+                        {safetyScore.details.factorBreakdown.map(f=> (
+                          <div key={f.key} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                              <span style={{ fontSize:11, fontWeight:700, color: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444' }}>{f.label}</span>
+                              <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{f.score}/{f.max}</span>
+                            </div>
+                            <div style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', marginTop:4, overflow:'hidden' }}>
+                              <div style={{ height:'100%', width:`${(f.score/f.max)*100}%`, background: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444', transition:'width 0.3s' }} />
+                            </div>
+                            <div style={{ fontSize:10, color:'#fff', opacity:0.68, marginTop:4, lineHeight:1.35, fontFamily:'ui-monospace, SFMono-Regular, monospace' }}>{f.calculation}</div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', marginTop:4, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${(f.score/f.max)*100}%`, background: f.status==='ok'?'#22c55e': f.status==='warn'?'#f59e0b':'#ef4444', transition:'width 0.3s' }} />
-                    </div>
-                    <div style={{ fontSize:10, color:'#fff', opacity:0.68, marginTop:4, lineHeight:1.35, fontFamily:'ui-monospace, SFMono-Regular, monospace' }}>{f.calculation}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {/* 🦴 Единый суставный анализ — качественная оценка нагрузки */}
-            {(safetyScore.details?.jointStressDetails || safetyScore.details?.orthopedic || safetyScore.details?.loadDistribution || (safetyScore.details?.jointDiagnoses && safetyScore.details.jointDiagnoses.length>0)) && (
-              <div style={{ padding:'8px 12px' }}>
-                <div style={{ ...CARD, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.42)' }}>
-                  <button type="button" onClick={() => setJointAnalysisOpen(v=>!v)} aria-expanded={jointAnalysisOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', cursor:'pointer', background: safetyScore.details?.jointStressDetails?.overallRisk==='high' ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))' : safetyScore.details?.jointStressDetails?.overallRisk==='moderate' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))' : 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))', border:'none', borderBottom: jointAnalysisOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
-                    <span style={{ fontSize:13, fontWeight:900, color:'#fff' }}>🦴 Суставная нагрузка — качественный анализ</span>
-                    <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, transform: jointAnalysisOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
-                  </button>
-                  <div style={{ display: jointAnalysisOpen ? 'block' : 'none' }}>
-                  <div style={{ padding:'10px 12px', background: safetyScore.details?.jointStressDetails?.overallRisk==='high' ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))' : safetyScore.details?.jointStressDetails?.overallRisk==='moderate' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))' : 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'none' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                      <span style={{ fontSize:13, fontWeight:900, color:'#fff', display:'none' }}>🦴 Суставная нагрузка — качественный анализ</span>
-                      {(() => {
-                        const r = safetyScore.details?.jointStressDetails?.overallRisk || 'low';
-                        const label = r==='high'?'Высокий риск': r==='moderate'?'Умеренно':'Низкий риск';
-                        const bg = r==='high'?'rgba(239,68,68,0.16)': r==='moderate'?'rgba(245,158,11,0.16)':'rgba(34,197,94,0.14)';
-                        const color = r==='high'?'#ef4444': r==='moderate'?'#f59e0b':'#22c55e';
-                        const border = r==='high'?'rgba(239,68,68,0.28)': r==='moderate'?'rgba(245,158,11,0.28)':'rgba(34,197,94,0.28)';
-                        return <span style={{ marginLeft:'auto', fontSize:10, fontWeight:800, padding:'3px 9px', borderRadius:20, background:bg, color, border:`1px solid ${border}` }}>{label}</span>;
-                      })()}
-                    </div>
-                    <div style={{ fontSize:10, color:'#fff', opacity:0.78, marginTop:4, lineHeight:1.45 }}>
-                      {(() => {
-                        const d = safetyScore.details?.jointStressDetails;
-                        if (!d) return 'Оценка по фактическому плану: стресс суставов, ортопедические блоки, распределение по неделе и точечная профилактика.';
-                        const peak = d.peakWeek ? `пик — нед ${d.peakWeek}` : 'пиковая неделя —';
-                        const avg = `средний нед. стресс ${Math.round(d.avgWeeklyStress)}`;
-                        const most = d.mostLoadedJoint ? `лидер: ${(({ shoulder:'плечо', knee:'колено', hip:'таз', spine:'поясница', lower_back:'поясница', elbow:'локоть', wrist:'запястье', ankle:'голеностоп', neck:'шея'} as any)[d.mostLoadedJoint.joint] || d.mostLoadedJoint.joint)} · ${Math.round(d.mostLoadedJoint.stress)}` : 'лидер —';
-                        const phase = safetyScore.details?.orthopedic?.phase;
-                        const phaseRu = phase==='acute'?'острая': phase==='subacute'?'подострая': phase==='chronic'?'хроническая': phase==='maintenance'?'восстановление':'—';
-                        return `${peak} · ${avg} · ${most} · фаза: ${phaseRu}`;
-                      })()}
-                    </div>
-                  </div>
+                  )}
+                  {/* 🦴 Единый суставный анализ — качественная оценка нагрузки */}
+                  {(safetyScore.details?.jointStressDetails || safetyScore.details?.orthopedic || safetyScore.details?.loadDistribution || (safetyScore.details?.jointDiagnoses && safetyScore.details.jointDiagnoses.length>0)) && (
+                    <div style={{ padding:'8px 12px' }}>
+                      <div style={{ ...CARD, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.42)' }}>
+                        <button type="button" onClick={() => setJointAnalysisOpen(v=>!v)} aria-expanded={jointAnalysisOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 12px', cursor:'pointer', background: safetyScore.details?.jointStressDetails?.overallRisk==='high' ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))' : safetyScore.details?.jointStressDetails?.overallRisk==='moderate' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))' : 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))', border:'none', borderBottom: jointAnalysisOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+                          <span style={{ fontSize:13, fontWeight:900, color:'#fff' }}>🦴 Суставная нагрузка — качественный анализ</span>
+                          <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, transform: jointAnalysisOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                        </button>
+                        <div style={{ display: jointAnalysisOpen ? 'block' : 'none' }}>
+                          <div style={{ padding:'10px 12px', background: safetyScore.details?.jointStressDetails?.overallRisk==='high' ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))' : safetyScore.details?.jointStressDetails?.overallRisk==='moderate' ? 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(245,158,11,0.05))' : 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
+                            <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                              <span style={{ fontSize:13, fontWeight:900, color:'#fff' }}>🦴 Суставная нагрузка — качественный анализ</span>
+                              {(() => {
+                                const r = safetyScore.details?.jointStressDetails?.overallRisk || 'low';
+                                const label = r==='high'?'Высокий риск': r==='moderate'?'Умеренно':'Низкий риск';
+                                const bg = r==='high'?'rgba(239,68,68,0.16)': r==='moderate'?'rgba(245,158,11,0.16)':'rgba(34,197,94,0.14)';
+                                const color = r==='high'?'#ef4444': r==='moderate'?'#f59e0b':'#22c55e';
+                                const border = r==='high'?'rgba(239,68,68,0.28)': r==='moderate'?'rgba(245,158,11,0.28)':'rgba(34,197,94,0.28)';
+                                return <span style={{ marginLeft:'auto', fontSize:10, fontWeight:800, padding:'3px 9px', borderRadius:20, background:bg, color, border:`1px solid ${border}` }}>{label}</span>;
+                              })()}
+                            </div>
+                            <div style={{ fontSize:10, color:'#fff', opacity:0.78, marginTop:4, lineHeight:1.45 }}>
+                              {(() => {
+                                const d = safetyScore.details?.jointStressDetails;
+                                if (!d) return 'Оценка по фактическому плану: стресс суставов, ортопедические блоки, распределение по неделе и точечная профилактика.';
+                                const peak = d.peakWeek ? `пик — нед ${d.peakWeek}` : 'пиковая неделя —';
+                                const avg = `средний нед. стресс ${Math.round(d.avgWeeklyStress)}`;
+                                const most = d.mostLoadedJoint ? `лидер: ${(({ shoulder:'плечо', knee:'колено', hip:'таз', spine:'поясница', lower_back:'поясница', elbow:'локоть', wrist:'запястье', ankle:'голеностоп', neck:'шея'} as any)[d.mostLoadedJoint.joint] || d.mostLoadedJoint.joint)} · ${Math.round(d.mostLoadedJoint.stress)}` : 'лидер —';
+                                const phase = safetyScore.details?.orthopedic?.phase;
+                                const phaseRu = phase==='acute'?'острая': phase==='subacute'?'подострая': phase==='chronic'?'хроническая': phase==='maintenance'?'восстановление':'—';
+                                return `${peak} · ${avg} · ${most} · фаза: ${phaseRu}`;
+                              })()}
+                            </div>
+                          </div>
                   <div style={{ padding:'10px 12px', display:'grid', gap:12 }}>
                     {/* 1 · Нагрузка по суставам */}
                     {(() => {
@@ -4228,20 +4229,22 @@ export const BbAutoConstructor: React.FC = () => {
                                 {jd.joint.relatedLifts?.length>0 && <div style={{ fontSize:9, color:'#fff', opacity:0.6, marginBottom:6 }}><b>Связанные движения:</b> {jd.joint.relatedLifts.join(', ')}</div>}
                                 {jd.options?.length>0 && (
                                   <div style={{ display:'grid', gap:6 }}>
-                                    {jd.options.map((opt:any)=> {
-                                      const lvlRu = opt.level==='critical'?'критический': opt.level==='high'?'высокий': opt.level==='moderate'?'умеренный':'низкий';
-                                      const lvlColor = opt.level==='critical'?'#ef4444': opt.level==='high'?'#f59e0b': opt.level==='moderate'?'#60a5fa':'#22c55e';
-                                      return (
-                                        <div key={opt.id} style={{ padding:'7px 8px', borderRadius:8, background: opt.level==='critical'?'rgba(239,68,68,0.07)': opt.level==='high'?'rgba(245,158,11,0.07)':'rgba(255,255,255,0.03)', border:`1px solid ${opt.level==='critical'?'rgba(239,68,68,0.14)': opt.level==='high'?'rgba(245,158,11,0.14)':'rgba(255,255,255,0.06)'}` }}>
-                                          <div style={{ fontSize:11, fontWeight:700, color: lvlColor, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}><span>{opt.label}</span><span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:6, background:lvlColor+'18', border:`1px solid ${lvlColor}22` }}>{lvlRu}</span></div>
-                                          <div style={{ fontSize:10, color:'#fff', opacity:0.8, marginTop:2, lineHeight:1.35 }}>{opt.description}</div>
-                                          <div style={{ fontSize:10, color:'#00e68a', marginTop:3 }}><b>Метод:</b> {opt.method}</div>
-                                          {opt.assistance?.length>0 && <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}><b>Ассисты:</b> {opt.assistance.join(', ')}</div>}
-                                          {opt.rationale && <div style={{ fontSize:9, color:'#fff', opacity:0.55, marginTop:2, fontStyle:'italic' }}>{opt.rationale}</div>}
-                                          <div style={{ fontSize:10, color:'#fff', marginTop:3, padding:'3px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', display:'inline-block' }}>Протокол: {opt.protocol.sets}×{opt.protocol.reps}{opt.protocol.pct?` @${opt.protocol.pct}%`:''} · RIR{opt.protocol.rir}{opt.protocol.tempo?` · ${opt.protocol.tempo}`:''}{opt.protocol.rest?` · ${opt.protocol.rest}`:''}{opt.protocol.note?` · ${opt.protocol.note}`:''}</div>
-                                        </div>
-                                      );
-                                    })}
+                                      {jd.options.map((opt:any)=> {
+                                       const lvlRu = opt.level==='critical'?'критический': opt.level==='high'?'высокий': opt.level==='moderate'?'умеренный':'низкий';
+                                       const lvlColor = opt.level==='critical'?'#ef4444': opt.level==='high'?'#f59e0b': opt.level==='moderate'?'#60a5fa':'#22c55e';
+                                       return (
+                                         <CollapsibleCard key={opt.id} title={`Профилактика: ${opt.label}`} defaultOpen={false} badge={lvlRu} headerStyle={{ background: opt.level==='critical'?'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.04))': opt.level==='high'?'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))':'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))', color: lvlColor }}>
+                                         <div style={{ padding:'0 0 2px' }}>
+                                           <div style={{ fontSize:11, fontWeight:700, color: lvlColor, display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}><span>{opt.label}</span><span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:6, background:lvlColor+'18', border:`1px solid ${lvlColor}22` }}>{lvlRu}</span></div>
+                                           <div style={{ fontSize:10, color:'#fff', opacity:0.8, marginTop:2, lineHeight:1.35 }}>{opt.description}</div>
+                                           <div style={{ fontSize:10, color:'#00e68a', marginTop:3 }}><b>Метод:</b> {opt.method}</div>
+                                           {opt.assistance?.length>0 && <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}><b>Ассисты:</b> {opt.assistance.join(', ')}</div>}
+                                           {opt.rationale && <div style={{ fontSize:9, color:'#fff', opacity:0.55, marginTop:2, fontStyle:'italic' }}>{opt.rationale}</div>}
+                                           <div style={{ fontSize:10, color:'#fff', marginTop:3, padding:'3px 6px', borderRadius:6, background:'rgba(0,0,0,0.18)', display:'inline-block' }}>Протокол: {opt.protocol.sets}×{opt.protocol.reps}{opt.protocol.pct?` @${opt.protocol.pct}%`:''} · RIR{opt.protocol.rir}{opt.protocol.tempo?` · ${opt.protocol.tempo}`:''}{opt.protocol.rest?` · ${opt.protocol.rest}`:''}{opt.protocol.note?` · ${opt.protocol.note}`:''}</div>
+                                         </div>
+                                         </CollapsibleCard>
+                                       );
+                                     })}
                                   </div>
                                 )}
                               </CollapsibleCard>
@@ -4263,7 +4266,7 @@ export const BbAutoConstructor: React.FC = () => {
                             <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(96,165,250,0.12)', border:'1px solid rgba(96,165,250,0.22)', color:'#60a5fa', fontSize:11, transform: safetyDistributionOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
                           </button>
                           <div style={{ display: safetyDistributionOpen ? 'block' : 'none', padding:'8px 10px' }}>
-                          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase', marginBottom:6, display:'none' }}>4 · Недельное распределение — восстановление суставов</div>
+                           <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase', marginBottom:6 }}>4 · Недельное распределение — восстановление суставов</div>
                           <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4, marginBottom:8 }}>
                             {ld.weekPlan.map((d:any)=> (
                               <div key={d.day} style={{ padding:'6px 4px', borderRadius:8, textAlign:'center', background: d.difficulty==='hard'?'rgba(239,68,68,0.10)': d.difficulty==='medium'?'rgba(245,158,11,0.10)': d.difficulty==='light'?'rgba(96,165,250,0.10)': d.difficulty==='rehab'?'rgba(168,85,247,0.10)':'rgba(255,255,255,0.04)', border:`1px solid ${d.difficulty==='hard'?'rgba(239,68,68,0.16)': d.difficulty==='medium'?'rgba(245,158,11,0.14)': d.difficulty==='light'?'rgba(96,165,250,0.12)':'rgba(255,255,255,0.06)'}` }}>
@@ -4319,9 +4322,8 @@ export const BbAutoConstructor: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  </div>
                 </div>
-                </div>
+              </div>
               </div>
             )}
             </div>
@@ -4576,13 +4578,8 @@ export const BbAutoConstructor: React.FC = () => {
                   // сортировка внутри группы
                   const sorted = [...rows].sort((a,b)=> (order[a.status]??9)-(order[b.status]??9) || b.effectiveSets - a.effectiveSets);
                   return (
-                    <div key={g.id} style={{ border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, overflow:'hidden', background:'rgba(255,255,255,0.02)' }}>
-                      <div style={{ padding:'7px 10px', background:'rgba(255,255,255,0.03)', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'flex', alignItems:'center', gap:6 }}>
-                        <span style={{ fontSize:12 }}>{g.icon}</span>
-                        <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{g.label}</span>
-                        <span style={{ fontSize:10, color:'#fff', opacity:0.6, marginLeft:'auto' }}>{sorted.length} мышцы</span>
-                      </div>
-                      <div style={{ display:'grid', gap:8, padding:'8px 10px' }}>
+                     <CollapsibleCard key={g.id} title={`${g.icon} ${g.label}`} defaultOpen={true} badge={`${sorted.length} мышц`} headerStyle={{ background:'linear-gradient(135deg, rgba(0,230,138,0.09), rgba(0,230,138,0.03))', color:'#00e68a' }}>
+                       <div style={{ display:'grid', gap:8 }}>
                         {sorted.map((m:any)=>{
                           const st = statusMeta[m.status] || statusMeta.optimal;
                           const tot = totalAgg[m.muscle] || { direct:0, effective:0 };
@@ -4593,12 +4590,13 @@ export const BbAutoConstructor: React.FC = () => {
                           const тяжPct = m.totalSets>0 ? Math.round(m.тяжSets/m.totalSets*100) : 0;
                           const isBack = m.muscle==='back';
                           return (
-                            <div key={m.muscle} style={{ padding:'8px 9px', borderRadius:9, background:'rgba(0,0,0,0.14)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                             <CollapsibleCard key={m.muscle} title={`${g.icon} ${ru(m.muscle)}`} defaultOpen={false} badge={`${Math.round(m.effectiveSets)} эфф`} headerStyle={{ background:'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))', color:'#fff' }}>
+                               <div style={{ padding:0, borderRadius:9, background:'rgba(0,0,0,0.14)' }}>
                               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
                                 <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{ru(m.muscle)}</span>
                                 <span style={{ fontSize:10, fontWeight:800, padding:'2px 7px', borderRadius:20, background: st.color+'18', color: st.color, border:`1px solid ${st.color}22` }}>{st.label}</span>
-                              </div>
-                              <div style={{ marginTop:5, display:'flex', gap:6, flexWrap:'wrap', fontSize:10, color:'#fff', lineHeight:1.35 }}>
+                               </div>
+                               <div style={{ marginTop:5, display:'flex', gap:6, flexWrap:'wrap', fontSize:10, color:'#fff', lineHeight:1.35 }}>
                                 <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }} title="Прямая / косвенная = эффективная">неделя: <b>{m.directSets}</b> / {indirectW} <span style={{ opacity:0.6 }}>(прям/косв)</span> · <b>{m.effectiveSets}</b> эфф {m.directSets===0 && indirectW>0 ? <span style={{ fontSize:9, color:'#60a5fa', background:'rgba(96,165,250,0.12)', padding:'1px 4px', borderRadius:4, marginLeft:4, border:'1px solid rgba(96,165,250,0.18)' }}>косвенная</span> : null}</span>
                                 <span style={{ background:'rgba(255,255,255,0.04)', padding:'2px 6px', borderRadius:6, border:'1px solid rgba(255,255,255,0.05)' }} title="Прямая / косвенная = эффективная">мезоцикл: {tot.direct} / {indirectT} <span style={{ opacity:0.6 }}>(прям/косв)</span> · <b>{Math.round(tot.effective)}</b> эфф · средн. {Math.round(tot.effective/totalWeeks*10)/10}/нед</span>
                               </div>
@@ -4657,10 +4655,11 @@ export const BbAutoConstructor: React.FC = () => {
                                 </div>
                               )}
                             </div>
+                            </CollapsibleCard>
                           );
                         })}
-                      </div>
-                    </div>
+                       </div>
+                     </CollapsibleCard>
                   );
                 })}
                 <div style={{ fontSize:9, color:'#fff', opacity:0.5, lineHeight:1.35, padding:'6px 8px', background:'rgba(255,255,255,0.02)', borderRadius:8, border:'1px solid rgba(255,255,255,0.04)' }}>
