@@ -13,6 +13,8 @@ export interface WarmupInput {
   equipmentAvailable: string[];
   /** Целевые группы тренировочного дня (muscleGroup упражнений плана) — упор разминки. */
   targetGroups?: string[];
+  /** Рабочие веса основных упражнений (параллельно primaryExercises) — для расчёта кг в специфике. */
+  primaryWeights?: (number | null)[];
 }
 
 /** Канонические русские названия разминочных упражнений (единый словарь). */
@@ -93,17 +95,32 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
     });
   }
 
-  // Упор на целевые группы дня (если переданы) — суставы ПЕРВЫМИ, затем подготовка зон
+  // Упор на целевые группы дня (если переданы) — сбалансированный микс суставов и зон
   const targetGroups = (input.targetGroups || []).filter(Boolean);
   const groupPrep = targetGroups.length > 0 ? collectGroupPrep(targetGroups, hasBand) : null;
   const jointPrep = targetGroups.length > 0 ? collectJointPrep(targetGroups) : null;
   const toBlockEx = (e: { id: string; sets: number; reps: number; note?: string }) => ({ exerciseId: e.id, sets: e.sets, reps: e.reps, ...(e.note ? { note: e.note } : {}) });
 
-  const mobilityExs: { exerciseId: string; sets: number; reps: number }[] = groupPrep
-    ? [...(jointPrep || []).map(toBlockEx), ...groupPrep.mobility.map(toBlockEx)]
-        .filter((e, i, arr) => arr.findIndex(x => x.exerciseId === e.exerciseId) === i)
-        .slice(0, 8)
-    : getMobilityExercises(input.sessionFocus, input.riskFlags);
+  const mobilityExs: { exerciseId: string; sets: number; reps: number; note?: string }[] = (() => {
+    if (!groupPrep) return getMobilityExercises(input.sessionFocus, input.riskFlags);
+    const joint = (jointPrep || []).map(toBlockEx);
+    const zone = groupPrep.mobility.map(toBlockEx);
+    const merged: { exerciseId: string; sets: number; reps: number; note?: string }[] = [];
+    const seen = new Set<string>();
+    let idxJ = 0, idxZ = 0;
+    while (merged.length < 9 && (idxJ < joint.length || idxZ < zone.length)) {
+      if (idxJ < joint.length) {
+        const cand = joint[idxJ++];
+        if (!seen.has(cand.exerciseId)) { seen.add(cand.exerciseId); merged.push(cand); }
+        if (merged.length >= 9) break;
+      }
+      if (idxZ < zone.length) {
+        const cand = zone[idxZ++];
+        if (!seen.has(cand.exerciseId)) { seen.add(cand.exerciseId); merged.push(cand); }
+      }
+    }
+    return merged.slice(0, 9);
+  })();
   if (Object.values(input.riskFlags).includes('high') && !mobilityExs.some(e => e.exerciseId === 'cat_camel')) {
     mobilityExs.push({ exerciseId: 'cat_camel', sets: 1, reps: 8 });
   }
@@ -113,8 +130,8 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
   if (mobilityExs.length > 0) {
     blocks.push({
       type: 'mobility',
-      // Длительность по факту: ~30с на упражнение, 90-240с
-      durationSec: Math.max(90, Math.min(240, mobilityExs.length * 30)),
+      // Длительность по факту: ~30с на упражнение, 90-270с (до 9 упр)
+      durationSec: Math.max(90, Math.min(270, mobilityExs.length * 30)),
       exercises: mobilityExs,
       notes: groupPrep ? `Суставная подготовка: ${jointPrepLabels(targetGroups)} · зоны: ${prepGroupLabels(targetGroups)}` : 'Суставная подготовка',
     });
@@ -134,26 +151,30 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
   if (activationExs.length > 0) {
     blocks.push({
       type: 'activation',
-      // Длительность по факту: ~35с на упражнение, 90-240с
-      durationSec: Math.max(90, Math.min(240, activationExs.length * 35)),
+      // Длительность по факту: ~35с на упражнение, 90-280с (до 8 упр)
+      durationSec: Math.max(90, Math.min(280, activationExs.length * 35)),
       exercises: activationExs,
-      notes: groupPrep ? `Активация: ${prepGroupLabels(targetGroups)}` : 'Активация мышц',
+      notes: groupPrep ? `Активация: ${prepGroupLabels(targetGroups)} — каждое рабочее движение «включается» до подходов` : 'Активация мышц',
     });
   }
 
   // Специальная: разминочные подходы по КАЖДОМУ основному упражнению (не только первому).
   // Рампа по канону warmup-ramp: 50%×10 → 70%×5 → 80%×3 → 90%×1 (первое),
-  // второе 50%×10 → 70%×5, остальные 50%×10.
+  // второе 50%×10 → 70%×5, остальные 50%×10. Если переданы веса — считаем кг и пишем в note.
   const primaries = (input.primaryExercises || []).filter(Boolean).slice(0, 3);
-  const specificExs: { exerciseId: string; sets: number; reps: number; intensityPct: number }[] = [];
+  const primWeights = (input.primaryWeights || []) as (number | null)[];
+  const specificExs: { exerciseId: string; sets: number; reps: number; intensityPct: number; note?: string }[] = [];
   const RAMP_REPS: Record<number, number> = { 50: 10, 70: 5, 80: 3, 90: 1 };
   if (primaries.length === 0) {
     specificExs.push({ exerciseId: 'squat', sets: 1, reps: 10, intensityPct: 50 });
   } else {
     primaries.forEach((ex, i) => {
+      const w = primWeights[i];
+      const hasW = typeof w === 'number' && Number.isFinite(w) && (w as number) > 0;
       const ramp = i === 0 ? [50, 70, 80, 90] : i === 1 ? [50, 70] : [50];
       ramp.forEach(pct => {
-        specificExs.push({ exerciseId: ex, sets: 1, reps: RAMP_REPS[pct], intensityPct: pct });
+        const note = hasW ? `~${Math.round((w as number) * pct / 100)} кг` : undefined;
+        specificExs.push({ exerciseId: ex, sets: 1, reps: RAMP_REPS[pct], intensityPct: pct, ...(note ? { note } : {}) });
       });
     });
   }
@@ -161,7 +182,7 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
     type: 'specific',
     durationSec: 300,
     exercises: specificExs,
-    notes: 'Разминочные подходы к рабочим весам',
+    notes: 'Разминочные подходы к рабочим весам — считайте по % от рабочего, техника как на рабочих',
   });
 
   return blocks;

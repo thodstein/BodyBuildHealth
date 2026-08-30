@@ -70,7 +70,7 @@ export const JOINT_BY_GROUP: Record<CanonGroup, JointKey[]> = {
   forearms: ['wrists', 'elbows'],
 };
 
-/** Суставная подготовка для набора групп дня: мерж с дедупликацией, кап ≤ 7. */
+/** Суставная подготовка для набора групп дня: гарантирует ≥1 упр. на каждый востребованный сустав, затем добирает вторые упражнения. Кап 9. */
 export function collectJointPrep(groups: string[]): WarmupPrepExercise[] {
   const wanted = new Set<JointKey>();
   for (const g of groups) {
@@ -78,17 +78,31 @@ export function collectJointPrep(groups: string[]): WarmupPrepExercise[] {
       for (const j of JOINT_BY_GROUP[canon] || []) wanted.add(j);
     }
   }
+  if (wanted.size === 0) return [];
+  const wantedList = JOINT_ORDER.filter(j => wanted.has(j));
   const seen = new Set<string>();
   const out: WarmupPrepExercise[] = [];
-  for (const joint of JOINT_ORDER) {
-    if (!wanted.has(joint)) continue;
-    for (const ex of JOINT_PREP[joint] || []) {
-      if (seen.has(ex.id)) continue;
-      seen.add(ex.id);
-      out.push(ex);
+  for (const joint of wantedList) {
+    const pool = JOINT_PREP[joint] || [];
+    if (pool.length > 0 && !seen.has(pool[0].id)) { seen.add(pool[0].id); out.push(pool[0]); }
+  }
+  const CAP = 9;
+  for (const joint of wantedList) {
+    if (out.length >= CAP) break;
+    const pool = JOINT_PREP[joint] || [];
+    for (let i = 1; i < pool.length; i++) {
+      if (out.length >= CAP) break;
+      if (!seen.has(pool[i].id)) { seen.add(pool[i].id); out.push(pool[i]); }
     }
   }
-  return out.slice(0, 7);
+  out.sort((a, b) => {
+    const jointA = Object.keys(JOINT_PREP).find(k => JOINT_PREP[k].some(e => e.id === a.id)) as JointKey | undefined;
+    const jointB = Object.keys(JOINT_PREP).find(k => JOINT_PREP[k].some(e => e.id === b.id)) as JointKey | undefined;
+    const idxA = jointA ? JOINT_ORDER.indexOf(jointA) : 99;
+    const idxB = jointB ? JOINT_ORDER.indexOf(jointB) : 99;
+    return idxA - idxB;
+  });
+  return out.slice(0, CAP);
 }
 
 /** Русские подписи суставов дня («плечи, локти, запястья»). */

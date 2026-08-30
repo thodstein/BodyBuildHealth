@@ -51,10 +51,10 @@ describe('collectGroupPrep', () => {
     expect(mob.filter(id => id === 'thoracic_rotation').length).toBe(1);
   });
 
-  it('лимиты: fullbody → ≤7 суставных и ≤5 активационных', () => {
+  it('лимиты: fullbody → ≤9 суставных и ≤8 активационных (сбалансированное покрытие)', () => {
     const prep = collectGroupPrep(['fullbody'], true);
-    expect(prep.mobility.length).toBeLessThanOrEqual(7);
-    expect(prep.activation.length).toBeLessThanOrEqual(5);
+    expect(prep.mobility.length).toBeLessThanOrEqual(9);
+    expect(prep.activation.length).toBeLessThanOrEqual(8);
   });
 
   it('без ленты ленточные упражнения пропускаются', () => {

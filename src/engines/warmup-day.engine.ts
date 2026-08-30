@@ -69,6 +69,7 @@ export const WARMUP_GROUP_PREP: Record<string, WarmupGroupPrep> = {
     activation: [
       { id: 'air_squat', sets: 1, reps: 10, note: 'приседания без веса, полная амплитуда' },
       { id: 'lateral_band_walk', sets: 1, reps: 8, band: true },
+      { id: 'leg_swings', sets: 1, reps: 12, note: 'без ленты: махи в стороны — активация отводящих' },
     ],
   },
   hamstrings: {
@@ -89,6 +90,7 @@ export const WARMUP_GROUP_PREP: Record<string, WarmupGroupPrep> = {
     activation: [
       { id: 'glute_bridge', sets: 1, reps: 12, note: 'сжатие ягодицы вверху' },
       { id: 'banded_clam', sets: 1, reps: 12, band: true },
+      { id: 'side_lying_abduction', sets: 1, reps: 12, note: 'без ленты: отведение лёжа — ягодицы' },
     ],
   },
   shoulders: {
@@ -101,6 +103,8 @@ export const WARMUP_GROUP_PREP: Record<string, WarmupGroupPrep> = {
       { id: 'external_rotation', sets: 1, reps: 12, band: true },
       { id: 'band_pull_apart', sets: 1, reps: 12, band: true },
       { id: 'ytw', sets: 1, reps: 6, note: 'Y-T-W лёжа, без веса' },
+      { id: 'wall_slide', sets: 1, reps: 10, note: 'без ленты: скольжение по стене — дельты' },
+      { id: 'scapular_pull', sets: 1, reps: 10, note: 'без ленты: лопатки вниз — верх спины/плечи' },
     ],
   },
   biceps: {
@@ -110,6 +114,8 @@ export const WARMUP_GROUP_PREP: Record<string, WarmupGroupPrep> = {
     ],
     activation: [
       { id: 'band_curl_light', sets: 1, reps: 12, band: true, note: 'лёгкие сгибания с резинкой' },
+      { id: 'arm_circles', sets: 1, reps: 15, note: 'без ленты: круги с напряжением бицепса, пауза вверху' },
+      { id: 'wrist_circles', sets: 1, reps: 12, note: 'без ленты: разогрев локтей/бицепса' },
     ],
   },
   triceps: {
@@ -119,6 +125,8 @@ export const WARMUP_GROUP_PREP: Record<string, WarmupGroupPrep> = {
     ],
     activation: [
       { id: 'band_pushdown_light', sets: 1, reps: 12, band: true, note: 'лёгкие разгибания с резинкой' },
+      { id: 'pushup_light', sets: 1, reps: 8, note: 'без ленты: узкие отжимания — трицепс, 8 повт' },
+      { id: 'wall_slide', sets: 1, reps: 10, note: 'без ленты: скольжение — активация разгибателей' },
     ],
   },
   calves: {
@@ -252,35 +260,89 @@ export function groupsFromExercises(exercises: { name?: string; muscleGroup?: st
   return out;
 }
 
-/** Разминка для набора групп дня: мерж с дедупликацией, приоритетом и фильтром ленты. */
+/** Разминка для набора групп дня: сбалансированный мерж с round-robin, фильтром ленты и гарантией покрытия каждой группы. */
 export function collectGroupPrep(groups: string[], hasBand = true): WarmupGroupPrep {
-  const seenMob = new Set<string>();
-  const seenAct = new Set<string>();
-  const mobility: WarmupPrepExercise[] = [];
-  const activation: WarmupPrepExercise[] = [];
+  const canonGroups: CanonGroup[] = [];
+  const seenCanon = new Set<string>();
   for (const g of groups) {
-    for (const canon of canonicalize(g)) {
-      const prep = WARMUP_GROUP_PREP[canon];
-      if (!prep) continue;
-      for (const ex of prep.mobility) {
-        if (ex.band && !hasBand) continue;
-        if (seenMob.has(ex.id)) continue;
-        seenMob.add(ex.id);
-        mobility.push(ex);
-      }
-      for (const ex of prep.activation) {
-        if (ex.band && !hasBand) continue;
-        if (seenAct.has(ex.id)) continue;
-        seenAct.add(ex.id);
-        activation.push(ex);
+    for (const c of canonicalize(g)) {
+      if (!seenCanon.has(c)) { seenCanon.add(c); canonGroups.push(c); }
+    }
+  }
+  if (canonGroups.length === 0) return { mobility: [], activation: [] };
+  const perGroupMob: Record<string, WarmupPrepExercise[]> = {};
+  const perGroupAct: Record<string, WarmupPrepExercise[]> = {};
+  for (const cg of canonGroups) {
+    const prep = WARMUP_GROUP_PREP[cg];
+    if (!prep) continue;
+    perGroupMob[cg] = prep.mobility.filter(e => !(e.band && !hasBand));
+    perGroupAct[cg] = prep.activation.filter(e => !(e.band && !hasBand));
+  }
+  const mobility: WarmupPrepExercise[] = [];
+  const seenMob = new Set<string>();
+  let added = true;
+  const maxMob = Math.min(9, Math.max(5, canonGroups.length + 3));
+  while (mobility.length < maxMob && added) {
+    added = false;
+    for (const cg of canonGroups) {
+      if (mobility.length >= maxMob) break;
+      const pool = perGroupMob[cg] || [];
+      const cnt = mobility.filter(m => perGroupMob[cg]?.some(p => p.id === m.id)).length;
+      if (cnt < pool.length) {
+        const cand = pool[cnt];
+        if (!seenMob.has(cand.id)) { seenMob.add(cand.id); mobility.push(cand); added = true; }
+        else {
+          let next = cnt + 1;
+          while (next < pool.length) {
+            const nxt = pool[next];
+            if (!seenMob.has(nxt.id)) { seenMob.add(nxt.id); mobility.push(nxt); added = true; break; }
+            next++;
+          }
+        }
       }
     }
   }
-  // Лимит объёма: не больше 7 суставных и 5 активационных упражнений
-  return {
-    mobility: mobility.slice(0, 7),
-    activation: activation.slice(0, 5),
-  };
+  if (mobility.length < maxMob) {
+    for (const cg of canonGroups) {
+      for (const e of (perGroupMob[cg] || [])) {
+        if (mobility.length >= maxMob) break;
+        if (!seenMob.has(e.id)) { seenMob.add(e.id); mobility.push(e); }
+      }
+    }
+  }
+  const activation: WarmupPrepExercise[] = [];
+  const seenAct = new Set<string>();
+  const maxAct = Math.min(8, Math.max(4, canonGroups.length + 2));
+  added = true;
+  while (activation.length < maxAct && added) {
+    added = false;
+    for (const cg of canonGroups) {
+      if (activation.length >= maxAct) break;
+      const pool = perGroupAct[cg] || [];
+      const cnt = activation.filter(a => perGroupAct[cg]?.some(p => p.id === a.id)).length;
+      if (cnt < pool.length) {
+        const cand = pool[cnt];
+        if (!seenAct.has(cand.id)) { seenAct.add(cand.id); activation.push(cand); added = true; }
+        else {
+          let next = cnt + 1;
+          while (next < pool.length) {
+            const nxt = pool[next];
+            if (!seenAct.has(nxt.id)) { seenAct.add(nxt.id); activation.push(nxt); added = true; break; }
+            next++;
+          }
+        }
+      }
+    }
+  }
+  if (activation.length < maxAct) {
+    for (const cg of canonGroups) {
+      for (const e of (perGroupAct[cg] || [])) {
+        if (activation.length >= maxAct) break;
+        if (!seenAct.has(e.id)) { seenAct.add(e.id); activation.push(e); }
+      }
+    }
+  }
+  return { mobility, activation };
 }
 
 /** Русские подписи групп для заметки блока («подготовка: грудь, спина»). */

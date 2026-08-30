@@ -402,6 +402,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
     const warmupInput: WarmupInput = {
       sessionFocus: focus,
       primaryExercises: day.exercises.map(ex => ex.name),
+      primaryWeights: day.exercises.map(ex => (Array.isArray(ex.targetSets) && ex.targetSets[0]?.weight ? Number(ex.targetSets[0].weight) : null) as any),
       riskFlags,
       techniqueIssues,
       fatigueLevel: profile.fatigue / 10,
@@ -918,59 +919,211 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
       )}
 
       {phase === 'warmup' && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={H}>🤸 Разминка: {day.label}</div>
-            {(() => {
-              const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
-              const done = Object.values(warmupDone).filter(Boolean).length;
-              const pct = total > 0 ? Math.round(done / total * 100) : 0;
-              const totalSec = warmupBlocks.reduce((s, b) => s + (b.durationSec || 0), 0);
-              return (
-                <span style={{ fontSize: 10, fontWeight: 600, color: pct === 100 ? '#22c55e' : ACCENT }}>
-                  {done}/{total} · {pct}%{totalSec > 0 ? ` · ~${Math.round(totalSec / 60 * 10) / 10} мин` : ''}
-                </span>
-              );
-            })()}
-          </div>
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* ── Красивая шапка разминки ── */}
           {(() => {
             const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
             const done = Object.values(warmupDone).filter(Boolean).length;
             const pct = total > 0 ? Math.round(done / total * 100) : 0;
+            const totalSec = warmupBlocks.reduce((s, b) => s + (b.durationSec || 0), 0);
+            const mins = totalSec > 0 ? Math.round(totalSec / 60 * 10) / 10 : 0;
+            const isDone = pct === 100;
             return (
-              <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : ACCENT, transition: 'width 0.3s ease' }} />
+              <div style={{
+                position: 'relative', overflow: 'hidden', borderRadius: 16, padding: '14px 14px 12px',
+                background: isDone
+                  ? 'linear-gradient(135deg, rgba(34,197,94,0.16), rgba(16,185,129,0.08))'
+                  : 'linear-gradient(135deg, rgba(249,115,22,0.14), rgba(251,146,60,0.07), rgba(167,139,250,0.07))',
+                border: `1px solid ${isDone ? 'rgba(34,197,94,0.28)' : 'rgba(249,115,22,0.22)'}`,
+                backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+                boxShadow: isDone ? '0 4px 20px rgba(34,197,94,0.18)' : '0 4px 20px rgba(249,115,22,0.12)',
+              }}>
+                <div style={{ position: 'absolute', top: -18, right: -18, width: 96, height: 96, borderRadius: 96, background: `radial-gradient(circle, ${isDone ? 'rgba(34,197,94,0.18)' : 'rgba(249,115,22,0.16)'}, transparent 70%)`, pointerEvents: 'none' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10, position: 'relative' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{
+                        width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: isDone ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'linear-gradient(135deg,#f97316,#ea580c)',
+                        color: '#fff', fontSize: 16, fontWeight: 800, boxShadow: '0 2px 10px rgba(0,0,0,0.18)', flexShrink: 0,
+                      }}>{isDone ? '✓' : '🔥'}</span>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Разминка · {day.label}</div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.72)', marginTop: 1, lineHeight: 1.2 }}>
+                          {warmupBlocks.length} блока · {total} пунктов · {mins} мин · группы дня учтены
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 20, background: isDone ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.07)', color: isDone ? '#22c55e' : '#fff', border: `1px solid ${isDone ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}` }}>
+                        {done}/{total} пунктов
+                      </span>
+                      <span style={{ fontSize: 9, fontWeight: 800, padding: '3px 8px', borderRadius: 20, background: isDone ? '#22c55e' : 'linear-gradient(135deg,#f97316,#ea580c)', color: isDone ? '#000' : '#fff' }}>
+                        {pct}%
+                      </span>
+                      <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.78)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        ⏱ ~{mins} мин
+                      </span>
+                      {warmupBlocks.some(b => b.notes?.includes('грудь') || b.notes?.includes('спина') || b.notes?.includes('ягодиц')) && (
+                        <span style={{ fontSize: 8, padding: '3px 7px', borderRadius: 20, background: 'rgba(167,139,250,0.12)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.22)' }}>
+                          🎯 по группам дня
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ width: 56, height: 56, borderRadius: 28, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
+                    <div style={{ position: 'absolute', inset: 4, borderRadius: 24, background: `conic-gradient(${isDone ? '#22c55e' : '#f97316'} ${pct * 3.6}deg, rgba(255,255,255,0.08) 0deg)`, mask: 'radial-gradient(circle 18px at center, transparent 18px, black 19px)', WebkitMask: 'radial-gradient(circle 18px at center, transparent 18px, black 19px)' }} />
+                    <span style={{ fontSize: 13, fontWeight: 800, color: isDone ? '#22c55e' : '#fff' }}>{pct}%</span>
+                  </div>
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 10 }}>
+                  <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: isDone ? 'linear-gradient(90deg,#22c55e,#16a34a)' : 'linear-gradient(90deg,#f97316,#fb923c)', transition: 'width 0.4s ease', boxShadow: isDone ? '0 0 8px rgba(34,197,94,0.45)' : '0 0 8px rgba(249,115,22,0.35)' }} />
+                </div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.3 }}>
+                  Отмечайте пункты по ходу · разминка пишется в дневник при переходе к основной части · {isDone ? 'отлично — все пункты отмечены!' : 'минимум: 50% для хорошей готовности'}
+                </div>
               </div>
             );
           })()}
-          {warmupBlocks.map((b, i) => (
-            <div key={i} style={{ ...CARD, marginBottom: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
-                {b.type === 'general' ? 'Кардио' : b.type === 'mobility' ? 'Суставная разминка' : b.type === 'activation' ? 'Активация мышц' : 'Специальная'}
-                <span style={{ fontWeight: 400, fontSize: 10, color: '#fff', marginLeft: 6 }}>{b.durationSec}с</span>
+
+          {/* ── Блоки разминки — красивые карточки ── */}
+          {warmupBlocks.map((b, i) => {
+            const meta = b.type === 'general'
+              ? { icon: '🏃', title: 'Общая разминка', color: '#06b6d4', bg: 'rgba(6,182,214,0.07)', border: 'rgba(6,182,214,0.24)', desc: 'Пульс + кровоток' }
+              : b.type === 'mobility'
+                ? { icon: '🤸', title: 'Суставы + зоны', color: '#f59e0b', bg: 'rgba(245,158,11,0.07)', border: 'rgba(245,158,11,0.24)', desc: 'Подвижность целевых суставов и мышц' }
+                : b.type === 'activation'
+                  ? { icon: '⚡', title: 'Активация', color: '#22c55e', bg: 'rgba(34,197,94,0.07)', border: 'rgba(34,197,94,0.24)', desc: 'Включение каждой рабочей группы' }
+                  : { icon: '🏋️', title: 'Подводящие подходы', color: '#a78bfa', bg: 'rgba(167,139,250,0.07)', border: 'rgba(167,139,250,0.24)', desc: 'К рабочим весам · техника' };
+            const total = b.exercises.length;
+            const done = b.exercises.filter((_, j) => warmupDone[`w_${i}_${j}`]).length;
+            const pct = total > 0 ? Math.round(done / total * 100) : 0;
+            const allDone = done === total && total > 0;
+            return (
+              <div key={i} style={{
+                position: 'relative', overflow: 'hidden', borderRadius: 14, padding: '10px 10px 8px',
+                background: allDone ? 'rgba(34,197,94,0.06)' : 'var(--glass-bg)',
+                border: `1px solid ${allDone ? 'rgba(34,197,94,0.22)' : meta.border}`,
+                borderLeft: `3px solid ${allDone ? '#22c55e' : meta.color}`,
+                backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+                boxShadow: allDone ? '0 2px 14px rgba(34,197,94,0.10)' : '0 2px 14px rgba(0,0,0,0.14)',
+              }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${meta.color}, transparent)`, opacity: allDone ? 0.9 : 0.65 }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                    <span style={{
+                      width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: allDone ? 'linear-gradient(135deg,#22c55e,#16a34a)' : `linear-gradient(135deg, ${meta.color}, ${meta.color}CC)`,
+                      color: '#fff', fontSize: 14, flexShrink: 0, boxShadow: `0 2px 8px ${meta.color}33`,
+                    }}>{allDone ? '✓' : meta.icon}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: allDone ? '#22c55e' : meta.color, lineHeight: 1 }}>{meta.title}</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.58)', lineHeight: 1.2 }}>{meta.desc} · {b.durationSec}с</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: allDone ? 'rgba(34,197,94,0.14)' : meta.bg, color: allDone ? '#22c55e' : meta.color, border: `1px solid ${allDone ? 'rgba(34,197,94,0.28)' : meta.border}` }}>
+                      ⏱ {b.durationSec}с
+                    </span>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: allDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: allDone ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      {done}/{total}
+                    </span>
+                  </div>
+                </div>
+                {b.notes && (
+                  <div style={{
+                    fontSize: 9, color: 'rgba(255,255,255,0.72)', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8,
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <span style={{ color: meta.color, fontWeight: 700 }}>ℹ </span>{b.notes}
+                  </div>
+                )}
+                <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 7 }}>
+                  <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: allDone ? '#22c55e' : meta.color, transition: 'width 0.3s ease' }} />
+                </div>
+                <ul style={{ padding: 0, margin: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {b.exercises.map((ex, j) => {
+                    const isDone = warmupDone[`w_${i}_${j}`];
+                    const isSpecific = 'intensityPct' in ex && (ex as any).intensityPct;
+                    return (
+                      <li key={j} style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 9, padding: '7px 8px', borderRadius: 10,
+                        background: isDone ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)',
+                        border: `1px solid ${isDone ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)'}`,
+                        opacity: isDone ? 0.85 : 1, transition: 'all 0.2s',
+                      }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, flex: 1, cursor: 'pointer', minWidth: 0 }}>
+                          <input type="checkbox" checked={isDone} onChange={() => toggleWarmup(i, j)}
+                            style={{ marginTop: 2, width: 16, height: 16, accentColor: isDone ? '#22c55e' : meta.color, cursor: 'pointer', flexShrink: 0 }} />
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{
+                              fontSize: 11, fontWeight: 600, color: isDone ? 'rgba(255,255,255,0.55)' : '#fff',
+                              textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.3, display: 'block',
+                            }}>
+                              {isSpecific ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}
+                            </span>
+                            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 3 }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
+                                background: isDone ? 'rgba(255,255,255,0.06)' : meta.bg, color: isDone ? 'rgba(255,255,255,0.5)' : meta.color,
+                                border: `1px solid ${isDone ? 'rgba(255,255,255,0.08)' : meta.border}`,
+                              }}>
+                                {isSpecific ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}` : `${ex.sets}×${ex.reps}`}
+                              </span>
+                              {'note' in ex && (ex as any).note && (
+                                <span style={{ fontSize: 9, color: isDone ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.62)', wordBreak: 'break-word' }}>
+                                  {(ex as any).note}
+                                </span>
+                              )}
+                            </span>
+                          </span>
+                        </label>
+                        <span style={{
+                          width: 22, height: 22, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                          background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.35)',
+                          border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.08)'}`, fontSize: 10, fontWeight: 800,
+                        }}>{isDone ? '✓' : '○'}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {total > 1 && (
+                  <button type="button" onClick={() => {
+                    const all = b.exercises.every((_, j) => warmupDone[`w_${i}_${j}`]);
+                    const next: Record<string, boolean> = { ...warmupDone };
+                    b.exercises.forEach((_, j) => { next[`w_${i}_${j}`] = !all; });
+                    setWarmupDone(next);
+                  }} style={{
+                    marginTop: 7, width: '100%', padding: '6px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                    background: done === total ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)', color: done === total ? '#22c55e' : 'rgba(255,255,255,0.65)',
+                    border: `1px solid ${done === total ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.08)'}`,
+                  }}>
+                    {done === total ? '↩ Сбросить блок' : `✓ Отметить весь блок (${total})`}
+                  </button>
+                )}
               </div>
-              {b.notes && <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>{b.notes}</div>}
-              <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
-                {b.exercises.map((ex, j) => {
-                  const isDone = warmupDone[`w_${i}_${j}`];
-                  return (
-                    <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="checkbox" checked={isDone} onChange={() => toggleWarmup(i, j)} />
-                      <span style={{ flex: 1 }}>
-                        <span>
-                          {'intensityPct' in ex && ex.intensityPct ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}
-                          {'intensityPct' in ex && ex.intensityPct ? ` · ${ex.intensityPct}% x ${ex.sets}x${ex.reps}` : ` · ${ex.sets}x${ex.reps}`}
-                        </span>
-                        {'note' in ex && ex.note ? <span style={{ display: 'block', fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>{ex.note}</span> : null}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-          <button style={{ ...BTN, width: '100%', marginTop: 12 }} onClick={startMain}>🚀 Перейти к основной тренировке</button>
+            );
+          })}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+            <button style={{ ...BTN, flex: 1, background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', boxShadow: '0 4px 16px rgba(249,115,22,0.28)' }} onClick={startMain}>
+              🚀 К основной части
+            </button>
+            <button type="button" onClick={() => {
+              const next: Record<string, boolean> = {};
+              warmupBlocks.forEach((b, i) => b.exercises.forEach((_, j) => { next[`w_${i}_${j}`] = true; }));
+              setWarmupDone(next);
+            }} style={{
+              padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+              background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.22)',
+            }}>
+              ✓ Всё готово
+            </button>
+          </div>
           <SkipBar reasons={WARMUP_SKIP_REASONS} label="разминку" onSkip={reason => { skipWarmupReasonRef.current = reason; startMain(); }} />
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', textAlign: 'center', lineHeight: 1.3, marginTop: 2 }}>
+            Активация подбирается под группы дня — каждая рабочая мышца получает мобильность и «включение» · без ленты — bodyweight-замены уже включены · подводящие — с весом в подсказке (~кг)
+          </div>
         </div>
       )}
 

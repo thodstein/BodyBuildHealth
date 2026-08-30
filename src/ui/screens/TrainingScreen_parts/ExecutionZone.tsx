@@ -13,6 +13,8 @@ import { selectTempo, formatTempo } from '../../../engines/tempo.engine';
 import { getCachedProgressForExercise } from '../../../engines/workout-logger.engine';
 import { isBodyweightExercise as isBWExercise } from '../../../engines/movement-pattern';
 import { activeRampRows } from '../../../engines/warmup-ramp.engine';
+import { generateWarmup, warmupLabel, warmupSpecificLabel, upsertWarmupLog } from '../../../engines/warmup.engine';
+import { groupsFromExercises } from '../../../engines/warmup-day.engine';
 import type { TrainingTab } from './shared';
 
 type RuntimeLogEntry = { sets: { weight: number; reps: number; rpe: number; rir: number }[]; completed: boolean };
@@ -48,6 +50,8 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const plRuntime = (_plRuntime && !Array.isArray(_plRuntime) && Array.isArray((_plRuntime as any).days)) ? _plRuntime : null;
   const [timerInitialSettings, setTimerInitialSettings] = React.useState<{ work: number; rest: number; rounds: number } | undefined>(undefined);
   const [dayDetailsOpen, setDayDetailsOpen] = React.useState(true);
+  const [warmupOpen, setWarmupOpen] = React.useState(true);
+  const [execWarmupDone, setExecWarmupDone] = React.useState<Record<string, boolean>>({});
   const [restTimer, setRestTimer] = React.useState(0);
   const [restTarget, setRestTarget] = React.useState(90);
   const restTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -186,7 +190,122 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       </div>
                     );
                   })()}
-                  <button onClick={() => { setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0); }} style={{
+                  {/* ── Красивая разминка дня — по группам, суставы+активация+подводящие ── */}
+                  {(() => {
+                    const dayExercises: any[] = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                    if (!dayExercises.length) return null;
+                    const groups = groupsFromExercises(dayExercises.map((e: any) => ({ name: e.name })));
+                    const warmupBlocksExec = generateWarmup({
+                      sessionFocus: 'fullbody',
+                      primaryExercises: dayExercises.slice(0, 3).map((e: any) => e.name),
+                      primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
+                      targetGroups: groups.length > 0 ? groups : ['fullbody'],
+                      riskFlags: {},
+                      techniqueIssues: [],
+                      fatigueLevel: 0.2,
+                      equipmentAvailable: ['barbell', 'dumbbell', 'band', 'bodyweight'],
+                    });
+                    const total = warmupBlocksExec.reduce((s, b) => s + b.exercises.length, 0);
+                    const done = Object.values(execWarmupDone).filter(Boolean).length;
+                    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+                    const mins = Math.round(warmupBlocksExec.reduce((s, b) => s + (b.durationSec || 0), 0) / 60 * 10) / 10;
+                    return (
+                      <div style={{
+                        margin: '8px 0', borderRadius: 14, overflow: 'hidden',
+                        background: 'linear-gradient(135deg, rgba(249,115,22,0.09), rgba(167,139,250,0.06))',
+                        border: '1px solid rgba(249,115,22,0.18)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+                      }}>
+                        <div
+                          role="button" tabIndex={0}
+                          onClick={() => setWarmupOpen(v => !v)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWarmupOpen(v => !v); } }}
+                          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', cursor: 'pointer', userSelect: 'none' }}
+                          aria-expanded={warmupOpen} aria-label="Разминка дня"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', fontSize: 14, flexShrink: 0 }}>🔥</span>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1 }}>Разминка дня · персональная</div>
+                              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.62)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {groups.length > 0 ? groups.join(', ') : 'общая'} · {warmupBlocksExec.length} блока · {total} пунктов · ~{mins} мин
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: pct === 100 ? '#22c55e' : 'rgba(255,255,255,0.07)', color: pct === 100 ? '#000' : '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>{done}/{total} · {pct}%</span>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>{warmupOpen ? '▲' : '▼'}</span>
+                          </div>
+                        </div>
+                        {warmupOpen && (
+                          <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : 'linear-gradient(90deg,#f97316,#fb923c)', transition: 'width 0.3s ease' }} />
+                            </div>
+                            {warmupBlocksExec.map((b, bi) => {
+                              const meta = b.type === 'general' ? { icon: '🏃', title: 'Общая', color: '#06b6d4', bg: 'rgba(6,182,214,0.08)', border: 'rgba(6,182,214,0.22)' }
+                                : b.type === 'mobility' ? { icon: '🤸', title: 'Суставы + зоны', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.22)' }
+                                : b.type === 'activation' ? { icon: '⚡', title: 'Активация', color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.22)' }
+                                : { icon: '🏋️', title: 'Подводящие', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)' };
+                              const bTotal = b.exercises.length;
+                              const bDone = b.exercises.filter((_, j) => execWarmupDone[`ew_${bi}_${j}`]).length;
+                              const bPct = bTotal > 0 ? Math.round(bDone / bTotal * 100) : 0;
+                              return (
+                                <div key={bi} style={{ borderRadius: 10, padding: '8px 8px 6px', background: bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${bDone === bTotal && bTotal > 0 ? 'rgba(34,197,94,0.18)' : meta.border}`, borderLeft: `3px solid ${bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color}` }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                    <span style={{ fontSize: 10, fontWeight: 800, color: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color }}>{meta.icon} {meta.title}</span>
+                                    <span style={{ fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>⏱ {b.durationSec}с · {bDone}/{bTotal}</span>
+                                  </div>
+                                  {b.notes && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.62)', marginBottom: 5, lineHeight: 1.3 }}>{b.notes}</div>}
+                                  <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 6 }}>
+                                    <div style={{ height: '100%', width: `${bPct}%`, background: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, transition: 'width 0.3s ease' }} />
+                                  </div>
+                                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                    {b.exercises.map((ex, j) => {
+                                      const isDone = !!execWarmupDone[`ew_${bi}_${j}`];
+                                      const isSpec = 'intensityPct' in ex && (ex as any).intensityPct;
+                                      return (
+                                        <li key={j} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '5px 6px', borderRadius: 8, background: isDone ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isDone ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.05)'}`, opacity: isDone ? 0.85 : 1 }}>
+                                          <input type="checkbox" checked={isDone} onChange={() => setExecWarmupDone(prev => ({ ...prev, [`ew_${bi}_${j}`]: !prev[`ew_${bi}_${j}`] }))} style={{ marginTop: 2, width: 14, height: 14, accentColor: meta.color, cursor: 'pointer', flexShrink: 0 }} />
+                                          <span style={{ flex: 1, minWidth: 0 }}>
+                                            <span style={{ fontSize: 10, fontWeight: 600, color: isDone ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.3 }}>{isSpec ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}</span>
+                                            <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+                                              <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: isDone ? 'rgba(255,255,255,0.06)' : meta.bg, color: isDone ? 'rgba(255,255,255,0.45)' : meta.color, border: `1px solid ${isDone ? 'rgba(255,255,255,0.06)' : meta.border}` }}>{isSpec ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}` : `${ex.sets}×${ex.reps}`}</span>
+                                              {'note' in ex && (ex as any).note && <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{(ex as any).note}</span>}
+                                            </span>
+                                          </span>
+                                          <span style={{ width: 18, height: 18, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.3)', border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.07)'}`, fontSize: 9, fontWeight: 800 }}>{isDone ? '✓' : '○'}</span>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </div>
+                              );
+                            })}
+                            <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)', textAlign: 'center', lineHeight: 1.3 }}>
+                              Отмечайте пункты — прогресс сохранится до старта · без ленты — bodyweight-замены уже включены · подводящие — с % и кг в подсказке
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <button onClick={() => {
+                    try {
+                      const dayExercises: any[] = trainingDaysList[safeRuntimeDay]?.exercises || [];
+                      const groups = groupsFromExercises(dayExercises.map((e: any) => ({ name: e.name })));
+                      const warmupBlocksExec = generateWarmup({
+                        sessionFocus: 'fullbody',
+                        primaryExercises: dayExercises.slice(0, 3).map((e: any) => e.name),
+                        primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
+                        targetGroups: groups.length > 0 ? groups : ['fullbody'],
+                        riskFlags: {}, techniqueIssues: [], fatigueLevel: 0.2, equipmentAvailable: ['barbell','dumbbell','band','bodyweight'],
+                      });
+                      const total = warmupBlocksExec.reduce((s,b)=>s+b.exercises.length,0);
+                      const done = Object.values(execWarmupDone).filter(Boolean).length;
+                      upsertWarmupLog({ date: new Date().toISOString().slice(0,10), done: done>0, quality: done>0 ? (done/total>=0.8?4: done/total>=0.5?3:2) : null, totalItems: total, doneItems: done });
+                    } catch {}
+                    setRuntimeStarted(true); setRuntimeLogs({}); setRuntimeExIdx(0);
+                  }} style={{
                      width: '100%', padding: 12, borderRadius: 8, border: 'none', cursor: 'pointer',
                      background: 'linear-gradient(135deg, var(--accent), #00c853)', color: '#000', fontWeight: 700, fontSize: 14,
                    }}>▶ Старт</button>

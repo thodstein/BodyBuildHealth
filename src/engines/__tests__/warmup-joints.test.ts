@@ -63,8 +63,8 @@ describe('collectJointPrep', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('кап ≤ 7 и неизвестные группы игнорируются', () => {
-    expect(collectJointPrep(['fullbody']).length).toBeLessThanOrEqual(7);
+  it('кап ≤ 9 и неизвестные группы игнорируются (все суставы покрыты)', () => {
+    expect(collectJointPrep(['fullbody']).length).toBeLessThanOrEqual(9);
     expect(collectJointPrep(['']).length).toBe(0);
     expect(collectJointPrep(['неизвестное']).length).toBe(0);
   });
