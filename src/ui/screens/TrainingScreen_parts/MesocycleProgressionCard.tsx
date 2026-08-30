@@ -45,6 +45,8 @@ export interface MesocycleProgressionCardProps {
   /** Кастомные подписи/цвета отдельных недель (например, тапер/mock/соревнования):
    *  key = номер недели → label + цвет. Применяется к таблице и таймлайну. */
   weekOverrides?: Record<number, { label: string; color: string }>;
+  /** Скрыть кнопку «Применить к планировщику» (напр. в сводке шага 5 ББ-авто). */
+  hideApply?: boolean;
 }
 
 export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> = ({
@@ -57,6 +59,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
   title,
   sourceWeeks,
   weekOverrides,
+  hideApply,
 }) => {
   const effectiveWeeks = sourceWeeks?.length ?? weeks;
   const config: MesocycleConfig = { weeks: effectiveWeeks, startVolumeSets, startIntensityPct, startRIR, goal, fatigueTrajectory };
@@ -229,7 +232,7 @@ export const MesocycleProgressionCard: React.FC<MesocycleProgressionCardProps> =
           но с поправкой на прогресс ПМ за предыдущий цикл.
         </div>
       </div>}
-      {!isSourceCalendar && <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
+      {!isSourceCalendar && !hideApply && <div style={{ marginTop: 8, padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.2)' }}>
         <div style={{ fontSize: 10, color: '#fff', marginBottom: 8 }}>🔗 Применить стартовую прогрессию мезо к планировщику: {startVolumeSets} сет/нед, {Math.round(startIntensityPct * 100)}% интенсивность, RIR {startRIR}.</div>
         <button onClick={() => applyToPlanner({ kind: 'mrv', label: 'Прогрессия мезо: старт ' + startVolumeSets + ' сет/нед, ' + Math.round(startIntensityPct * 100) + '%, RIR ' + startRIR, data: { mrv: startVolumeSets } })} style={{ width: '100%', padding: 12, borderRadius: 10, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontWeight: 800, fontSize: 13, minHeight: 44 }}>🛠 Применить прогрессию к планировщику</button>
       </div>}

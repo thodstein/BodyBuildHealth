@@ -25,7 +25,7 @@ import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 
 // ── Типы ──
 
-export type JointId = 'shoulder' | 'elbow' | 'wrist' | 'spine' | 'hip' | 'knee' | 'ankle';
+export type JointId = 'shoulder' | 'elbow' | 'wrist' | 'spine' | 'hip' | 'knee' | 'ankle' | 'neck';
 export type JointRiskLevel = 'none' | 'low' | 'moderate' | 'high' | 'critical';
 
 export interface JointMeta {
@@ -64,6 +64,7 @@ export const JOINTS: JointMeta[] = [
   { id: 'hip', label: 'Тазобедренный', icon: '🦿', dangerous: ['labrum', 'импинджмент FAI', 'сгибатели бедра'], description: 'Глубокий присед ATG без мобильности голеностопа → клевок таза. Ширина + носки 15-30°.', relatedLifts: ['squat','sumo','deadlift'], mobilityTestId: 'thomas' },
   { id: 'knee', label: 'Колено', icon: '🦵', dangerous: ['ACL', 'мениск', 'пателлярное сухожилие', 'хрящ'], description: 'Вальгус внутрь, глубокий присед без контроля, объём без делода. Трекинг над носками + лента.', relatedLifts: ['squat','deadlift'], mobilityTestId: 'deep_squat' },
   { id: 'ankle', label: 'Голеностоп', icon: '🦶', dangerous: ['ахилл', 'дельтовидная связка'], description: 'Жёсткий голеностоп → пятки отрываются, компенсация поясницей. Мобилизация с лентой, пятка остаётся.', relatedLifts: ['squat'], mobilityTestId: 'deep_squat' },
+  { id: 'neck', label: 'Шея', icon: '🧣', dangerous: ['межпозвонковые диски C5-C7', 'фасеточные суставы', 'верхняя порция трапеций', 'длительная статика'], description: 'Перегруз шрагами без пауз, тяги к подбородку, длительная статика/сидячая поза → спазм верхней трапеции и цервикальное напряжение. Контроль амплитуды, паузы и умеренный объём.', relatedLifts: ['row','ohp'], mobilityTestId: undefined },
 ];
 
 export const JOINT_MAP: Record<JointId, JointMeta> = Object.fromEntries(JOINTS.map(j=>[j.id,j])) as Record<JointId, JointMeta>;
@@ -100,6 +101,9 @@ export const JOINT_OPTIONS: JointOption[] = [
   // ГОЛЕНОСТОП
   { id:'ankle_stiff', joint:'ankle', lifts:['squat'], label:'Жёсткий голеностоп → пятки отрываются', description:'Ограничение dorsiflexion → компенсация поясницей.', method:'Мобилизация с лентой 2×10 + пятка на блине 1см: 3×5 @68%', assistance:['Приседания со штангой','Мобилизация голеностопа с лентой'], protocol:{sets:3,reps:5,rir:2,rest:'90 с'}, rationale:'Пятка остаётся, глубина сохраняется.', references:['Bell-Jenje 2016'], level:'moderate' },
   { id:'ankle_achilles_overload', joint:'ankle', lifts:['squat','deadlift'], label:'Ахилл — частые подъёмы на носки/прыжки + приседы', description:'Объём икр без пауз → тендинопатия ахилла.', method:'Эксцентрик 3×12 @60% + изометрия 30с, объём ×0.7', assistance:['Подъёмы на носки стоя','Подъёмы на носки сидя','Мобилизация голеностопа'], protocol:{sets:3,reps:12,rir:2,tempo:'3-1-1-0',rest:'75 с',note:'медленно вниз'}, rationale:'Эксцентрик лечит ахилл.', references:['Alfredson 1998'], level:'moderate' },
+  // ШЕЯ
+  { id:'neck_shrug_overload', joint:'neck', lifts:['row','ohp'], label:'Шраги/тяги без пауз — перегруз верхней трапеции и шейного отдела', description:'Высокий объём шрагов и тяг к подбородку без пауз → спазм верхней порции трапеций, цервикальное напряжение.', method:'Паузы 1с в верхней точке, объём ×0.8, RIR 2-3: 3×10 @60% RIR2', assistance:['Шраги со штангой (пауза 1с)','Тяга к лицу (face pull)','Разведение в наклоне (задняя дельта)'], protocol:{sets:3,reps:10,rir:2,tempo:'2-1-2-0',rest:'75 с',note:'без читинга'}, rationale:'Пауза снимает пик напряжения с верхней трапеции.', references:['Helms 2022'], level:'moderate' },
+  { id:'neck_posture_static', joint:'neck', lifts:['row'], label:'Длительная статика/сидячая поза → хронический спазм шеи', description:'Малоподвижность + частые вертикальные тяги без разминки → ригидность шеи.', method:'Разминка шейного отдела 2-3 мин + удержания 2×30с + тяга к лицу: 2×15 @55% RIR3', assistance:['Тяга к лицу (face pull)','Шраги со штангой','Гиперэкстензия (45°)'], protocol:{sets:2,reps:15,rir:3,tempo:'2-1-1-0',rest:'60 с',note:'втягивание подбородка'}, rationale:'Активация нижних фиксаторов лопатки разгружает шею.', references:['Ylinen 2003'], level:'low' },
 ];
 
 // ── Агрегатор ──

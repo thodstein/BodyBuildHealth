@@ -4106,14 +4106,25 @@ export const BbAutoConstructor: React.FC = () => {
                       if (!d || Object.keys(d.byJointPeak).length===0) {
                         return <div style={{ fontSize:10, color:'#fff', opacity:0.6, padding:'8px 10px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>Нет данных о суставной нагрузке — план без силовых сессий или только разгрузочные недели.</div>;
                       }
-                      const entries = Object.entries(d.byJointPeak as Record<string, number>).sort((a,b)=> (b[1] as number)-(a[1] as number));
+                      // Нормализация: lower_back → spine (сумма), чтобы поясница не дублировалась и не терялась
+                      const normMap: Record<string, number> = {};
+                      for (const [j, v] of Object.entries(d.byJointPeak as Record<string, number>)) {
+                        const key = j === 'lower_back' ? 'spine' : j;
+                        normMap[key] = (normMap[key] || 0) + (v || 0);
+                      }
+                      const normAvg: Record<string, number> = {};
+                      for (const [j, v] of Object.entries(d.byJointAvg as Record<string, number>)) {
+                        const key = j === 'lower_back' ? 'spine' : j;
+                        normAvg[key] = (normAvg[key] || 0) + (v || 0);
+                      }
+                      const entries = Object.entries(normMap).sort((a,b)=> (b[1] as number)-(a[1] as number));
                       const RU: Record<string,{label:string,icon:string}> = { shoulder:{label:'Плечо',icon:'🤸'}, knee:{label:'Колено',icon:'🦵'}, hip:{label:'Таз',icon:'🦵'}, spine:{label:'Поясница',icon:'🦴'}, lower_back:{label:'Поясница',icon:'🦴'}, elbow:{label:'Локоть',icon:'💪'}, wrist:{label:'Запястье',icon:'🤚'}, ankle:{label:'Голеностоп',icon:'🦶'}, neck:{label:'Шея',icon:'🧣'} };
                       return (
                         <CollapsibleCard title="1 · Нагрузка по суставам" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.10), rgba(96,165,250,0.03))', color: '#60a5fa' }}>
                           <div style={{ display:'grid', gap:6 }}>
                             {entries.map(([joint, peak])=>{
                               const meta = RU[joint] || {label: joint, icon:'🦴'};
-                              const avg = (d.byJointAvg as any)[joint] || 0;
+                              const avg = normAvg[joint] || 0;
                               const thresh = d.thresholds as any;
                               const lvl = (peak as number) > thresh.high ? 'high' : (peak as number) > thresh.moderate ? 'moderate' : (peak as number) > thresh.low ? 'low' : 'none';
                               const color = lvl==='high'?'#ef4444': lvl==='moderate'?'#f59e0b': lvl==='low'?'#eab308':'#22c55e';
@@ -4374,6 +4385,9 @@ export const BbAutoConstructor: React.FC = () => {
                     <div style={{ padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
                   </div>
                   <div style={{ fontSize:10, color:'#fff', opacity:0.6 }}>Цель «{proQ.goalAlignment?.goal || bbGoal}» — объём {proQ.goalAlignment?.volumePctAvg || 0}% MRV · техники {proQ.technique.pct}% · растяжка {Math.round((proQ.goalAlignment?.stretchCoverage||0)*100)}% {proQ.goalAlignment?.ok ? '✅' : '⚠️ ' + (proQ.goalAlignment?.issue || '')}</div>
+                  {proQ.totalIssues.length > 0 && <div style={{ fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss:any,i:number)=><div key={i}>• {iss}</div>)}</div>}
+                  {proQ.totalRecommendations.length > 0 && <div style={{ fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec:any,i:number)=><div key={i}>→ {rec}</div>)}</div>}
+                  <div style={{ fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Изменение оценки: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включено в итог {quality.score}/100)</div>
                 </div>
               );
             })()}
@@ -4406,10 +4420,12 @@ export const BbAutoConstructor: React.FC = () => {
           const totalSetsWeek = wkExs.reduce((a,e)=> a+ (e.sets||0),0);
           return <CollapsibleCard title={`📌 Фаза (факт) — ${PHASE_LABELS[curPh] || curPh}`} defaultOpen={true} headerStyle={{ background: `linear-gradient(135deg, ${PHASE_COLORS[curPh]}18, ${PHASE_COLORS[curPh]}08)`, color: PHASE_COLORS[curPh] }}><div style={{ marginBottom:6, padding:'10px 12px', borderRadius:12, background:PHASE_COLORS[curPh] + '18', border:'1px solid ' + PHASE_COLORS[curPh] + '30' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:6 }}>
-                <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт): {PHASE_LABELS[curPh]}</span>
-                <select aria-label="Выбрать неделю для анализа фазы" value={wkq.week} onChange={e => setBbWeekSel(Number(e.target.value))} style={{ padding:'4px 8px', borderRadius:8, border:`1px solid ${PHASE_COLORS[curPh]}55`, background:'rgba(0,0,0,0.2)', color:'#fff', fontSize:11 }}>
-                  {Wq.map(w => <option key={w.week} value={w.week}>Неделя {w.week}</option>)}
-                </select>
+                <span style={{ fontSize:12, fontWeight:800, color:PHASE_COLORS[curPh] }}>📌 Фаза (факт): {PHASE_LABELS[curPh]} · нед {wkq.week}/{Wq.length}</span>
+                <div style={{ display:'flex', alignItems:'center', gap:8, flex:1, minWidth:220, maxWidth:360 }}>
+                  <span style={{ fontSize:10, color:'#fff', opacity:0.6, whiteSpace:'nowrap' }}>1</span>
+                  <input type="range" min={1} max={Wq.length} value={wkq.week} aria-label="Выбрать неделю для анализа фазы" onChange={e => setBbWeekSel(Number(e.target.value))} style={{ flex:1, accentColor: PHASE_COLORS[curPh] }} />
+                  <span style={{ fontSize:10, color:'#fff', opacity:0.6, whiteSpace:'nowrap' }}>{Wq.length}</span>
+                </div>
                 <span style={{ fontSize:11, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>RIR факт {avgRirFact.toFixed(1)} · Повт {repMin}-{repMax} · Темп {tempoFact} · Сетов {totalSetsWeek}</span>
               </div>
               <div style={{ marginTop:8, display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
@@ -4445,6 +4461,19 @@ export const BbAutoConstructor: React.FC = () => {
               </div>
               <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.7, display:'flex', flexWrap:'wrap', gap:8 }}>
                 <span>Уровень «{bbLevel}»</span><span>Цель «{bbGoal}»</span><span>Фокус «{bbTrainingFocus}»</span><span>Методика «{bbMethodology}»</span><span>Сплит «{builtPlan.pattern?.name || ''}»</span><span>PED ×{pedAdapt.combinedMrvMultiplier.toFixed(2)}</span><span>ACWR {acwrQ ? acwrQ.ratio.toFixed(2) : '—'}</span><span>Стадий {Object.keys(phaseGroups).length}</span>
+                {(() => {
+                  const peakW = W.reduce((best, w) => { const ts = w.sessions.reduce((s, ss) => s + ss.exercises.reduce((ss2, e) => ss2 + e.sets, 0), 0); return ts > best.ts ? { wk: w.week, ts } : best; }, { wk: 1, ts: 0 });
+                  const delW = W.filter((w:any) => (w as any).phase === 'deload' || (w as any).deload).map((w:any) => w.week);
+                  const accW = W.filter((w:any) => ((w as any).phase || 'accumulation') === 'accumulation');
+                  const intW = W.filter((w:any) => ((w as any).phase || '') === 'intensification');
+                  const avgRirFor = (ws: any[]) => { const exs = ws.flatMap((w:any) => w.sessions.flatMap((s:any) => s.exercises)); if (!exs.length) return '—'; return (exs.reduce((a:any,e:any) => a + (Number.isFinite(e.rir) ? e.rir : 2), 0) / exs.length).toFixed(1); };
+                  return (<>
+                    <span style={{ fontSize:10, color:'#f59e0b' }}>📈 пик нед {peakW.wk} ({peakW.ts} сетов)</span>
+                    <span style={{ fontSize:10, color: delW.length ? '#22c55e' : '#ef4444' }}>🔻 делод: {delW.length ? 'нед '+delW.join(',') : '⚠ не запланирована'}</span>
+                    {accW.length ? <span style={{ fontSize:10, color:'#60a5fa' }}>⬆ накопл {accW.length} нед (RIR {avgRirFor(accW)})</span> : null}
+                    {intW.length ? <span style={{ fontSize:10, color:'#ef4444' }}>⬇ интенсиф {intW.length} нед (RIR {avgRirFor(intW)})</span> : null}
+                  </>);
+                })()}  
               </div>
             </div>
             {needsDeloadQ && curPh !== 'deload' && (
@@ -4456,61 +4485,6 @@ export const BbAutoConstructor: React.FC = () => {
             })()}
           </CollapsibleCard>;
         })()}
-        {/* 🧩 Оценка сплита — соответствие выбранным параметрам (скор) */}
-        {(() => {
-          const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
-          const sc = sel?.score ?? bestSplit?.score ?? 0;
-          const maxSc = Math.max(...ranked.map(r=>r.score), 1);
-          const pct = Math.round((sc/maxSc)*100);
-          const color = pct>=80?'#22c55e': pct>=60?'#f59e0b':'#ef4444';
-          return <CollapsibleCard title={`🧩 Сплит: ${builtPlan.pattern?.name || '—'} · скор ${sc} (${pct}%)`} defaultOpen={true} headerStyle={{ background: `linear-gradient(135deg, ${color}14, transparent)`, color }}><div style={{ ...CARD, background:`linear-gradient(135deg, ${color}14, transparent)`, border:`1px solid ${color}22`, marginTop:8 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6, flexWrap:'wrap', gap:6 }}>
-                <span style={{ fontSize:12, fontWeight:800, color }}>🧩 Сплит: {builtPlan.pattern?.name || '—'} · скор {sc} ({pct}%)</span>
-                <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.06)', padding:'2px 8px', borderRadius:20 }}>{bbDays}×/нед · {bbLevel} · {bbGoal} · {weakPoints.length?`слабые ${weakPoints.slice(0,2).join(',')}`:'баланс'}</span>
-              </div>
-              <div style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', overflow:'hidden', marginBottom:8 }}>
-                <div style={{ width:`${pct}%`, height:'100%', background:color, transition:'width 0.3s' }} />
-              </div>
-              <div style={{ fontSize:10, color:'#fff', lineHeight:1.5 }}>
-                <b>Соответствие:</b> {sel ? sel.rationale.slice(0,3).join(' · ') : '—'}<br/>
-                <b>Выбрано:</b> дней {bbDays}, цель {bbGoal}, слабые {weakPoints.join(', ')||'—'}, фокус —, оборудование {bbEquipment.slice(0,2).join(', ')||'все'}, травмы {injuries.length||'нет'} · <b>План:</b> {builtPlan.pattern?.schedule?.length||'?'} дн/ротацию
-              </div>
-              {sel?.warnings?.length ? <div style={{ marginTop:6, fontSize:11, color:'#f59e0b' }}>{sel.warnings.slice(0,2).map((w,i)=><div key={i}>⚠ {w}</div>)}</div> : null}
-            </div></CollapsibleCard>
-          ;
-        })()}
-        {/* Legacy cycle info — для старых сохранённых bb_cycle планов */}
-        <CollapsibleCard title={`📋 ПРОФ-цикл: ${getCycleById(selectedCycleId)?.meta.title || '—'}`} defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(0,230,138,0.03))', color: '#00e68a' }}>{(planMode === 'programs' || planMode === 'bb_cycle') && selectedCycleId && getCycleById(selectedCycleId) && (() => {
-          const c = getCycleById(selectedCycleId);
-          if (!c) return null;
-          return (
-            <div style={{ ...CARD, marginBottom:8, background:'rgba(0,230,138,0.04)', border:'1px solid rgba(0,230,138,0.12)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#00e68a', marginBottom:4, display:'none' }}>📋 ПРОФ-цикл: {c.meta.title}</div>
-              <div style={{ fontSize:11, color:'#fff' }}>
-                <div>Упражнения: заданы циклом ({c.week1.reduce((s, d) => s + d.exercises.length, 0)} упр/день)</div>
-                <div>Фазы: {c.meta.phases && c.meta.phases.length > 0 ? c.meta.phases.map(ph => ph.title || `нед ${ph.weekStart}-${ph.weekEnd}`).join(', ') : 'RIR-прогрессия'}</div>
-                <div>{c.meta.conditions.slice(0, 2).map((cond, i) => <div key={i}>• {cond}</div>)}</div>
-              </div>
-            </div>
-          );
-        })()}</CollapsibleCard>
-        <CollapsibleCard title={`⭐ Оценка качества — ${quality.score}/100 ${quality.label}`} defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(168,85,247,0.03))', color: '#a855f7' }}><div style={{ ...CARD, textAlign:'center', borderLeft:'3px solid ' + (quality.score >= 85 ? '#22c55e' : quality.score >= 65 ? '#eab308' : '#ef4444') }}>
-          <div style={{ fontSize:36, fontWeight:800, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444', display:'none' }}>{quality.score}/100</div>
-          <div style={{ fontSize:13, fontWeight:700, color:quality.score >=85?'#22c55e':quality.score >=65?'#eab308':'#ef4444' }}>{quality.label}</div>
-          <div style={{ marginTop:8, display:'flex', justifyContent:'center', gap:12, flexWrap:'wrap' }}>
-            <div style={SMALL}>Всего сетов (пик): <b style={{ color:'#fff' }}>{metrics.totalSets}</b></div>
-            <div style={SMALL}>Тяж: <b style={{ color:'#ef4444' }}>{(metrics.тяжPct*100).toFixed(0)}%</b></div>
-            <div style={SMALL}>Памп: <b style={{ color:'#60a5fa' }}>{(metrics.пампPct*100).toFixed(0)}%</b></div>
-            <div style={SMALL}>RIR: <b style={{ color:'#f59e0b' }}>{metrics.avgRir.toFixed(1)}</b></div>
-            <div style={SMALL}>Фаз: <b style={{ color:'#a855f7' }}>{Array.from(new Set(W.map((w:any) => (w as any).phase || 'accumulation'))).length}</b></div>
-          </div>
-          {pedAdapt.combinedMrvMultiplier > 1 && (
-            <div style={{ marginTop:6, fontSize:11, fontWeight:700, color:'#f59e0b', background:'rgba(245,158,11,0.08)', padding:'4px 10px', borderRadius:8, display:'inline-block' }}>
-              💉 PED: MRV ×{pedAdapt.combinedMrvMultiplier.toFixed(2)} — пороги MEV/MAV/MRV увеличены
-            </div>
-          )}
-          <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Средний объём по мезо — в «Бюджете объёма», пик — здесь</div>
-        </div></CollapsibleCard>
         {/* 📊 Тренировочный объём — PRO (единственная карточка объёма, без дублей) */}
         {metrics && (() => {
           // — агрегаты по мезоциклу (все недели) для общего объёма
@@ -4670,111 +4644,10 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           );
         })()}
-        <CollapsibleCard title="🔍 Детальный анализ" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.08), rgba(96,165,250,0.03))', color: '#60a5fa' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-          {freqOptResult && freqOptResult.totalAdjustments > 0 && (
-            <ExpandableCard title={`🔧 Частота ${freqOptResult.totalAdjustments}`} icon="🔧" short={`${freqOptResult.totalAdjustments} рекомендаций`} full={
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {freqOptResult.recommendations.slice(0,3).map((rec:any,i:number)=> {
-                  const up = rec.recommendedFrequency > rec.currentFrequency;
-                  return <div key={i} style={{ fontSize:10, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', color:'#fff' }}>{up?'↑':'↓'} {(MUSCLE_LABEL_RU as any)[rec.muscle]||rec.muscle}: {rec.currentFrequency}→{rec.recommendedFrequency}× {rec.reason}</div>
-                })}
-              </div>
-            } />
-          )}
-          {(() => {
-            const summary = summarizeAutoRegulation(builtPlan);
-            if (summary.adjustedExercises === 0) return null;
-            return <ExpandableCard title={`↻ Авто ${summary.adjustedExercises}`} icon="↻" short={`${summary.adjustedExercises} скоррект.`} full={
-              <div style={{ fontSize:10, color:'#fff', display:'flex', flexDirection:'column', gap:2 }}>{summary.details.slice(0,3).map((d,i)=><div key={i}>{d.exercise}: {d.from}→{d.to}</div>)} </div>
-            } />
-          })()}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-          {builtPlan.balanceReport && (
-            <ExpandableCard title="⚖️ Баланс" icon="⚖️" short={`${builtPlan.balanceReport.press}ж/${builtPlan.balanceReport.pull}т`} full={
-              <div style={{ fontSize:10, color:'#fff' }}>Тяги {builtPlan.balanceReport.pull} · Жимы {builtPlan.balanceReport.press} · Растянутая {builtPlan.balanceReport.lengthened}</div>
-            } />
-          )}
-        </div>
-        </CollapsibleCard>
-        {/* Прогноз по фазам — факт из плана */}
-        {(() => {
-          const peakWeek = W.reduce((best, w, i) => {
-            const ts = w.sessions.reduce((s, ss) => s + ss.exercises.reduce((ss2, e) => ss2 + e.sets, 0), 0);
-            return ts > best.ts ? { wk: w.week, ts } : best;
-          }, { wk: 1, ts: 0 });
-          const actualDeloadWeeks = W.filter((w:any) => (w as any).phase === 'deload' || (w as any).deload).map((w:any) => w.week);
-          const hasDeload = actualDeloadWeeks.length > 0;
-          const accWeeks = W.filter((w:any) => ((w as any).phase || 'accumulation') === 'accumulation');
-          const intensWeeks = W.filter((w:any) => ((w as any).phase || '') === 'intensification');
-          return <CollapsibleCard title="🔮 Прогноз по фазам" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(34,197,94,0.03))', color: '#22c55e' }}><div style={{ marginTop:8, padding:10, borderRadius:10, background:'rgba(34,197,94,0.04)', border:'1px solid rgba(34,197,94,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6, display:'none' }}>🔮 Прогноз по фазам</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:11 }}>
-                <div>
-                  <span style={{ color:'#fff' }}>Пик объёма: </span>
-                  <span style={{ fontWeight:700, color:'#f59e0b' }}>нед {peakWeek.wk}</span>
-                  <span style={{ color:'#fff' }}> ({peakWeek.ts} сетов)</span>
-                </div>
-                <div>
-                  <span style={{ color:'#fff' }}>Разгрузка: </span>
-                  <span style={{ fontWeight:700, color: hasDeload ? '#22c55e' : '#ef4444' }}>
-                    {hasDeload ? 'нед ' + actualDeloadWeeks.join(', ') : 'НЕ ЗАПЛАНИРОВАНА ⚠'}
-                  </span>
-                </div>
-                {(() => {
-                  const avgRirFor = (weeks: any[]) => {
-                    const exs = weeks.flatMap((w:any) => w.sessions.flatMap((s:any) => s.exercises));
-                    if (exs.length === 0) return '—';
-                    const avg = exs.reduce((a:any,e:any) => a + (Number.isFinite(e.rir) ? e.rir : 2), 0) / exs.length;
-                    return avg.toFixed(1);
-                  };
-                  return (<>
-                    <div>
-                      <span style={{ color:'#fff' }}>Накопление: </span>
-                      <span style={{ fontWeight:700, color:'#60a5fa' }}>{accWeeks.length} нед</span>
-                      <span style={{ color:'#fff' }}> (ср. RIR {avgRirFor(accWeeks)})</span>
-                    </div>
-                    <div>
-                      <span style={{ color:'#fff' }}>Интенсификация: </span>
-                      <span style={{ fontWeight:700, color:'#ef4444' }}>{intensWeeks.length} нед</span>
-                      <span style={{ color:'#fff' }}> (ср. RIR {avgRirFor(intensWeeks)})</span>
-                    </div>
-                  </>);
-                })()}
-              </div>
-              {!hasDeload && W.length >= 6 && (
-                <div style={{ marginTop:6, padding:'4px 8px', borderRadius:8, background:'rgba(239,68,68,0.1)', fontSize:11, color:'#ef4444' }}>
-                  ⚠ Мезоцикл {W.length} нед без разгрузки — высокий риск перетрена. Добавьте разгрузочную неделю.
-                </div>
-              )}
-            </div></CollapsibleCard>
-          ;
-        })()}
-        {/* Подробная таблица объёма по мышцам — убрана как дубль «Бюджета объёма» (Step 4 heatmap + Step 5 VolumeBudgetCard) */}
-        {/* PRO Quality — отдельный блок, данные из единого quality.proResult */}
-        {(() => {
-          const proQ = (quality as any).proResult as ReturnType<typeof analyzeProQuality> | null;
-          if (!proQ) return null;
-          return <CollapsibleCard title="🧠 PRO-качество (паттерны/углы/растяжка)" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(168,85,247,0.03))', color: '#a855f7' }}><div style={{ ...CARD, marginTop:8, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#a855f7', marginBottom:6, display:'none' }}>🧠 PRO-качество (паттерны/углы/растяжка)</div>
-              <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginBottom:6 }}>Оценка техники/углов/растяжки из интеллектуальных тренировок. Скорректировала базовую оценку на {proQ.scoreDelta>0?'+':''}{proQ.scoreDelta}.</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:10 }}>
-                <div><b>Паттерны:</b> {proQ.patterns.filter(p=>p.ok).length}/{proQ.patterns.length} в норме {proQ.patterns.filter(p=>!p.ok).map(p=>p.issue).slice(0,2).join('; ') || '—'}</div>
-                <div><b>Углы:</b> {proQ.angles.filter(a=>a.ok).length}/{proQ.angles.length} в норме {proQ.angles.filter(a=>!a.ok).map(a=>a.issue).slice(0,2).join('; ') || '—'}</div>
-                <div><b>Растяжка:</b> {proQ.stretches.filter(s=>s.ok).length}/{proQ.stretches.length} в норме</div>
-                <div><b>Техники:</b> {proQ.technique.pct}% {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}</div>
-              </div>
-              {proQ.totalIssues.length > 0 && <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>{proQ.totalIssues.slice(0,3).map((iss,i)=><div key={i}>• {iss}</div>)}</div>}
-              {proQ.totalRecommendations.length > 0 && <div style={{ marginTop:4, fontSize:10, color:'#22c55e' }}>{proQ.totalRecommendations.slice(0,3).map((rec,i)=><div key={i}>→ {rec}</div>)}</div>}
-              <div style={{ marginTop:4, fontSize:10, color: proQ.scoreDelta >=0 ? '#22c55e' : '#f59e0b' }}>Изменение оценки: {proQ.scoreDelta >0 ? '+' : ''}{proQ.scoreDelta} (уже включено в итог {quality.score}/100)</div>
-            </div></CollapsibleCard>
-          ;
-        })()}
         {/* Прогрессия весов по неделям (основные упражнения) — факт из плана */}
         {(() => {
           const totalW = W.length;
-          const cols = Math.min(8, totalW);
+          const selW = Math.min(Math.max(1, bbWeekSel), totalW);
           const primaryExs = new Map<string, { name: string; muscle: string; weights: number[] }>();
           for (const w of W) {
             for (const s of w.sessions) {
@@ -4790,44 +4663,45 @@ export const BbAutoConstructor: React.FC = () => {
           if (primaryExs.size === 0) return null;
           const top = [...primaryExs.values()].filter(e => e.weights.some(w => w > 0)).slice(0, 6);
           if (top.length === 0) return null;
-          return <CollapsibleCard title="📈 Прогрессия весов (кг) — факт плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03))', color: '#f59e0b' }}><div style={{ ...CARD, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.15)' }}>
-              <div style={{ fontSize:11, fontWeight:700, color:'#f59e0b', marginBottom:6, display:'none' }}>📈 Прогрессия весов (кг) по неделям — факт плана</div>
-              <div style={{ overflowX:'auto' }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, minWidth: cols*40+120 }}>
-                  <span style={{ fontWeight:700, color:'#fff' }}>Упражнение</span>
-                  {Array.from({ length: cols }, (_, i) => (
-                    <span key={i} style={{ fontWeight:700, color:'#fff', textAlign:'center' }}>{i+1}</span>
-                  ))}
-                </div>
-                {top.map(ex => {
-                  const weights = ex.weights.slice(0, cols);
-                  const first = weights.find(w => w > 0) || 0;
-                  const last = weights.filter(w => w > 0).pop() || first;
-                  const delta = last > first ? '+' + (last - first) : '';
-                  return (
-                    <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.2fr ' + '0.45fr '.repeat(cols), gap:2, fontSize:10, padding:'2px 0', borderTop:'1px solid rgba(255,255,255,0.04)', alignItems:'center' }}>
-                      <span style={{ fontWeight:600, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={ex.name}>{ex.name.substring(0, 18)}</span>
-                      {weights.map((w, wi) => {
-                        const prev = wi > 0 ? weights[wi-1] : 0;
-                        const up = prev > 0 && w > prev;
-                        const down = prev > 0 && w < prev;
-                        return (
-                          <span key={wi} style={{
-                            textAlign:'center', fontWeight: w > 0 ? 700 : 400,
-                            color: w > 0 ? (up ? '#22c55e' : down ? '#ef4444' : '#f59e0b') : 'rgba(255,255,255,0.2)',
-                          }}>{w > 0 ? w : '—'}</span>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop:4, fontSize:10, color:'#fff', display:'flex', gap:12 }}>
-                <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span>
-              </div>
-              {totalW > 8 && <div style={{ marginTop:4, fontSize:10, color:'#fff', opacity:0.6 }}>Показаны первые 8 нед из {totalW}</div>}
-            </div></CollapsibleCard>
-          ;
+          const startW = 0;
+          return <CollapsibleCard title="📈 Прогрессия весов (кг) — факт плана" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04))', color: '#f59e0b' }} badge={`нед ${selW}/${totalW}`}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+              <span style={{ fontSize:10, color:'#fff', opacity:0.6, whiteSpace:'nowrap' }}>1</span>
+              <input type="range" min={1} max={totalW} value={selW} aria-label="Выбрать неделю для анализа прогрессии весов" onChange={e => setBbWeekSel(Number(e.target.value))} style={{ flex:1, accentColor:'#f59e0b' }} />
+              <span style={{ fontSize:10, color:'#fff', opacity:0.6, whiteSpace:'nowrap' }}>{totalW}</span>
+            </div>
+            <div style={{ display:'grid', gap:6 }}>
+              {top.map(ex => {
+                const wSel = ex.weights[selW - 1] || 0;
+                const wStart = ex.weights[startW] || 0;
+                const prev = selW > 1 ? (ex.weights[selW - 2] || 0) : 0;
+                const up = prev > 0 && wSel > prev;
+                const down = prev > 0 && wSel < prev;
+                const delta = wStart > 0 ? wSel - wStart : 0;
+                const deltaStr = delta > 0 ? '+' + delta : delta < 0 ? String(delta) : '0';
+                const pct = (() => {
+                  const nonZero = ex.weights.filter(v => v > 0);
+                  if (nonZero.length < 2) return null;
+                  const mn = Math.min(...nonZero), mx = Math.max(...nonZero);
+                  if (mx === mn) return 100;
+                  return Math.round(((wSel - mn) / (mx - mn)) * 100);
+                })();
+                return (
+                  <div key={ex.name} style={{ display:'grid', gridTemplateColumns:'1.4fr 0.7fr 0.7fr 1fr', gap:6, alignItems:'center', padding:'7px 9px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontWeight:600, color:'#fff', fontSize:11, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={ex.name}>{ex.name.substring(0, 22)}</span>
+                    <span style={{ fontSize:10, color:'#fff', opacity:0.55 }}>нед 1: <b style={{ color:'#fff' }}>{wStart || '—'}</b> кг</span>
+                    <span style={{ fontSize:11, fontWeight:800, color: up ? '#22c55e' : down ? '#ef4444' : '#f59e0b' }}>{wSel ? wSel + ' кг' : '—'}{wSel > 0 && delta !== 0 ? <span style={{ fontSize:9, opacity:0.8, marginLeft:4 }}>({deltaStr})</span> : null}</span>
+                    <span style={{ height:6, borderRadius:6, background:'rgba(255,255,255,0.08)', overflow:'hidden' }}>
+                      <span style={{ display:'block', height:'100%', width: (pct ?? 0) + '%', background: up ? '#22c55e' : down ? '#ef4444' : '#f59e0b', transition:'width 0.2s' }} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop:6, fontSize:10, color:'#fff', display:'flex', gap:12 }}>
+              <span>🟢 +вес</span><span>🟡 стабильно</span><span>🔴 −вес (разгрузка)</span><span style={{ opacity:0.6, marginLeft:'auto' }}>ползунок — выбор недели</span>
+            </div>
+          </CollapsibleCard>;
         })()}
         <CollapsibleCard title="🗑 Мусорный объём" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.08), rgba(239,68,68,0.03))', color: '#ef4444' }}>
         {(() => {
@@ -4857,7 +4731,6 @@ export const BbAutoConstructor: React.FC = () => {
                 <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
                   {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
                 </div>
-                <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.55, fontFamily:'ui-monospace, monospace' }}>{`Логика: detectGarbageVolume(weeks, weakPoints, {level, trainingYears, focusGroup: '', specialization}) → warmup исключён, back по classifyBackExercise, compound исключён, seenPatterns per session, слабые/фокус — скип.`}</div>
               </div>
             );
           }
@@ -4884,7 +4757,6 @@ export const BbAutoConstructor: React.FC = () => {
               <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
                 {paramChips.map((p,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'2px 7px', borderRadius:20 }}>{p}</span>)}
               </div>
-              <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.5, fontFamily:'ui-monospace, monospace' }}>Формула: per session seenPatterns[day-muscle-pattern] → если дубль && !isWeak && !calvesByDesign → мусор. isWeak учитывает weakPoints+focusGroup+specializationTargets.</div>
             </div>
           );
         })()}</CollapsibleCard>
@@ -4941,7 +4813,7 @@ export const BbAutoConstructor: React.FC = () => {
           short="Прогрессия мезоцикла"
           full={
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" />
+              <MesocycleProgressionCard weeks={W.length} startVolumeSets={Math.round(W.reduce((s,w)=>s+w.sessions.reduce((ss,sess)=>ss+sess.exercises.reduce((sss,e)=>sss+e.sets,0),0),0)/W.length)} startIntensityPct={0.7} startRIR={2} goal="hypertrophy" title="Прогрессия мезоцикла (ББ)" hideApply />
             </div>
           }
         />
