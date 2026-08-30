@@ -124,10 +124,13 @@ export function correctDayToTargets(
 
   const maxCoreScale = opts?.allowCoreScale ? 1.30 : 1.20;
   for (let iter = 0; iter < maxIter; iter++) {
-    // человечность: орехи/семена ≤85г и клетчатка ≤85г — режем перебор до сведения КБЖУ
+    // человечность: орехи/семена ≤85г и клетчатка ≤85г — режем перебор ДО сведения КБЖУ.
+    // ВАЖНО: тримим ТОЛЬКО при переборе ккал или в норме — при недоборе ккал срезка углеводов
+    // (носитель клетчатки) рушит калораж (800г углей → клетчатка 200г+ → 5089→4307 ккал).
     const nutG = currentNutGrams(meals);
     const fibG = currentFiber(meals);
-    if (nutG > 85 || fibG > 85) {
+    const _kcalNow = sumTotals(meals).kcal;
+    if (!(safeTargets.kcal > 0 && _kcalNow < safeTargets.kcal * 0.97) && (nutG > 85 || fibG > 85)) {
       const isNutOver = nutG > 85;
       const cands = meals.flatMap((m, mi) => m.items.map((it, ii) => ({ mi, ii, it, m })))
         .filter(x => !((x.it as any)._fixedGrams) && x.m.type !== 'presleep' && x.m.type !== 'intra')
@@ -138,19 +141,103 @@ export function correctDayToTargets(
         })
         .sort((a, b) => (b.it.fiber || 0) - (a.it.fiber || 0));
       let cut = false;
+      const beforeDevAll = maxDevPct(sumTotals(meals) as DayTargets, safeTargets);
       for (const cand of cands) {
         if ((cand.it.amount || 0) < 20) continue;
         const newAmount = Math.max(15, Math.round(cand.it.amount * 0.85));
-        const before = cand.it.amount;
+        const prevAmount = cand.it.amount;
         scaleItem(cand.it, newAmount);
         recalcMealTotals(meals);
-        cut = true; break;
+        const afterDevAll = maxDevPct(sumTotals(meals) as DayTargets, safeTargets);
+        // мягкий допуск +0.5%: мелкий трим (85.2→85г клетчатки) проходит, катастрофическая
+        // срезка (217→85г при 800г углей, рушит ~1000 ккал) отклоняется.
+        if (afterDevAll < beforeDevAll + 0.5) { cut = true; break; }
+        // откат — срезка клетчатки не должна ломать КБЖУ
+        scaleItem(cand.it, prevAmount);
+        recalcMealTotals(meals);
       }
       if (cut) continue;
     }
     const totals = sumTotals(meals);
     const dev = maxDevPct(totals as DayTargets, safeTargets);
     if (dev <= 3) break;
+    // SWAP (до выбора оси): универсально — любая ПЕРЕБРАННАЯ ось (жир/угли/белок) меняется
+    // на любую НЕДОБРАННУЮ, по ккал-паритету. Иначе при конфликте «жир перебран + угли
+    // недобраны» (или «белок недобран + жир перебран») корректор по одной оси застревает:
+    // добавление недобранного ухудшает перебранное → maxDev не падает → разбег 12-28%.
+    {
+      const dP = safeTargets.p - totals.p;
+      const dF = safeTargets.f - totals.f;
+      const dC = safeTargets.c - totals.c;
+      // under/over по осям (порог: белк/угли >5г, жир >2г)
+      const unders: Array<'p' | 'f' | 'c'> = [];
+      const overs: Array<'p' | 'f' | 'c'> = [];
+      if (dP > 5) unders.push('p'); else if (dP < -5) overs.push('p');
+      if (dF > 2) unders.push('f'); else if (dF < -2) overs.push('f');
+      if (dC > 5) unders.push('c'); else if (dC < -5) overs.push('c');
+      // сортируем по величине |отклонения| (г) — правим самую больную ось
+      const magOf = (a: 'p' | 'f' | 'c') => a === 'p' ? Math.abs(dP) : a === 'f' ? Math.abs(dF) : Math.abs(dC);
+      unders.sort((a, b) => magOf(b) - magOf(a));
+      overs.sort((a, b) => magOf(b) - magOf(a));
+      if (unders.length > 0 && overs.length > 0) {
+        const under = unders[0];
+        const over = overs[0];
+        const needFor = (f: FoodItem) => under === 'p' ? (f.protein || 0) : under === 'c' ? (f.carbs || 0) : (f.fat || 0);
+        const overFor = (f: FoodItem) => over === 'p' ? (f.protein || 0) : over === 'c' ? (f.carbs || 0) : (f.fat || 0);
+        const underPool = poolFor(under, opts?.excludedIds).filter(f => needFor(f) > 0);
+        if (underPool.length > 0) {
+          const bestU = [...underPool].sort((a, b) => needFor(b) / Math.max(1, b.kcal || 1) - needFor(a) / Math.max(1, a.kcal || 1))[0];
+          let victim: { mi: number; ii: number; it: CorrectorItem } | null = null;
+          let victimBad = -1;
+          const bestUFood = FOOD_DB.find(f => f.id === bestU.id);
+          const bestUMacros = bestUFood ? { p: bestUFood.protein || 0, f: bestUFood.fat || 0, c: bestUFood.carbs || 0 } : { p: 0, f: 0, c: 0 };
+          meals.forEach((m, mi) => {
+            if (m.type === 'presleep' || m.type === 'intra' || m.type === 'preworkout') return;
+            (m.items || []).forEach((it, ii) => {
+              if ((it as any)._fixedGrams) return;
+              if (isCoreRecipeItem(m, it.id)) return;
+              const food = FOOD_DB.find(f => f.id === it.id);
+              if (!food) return;
+              const ov = overFor(food);
+              if (ov < 2) return;
+              const k = Math.max(1, food.kcal || 1);
+              const vm = { p: (food.protein || 0) / k, f: (food.fat || 0) / k, c: (food.carbs || 0) / k };
+              const bm = { p: bestUMacros.p / Math.max(1, bestU.kcal || 1), f: bestUMacros.f / Math.max(1, bestU.kcal || 1), c: bestUMacros.c / Math.max(1, bestU.kcal || 1) };
+              // Замена на bestU должна НЕ ухудшать недобранные оси и СНИЖАТЬ перебранные.
+              for (const u of unders) if (bm[u] + 0.001 < vm[u]) return;
+              for (const o of overs) if (vm[o] + 0.001 < bm[o]) return;
+              const bad = ov * (it.amount || 0) / 100;
+              if (bad > victimBad) { victimBad = bad; victim = { mi, ii, it }; }
+            });
+          });
+          if (victim && bestU) {
+            const freedKcal = victim.it.kcal || 0;
+            const swapG = Math.max(20, Math.round(freedKcal / Math.max(1, bestU.kcal || 1) * 100 / 10) * 10);
+            if (swapG >= 20) {
+              const beforeTotals = sumTotals(meals);
+              const beforeDev = maxDevPct(beforeTotals as DayTargets, safeTargets);
+              const newIt: CorrectorItem = {
+                id: bestU.id, name: bestU.name, amount: swapG,
+                kcal: Math.round((bestU.kcal || 0) * swapG / 100),
+                p: Math.round((bestU.protein || 0) * swapG / 100 * 10) / 10,
+                f: Math.round((bestU.fat || 0) * swapG / 100 * 10) / 10,
+                c: Math.round((bestU.carbs || 0) * swapG / 100 * 10) / 10,
+                fiber: Math.round((bestU.fiber || 0) * swapG / 100 * 10) / 10,
+                role: under === 'p' ? 'protein' : under === 'c' ? 'carb_slow' : 'fat',
+              } as any;
+              newIt.kcal = Math.round(4 * newIt.p + 9 * newIt.f + 4 * newIt.c);
+              meals[victim.mi].items[victim.ii] = newIt;
+              recalcMealTotals(meals);
+              const afterTotals = sumTotals(meals);
+              const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
+              if (afterDev < beforeDev - 0.05) continue;
+              meals[victim.mi].items[victim.ii] = victim.it;
+              recalcMealTotals(meals);
+            }
+          }
+        }
+      }
+    }
     const pd = perDev(totals as DayTargets, safeTargets);
     // выбираем ось с максимальным |dev|
     const abs = { k: Math.abs(pd.k), p: Math.abs(pd.p), f: Math.abs(pd.f), c: Math.abs(pd.c) };

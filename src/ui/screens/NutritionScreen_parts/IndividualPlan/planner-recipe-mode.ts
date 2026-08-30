@@ -879,8 +879,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // Шире сеть кандидатов — финальный отбор по фактической декомпозиции ниже
     // Для тяжей 100-120кг — масштабирование до 3.0 и 2-3 порции, иначе 14г каши
     const heavyScaleMax = (args.athleteWeightKg ?? 80) >= 120 ? 3.0 : (args.athleteWeightKg ?? 80) >= 110 ? 2.8 : (args.athleteWeightKg ?? 80) >= 100 ? 2.5 : 2.2;
-    const heavyProteinCap = (args.athleteWeightKg ?? 80) >= 100 ? 1.5 : 1.25;
-    const heavyCarbCap = (args.athleteWeightKg ?? 80) >= 100 ? 1.5 : 1.25;
+    // КБЖУ ≤3%: рецепт не должен масштабироваться вверх по белку/углям сильнее 1.2×
+    // цели приёма — иначе день систематически перебирает белок (+18%) и недобирает угли.
+    const heavyProteinCap = 1.2;
+    const heavyCarbCap = 1.2;
     const scaleOf = (kcal: number, p: number, f: number, c: number): number => {
       let s = Math.max(0.7, Math.min(heavyScaleMax, targetKcal / Math.max(50, kcal)));
       if (p > 0) s = Math.min(s, (heavyProteinCap * (tgt.p || 30)) / p);
@@ -1026,8 +1028,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       const tk = built.totals.kcal || 1;
       return Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= kcalTol
         && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
+        && built.totals.p <= 1.25 * (tgt.p || 30) + 0.5
         && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
-        && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5;
+        && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5
+        && built.totals.c <= 1.30 * (tgt.c || 40) + 0.5;
     };
     for (const cand of ranked) {
       const built = tryBuild(cand);
@@ -1045,8 +1049,10 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         const tk = built.totals.kcal || 1;
         if (Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= 0.25
           && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
+          && built.totals.p <= 1.30 * (tgt.p || 30) + 0.5
           && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
-          && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5) { chosen = built; break; }
+          && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5
+          && built.totals.c <= 1.35 * (tgt.c || 40) + 0.5) { chosen = built; break; }
       }
     }
     if (!chosen && !fallback) return;
