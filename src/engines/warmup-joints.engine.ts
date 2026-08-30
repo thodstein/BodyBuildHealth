@@ -70,8 +70,10 @@ export const JOINT_BY_GROUP: Record<CanonGroup, JointKey[]> = {
   forearms: ['wrists', 'elbows'],
 };
 
-/** Суставная подготовка для набора групп дня: гарантирует ≥1 упр. на каждый востребованный сустав, затем добирает вторые упражнения. Кап 9. */
-export function collectJointPrep(groups: string[]): WarmupPrepExercise[] {
+export type JointWarmupMode = 'quick' | 'standard' | 'full';
+
+/** Суставная подготовка для набора групп дня: гарантирует ≥1 упр. на каждый востребованный сустав, затем добирает вторые упражнения. */
+export function collectJointPrep(groups: string[], mode?: JointWarmupMode): WarmupPrepExercise[] {
   const wanted = new Set<JointKey>();
   for (const g of groups) {
     for (const canon of canonicalizeGroups(g)) {
@@ -86,7 +88,7 @@ export function collectJointPrep(groups: string[]): WarmupPrepExercise[] {
     const pool = JOINT_PREP[joint] || [];
     if (pool.length > 0 && !seen.has(pool[0].id)) { seen.add(pool[0].id); out.push(pool[0]); }
   }
-  const CAP = 9;
+  const CAP = mode === 'quick' ? 5 : mode === 'full' ? 11 : 9;
   for (const joint of wantedList) {
     if (out.length >= CAP) break;
     const pool = JOINT_PREP[joint] || [];

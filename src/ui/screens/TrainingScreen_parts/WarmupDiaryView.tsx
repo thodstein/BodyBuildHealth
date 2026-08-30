@@ -96,38 +96,64 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
         </div>
       </div>
 
-      {/* ── Предпросмотр: разминка по плану на сегодня ── */}
-      <div style={CARD}>
-        <div style={{ fontSize: 10, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6 }}>
-          🧭 Разминка по плану на сегодня
+      {/* ── Предпросмотр: разминка по плану на сегодня — красивая и персональная ── */}
+      <div style={{ ...CARD, background: 'linear-gradient(135deg, rgba(249,115,22,0.07), rgba(167,139,250,0.05))', border: '1px solid rgba(249,115,22,0.18)', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -12, right: -12, width: 72, height: 72, borderRadius: 72, background: 'radial-gradient(circle, rgba(249,115,22,0.14), transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ fontSize: 10, color: '#fff', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 22, height: 22, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', fontSize: 11 }}>🧭</span> Разминка по плану на сегодня
+          <span style={{ marginLeft: 'auto', fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.08)' }}>персональная</span>
         </div>
         {!planDay || !Array.isArray(planDay.exercises) || planDay.exercises.length === 0 ? (
           <div style={{ fontSize: 10, color: DIM, lineHeight: 1.5 }}>
-            Нет плана на сегодня — разминка сгенерируется автоматически при старте любой сессии (по упражнениям и оборудованию).
+            Нет плана на сегодня — разминка сгенерируется автоматически при старте любой сессии (по упражнениям и оборудованию). Каждая группа получит суставы + зоны + активацию.
           </div>
         ) : (() => {
           const groups = groupsFromExercises(planDay.exercises);
           if (groups.length === 0) {
             return <div style={{ fontSize: 10, color: DIM }}>Не удалось определить группы дня — разминка будет по упражнениям сессии.</div>;
           }
-          const joints = collectJointPrep(groups);
-          const prep = collectGroupPrep(groups, true);
+          const joints = collectJointPrep(groups, 'standard');
+          const prep = collectGroupPrep(groups, true, 'standard');
+          const totalMob = joints.length + prep.mobility.length;
+          const totalAct = prep.activation.length;
           return (
             <div>
-              <div style={{ fontSize: 10, color: '#fff', marginBottom: 4 }}>
-                🎯 {planDay.name || 'Тренировка'} · зоны: <b style={{ color: '#fff' }}>{prepGroupLabels(groups)}</b>
+              <div style={{ fontSize: 10, color: '#fff', marginBottom: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                <span>🎯 <b style={{ color: '#fff' }}>{planDay.name || 'Тренировка'}</b></span>
+                <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: 'rgba(167,139,250,0.12)', color: '#c4b5fd', border: '1px solid rgba(167,139,250,0.22)' }}>зоны: {prepGroupLabels(groups)}</span>
+                <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)' }}>{groups.join(', ')}</span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
-                {joints.slice(0, 6).map(j => (
-                  <span key={j.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(249,115,22,0.1)', color: '#fff', border: '1px solid rgba(249,115,22,0.25)' }}>
-                    {warmupLabel(j.id)}{j.note ? ` — ${j.note}` : ''}
+                <span style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', alignSelf: 'center', marginRight: 2 }}>🤸 Суставы:</span>
+                {joints.slice(0, 7).map(j => (
+                  <span key={j.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(245,158,11,0.10)', color: '#fff', border: '1px solid rgba(245,158,11,0.22)' }}>
+                    {warmupLabel(j.id)}
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                <span style={{ fontSize: 8, fontWeight: 700, color: '#f59e0b', alignSelf: 'center', marginRight: 2 }}>🧩 Зоны:</span>
+                {prep.mobility.slice(0, 5).map(m => (
+                  <span key={m.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(6,182,214,0.08)', color: '#fff', border: '1px solid rgba(6,182,214,0.18)' }}>
+                    {warmupLabel(m.id)}
                   </span>
                 ))}
               </div>
               {prep.activation.length > 0 && (
-                <div style={{ fontSize: 9, color: DIM, marginBottom: 2 }}>Активация: {prep.activation.slice(0, 3).map(a => warmupLabel(a.id)).join(' · ')}</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+                  <span style={{ fontSize: 8, fontWeight: 700, color: '#22c55e', alignSelf: 'center', marginRight: 2 }}>⚡ Активация:</span>
+                  {prep.activation.slice(0, 5).map(a => (
+                    <span key={a.id} style={{ fontSize: 9, padding: '2px 8px', borderRadius: 10, background: 'rgba(34,197,94,0.10)', color: '#fff', border: '1px solid rgba(34,197,94,0.22)' }}>
+                      {warmupLabel(a.id)}
+                    </span>
+                  ))}
+                </div>
               )}
-              <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 4 }}>Полный план с чекбоксами — при старте сессии (фаза «Разминка»).</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6, fontSize: 9 }}>
+                <span style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.70)', border: '1px solid rgba(255,255,255,0.07)' }}>суставов {joints.length} · зон {prep.mobility.length} · активаций {totalAct}</span>
+                <span style={{ padding: '2px 7px', borderRadius: 20, background: 'rgba(249,115,22,0.10)', color: '#fb923c', border: '1px solid rgba(249,115,22,0.22)' }}>~{Math.round((joints.length*30 + prep.mobility.length*30 + prep.activation.length*35)/60*10)/10} мин</span>
+              </div>
+              <div style={{ fontSize: 8, color: 'var(--text-faint)', marginTop: 6, lineHeight: 1.3 }}>Полный план с чекбоксами, таймером 30с и режимами Быстро/Стандарт/Полная — при старте сессии (фаза «Разминка»). Без ленты — bodyweight-замены уже включены.</div>
             </div>
           );
         })()}
@@ -153,27 +179,30 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
         ) : (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 6 }}>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: DIM }}>Записей</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: WARMUP_COLOR }}>{adherence.total}</div>
+              <div style={{ padding: '8px 8px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(249,115,22,0.12), rgba(251,146,60,0.06))', border: '1px solid rgba(249,115,22,0.18)', textAlign: 'center' }}>
+                <div style={{ fontSize: 11 }}>📝</div><div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>Записей</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: WARMUP_COLOR, marginTop: 2 }}>{adherence.total}</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: DIM }}>Приверженность</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: adherence.pct >= 80 ? '#22c55e' : adherence.pct >= 50 ? '#f59e0b' : '#ef4444' }}>
+              <div style={{ padding: '8px 8px', borderRadius: 12, background: adherence.pct >= 80 ? 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(16,185,129,0.07))' : adherence.pct >= 50 ? 'linear-gradient(135deg, rgba(245,158,11,0.12), rgba(251,146,60,0.06))' : 'linear-gradient(135deg, rgba(239,68,68,0.12), rgba(220,38,38,0.06))', border: `1px solid ${adherence.pct >= 80 ? 'rgba(34,197,94,0.20)' : adherence.pct >= 50 ? 'rgba(245,158,11,0.20)' : 'rgba(239,68,68,0.18)'}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 11 }}>🎯</div><div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>Приверж.</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: adherence.pct >= 80 ? '#22c55e' : adherence.pct >= 50 ? '#f59e0b' : '#ef4444', marginTop: 2 }}>
                   {adherence.total > 0 ? `${adherence.pct}%` : '—'}
                 </div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: DIM }}>Ср. качество</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#a78bfa' }}>{quality.count > 0 ? quality.avg.toFixed(1) : '—'}</div>
+              <div style={{ padding: '8px 8px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(167,139,250,0.12), rgba(139,92,246,0.06))', border: '1px solid rgba(167,139,250,0.18)', textAlign: 'center' }}>
+                <div style={{ fontSize: 11 }}>⭐</div><div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>Качество</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#a78bfa', marginTop: 2 }}>{quality.count > 0 ? quality.avg.toFixed(1) : '—'}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)' }}>/5</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: DIM }}>Выполнено дней</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#00e68a' }}>{adherence.done}</div>
+              <div style={{ padding: '8px 8px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(16,185,129,0.06))', border: '1px solid rgba(0,230,138,0.18)', textAlign: 'center' }}>
+                <div style={{ fontSize: 11 }}>✅</div><div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>Выполнено</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#00e68a', marginTop: 2 }}>{adherence.done}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)' }}>дней</div>
               </div>
-              <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}>
-                <div style={{ fontSize: 9, color: DIM }}>Серия</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: streak >= 3 ? '#22c55e' : streak > 0 ? '#f59e0b' : '#fff' }}>{streak > 0 ? `${streak} дн` : '—'}</div>
+              <div style={{ padding: '8px 8px', borderRadius: 12, background: streak >= 3 ? 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(16,185,129,0.07))' : streak > 0 ? 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(251,146,60,0.06))' : 'rgba(255,255,255,0.03)', border: `1px solid ${streak >= 3 ? 'rgba(34,197,94,0.20)' : streak > 0 ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.06)'}`, textAlign: 'center' }}>
+                <div style={{ fontSize: 11 }}>🔥</div><div style={{ fontSize: 8, color: DIM, marginTop: 1 }}>Серия</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: streak >= 3 ? '#22c55e' : streak > 0 ? '#f59e0b' : '#fff', marginTop: 2 }}>{streak > 0 ? `${streak}` : '—'}</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.45)' }}>{streak > 0 ? 'дн' : ''}</div>
               </div>
             </div>
             {quality.count >= 2 && (

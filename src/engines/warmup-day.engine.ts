@@ -260,8 +260,16 @@ export function groupsFromExercises(exercises: { name?: string; muscleGroup?: st
   return out;
 }
 
+export type WarmupMode = 'quick' | 'standard' | 'full';
+
+function capsForMode(mode: WarmupMode | undefined, canonCount: number): { maxMob: number; maxAct: number } {
+  if (mode === 'quick') return { maxMob: Math.min(5, Math.max(3, canonCount + 1)), maxAct: Math.min(4, Math.max(2, canonCount + 1)) };
+  if (mode === 'full') return { maxMob: Math.min(12, Math.max(7, canonCount + 5)), maxAct: Math.min(10, Math.max(6, canonCount + 4)) };
+  return { maxMob: Math.min(9, Math.max(5, canonCount + 3)), maxAct: Math.min(8, Math.max(4, canonCount + 2)) };
+}
+
 /** Разминка для набора групп дня: сбалансированный мерж с round-robin, фильтром ленты и гарантией покрытия каждой группы. */
-export function collectGroupPrep(groups: string[], hasBand = true): WarmupGroupPrep {
+export function collectGroupPrep(groups: string[], hasBand = true, mode?: WarmupMode): WarmupGroupPrep {
   const canonGroups: CanonGroup[] = [];
   const seenCanon = new Set<string>();
   for (const g of groups) {
@@ -278,10 +286,10 @@ export function collectGroupPrep(groups: string[], hasBand = true): WarmupGroupP
     perGroupMob[cg] = prep.mobility.filter(e => !(e.band && !hasBand));
     perGroupAct[cg] = prep.activation.filter(e => !(e.band && !hasBand));
   }
+  const { maxMob, maxAct } = capsForMode(mode, canonGroups.length);
   const mobility: WarmupPrepExercise[] = [];
   const seenMob = new Set<string>();
   let added = true;
-  const maxMob = Math.min(9, Math.max(5, canonGroups.length + 3));
   while (mobility.length < maxMob && added) {
     added = false;
     for (const cg of canonGroups) {
@@ -312,7 +320,6 @@ export function collectGroupPrep(groups: string[], hasBand = true): WarmupGroupP
   }
   const activation: WarmupPrepExercise[] = [];
   const seenAct = new Set<string>();
-  const maxAct = Math.min(8, Math.max(4, canonGroups.length + 2));
   added = true;
   while (activation.length < maxAct && added) {
     added = false;

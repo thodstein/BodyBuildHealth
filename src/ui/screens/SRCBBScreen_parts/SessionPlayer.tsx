@@ -10,7 +10,7 @@ import {
   getExerciseProgress, cacheExerciseProgress, cacheSessionStats, getWorkoutStats,
   compareWithPrevious, getCachedProgressForExercise,
 } from '../../../engines/workout-logger.engine';
-import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, WARMUP_SKIP_REASONS, type WarmupInput } from '../../../engines/warmup.engine';
+import { generateWarmup, upsertWarmupLog, warmupLabel, warmupSpecificLabel, WARMUP_SKIP_REASONS, type WarmupInput, type WarmupMode } from '../../../engines/warmup.engine';
 import { generateCooldown, upsertCooldownLog, cooldownLabel, COOLDOWN_SKIP_REASONS, type CooldownInput } from '../../../engines/cooldown.engine';
 import { type WarmupBlock, type CooldownBlock } from '../../../core/types';
 import { computeSessionMetrics } from './sessionMetrics';
@@ -117,6 +117,10 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   const [cooldownBlocks, setCooldownBlocks] = useState<CooldownBlock[]>([]);
   const [warmupDone, setWarmupDone] = useState<Record<string, boolean>>({});
   const [cooldownDone, setCooldownDone] = useState<Record<string, boolean>>({});
+  const [warmupMode, setWarmupMode] = useState<WarmupMode>(() => {
+    try { const v = localStorage.getItem('he_warmup_mode') as WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
+  });
+  const [warmupTimer, setWarmupTimer] = useState<{ i: number; j: number; remaining: number; total: number } | null>(null);
   // Таймер растяжки в фазе заминки (обратный отсчёт и автопроверка)
   const [coolTimer, setCoolTimer] = useState<{ i: number; j: number; remaining: number; total: number } | null>(null);
   useEffect(() => {
@@ -133,6 +137,20 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
     }, 1000);
     return () => window.clearInterval(t);
   }, [coolTimer ? `${coolTimer.i}_${coolTimer.j}` : null]);
+  useEffect(() => {
+    if (!warmupTimer) return;
+    const t = window.setInterval(() => {
+      setWarmupTimer(p => {
+        if (!p) return p;
+        if (p.remaining <= 1) {
+          setWarmupDone(prev => ({ ...prev, [`w_${p.i}_${p.j}`]: true }));
+          return null;
+        }
+        return { ...p, remaining: p.remaining - 1 };
+      });
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [warmupTimer ? `${warmupTimer.i}_${warmupTimer.j}` : null]);
   // фактический ввод текущего подхода: [exerciseIndex][setIndex] -> {weight,reps}
   const [actual, setActual] = useState<Record<string, { weight: number; reps: number; rpe: number }>>({});
    const [exDone, setExDone] = useState<Record<string, boolean>>({});
@@ -408,10 +426,12 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
       fatigueLevel: profile.fatigue / 10,
       equipmentAvailable: profile.equipment,
       targetGroups: Array.from(new Set(day.exercises.map(ex => ex.muscleGroup || '').filter(Boolean))),
+      mode: warmupMode,
     };
     setWarmupBlocks(generateWarmup(warmupInput));
     setPhase('warmup');
     setWarmupDone({});
+    try { localStorage.setItem('he_warmup_mode', warmupMode); } catch {}
   };
 
   const startMain = () => {
@@ -979,6 +999,60 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginTop: 10 }}>
                   <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: isDone ? 'linear-gradient(90deg,#22c55e,#16a34a)' : 'linear-gradient(90deg,#f97316,#fb923c)', transition: 'width 0.4s ease', boxShadow: isDone ? '0 0 8px rgba(34,197,94,0.45)' : '0 0 8px rgba(249,115,22,0.35)' }} />
                 </div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                  {(['quick','standard','full'] as WarmupMode[]).map(modeOpt => {
+                    const active = warmupMode === modeOpt;
+                    const cfg = modeOpt === 'quick' ? { label: '⚡ Быстро', sub: '5 мин', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.28)' } : modeOpt === 'standard' ? { label: '⚖️ Стандарт', sub: '9 мин', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.28)' } : { label: '🎯 Полная', sub: '14 мин', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.28)' };
+                    return (
+                      <button key={modeOpt} onClick={() => {
+                        setWarmupMode(modeOpt);
+                        try { localStorage.setItem('he_warmup_mode', modeOpt); } catch {}
+                        if (phase !== 'warmup' || !day || !Array.isArray(day.exercises)) return;
+                        const riskFlags2: Record<string,string> = {};
+                        if (profile.injuries?.length) {
+                          profile.injuries.forEach(inj => {
+                            const mm = inj.muscle?.toLowerCase() || '';
+                            if (mm.includes('колен') || mm.includes('knee')) riskFlags2['knee'] = 'high';
+                            if (mm.includes('плеч') || mm.includes('shoulder')) riskFlags2['shoulder'] = 'high';
+                            if (mm.includes('спин') || mm.includes('поясн') || mm.includes('back') || mm.includes('lumbar')) riskFlags2['back'] = 'high';
+                          });
+                        }
+                        const techniqueIssues2: string[] = profile.weakPoints?.length
+                          ? profile.weakPoints.map(w => {
+                              const wp = String(w).toLowerCase();
+                              if (wp.includes('back') || wp.includes('поясн') || wp === 'core') return 'rounding_back';
+                              if (wp.includes('knee') || wp.includes('колен')) return 'knee_valgus';
+                              if (wp.includes('shoulder') || wp.includes('плеч')) return 'tight_shoulders';
+                              if (wp.includes('hip') || wp.includes('бёдр') || wp.includes('таз')) return 'tight_hips';
+                              if (wp.includes('ankle') || wp.includes('голеност')) return 'tight_ankles';
+                              if (wp.includes('chest') || wp.includes('груд')) return 'tight_chest';
+                              return '';
+                            }).filter(Boolean)
+                          : [];
+                        const inp: WarmupInput = {
+                          sessionFocus: focus,
+                          primaryExercises: day.exercises.map(ex => ex.name),
+                          primaryWeights: day.exercises.map(ex => (Array.isArray(ex.targetSets) && ex.targetSets[0]?.weight ? Number(ex.targetSets[0].weight) : null) as any),
+                          riskFlags: riskFlags2,
+                          techniqueIssues: techniqueIssues2,
+                          fatigueLevel: profile.fatigue / 10,
+                          equipmentAvailable: profile.equipment,
+                          targetGroups: Array.from(new Set(day.exercises.map(ex => ex.muscleGroup || '').filter(Boolean))),
+                          mode: modeOpt,
+                        };
+                        setWarmupBlocks(generateWarmup(inp));
+                        setWarmupDone({});
+                        setWarmupTimer(null);
+                      }} style={{
+                        flex: 1, minWidth: 72, padding: '5px 6px', borderRadius: 9, cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                        background: active ? cfg.bg : 'rgba(255,255,255,0.04)', color: active ? cfg.color : 'rgba(255,255,255,0.60)',
+                        border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.08)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                      }}>
+                        <span>{cfg.label}</span><span style={{ fontSize: 8, opacity: 0.85 }}>{cfg.sub}</span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 6, lineHeight: 1.3 }}>
                   Отмечайте пункты по ходу · разминка пишется в дневник при переходе к основной части · {isDone ? 'отлично — все пункты отмечены!' : 'минимум: 50% для хорошей готовности'}
                 </div>
@@ -1078,6 +1152,14 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                             </span>
                           </span>
                         </label>
+                        {(() => {
+                          if (isDone) return null;
+                          const isActive = warmupTimer && warmupTimer.i === i && warmupTimer.j === j;
+                          if (isActive) {
+                            return <span style={{ minWidth: 44, padding: '3px 6px', borderRadius: 8, background: 'rgba(6,182,214,0.14)', color: '#06b6d4', border: '1px solid rgba(6,182,214,0.28)', fontSize: 10, fontWeight: 800, textAlign: 'center', flexShrink: 0, marginTop: 1 }}>{warmupTimer!.remaining}с</span>;
+                          }
+                          return <button type="button" disabled={isDone} onClick={() => setWarmupTimer({ i, j, remaining: 30, total: 30 })} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.65)', flexShrink: 0, marginTop: 1 }} aria-label="Таймер 30с">⏱ 30с</button>;
+                        })()}
                         <span style={{
                           width: 22, height: 22, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
                           background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.35)',

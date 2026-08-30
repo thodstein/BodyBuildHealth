@@ -52,6 +52,9 @@ export const ExecutionZone: React.FC<Props> = (p) => {
   const [dayDetailsOpen, setDayDetailsOpen] = React.useState(true);
   const [warmupOpen, setWarmupOpen] = React.useState(true);
   const [execWarmupDone, setExecWarmupDone] = React.useState<Record<string, boolean>>({});
+  const [execWarmupMode, setExecWarmupMode] = React.useState<import('../../../engines/warmup.engine').WarmupMode>(() => {
+    try { const v = localStorage.getItem('he_warmup_mode') as import('../../../engines/warmup.engine').WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
+  });
   const [restTimer, setRestTimer] = React.useState(0);
   const [restTarget, setRestTarget] = React.useState(90);
   const restTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -204,6 +207,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                       techniqueIssues: [],
                       fatigueLevel: 0.2,
                       equipmentAvailable: ['barbell', 'dumbbell', 'band', 'bodyweight'],
+                      mode: execWarmupMode,
                     });
                     const total = warmupBlocksExec.reduce((s, b) => s + b.exercises.length, 0);
                     const done = Object.values(execWarmupDone).filter(Boolean).length;
@@ -240,6 +244,21 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                           <div style={{ padding: '0 10px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                             <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                               <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : 'linear-gradient(90deg,#f97316,#fb923c)', transition: 'width 0.3s ease' }} />
+                            </div>
+                            <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                              {(['quick','standard','full'] as const).map(m => {
+                                const active = execWarmupMode === m;
+                                const cfg = m === 'quick' ? { label: '⚡ Быстро', sub: '5м', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.28)' } : m === 'standard' ? { label: '⚖️ Стандарт', sub: '9м', color: '#22c55e', bg: 'rgba(34,197,94,0.12)', border: 'rgba(34,197,94,0.28)' } : { label: '🎯 Полная', sub: '14м', color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.28)' };
+                                return (
+                                  <button key={m} onClick={() => {
+                                    setExecWarmupMode(m);
+                                    try { localStorage.setItem('he_warmup_mode', m); } catch {}
+                                    setExecWarmupDone({});
+                                  }} style={{ flex: 1, minWidth: 60, padding: '4px 6px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 700, background: active ? cfg.bg : 'rgba(255,255,255,0.04)', color: active ? cfg.color : 'rgba(255,255,255,0.55)', border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.07)'}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                    <span>{cfg.label}</span><span style={{ fontSize: 7, opacity: 0.85 }}>{cfg.sub}</span>
+                                  </button>
+                                );
+                              })}
                             </div>
                             {warmupBlocksExec.map((b, bi) => {
                               const meta = b.type === 'general' ? { icon: '🏃', title: 'Общая', color: '#06b6d4', bg: 'rgba(6,182,214,0.08)', border: 'rgba(6,182,214,0.22)' }
@@ -299,6 +318,7 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                         primaryWeights: dayExercises.slice(0, 3).map((e: any) => (typeof e.weight === 'number' ? e.weight : null) as any),
                         targetGroups: groups.length > 0 ? groups : ['fullbody'],
                         riskFlags: {}, techniqueIssues: [], fatigueLevel: 0.2, equipmentAvailable: ['barbell','dumbbell','band','bodyweight'],
+                        mode: execWarmupMode,
                       });
                       const total = warmupBlocksExec.reduce((s,b)=>s+b.exercises.length,0);
                       const done = Object.values(execWarmupDone).filter(Boolean).length;
