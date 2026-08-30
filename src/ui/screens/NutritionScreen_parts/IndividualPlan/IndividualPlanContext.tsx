@@ -27,7 +27,7 @@ import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplac
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
 import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
-import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay } from "./planner-recipe-mode";
+import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget } from "./planner-recipe-mode";
 import type { FlatRecipeOption } from "./planner-recipe-mode";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -1721,10 +1721,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     const m = mealsSrc[mealIdx];
     const flat: FlatRecipeOption | undefined = (m?.recipeOptions || []).find((o: FlatRecipeOption) => o?.name === optionName);
     if (!flat) return { ok: false };
-    const items = buildRecipeMealItems(rebuildRecipeFromFlat(flat));
+    const _tgt = m?.target || { p: m?.totals?.p ?? 30, c: m?.totals?.c ?? 40, f: m?.totals?.f ?? 15 };
+    const _tKcal = m?.totals?.kcal || Math.round((_tgt.p || 0) * 4 + (_tgt.c || 0) * 4 + (_tgt.f || 0) * 9) || 300;
+    const scaled = scaleRecipeToTarget(rebuildRecipeFromFlat(flat), { kcal: _tKcal, p: _tgt.p || 30, f: _tgt.f || 15, c: _tgt.c || 40 }, weight);
+    const items = scaled ? scaled.items : buildRecipeMealItems(rebuildRecipeFromFlat(flat));
     if (!items || items.length === 0) return { ok: false };
+    const flatScaled: FlatRecipeOption = scaled ? { ...flat, appliedScale: scaled.scale } : flat;
     const next = mealsSrc.map((x: any, i: number) => i === mealIdx
-      ? { ...x, items, totals: sumMealTotals(items), recipeApplied: flat.name, recipeAppliedData: flat }
+      ? { ...x, items, totals: sumMealTotals(items), recipeApplied: flat.name, recipeAppliedData: flatScaled }
       : x);
     const pre = sumDayTotals(next as any);
     const rb = rebalanceDayAfterRecipes(next as any, {
@@ -2009,20 +2013,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // Каждый ингредиент получает долю kcal = recipe.kcal / N, а граммовка выводится из
     // энергетической плотности продукта (kcal/100g). Белок/жиры/угл берутся из FOOD_DB
     // и масштабируются к фактической граммовке, а не к 100г.
-    const buildRecipeItems = () => {
-      // 🍳 Сначала авторские порции рецепта (ingredientIds+portions → FOOD_DB через decomposeRecipe).
-      // Старый равный сплит ккал — fallback, если разбор не дал ни одного продукта.
-      const decomposed = buildRecipeMealItems(recipe);
-      if (decomposed && decomposed.length > 0) {
-        return decomposed.map(it => ({ name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c, fiber: it.fiber }));
+    // МАСШТАБ (Роунд «второй рецепт»): порция рецепта масштабируется к ЦЕЛИ приёма по КБЖУ —
+    // атлет 100 кг и 80 кг получают разные граммовки одного рецепта (scaleRecipeToTarget).
+    const buildRecipeItems = (targetKcal: number, targetP: number, targetF: number, targetC: number) => {
+      const scaled = scaleRecipeToTarget(recipe, { kcal: targetKcal, p: targetP, f: targetF, c: targetC }, weight);
+      if (scaled && scaled.items.length > 0) {
+        return { items: scaled.items.map(it => ({ name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c, fiber: it.fiber })), scale: scaled.scale };
       }
+      // fallback: старый равный сплит (рецепт без ingredientIds / пустой разбор)
       const n = Math.max(1, recipe.ingredients.length);
       const perItemKcal = recipe.kcal / n;
-      return recipe.ingredients.map((ing) => {
+      const items = recipe.ingredients.map((ing) => {
         const lower = ing.toLowerCase();
         const food = FOOD_DB.find(f => lower.includes(f.name.toLowerCase()) || lower.includes(f.id));
         if (food) {
-          // P0-fix: считаем граммовку из kcal-плотности: grams = perItemKcal / (food.kcal/100)
           let grams = food.kcal > 0 ? Math.round(perItemKcal / food.kcal * 100) : 100;
           if (food.category === 'grain' && grams < 50) grams = 50;
           if (food.id === 'oats' && grams < 60) grams = 60;
@@ -2030,32 +2034,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           const _p = Math.round((food.protein || 0) * ratio * 10) / 10;
           const _f = Math.round((food.fat || 0) * ratio * 10) / 10;
           const _c = Math.round((food.carbs || 0) * ratio * 10) / 10;
-          return {
-            name: food.name,
-            id: food.id,
-            amount: grams,
-            kcal: Math.round(4 * _p + 9 * _f + 4 * _c),
-            p: _p,
-            f: _f,
-            c: _c,
-            fiber: Math.round((food.fiber || 0) * ratio * 10) / 10,
-          };
+          return { name: food.name, id: food.id, amount: grams, kcal: Math.round(4 * _p + 9 * _f + 4 * _c), p: _p, f: _f, c: _c, fiber: Math.round((food.fiber || 0) * ratio * 10) / 10 };
         }
-        // Fallback: ингредиент не найден в FOOD_DB — распределяем макросы равномерно
-        const fallbackGrams = 100;
         const fbP = Math.round(recipe.protein / n * 10) / 10;
         const fbF = Math.round(recipe.fat / n * 10) / 10;
         const fbC = Math.round(recipe.carbs / n * 10) / 10;
-        return {
-          name: ing,
-          id: ing,
-          amount: fallbackGrams,
-          kcal: Math.round(4 * fbP + 9 * fbF + 4 * fbC),
-          p: fbP,
-          f: fbF,
-          c: fbC,
-        };
+        return { name: ing, id: ing, amount: 100, kcal: Math.round(4 * fbP + 9 * fbF + 4 * fbC), p: fbP, f: fbF, c: fbC };
       });
+      return { items, scale: 1 };
     };
     let _outerResMeals: any[] | null = null;
     let _outerVisibleMealsForOptions: any[] | null = null;
@@ -2065,9 +2051,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const flatOpt = flattenRecipeOption(recipe);
       const applyRebalanced = (mealsSrc: any[] | undefined): any[] | null => {
         if (!Array.isArray(mealsSrc) || mealIdx < 0 || mealIdx >= mealsSrc.length) return null;
-        const items = buildRecipeItems();
+        const _mt = mealsSrc[mealIdx];
+        const _tgt = _mt?.target || { p: _mt?.totals?.p ?? 30, c: _mt?.totals?.c ?? 40, f: _mt?.totals?.f ?? 15 };
+        const _tKcal = _mt?.totals?.kcal || Math.round((_tgt.p || 0) * 4 + (_tgt.c || 0) * 4 + (_tgt.f || 0) * 9) || 300;
+        const built = buildRecipeItems(_tKcal, _tgt.p || 30, _tgt.f || 15, _tgt.c || 40);
+        const items = built.items;
+        const appliedScale = built.scale;
+        const flatOptScaled = flatOpt ? { ...flatOpt, appliedScale } : flatOpt;
         const patched = mealsSrc.map((x, i) => i === mealIdx
-          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOpt }
+          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOptScaled }
           : x);
         const pre = sumDayTotals(patched as any);
         const rb = rebalanceDayAfterRecipes(patched as any, {
@@ -2111,9 +2103,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const flatOpt = flattenRecipeOption(recipe);
       const applyRebalanced2 = (mealsSrc: any[]): any[] | null => {
         if (!Array.isArray(mealsSrc) || mealIdx < 0 || mealIdx >= mealsSrc.length) return null;
-        const items = buildRecipeItems();
+        const _mt = mealsSrc[mealIdx];
+        const _tgt = _mt?.target || { p: _mt?.totals?.p ?? 30, c: _mt?.totals?.c ?? 40, f: _mt?.totals?.f ?? 15 };
+        const _tKcal = _mt?.totals?.kcal || Math.round((_tgt.p || 0) * 4 + (_tgt.c || 0) * 4 + (_tgt.f || 0) * 9) || 300;
+        const built = buildRecipeItems(_tKcal, _tgt.p || 30, _tgt.f || 15, _tgt.c || 40);
+        const items = built.items;
+        const flatOptScaled = flatOpt ? { ...flatOpt, appliedScale: built.scale } : flatOpt;
         const patched = mealsSrc.map((x, i) => i === mealIdx
-          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOpt }
+          ? { ...x, items, totals: calcItemTotals(items), recipeApplied: recipe.name, recipeAppliedData: flatOptScaled }
           : x);
         const pre = sumDayTotals(patched as any);
         const rb = rebalanceDayAfterRecipes(patched as any, {

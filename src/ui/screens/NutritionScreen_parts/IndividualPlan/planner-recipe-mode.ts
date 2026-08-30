@@ -148,6 +148,33 @@ export function buildRecipeMealItems(recipe: Recipe): PlanItemLike[] | null {
   }));
 }
 
+/**
+ * Масштабирует декомпозицию рецепта под ЦЕЛЬ приёма по КБЖУ (порции автора растут/сжимаются
+ * пропорционально). Атлет 100 кг и 80 кг получают РАЗНЫЕ граммовки одного рецепта:
+ * цель приёма у тяжа крупнее → порция ×больше. Масштаб клампуется в 0.7–2.2 (3.0 для 120кг+),
+ * капится по белку (1.2×) и жиру (1.5×) — перебор макроса хуже лёгкого недобора ккал.
+ * Возвращает null при пустой декомпозиции, иначе {items, scale}.
+ */
+export function scaleRecipeToTarget(
+  recipe: Recipe,
+  target: { kcal: number; p?: number; f?: number; c?: number },
+  athleteWeightKg: number = 80,
+): { items: PlanItemLike[]; scale: number } | null {
+  const built = buildRecipeMealItems(recipe);
+  if (!built || built.length === 0) return null;
+  const t = sumMealTotals(built);
+  const kcal = Math.max(50, t.kcal || 1);
+  const heavyScaleMax = athleteWeightKg >= 120 ? 3.0 : athleteWeightKg >= 110 ? 2.8 : athleteWeightKg >= 100 ? 2.5 : 2.2;
+  const tp = target.p ?? 30, tf = target.f ?? 15, tc = target.c ?? 40;
+  let s = Math.max(0.7, Math.min(heavyScaleMax, target.kcal / kcal));
+  if (t.p > 0) s = Math.min(s, (1.2 * tp) / t.p);
+  if (t.f > 0) s = Math.min(s, (1.5 * tf) / t.f);
+  if (t.c > 0) s = Math.min(s, (1.2 * tc) / t.c);
+  s = Math.max(0.7, Math.round(s * 20) / 20);
+  const scaled = built.map(it => scaleItem(it, Math.max(5, Math.round((it.amount || 0) * s / 5) * 5)));
+  return { items: scaled, scale: s };
+}
+
 export function sumMealTotals(items: PlanItemLike[]): PlanTotalsLike {
   return {
     kcal: items.reduce((s, i) => s + (i.kcal || 0), 0),
