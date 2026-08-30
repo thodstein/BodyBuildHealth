@@ -2452,15 +2452,57 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     }
     return (r: string) => vals[r] ?? 0;
   })();
-  const breakC = _carbFor('breakfast');
-  const lunchC = _carbFor('lunch');
-  const dinnerC = _carbFor('dinner');
+  let breakC = _carbFor('breakfast');
+  let lunchC = _carbFor('lunch');
+  let dinnerC = _carbFor('dinner');
   const prewCarbG = _carbFor('prew');
   const postwCarbG = _carbFor('postw');
   const snackC = _carbFor('snack');
   const snack2C = _carbFor('snack2');
   const snack3C = _carbFor('snack3');
   const snack4C = _carbFor('snack4');
+  // ─── Кап углеводов на основной приём + перераспределение излишка ───
+  // CARB_W даёт обеду 1.7× (для высокоуглеводных дней на 3 приёмах — 400г+ углеводов),
+  // а физический потолок приёма = лимит каши (сухая крупа ~70% углей). Излишек сверх капа
+  // переносим в основные приёмы с запасом (иначе обед «упёрся в лимит», а остальное пусто).
+  // Кап считается от реального потолка: maxDryGrainPerMeal × 0.7 углей — консервативно.
+  const _mainCarbCap = (() => {
+    const ws = Math.max(1, Math.min(1.6, input.weightKg / 80));
+    const grainCap = Math.round(((input.budget === 'max' || input.budget === 'enhanced') ? 350 : 280) * ws);
+    return Math.max(120, Math.round(grainCap * 0.72));
+  })();
+  {
+    const _mains: { key: 'breakfast' | 'lunch' | 'dinner'; c: number }[] = [
+      { key: 'breakfast', c: breakC }, { key: 'lunch', c: lunchC }, { key: 'dinner', c: dinnerC },
+    ];
+    // «Комната» перераспределения излишка — только в основных (они несут кашу).
+    let _totalMain = 0;
+    for (let _pass = 0; _pass < 12; _pass++) {
+      _totalMain = _mains.reduce((s, m) => s + m.c, 0);
+      const _over = _mains.find(m => m.c > _mainCarbCap);
+      if (!_over) break;
+      const _excess = _over.c - _mainCarbCap;
+      _over.c = _mainCarbCap;
+      // размазываем по основным с запасом (не превышая кап) и по перекусам (не имеют капа каши)
+      const _roomMains = _mains.filter(m => m.c < _mainCarbCap);
+      const _roomTotal = _roomMains.reduce((s, m) => s + (_mainCarbCap - m.c), 0);
+      if (_roomTotal > 0) {
+        let _left = _excess;
+        for (const m of _roomMains) {
+          const _share = Math.round(_excess * (_mainCarbCap - m.c) / _roomTotal);
+          m.c += Math.min(_share, _left);
+          _left -= Math.min(_share, _left);
+          if (_left <= 0) break;
+        }
+      }
+    }
+    for (const m of _mains) {
+      if (m.key === 'breakfast') (breakC) = m.c;
+      else if (m.key === 'lunch') (lunchC) = m.c;
+      else (dinnerC) = m.c;
+    }
+    void _totalMain;
+  }
   const fatTotal = Math.max(fatFloorG, adjustedFatG || input.goalFatG);
 
   // Snack on non-training days to fill MPS gap (lunch 12:30 → dinner 19:00 = 6.5h)
