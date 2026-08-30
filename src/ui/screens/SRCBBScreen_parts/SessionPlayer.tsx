@@ -26,6 +26,7 @@ import { MindsetPreSessionCard, MindsetApproachHint, MindsetCheckinCard } from '
 import { MobilitySessionPanel, MobilityPostPanel } from './MobilitySessionPanel';
 import { PlateCalcTab } from '../TrainingScreen_parts/PlateCalcTab';
 import { techniqueLabel, techniqueChainParts } from '../TrainingScreen_parts/bb-technique-display';
+import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 
   const CARD: React.CSSProperties = { background: 'var(--glass-bg)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 'var(--radius-sm)', padding: 12, margin: '6px 0' };
   const ACCENT = '#00e68a';
@@ -92,31 +93,11 @@ const SkipBar: React.FC<{ reasons: string[]; onSkip: (reason: string) => void; l
           <button type="button" style={{ ...BTN, flex: 1, minWidth: 120 }} onClick={() => { onSkip(reason); setOpen(false); }}>
             Пропустить
           </button>
-</div>
-        )}
-        {/* Липкий нижний таймер для зала (SessionPlayer) */}
-        {phase === 'main' && timerRunning && timerSec > 0 && (
-          <div style={{
-            position: 'fixed', bottom: 'calc(var(--nav-height) + 14px)', left: 12, right: 12, zIndex: 45,
-            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16,
-            background: timerSec <= 10 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #00e68a, #00c853)',
-            color: timerSec <= 10 ? '#fff' : '#000', boxShadow: '0 10px 28px rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.18)',
-            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-          }}>
-            <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.14)', fontSize: 16, fontWeight: 800, flexShrink: 0 }}>⏱</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, lineHeight: 1 }}>Отдых · {timerSec <= 10 ? 'готовьтесь!' : 'восстановление'}</div>
-              <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}</div>
-              <div style={{ height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
-                <div style={{ width: `${Math.max(0, Math.min(100, ((currentRestSec - timerSec) / Math.max(1, currentRestSec)) * 100))}%`, height: '100%', background: timerSec <= 10 ? '#fff' : '#000', transition: 'width 1s linear' }} />
-              </div>
-            </div>
-            <button onClick={() => { hapticImpact('light'); setTimerRunning(false); setTimerSec(0); }} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: timerSec <= 10 ? '#fff' : '#000', color: timerSec <= 10 ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 40 }}>Пропустить</button>
-          </div>
-        )}
-      </div>
-    );
-  };
+        </div>
+      )}
+    </div>
+  );
+};
 const IN: React.CSSProperties = { background: 'var(--input-bg)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '8px', minHeight: 38, width: '100%', boxSizing: 'border-box' as const };
 const LABEL: React.CSSProperties = { color: '#fff', fontSize: 11, margin: '4px 0 2px' };
 const H: React.CSSProperties = { color: '#fff', fontSize: 14, fontWeight: 600, margin: '4px 0 6px' };
@@ -207,6 +188,8 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
     const [supersetExercises, setSupersetExercises] = useState<number[]>([]);
     // Подкладка «Калькулятор блинов»: доступный вес применяется к упражнению текущей сессии
     const [plateOpen, setPlateOpen] = useState<boolean>(false);
+    // Разворачиваемая техника упражнения (по имени упражнения)
+    const [techOpen, setTechOpen] = useState<Record<string, boolean>>({});
     const [autoStartRest, setAutoStartRest] = useState<boolean>(true);
     const [exerciseProgress, setExerciseProgress] = useState<Record<string, { completed: number; total: number }>>({});
     const [restHistory, setRestHistory] = useState<{ exercise: string; duration: number; timestamp: string }[]>([]);
@@ -1398,9 +1381,42 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                    <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: pct === 100 ? '#22c55e' : 'var(--accent)', transition: 'width 0.3s ease' }} />
                  </div>
                </div>
-             );
-           })()}
-
+);
+            })()}
+            {/* Volume Landmarks (MEV/MAV/MRV) per muscle — инлайн в сессии */}
+            {(() => {
+              const muscleSets: Record<string, number> = {};
+              day?.exercises?.forEach(ex => {
+                ex.targetSets.forEach(t => { muscleSets[ex.muscleGroup] = (muscleSets[ex.muscleGroup] || 0) + 1; });
+              });
+              const muscles = Object.keys(muscleSets);
+              if (muscles.length === 0) return null;
+              return (
+                <div style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, color: '#a78bfa', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 6 }}>Volume Landmarks (MEV/MAV/MRV)</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {muscles.map(m => {
+                      const sets = muscleSets[m];
+                      const mev = Math.max(4, Math.round(sets * 0.4));
+                      const mav = Math.max(6, Math.round(sets * 0.7));
+                      const mrv = Math.max(10, Math.round(sets * 1.2));
+                      let status = 'low', color = '#60a5fa';
+                      if (sets >= mrv) { status = 'over'; color = '#ef4444'; }
+                      else if (sets >= mav) { status = 'high'; color = '#f59e0b'; }
+                      else if (sets >= mev) { status = 'opt'; color = '#22c55e'; }
+                      return (
+                        <span key={m} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 20, background: `${color}18`, color, border: `1px solid ${color}40`, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontWeight: 800 }}>{m.slice(0,4).toUpperCase()}</span>
+                          <span style={{ fontWeight: 700 }}>{sets} с.</span>
+                          <span style={{ fontSize: 8, opacity: 0.7 }}>MEV {mev}·MAV {mav}·MRV {mrv}</span>
+                          <span style={{ width: 6, height: 6, borderRadius: 6, background: color, boxShadow: `0 0 6px ${color}` }} />
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
             {/* режимы суперсета и круга — современные карточки-кнопки */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Режим</span>
@@ -1517,6 +1533,17 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                           ) : null;
                         })()}
                         {(() => { const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.muscleGroup?.toLowerCase() || ''); const t = TEMPO_PRESETS[recommendTempo('hypertrophy', isCompound ? 'compound' : 'isolation')]; return <span style={{ fontSize:9, color:'var(--text-faint)', marginLeft:6 }} title={t?.nameRu}>⏱ {formatTempo(t?.tempo)}</span>; })()}
+                        <button type="button" aria-expanded={!!techOpen[ex.name]} onClick={() => { hapticImpact('light'); setTechOpen(p => ({ ...p, [ex.name]: !p[ex.name] })); }} style={{ marginLeft: 6, padding: '3px 8px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: techOpen[ex.name] ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.10)', background: techOpen[ex.name] ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)', color: techOpen[ex.name] ? '#00e68a' : '#fff', fontWeight: 600 }}>📖 {techOpen[ex.name] ? 'Скрыть' : 'Техника'}</button>
+                        {techOpen[ex.name] && (() => {
+                          const cat = EXERCISE_CATALOG.find(c => (c.name || '').toLowerCase() === (ex.name || '').toLowerCase());
+                          const tech = cat?.technique;
+                          if (!tech) return <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#fff' }}>Нет данных по технике для «{ex.name}»</div>;
+                          return (
+                            <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.14)', fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                              <span style={{ color: '#00e68a', fontWeight: 700 }}>🎯 Техника:</span> {tech}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
@@ -1534,8 +1561,32 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                        {Object.keys(actual).filter(k => k.startsWith(`${ei}_`)).length}/{ex.targetSets.length}
                      </span>
                     </div>
-                   <MindsetApproachHint focus={focus} exerciseStarted={Object.keys(actual).some(k => k.startsWith(`${ei}_`))} />
-                 {ex.targetSets.map((t, si) => {
+<MindsetApproachHint focus={focus} exerciseStarted={Object.keys(actual).some(k => k.startsWith(`${ei}_`))} />
+                    {/* Суперсет/круг — визуальная последовательность и отдых */}
+                    {(supersetMode || circuitMode) && supersetExercises.length > 1 && (
+                      <div style={{ marginTop: 6, padding: '8px 10px', borderRadius: 8, background: supersetMode ? 'rgba(245,158,11,0.08)' : 'rgba(139,92,246,0.08)', border: `1px solid ${supersetMode ? 'rgba(245,158,11,0.22)' : 'rgba(139,92,246,0.22)'}` }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: supersetMode ? '#f59e0b' : '#8b5cf6', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span>{supersetMode ? '🔄 Суперсет:' : '⭕ Круг:'}</span>
+                          <span style={{ fontSize: 9, color: '#fff', opacity: 0.7 }}>отдых {getSupersetRestTime()}с между упр.</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {supersetExercises.map((exIdx, order) => (
+                            <span key={exIdx} style={{
+                              fontSize: 9, padding: '2px 8px', borderRadius: 12,
+                              background: exIdx === ei ? (supersetMode ? '#f59e0b' : '#8b5cf6') : 'rgba(255,255,255,0.10)',
+                              color: exIdx === ei ? '#000' : '#fff',
+                              fontWeight: exIdx === ei ? 800 : 600,
+                              border: exIdx === ei ? `1px solid ${supersetMode ? '#f59e0b' : '#8b5cf6'}` : '1px solid rgba(255,255,255,0.12)',
+                              boxShadow: exIdx === ei ? (supersetMode ? '0 0 8px rgba(245,158,11,0.4)' : '0 0 8px rgba(139,92,246,0.4)') : 'none',
+                            }}>
+                              {order + 1}. {day?.exercises[exIdx]?.name || `Упр ${exIdx + 1}`}
+                              {exIdx === ei && <span style={{ marginLeft: 4, color: supersetMode ? '#fff200' : '#fff' }}>← ТЫ</span>}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  {ex.targetSets.map((t, si) => {
                  const k = keyFor(ei, si);
                  const a = actual[k] || { weight: t.weight, reps: t.reps, rpe: 0 };
                  const logged = !!actual[k];
@@ -1557,9 +1608,33 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                           🏋️ {formatPlates(t.weight, ex.name)}
                         </span>
                       )}
-                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
-                        {/* Вес + повторы — крупные степперы для зала */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+<div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                         {/* Предыдущая сессия — инлайн сравнение */}
+                         {(() => {
+                           const prev = getLastSession();
+                           if (!prev) return null;
+                           const prevEx = prev.exercises.find(e => e.exerciseName.toLowerCase() === ex.name.toLowerCase());
+                           if (!prevEx || !prevEx.sets.length) return null;
+                           const lastSet = prevEx.sets[prevEx.sets.length - 1];
+                           const prev1RM = Math.round(lastSet.weightKg * (1 + lastSet.reps / 30));
+                           const target1RM = Math.round(t.weight * (1 + t.reps / 30));
+                           const wDiff = lastSet.weightKg - t.weight;
+                           const rDiff = lastSet.reps - t.reps;
+                           return (
+                             <div style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', fontSize: 10 }}>
+                               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                                 <span style={{ color: '#60a5fa', fontWeight: 700 }}>📅 {prev.date} · {prevEx.sets.length} подх.</span>
+                                 <span style={{ color: wDiff === 0 ? '#fff' : wDiff > 0 ? '#22c55e' : '#f59e0b' }}>вес {wDiff > 0 ? '+' : ''}{wDiff}кг</span>
+                                 <span style={{ color: rDiff === 0 ? '#fff' : rDiff > 0 ? '#22c55e' : '#f59e0b' }}>повт {rDiff > 0 ? '+' : ''}{rDiff}</span>
+                                 <span style={{ color: '#fff' }}>RPE {lastSet.rpe}</span>
+                                 <span style={{ color: '#60a5fa', fontWeight: 600 }}>1RM {prev1RM}кг</span>
+                                 <span style={{ color: '#fff', opacity: 0.6 }}>цель {target1RM}кг</span>
+                               </div>
+                             </div>
+                           );
+                         })()}
+                         {/* Вес + повторы — крупные степперы для зала */}
+                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                             <button type="button" onClick={() => { hapticImpact('light'); setActual(p => ({ ...p, [k]: { weight: Math.max(0, Math.round((a.weight - 2.5) * 10) / 10), reps: a.reps, rpe: a.rpe } })); }} style={{ width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, fontWeight: 800, flexShrink: 0, cursor: 'pointer' }}>−</button>
                             <input style={{ ...IN, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 16, fontWeight: 700, padding: '6px 2px' }} type="number" inputMode="decimal" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
@@ -1600,17 +1675,38 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                           </button>
                         );
                       })()}
-                        {logged && (
+{logged && (
                           <div style={{ width: '100%', fontSize: 10, color: '#fff', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                             <span style={{ color: '#fff' }}>🏋️ {formatPlates(a.weight, ex.name)}</span>
-                           <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
-                           <span style={{ color: dW === 0 ? '#fff' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
-                           <span style={{ color: dR === 0 ? '#fff' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
-                           {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : '#fff' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
-                           {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
-                             <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
-                           )}
-                           {/* MMC-трекинг */}
+                            <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
+                            <span style={{ color: dW === 0 ? '#fff' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
+                            <span style={{ color: dR === 0 ? '#fff' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>
+                            {a.rpe > 0 && <span style={{ color: rpeDelta > 0 ? '#ef4444' : rpeDelta < -1 ? '#22c55e' : '#fff' }}>RPE vs цели({targetRPE}): {rpeDelta > 0 ? '+' : ''}{rpeDelta}</span>}
+                            {a.rpe > 0 && (rpeDelta > 0 || rpeDelta < -1) && (
+                              <span style={{ color: ACCENT, fontWeight: 700 }}>→ след. сет: {nextW}кг×{nextR}{rpeDelta > 0 ? ' (легче)' : ' (тяжелее)'}</span>
+                            )}
+                          </div>
+                        )}
+                        {/* Авто-предложение прогрессии после залогированного сета */}
+                        {logged && a.rpe > 0 && si === ex.targetSets.length - 1 && (
+                          <div style={{ width: '100%', paddingLeft: 56, marginTop: 4, padding: '6px 8px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)', fontSize: 10 }}>
+                            <span style={{ color: '#f59e0b', fontWeight: 700 }}>📈 Прогрессия: </span>
+                            {(() => {
+                              const inc = a.weight >= 40 ? 2.5 : 1;
+                              if (a.rpe <= 7 && a.reps >= t.reps) {
+                                return <span style={{ color: '#22c55e' }}>✅ цель достигнута легко → след. сет {a.weight + inc}кг×{t.reps} (или +1-2 повт)</span>;
+                              }
+                              if (a.rpe >= 9) {
+                                return <span style={{ color: '#ef4444' }}>⚠ слишком тяжело → держи {a.weight}кг, добери повторы до {t.reps}</span>;
+                              }
+                              if (a.reps < t.reps) {
+                                return <span style={{ color: '#f59e0b' }}>🔄 недобор повт → повтори {a.weight}кг, цель {t.reps}</span>;
+                              }
+                              return <span style={{ color: '#fff' }}>➡ держи {a.weight}кг×{t.reps}, следующая неделя +{a.weight >= 40 ? 2.5 : 1}кг</span>;
+                            })()}
+                          </div>
+)}
+                            {/* MMC-трекинг */}
                            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', cursor: 'pointer', userSelect:'none', borderBottom:'1px dashed rgba(255,255,255,0.15)' }} onClick={() => setMMCOpen(mmco === k ? '' : k)}>
                              {mmco === k ? '🔼 скрыть MMC' : '🔽 MMC/Пампинг/Суставы'}
                            </span>
@@ -1626,12 +1722,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                                </label>
                              })}
                            </div>}
-                         </div>
-                       )}
- 
-                   </div>
-                 );
-               })}
+                          </div>
+                        );
+                })}
               {/* P11: VBT-авторегуляция по потере скорости (если введены скорости) */}
               {(() => {
                 const vels = ex.targetSets.map((t, si) => vel[keyFor(ei, si)]).filter(v => v && v > 0);
@@ -2045,8 +2138,29 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 ➡ Следующий день: {days[dayIdx + 1]?.label} ({dayIdx + 2}/{days.length})
               </button>
             )}
-         </div>
-       )}
+          </div>
+        )}
+
+        {/* Липкий нижний таймер для зала (SessionPlayer) */}
+        {phase === 'main' && timerRunning && timerSec > 0 && (
+          <div style={{
+            position: 'fixed', bottom: 'calc(var(--nav-height) + 14px)', left: 12, right: 12, zIndex: 45,
+            display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 16,
+            background: timerSec <= 10 ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #00e68a, #00c853)',
+            color: timerSec <= 10 ? '#fff' : '#000', boxShadow: '0 10px 28px rgba(0,0,0,0.32)', border: '1px solid rgba(255,255,255,0.18)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+          }}>
+            <span style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.14)', fontSize: 16, fontWeight: 800, flexShrink: 0 }}>⏱</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, lineHeight: 1 }}>Отдых · {timerSec <= 10 ? 'готовьтесь!' : 'восстановление'}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{String(Math.floor(timerSec / 60)).padStart(2, '0')}:{String(timerSec % 60).padStart(2, '0')}</div>
+              <div style={{ height: 4, borderRadius: 2, background: 'rgba(0,0,0,0.15)', overflow: 'hidden', marginTop: 4 }}>
+                <div style={{ width: `${Math.max(0, Math.min(100, ((currentRestSec - timerSec) / Math.max(1, currentRestSec)) * 100))}%`, height: '100%', background: timerSec <= 10 ? '#fff' : '#000', transition: 'width 1s linear' }} />
+              </div>
+            </div>
+            <button onClick={() => { hapticImpact('light'); setTimerRunning(false); setTimerSec(0); }} style={{ padding: '10px 14px', borderRadius: 10, border: 'none', background: timerSec <= 10 ? '#fff' : '#000', color: timerSec <= 10 ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 40 }}>Пропустить</button>
+          </div>
+        )}
 
     </div>
   );
