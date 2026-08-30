@@ -2578,10 +2578,19 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   const usedTodayIds = new Set<string>();
   const effRecentIds = (): Set<string> => new Set<string>([...(input.recentFoodIds || []), ...usedTodayIds]);
   // Smart 7-day variety: hard-exclude foods from the last 1-2 days (only when strictness='strict').
-  const effHardRecentIds: Set<string> | undefined =
-    (input.varietyStrictness === 'strict' && input.hardRecentIds && input.hardRecentIds.size > 0)
-      ? input.hardRecentIds
-      : undefined;
+  // D (Эпик D): в НЕ-strict режиме жёстко исключаем только СТЕЙПЛЫ и основные белки
+  // предыдущих дней («рис в каждый день» / «курица 7 раз в неделю») — полный hard-window
+  // остаётся strict-эксклюзивом.
+  const _D_STAPLE_PROTEIN_IDS = new Set(['chicken_breast', 'chicken_thigh', 'turkey_breast', 'beef_lean', 'beef_minced', 'salmon', 'cod', 'pollock', 'tuna_canned', 'mackerel', 'sardines', 'egg_whole', 'cottage_cheese_5', 'tofu', 'lentils', 'chickpeas']);
+  const effHardRecentIds: Set<string> | undefined = (() => {
+    if (!input.hardRecentIds || input.hardRecentIds.size === 0) return undefined;
+    if (input.varietyStrictness === 'strict') return input.hardRecentIds;
+    const hard = new Set<string>();
+    for (const id of input.hardRecentIds) {
+      if (stapleFamilyOf(id) || _D_STAPLE_PROTEIN_IDS.has(id)) hard.add(id);
+    }
+    return hard.size > 0 ? hard : undefined;
+  })();
   const markUsed = (meal: Meal) => { meal.items.forEach(it => { allFoodsUsed.push(it.id); usedTodayIds.add(it.id); }); };
   // Адаптация по дневнику: пробросить заметку о компенсации в plan notes.
   if (input.diaryCompensation && input.diaryCompensation.note) {

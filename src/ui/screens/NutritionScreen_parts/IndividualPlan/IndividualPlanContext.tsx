@@ -2350,6 +2350,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // signature of types+doses so adding/removing/changing a drug all trigger recalc.
   const effectiveKcalRef = useRef(effectiveKcal);
   effectiveKcalRef.current = effectiveKcal;
+  // D (Эпик D): сквозной леджер разнообразия для серии генераций месяца —
+  // recent-продукты, окно последних 2 дней и использованные рецепты НЕ сбрасываются
+  // при переходе между неделями месяца (weekIndex-defined вызовы).
+  const varietyLedgerRef = useRef<{ foods: Set<string>; recipes: Set<string>; recent: string[][] }>({ foods: new Set(), recipes: new Set(), recent: [] });
   const manualGPerKgRef = useRef(manualGPerKg);
   manualGPerKgRef.current = manualGPerKg;
   const injectionsSignature = (Array.isArray(injections) ? injections : [])
@@ -2497,8 +2501,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // единым резолвером в ОБОИХ путях генерации (раньше pro-движок их игнорировал).
         for (const fid of resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || [])) excludedIds.add(fid);
         try { setAllergenExcludedCount(countExcludedByAllergens(FOOD_DB, allergens || [])); } catch {}
-       const lockedIds = new Set<string>([...(lockedFoodIds || [])]);
-       const recentFoodIds = new Set<string>();
+        const lockedIds = new Set<string>([...(lockedFoodIds || [])]);
+        // D (Эпик D): сквозной ledger разнообразия — месяц НЕ сбрасывает «недавние»
+        // продукты/рецепты между неделями (раньше каждая generatePlan(7, w) начинала
+        // с пустого recentFoodIds/_usedRecipeNames → recipes повторялись week-to-week).
+        // Леджер живёт на время серии генераций месяца; обычная генерация стартует чистым.
+        const _ledger = weekIndex !== undefined
+          ? varietyLedgerRef.current
+          : (varietyLedgerRef.current = { foods: new Set<string>(), recipes: new Set<string>() });
+        const recentFoodIds = _ledger.foods;
        // B5 (междневная ротация): семейства гарниров предыдущих дней текущей генерации —
        // движок деприоритизирует «рис в каждый день», если есть ≥2 свежих альтернатив.
        const recentStapleFamilies = new Set<string>();
@@ -2519,7 +2530,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const planRandomSalt = Math.floor(Math.random() * 1000000);
       // 🍳 Режим «по рецептам»: имена рецептов, уже использованные в МНОГОДНЕВНОМ плане
       // (разнообразие между днями — один рецепт не повторяется на протяжении генерации).
-      const _usedRecipeNames = new Set<string>();
+      // D (Эпик D): в месяце леджер не сбрасывается между неделями.
+      const _usedRecipeNames = _ledger.recipes;
 
       // 🧪 Собираем lab values из v2Labs (строки → числа) для диетической коррекции.
       // ВАЖНО (units-fix): v2Labs содержит и СЫВОРОТОЧНЫЕ анализы (ALT/AST/LDL/гематокрит/…),
@@ -2554,7 +2566,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // Smart 7-day variety: rolling window of food IDs from the last 2 built days.
       // recentFoodIds (existing) accumulates ALL prior days; hardWindow holds the last 2
       // for the stricter hard-exclusion (adjacent days don't repeat products).
-      const hardWindow: string[][] = [];
+      // D (Эпик D): в месяце окно сшивается с прошлой неделей (стык недель не повторяет стейплы).
+      const hardWindow: string[][] = weekIndex !== undefined && varietyLedgerRef.current.recent.length > 0
+        ? [...varietyLedgerRef.current.recent]
+        : [];
       const collectDayFoods = (day: any): string[] => {
         const ids: string[] = [];
         if (day?.meals) day.meals.forEach((m: any) => m.items?.forEach((it: any) => { if (it.id) ids.push(it.id); }));
@@ -2886,6 +2901,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         _dayFoodIds.forEach((id: string) => recentFoodIds.add(id));
         hardWindow.push(_dayFoodIds);
         if (hardWindow.length > 2) hardWindow.shift();
+        // D (Эпик D): леджер хранит окно последних 2 дней — стык недель месяца не повторяет стейплы.
+        varietyLedgerRef.current.recent = hardWindow.slice();
         return {
           meals, totals: _finalDayTotals
             ? { kcal: _finalDayTotals.kcal, p: _finalDayTotals.p, f: _finalDayTotals.f, c: _finalDayTotals.c, fiber: _finalDayTotals.fiber || 0 }
