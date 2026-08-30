@@ -3118,7 +3118,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       notes.push(`⚠ ${mb.label}: ${mb.proteinG} г белка (лейцин ${mb.leucineG} г) — ниже MPS-порога ~${Math.max(22, Math.round(_lbmSafe * 0.22))} г. Дополните приём творогом/яйцами/сывороткой (+15-20 г белка).`);
     }
   }
-  const mpsSummary = {
+  const mpsSummary: DayPlanV2['mpsSummary'] & { meals: unknown[]; fiberG: number; fiberTargetG: number; proteinCV?: number; ea?: number; eaStatus?: string; eaEee?: number } = {
     feedings,
     avg_leucine_g: Math.round(totals.leucine_mg / Math.max(1, feedings) / 10) / 100,
     avg_protein_per_meal_g: Math.round(totals.p / Math.max(1, meals.length)),
@@ -3133,7 +3133,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       if (typeof input.fiberCapG === 'number' && input.fiberCapG < base) return Math.max(15, Math.round(input.fiberCapG));
       return base;
     })(),
-  } as Record<string, any>;
+  };
   // Mamerow et al. even distribution: CV protein across meals >40% → -25% 24h MPS vs even
   {
     const _protVals = meals.filter(m => !['intra','presleep'].includes(m.type)).map(m => m.totals.p || 0).filter(v => v > 0);
@@ -3214,7 +3214,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         }
       }
     } else if (!hasOmega3 && input.isVegetarian) {
-      const vegOmega = [f => f.id === 'flaxseed', f => f.id === 'chia_seeds', f => f.id === 'walnuts']
+      const vegOmega = [(f: FoodItem) => f.id === 'flaxseed', (f: FoodItem) => f.id === 'chia_seeds', (f: FoodItem) => f.id === 'walnuts']
         .map(pred => FOOD_DB.find(f => pred(f) && _o3Allowed(f)))
         .find(Boolean);
       if (vegOmega) {

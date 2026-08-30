@@ -2506,7 +2506,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // Леджер живёт на время серии генераций месяца; обычная генерация стартует чистым.
         const _ledger = weekIndex !== undefined
           ? varietyLedgerRef.current
-          : (varietyLedgerRef.current = { foods: new Set<string>(), recipes: new Set<string>() });
+          : (varietyLedgerRef.current = { foods: new Set<string>(), recipes: new Set<string>(), recent: [] });
         const recentFoodIds = _ledger.foods;
        // B5 (междневная ротация): семейства гарниров предыдущих дней текущей генерации —
        // движок деприоритизирует «рис в каждый день», если есть ≥2 свежих альтернатив.
