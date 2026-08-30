@@ -596,7 +596,17 @@ export function buildRecipeCookingPlan(
   // По шагу на каждый рецепт
   list.forEach(a => {
     const dur = Math.max(5, a.recipe.prepTimeMin || 15);
-    steps.push({ step: n++, action: `${a.label}: ${a.recipe.name}`, duration: dur, items: (a.recipe.instructions || []).slice(0, 8) });
+    const items = (a.recipe.instructions || []).slice(0, 8);
+    // C8 (Эпик C): при готовке на N дней показываем РЕАЛЬНУЮ граммовку партии
+    // (portions × days), а не абстрактную «упаковку» — раньше масштаб порций не считался.
+    if (days > 1 && a.recipe.portions && Object.keys(a.recipe.portions).length > 0) {
+      const batchLines = Object.entries(a.recipe.portions).slice(0, 10).map(([id, g]) => {
+        const food = FOOD_DB.find(f => f.id === id);
+        return `${food?.name || id}: ${Math.round((g || 0) * days)} г`;
+      });
+      items.push(`📦 Партия на ${days} дн (×${days}):`, ...batchLines);
+    }
+    steps.push({ step: n++, action: `${a.label}: ${a.recipe.name}`, duration: days > 1 ? dur * Math.min(2, days) : dur, items });
   });
   // Упаковка при готовке впрок
   const totalPrep = steps.reduce((s, st) => s + st.duration, 0);
@@ -940,8 +950,8 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   });
 
   // Ребаланс дня: недобор закрываем топ-апом в перекус, перебор режем по гибким слотам
-  // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%.
-  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds });
+  // (выбранные рецепты не трогаются). Цель — дневные КБЖУ в ±3%. C5: субротация пулов.
+  const rb = rebalanceDayAfterRecipes(meals, targets, { excludedIds, seed: args.seed });
   const notes = [...rb.notes];
 
   // D4: единый корректор — после всех капов/ребелов доводим день до ≤3% по 4 осям.
@@ -950,17 +960,20 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   if (needCorr) {
     const corr = correctDayToTargets(rb.meals as any, targets as any, { excludedIds, allowCoreScale: true, maxIter: 80, weightKg: args.athleteWeightKg ?? 80 });
     const corrDev = corr.deviationPct;
+    // C1: финальный грамм-трим квот после корректора (его доборы идут мимо квот).
+    const _trimNotes1 = trimQuotaOverflow(corr.meals as any);
     if (corrDev + 1e-9 < rb.deviationPct) {
       if (corr.withinTolerance) {
-        return { meals: corr.meals as any, notes: [...notes, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}% (≤3%)`], withinTolerance: true, deviationPct: corrDev, appliedCount };
+        return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}% (≤3%)`], withinTolerance: true, deviationPct: corrDev, appliedCount };
       }
       // улучшили, но не до ≤3% — отдаём лучшее с предупреждением (>3%)
-      return { meals: corr.meals as any, notes: [...notes, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}%`, `⚠ Режим «по рецептам»: дневное отклонение от целей ${corrDev}% (>3%) — попробуйте выбрать другие варианты рецептов.`], withinTolerance: false, deviationPct: corrDev, appliedCount };
+      return { meals: corr.meals as any, notes: [...notes, ..._trimNotes1, `✓ Корректор дневных целей: ${rb.deviationPct}% → ${corrDev}%`, `⚠ Режим «по рецептам»: дневное отклонение от целей ${corrDev}% (>3%) — попробуйте выбрать другие варианты рецептов.`], withinTolerance: false, deviationPct: corrDev, appliedCount };
     }
   }
 
   if (!rb.withinTolerance) {
     notes.push(`⚠ Режим «по рецептам»: дневное отклонение от целей ${rb.deviationPct}% (>3%) — попробуйте выбрать другие варианты рецептов.`);
   }
-  return { meals: rb.meals, notes, withinTolerance: rb.withinTolerance, deviationPct: rb.deviationPct, appliedCount };
+  const _trimNotes = trimQuotaOverflow(rb.meals);
+  return { meals: rb.meals, notes: [...notes, ..._trimNotes], withinTolerance: rb.withinTolerance, deviationPct: rb.deviationPct, appliedCount };
 }

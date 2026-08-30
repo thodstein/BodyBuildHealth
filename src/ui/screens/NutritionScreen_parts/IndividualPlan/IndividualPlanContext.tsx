@@ -2857,6 +2857,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
             usedNamesAcrossDays: _usedRecipeNames,
             goal: goal === 'cutting' || goal === 'fat_loss' ? 'cut' : goal === 'maintenance' ? 'maintenance' : 'mass',
             athleteWeightKg: weight,
+            // C2/C5 (Эпик C): peri-рецепты только в трен-день; субротация доборов по seed дня.
+            trainDay: isTrainDay(offset),
+            seed: planRandomSalt + offset,
           });
           meals.splice(0, meals.length, ...(_asm.meals as any[]));
           if (_asm.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._asm.notes];

@@ -1357,6 +1357,19 @@ export const RECIPE_ENRICHMENT: Record<string, RecipeEnrichment> = {
 export function enrichRecipe(recipe: Recipe): Recipe {
   const enr = RECIPE_ENRICHMENT[recipe.name];
   if (!enr) return recipe;
-  return { ...recipe, ingredientIds: enr.ingredientIds, portions: enr.portions, difficulty: enr.difficulty, batchFriendly: enr.batchFriendly, cookSkill: enr.cookSkill, flavorProfile: enr.flavorProfile, pairsWith: enr.pairsWith, };
+  // C7 (Эпик C): enrichment НЕ перезаписывает АВТОРСКИЕ ingredientIds/portions
+  // (раньше «Протеиновые панкейки» с авторской декомпозицией затирались словарём).
+  // Для рецептов с собственными id enrichment добавляет только difficulty/skill/flavor.
+  const hasAuthorIds = Array.isArray(recipe.ingredientIds) && recipe.ingredientIds.length > 0;
+  return {
+    ...recipe,
+    ingredientIds: hasAuthorIds ? recipe.ingredientIds : enr.ingredientIds,
+    portions: hasAuthorIds ? recipe.portions : enr.portions,
+    difficulty: recipe.difficulty ?? enr.difficulty,
+    batchFriendly: recipe.batchFriendly ?? enr.batchFriendly,
+    cookSkill: recipe.cookSkill ?? enr.cookSkill,
+    flavorProfile: recipe.flavorProfile ?? enr.flavorProfile,
+    pairsWith: recipe.pairsWith ?? enr.pairsWith,
+  };
 }
 export function enrichRecipes(recipes: Recipe[]): Recipe[] { return recipes.map(enrichRecipe); }
