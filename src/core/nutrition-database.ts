@@ -2350,7 +2350,12 @@ export { RATION_TIERS };
     const isSupp = cat === 'supplement';
     const isOther = cat === 'other' || cat === 'fast_food';
     const hasGluten = ['grain', 'carb'].includes(cat) || f.id.includes('bread') || f.id.includes('pasta') || f.id.includes('noodle') || f.id.includes('flour') || f.id.includes('cereal');
-    const hasDairy = isDairy || f.id.includes('milk') || f.id.includes('cheese') || f.id.includes('cream') || f.id.includes('yogurt') || f.id.includes('kefir');
+    // C4-фикс (Эпик C/H): растительные молока (миндальное/овсяное/соевое/кокосовое)
+    // ошибочно классифицировались как «dairy» → isVegan:false — веган-гейт рецептов
+    // отвергал все растительные молока. Список растительных молок исключает их из dairy.
+    const isPlantMilk = /^(milk_|oat_milk|almond_milk|soy_milk|coconut_milk|drink_oat)/.test(f.id)
+      && !f.id.startsWith('milk_powder');
+    const hasDairy = (isDairy || f.id.includes('milk') || f.id.includes('cheese') || f.id.includes('cream') || f.id.includes('yogurt') || f.id.includes('kefir')) && !isPlantMilk;
     const hasFish = f.id.includes('fish') || f.id.includes('salmon') || f.id.includes('tuna') || f.id.includes('cod') || f.id.includes('herring') || f.id.includes('mackerel') || f.id.includes('sardine') || f.id.includes('trout');
     const hasShellfish = f.id.includes('shrimp') || f.id.includes('crab') || f.id.includes('lobster') || f.id.includes('mussel') || f.id.includes('clam') || f.id.includes('oyster') || f.id.includes('scallop') || f.id.includes('octopus') || f.id.includes('squid');
     const hasEggs = f.id.includes('egg');
