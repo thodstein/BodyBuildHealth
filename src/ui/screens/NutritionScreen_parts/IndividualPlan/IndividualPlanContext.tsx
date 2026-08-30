@@ -13,7 +13,8 @@ import { updateSection } from "../../../../core/profile-manager";
 import { getWeightLog, saveWeightLog } from "../../../../engines/profile-store";
 import { getNutritionV2Data, saveNutritionV2Data } from "../../../../core/nutrition-v2-data";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
-import { computePlannerTargets, computeDieteticCarbTarget, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
+import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
+import { buildDayTargets } from "./planner-day-targets";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
@@ -114,6 +115,8 @@ export interface PlanCtx {
   effectiveP: number;
   effectiveF: number;
   effectiveC: number;
+  /** Эпик A: человекочитаемый разбор целей (TDEE → модификаторы → макросы). */
+  dayTargetsBreakdown: string[];
   carbCapClipped: boolean;
   carbCapGPerKg: number;
   kbjuMode: string; setKbjuMode: (v: any) => void;
@@ -803,27 +806,31 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // Алиас v6 для UI: proteinPreset === nutrLevel (одна сущность)
   const proteinPreset: NutritionLevel = nutrLevel;
   const setProteinPreset = setNutrLevel;
-  const _baseP = kbjuMode === 'manual' && manualP !== null ? manualP : (kbjuMode === 'profile' ? profileTargets.protein : calcTargets.protein);
-  const effectiveP = kbjuMode === 'manual' ? _baseP : Math.round(weight * _proteinGPerKg);
-  const _baseF = kbjuMode === 'manual' && manualF !== null ? manualF : (kbjuMode === 'profile' ? profileTargets.fats : calcTargets.fats);
-  const effectiveF = kbjuMode === 'manual' ? Math.max(Math.round(weight * 0.8), _baseF) : Math.max(Math.round(weight * 0.8), _baseF);
-  // П.4/П.1 (Aug 22 2026, диетология): УГЛЕВОДЫ НЕ СТЭКАЮТСЯ nutrLevel'ом и ограничены
-  // ДИЕТОЛОГИЧЕСКИМ потолком (computeDieteticCarbTarget). Цель углеводов — г/кг (межсезонье
-  // 4-6 г/кг), а не абстрактный ×множитель (жалоба «120 кг на курсе → 900/814 г углеводов»).
-  // При инсулине потолок НЕ ниже инсулин-флора (~10 г/1 ЕД, до 8 г/кг). Применяется ко ВСЕМ
-  // уровням (не только enhanced/max) — иначе на base/medium дисплей по-прежнему показывал бы 800+.
+  // Эпик A (NUTRITION-PLANNER-QUALITY-PLAN): фактические цели дня — единая чистая функция
+  // buildDayTargets (planner-day-targets.ts). Наука (TDEE→surplus→фаза→фарма→weight-adapt→
+  // metabolic→female gate) задаёт КАЛОРАЖ, пресет белка — оверрайд, угли — остаток до цели.
+  // effectiveP/F/C/Kcal сохраняют прежние имена (100+ потребителей).
   const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? _pf.budget : 'medium');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
-  const effectiveC = (() => {
-    if (kbjuMode === 'manual' && manualC !== null) return manualC;
-    if (kbjuMode === 'manual' && manualKcal !== null && manualP !== null && manualF !== null && manualC === null) {
-      return Math.max(0, Math.round((manualKcal - manualP * 4 - manualF * 9) / 4));
-    }
-    const rawC = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
-    const vol = (() => { try { return trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60); } catch { return 0; } })();
-    return computeDieteticCarbTarget({ weightKg: weight, rawCarbsG: rawC, insulinTotalUnits: _insulinUnits, goalPhase: plannerGoalCategory(goal), trainingVolumeMinPerWeek: vol, budget });
-  })();
+  const _trainVolMin = (() => { try { return trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60); } catch { return 0; } })();
+  const dayTargets = useMemo(() => buildDayTargets({
+    weightKg: weight,
+    presetGPerKg: _proteinGPerKg,
+    fatFloorGPerKg: 0.8,
+    kbjuMode,
+    manual: { kcal: manualKcal, p: manualP, f: manualF, c: manualC },
+    calcTargets,
+    profileTargets,
+    goal,
+    trainingVolumeMinPerWeek: _trainVolMin,
+    budget,
+    insulinTotalUnits: _insulinUnits,
+  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits]);
+  const dayTargetsBreakdown: string[] = dayTargets.breakdown;
+  const effectiveP = dayTargets.protein;
+  const effectiveF = dayTargets.fats;
+  const effectiveC = dayTargets.carbs;
   const _rawCForCap = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
   const carbCapGPerKg = (() => {
     try {
@@ -834,12 +841,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const carbCapClipped = (() => {
     try { return _rawCForCap > carbCapGPerKg * weight + 1; } catch { return false; }
   })();
-  // Kcal согласуем с фактическими макросами (Atwater) ВСЕГДА (для auto): display == генерация,
-  // чтобы не было «разбега» между целью углеводов и собранным планом. Усиление уровня (nutrMult)
-  // поднимает Б/Ж, а углеводы — в пределах диетологического потолка; kcal = сумма макросов.
-  const effectiveKcal = (kbjuMode === 'manual' && manualKcal !== null)
-    ? manualKcal
-    : Math.round(effectiveP * 4 + effectiveF * 9 + effectiveC * 4);
+  // Kcal согласован с фактическими макросами (Atwater) — display == генерация (buildDayTargets).
+  const effectiveKcal = dayTargets.kcal;
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
@@ -3275,7 +3278,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     trainStart, setTrainStart, trainEnd, setTrainEnd, linkToTraining, setLinkToTraining,
     trainScheduleType, setTrainScheduleType, trainPattern, setTrainPattern, isTrainDay,
     injectDrugTypes, calcTargets, profileTargets,
-    effectiveKcal, effectiveP, effectiveF, effectiveC, carbCapClipped, carbCapGPerKg,
+    effectiveKcal, effectiveP, effectiveF, effectiveC, dayTargetsBreakdown, carbCapClipped, carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
     resultsRef, budget, setBudget, nutrLevel, setNutrLevel, proteinPreset, setProteinPreset,

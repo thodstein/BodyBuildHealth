@@ -80,7 +80,7 @@ export const IndividualPlanSettings: React.FC = () => {
     injName, setInjName, injTime, setInjTime, injDose, setInjDose,
     injUnit, setInjUnit, injType, setInjType, injEster, setInjEster,
     injectDrugTypes,
-    calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC,
+    calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, dayTargetsBreakdown,
     carbCapClipped, carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
@@ -266,6 +266,14 @@ export const IndividualPlanSettings: React.FC = () => {
             <div style={{ fontSize:9, color:'#fbbf24', padding:'6px 8px', marginBottom:7, background:'rgba(245,158,11,0.07)', border:'1px solid rgba(245,158,11,0.25)', borderRadius:8, lineHeight:1.5 }}>
               ⚠ Углеводы ограничены диетологическим потолком {carbCapGPerKg} г/кг — цель ккал ниже «TDEE + профицит». На массе потолок растёт с объёмом тренировок (7-8 г/кг). Снять ограничение можно в ручном режиме КБЖУ.
             </div>
+          )}
+          {Array.isArray(dayTargetsBreakdown) && dayTargetsBreakdown.length > 0 && (
+            <details style={{ fontSize:9, color:'rgba(255,255,255,0.75)', padding:'6px 8px', marginBottom:7, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:8, lineHeight:1.6 }}>
+              <summary style={{ cursor:'pointer', fontWeight:700, color:'#93c5fd' }}>🧮 Как считаются цели (TDEE → модификаторы → макросы)</summary>
+              <div style={{ marginTop:5 }}>
+                {dayTargetsBreakdown.map((s: string, i: number) => <div key={i} style={{ color: s.startsWith('⚠') ? '#fbbf24' : 'rgba(255,255,255,0.72)' }}>{s}</div>)}
+              </div>
+            </details>
           )}
           {(() => {
             // П2 (Роунд-2): совет автокоррекции калорий по темпу веса (план → факт → коррекция)
