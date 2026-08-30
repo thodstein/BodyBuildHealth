@@ -108,17 +108,40 @@ export const ExecutionZone: React.FC<Props> = (p) => {
               </p>
               {macrocycle && currentMicrocycle && trainingDaysList.length > 0 ? (
                 <>
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-                    {(() => { const _todayIdx = (((new Date().getDay() + 6) % 7)) % Math.max(1, trainingDaysList.length); return (
-                      <button onClick={() => setRuntimeDay(_todayIdx)} title="Сегодня (по дню недели)" style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', background: 'rgba(0,230,138,0.12)', color: 'var(--accent)', border: '1px solid rgba(0,230,138,0.4)' }}>📅 Сегодня</button>
+                  <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', marginBottom: 10 }}>
+                    {(() => { const _todayIdx = (((new Date().getDay() + 6) % 7)) % Math.max(1, trainingDaysList.length); const isToday = safeRuntimeDay === _todayIdx; return (
+                      <button onClick={() => setRuntimeDay(_todayIdx)} aria-label="Выбрать сегодняшний день" style={{
+                        minWidth: 92, flex: '0 0 auto', scrollSnapAlign: 'start', padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'center',
+                        background: isToday ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)',
+                        color: isToday ? '#00e68a' : '#fff', border: `1px solid ${isToday ? 'rgba(0,230,138,0.28)' : 'rgba(255,255,255,0.08)'}`,
+                        fontSize: 10, fontWeight: 800,
+                      }}>📅 Сегодня</button>
                     ); })()}
-                    {trainingDaysList.map((day: any, di: number) => (
-                      <button key={di} onClick={() => setRuntimeDay(di)} style={{
-                        padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: safeRuntimeDay === di ? 700 : 400, cursor: 'pointer',
-                        background: safeRuntimeDay === di ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
-                        color: safeRuntimeDay === di ? '#000' : '#fff', border: '1px solid ' + (safeRuntimeDay === di ? 'var(--accent)' : 'rgba(255,255,255,0.08)'),
-                      }}>{day.day || `День ${di+1}`}</button>
-                    ))}
+                    {trainingDaysList.map((day: any, di: number) => {
+                      const active = safeRuntimeDay === di;
+                      const exCnt = day.exercises?.length ?? 0;
+                      const sets = day.exercises?.reduce((s: number, e: any) => s + (e.sets || 0), 0) ?? 0;
+                      return (
+                        <button key={di} onClick={() => setRuntimeDay(di)} aria-pressed={active} aria-label={`Выбрать ${day.day || `День ${di+1}`}`} style={{
+                          minWidth: 112, flex: '0 0 auto', scrollSnapAlign: 'start', textAlign: 'left', position: 'relative', overflow: 'hidden',
+                          padding: '9px 11px', borderRadius: 13, cursor: 'pointer',
+                          background: active ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.07))' : 'rgba(255,255,255,0.04)',
+                          border: active ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)',
+                          borderLeft: `3px solid ${active ? '#00e68a' : 'rgba(255,255,255,0.10)'}`,
+                          boxShadow: active ? '0 4px 14px rgba(0,230,138,0.16)' : '0 1px 8px rgba(0,0,0,0.10)',
+                          transition: 'all 0.2s',
+                        }}>
+                          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: active ? 'linear-gradient(90deg,#00e68a,#00c853)' : 'linear-gradient(90deg, rgba(255,255,255,0.06), transparent)' }} />
+                          <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: active ? '#00e68a' : 'rgba(255,255,255,0.50)', marginBottom: 3 }}>День {di + 1}{active ? ' •' : ''}</div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: '#fff', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{day.day || `День ${di + 1}`}</div>
+                          <div style={{ display: 'flex', gap: 4, marginTop: 5 }}>
+                            <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 20, background: active ? 'rgba(0,230,138,0.13)' : 'rgba(255,255,255,0.06)', color: active ? '#00e68a' : '#fff', border: `1px solid ${active ? 'rgba(0,230,138,0.20)' : 'rgba(255,255,255,0.07)'}` }}>{exCnt} упр.</span>
+                            <span style={{ fontSize: 8, padding: '1px 5px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.62)', border: '1px solid rgba(255,255,255,0.06)' }}>{sets} сет.</span>
+                          </div>
+                          {active && <span style={{ position: 'absolute', top: 6, right: 7, width: 16, height: 16, borderRadius: 16, background: '#00e68a', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800 }}>✓</span>}
+                        </button>
+                      );
+                    })}
                   </div>
             <div style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 6, padding: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 10, color: '#fff' }}>
@@ -278,21 +301,42 @@ export const ExecutionZone: React.FC<Props> = (p) => {
                                   <div style={{ height: 2, borderRadius: 1, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 6 }}>
                                     <div style={{ height: '100%', width: `${bPct}%`, background: bDone === bTotal && bTotal > 0 ? '#22c55e' : meta.color, transition: 'width 0.3s ease' }} />
                                   </div>
-                                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     {b.exercises.map((ex, j) => {
                                       const isDone = !!execWarmupDone[`ew_${bi}_${j}`];
                                       const isSpec = 'intensityPct' in ex && (ex as any).intensityPct;
+                                      const elabel = isSpec ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId);
+                                      const edose = isSpec ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}` : `${ex.sets}×${ex.reps}`;
                                       return (
-                                        <li key={j} style={{ display: 'flex', gap: 7, alignItems: 'flex-start', padding: '5px 6px', borderRadius: 8, background: isDone ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isDone ? 'rgba(34,197,94,0.14)' : 'rgba(255,255,255,0.05)'}`, opacity: isDone ? 0.85 : 1 }}>
-                                          <input type="checkbox" checked={isDone} onChange={() => setExecWarmupDone(prev => ({ ...prev, [`ew_${bi}_${j}`]: !prev[`ew_${bi}_${j}`] }))} style={{ marginTop: 2, width: 14, height: 14, accentColor: meta.color, cursor: 'pointer', flexShrink: 0 }} />
-                                          <span style={{ flex: 1, minWidth: 0 }}>
-                                            <span style={{ fontSize: 10, fontWeight: 600, color: isDone ? 'rgba(255,255,255,0.5)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.3 }}>{isSpec ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}</span>
-                                            <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
-                                              <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 5px', borderRadius: 5, background: isDone ? 'rgba(255,255,255,0.06)' : meta.bg, color: isDone ? 'rgba(255,255,255,0.45)' : meta.color, border: `1px solid ${isDone ? 'rgba(255,255,255,0.06)' : meta.border}` }}>{isSpec ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}` : `${ex.sets}×${ex.reps}`}</span>
-                                              {'note' in ex && (ex as any).note && <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.55)' }}>{(ex as any).note}</span>}
+                                        <li key={j} style={{ listStyle: 'none' }}>
+                                          <button type="button" aria-pressed={isDone} aria-label={`${elabel} — ${isDone ? 'выполнено' : 'отметить'}`}
+                                            onClick={() => setExecWarmupDone(prev => ({ ...prev, [`ew_${bi}_${j}`]: !prev[`ew_${bi}_${j}`] }))}
+                                            style={{
+                                              width: '100%', display: 'flex', alignItems: 'flex-start', gap: 9, padding: '8px 9px', borderRadius: 11, cursor: 'pointer', textAlign: 'left', minWidth: 0,
+                                              background: isDone ? 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(16,185,129,0.07))' : 'rgba(255,255,255,0.035)',
+                                              border: `1px solid ${isDone ? 'rgba(34,197,94,0.24)' : 'rgba(255,255,255,0.06)'}`,
+                                              borderLeft: `3px solid ${isDone ? '#22c55e' : meta.color}`,
+                                              boxShadow: isDone ? '0 2px 10px rgba(34,197,94,0.14)' : '0 1px 6px rgba(0,0,0,0.08)',
+                                              opacity: isDone ? 0.92 : 1, transition: 'all 0.2s',
+                                            }}>
+                                            <span style={{
+                                              width: 24, height: 24, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                                              background: isDone ? 'linear-gradient(135deg,#22c55e,#16a34a)' : `linear-gradient(135deg, ${meta.color}, ${meta.color}CC)`,
+                                              color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: `0 2px 7px ${isDone ? 'rgba(34,197,94,0.26)' : meta.color + '33'}`,
+                                            }}>{isDone ? '✓' : (j + 1)}</span>
+                                            <span style={{ flex: 1, minWidth: 0 }}>
+                                              <span style={{ fontSize: 10.5, fontWeight: isDone ? 600 : 700, color: isDone ? 'rgba(255,255,255,0.74)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.3, display: 'block', wordBreak: 'break-word' }}>{elabel}</span>
+                                              <span style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginTop: 3 }}>
+                                                <span style={{ fontSize: 8, fontWeight: 800, padding: '1px 6px', borderRadius: 20, background: isDone ? 'rgba(34,197,94,0.13)' : meta.bg, color: isDone ? '#86efac' : meta.color, border: `1px solid ${isDone ? 'rgba(34,197,94,0.20)' : meta.border}` }}>{edose}</span>
+                                                {'note' in ex && (ex as any).note && <span style={{ fontSize: 8, color: isDone ? 'rgba(255,255,255,0.40)' : 'rgba(255,255,255,0.58)', lineHeight: 1.3 }}>{(ex as any).note}</span>}
+                                              </span>
                                             </span>
-                                          </span>
-                                          <span style={{ width: 18, height: 18, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1, background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.3)', border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.07)'}`, fontSize: 9, fontWeight: 800 }}>{isDone ? '✓' : '○'}</span>
+                                            <span style={{
+                                              width: 22, height: 22, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                                              background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.34)',
+                                              border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.08)'}`, fontSize: 9, fontWeight: 800,
+                                            }}>{isDone ? '✓' : '○'}</span>
+                                          </button>
                                         </li>
                                       );
                                     })}

@@ -83,20 +83,36 @@ export const MindsetPreSessionCard: React.FC<{ focus: string; dayLabel: string }
       <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden', marginBottom: 8 }}>
         <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: pct === 100 ? '#22c55e' : '#a78bfa', transition: 'width 0.3s ease' }} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         {items.map(it => {
           const done = progress.doneItems.includes(it.id);
           return (
-            <div key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-              <input type="checkbox" checked={done} onChange={() => toggle(it.id)} aria-label={`Шаг: ${it.title}`}
-                style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer' }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: done ? '#fff' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
-                  {KIND_ICON[it.kind]} {it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>({KIND_LABELS[it.kind]} · {it.durationMin} мин)</span>
-                </div>
-                {!done && <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}
-              </div>
-            </div>
+            <button key={it.id} type="button" role="checkbox" aria-checked={done} aria-label={`Шаг: ${it.title}`}
+              onClick={() => toggle(it.id)}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', textAlign: 'left', padding: '9px 10px', borderRadius: 12, cursor: 'pointer',
+                background: done ? 'linear-gradient(135deg, rgba(167,139,250,0.14), rgba(139,92,246,0.08))' : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${done ? 'rgba(167,139,250,0.28)' : 'rgba(255,255,255,0.07)'}`,
+                borderLeft: `3px solid ${done ? '#a78bfa' : 'rgba(167,139,250,0.45)'}`,
+                opacity: done ? 0.90 : 1, transition: 'all 0.2s',
+              }}>
+              <span style={{
+                width: 26, height: 26, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                background: done ? 'linear-gradient(135deg,#a78bfa,#8b5cf6)' : 'rgba(255,255,255,0.07)',
+                color: done ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 800,
+              }}>{done ? '✓' : KIND_ICON[it.kind]}</span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: 10.5, fontWeight: done ? 600 : 700, color: done ? 'rgba(255,255,255,0.78)' : '#fff', textDecoration: done ? 'line-through' : 'none', lineHeight: 1.3, display: 'block' }}>
+                  {it.title} <span style={{ fontSize: 9, color: done ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.60)', fontWeight: 400 }}>({KIND_LABELS[it.kind]} · {it.durationMin} мин)</span>
+                </span>
+                <span style={{ fontSize: 9, color: done ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.72)', lineHeight: 1.45, marginTop: 2, display: done ? 'none' : 'block' }}>{it.script}</span>
+              </span>
+              <span style={{
+                width: 26, height: 26, borderRadius: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                background: done ? '#a78bfa' : 'rgba(255,255,255,0.06)', color: done ? '#fff' : 'rgba(255,255,255,0.38)',
+                border: `1px solid ${done ? '#a78bfa' : 'rgba(255,255,255,0.08)'}`, fontSize: 10, fontWeight: 800,
+              }}>{done ? '✓' : '○'}</span>
+            </button>
           );
         })}
       </div>

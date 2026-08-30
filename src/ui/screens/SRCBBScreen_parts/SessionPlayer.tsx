@@ -785,13 +785,40 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   return (
     <div>
       <style>{timerAnimationStyle}</style>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-        {days.map((d, i) => (
-          <button key={i} disabled={phase !== 'ready' && phase !== 'done'}
-            title={phase !== 'ready' && phase !== 'done' ? 'Завершите текущую тренировку, чтобы сменить день' : undefined}
-            style={{ ...(i === dayIdx ? BTN : BTN_GHOST), opacity: phase !== 'ready' && phase !== 'done' && i !== dayIdx ? 0.35 : 1, cursor: phase !== 'ready' && phase !== 'done' && i !== dayIdx ? 'not-allowed' : 'pointer' }}
-            onClick={() => setDayIdx(i)}>{d.label}</button>
-        ))}
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', marginBottom: 10 }}>
+        {days.map((d, i) => {
+          const active = i === dayIdx;
+          const locked = phase !== 'ready' && phase !== 'done';
+          const exCnt = d.exercises?.length ?? 0;
+          const totalSets = d.exercises?.reduce((s: number, e: any) => s + (e.targetSets?.length || 0), 0) ?? 0;
+          return (
+            <button key={i} disabled={locked && !active}
+              title={locked && !active ? 'Завершите текущую тренировку, чтобы сменить день' : `Выбрать ${d.label}`}
+              aria-pressed={active} aria-label={`Выбрать ${d.label}`}
+              onClick={() => { hapticImpact('light'); setDayIdx(i); }}
+              style={{
+                minWidth: 122, flex: '0 0 auto', scrollSnapAlign: 'start', textAlign: 'left', position: 'relative', overflow: 'hidden',
+                padding: '10px 12px', borderRadius: 14, cursor: locked && !active ? 'not-allowed' : 'pointer',
+                background: active ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)',
+                border: active ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.08)',
+                borderLeft: `3px solid ${active ? '#00e68a' : 'rgba(255,255,255,0.12)'}`,
+                boxShadow: active ? '0 6px 18px rgba(0,230,138,0.18), inset 0 1px 0 rgba(255,255,255,0.06)' : '0 2px 10px rgba(0,0,0,0.12)',
+                opacity: locked && !active ? 0.42 : 1, transition: 'all 0.22s ease', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+              }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: active ? 'linear-gradient(90deg,#00e68a,#00c853)' : 'linear-gradient(90deg, rgba(255,255,255,0.08), transparent)', opacity: active ? 1 : 0.5 }} />
+              <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: 0.5, textTransform: 'uppercase', color: active ? '#00e68a' : 'rgba(255,255,255,0.55)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? '#00e68a' : 'rgba(255,255,255,0.08)', color: active ? '#000' : 'rgba(255,255,255,0.65)', fontSize: 9, fontWeight: 800 }}>{i + 1}</span>
+                День {i + 1}{active ? ' • выбран' : ''}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.label}</div>
+              <div style={{ display: 'flex', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: active ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.06)', color: active ? '#00e68a' : '#fff', border: `1px solid ${active ? 'rgba(0,230,138,0.22)' : 'rgba(255,255,255,0.08)'}` }}>{exCnt} упр.</span>
+                <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.06)' }}>{totalSets} сетов</span>
+              </div>
+              {active && <span style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 18, background: '#00e68a', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, boxShadow: '0 2px 8px rgba(0,230,138,0.35)' }}>✓</span>}
+            </button>
+          );
+        })}
       </div>
 
       {/* Степпер фаз сессии */}
@@ -819,7 +846,17 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
 
       {phase === 'ready' && (
         <div style={{ marginTop: 8 }}>
-          <button style={{ ...BTN, width: '100%' }} onClick={begin}>▶ Начать тренировку — {day.label} (нед {weekNumber})</button>
+          <button onClick={() => { hapticImpact('medium'); begin(); }} style={{
+            width: '100%', padding: '14px 16px', borderRadius: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12,
+            background: 'linear-gradient(135deg, #00e68a, #00c853)', color: '#000', fontWeight: 800, fontSize: 14, boxShadow: '0 6px 20px rgba(0,230,138,0.28)', transition: 'transform 0.15s, boxShadow 0.15s',
+          }}>
+            <span style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>▶</span>
+            <span style={{ flex: 1, textAlign: 'left', lineHeight: 1.2 }}>
+              <span style={{ display: 'block', fontSize: 14, fontWeight: 800 }}>Начать тренировку</span>
+              <span style={{ display: 'block', fontSize: 10, fontWeight: 600, opacity: 0.75 }}>{day.label} · нед {weekNumber} · {day.exercises?.length ?? 0} упр.</span>
+            </span>
+            <span style={{ fontSize: 18, opacity: 0.7 }}>→</span>
+          </button>
           {/* оценка длительности */}
           {day && Array.isArray(day.exercises) && day.exercises.length > 0 && (() => {
             const totalSets = day.exercises.reduce((s, ex) => s + ex.targetSets.length, 0);
@@ -1116,56 +1153,64 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                 <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 7 }}>
                   <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: allDone ? '#22c55e' : meta.color, transition: 'width 0.3s ease' }} />
                 </div>
-                <ul style={{ padding: 0, margin: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <ul style={{ padding: 0, margin: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {b.exercises.map((ex, j) => {
                     const isDone = warmupDone[`w_${i}_${j}`];
                     const isSpecific = 'intensityPct' in ex && (ex as any).intensityPct;
+                    const label = isSpecific ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId);
+                    const dose = isSpecific ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}` : `${ex.sets}×${ex.reps}`;
                     return (
-                      <li key={j} style={{
-                        display: 'flex', alignItems: 'flex-start', gap: 9, padding: '7px 8px', borderRadius: 10,
-                        background: isDone ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)',
-                        border: `1px solid ${isDone ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.06)'}`,
-                        opacity: isDone ? 0.85 : 1, transition: 'all 0.2s',
-                      }}>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, flex: 1, cursor: 'pointer', minWidth: 0 }}>
-                          <input type="checkbox" checked={isDone} onChange={() => toggleWarmup(i, j)}
-                            style={{ marginTop: 2, width: 16, height: 16, accentColor: isDone ? '#22c55e' : meta.color, cursor: 'pointer', flexShrink: 0 }} />
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{
-                              fontSize: 11, fontWeight: 600, color: isDone ? 'rgba(255,255,255,0.55)' : '#fff',
-                              textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.3, display: 'block',
+                      <li key={j} style={{ listStyle: 'none' }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+                          <button type="button" aria-pressed={isDone} aria-label={`${label} — ${isDone ? 'выполнено, нажать чтобы отменить' : 'отметить выполнение'}`}
+                            onClick={() => { hapticImpact(isDone ? 'light' : 'medium'); toggleWarmup(i, j); }}
+                            style={{
+                              flex: 1, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', minWidth: 0,
+                              background: isDone ? 'linear-gradient(135deg, rgba(34,197,94,0.13), rgba(16,185,129,0.07))' : 'rgba(255,255,255,0.035)',
+                              border: `1px solid ${isDone ? 'rgba(34,197,94,0.28)' : 'rgba(255,255,255,0.07)'}`,
+                              borderLeft: `3px solid ${isDone ? '#22c55e' : meta.color}`,
+                              boxShadow: isDone ? '0 3px 12px rgba(34,197,94,0.16), inset 0 1px 0 rgba(255,255,255,0.06)' : '0 1px 8px rgba(0,0,0,0.10)',
+                              opacity: isDone ? 0.92 : 1, transition: 'all 0.22s ease', position: 'relative', overflow: 'hidden',
                             }}>
-                              {isSpecific ? warmupSpecificLabel(ex.exerciseId) : warmupLabel(ex.exerciseId)}
-                            </span>
-                            <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 3 }}>
+                            <span style={{
+                              width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                              background: isDone ? 'linear-gradient(135deg,#22c55e,#16a34a)' : `linear-gradient(135deg, ${meta.color}, ${meta.color}CC)`,
+                              color: '#fff', fontSize: 12, fontWeight: 800, boxShadow: `0 2px 8px ${isDone ? 'rgba(34,197,94,0.28)' : meta.color + '33'}`,
+                            }}>{isDone ? '✓' : (j + 1)}</span>
+                            <span style={{ flex: 1, minWidth: 0 }}>
                               <span style={{
-                                fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 6,
-                                background: isDone ? 'rgba(255,255,255,0.06)' : meta.bg, color: isDone ? 'rgba(255,255,255,0.5)' : meta.color,
-                                border: `1px solid ${isDone ? 'rgba(255,255,255,0.08)' : meta.border}`,
-                              }}>
-                                {isSpecific ? `${(ex as any).intensityPct}% · ${ex.sets}×${ex.reps}` : `${ex.sets}×${ex.reps}`}
+                                fontSize: 11.5, fontWeight: isDone ? 600 : 700, color: isDone ? 'rgba(255,255,255,0.78)' : '#fff',
+                                textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.35, display: 'block', wordBreak: 'break-word',
+                              }}>{label}</span>
+                              <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                                <span style={{
+                                  fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 20,
+                                  background: isDone ? 'rgba(34,197,94,0.14)' : meta.bg, color: isDone ? '#86efac' : meta.color,
+                                  border: `1px solid ${isDone ? 'rgba(34,197,94,0.22)' : meta.border}`,
+                                }}>{dose}</span>
+                                {'note' in ex && (ex as any).note && (
+                                  <span style={{ fontSize: 9, color: isDone ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.62)', wordBreak: 'break-word', lineHeight: 1.3 }}>
+                                    {(ex as any).note}
+                                  </span>
+                                )}
                               </span>
-                              {'note' in ex && (ex as any).note && (
-                                <span style={{ fontSize: 9, color: isDone ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.62)', wordBreak: 'break-word' }}>
-                                  {(ex as any).note}
-                                </span>
-                              )}
                             </span>
-                          </span>
-                        </label>
-                        {(() => {
-                          if (isDone) return null;
-                          const isActive = warmupTimer && warmupTimer.i === i && warmupTimer.j === j;
-                          if (isActive) {
-                            return <span style={{ minWidth: 44, padding: '3px 6px', borderRadius: 8, background: 'rgba(6,182,214,0.14)', color: '#06b6d4', border: '1px solid rgba(6,182,214,0.28)', fontSize: 10, fontWeight: 800, textAlign: 'center', flexShrink: 0, marginTop: 1 }}>{warmupTimer!.remaining}с</span>;
-                          }
-                          return <button type="button" disabled={isDone} onClick={() => setWarmupTimer({ i, j, remaining: 30, total: 30 })} style={{ padding: '3px 7px', borderRadius: 8, fontSize: 9, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.65)', flexShrink: 0, marginTop: 1 }} aria-label="Таймер 30с">⏱ 30с</button>;
-                        })()}
-                        <span style={{
-                          width: 22, height: 22, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
-                          background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.35)',
-                          border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.08)'}`, fontSize: 10, fontWeight: 800,
-                        }}>{isDone ? '✓' : '○'}</span>
+                            <span style={{
+                              width: 28, height: 28, borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                              background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.38)',
+                              border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.09)'}`, fontSize: 11, fontWeight: 800, boxShadow: isDone ? '0 2px 8px rgba(34,197,94,0.28)' : 'none',
+                              transition: 'all 0.2s',
+                            }}>{isDone ? '✓' : '○'}</span>
+                          </button>
+                          {(() => {
+                            if (isDone) return null;
+                            const isActive = warmupTimer && warmupTimer.i === i && warmupTimer.j === j;
+                            if (isActive) {
+                              return <span style={{ minWidth: 48, alignSelf: 'center', padding: '6px 8px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(6,182,214,0.16), rgba(14,165,233,0.10))', color: '#22d3ee', border: '1px solid rgba(6,182,214,0.28)', fontSize: 11, fontWeight: 800, textAlign: 'center', flexShrink: 0, boxShadow: '0 2px 10px rgba(6,182,214,0.18)' }}>{warmupTimer!.remaining}с</span>;
+                            }
+                            return <button type="button" onClick={(e) => { e.stopPropagation(); hapticImpact('light'); setWarmupTimer({ i, j, remaining: 30, total: 30 }); }} style={{ alignSelf: 'center', padding: '7px 9px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.78)', flexShrink: 0, backdropFilter: 'blur(8px)' }} aria-label={`Таймер 30с для ${label}`}>⏱ 30с</button>;
+                          })()}
+                        </div>
                       </li>
                     );
                   })}
@@ -1254,24 +1299,42 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
              );
            })()}
 
-           {/* режимы суперсета и круга */}
-           <div style={{ display: 'flex', gap: 4, marginBottom: 8, flexWrap: 'wrap' }}>
-             <span style={{ fontSize: 9, color: '#fff', alignSelf: 'center' }}>Режим:</span>
-             <button onClick={toggleSupersetMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: supersetMode?'1px solid #f59e0b':'1px solid rgba(255,255,255,0.08)', background: supersetMode?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', color: supersetMode?'#f59e0b':'#fff' }}>
-               🔄 Суперсет
-             </button>
-             <button onClick={toggleCircuitMode} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: circuitMode?'1px solid #8b5cf6':'1px solid rgba(255,255,255,0.08)', background: circuitMode?'rgba(139,92,246,0.12)':'rgba(255,255,255,0.04)', color: circuitMode?'#8b5cf6':'#fff' }}>
-               ⭕ Круг
-             </button>
-             <button onClick={() => setPlateOpen(v => !v)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: plateOpen?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: plateOpen?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: plateOpen?'#00e68a':'#fff' }}>
-               🧮 Блины
-             </button>
-             {(supersetMode || circuitMode) && (
-               <span style={{ fontSize: 9, color: '#fff', alignSelf: 'center' }}>
-                 {supersetMode ? 'Выберите 2+ упражнения' : 'Минимальный отдых между упражнениями'}
-               </span>
-             )}
-            </div>
+            {/* режимы суперсета и круга — современные карточки-кнопки */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Режим</span>
+              <button type="button" aria-pressed={supersetMode} onClick={() => { hapticImpact('light'); toggleSupersetMode(); }} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 20, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                border: supersetMode ? '1px solid rgba(245,158,11,0.32)' : '1px solid rgba(255,255,255,0.09)',
+                background: supersetMode ? 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(217,119,6,0.10))' : 'rgba(255,255,255,0.04)',
+                color: supersetMode ? '#f59e0b' : '#fff', boxShadow: supersetMode ? '0 3px 12px rgba(245,158,11,0.18)' : 'none', transition: 'all 0.2s',
+              }}>
+                <span style={{ width: 18, height: 18, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: supersetMode ? '#f59e0b' : 'rgba(255,255,255,0.08)', color: supersetMode ? '#000' : 'rgba(255,255,255,0.6)', fontSize: 10 }}>🔄</span>
+                Суперсет {supersetMode ? '✓' : ''}
+              </button>
+              <button type="button" aria-pressed={circuitMode} onClick={() => { hapticImpact('light'); toggleCircuitMode(); }} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 20, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                border: circuitMode ? '1px solid rgba(139,92,246,0.32)' : '1px solid rgba(255,255,255,0.09)',
+                background: circuitMode ? 'linear-gradient(135deg, rgba(139,92,246,0.16), rgba(99,102,241,0.10))' : 'rgba(255,255,255,0.04)',
+                color: circuitMode ? '#a78bfa' : '#fff', boxShadow: circuitMode ? '0 3px 12px rgba(139,92,246,0.18)' : 'none', transition: 'all 0.2s',
+              }}>
+                <span style={{ width: 18, height: 18, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: circuitMode ? '#8b5cf6' : 'rgba(255,255,255,0.08)', color: circuitMode ? '#fff' : 'rgba(255,255,255,0.6)', fontSize: 10 }}>⭕</span>
+                Круг {circuitMode ? '✓' : ''}
+              </button>
+              <button type="button" aria-pressed={plateOpen} onClick={() => { hapticImpact('light'); setPlateOpen(v => !v); }} style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 11px', borderRadius: 20, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                border: plateOpen ? '1px solid rgba(0,230,138,0.32)' : '1px solid rgba(255,255,255,0.09)',
+                background: plateOpen ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : 'rgba(255,255,255,0.04)',
+                color: plateOpen ? '#00e68a' : '#fff', boxShadow: plateOpen ? '0 3px 12px rgba(0,230,138,0.18)' : 'none', transition: 'all 0.2s',
+              }}>
+                <span style={{ width: 18, height: 18, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: plateOpen ? '#00e68a' : 'rgba(255,255,255,0.08)', color: plateOpen ? '#000' : 'rgba(255,255,255,0.6)', fontSize: 10 }}>🧮</span>
+                Блины {plateOpen ? '✓' : ''}
+              </button>
+              {(supersetMode || circuitMode) && (
+                <span style={{ fontSize: 9, color: supersetMode ? '#f59e0b' : '#a78bfa', fontWeight: 600, background: supersetMode ? 'rgba(245,158,11,0.08)' : 'rgba(139,92,246,0.08)', padding: '3px 8px', borderRadius: 20, border: `1px solid ${supersetMode ? 'rgba(245,158,11,0.18)' : 'rgba(139,92,246,0.18)'}` }}>
+                  {supersetMode ? 'Выберите 2+ упражнения • короткий отдых' : 'Минимальный отдых между упражнениями'}
+                </span>
+              )}
+             </div>
 
            {/* подсказки горячих клавиш */}
            <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
@@ -1287,11 +1350,12 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
 
            <div style={{ ...SMALL, marginBottom: 6 }}>План: {planned.sets} сетов / {planned.volume} кг·пов · Факт: {factVol.sets} сетов / {factVol.volume} кг·пов</div>
           {/* P12: sRPE для мониторинга нагрузки (сохранится при завершении) */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10, color: '#fff' }}>sRPE сессии:</span>
-            {[6,7,8,9,10].map(r => <button key={r} onClick={() => setSessionRPE(r)} style={{ padding: '3px 9px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: sessionRPE===r?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: sessionRPE===r?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff' }}>{r}</button>)}
-            <span style={{ fontSize: 10, color: '#fff' }}>· длительность, мин:</span>
-            <input style={{ ...IN, width: 64 }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
+           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.55)', letterSpacing: 0.3, textTransform: 'uppercase' }}>sRPE</span>
+            {[6,7,8,9,10].map(r => <button key={r} type="button" aria-pressed={sessionRPE===r} onClick={() => { hapticImpact('light'); setSessionRPE(r); }} style={{ minWidth: 30, padding: '5px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: sessionRPE===r?'1px solid rgba(0,230,138,0.32)':'1px solid rgba(255,255,255,0.09)', background: sessionRPE===r?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))':'rgba(255,255,255,0.04)', color: sessionRPE===r?'#00e68a':'#fff', boxShadow: sessionRPE===r?'0 2px 10px rgba(0,230,138,0.16)':'none', transition: 'all 0.2s' }}>{r}</button>)}
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginLeft: 2 }}>·</span>
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.55)' }}>мин</span>
+            <input style={{ ...IN, width: 58, padding: '4px 6px', borderRadius: 8, fontSize: 11, textAlign: 'center' }} type="number" value={sessionDur} onChange={e => setSessionDur(+e.target.value)} aria-label="длительность мин" />
           </div>
           {/* 🧮 Калькулятор блинов: подкладка с выбором упражнения текущей сессии */}
           {plateOpen && (
@@ -1314,28 +1378,46 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                  paddingLeft: supersetExercises.includes(ei) ? 8 : 0,
                  paddingRight: supersetExercises.includes(ei) ? 8 : 0,
                }}>
-                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                   {(supersetMode || circuitMode) && (
-                     <input type="checkbox" checked={supersetExercises.includes(ei)} onChange={() => toggleExerciseInSuperset(ei)} 
-                       style={{ cursor: 'pointer', width: 16, height: 16 }} />
-                   )}
-                   <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, flex: 1 }}>
-                     {ex.name} <span style={{ color: '#fff', fontWeight: 400 }}>({ex.muscleGroup})</span>
-                     {(() => {
-                       const t = ex.targetSets[ex.targetSets.length - 1]?.technique;
-                       const lbl = techniqueLabel(t);
-                       return lbl ? (
-                         <span style={{ fontSize: 9, marginLeft: 6, color: '#f87171', fontWeight: 700 }} title="Техника на последнем подходе">💥 {lbl}</span>
-                       ) : null;
-                     })()}
-                     {supersetExercises.includes(ei) && (
-                       <span style={{ fontSize: 9, marginLeft: 6, color: supersetMode ? '#f59e0b' : '#8b5cf6' }}>
-                         {supersetMode ? '🔄 Суперсет' : '⭕ Круг'}
-                       </span>
-                     )}
-                     {(() => { const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.muscleGroup?.toLowerCase() || ''); const t = TEMPO_PRESETS[recommendTempo('hypertrophy', isCompound ? 'compound' : 'isolation')]; return <span style={{ fontSize:9, color:'var(--text-faint)', marginLeft:6 }} title={t?.nameRu}>⏱ {formatTempo(t?.tempo)}</span>; })()}
-                   </div>
-                 </div>
+                  {(supersetMode || circuitMode) ? (
+                    <button type="button" aria-pressed={supersetExercises.includes(ei)} aria-label={`${ex.name} — ${supersetExercises.includes(ei) ? 'убрать из' : 'добавить в'} ${supersetMode ? 'суперсет' : 'круг'}`}
+                      onClick={() => { hapticImpact('light'); toggleExerciseInSuperset(ei); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left',
+                        background: supersetExercises.includes(ei) ? (supersetMode ? 'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(217,119,6,0.08))' : 'linear-gradient(135deg, rgba(139,92,246,0.13), rgba(99,102,241,0.08))') : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.32)' : 'rgba(139,92,246,0.30)') : 'rgba(255,255,255,0.07)'}`,
+                        borderLeft: `3px solid ${supersetExercises.includes(ei) ? (supersetMode ? '#f59e0b' : '#8b5cf6') : 'rgba(255,255,255,0.12)'}`,
+                        boxShadow: supersetExercises.includes(ei) ? (supersetMode ? '0 3px 12px rgba(245,158,11,0.18)' : '0 3px 12px rgba(139,92,246,0.18)') : 'none',
+                        transition: 'all 0.2s',
+                      }}>
+                      <span style={{
+                        width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        background: supersetExercises.includes(ei) ? (supersetMode ? 'linear-gradient(135deg,#f59e0b,#d97706)' : 'linear-gradient(135deg,#8b5cf6,#6366f1)') : 'rgba(255,255,255,0.08)',
+                        color: supersetExercises.includes(ei) ? '#fff' : 'rgba(255,255,255,0.45)', fontSize: 12, fontWeight: 800,
+                      }}>{supersetExercises.includes(ei) ? '✓' : (ei + 1)}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ color: '#fff', fontSize: 13, fontWeight: 700, lineHeight: 1.2, display: 'block' }}>{ex.name} <span style={{ color: 'rgba(255,255,255,0.55)', fontWeight: 400, fontSize: 11 }}>({ex.muscleGroup})</span></span>
+                        <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+                          {(() => { const t = ex.targetSets[ex.targetSets.length - 1]?.technique; const lbl = techniqueLabel(t); return lbl ? (<span style={{ fontSize: 9, color: '#f87171', fontWeight: 700 }}>💥 {lbl}</span>) : null; })()}
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 20, background: supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.16)' : 'rgba(139,92,246,0.16)') : 'rgba(255,255,255,0.06)', color: supersetExercises.includes(ei) ? (supersetMode ? '#f59e0b' : '#a78bfa') : 'rgba(255,255,255,0.5)', border: `1px solid ${supersetExercises.includes(ei) ? (supersetMode ? 'rgba(245,158,11,0.22)' : 'rgba(139,92,246,0.22)') : 'rgba(255,255,255,0.06)'}` }}>{supersetExercises.includes(ei) ? (supersetMode ? '🔄 в суперсете' : '⭕ в круге') : (supersetMode ? 'нажать чтобы добавить в суперсет' : 'нажать чтобы добавить в круг')}</span>
+                        </span>
+                      </span>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '4px 8px', borderRadius: 20, background: supersetExercises.includes(ei) ? (supersetMode ? '#f59e0b' : '#8b5cf6') : 'rgba(255,255,255,0.06)', color: supersetExercises.includes(ei) ? '#fff' : 'rgba(255,255,255,0.55)', border: `1px solid ${supersetExercises.includes(ei) ? (supersetMode ? '#f59e0b' : '#8b5cf6') : 'rgba(255,255,255,0.08)'}` }}>{supersetExercises.includes(ei) ? '✓ выбрано' : '+'}</span>
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, flex: 1 }}>
+                        {ex.name} <span style={{ color: '#fff', fontWeight: 400 }}>({ex.muscleGroup})</span>
+                        {(() => {
+                          const t = ex.targetSets[ex.targetSets.length - 1]?.technique;
+                          const lbl = techniqueLabel(t);
+                          return lbl ? (
+                            <span style={{ fontSize: 9, marginLeft: 6, color: '#f87171', fontWeight: 700 }} title="Техника на последнем подходе">💥 {lbl}</span>
+                          ) : null;
+                        })()}
+                        {(() => { const isCompound = ['chest','back','quads','hamstrings','shoulders','legs'].includes(ex.muscleGroup?.toLowerCase() || ''); const t = TEMPO_PRESETS[recommendTempo('hypertrophy', isCompound ? 'compound' : 'isolation')]; return <span style={{ fontSize:9, color:'var(--text-faint)', marginLeft:6 }} title={t?.nameRu}>⏱ {formatTempo(t?.tempo)}</span>; })()}
+                      </div>
+                    </div>
+                  )}
                  
                   {/* индикатор прогресса упражнения */}
                   <div style={{ display: 'flex', gap: 4, marginTop: 4, alignItems: 'center' }}>
@@ -1441,11 +1523,15 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                   <div style={{ fontSize: 10, color: '#fff' }}>{vl.exceeded ? '🔴 СТОП — порог превышен, заканчивайте сет' : '🟢 ещё ~' + vl.remainingReps + ' повторов до порога'} · {zone}</div>
                 </div>;
               })()}
-              <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 9, color: '#fff' }}>VBT-интент:</span>
-                {(['strength','hypertrophy','power_heavy','speed'] as VBTIntent[]).map(it => (
-                  <button key={it} onClick={() => setVbtIntent(it)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: vbtIntent===it?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: vbtIntent===it?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: vbtIntent===it?'#00e68a':'#fff' }}>{it}</button>
-                ))}
+              <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap', alignItems: 'center', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.50)', letterSpacing: 0.3, textTransform: 'uppercase' }}>VBT</span>
+                {(['strength','hypertrophy','power_heavy','speed'] as VBTIntent[]).map(it => {
+                  const active = vbtIntent===it;
+                  const label = it === 'strength' ? '💪 Сила' : it === 'hypertrophy' ? '🏋️ Гипер' : it === 'power_heavy' ? '⚡ Мощь' : '🚀 Скорость';
+                  return (
+                    <button key={it} type="button" aria-pressed={active} onClick={() => { hapticImpact('light'); setVbtIntent(it); }} style={{ padding: '4px 9px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: active?'1px solid rgba(0,230,138,0.30)':'1px solid rgba(255,255,255,0.08)', background: active?'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.08))':'rgba(255,255,255,0.04)', color: active?'#00e68a':'rgba(255,255,255,0.75)', boxShadow: active?'0 2px 10px rgba(0,230,138,0.14)':'none', transition: 'all 0.2s' }}>{label}</button>
+                  );
+                })}
               </div>
                {/* таймер отдыха для этого упражнения */}
                {timerRunning && timerExIdx === ei && (
@@ -1470,28 +1556,32 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                   </div>
                  )}
                 
-                {/* пресеты таймера отдыха */}
-               <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-                 <span style={{ fontSize: 9, color: '#fff', alignSelf: 'center' }}>Таймер:</span>
-                 {(['compound','isolation','pump'] as const).map(p => (
-                   <button key={p} onClick={() => setTimerPreset(p)} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset===p?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: timerPreset===p?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: timerPreset===p?'#00e68a':'#fff' }}>
-                     {p === 'compound' ? 'Силовой' : p === 'isolation' ? 'Изоляция' : 'Пампинг'}
-                   </button>
-                 ))}
-                 <button onClick={() => { setTimerPreset('custom'); }} style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: timerPreset==='custom'?'1px solid #00e68a':'1px solid rgba(255,255,255,0.08)', background: timerPreset==='custom'?'rgba(0,230,138,0.12)':'rgba(255,255,255,0.04)', color: timerPreset==='custom'?'#00e68a':'#fff' }}>
-                   {customRestSec}с
-                 </button>
-                 {timerPreset === 'custom' && (
-                   <input style={{ ...IN, width: 48, fontSize: 10, padding: '2px 4px' }} type="number" min={30} max={300} value={customRestSec} onChange={e => setCustomRestSec(Math.max(30, Math.min(300, +e.target.value)))} aria-label="свой таймер" />
-                 )}
-                 <button onClick={() => setAutoStartRest(!autoStartRest)} style={{ 
-                   padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', 
-                   border: autoStartRest ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.08)', 
-                   background: autoStartRest ? 'rgba(0,230,138,0.12)' : 'rgba(255,255,255,0.04)', 
-                   color: autoStartRest ? '#00e68a' : '#fff' 
-                 }}>
-                   {autoStartRest ? '▶ Авто-старт' : '⏸ Ручной'}
-                 </button>
+                 {/* пресеты таймера отдыха — современные пилюли */}
+                <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap', alignItems: 'center', padding: '6px 8px', borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.50)', letterSpacing: 0.3, textTransform: 'uppercase' }}>Таймер</span>
+                  {(['compound','isolation','pump'] as const).map(p => {
+                    const active = timerPreset===p;
+                    return (
+                      <button key={p} type="button" aria-pressed={active} onClick={() => { hapticImpact('light'); setTimerPreset(p); }} style={{ padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: active?'1px solid rgba(0,230,138,0.30)':'1px solid rgba(255,255,255,0.08)', background: active?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.08))':'rgba(255,255,255,0.04)', color: active?'#00e68a':'#fff', boxShadow: active?'0 2px 10px rgba(0,230,138,0.14)':'none', transition: 'all 0.2s' }}>
+                        {p === 'compound' ? '🏋️ Силовой' : p === 'isolation' ? '🎯 Изоляция' : '⚡ Пампинг'}
+                      </button>
+                    );
+                  })}
+                  <button type="button" aria-pressed={timerPreset==='custom'} onClick={() => { hapticImpact('light'); setTimerPreset('custom'); }} style={{ padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: timerPreset==='custom'?'1px solid rgba(0,230,138,0.30)':'1px solid rgba(255,255,255,0.08)', background: timerPreset==='custom'?'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.08))':'rgba(255,255,255,0.04)', color: timerPreset==='custom'?'#00e68a':'#fff', transition: 'all 0.2s' }}>
+                    ⏱ {customRestSec}с
+                  </button>
+                  {timerPreset === 'custom' && (
+                    <input style={{ ...IN, width: 52, fontSize: 10, padding: '4px 6px', borderRadius: 8 }} type="number" min={30} max={300} value={customRestSec} onChange={e => setCustomRestSec(Math.max(30, Math.min(300, +e.target.value)))} aria-label="свой таймер" />
+                  )}
+                  <button type="button" aria-pressed={autoStartRest} onClick={() => { hapticImpact('light'); setAutoStartRest(!autoStartRest); }} style={{ 
+                    padding: '4px 10px', borderRadius: 20, fontSize: 10, fontWeight: 700, cursor: 'pointer', 
+                    border: autoStartRest ? '1px solid rgba(0,230,138,0.30)' : '1px solid rgba(255,255,255,0.08)', 
+                    background: autoStartRest ? 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(16,185,129,0.08))' : 'rgba(255,255,255,0.04)', 
+                    color: autoStartRest ? '#00e68a' : 'rgba(255,255,255,0.65)', boxShadow: autoStartRest ? '0 2px 10px rgba(0,230,138,0.12)' : 'none',
+                    transition: 'all 0.2s',
+                  }}>
+                    {autoStartRest ? '▶ Авто' : '⏸ Ручной'}
+                  </button>
                 </div>
                
                {/* кнопка отдыха между упражнениями */}
@@ -1574,42 +1664,92 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
               </div>
             );
           })()}
-          {cooldownBlocks.map((b, i) => (
-            <div key={i} style={{ ...CARD, marginBottom: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: ACCENT, marginBottom: 4 }}>
-                {b.type === 'cardio' ? 'Лёгкое кардио' : b.type === 'stretch' ? 'Стретчинг' : b.type === 'breathing' ? 'Дыхание' : 'Восстановление'}
-                <span style={{ fontWeight: 400, fontSize: 10, color: '#fff', marginLeft: 6 }}>{b.durationSec}с</span>
+          {cooldownBlocks.map((b, i) => {
+            const cMeta = b.type === 'cardio' ? { icon: '🏃', title: 'Лёгкое кардио', color: '#06b6d4', bg: 'rgba(6,182,214,0.08)', border: 'rgba(6,182,214,0.22)' }
+              : b.type === 'stretch' ? { icon: '🧘', title: 'Стретчинг', color: '#a78bfa', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.22)' }
+              : b.type === 'breathing' ? { icon: '🌬️', title: 'Дыхание', color: '#38bdf8', bg: 'rgba(56,189,248,0.08)', border: 'rgba(56,189,248,0.22)' }
+              : { icon: '💆', title: 'Восстановление', color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.22)' };
+            const cTotal = b.exercises.length;
+            const cDone = b.exercises.filter((_, j) => cooldownDone[`c_${i}_${j}`]).length;
+            const cPct = cTotal > 0 ? Math.round(cDone / cTotal * 100) : 0;
+            const cAllDone = cDone === cTotal && cTotal > 0;
+            return (
+              <div key={i} style={{
+                position: 'relative', overflow: 'hidden', borderRadius: 14, padding: '10px 10px 8px', marginBottom: 8,
+                background: cAllDone ? 'rgba(34,197,94,0.06)' : 'var(--glass-bg)',
+                border: `1px solid ${cAllDone ? 'rgba(34,197,94,0.22)' : cMeta.border}`,
+                borderLeft: `3px solid ${cAllDone ? '#22c55e' : cMeta.color}`,
+                backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+                boxShadow: cAllDone ? '0 2px 14px rgba(34,197,94,0.10)' : '0 2px 14px rgba(0,0,0,0.14)',
+              }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${cMeta.color}, transparent)`, opacity: cAllDone ? 0.9 : 0.65 }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{
+                      width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: cAllDone ? 'linear-gradient(135deg,#22c55e,#16a34a)' : `linear-gradient(135deg, ${cMeta.color}, ${cMeta.color}CC)`,
+                      color: '#fff', fontSize: 14, boxShadow: `0 2px 8px ${cMeta.color}33`,
+                    }}>{cAllDone ? '✓' : cMeta.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: cAllDone ? '#22c55e' : cMeta.color, lineHeight: 1 }}>{cMeta.title}</div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.58)', lineHeight: 1.2 }}>⏱ {b.durationSec}с · {cDone}/{cTotal}</div>
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: cAllDone ? '#22c55e' : cMeta.bg, color: cAllDone ? '#000' : cMeta.color, border: `1px solid ${cAllDone ? 'rgba(34,197,94,0.28)' : cMeta.border}` }}>{cPct}%</span>
+                </div>
+                {b.notes && <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.72)', lineHeight: 1.35, marginBottom: 7, padding: '5px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}><span style={{ color: cMeta.color, fontWeight: 700 }}>ℹ </span>{b.notes}</div>}
+                <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 7 }}>
+                  <div style={{ height: '100%', width: `${cPct}%`, borderRadius: 2, background: cAllDone ? '#22c55e' : cMeta.color, transition: 'width 0.3s ease' }} />
+                </div>
+                <ul style={{ padding: 0, margin: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {b.exercises.map((ex, j) => {
+                    const isDone = cooldownDone[`c_${i}_${j}`];
+                    const isTimer = coolTimer && coolTimer.i === i && coolTimer.j === j;
+                    const clabel = cooldownLabel(ex.exerciseId);
+                    return (
+                      <li key={j} style={{ listStyle: 'none' }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+                          <button type="button" aria-pressed={isDone} aria-label={`${clabel} — ${isDone ? 'выполнено' : 'отметить'}`}
+                            onClick={() => { hapticImpact(isDone ? 'light' : 'medium'); toggleCooldown(i, j); }}
+                            style={{
+                              flex: 1, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 12, cursor: 'pointer', textAlign: 'left', minWidth: 0,
+                              background: isDone ? 'linear-gradient(135deg, rgba(34,197,94,0.13), rgba(16,185,129,0.07))' : 'rgba(255,255,255,0.035)',
+                              border: `1px solid ${isDone ? 'rgba(34,197,94,0.28)' : 'rgba(255,255,255,0.07)'}`,
+                              borderLeft: `3px solid ${isDone ? '#22c55e' : cMeta.color}`,
+                              boxShadow: isDone ? '0 3px 12px rgba(34,197,94,0.14)' : '0 1px 8px rgba(0,0,0,0.10)',
+                              opacity: isDone ? 0.92 : 1, transition: 'all 0.2s',
+                            }}>
+                            <span style={{
+                              width: 28, height: 28, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                              background: isDone ? 'linear-gradient(135deg,#22c55e,#16a34a)' : `linear-gradient(135deg, ${cMeta.color}, ${cMeta.color}CC)`,
+                              color: '#fff', fontSize: 12, fontWeight: 800, boxShadow: `0 2px 8px ${isDone ? 'rgba(34,197,94,0.28)' : cMeta.color + '33'}`,
+                            }}>{isDone ? '✓' : (j + 1)}</span>
+                            <span style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: 11.5, fontWeight: isDone ? 600 : 700, color: isDone ? 'rgba(255,255,255,0.78)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', lineHeight: 1.35, display: 'block', wordBreak: 'break-word' }}>{clabel}</span>
+                              <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 3 }}>
+                                <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 20, background: isDone ? 'rgba(34,197,94,0.14)' : cMeta.bg, color: isDone ? '#86efac' : cMeta.color, border: `1px solid ${isDone ? 'rgba(34,197,94,0.22)' : cMeta.border}` }}>⏱ {ex.durationSec}с</span>
+                                {'note' in ex && (ex as any).note && <span style={{ fontSize: 9, color: isDone ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.62)', lineHeight: 1.3 }}>{(ex as any).note}</span>}
+                              </span>
+                            </span>
+                            <span style={{
+                              width: 28, height: 28, borderRadius: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+                              background: isDone ? '#22c55e' : 'rgba(255,255,255,0.06)', color: isDone ? '#000' : 'rgba(255,255,255,0.38)',
+                              border: `1px solid ${isDone ? '#22c55e' : 'rgba(255,255,255,0.09)'}`, fontSize: 11, fontWeight: 800,
+                            }}>{isDone ? '✓' : '○'}</span>
+                          </button>
+                          {isTimer ? (
+                            <span style={{ minWidth: 48, alignSelf: 'center', padding: '6px 8px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(56,189,248,0.16), rgba(6,182,214,0.10))', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.28)', fontSize: 11, fontWeight: 800, textAlign: 'center', flexShrink: 0 }}>{coolTimer!.remaining}с</span>
+                          ) : (
+                            <button type="button" disabled={isDone} onClick={(e) => { e.stopPropagation(); if (!isDone) { hapticImpact('light'); setCoolTimer({ i, j, remaining: ex.durationSec, total: ex.durationSec }); } }} style={{ alignSelf: 'center', padding: '7px 9px', borderRadius: 10, fontSize: 10, fontWeight: 700, cursor: isDone ? 'not-allowed' : 'pointer', border: '1px solid rgba(56,189,248,0.22)', background: isDone ? 'rgba(255,255,255,0.03)' : 'rgba(56,189,248,0.10)', color: isDone ? 'rgba(255,255,255,0.32)' : '#38bdf8', flexShrink: 0, opacity: isDone ? 0.55 : 1 }} aria-label={`Таймер ${clabel}`}>{isDone ? '✓' : '⏱'}</button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-              {b.notes && <div style={{ fontSize: 10, color: '#fff', marginBottom: 6 }}>{b.notes}</div>}
-              <ul style={{ paddingLeft: 16, margin: '2px 0', listStyle: 'none' }}>
-                {b.exercises.map((ex, j) => {
-                  const isDone = cooldownDone[`c_${i}_${j}`];
-                  const isTimer = coolTimer && coolTimer.i === i && coolTimer.j === j;
-                  return (
-                    <li key={j} style={{ fontSize: 11, color: isDone ? 'var(--text-faint)' : '#fff', textDecoration: isDone ? 'line-through' : 'none', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="checkbox" checked={isDone} onChange={() => toggleCooldown(i, j)} />
-                      <span style={{ flex: 1 }}>
-                        <span>
-                          {cooldownLabel(ex.exerciseId)}
-                          <span style={{ color: '#fff', fontSize: 10 }}> · {ex.durationSec}с</span>
-                        </span>
-                        {'note' in ex && ex.note ? <span style={{ display: 'block', fontSize: 9, color: 'var(--text-faint)', marginTop: 1 }}>{ex.note}</span> : null}
-                      </span>
-                      {isTimer ? (
-                        <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 12, minWidth: 34, textAlign: 'center' }}>{coolTimer!.remaining}с</span>
-                      ) : (
-                        <button type="button" disabled={isDone} onClick={() => setCoolTimer({ i, j, remaining: ex.durationSec, total: ex.durationSec })}
-                          style={{ padding: '2px 8px', borderRadius: 6, fontSize: 9, cursor: 'pointer', border: '1px solid rgba(56,189,248,0.3)', background: 'rgba(56,189,248,0.1)', color: isDone ? 'var(--text-faint)' : '#38bdf8', minHeight: 24 }}
-                          aria-label={`Таймер ${cooldownLabel(ex.exerciseId)}`}>
-                          {isDone ? '✓' : '⏱'}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+            );
+          })}
           <button style={{ ...BTN, width: '100%', marginTop: 12 }} onClick={exitSession}>✓ Завершить и выйти</button>
           <SkipBar reasons={COOLDOWN_SKIP_REASONS} label="заминку" onSkip={reason => { skipCooldownReasonRef.current = reason; exitSession(); }} />
         </div>

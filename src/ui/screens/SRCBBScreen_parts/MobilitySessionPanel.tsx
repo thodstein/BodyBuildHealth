@@ -35,20 +35,36 @@ function CheckboxList({ items, progress, onToggle }: {
 }) {
   if (items.length === 0) return null;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {items.map(it => {
         const done = progress.doneItems.includes(it.id);
         return (
-          <div key={it.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <input type="checkbox" checked={done} onChange={() => onToggle(it.id)} aria-label={`Шаг мобильности: ${it.title}`}
-              style={{ marginTop: 2, width: 15, height: 15, cursor: 'pointer' }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: done ? '#fff' : '#fff', textDecoration: done ? 'line-through' : 'none' }}>
-                {it.title} <span style={{ fontSize: 9, color: DIM, fontWeight: 400 }}>({it.durationMin} мин)</span>
-              </div>
-              {!done && <div style={{ fontSize: 9, color: '#fff', lineHeight: 1.45, marginTop: 2 }}>{it.script}</div>}
-            </div>
-          </div>
+          <button key={it.id} type="button" role="checkbox" aria-checked={done} aria-label={`Шаг мобильности: ${it.title}`}
+            onClick={() => onToggle(it.id)}
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 11, cursor: 'pointer',
+              background: done ? 'linear-gradient(135deg, rgba(96,165,250,0.13), rgba(59,130,246,0.07))' : 'rgba(255,255,255,0.03)',
+              border: `1px solid ${done ? 'rgba(96,165,250,0.28)' : 'rgba(255,255,255,0.07)'}`,
+              borderLeft: `3px solid ${done ? '#60a5fa' : 'rgba(96,165,250,0.45)'}`,
+              opacity: done ? 0.90 : 1, transition: 'all 0.2s',
+            }}>
+            <span style={{
+              width: 24, height: 24, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+              background: done ? 'linear-gradient(135deg,#60a5fa,#3b82f6)' : 'rgba(255,255,255,0.07)',
+              color: done ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 800,
+            }}>{done ? '✓' : '•'}</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontSize: 10.5, fontWeight: done ? 600 : 700, color: done ? 'rgba(255,255,255,0.78)' : '#fff', textDecoration: done ? 'line-through' : 'none', lineHeight: 1.3, display: 'block' }}>
+                {it.title} <span style={{ fontSize: 9, color: done ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.60)', fontWeight: 400 }}>({it.durationMin} мин)</span>
+              </span>
+              <span style={{ fontSize: 9, color: done ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.72)', lineHeight: 1.45, marginTop: 2, display: done ? 'none' : 'block' }}>{it.script}</span>
+            </span>
+            <span style={{
+              width: 24, height: 24, borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1,
+              background: done ? '#60a5fa' : 'rgba(255,255,255,0.06)', color: done ? '#fff' : 'rgba(255,255,255,0.38)',
+              border: `1px solid ${done ? '#60a5fa' : 'rgba(255,255,255,0.08)'}`, fontSize: 10, fontWeight: 800,
+            }}>{done ? '✓' : '○'}</span>
+          </button>
         );
       })}
     </div>
