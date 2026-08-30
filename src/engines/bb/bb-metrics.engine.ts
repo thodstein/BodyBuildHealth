@@ -121,32 +121,72 @@ export function calcBBPlanMetrics(plan: BBPlan, mrvMultiplier?: number): BBPlanM
   });
   // Корректировка плеч: косвенная shoulders (от жимов/тяг) распределяется по головкам,
   // иначе передняя дельта всегда 0, а shoulders-generic дублирует per-head.
-  const hasHeads = perMuscle.some(m => m.muscle === 'delt_front' || m.muscle === 'delt_mid' || m.muscle === 'delt_rear');
-  if (hasHeads) {
-    const shouldersIdx = perMuscle.findIndex(m => m.muscle === 'shoulders');
-    if (shouldersIdx >= 0) {
-      const sh = perMuscle[shouldersIdx];
-      const shEff = sh.effectiveSets;
-      // распределение косвенной плечевой нагрузки: 55% front (жимы), 25% rear (тяги), 20% mid
-      const dist: Record<string, number> = { delt_front: 0.55, delt_mid: 0.20, delt_rear: 0.25 };
-      for (const m of perMuscle) {
-        if (dist[m.muscle] != null) {
-          const add = shEff * dist[m.muscle]!;
-          m.effectiveSets = Math.round((m.effectiveSets + add) * 10) / 10;
-          m.directSets = Math.round((m.directSets + add) * 10) / 10; // для отображения effective как direct+indirect
-          // частота головок +1 если shoulders частота >0
-          if ((freqMapAll['shoulders'] || 0) > 0) {
-            m.frequencyPerRotation = Math.round(Math.max(m.frequencyPerRotation, (freqMapAll['shoulders'] || 0) / totalWeeks) * 10) / 10;
-          }
-          // пересчёт статуса после добавки косвенной
-          if (m.effectiveSets >= m.mrv) m.status = 'exceeding_mrv';
-          else if (m.effectiveSets > m.mav) m.status = 'approaching_mrv';
-          else if (m.effectiveSets >= m.mev) m.status = 'optimal';
-          else m.status = 'below_mev';
-        }
+  // Фикс: гарантируем наличие головок даже если прямых сетов нет, и показываем дробь честно (direct vs effective).
+  const shouldersIdx = perMuscle.findIndex(m => m.muscle === 'shoulders');
+  if (shouldersIdx >= 0) {
+    const sh = perMuscle[shouldersIdx];
+    const shEff = sh.effectiveSets;
+    // распределение косвенной плечевой нагрузки: 55% front (жимы), 25% rear (тяги), 20% mid
+    const dist: Record<string, number> = { delt_front: 0.55, delt_mid: 0.20, delt_rear: 0.25 };
+    // гарантируем наличие головок даже если прямых сетов нет (только indirect)
+    for (const head of ['delt_front','delt_mid','delt_rear'] as const) {
+      if (!perMuscle.some(m => m.muscle === head)) {
+        const lm = getVolumeLandmarks(level, head) || { mev: 0, mav: 0, mrv: 0 };
+        const finalLm = plan.volumeLandmarks?.find(row => row.group === head);
+        const mev = finalLm?.mev ?? Math.round(lm.mev * mult);
+        const mav = finalLm?.mav ?? Math.round(lm.mav * mult);
+        const mrv = finalLm?.mrv ?? Math.round(lm.mrv * mult);
+        const freq = (freqMapAll['shoulders'] || 0) / totalWeeks;
+        perMuscle.push({
+          muscle: head,
+          totalSets: 0,
+          directSets: 0,
+          effectiveSets: 0,
+          fatigueWeightedSets: 0,
+          тяжSets: 0, пампSets: 0, лёгSets: 0,
+          hardSets: 0,
+          avgRir: 0,
+          frequencyPerRotation: Math.round(freq * 10) / 10,
+          mev, mav, mrv, status: 'below_mev',
+        });
       }
-      // удаляем generic shoulders, чтобы не дублировать per-head
-      perMuscle.splice(shouldersIdx, 1);
+    }
+    for (const m of perMuscle) {
+      if (dist[m.muscle] != null) {
+        const addEff = shEff * dist[m.muscle]!;
+        m.effectiveSets = Math.round((m.effectiveSets + addEff) * 10) / 10;
+        // direct остаётся честным (0 если только indirect), чтобы дробь показывала 0/5 и бейдж "косвенная"
+        if ((freqMapAll['shoulders'] || 0) > 0) {
+          m.frequencyPerRotation = Math.round(Math.max(m.frequencyPerRotation, (freqMapAll['shoulders'] || 0) / totalWeeks) * 10) / 10;
+        }
+        if (m.effectiveSets >= m.mrv) m.status = 'exceeding_mrv';
+        else if (m.effectiveSets > m.mav) m.status = 'approaching_mrv';
+        else if (m.effectiveSets >= m.mev) m.status = 'optimal';
+        else m.status = 'below_mev';
+      }
+    }
+    perMuscle.splice(shouldersIdx, 1);
+  }
+  // Гарантируем наличие всех головок даже если shoulders-generic отсутствует (план без жимов/тяг)
+  for (const head of ['delt_front','delt_mid','delt_rear'] as const) {
+    if (!perMuscle.some(m => m.muscle === head)) {
+      const lm = getVolumeLandmarks(level, head) || { mev: 0, mav: 0, mrv: 0 };
+      const finalLm = plan.volumeLandmarks?.find(row => row.group === head);
+      const mev = finalLm?.mev ?? Math.round(lm.mev * mult);
+      const mav = finalLm?.mav ?? Math.round(lm.mav * mult);
+      const mrv = finalLm?.mrv ?? Math.round(lm.mrv * mult);
+      perMuscle.push({
+        muscle: head,
+        totalSets: 0,
+        directSets: 0,
+        effectiveSets: 0,
+        fatigueWeightedSets: 0,
+        тяжSets: 0, пампSets: 0, лёгSets: 0,
+        hardSets: 0,
+        avgRir: 0,
+        frequencyPerRotation: 0,
+        mev, mav, mrv, status: 'below_mev',
+      });
     }
   }
   const totalSets = perMuscle.reduce((s, m) => s + m.totalSets, 0);
