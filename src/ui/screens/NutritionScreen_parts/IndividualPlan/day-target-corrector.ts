@@ -187,10 +187,10 @@ export function correctDayToTargets(
         const underPool = poolFor(under, opts?.excludedIds).filter(f => needFor(f) > 0);
         if (underPool.length > 0) {
           const bestU = [...underPool].sort((a, b) => needFor(b) / Math.max(1, b.kcal || 1) - needFor(a) / Math.max(1, a.kcal || 1))[0];
-          let victim: { mi: number; ii: number; it: CorrectorItem } | null = null;
-          let victimBad = -1;
           const bestUFood = FOOD_DB.find(f => f.id === bestU.id);
           const bestUMacros = bestUFood ? { p: bestUFood.protein || 0, f: bestUFood.fat || 0, c: bestUFood.carbs || 0 } : { p: 0, f: 0, c: 0 };
+          let victimMi = -1, victimIi = -1, victimBad = -1;
+          let victimIt: CorrectorItem = { id: '', name: '', amount: 0, kcal: 0, p: 0, f: 0, c: 0 };
           meals.forEach((m, mi) => {
             if (m.type === 'presleep' || m.type === 'intra' || m.type === 'preworkout') return;
             (m.items || []).forEach((it, ii) => {
@@ -207,11 +207,11 @@ export function correctDayToTargets(
               for (const u of unders) if (bm[u] + 0.001 < vm[u]) return;
               for (const o of overs) if (vm[o] + 0.001 < bm[o]) return;
               const bad = ov * (it.amount || 0) / 100;
-              if (bad > victimBad) { victimBad = bad; victim = { mi, ii, it }; }
+              if (bad > victimBad) { victimBad = bad; victimMi = mi; victimIi = ii; victimIt = it; }
             });
           });
-          if (victim && bestU) {
-            const freedKcal = victim.it.kcal || 0;
+          if (victimBad >= 0 && victimMi >= 0 && bestU) {
+            const freedKcal = victimIt.kcal || 0;
             const swapG = Math.max(20, Math.round(freedKcal / Math.max(1, bestU.kcal || 1) * 100 / 10) * 10);
             if (swapG >= 20) {
               const beforeTotals = sumTotals(meals);
@@ -226,12 +226,12 @@ export function correctDayToTargets(
                 role: under === 'p' ? 'protein' : under === 'c' ? 'carb_slow' : 'fat',
               } as any;
               newIt.kcal = Math.round(4 * newIt.p + 9 * newIt.f + 4 * newIt.c);
-              meals[victim.mi].items[victim.ii] = newIt;
+              meals[victimMi].items[victimIi] = newIt;
               recalcMealTotals(meals);
               const afterTotals = sumTotals(meals);
               const afterDev = maxDevPct(afterTotals as DayTargets, safeTargets);
               if (afterDev < beforeDev - 0.05) continue;
-              meals[victim.mi].items[victim.ii] = victim.it;
+              meals[victimMi].items[victimIi] = victimIt;
               recalcMealTotals(meals);
             }
           }
