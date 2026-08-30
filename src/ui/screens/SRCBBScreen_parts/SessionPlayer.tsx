@@ -42,8 +42,29 @@ import { techniqueLabel, techniqueChainParts } from '../TrainingScreen_parts/bb-
     }
   `;
 
-function formatPlates(targetW: number): string {
+function isDumbbellExercise(name?: string): boolean {
+  const n = (name || '').toLowerCase();
+  return n.includes('гантел') || n.includes('dumbbell');
+}
+function isKettlebellExercise(name?: string): boolean {
+  const n = (name || '').toLowerCase();
+  return n.includes('гир');
+}
+function formatPlates(targetW: number, exerciseName?: string): string {
   if (targetW <= 0) return '';
+  const isDB = isDumbbellExercise(exerciseName);
+  const isKB = isKettlebellExercise(exerciseName);
+  if (isKB) return `гиря ${targetW} кг`;
+  if (isDB) {
+    // вес гантели — за одну гантель; разборная рукоять ~2 кг
+    const handle = 2;
+    if (targetW <= handle) return `гантель ${targetW} кг`;
+    const perSide = (targetW - handle) / 2;
+    const r = calculatePlates(targetW, handle);
+    if (r.platesPerSide.length === 0) return `2×${targetW} кг гантели`;
+    const platesStr = r.platesPerSide.map(p => `${p.count}×${p.plate}`).join(' + ');
+    return `2×${targetW} кг → ${platesStr} на гантель ${handle}кг (по ${perSide.toFixed(1)}кг/сторона)`;
+  }
   const r = calculatePlates(targetW);
   if (r.platesPerSide.length > 0) {
     return r.platesPerSide.map(p => `${p.count * 2}x${p.plate}`).join(' + ') + ` на гриф ${r.barWeight} кг`;
@@ -785,6 +806,50 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   return (
     <div>
       <style>{timerAnimationStyle}</style>
+      {(() => {
+        const totalWeeklySets = days.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + (e.targetSets?.length || 0), 0), 0);
+        const totalWeeklyVol = days.reduce((s: number, d: any) => s + d.exercises.reduce((ss: number, e: any) => ss + e.targetSets.reduce((sss: number, t: any) => sss + (t.weight || 0) * (t.reps || 0), 0), 0), 0);
+        const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+        return (
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10, padding: '10px 12px', borderRadius: 14,
+            background: 'linear-gradient(135deg, rgba(0,230,138,0.08), rgba(16,185,129,0.05), rgba(59,130,246,0.06))',
+            border: '1px solid rgba(0,230,138,0.16)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 30, height: 30, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 13, fontWeight: 800 }}>#{weekNumber}</span>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {weekNumber} · {days.length} тренировки {focus ? `· ${focus}` : ''}</div>
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.60)', lineHeight: 1.2 }}>{totalWeeklySets} сетов · {totalWeeklyVol.toLocaleString()} кг недельный объём · {days[dayIdx]?.label || ''}</div>
+                </div>
+              </div>
+              <span style={{ fontSize: 9, fontWeight: 700, padding: '4px 8px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.22)', whiteSpace: 'nowrap' }}>{phase === 'ready' || phase === 'done' ? 'выбор дня' : phase === 'warmup' ? 'разминка' : phase === 'main' ? 'тренировка' : 'заминка'}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+              {weekDays.map((wd, wi) => {
+                // равномерное распределение тренировочных дней по неделе для визуального понедельного отображения
+                const trainingIdx = wi < days.length ? wi : -1;
+                const isTrainingDay = trainingIdx >= 0;
+                const isActive = isTrainingDay && trainingIdx === dayIdx;
+                const isDonePast = isTrainingDay && trainingIdx < dayIdx && (phase === 'done' || phase === 'main' || phase === 'cooldown');
+                return (
+                  <div key={wi} style={{
+                    flex: 1, minWidth: 0, padding: '6px 2px', borderRadius: 9, textAlign: 'center',
+                    background: isActive ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : isTrainingDay ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+                    border: isActive ? '1px solid rgba(0,230,138,0.28)' : isTrainingDay ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(255,255,255,0.04)',
+                    opacity: isTrainingDay ? 1 : 0.45,
+                  }}>
+                    <div style={{ fontSize: 8, fontWeight: 700, color: isActive ? '#00e68a' : isTrainingDay ? '#fff' : 'rgba(255,255,255,0.35)', lineHeight: 1 }}>{wd}</div>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: isActive ? '#00e68a' : isTrainingDay ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.25)', marginTop: 2, lineHeight: 1 }}>{isTrainingDay ? `Д${trainingIdx + 1}` : '—'}</div>
+                    {isTrainingDay && <div style={{ width: 6, height: 6, borderRadius: 6, margin: '4px auto 0', background: isActive ? '#00e68a' : isDonePast ? '#22c55e' : 'rgba(255,255,255,0.18)', boxShadow: isActive ? '0 0 6px rgba(0,230,138,0.45)' : 'none' }} />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', marginBottom: 10 }}>
         {days.map((d, i) => {
           const active = i === dayIdx;
@@ -929,7 +994,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                       const setsStr = ex.targetSets.map((s, si) => (si === 0 ? '' : si === ex.targetSets.length - 1 ? ' × ' : ' · ') + `${s.reps}`).join('');
                       const firstW = ex.targetSets[0]?.weight;
                       const rirStr = ex.targetSets[0]?.rir;
-                      const plates = firstW ? formatPlates(firstW) : '';
+                      const plates = firstW ? formatPlates(firstW, ex.name) : '';
                       return (
                         <div key={ei} style={{ ...ROW, gap: 8, alignItems: 'flex-start' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1450,11 +1515,11 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                      {t.technique && (
                        <span style={{ fontSize: 10, color: '#f87171', fontWeight: 700 }} title={techniqueChainParts({ workSets: [{ reps: t.reps, weight: t.weight, rir: t.rir, technique: t.technique }] })?.parts.join(' → ') || ''}>💥 {techniqueLabel(t.technique)}</span>
                      )}
-                     {t.weight > 0 && (
-                       <span style={{ fontSize: 9, color: 'var(--text-faint)', width: '100%', paddingLeft: 52 }}>
-                         🏋️ {formatPlates(t.weight)}
-                       </span>
-                     )}
+                      {t.weight > 0 && (
+                        <span style={{ fontSize: 9, color: 'var(--text-faint)', width: '100%', paddingLeft: 52 }}>
+                          🏋️ {formatPlates(t.weight, ex.name)}
+                        </span>
+                      )}
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                         <input style={{ ...IN, width: 60 }} type="number" value={a.weight} onChange={e => setActual(p => ({ ...p, [k]: { weight: +e.target.value, reps: a.reps, rpe: a.rpe } }))} aria-label="вес" />
                         <input style={{ ...IN, width: 48 }} type="number" value={a.reps} onChange={e => setActual(p => ({ ...p, [k]: { weight: a.weight, reps: +e.target.value, rpe: a.rpe } }))} aria-label="повт" />
@@ -1478,9 +1543,9 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
                           </button>
                         );
                       })()}
-                       {logged && (
-                         <div style={{ width: '100%', fontSize: 10, color: '#fff', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                           <span style={{ color: '#fff' }}>🏋️ {formatPlates(a.weight)}</span>
+                        {logged && (
+                          <div style={{ width: '100%', fontSize: 10, color: '#fff', paddingLeft: 56, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ color: '#fff' }}>🏋️ {formatPlates(a.weight, ex.name)}</span>
                            <span>факт <b style={{ color: '#fff' }}>{a.weight}кг×{a.reps}</b>{a.rpe > 0 ? `@RPE${a.rpe}` : ''}</span>
                            <span style={{ color: dW === 0 ? '#fff' : dW > 0 ? '#22c55e' : '#f59e0b' }}>Δвес {dW > 0 ? '+' : ''}{dW}</span>
                            <span style={{ color: dR === 0 ? '#fff' : dR > 0 ? '#22c55e' : '#f59e0b' }}>Δповт {dR > 0 ? '+' : ''}{dR}</span>

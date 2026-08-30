@@ -119,14 +119,19 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
   };
 
   const wUnit: WeightUnit = unit === 'metric' ? 'kg' : 'lbs';
-  const plates = useMemo(() => calculatePlates(targetWeight, barWeight, wUnit, availablePlates), [targetWeight, barWeight, wUnit, availablePlates]);
-  const order = useMemo(() => getPlateLoadingOrder(targetWeight, barWeight, wUnit), [targetWeight, barWeight, wUnit]);
-  const warmup = useMemo(() => warmupPlateSequence(targetWeight, barWeight, wUnit, availablePlates), [targetWeight, barWeight, wUnit, availablePlates]);
+  const isDumbbellSelected = useMemo(() => {
+    const lbl = (selectedOpt?.label || '').toLowerCase();
+    return lbl.includes('гантел') || lbl.includes('dumbbell');
+  }, [selectedOpt]);
+  const effectiveBarWeight = isDumbbellSelected ? (unit === 'metric' ? 2 : 5) : barWeight;
+  const plates = useMemo(() => calculatePlates(targetWeight, effectiveBarWeight, wUnit, availablePlates), [targetWeight, effectiveBarWeight, wUnit, availablePlates]);
+  const order = useMemo(() => getPlateLoadingOrder(targetWeight, effectiveBarWeight, wUnit), [targetWeight, effectiveBarWeight, wUnit]);
+  const warmup = useMemo(() => warmupPlateSequence(targetWeight, effectiveBarWeight, wUnit, availablePlates), [targetWeight, effectiveBarWeight, wUnit, availablePlates]);
   const displayAlt = unit === 'metric' ? `${kgToLb(targetWeight)} фн` : `${lbToKg(targetWeight)} кг`;
   const deviation = Math.abs(plates.deviation);
   const devColor = deviation < 0.5 ? ACCENT : deviation > 2 ? '#ef4444' : '#f59e0b';
   const unitLabel = unit === 'metric' ? 'кг' : 'фн';
-  const sideWeight = Math.round(((targetWeight - barWeight) / 2) * 10) / 10;
+  const sideWeight = Math.round(((targetWeight - effectiveBarWeight) / 2) * 10) / 10;
   const platesPerSideSum = plates.platesPerSide.reduce((s, p) => s + p.plate * p.count, 0);
 
   const handleApply = useCallback(() => {
@@ -149,10 +154,11 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
         )}
       </div>
       <div style={{ ...SMALL, color: '#fff', marginBottom: 10 }}>
-        Расчёт набора блинов на гриф под рабочий вес. Все системы единиц, 8 типов грифов,
+        Расчёт набора блинов {isDumbbellSelected ? 'на гантель (2× по одной)' : 'на гриф'} под рабочий вес. Все системы единиц, 8 типов грифов,
         1ПМ-пресеты, SVG-визуализация, разминка, порядок навешивания, экспорт.
-        {initialWeight && <span style={{ color: ACCENT }}> · Вес из плана: {initialWeight} {unitLabel}</span>}
+        {initialWeight && <span style={{ color: ACCENT }}> · Вес из плана: {initialWeight} {unitLabel}{isDumbbellSelected ? ' ×2 гантели' : ''}</span>}
         {selectedOpt && <span style={{ color: ACCENT }}> · Упражнение: {selectedOpt.label}</span>}
+        {isDumbbellSelected && <span style={{ color: '#f59e0b', marginLeft: 6, fontWeight: 700 }}>· гантели: рукоять 2 кг, расчёт на одну гантель ({effectiveBarWeight} кг)</span>}
       </div>
 
       {/* ⚙️ Параметры */}
@@ -301,7 +307,7 @@ export const PlateCalcTab: React.FC<PlateCalcTabProps> = ({ initialWeight, onApp
       <div style={{ ...CARD, background: 'rgba(59,130,246,0.04)', borderColor: 'rgba(59,130,246,0.15)' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 6 }}>📐 Формула</div>
         <div style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>
-          {targetWeight} {unitLabel} = гриф {barWeight} {unitLabel} + {sideWeight} {unitLabel}/сторона
+          {isDumbbellSelected ? `${targetWeight} ${unitLabel} = гантель ${effectiveBarWeight} ${unitLabel} + ${sideWeight} ${unitLabel}/сторона ×2 гантели (итого ${targetWeight * 2} ${unitLabel})` : `${targetWeight} ${unitLabel} = гриф ${effectiveBarWeight} ${unitLabel} + ${sideWeight} ${unitLabel}/сторона`}
         </div>
         <div style={{ ...SMALL, marginTop: 4 }}>
           {plates.platesPerSide.length > 0

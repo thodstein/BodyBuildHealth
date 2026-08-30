@@ -108,6 +108,51 @@ export const ExecutionZone: React.FC<Props> = (p) => {
               </p>
               {macrocycle && currentMicrocycle && trainingDaysList.length > 0 ? (
                 <>
+                  {(() => {
+                    const totalSetsWeek = trainingDaysList.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0), 0) || 0), 0);
+                    const totalVolWeek = trainingDaysList.reduce((s: number, d: any) => s + (d.exercises?.reduce((ss: number, e: any) => ss + (e.sets || 0) * (Number(e.reps) || 0) * (e.weight || 0), 0) || 0), 0);
+                    const allDays = (currentMicrocycle.days || []) as any[];
+                    const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+                    const trainingMap = new Set(trainingDaysList.map((d: any) => d.day || ''));
+                    return (
+                      <div style={{
+                        display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8, padding: '10px 11px', borderRadius: 13,
+                        background: 'linear-gradient(135deg, rgba(0,230,138,0.07), rgba(59,130,246,0.06))',
+                        border: '1px solid rgba(0,230,138,0.14)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ width: 28, height: 28, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000', fontSize: 12, fontWeight: 800 }}>#{selectedWeek}</span>
+                            <div>
+                              <div style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', lineHeight: 1 }}>Неделя {selectedWeek} · {trainingDaysList.length} тренировки · {currentMicrocycle.mesocycleType || ''}</div>
+                              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.60)' }}>{totalSetsWeek} сетов · {totalVolWeek.toLocaleString()} кг недельный объём</div>
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 7px', borderRadius: 20, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.20)', whiteSpace: 'nowrap' }}>понедельно</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {weekDays.map((wd, wi) => {
+                            const dayObj = allDays[wi];
+                            const isTraining = dayObj ? !!dayObj.isTraining : wi < trainingDaysList.length;
+                            const label = dayObj?.day || (isTraining ? `Д${wi + 1}` : '—');
+                            const isSelected = isTraining && trainingDaysList[safeRuntimeDay]?.day === dayObj?.day;
+                            return (
+                              <div key={wi} style={{
+                                flex: 1, minWidth: 0, padding: '5px 2px', borderRadius: 9, textAlign: 'center',
+                                background: isSelected ? 'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.10))' : isTraining ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+                                border: isSelected ? '1px solid rgba(0,230,138,0.28)' : isTraining ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(255,255,255,0.04)',
+                                opacity: isTraining ? 1 : 0.45,
+                              }}>
+                                <div style={{ fontSize: 8, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? '#fff' : 'rgba(255,255,255,0.35)' }}>{wd}</div>
+                                <div style={{ fontSize: 8, fontWeight: 700, color: isSelected ? '#00e68a' : isTraining ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.25)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label.slice(0, 6)}</div>
+                                <div style={{ width: 5, height: 5, borderRadius: 5, margin: '3px auto 0', background: isSelected ? '#00e68a' : isTraining ? 'rgba(255,255,255,0.22)' : 'transparent', boxShadow: isSelected ? '0 0 6px rgba(0,230,138,0.45)' : 'none' }} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', marginBottom: 10 }}>
                     {(() => { const _todayIdx = (((new Date().getDay() + 6) % 7)) % Math.max(1, trainingDaysList.length); const isToday = safeRuntimeDay === _todayIdx; return (
                       <button onClick={() => setRuntimeDay(_todayIdx)} aria-label="Выбрать сегодняшний день" style={{
