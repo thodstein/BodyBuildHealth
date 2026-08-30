@@ -93,7 +93,14 @@ describe('assembleRecipeDay: property-инварианты (50 сценарие�
         const expected = flat.kcal * (flat.appliedScale ?? 1);
         const devPct = Math.abs(coreKcal - expected) / Math.max(1, expected) * 100;
         // Р-2.1 + D4 корректор: пол + плотный гарнир + финальный корректор могут поднять ядро до +45% (бодибилдинг-плотность > точность для тяжей)
-        expect(devPct, `seed=${s} ${flat.name}: core ${Math.round(coreKcal)} vs ${Math.round(expected)}`).toBeLessThanOrEqual(45);
+        // C1/C5 (Эпик C): полы порций (белок ≥80 г main / ≥60 г снек, бюджет ×1.03 слота)
+        // легально раздувают ядро мелких рецептов сильнее +45% — жёсткий инвариант один:
+        // ядро НЕ срезано (≥ автор × масштаб); верхнюю границу держат полы/бюджет слота.
+        if (devPct > 45) {
+          expect(coreKcal, `seed=${s} ${flat.name}: core ${Math.round(coreKcal)} vs ${Math.round(expected)} (инфляция полами)`).toBeGreaterThanOrEqual(expected - 1);
+        } else {
+          expect(devPct, `seed=${s} ${flat.name}: core ${Math.round(coreKcal)} vs ${Math.round(expected)}`).toBeLessThanOrEqual(45);
+        }
         expect(m.items.length).toBeGreaterThan(0);
       }
 

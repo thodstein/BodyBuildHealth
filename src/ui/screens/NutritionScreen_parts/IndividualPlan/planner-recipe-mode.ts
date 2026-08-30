@@ -917,24 +917,29 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
       const _wholeFood = cands.filter(r => !_recipeHasPowder(r));
       if (_wholeFood.length > 0) cands = _wholeFood;
     }
-    // C1: гейт квот дня — кандидаты, чья декомпозиция нарушает квоту следующего приёма
-    // (семейство гарнира исчерпано, орехи/масла/яйца на лимите), уходят из выборки.
+    // C1: гейт квот дня — двухпроходный. Сначала кандидаты БЕЗ жёстких нарушений
+    // грамм-квот (орехи/масла/яйца/порошок); мягкий кап семейства — демотировка.
+    // Если ни один чистый не закрыл приём (КБЖУ-гейт) — второй проход по всем:
+    // лучше осознанное нарушение квоты, чем раздутый ×2.3 чужой рецепт.
     const _quotaBlocked = blockedIdsForNextMeal(quota, String(matchMealType));
-    const quotaViolates = (r: Recipe): boolean => {
+    const HARD_QUOTA_FAMS = new Set(['nuts', 'seeds', 'oils']);
+    const quotaClass = (r: Recipe): 0 | 1 | 2 => {
       const its = decomposedFacts(r).items;
-      if (!its || its.length === 0) return false;
-      return its.some(it => {
+      if (!its || its.length === 0) return 0;
+      let worst: 0 | 1 | 2 = 0;
+      for (const it of its) {
         const fd = FOOD_DB.find(f => f.id === it.id);
-        return !foodAvailableWithQuota({ id: it.id, category: fd?.category, carbs: it.c, fiber: it.fiber } as any, _quotaBlocked);
-      });
+        if (!foodAvailableWithQuota({ id: it.id, category: fd?.category, carbs: it.c, fiber: it.fiber } as any, _quotaBlocked)) {
+          const fam = stapleFamilyOf(it.id) || '';
+          if (!_quotaBlocked.has(`__FAM__${fam}`) || HARD_QUOTA_FAMS.has(fam)) return 2; // жёсткое нарушение
+          worst = 1; // мягкое (семейство)
+        }
+      }
+      return worst;
     };
-    const _okQuota = cands.filter(r => !quotaViolates(r));
-    if (_okQuota.length > 0) cands = _okQuota;
-    // Переранжирование по декомпозированным фактам С УЧЁТОМ масштабирования к цели приёма:
-    // рецепт 500 ккал при цели 1000 масштабируется ×2 → дистанция считается для масштаба.
-    // Масштаб дополнительно КАПИТСЯ по белку (≤1.25×цели), жиру (≤1.5×цели) и углям
-    // (≤1.25×цели) — иначе ккал-масштаб рецепта раздувал доминирующий макрос в 2+ раза.
-    const ranked = rankCands(cands);
+    const rankedAll = rankCands(cands);
+    const _clean = cands.filter(r => quotaClass(r) === 0);
+    const ranked = (_clean.length > 0 && _clean.length < cands.length) ? rankCands(_clean) : rankedAll;
     // Р-2.2: fitPct — «закрывает приём на ~N%» для каждого варианта (после масштаба
     // с капами); 90-110% подсвечивается зелёным в UI, крайние значения — варн.
     const flats: FlatRecipeOption[] = ranked.slice(0, 3).map(r => {
@@ -1017,16 +1022,32 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     // C5 (Эпик C): ккал-гейт приёмки ±25% пропускал ПОЛОВИННЫЙ недобор (рецепт = 50%
     // приёма, остальное — сайды) — снижаем до ±15% (перекусы ±20%: их догоняет ребаланс).
     const kcalTol = isSnackSlot ? 0.20 : 0.15;
+    const _passesGate = (built: { totals: PlanTotalsLike }): boolean => {
+      const tk = built.totals.kcal || 1;
+      return Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= kcalTol
+        && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
+        && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
+        && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5;
+    };
     for (const cand of ranked) {
       const built = tryBuild(cand);
       if (!built) continue;
       if (!fallback) fallback = built;
-      const tk = built.totals.kcal || 1;
-      const passes = Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= kcalTol
-        && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
-        && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
-        && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5;
-      if (passes) { chosen = built; break; }
+      if (_passesGate(built)) { chosen = built; break; }
+    }
+    // C1 второй проход: чистые кандидаты не закрыли приём по строгому гейту —
+    // пробуем нарушителей квот с LEGACY-допуском ±25% (старое поведение гейта):
+    // осознанное нарушение квоты лучше, чем раздутый ×2.3 чужой рецепт.
+    if (!chosen && rankedAll !== ranked) {
+      for (const cand of rankedAll) {
+        const built = tryBuild(cand);
+        if (!built) continue;
+        const tk = built.totals.kcal || 1;
+        if (Math.abs(tk - targetKcal) / Math.max(1, targetKcal) <= 0.25
+          && built.totals.p >= 0.80 * (tgt.p || 30) - 0.5
+          && built.totals.f <= 1.35 * (tgt.f || 15) + 0.5
+          && built.totals.c >= 0.70 * (tgt.c || 40) - 0.5) { chosen = built; break; }
+      }
     }
     if (!chosen && !fallback) return;
     const use = chosen || fallback!;
