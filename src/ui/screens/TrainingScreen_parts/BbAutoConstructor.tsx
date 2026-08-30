@@ -3861,6 +3861,89 @@ export const BbAutoConstructor: React.FC = () => {
     const ratio = acwrData;
     return (
       <div>
+        {/* 🧠 Логика построения плана — вынесена первой в Шаге 5 */}
+        {(() => {
+          const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
+          const goalRu: Record<string,string> = { mass:'масса', cut:'сушка', recomp:'рекомпозиция', maintenance:'поддержание', strength_mass:'сила+масса', strength:'сила' };
+          const focusRu: Record<string,string> = { hypertrophy:'гипертрофия', strength:'сила', endurance:'выносливость' };
+          const methRu: Record<string,string> = { compound_first:'база → изоляция', pre_exhaust:'предутомление', post_exhaust:'пост-утомление', antagonistic:'антагонисты', giant_sets:'гигант-сеты' };
+          const volRu: Record<string,string> = { mev:'минимум (MEV)', mav:'оптимум (MAV)', mrv:'максимум (MRV)' };
+          const stratRu: Record<string,string> = { double_progression:'двойная', linear:'линейная', wave:'волновая', rpe_based:'RPE-регуляция', undulating:'волновая', block:'блочная' };
+          const totalW = builtPlan.weeks.length;
+          const phaseGroups: Record<string, number[]> = {};
+          for (const w of builtPlan.weeks) { const pr = ((w as any).phase || 'accumulation') as string; if (!phaseGroups[pr]) phaseGroups[pr]=[]; phaseGroups[pr].push(w.week); }
+          const phaseRu: Record<string,string> = { accumulation:'накопление', intensification:'интенсификация', deload:'разгрузка', peaking:'пик' };
+          const phaseText = Object.entries(phaseGroups).map(([pr,ws])=> `${phaseRu[pr]||pr} ${ws.length} нед`).join(' · ');
+          const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
+          const scoreText = sel ? `${sel.score}/${Math.max(...ranked.map(r=>r.score),1)}` : '—';
+          const topAlt = ranked.slice(0,3).map(r=> `${r.pattern.name} ${r.score}`).join(' · ');
+          const injText = injuries.length ? injuries.map(i=> `${i.muscle}${i.exclude?' (искл.)':' (щадящ.)'}`).join(', ') : 'нет';
+          const mobText = mobilityRestrictions.length ? mobilityRestrictions.join(', ') : 'нет';
+          const equipText = bbEquipment.length ? bbEquipment.slice(0,4).join(', ') : 'всё доступно';
+          const specText = specTargets.length ? specTargets.join(' + ') : 'баланс';
+          const pedMult = (pedAdapt as any).combinedMrvMultiplier ?? 1;
+          const pedLabel = pedMult>1 ? `MRV ×${Number(pedMult).toFixed(2)} · ${peds.join(', ')||'курс'}` : 'натурал';
+          return <CollapsibleCard title="🧠 Логика построения плана" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.08))', color: '#60a5fa' }} badge={`${totalW} нед · ${builtPlan.pattern?.name || ''}`}>
+            <div style={{ ...CARD, marginTop:0, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.38)' }}>
+              <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
+                <CollapsibleCard title="1 · Вход и цель" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.10), rgba(96,165,250,0.03))', color: '#60a5fa' }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    {[
+                      `уровень: ${levelRu[bbLevel]||bbLevel} (${bbTrainingYears} г)`,
+                      `цель: ${goalRu[bbGoal]||bbGoal}`,
+                      `фокус: ${focusRu[bbTrainingFocus]||bbTrainingFocus}`,
+                      `методика: ${methRu[bbMethodology]||bbMethodology}`,
+                      `объём: ${volRu[bbVolGoal]||bbVolGoal}${trainingVolumeMode==='high'?' · объёмный режим':''}`,
+                      `прогрессия: ${stratRu[loadStrategy]||loadStrategy} · RIR ${(getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir ?? '2–3'}→${(getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir ?? '1–2'}`,
+                    ].map((t,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>{t}</span>)}
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35, marginTop:6 }}>
+                    Уровень задаёт капы подходов/упражнений и доступ к сложным техникам · цель меняет фазовый профиль (масса — больше накопления, сушка — ниже объём) · фокус меняет RIR/повторы/темп · методика — порядок упражнений в сессии.
+                  </div>
+                </CollapsibleCard>
+                <CollapsibleCard title="2 · Сплит — почему выбран" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(168,85,247,0.03))', color: '#a78bfa' }}>
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', padding:'4px 8px', borderRadius:8 }}>{builtPlan.pattern?.name || '—'} · {bbDays}×/нед · {totalW} нед</span>
+                    <span style={{ fontSize:11, fontWeight:700, color: (sel ? (Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.8 ? '#22c55e' : Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.6 ? '#f59e0b' : '#ef4444') : '#fff') }}>скор {scoreText}</span>
+                  </div>
+                  {sel && <div style={{ fontSize:10, color:'#fff', opacity:0.78, lineHeight:1.35, marginTop:6 }}><b>Подходит из-за:</b> {sel.rationale.slice(0,2).join(' · ') || 'баланс по дням и уровню'}</div>}
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.62, lineHeight:1.35, marginTop:4 }}>Альтернативы топ-3: {topAlt || '—'} · слабые: {weakPoints.join(', ')||'баланс'} · специализация: {specText}</div>
+                  {sel?.warnings?.length ? <div style={{ fontSize:10, color:'#f59e0b', marginTop:4 }}>⚠ {sel.warnings.slice(0,2).join(' · ')}</div> : null}
+                </CollapsibleCard>
+                <CollapsibleCard title="3 · Периодизация — как меняется нагрузка" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.03))', color: '#22c55e' }}>
+                  <div style={{ display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
+                    {builtPlan.weeks.map(w=>{ const pr = ((w as any).phase || 'accumulation') as BBPhase; return <div key={w.week} title={`Нед ${w.week}: ${phaseRu[pr]||pr}`} style={{ flex:1, background: PHASE_COLORS[pr]||'#fff', opacity:0.9 }} />; })}
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.35, marginTop:6 }}><b>Фазы:</b> {phaseText} · <b>RIR:</b> накопление {String((getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir || '2–3')} → интенсификация {String((getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir || '1–2')} · <b>темп:</b> {getPhaseConfig('accumulation', bbTrainingFocus as any).tempo} → {getPhaseConfig('intensification', bbTrainingFocus as any).tempo}</div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.62, marginTop:4 }}>Прогрессия весов: {stratRu[loadStrategy]||loadStrategy} · делод: {DELOAD_PROTOCOLS[deloadType]?.description || deloadType} · DUP {dupMode} · суперсеты {supersetMode} · схемы {volumeScheme}</div>
+                </CollapsibleCard>
+                <CollapsibleCard title="4 · Объём и восстановление — стратегия" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.03))', color: '#f59e0b' }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    <span style={{ fontSize:10, color:'#fff', background: pedMult>1?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', border:`1px solid ${pedMult>1?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)'}`, padding:'3px 7px', borderRadius:20 }}>{pedLabel}</span>
+                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>лимиты {builtPlan.maxWorkingSets} сетов / {builtPlan.maxExercises} упр. · режим {sessionLimitsFor({onCourse: pedMult>1, level: bbLevel, trainingYears: bbTrainingYears, trainingVolumeMode} as any).weeklyWorkingSets} в неделю</span>
+                  </div>
+                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35, marginTop:6 }}>Детализация по мышцам — в карточке «Тренировочный объём» ниже: там прямой/косвенный, недельный и общий, подмышцы и статус MEV/MAV/MRV.</div>
+                </CollapsibleCard>
+                <CollapsibleCard title="5 · Приоритеты" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.10), rgba(236,72,153,0.03))', color: '#ec4899' }}>
+                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.45 }}>
+                    <div><b>Слабые:</b> {weakPoints.length? weakPoints.join(' · ') : 'баланс — без акцента'}</div>
+                    <div><b>Специализация:</b> {specText}{specTargets.length? ` · блоки: ${specTargets.length} (по ${Math.round(bbWeeks/Math.max(1,specTargets.length))} нед)` : ''}</div>
+                    {builtPlan.rationale?.some((r:string)=> /специализ|донор/i.test(r)) && <div style={{ opacity:0.75, marginTop:4 }}>Донорское перераспределение сохраняет косвенную нагрузку до MEV — прямой объём донора снижается, целевой растёт.</div>}
+                  </div>
+                </CollapsibleCard>
+                <CollapsibleCard title="6 · Безопасность" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.03))', color: '#ef4444' }}>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
+                    <span style={{ fontSize:10, color:'#fff', background: injuries.length?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', border:`1px solid ${injuries.length?'rgba(239,68,68,0.18)':'rgba(34,197,94,0.16)'}`, padding:'3px 7px', borderRadius:20 }}>травмы: {injText}</span>
+                    <span style={{ fontSize:10, color:'#fff', background: mobilityRestrictions.length?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>мобильность: {mobText}</span>
+                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>оборудование: {equipText}</span>
+                    {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
+                    {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
+                  </div>
+                </CollapsibleCard>
+              </div>
+            </div></CollapsibleCard>
+          ;
+         })()}
         <div style={{ ...CARD, padding:0, overflow:'hidden', marginBottom:8, border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.32)' }}>
           <button type="button" onClick={() => setGeneralSafetyLoadOpen(v=>!v)} aria-expanded={generalSafetyLoadOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', cursor:'pointer', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(96,165,250,0.06))', border:'none', borderBottom: generalSafetyLoadOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
             <span style={{ fontSize:14, fontWeight:900, color:'#fff' }}>🛡️ Безопасность и нагрузка — общий обзор</span>
@@ -3945,8 +4028,7 @@ export const BbAutoConstructor: React.FC = () => {
                       const entries = Object.entries(d.byJointPeak as Record<string, number>).sort((a,b)=> (b[1] as number)-(a[1] as number));
                       const RU: Record<string,{label:string,icon:string}> = { shoulder:{label:'Плечо',icon:'🤸'}, knee:{label:'Колено',icon:'🦵'}, hip:{label:'Таз',icon:'🦵'}, spine:{label:'Поясница',icon:'🦴'}, lower_back:{label:'Поясница',icon:'🦴'}, elbow:{label:'Локоть',icon:'💪'}, wrist:{label:'Запястье',icon:'🤚'}, ankle:{label:'Голеностоп',icon:'🦶'}, neck:{label:'Шея',icon:'🧣'} };
                       return (
-                        <div>
-                          <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase', marginBottom:6 }}>1 · Нагрузка по суставам</div>
+                        <CollapsibleCard title="1 · Нагрузка по суставам" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.10), rgba(96,165,250,0.03))', color: '#60a5fa' }}>
                           <div style={{ display:'grid', gap:6 }}>
                             {entries.map(([joint, peak])=>{
                               const meta = RU[joint] || {label: joint, icon:'🦴'};
@@ -3977,7 +4059,7 @@ export const BbAutoConstructor: React.FC = () => {
                             })}
                           </div>
                           <div style={{ fontSize:9, color:'#fff', opacity:0.42, marginTop:6, lineHeight:1.3 }}>Расчёт: база 3/6/10 (low/med/high из каталога) × подходы × близость к отказу × вес. Сумма по упражнениям → пик и среднее по неделям (без учёта разгрузочных).</div>
-                        </div>
+                        </CollapsibleCard>
                       );
                     })()}
 
@@ -3991,8 +4073,7 @@ export const BbAutoConstructor: React.FC = () => {
                       const tr = (p:string)=> PAT_RU[p] || p;
                       const jLabel = (j:string)=> ({ shoulder:'Плечо', spine:'Поясница', hip:'Таз', knee:'Колено', elbow:'Локоть', ankle:'Голеностоп', wrist:'Запястье', lower_back:'Поясница', neck:'Шея'} as any)[j] || j;
                       return (
-                        <div>
-                          <div style={{ fontSize:10, fontWeight:800, color:'#a78bfa', letterSpacing:0.3, textTransform:'uppercase', marginBottom:6 }}>2 · Ортопедика и ограничения</div>
+                        <CollapsibleCard title="2 · Ортопедика и ограничения" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(168,85,247,0.03))', color: '#a78bfa' }}>
                           <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center', marginBottom:8 }}>
                             <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>Фаза:</span>
                             <span style={{ fontSize:11, fontWeight:800, padding:'3px 8px', borderRadius:20, background: phaseColor+'18', color: phaseColor, border:`1px solid ${phaseColor}22` }}>{phaseRu}</span>
@@ -4038,7 +4119,7 @@ export const BbAutoConstructor: React.FC = () => {
                               {o.recommendations.map((r,i)=> <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, paddingLeft:8, borderLeft:'2px solid rgba(0,230,138,0.5)', lineHeight:1.35 }}>{r}</div>)}
                             </div>
                           )}
-                        </div>
+                        </CollapsibleCard>
                       );
                     })()}
 
@@ -4056,7 +4137,7 @@ export const BbAutoConstructor: React.FC = () => {
                           <div style={{ fontSize:9, color:'#fff', opacity:0.55, marginBottom:8, lineHeight:1.35 }}>Каждый нагруженный сустав расписан так же детально как колено/таз: опасные структуры, фаза, метод, ассисты и протокол. Плечо и остальные показаны наравне с нагруженными.</div>
                           <div style={{ display:'grid', gap:8 }}>
                             {diags.map((jd:any)=> (
-                              <div key={jd.joint.id} style={{ padding:'9px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
+                              <CollapsibleCard key={jd.joint.id} title={`${jd.joint.icon} ${jd.joint.label}`} defaultOpen={jd.joint.id==='shoulder' || jd.joint.id==='knee' || jd.joint.id==='hip' || jd.joint.id==='spine'} headerStyle={{ background: jd.phase==='acute'?'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(239,68,68,0.06))': jd.phase==='subacute'?'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(245,158,11,0.06))': jd.phase==='chronic'?'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(96,165,250,0.06))':'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(34,197,94,0.04))', color: jd.phase==='acute'?'#ef4444':jd.phase==='subacute'?'#f59e0b':jd.phase==='chronic'?'#60a5fa':'#22c55e' }} badge={jd.joint.dangerous.slice(0,2).join(' · ')}>
                                 <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:4, flexWrap:'wrap' }}>
                                   <span style={{ fontSize:13 }}>{jd.joint.icon}</span>
                                   <span style={{ fontSize:11, fontWeight:800, color:'#fff' }}>{jd.joint.label}</span>
@@ -4083,7 +4164,7 @@ export const BbAutoConstructor: React.FC = () => {
                                     })}
                                   </div>
                                 )}
-                              </div>
+                              </CollapsibleCard>
                             ))}
                           </div>
                           </div>
@@ -4172,105 +4253,7 @@ export const BbAutoConstructor: React.FC = () => {
           </button>
         </div>
         <div style={{ display: qualityOpen ? 'block' : 'none' }}>
-                {/* 🧠 Логика построения плана (только нужное) */}
-        {(() => {
-          const levelRu: Record<string,string> = { beginner:'новичок', intermediate:'средний', advanced:'продвинутый', enhanced:'продвинутый+' };
-          const goalRu: Record<string,string> = { mass:'масса', cut:'сушка', recomp:'рекомпозиция', maintenance:'поддержание', strength_mass:'сила+масса', strength:'сила' };
-          const focusRu: Record<string,string> = { hypertrophy:'гипертрофия', strength:'сила', endurance:'выносливость' };
-          const methRu: Record<string,string> = { compound_first:'база → изоляция', pre_exhaust:'предутомление', post_exhaust:'пост-утомление', antagonistic:'антагонисты', giant_sets:'гигант-сеты' };
-          const volRu: Record<string,string> = { mev:'минимум (MEV)', mav:'оптимум (MAV)', mrv:'максимум (MRV)' };
-          const stratRu: Record<string,string> = { double_progression:'двойная', linear:'линейная', wave:'волновая', rpe_based:'RPE-регуляция', undulating:'волновая', block:'блочная' };
-          const totalW = builtPlan.weeks.length;
-          const phaseGroups: Record<string, number[]> = {};
-          for (const w of builtPlan.weeks) { const p = ((w as any).phase || 'accumulation') as string; if (!phaseGroups[p]) phaseGroups[p]=[]; phaseGroups[p].push(w.week); }
-          const phaseRu: Record<string,string> = { accumulation:'накопление', intensification:'интенсификация', deload:'разгрузка', peaking:'пик' };
-          const phaseText = Object.entries(phaseGroups).map(([p,ws])=> `${phaseRu[p]||p} ${ws.length} нед`).join(' · ');
-          const sel = ranked.find(r=> r.pattern.id===builtPlan.pattern?.id);
-          const scoreText = sel ? `${sel.score}/${Math.max(...ranked.map(r=>r.score),1)}` : '—';
-          const topAlt = ranked.slice(0,3).map(r=> `${r.pattern.name} ${r.score}`).join(' · ');
-          const injText = injuries.length ? injuries.map(i=> `${i.muscle}${i.exclude?' (искл.)':' (щадящ.)'}`).join(', ') : 'нет';
-          const mobText = mobilityRestrictions.length ? mobilityRestrictions.join(', ') : 'нет';
-          const equipText = bbEquipment.length ? bbEquipment.slice(0,4).join(', ') : 'всё доступно';
-          const specText = specTargets.length ? specTargets.join(' + ') : 'баланс';
-          const pedMult = (pedAdapt as any).combinedMrvMultiplier ?? 1;
-          const pedLabel = pedMult>1 ? `MRV ×${Number(pedMult).toFixed(2)} · ${peds.join(', ')||'курс'}` : 'натурал';
-          return <CollapsibleCard title="🧠 Логика построения плана" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }}><div style={{ ...CARD, marginTop:8, padding:0, overflow:'hidden', border:'1px solid rgba(96,165,250,0.22)', background:'rgba(15,23,42,0.38)' }}>
-              <div style={{ padding:'10px 12px', background:'linear-gradient(135deg, rgba(96,165,250,0.14), rgba(59,130,246,0.05))', borderBottom:'1px solid rgba(255,255,255,0.06)', display:'none' }}>
-                <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>🧠 Логика построения плана</div>
-                <div style={{ fontSize:10, color:'#fff', opacity:0.7, marginTop:2 }}>Только ключевые решения — почему план именно такой для ваших параметров</div>
-              </div>
-              <div style={{ padding:'10px 12px', display:'grid', gap:10 }}>
-                {/* 1 вход */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#60a5fa', letterSpacing:0.3, textTransform:'uppercase' }}>1 · Вход и цель</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    {[
-                      `уровень: ${levelRu[bbLevel]||bbLevel} (${bbTrainingYears} г)`,
-                      `цель: ${goalRu[bbGoal]||bbGoal}`,
-                      `фокус: ${focusRu[bbTrainingFocus]||bbTrainingFocus}`,
-                      `методика: ${methRu[bbMethodology]||bbMethodology}`,
-                      `объём: ${volRu[bbVolGoal]||bbVolGoal}${trainingVolumeMode==='high'?' · объёмный режим':''}`,
-                      `прогрессия: ${stratRu[loadStrategy]||loadStrategy} · RIR ${(getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir ?? '2–3'}→${(getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir ?? '1–2'}`,
-                    ].map((t,i)=> <span key={i} style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>{t}</span>)}
-                  </div>
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>
-                    Уровень задаёт капы подходов/упражнений и доступ к сложным техникам · цель меняет фазовый профиль (масса — больше накопления, сушка — ниже объём) · фокус меняет RIR/повторы/темп · методика — порядок упражнений в сессии.
-                  </div>
-                </div>
-                {/* 2 сплит */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#a78bfa', letterSpacing:0.3, textTransform:'uppercase' }}>2 · Сплит — почему выбран</div>
-                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-                    <span style={{ fontSize:11, fontWeight:800, color:'#fff', background:'rgba(168,85,247,0.12)', border:'1px solid rgba(168,85,247,0.22)', padding:'4px 8px', borderRadius:8 }}>{builtPlan.pattern?.name || '—'} · {bbDays}×/нед · {totalW} нед</span>
-                    <span style={{ fontSize:11, fontWeight:700, color: (sel ? (Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.8 ? '#22c55e' : Number(scoreText.split('/')[0])/Number(scoreText.split('/')[1]||1) >=0.6 ? '#f59e0b' : '#ef4444') : '#fff') }}>скор {scoreText}</span>
-                  </div>
-                  {sel && <div style={{ fontSize:10, color:'#fff', opacity:0.78, lineHeight:1.35 }}><b>Подходит из-за:</b> {sel.rationale.slice(0,2).join(' · ') || 'баланс по дням и уровню'}</div>}
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.62, lineHeight:1.35 }}>Альтернативы топ-3: {topAlt || '—'} · слабые: {weakPoints.join(', ')||'баланс'} · специализация: {specText}</div>
-                  {sel?.warnings?.length ? <div style={{ fontSize:10, color:'#f59e0b' }}>⚠ {sel.warnings.slice(0,2).join(' · ')}</div> : null}
-                </div>
-                {/* 3 периодизация */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#22c55e', letterSpacing:0.3, textTransform:'uppercase' }}>3 · Периодизация — как меняется нагрузка</div>
-                  <div style={{ display:'flex', gap:2, height:8, borderRadius:6, overflow:'hidden', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)' }}>
-                    {builtPlan.weeks.map(w=>{ const p = ((w as any).phase || 'accumulation') as BBPhase; return <div key={w.week} title={`Нед ${w.week}: ${phaseRu[p]||p}`} style={{ flex:1, background: PHASE_COLORS[p]||'#fff', opacity:0.9 }} />; })}
-                  </div>
-                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.35 }}><b>Фазы:</b> {phaseText} · <b>RIR:</b> накопление {String((getPhaseConfig('accumulation', bbTrainingFocus as any) as any).rir || '2–3')} → интенсификация {String((getPhaseConfig('intensification', bbTrainingFocus as any) as any).rir || '1–2')} · <b>темп:</b> {getPhaseConfig('accumulation', bbTrainingFocus as any).tempo} → {getPhaseConfig('intensification', bbTrainingFocus as any).tempo}</div>
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.62 }}>Прогрессия весов: {stratRu[loadStrategy]||loadStrategy} · делод: {DELOAD_PROTOCOLS[deloadType]?.description || deloadType} · DUP {dupMode} · суперсеты {supersetMode} · схемы {volumeScheme}</div>
-                </div>
-                {/* 4 объём-стратегия (кратко) */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#f59e0b', letterSpacing:0.3, textTransform:'uppercase' }}>4 · Объём и восстановление — стратегия</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    <span style={{ fontSize:10, color:'#fff', background: pedMult>1?'rgba(245,158,11,0.12)':'rgba(255,255,255,0.04)', border:`1px solid ${pedMult>1?'rgba(245,158,11,0.22)':'rgba(255,255,255,0.06)'}`, padding:'3px 7px', borderRadius:20 }}>{pedLabel}</span>
-                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>лимиты {builtPlan.maxWorkingSets} сетов / {builtPlan.maxExercises} упр. · режим {sessionLimitsFor({onCourse: pedMult>1, level: bbLevel, trainingYears: bbTrainingYears, trainingVolumeMode} as any).weeklyWorkingSets} в неделю</span>
-                  </div>
-                  <div style={{ fontSize:10, color:'#fff', opacity:0.7, lineHeight:1.35 }}>Детализация по мышцам — в карточке «Тренировочный объём» ниже: там прямой/косвенный, недельный и общий, подмышцы и статус MEV/MAV/MRV.</div>
-                </div>
-                {/* 5 приоритеты */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#ec4899', letterSpacing:0.3, textTransform:'uppercase' }}>5 · Приоритеты</div>
-                  <div style={{ fontSize:10, color:'#fff', lineHeight:1.45 }}>
-                    <div><b>Слабые:</b> {weakPoints.length? weakPoints.join(' · ') : 'баланс — без акцента'}</div>
-                    <div><b>Специализация:</b> {specText}{specTargets.length? ` · блоки: ${specTargets.length} (по ${Math.round(bbWeeks/Math.max(1,specTargets.length))} нед)` : ''}</div>
-                    {builtPlan.rationale?.some((r:string)=> /специализ|донор/i.test(r)) && <div style={{ opacity:0.75, marginTop:2 }}>Донорское перераспределение сохраняет косвенную нагрузку до MEV — прямой объём донора снижается, целевой растёт.</div>}
-                  </div>
-                </div>
-                {/* 6 безопасность */}
-                <div style={{ display:'grid', gap:6 }}>
-                  <div style={{ fontSize:10, fontWeight:800, color:'#ef4444', letterSpacing:0.3, textTransform:'uppercase' }}>6 · Безопасность</div>
-                  <div style={{ display:'flex', flexWrap:'wrap', gap:5 }}>
-                    <span style={{ fontSize:10, color:'#fff', background: injuries.length?'rgba(239,68,68,0.10)':'rgba(34,197,94,0.08)', border:`1px solid ${injuries.length?'rgba(239,68,68,0.18)':'rgba(34,197,94,0.16)'}`, padding:'3px 7px', borderRadius:20 }}>травмы: {injText}</span>
-                    <span style={{ fontSize:10, color:'#fff', background: mobilityRestrictions.length?'rgba(245,158,11,0.10)':'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>мобильность: {mobText}</span>
-                    <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>оборудование: {equipText}</span>
-                    {avoidAxialLoadUi || (builtPlan.safetyConstraints as any)?.avoidAxialLoad ? <span style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.22)', padding:'3px 7px', borderRadius:20 }}>без осевой</span> : null}
-                    {fewerCompound ? <span style={{ fontSize:10, color:'#fff', background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)', padding:'3px 7px', borderRadius:20 }}>меньше многосуставных</span> : null}
-                  </div>
-                </div>
-              </div>
-            </div></CollapsibleCard>
-          ;
-        })()}
-        <CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`${quality.score}/100 ${quality.label}`}>
+<CollapsibleCard title="📋 Общая информация о плане" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a855f7' }} badge={`${quality.score}/100 ${quality.label}`}>
           <div style={{ display:'grid', gap:8, fontSize:11 }}>
             <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
               <span style={{ padding:'3px 7px', borderRadius:20, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.14)', color:'#a855f7' }}>{builtPlan.pattern?.name || '—'} · {W.length} нед · {builtPlan.weeks[0]?.sessions.length || bbDays}×/нед</span>
@@ -4567,13 +4550,30 @@ export const BbAutoConstructor: React.FC = () => {
                               })()}
                               {isBack && Object.keys(backSubPeak).length>0 && (
                                 <div style={{ marginTop:6, display:'grid', gap:4 }}>
-                                  <div style={{ fontSize:9, fontWeight:700, color:'#fff', opacity:0.6 }}>Подмышцы спины (пик / мезо):</div>
-                                  {Object.entries(backSubPeak).sort((a,b)=> (b[1] as number)-(a[1] as number)).slice(0,4).map(([sub, v])=> (
-                                    <div key={sub} style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff', background:'rgba(255,255,255,0.03)', padding:'3px 6px', borderRadius:6 }}>
-                                      <span>{SUB_LABEL[sub]||sub}</span>
-                                      <span>пик {v as number} · всего {backSubTotal[sub]||0} · средн. {Math.round((backSubTotal[sub]||0)/totalWeeks*10)/10}/нед</span>
+                                  <div style={{ fontSize:9, fontWeight:700, color:'#fff', opacity:0.6 }}>Подмышцы спины (пик / мезо) + паттерны/углы/растяжка:</div>
+                                  {Object.entries(backSubPeak).sort((a,b)=> (b[1] as number)-(a[1] as number)).slice(0,4).map(([sub, v])=> {
+                                    const subPro = (quality as any).proResult as any;
+                                    const subFindPat = subPro?.patterns.find((pp:any)=> pp.muscle==='back' && (pp as any).subgroup===sub);
+                                    const subFindAng = subPro?.angles.find((aa:any)=> aa.muscle==='back' && (aa as any).subgroup===sub);
+                                    const subFindStr = subPro?.stretches.find((ss:any)=> ss.muscle==='back' && (ss as any).subgroup===sub);
+                                    return (
+                                    <div key={sub} style={{ display:'grid', gap:3, padding:'5px 6px', borderRadius:6, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }}>
+                                      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#fff' }}>
+                                        <span style={{ fontWeight:700 }}>{SUB_LABEL[sub]||sub}</span>
+                                        <span>пик {v as number} · всего {backSubTotal[sub]||0} · средн. {Math.round((backSubTotal[sub]||0)/totalWeeks*10)/10}/нед</span>
+                                      </div>
+                                      {(subFindPat || subFindAng || subFindStr) && (
+                                        <div style={{ fontSize:9, color:'#fff', lineHeight:1.3, opacity:0.85 }}>
+                                          {subFindPat && <div><b>Паттерн:</b> {subFindPat.patterns?.join(', ')||'—'} {subFindPat.ok?'✅':'⚠️ '+(subFindPat.issue||'')}</div>}
+                                          {subFindAng && <div><b>Угол:</b> {subFindAng.angles?.join(', ')||'—'} {subFindAng.ok?'✅':'⚠️ '+(subFindAng.issue||'')} · {Math.round((subFindAng.coverage||0)*100)}%</div>}
+                                          {subFindStr && <div><b>Растяжка:</b> {subFindStr.hasStretch?`✅ ${subFindStr.stretchExercises?.slice(0,1).join(', ')}`:'❌ нет'}</div>}
+                                        </div>
+                                      )}
+                                      {!subFindPat && !subFindAng && !subFindStr && (
+                                        <div style={{ fontSize:9, color:'#fff', opacity:0.6 }}>Паттерны спины общие: тяги вертикаль/горизонталь · углы в норме · растяжка: тяга с паузой</div>
+                                      )}
                                     </div>
-                                  ))}
+                                  )})}
                                 </div>
                               )}
                             </div>

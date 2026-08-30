@@ -328,19 +328,39 @@ export function calculatePlanSafetyScore(
       });
     } catch { loadDistribution = null; }
 
-    // Joint diagnoses — все нагруженные суставы (как таз/колено — так же детально для каждого)
+    // Joint diagnoses — все нагруженные суставы детально как таз/колено (плечо и остальные наравне)
     let jointDiagnoses: JointLoadDiagnosis[] = [];
     try {
       const sortedJoints = (Object.keys(byJointPeak) as JointId[]).sort((a,b)=> (byJointPeak[b]||0)-(byJointPeak[a]||0));
-      const lowThresh = STRESS_THRESHOLDS.low; // 15 — порог, выше которого сустав считается нагруженным
-      let jointsToDiagnose: JointId[] = sortedJoints.filter(j => (byJointPeak[j]||0) >= lowThresh);
+      // Включаем ВСЕ суставы с любой нагрузкой >0, а не только >=15 — чтобы плечо/локоть/запястье не пропадали
+      let jointsToDiagnose: JointId[] = sortedJoints.filter(j => (byJointPeak[j]||0) > 0);
+      // Если план без стресса (например только делод) — показываем топ-3 по пику
       if (jointsToDiagnose.length === 0 && sortedJoints.length > 0) {
-        jointsToDiagnose = sortedJoints.slice(0, Math.min(3, sortedJoints.length)) as any;
+        jointsToDiagnose = sortedJoints.slice(0, Math.min(4, sortedJoints.length)) as any;
       }
+      // Гарантируем что ключевые суставы (плечо, поясница, колено, таз) присутствуют если у них есть хоть минимальный стресс в плане
+      const mustHave: JointId[] = ['shoulder','spine','knee','hip'] as JointId[];
+      for (const must of mustHave) {
+        if ((byJointPeak[must]||0) > 0 && !jointsToDiagnose.includes(must)) {
+          jointsToDiagnose.push(must);
+        }
+      }
+      // Если всё ещё мало — дополняем до 5 из fallback (чтобы плечо не терялось)
+      if (jointsToDiagnose.length < 4) {
+        const fallback: JointId[] = ['shoulder','spine','knee','hip','elbow','wrist','ankle'] as JointId[];
+        for (const fb of fallback) {
+          if (!jointsToDiagnose.includes(fb)) jointsToDiagnose.push(fb);
+          if (jointsToDiagnose.length >= 5) break;
+        }
+      }
+      // Сортируем снова по нагрузке чтобы самые нагруженные были первыми, но гарантируем плечо в топе если нагружено
+      jointsToDiagnose = jointsToDiagnose.sort((a,b)=> (byJointPeak[b]||0)-(byJointPeak[a]||0));
       if (jointsToDiagnose.length > 7) jointsToDiagnose = jointsToDiagnose.slice(0,7) as any;
-      const fallbackJoints: JointId[] = (orthopedic?.blockedPatterns.length ? (['spine','shoulder','knee','hip','elbow','wrist','ankle'] as JointId[]) : []) as any;
-      const targetJoints = jointsToDiagnose.length ? jointsToDiagnose : (fallbackJoints.length ? fallbackJoints : ['spine','shoulder','knee','hip','elbow'] as any);
-      jointDiagnoses = targetJoints.slice(0,7).map((jid: JointId) => {
+      // Финальный fallback если всё пусто
+      if (jointsToDiagnose.length === 0) {
+        jointsToDiagnose = (orthopedic?.blockedPatterns.length ? (['spine','shoulder','knee','hip','elbow','wrist','ankle'] as JointId[]) : ['spine','shoulder','knee','hip','elbow'] as JointId[]) as any;
+      }
+      jointDiagnoses = jointsToDiagnose.slice(0,7).map((jid: JointId) => {
         try { return jointLoadDiagnosis({ joint: jid, injuries: injuriesToHistory(options.injuries as any), mobilityRestrictions: options.mobilityRestrictions || [], currentPain: options.currentPain || [], jointLimitations: buildJointLimitations(options.injuries as any, options.mobilityRestrictions||[]) as any }); } catch { return null as any; }
       }).filter(Boolean);
       if (jointDiagnoses.length===0) {
