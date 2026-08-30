@@ -120,6 +120,7 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   const [warmupMode, setWarmupMode] = useState<WarmupMode>(() => {
     try { const v = localStorage.getItem('he_warmup_mode') as WarmupMode | null; return v === 'quick' || v === 'full' ? v : 'standard'; } catch { return 'standard'; }
   });
+  const [warmupQuality, setWarmupQuality] = useState<number | null>(null);
   const [warmupTimer, setWarmupTimer] = useState<{ i: number; j: number; remaining: number; total: number } | null>(null);
   // Таймер растяжки в фазе заминки (обратный отсчёт и автопроверка)
   const [coolTimer, setCoolTimer] = useState<{ i: number; j: number; remaining: number; total: number } | null>(null);
@@ -435,23 +436,26 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
   };
 
   const startMain = () => {
-     if (!day || !Array.isArray(day.exercises)) return;
-     // Фиксируем факт разминки в дневник (he_warmup_diary, одна запись на дату)
-     try {
-       const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
-       const doneCnt = Object.values(warmupDone).filter(Boolean).length;
-       const pct = total > 0 ? doneCnt / total : 0;
-       const skipped = skipWarmupReasonRef.current;
-       upsertWarmupLog({
-         date: new Date().toISOString().slice(0, 10),
-         done: skipped ? false : doneCnt > 0,
-         quality: skipped ? null : doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null,
-         totalItems: total,
-         doneItems: doneCnt,
-         skippedReason: skipped || (doneCnt === 0 ? 'не отметил ни одного пункта' : undefined),
-       });
-       skipWarmupReasonRef.current = null;
-     } catch { /* дневник разминки недоступен — не блокируем переход */ }
+      if (!day || !Array.isArray(day.exercises)) return;
+      // Фиксируем факт разминки в дневник (he_warmup_diary, одна запись на дату) — качество берём из явной оценки, иначе авто
+      try {
+        const total = warmupBlocks.reduce((s, b) => s + b.exercises.length, 0);
+        const doneCnt = Object.values(warmupDone).filter(Boolean).length;
+        const pct = total > 0 ? doneCnt / total : 0;
+        const skipped = skipWarmupReasonRef.current;
+        const autoQuality = doneCnt > 0 ? (pct >= 0.8 ? 4 : pct >= 0.5 ? 3 : 2) : null;
+        upsertWarmupLog({
+          date: new Date().toISOString().slice(0, 10),
+          done: skipped ? false : doneCnt > 0,
+          quality: skipped ? null : (warmupQuality ?? autoQuality),
+          totalItems: total,
+          doneItems: doneCnt,
+          skippedReason: skipped || (doneCnt === 0 ? 'не отметил ни одного пункта' : undefined),
+          note: warmupQuality ? `оценка ${warmupQuality}/5` : undefined,
+        });
+        skipWarmupReasonRef.current = null;
+        setWarmupQuality(null);
+      } catch { /* дневник разминки недоступен — не блокируем переход */ }
      let s = startSession(focus || day.label, weekNumber);
      day.exercises.forEach(ex => {
        s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
@@ -1187,6 +1191,19 @@ const [phase, setPhase] = useState<'ready' | 'warmup' | 'main' | 'cooldown' | 'd
             );
           })}
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.65)' }}>Оценка разминки:</span>
+            {[1,2,3,4,5].map(v => (
+              <button key={v} type="button" onClick={() => setWarmupQuality(v === warmupQuality ? null : v)} style={{
+                width: 28, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 11, fontWeight: 700,
+                border: warmupQuality === v ? '1px solid #f97316' : '1px solid rgba(255,255,255,0.08)',
+                background: warmupQuality === v ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.04)',
+                color: warmupQuality === v ? '#f97316' : '#fff',
+              }} aria-label={`Оценка ${v}`}>{v}</button>
+            ))}
+            {warmupQuality && <span style={{ fontSize: 9, color: '#f97316', fontWeight: 700 }}>→ {warmupQuality}/5</span>}
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.38)', marginLeft: 4 }}>по ощущению (сохранится в дневник)</span>
+          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
             <button style={{ ...BTN, flex: 1, background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff', boxShadow: '0 4px 16px rgba(249,115,22,0.28)' }} onClick={startMain}>
               🚀 К основной части

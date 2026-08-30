@@ -231,6 +231,35 @@ export const WarmupDiaryView: React.FC<{ historyWorkouts?: WorkoutLog[]; planDay
                 />
               </div>
             )}
+            {/* Тепловая карта 56 дней */}
+            {(() => {
+              const doneByDate = new Map(log.map(e => [e.date, e.done]));
+              const today = new Date();
+              const cells: { date: string; done: boolean | null }[] = [];
+              for (let i = 55; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(today.getDate() - i);
+                const iso = d.toISOString().slice(0, 10);
+                const v = doneByDate.get(iso);
+                cells.push({ date: iso, done: v === undefined ? null : v });
+              }
+              return (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Тепловая карта 56 дней</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(14, 1fr)', gap: 3 }}>
+                    {cells.map(c => (
+                      <div key={c.date} title={`${c.date}: ${c.done === null ? 'нет записи' : c.done ? 'выполнена' : 'пропущена'}`}
+                        style={{
+                          aspectRatio: '1', borderRadius: 4,
+                          background: c.done === true ? 'linear-gradient(135deg,#22c55e,#16a34a)' : c.done === false ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.06)',
+                          border: `1px solid ${c.done === true ? 'rgba(34,197,94,0.3)' : c.done === false ? 'rgba(239,68,68,0.24)' : 'rgba(255,255,255,0.06)'}`,
+                        }} />
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginTop: 3, display: 'flex', gap: 6 }}><span>■ выполнена</span><span>■ пропущена</span><span>■ нет данных</span></div>
+                </div>
+              );
+            })()}
             {link.n >= 3 && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 9, color: DIM, marginBottom: 4 }}>Связь качества разминки и e1RM сессии (n={link.n}):</div>

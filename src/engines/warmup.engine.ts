@@ -102,11 +102,14 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
   // Упор на целевые группы дня (если переданы) — сбалансированный микс суставов и зон
   const targetGroups = (input.targetGroups || []).filter(Boolean);
   const mode = (input.mode || 'standard') as WarmupMode;
-  const groupPrep = targetGroups.length > 0 ? collectGroupPrep(targetGroups, hasBand, mode) : null;
-  const jointPrep = targetGroups.length > 0 ? collectJointPrep(targetGroups, mode) : null;
+  // Адаптация по усталости: умеренная усталость 0.51-0.7 → авто-quick (бережём ресурсы)
+  const effectiveMode: WarmupMode = input.fatigueLevel > 0.5 && input.fatigueLevel <= 0.7 && mode !== 'quick' ? 'quick' : mode;
+  const adaptedByFatigue = effectiveMode !== mode;
+  const groupPrep = targetGroups.length > 0 ? collectGroupPrep(targetGroups, hasBand, effectiveMode) : null;
+  const jointPrep = targetGroups.length > 0 ? collectJointPrep(targetGroups, effectiveMode) : null;
   const toBlockEx = (e: { id: string; sets: number; reps: number; note?: string }) => ({ exerciseId: e.id, sets: e.sets, reps: e.reps, ...(e.note ? { note: e.note } : {}) });
 
-  const mobilityCap = mode === 'quick' ? 5 : mode === 'full' ? 12 : 9;
+  const mobilityCap = effectiveMode === 'quick' ? 5 : effectiveMode === 'full' ? 12 : 9;
   const mobilityExs: { exerciseId: string; sets: number; reps: number; note?: string }[] = (() => {
     if (!groupPrep) return getMobilityExercises(input.sessionFocus, input.riskFlags);
     const joint = (jointPrep || []).map(toBlockEx);
@@ -134,12 +137,18 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
     mobilityExs.push({ exerciseId: 'worlds_greatest', sets: 1, reps: 6 });
   }
   if (mobilityExs.length > 0) {
+    // Травма-специфика: даже вне целевых групп добавляем защиту уязвимого сустава
+    if (input.riskFlags['knee'] === 'high' && !mobilityExs.some(e => e.exerciseId === 'knee_circles')) mobilityExs.push({ exerciseId: 'knee_circles', sets: 1, reps: 10 });
+    if (input.riskFlags['shoulder'] === 'high' && !mobilityExs.some(e => e.exerciseId === 'shoulder_circle')) mobilityExs.unshift({ exerciseId: 'shoulder_circle', sets: 1, reps: 10 });
+    if (input.riskFlags['back'] === 'high' && !mobilityExs.some(e => e.exerciseId === 'cat_camel')) mobilityExs.push({ exerciseId: 'cat_camel', sets: 1, reps: 8 });
     blocks.push({
       type: 'mobility',
       // Длительность по факту: ~30с на упражнение, 90-360с
-      durationSec: Math.max(90, Math.min(mode === 'quick' ? 180 : mode === 'full' ? 360 : 270, mobilityExs.length * 30)),
+      durationSec: Math.max(90, Math.min(effectiveMode === 'quick' ? 180 : effectiveMode === 'full' ? 360 : 270, mobilityExs.length * 30)),
       exercises: mobilityExs,
-      notes: groupPrep ? `Суставная подготовка: ${jointPrepLabels(targetGroups)} · зоны: ${prepGroupLabels(targetGroups)}` : 'Суставная подготовка',
+      notes: groupPrep
+        ? `${adaptedByFatigue ? '⚡ Адаптация: усталость ' + Math.round(input.fatigueLevel * 10) + '/10 → объём ×0.6 · ' : ''}Суставная подготовка: ${jointPrepLabels(targetGroups)} · зоны: ${prepGroupLabels(targetGroups)}`
+        : 'Суставная подготовка',
     });
   }
 
@@ -155,12 +164,19 @@ export function generateWarmup(input: WarmupInput): WarmupBlock[] {
     activationExs.push({ exerciseId: 'bird_dog', sets: 2, reps: 10 });
   }
   if (activationExs.length > 0) {
+    // Травма-специфика: уязвимый сустав — даже вне целевых групп добавляем активацию
+    if (input.riskFlags['knee'] === 'high' && !activationExs.some(e => e.exerciseId === 'banded_clam' || e.exerciseId === 'side_lying_abduction')) {
+      activationExs.push(hasBand ? { exerciseId: 'banded_clam', sets: 1, reps: 12 } : { exerciseId: 'side_lying_abduction', sets: 1, reps: 12 });
+    }
+    if (input.riskFlags['shoulder'] === 'high' && !activationExs.some(e => e.exerciseId === 'external_rotation' || e.exerciseId === 'wall_slide')) {
+      activationExs.push(hasBand ? { exerciseId: 'external_rotation', sets: 1, reps: 12 } : { exerciseId: 'wall_slide', sets: 1, reps: 10 });
+    }
     blocks.push({
       type: 'activation',
       // Длительность по факту: ~35с на упражнение, адаптивно по режиму
-      durationSec: Math.max(90, Math.min(mode === 'quick' ? 180 : mode === 'full' ? 360 : 280, activationExs.length * 35)),
+      durationSec: Math.max(90, Math.min(effectiveMode === 'quick' ? 180 : effectiveMode === 'full' ? 360 : 280, activationExs.length * 35)),
       exercises: activationExs,
-      notes: groupPrep ? `Активация: ${prepGroupLabels(targetGroups)} — каждое рабочее движение «включается» до подходов` : 'Активация мышц',
+      notes: groupPrep ? `${adaptedByFatigue ? '⚡ Адаптация · ' : ''}Активация: ${prepGroupLabels(targetGroups)} — каждое рабочее движение «включается» до подходов` : 'Активация мышц',
     });
   }
 
