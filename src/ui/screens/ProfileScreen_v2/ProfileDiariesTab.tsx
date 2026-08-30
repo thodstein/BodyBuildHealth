@@ -1531,6 +1531,7 @@ const exportAllDiariesPdf = () => {
                     daysSinceLast={daysSinceLast(getEntryArray(d.key))}
                     loggedToday={todayEntry(getEntryArray(d.key))}
                     history={getEntryArray(d.key)}
+                    largeIcon={d.key === 'weight' || d.key === 'measurements'}
                     extra={
                       d.key === 'health' && healthEntries[0]
                         ? (() => {

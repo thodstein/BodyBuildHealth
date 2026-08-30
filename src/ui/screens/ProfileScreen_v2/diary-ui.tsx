@@ -271,6 +271,7 @@ export interface DiaryCardProps {
   onOpen: () => void;
   extra?: string;
   history?: { date: string }[];
+  largeIcon?: boolean;
 }
 
 export const DiaryCard: React.FC<DiaryCardProps> = ({
@@ -283,6 +284,7 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
   onOpen,
   extra,
   history,
+  largeIcon = false,
 }) => {
   const meta = DIARY_META[diaryKey] || { title: diaryKey, color: colors.textMuted, icon: '📓' };
   const stale = daysSinceLast !== null && daysSinceLast >= 3 && !loggedToday;
@@ -295,9 +297,11 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
           ? '#f59e0b'
           : meta.color;
 
+  const showLargeIcon = largeIcon || count === 0;
+
   return (
-    count === 0 ? (
-      // Empty state with illustration
+    showLargeIcon ? (
+      // Large icon state (empty or forced for weight/measurements)
       <div
         onClick={onOpen}
         onKeyDown={(e: React.KeyboardEvent) => {
@@ -345,12 +349,25 @@ export const DiaryCard: React.FC<DiaryCardProps> = ({
           </div>
           <div style={{ textAlign: 'center', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{meta.title}</div>
-            <div style={{ fontSize: 12, color: '#ffffff' }}>
-              {meta.unit ? `Единицы: ${meta.unit}` : 'Ещё нет записей'}
-            </div>
-            <div style={{ fontSize: 11, color: '#ffffff', marginTop: 8 }}>
-              Нажмите «+ Добавить» для первой записи
-            </div>
+            {count === 0 ? (
+              <>
+                <div style={{ fontSize: 12, color: '#ffffff' }}>
+                  {meta.unit ? `Единицы: ${meta.unit}` : 'Ещё нет записей'}
+                </div>
+                <div style={{ fontSize: 11, color: '#ffffff', marginTop: 8 }}>
+                  Нажмите «+ Добавить» для первой записи
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, color: '#ffffff' }}>
+                  {count} {count === 1 ? 'запись' : count < 5 ? 'записи' : 'записей'}
+                </div>
+                <div style={{ fontSize: 11, color: '#ffffff', marginTop: 4 }}>
+                  Последняя: {last}
+                </div>
+              </>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 16, width: '100%', justifyContent: 'center' }}>
             <button
