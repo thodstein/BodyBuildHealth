@@ -81,7 +81,7 @@ export const MealComposer: React.FC = () => {
     selectedDayIndex, setSelectedDayIndex,
     generated, setGenerated,
     renderMealList,
-    recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe,
+    recipePickerMeal, setRecipePickerMeal, replaceMealWithRecipe, addSecondRecipeToMeal,
     favoriteRecipes, isFavoriteRecipe, toggleFavoriteRecipe,
     effectiveKcal, effectiveP, effectiveF, effectiveC,
     setDayPlan, setThreeDayPlan, setWeekPlan, saveUndo,
@@ -349,22 +349,36 @@ export const MealComposer: React.FC = () => {
               onClick={() => setRecipePickerMeal(null)}>
               <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 28px', borderRadius:'20px', background:'#18181b', boxShadow:'0 18px 54px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
-                <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4 }}>🍳 Заменить «{recipePickerMeal.label}» рецептом</div>
-                <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:12 }}>Подходящие рецепты</div>
-                <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
-                  {sortedPickerRecipes.length === 0 ? (
-                    <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
-                  ) : sortedPickerRecipes.map((r: any, i: number) => (
-                    <div key={i} style={{ display:'flex', gap:4, alignItems:'stretch' }}>
-                      <span onClick={(e) => { e.stopPropagation(); toggleFavoriteRecipe(r.name); }} title={isFavoriteRecipe(r.name) ? 'Убрать из избранного' : 'В избранное (приоритет в подборе)'} style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, borderRadius:12, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color: isFavoriteRecipe(r.name) ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize:13 }}>{isFavoriteRecipe(r.name) ? '⭐' : '☆'}</span>
-                      <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:`1px solid ${isFavoriteRecipe(r.name) ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.06)'}`, color:'#fff', fontSize:9 }}>
-                        <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{isFavoriteRecipe(r.name) ? '⭐ ' : ''}{r.name}</div>
-                        <div style={{ color:'rgba(255,255,255,0.85)' }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:8, fontWeight:600 }}>✕ Отмена</button>
+                {(() => {
+                  const _dayForPicker = dayPlan || (threeDayPlan?.days ? threeDayPlan.days[selectedDayIndex] : null) || (weekPlan?.days ? weekPlan.days[selectedDayIndex] : null);
+                  const _curMeal = _dayForPicker?.meals?.[recipePickerMeal.mealIdx];
+                  const _hasFirst = !!_curMeal?.recipeApplied;
+                  const _hasSecond = !!_curMeal?.recipeApplied2;
+                  return (
+                    <>
+                      <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4 }}>
+                        {_hasFirst ? (_hasSecond ? '🍳 Заменить второй рецепт' : '➕ Добавить второй рецепт') : '🍳 Заменить'} «{recipePickerMeal.label}» рецептом
+                      </div>
+                      <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:12 }}>
+                        {_hasSecond ? `Уже: «${_curMeal.recipeApplied}» + «${_curMeal.recipeApplied2}» — выберите на замену второго` : _hasFirst ? `Уже: «${_curMeal.recipeApplied}» — выберите второй рецепт (совместимый)` : 'Подходящие рецепты'}
+                      </div>
+                      <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
+                        {sortedPickerRecipes.length === 0 ? (
+                          <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
+                        ) : sortedPickerRecipes.map((r: any, i: number) => (
+                          <div key={i} style={{ display:'flex', gap:4, alignItems:'stretch' }}>
+                            <span onClick={(e) => { e.stopPropagation(); toggleFavoriteRecipe(r.name); }} title={isFavoriteRecipe(r.name) ? 'Убрать из избранного' : 'В избранное (приоритет в подборе)'} style={{ display:'flex', alignItems:'center', justifyContent:'center', width:30, borderRadius:12, cursor:'pointer', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color: isFavoriteRecipe(r.name) ? '#f59e0b' : 'rgba(255,255,255,0.3)', fontSize:13 }}>{isFavoriteRecipe(r.name) ? '⭐' : '☆'}</span>
+                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (_hasFirst && !_hasSecond) { addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } else { replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:`1px solid ${isFavoriteRecipe(r.name) ? 'rgba(245,158,11,0.35)' : 'rgba(255,255,255,0.06)'}`, color:'#fff', fontSize:9 }}>
+                              <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{isFavoriteRecipe(r.name) ? '⭐ ' : ''}{r.name}</div>
+                              <div style={{ color:'rgba(255,255,255,0.85)' }}>⏱{r.prepTimeMin}мин · {r.kcal}ккал · Б{r.protein}/Ж{r.fat}/У{r.carbs}</div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={() => setRecipePickerMeal(null)} style={{ width:'100%', marginTop:8, padding:'6px', borderRadius:8, cursor:'pointer', border:'1px solid rgba(255,255,255,0.06)', background:'#202023', color:'rgba(255,255,255,0.85)', fontSize:8, fontWeight:600 }}>✕ Отмена</button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           )}

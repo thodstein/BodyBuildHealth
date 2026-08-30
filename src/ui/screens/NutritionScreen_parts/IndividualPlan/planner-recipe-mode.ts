@@ -56,6 +56,10 @@ export interface PlanMealLike {
   recipeApplied?: string;
   /** Полные данные выбранного рецепта (для карточки готовки) — JSON-safe */
   recipeAppliedData?: FlatRecipeOption;
+  /** Второй рецепт в этом же приёме (два блюда на один приём) */
+  recipeApplied2?: string;
+  /** Данные второго рецепта */
+  recipeAppliedData2?: FlatRecipeOption;
   /** 2–3 варианта на выбор (режим «по рецептам») */
   recipeOptions?: FlatRecipeOption[];
   /** Имена уже показанных вариантов — для кнопки «Другие варианты» */
@@ -113,6 +117,34 @@ export function rebuildRecipeFromFlat(flat: FlatRecipeOption): Recipe {
     ingredientIds: flat.ingredientIds,
     portions: flat.portions,
   };
+}
+
+/**
+ * Совместимость двух рецептов в ОДНОМ приёме. Два блюда не должны быть:
+ *  (а) одним и тем же рецептом (дубль);
+ *  (б) из одного «профиля» основного белка (две курицы / два коровьих);
+ *  (в) однотипной углеводной основой (две каши / две пасты).
+ * Возвращает {compatible, reason} — reason = подсказка пользователю при отказе.
+ */
+export function recipeCompatibility(a: Recipe & { ingredientIds?: string[] }, b: Recipe & { ingredientIds?: string[] }): { compatible: boolean; reason: string } {
+  if (a.name === b.name) return { compatible: false, reason: 'Это уже выбранный рецепт этого приёма' };
+  const idsA = a.ingredientIds || [];
+  const idsB = b.ingredientIds || [];
+  const aSet = new Set(idsA);
+  // Пересечение ингредиентов-«основ»: если два рецепта делят ≥2 ключевых продукта, вероятен дубль-профиль.
+  const shared = idsB.filter(id => aSet.has(id));
+  const sharedKey = shared.filter(id => {
+    const f = FOOD_DB.find(x => x.id === id);
+    if (!f) return false;
+    const cat = f.category;
+    return cat === 'protein' || cat === 'grain' || cat === 'carb' || cat === 'veg_fruit' || cat === 'fast_food';
+  });
+  if (sharedKey.length >= 3) return { compatible: false, reason: `Слишком похожи по составу (${sharedKey.length} общих ключевых продукта)` };
+  if (sharedKey.length >= 2) {
+    // Два общих — только если это «фоновые» (масло/специи) не критично; но 2 ключевых = осторожно
+    return { compatible: false, reason: 'Похожие рецепты (много общих ингредиентов) — второй не добавит разнообразия' };
+  }
+  return { compatible: true, reason: '' };
 }
 
 /**
@@ -469,10 +501,25 @@ export function rebalanceDayAfterRecipes(
     work.forEach((m, mi) => {
       // Aug 28: в рецептурных приёмах авторское ЯДРО не трогается, но САЙД-добивка
       // (продукт не из ingredientIds рецепта) — сжимаема, иначе перебор неустраним.
-      // Без ingredientIds в данных — консервативно считаем ВСЁ ядром.
-      const coreIds = m.recipeApplied
-        ? new Set<string>(m.recipeAppliedData?.ingredientIds && m.recipeAppliedData.ingredientIds.length > 0 ? m.recipeAppliedData.ingredientIds : (m.items || []).map(i => i.id))
-        : null;
+      // Без ingredientIds в данных — консервативно считаем ВСЁ ядром. Второй рецепт — тоже ядро.
+      const _coreOfMeal = (d: FlatRecipeOption | undefined): Set<string> | null =>
+        d && d.ingredientIds && d.ingredientIds.length > 0
+          ? new Set<string>(d.ingredientIds)
+          : null; // без ids → весь приём ядро
+      const coreIds = (() => {
+        if (!m.recipeApplied && !(m as any).recipeApplied2) return null;
+        // собираем явные ingredientIds всех рецептов; если хотя бы у одного нет ids — весь приём ядро
+        const s = new Set<string>();
+        let allAll = false;
+        const addOf = (d: FlatRecipeOption | undefined) => {
+          const c = _coreOfMeal(d);
+          if (c) c.forEach(x => s.add(x));
+          else allAll = true;
+        };
+        if (m.recipeApplied) addOf(m.recipeAppliedData);
+        if ((m as any).recipeApplied2) addOf((m as any).recipeAppliedData2);
+        return allAll ? new Set<string>((m.items || []).map(i => i.id)) : s;
+      })();
       (m.items || []).forEach((it, ii) => {
         if (coreIds && coreIds.has(it.id)) return;
         if (mi === lastAddedMeal && it.id === lastAddedId) return; // свежий top-ап не режем
@@ -654,11 +701,12 @@ export function buildRecipeCookingPlan(
   return { steps, totalTime, containers };
 }
 
-/** Собирает применённые рецепты из плана дня (для карточки готовки). */
+/** Собирает применённые рецепты из плана дня (для карточки готовки). Поддерживает 2 рецепта на приём. */
 export function collectAppliedRecipes(plan: any): { label: string; recipe: FlatRecipeOption }[] {
   const out: { label: string; recipe: FlatRecipeOption }[] = [];
-  (plan?.meals || []).forEach((m: PlanMealLike) => {
+  (plan?.meals || []).forEach((m: any) => {
     if (m.recipeApplied && m.recipeAppliedData) out.push({ label: m.label || 'Приём', recipe: m.recipeAppliedData });
+    if (m.recipeApplied2 && m.recipeAppliedData2) out.push({ label: m.label || 'Приём', recipe: m.recipeAppliedData2 });
   });
   return out;
 }

@@ -27,7 +27,7 @@ import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplac
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
 import { DEFAULT_TRAIN_SCHEDULE, normalizeTrainSchedule, isTrainingDayFor, buildTrainSchedule, type TrainScheduleType, type TrainSchedule } from "./planner-training-schedule"; // FIX train-bind: плавающий график тренировок
 import { decomposeRecipe, pickRecipeForMeal, pickRecipesForMeal, cookProfileFromSettings, prepTimeBudgetPerMeal, filterByCookSkill, type CookProfile } from "./recipe-engine";
-import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget } from "./planner-recipe-mode";
+import { kbjuFormulaDeviationPct, isMainMealLabel, mealTypeFromLabel, flattenRecipeOption, rebuildRecipeFromFlat, buildRecipeMealItems, sumMealTotals, sumDayTotals, pickRecipeOptions, rebalanceDayAfterRecipes, buildShoppingFromPlans, buildRecipeCookingPlan, collectAppliedRecipes, assembleRecipeDay, scaleRecipeToTarget, recipeCompatibility } from "./planner-recipe-mode";
 import type { FlatRecipeOption } from "./planner-recipe-mode";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import type { LabCompositeResult } from "../../../../engines/lab-analysis.engine";
@@ -214,6 +214,7 @@ export interface PlanCtx {
   updateItemAmount: (a: number, b: number, c: number, d: number) => void;
   removeFoodItem: (a: number, b: number, c: number) => void;
   replaceMealWithRecipe: (recipe: Recipe, mealIdx: number, dayIdx?: number) => void;
+  addSecondRecipeToMeal: (recipe: Recipe, mealIdx: number, dayIdx: number) => void;
   addFoodToMeal: (dayIdx: number, mealIdx: number, food: any) => void;
 addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   generatePlan: (days: 1 | 3 | 7, weekIndex?: number, dayIndex?: number, opts?: { skipUndo?: boolean; async?: boolean; overrides?: { mealsCount?: number } }) => void;
@@ -2164,6 +2165,66 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     setRecipePickerMeal(null);
   };
 
+  /**
+   * Добавление ВТОРОГО рецепта в приём, где уже выбран первый. Два блюда делят цель приёма:
+   * второй масштабируется к ОСТАТКУ (цель приёма − факт первого рецепта), совместимость
+   * проверяется (не дубль, не тот же белковый/углеводный профиль). Продукты обоих рецептов
+   * объединяются, приём помечается recipeApplied2/recipeAppliedData2.
+   */
+  const addSecondRecipeToMeal = (recipe: Recipe, mealIdx: number, dayIdx: number) => {
+    const resolveMeals = (): { meals: any[]; plan: 'day' | 'three' | 'week'; day: number } | null => {
+      if (dayIdx === 0) return { meals: dayPlan?.meals || [], plan: 'day', day: 0 };
+      const r = _resolvePlanDay(dayIdx);
+      if (!r || r.plan === 'day') return null;
+      const p: any = r.plan === 'three' ? threeDayPlan : weekPlan;
+      if (!p?.days?.[r.day]) return null;
+      return { meals: p.days[r.day].meals, plan: r.plan, day: r.day };
+    };
+    const resolved = resolveMeals();
+    if (!resolved || mealIdx < 0 || mealIdx >= resolved.meals.length) { setRecipePickerMeal(null); return; }
+    const m = resolved.meals[mealIdx];
+    if (!m || !m.recipeApplied) { setRecipePickerMeal(null); return; }
+    // Совместимость
+    const comp = recipeCompatibility(m.recipeAppliedData as any, recipe as any);
+    if (!comp.compatible) {
+      if (typeof (window as any).showToast === 'function') (window as any).showToast(`⚠ ${comp.reason}`, 'warning');
+      setRecipePickerMeal(null);
+      return;
+    }
+    saveUndo();
+    const items2 = buildRecipeMealItems(recipe) || [];
+    if (items2.length === 0) { setRecipePickerMeal(null); return; }
+    const mergedItems = [...(m.items || []), ...items2];
+    const flat2 = flattenRecipeOption(recipe);
+    const patched = resolved.meals.map((x: any, i: number) => i === mealIdx
+      ? { ...x, items: mergedItems, totals: sumMealTotals(mergedItems), recipeApplied2: recipe.name, recipeAppliedData2: flat2 }
+      : x);
+    const pre = sumDayTotals(patched as any);
+    const rb = rebalanceDayAfterRecipes(patched as any, {
+      kcal: effectiveKcal > 0 ? effectiveKcal : pre.kcal,
+      p: effectiveP > 0 ? effectiveP : pre.p,
+      f: effectiveF > 0 ? effectiveF : pre.f,
+      c: effectiveC > 0 ? effectiveC : pre.c,
+    });
+    const resMeals = rb.meals as any[];
+    if (resolved.plan === 'day') {
+      setDayPlan({ ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any) });
+    } else if (resolved.plan === 'three') {
+      const days = [...threeDayPlan!.days];
+      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      setThreeDayPlan({ ...threeDayPlan!, days, totals: sumMultiTotals(days) });
+      if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
+    } else {
+      const days = [...weekPlan!.days];
+      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      setWeekPlan({ ...weekPlan!, days, totals: sumMultiTotals(days) });
+      if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
+    }
+    setShoppingList(buildShoppingFromPlans(resolved.plan === 'day' ? [ { ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any) } ] : (resolved.plan === 'three' ? threeDayPlan!.days : weekPlan!.days)));
+    if (typeof (window as any).showToast === 'function') (window as any).showToast(`🍳 Второй рецепт «${recipe.name}» добавлен в приём`, 'success');
+    setRecipePickerMeal(null);
+  };
+
   const toggleAllergen = (id: string) => {
     setAllergens(prev => {
       const updated = prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id];
@@ -3311,7 +3372,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     suppSearch, setSuppSearch, newRecipe, setNewRecipe,
     saveUndo, moveFoodItem, findSimilarFoods, replaceFoodItem,
     quickAddMealIdx, setQuickAddMealIdx, quickAddSearch, setQuickAddSearch,
-    updateItemAmount, removeFoodItem, replaceMealWithRecipe, generatePlan,
+    updateItemAmount, removeFoodItem, replaceMealWithRecipe, addSecondRecipeToMeal, generatePlan,
     generationMode, setGenerationMode,
     favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe,
     pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced,

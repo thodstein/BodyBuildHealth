@@ -16,7 +16,7 @@ import { foodAvailableForPlan, stapleFamilyOf } from './food-availability';
 
 export interface DayTargets { kcal: number; p: number; f: number; c: number; }
 export interface CorrectorItem { id: string; name: string; amount: number; kcal: number; p: number; f: number; c: number; fiber?: number; leucine_mg?: number; role?: string; _fixedGrams?: number; }
-export interface CorrectorMeal { label?: string; type?: string; items: CorrectorItem[]; totals?: { kcal: number; p: number; f: number; c: number; fiber?: number }; recipeApplied?: string; recipeAppliedData?: { ingredientIds?: string[] }; }
+export interface CorrectorMeal { label?: string; type?: string; items: CorrectorItem[]; totals?: { kcal: number; p: number; f: number; c: number; fiber?: number }; recipeApplied?: string; recipeAppliedData?: { ingredientIds?: string[] }; recipeApplied2?: string; recipeAppliedData2?: { ingredientIds?: string[] }; }
 
 function sumTotals(meals: CorrectorMeal[]): DayTargets & { fiber: number } {
   let kcal = 0, p = 0, f = 0, c = 0, fiber = 0;
@@ -66,11 +66,22 @@ function scaleItem(it: CorrectorItem, newAmount: number): void {
 }
 
 function isCoreRecipeItem(meal: CorrectorMeal, itemId: string): boolean {
-  if (!meal.recipeApplied) return false;
-  const ids = meal.recipeAppliedData?.ingredientIds;
-  if (ids && ids.length > 0) return ids.includes(itemId);
-  // без ids — консервативно считаем весь приём ядром (не трогаем без нужды)
-  return true;
+  const inCore = (d: { ingredientIds?: string[] } | undefined): boolean | null => {
+    // null = «без ingredientIds → консервативно весь приём ядро»
+    if (!d || !d.ingredientIds || d.ingredientIds.length === 0) return null;
+    return d.ingredientIds.includes(itemId);
+  };
+  if (meal.recipeApplied) {
+    const r = inCore(meal.recipeAppliedData);
+    if (r !== null) return r;
+    if (!meal.recipeApplied2) return true; // один рецепт без ids — весь приём ядро (старое поведение)
+  }
+  if (meal.recipeApplied2) {
+    const r2 = inCore(meal.recipeAppliedData2);
+    if (r2 !== null) return r2;
+    return true; // второй рецепт без ids — его часть ядро
+  }
+  return false;
 }
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).

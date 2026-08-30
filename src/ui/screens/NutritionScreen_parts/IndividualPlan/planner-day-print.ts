@@ -84,7 +84,10 @@ export function buildCoachExportHtml(args: {
   // Приёмы с продуктами
   const mealRows = (Array.isArray(meals) ? meals : []).map((m: any) => {
     const items = Array.isArray(m.items) ? m.items : [];
-    const recipeBadge = m.recipeApplied ? `<span style="font-size:11px;color:#c2620a">🍳 ${esc(m.recipeApplied)}</span>` : '';
+    const recipeBadge = [
+      m.recipeApplied ? `<span style="font-size:11px;color:#c2620a">🍳 ${esc(m.recipeApplied)}</span>` : '',
+      m.recipeApplied2 ? `<span style="font-size:11px;color:#b45309">🍳 +${esc(m.recipeApplied2)}</span>` : '',
+    ].filter(Boolean).join(' ');
     return `<tr>
       <td style="padding:6px;border:1px solid #ddd;font-size:12px;white-space:nowrap">${esc(m.time || '')}</td>
       <td style="padding:6px;border:1px solid #ddd;font-size:12px"><b>${esc(m.label || '')}</b> ${recipeBadge}
@@ -97,10 +100,14 @@ export function buildCoachExportHtml(args: {
     </tr>`;
   }).join('');
 
-  // Рецепты: ингредиенты + шаги
-  const applied = (Array.isArray(meals) ? meals : []).filter((m: any) => m?.recipeApplied && m?.recipeAppliedData);
-  const recipeBlocks = applied.map((m: any) => {
-    const r = m.recipeAppliedData;
+  // Рецепты: ингредиенты + шаги (оба рецепта на приём)
+  const applied = (Array.isArray(meals) ? meals : []).flatMap((m: any) => {
+    const list: any[] = [];
+    if (m?.recipeApplied && m?.recipeAppliedData) list.push({ label: m.label, r: m.recipeAppliedData });
+    if (m?.recipeApplied2 && m?.recipeAppliedData2) list.push({ label: m.label, r: m.recipeAppliedData2 });
+    return list;
+  });
+  const recipeBlocks = applied.map(({ label, r }: any) => {
     const ing = Array.isArray(r.ingredients) && r.ingredients.length > 0
       ? `<ul style="margin:4px 0 0 18px;padding:0">${r.ingredients.map((i: string) => `<li style="font-size:12px;margin-bottom:2px">${esc(i)}</li>`).join('')}</ul>`
       : '';
@@ -108,7 +115,7 @@ export function buildCoachExportHtml(args: {
       ? `<ol style="margin:6px 0 0 18px;padding:0">${r.instructions.map((s: string) => `<li style="font-size:12px;margin-bottom:3px">${esc(s)}</li>`).join('')}</ol>`
       : '';
     return `<div style="page-break-inside:avoid;border:1px solid #f9731633;background:#fff8f2;border-radius:10px;padding:10px;margin-bottom:10px">
-      <b style="font-size:13px">${esc(m.label)}: ${esc(r.name)}</b>
+      <b style="font-size:13px">${esc(label)}: ${esc(r.name)}</b>
       <span style="float:right;font-size:11px;color:#888">⏱ ${esc(String(r.prepTimeMin ?? ''))} мин · ${Math.round(r.kcal)} ккал · Б${r.protein}/Ж${r.fat}/У${r.carbs}</span>
       <div style="font-size:11px;font-weight:700;margin-top:6px;color:#c2620a">Ингредиенты:</div>${ing}
       <div style="font-size:11px;font-weight:700;margin-top:6px;color:#c2620a">Приготовление:</div>${steps}
@@ -165,10 +172,14 @@ export function downloadCoachExport(html: string, filename: string): boolean {
  */
 export function buildRecipePlanPrintHtml(day: any): string {
   const meals = Array.isArray(day?.meals) ? day.meals : [];
-  const applied = meals.filter((m: any) => m?.recipeApplied && m?.recipeAppliedData);
+  const applied = meals.flatMap((m: any) => {
+    const list: any[] = [];
+    if (m?.recipeApplied && m?.recipeAppliedData) list.push({ m, r: m.recipeAppliedData });
+    if (m?.recipeApplied2 && m?.recipeAppliedData2) list.push({ m, r: m.recipeAppliedData2 });
+    return list;
+  });
   const t = day?.totals || { kcal: 0, p: 0, f: 0, c: 0 };
-  const recipeBlocks = applied.map((m: any) => {
-    const r = m.recipeAppliedData;
+  const recipeBlocks = applied.map(({ m, r }: any) => {
     const ing = Array.isArray(r.ingredients) && r.ingredients.length > 0
       ? `<ul style="margin:4px 0 0 18px;padding:0">${r.ingredients.map((i: string) => `<li style="font-size:13px;margin-bottom:2px">${esc(i)}</li>`).join('')}</ul>`
       : '';

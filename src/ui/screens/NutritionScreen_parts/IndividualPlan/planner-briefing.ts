@@ -12,7 +12,7 @@ export interface BriefingArgs {
   /** Цели дня */
   goals: { kcal: number; p: number; f: number; c: number };
   /** Приёмы дня (label/time/items) — опционально recipeApplied */
-  meals: Array<{ label?: string; time?: string; recipeApplied?: string }>;
+  meals: Array<{ label?: string; time?: string; recipeApplied?: string; recipeApplied2?: string }>;
   /** Тренировочный день? */
   isTrainingDay: boolean;
   /** Время тренировки 'HH:MM' (опционально) */
@@ -65,6 +65,10 @@ export function buildDayBriefing(args: BriefingArgs): DayBriefing {
     if (m?.recipeApplied && !seen.has(m.recipeApplied)) {
       seen.add(m.recipeApplied);
       cookToday.push(m.recipeApplied);
+    }
+    if (m?.recipeApplied2 && !seen.has(m.recipeApplied2)) {
+      seen.add(m.recipeApplied2);
+      cookToday.push(m.recipeApplied2);
     }
   });
 
