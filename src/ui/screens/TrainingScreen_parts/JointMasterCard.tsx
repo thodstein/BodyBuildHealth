@@ -31,7 +31,7 @@ const SECTIONS: Array<{id:string; label:string; icon:string; accent:string}> = [
   {id:'sec-video', label:'5 Видео', icon:'🎥', accent:'#f59e0b'},
   {id:'sec-jsi', label:'0 JSI', icon:'🔥', accent:'#f43f5e'},
 ];
-const JOINT_COLOR: Record<JointId,string> = { shoulder:'#f43f5e', elbow:'#fb923c', wrist:'#facc15', spine:'#ef4444', hip:'#a78bfa', knee:'#38bdf8', ankle:'#4ade80' };
+const JOINT_COLOR: Record<JointId,string> = { shoulder:'#f43f5e', elbow:'#fb923c', wrist:'#facc15', spine:'#ef4444', hip:'#a78bfa', knee:'#38bdf8', ankle:'#4ade80', neck:'#f472b6' };
 const LEVEL_RU: Record<string,string> = { critical: 'Критично', high: 'Высокий', moderate: 'Средний', medium: 'Средний', low: 'Низкий', none: 'Нет' };
 const PHASE_RU: Record<string,string> = { acute: 'Острая', subacute: 'Подострая', chronic: 'Хроническая', normal: 'Норма', stable: 'Стабильная' };
 const DIFF_RU: Record<string,string> = { hard: 'Тяжёлая', medium: 'Средняя', light: 'Лёгкая', off: 'Отдых' };

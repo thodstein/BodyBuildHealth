@@ -138,5 +138,5 @@ export function buildCompactJsiSummary(
 
 export { JSI_LEVEL_COLOR, JSI_LEVEL_BG };
 export const JOINT_RU: Record<JointId, string> = {
-  wrist: 'Кисть', elbow: 'Локоть', shoulder: 'Плечо', spine: 'Поясница', hip: 'Таз', knee: 'Колено', ankle: 'Голеностоп',
+  wrist: 'Кисть', elbow: 'Локоть', shoulder: 'Плечо', spine: 'Поясница', hip: 'Таз', knee: 'Колено', ankle: 'Голеностоп', neck: 'Шея',
 };

@@ -17,13 +17,13 @@ const btn: React.CSSProperties = { padding:'5px 10px', borderRadius:7, cursor:'p
 const LIFT_RU: Record<Lift,string> = { bench:'Жим лёжа', squat:'Присед', deadlift:'Становая', ohp:'Жим стоя', row:'Тяга в наклоне', pulldown:'Тяга блока', incline_press:'Наклонный жим', sumo:'Сумо', biceps:'Бицепс', triceps:'Трицепс', calf:'Икры', shrug:'Шраги' };
 const AMPLITUDE_OPTS: {id:AmplitudeMode; label:string}[] = [
   {id:'full', label:'Полная'}, {id:'partial_top', label:'Частичная верх'}, {id:'partial_stretched', label:'Частичная растянутая (HIGH RISK)'}];
-const JOINTS: JointId[] = ['wrist','elbow','shoulder','spine','hip','knee','ankle'];
+const JOINTS: JointId[] = ['wrist','elbow','shoulder','spine','hip','knee','ankle','neck'];
 
 // тепловой силуэт — упрощённый человечек, суставы — кружки с цветом JSI
 const Silhouette: React.FC<{ perJoint: Record<JointId,{level:string}> }> = ({ perJoint }) => {
   const pos: Record<JointId,{x:number;y:number}> = {
     shoulder:{x:50,y:32}, elbow:{x:24,y:48}, wrist:{x:18,y:58},
-    spine:{x:50,y:54}, hip:{x:50,y:68}, knee:{x:42,y:84}, ankle:{x:42,y:96},
+    spine:{x:50,y:54}, hip:{x:50,y:68}, knee:{x:42,y:84}, ankle:{x:42,y:96}, neck:{x:50,y:20},
   };
   return (
     <svg viewBox="0 0 100 110" width="100%" style={{ maxWidth:260, display:'block', margin:'0 auto' }}>

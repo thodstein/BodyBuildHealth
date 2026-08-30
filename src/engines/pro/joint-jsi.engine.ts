@@ -96,8 +96,8 @@ export interface JointJsiResult {
 
 // ── Константы ──
 
-const JOINTS: JointId[] = ['wrist','elbow','shoulder','spine','hip','knee','ankle'];
-const JOINT_RU: Record<JointId,string> = { wrist:'Кисть', elbow:'Локоть', shoulder:'Плечо', spine:'Поясница L4-S1', hip:'Таз', knee:'Колено', ankle:'Голеностоп' };
+const JOINTS: JointId[] = ['wrist','elbow','shoulder','spine','hip','knee','ankle','neck'];
+const JOINT_RU: Record<JointId,string> = { wrist:'Кисть', elbow:'Локоть', shoulder:'Плечо', spine:'Поясница L4-S1', hip:'Таз', knee:'Колено', ankle:'Голеностоп', neck:'Шея' };
 
 // K_base: нагрузка сустава в лифте (0..1.2). Сумма по суставу ≈ кинематическая цепь.
 const K_BASE: Record<Lift, Partial<Record<JointId, number>>> = {
