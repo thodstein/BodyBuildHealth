@@ -915,6 +915,8 @@ let _qualityMode: 'full' | 'basic' = 'full';
 let _currentBudget: string = 'medium';
 let _currentWeightKg: number = 80;
 let _currentExcludedIds: Set<string> | undefined = undefined;
+// F1 (Эпик F): г/кг углей текущего дня — включает второй гарнир на high-carb bulk-днях.
+let _currentCarbGPerKg: number = 0;
 
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
@@ -1567,6 +1569,23 @@ function buildWholeMeal(
       // внутри buildWholeMeal убран намеренно: он ломал сходимость белка/жиров (side-эффекты
       // белка в углеводных носителях) и возвращал «гречка+рис» — остаток добирается
       // рецептурным сайдом (recipe-режим) или посадкой.
+      // F1 (Эпик F): ИСКЛЮЧЕНИЕ — высокоуглеводные дни (≥6 г/кг, bulk 8-10 г/кг): E5-фрукт
+      // не закрывает остаток, «Перегрузка приёма» неизбежна. Второй гарнир из ДРУГОГО
+      // семейства (не «гречка+рис» одного вида) с реалистичной порцией ≤250 г.
+      if (!breakfast && _currentCarbGPerKg >= 6 && remC > 40 && pool.carbSlow.length > 0) {
+        const usedIds2 = new Set(items.map(i => i.id));
+        const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
+        const alt2 = pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id)
+          && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam);
+        const src2 = alt2.length > 0 ? pickPriority(alt2, seed + 27, { lockedIds, recentIds, hardRecentIds }) : undefined;
+        if (src2) {
+          const g2 = Math.min(gramsForMacro(src2, remC, 'carbs', carbPortionCap(src2)), 250);
+          if (g2 >= 50) {
+            const it2 = makeItem(src2, g2, 'carb_slow');
+            items.push(it2); remP -= it2.p; remF -= it2.f; remC -= it2.c;
+          }
+        }
+      }
     }
   }
 
@@ -2116,6 +2135,8 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _qualityMode = input.quality === 'basic' ? 'basic' : 'full';
   _currentBudget = input.budget || 'medium';
   _currentWeightKg = Number.isFinite(input.weightKg) && input.weightKg > 0 ? input.weightKg : 80;
+  // F1 (Эпик F): г/кг углей дня — для включения второго гарнира на high-carb днях.
+  _currentCarbGPerKg = (input.goalCarbsG || 0) / Math.max(1, input.weightKg || 80);
   _currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
@@ -4405,6 +4426,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     // A6 (санитария): _currentBudget/_currentWeight тоже сбрасывается — иначе протекал между вызовами
     _currentBudget = 'medium';
     _currentWeightKg = 80;
+    _currentCarbGPerKg = 0;
   }
 }
 

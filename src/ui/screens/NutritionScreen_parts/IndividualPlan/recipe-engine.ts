@@ -369,6 +369,21 @@ export function scoreRecipeForMeal(recipe: Recipe, opts: RecipeMatchOptions): nu
     if (has('пп')) score += 3;
   }
 
+  // E1 (Эпик E): bbScore-бонус — средний bb_quality_score декомпозиции слегка
+  // смещает выбор к качественным рецептам (8+ → +4, <5 → −3), не решая исход.
+  if (recipe.ingredientIds && recipe.ingredientIds.length > 0) {
+    let sum = 0; let n = 0;
+    for (const fid of recipe.ingredientIds) {
+      const f = FOOD_DB.find(x => x.id === fid);
+      if (f && typeof (f as any).bb_quality_score === 'number') { sum += (f as any).bb_quality_score; n++; }
+    }
+    if (n > 0) {
+      const avg = sum / n;
+      if (avg >= 8) score += 4;
+      else if (avg < 5) score -= 3;
+    }
+  }
+
   // D5 (порционные якоря): рецепт рассчитан на определённую массу атлета
   // (baseWeightKg; derived из тегов «масса»→110 кг / «сушка»→80 кг, если не задан явно).
   // Крупный атлет на 110-кг порции — +8, на 80-кг суша-порции — −6 (и наоборот).
