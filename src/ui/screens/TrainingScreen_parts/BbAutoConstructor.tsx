@@ -3869,19 +3869,24 @@ export const BbAutoConstructor: React.FC = () => {
           <div style={{ display: generalSafetyLoadOpen ? 'block' : 'none', padding:'8px 12px' }}>
             {safetyScore && (
           <div role="status" aria-label={`SafetyScore ${safetyScore.score} из 100`} style={{ marginBottom: 10, borderRadius: 14, border: `1px solid ${safetyScore.riskLevel === 'safe' ? '#22c55e' : safetyScore.riskLevel === 'caution' ? '#f59e0b' : '#ef4444'}`, background: 'rgba(255,255,255,0.03)', overflow:'hidden' }}>
-            {/* Header gauge + overall */}
-            <div style={{ padding: 12, display:'flex', gap:12, alignItems:'center', background: `linear-gradient(135deg, ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.14)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.14)':'rgba(239,68,68,0.14)'}, transparent)`}}>
+            <button type="button" onClick={() => setSafetyOpen(v=>!v)} aria-expanded={safetyOpen} style={{ width:'100%', display:'flex', gap:12, alignItems:'center', padding:12, cursor:'pointer', background: `linear-gradient(135deg, ${safetyScore.riskLevel==='safe'?'rgba(34,197,94,0.14)': safetyScore.riskLevel==='caution'?'rgba(245,158,11,0.14)':'rgba(239,68,68,0.14)'}, transparent)`, border:'none', borderBottom: safetyOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
               <div style={{ width:62, height:62, borderRadius:16, display:'flex', alignItems:'center', justifyContent:'center', background: safetyScore.riskLevel==='safe'?'#22c55e': safetyScore.riskLevel==='caution'?'#f59e0b':'#ef4444', color:'#000', fontWeight:900, fontSize:22, boxShadow:'0 4px 12px rgba(0,0,0,0.25)' }}>{safetyScore.score}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:13, fontWeight:800, color:'#fff' }}>🛡 Безопасность плана: {safetyScore.score}/100 · {safetyScore.riskLevel === 'safe' ? 'Безопасный' : safetyScore.riskLevel === 'caution' ? 'Требует внимания' : 'Опасный'}</div>
                 <div style={{ fontSize:11, color:'#fff', opacity:0.9, marginTop:2, lineHeight:1.3 }}>{safetyScore.recommendations[0]}</div>
                 <div style={{ fontSize:10, color:'#fff', opacity:0.55, marginTop:4 }}>Веса: суставы 20 · ACWR 20 · восстановление 15 · травмы 15 · MRV 15 · частота 5 · баланс 10 = 100 · Формула каждого фактора — ниже</div>
               </div>
-            </div>
-            {/* Factor breakdown with calculations */}
+              <span style={{ width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:13, transform: safetyOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+            </button>
+            <div style={{ display: safetyOpen ? 'block' : 'none' }}>
+            {/* Factor breakdown — сворачиваемая карточка с кнопкой */}
             {safetyScore.details?.factorBreakdown && (
-              <div style={{ padding:'8px 12px', display:'grid', gridTemplateColumns:'1fr', gap:6, background:'rgba(0,0,0,0.08)' }}>
-                <div style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, letterSpacing:0.3, textTransform:'uppercase' }}>Расчёт по факторам — откуда баллы</div>
+              <div style={{ padding:0, overflow:'hidden', background:'rgba(0,0,0,0.08)', borderBottom:'1px solid rgba(255,255,255,0.06)', borderRadius:8 }}>
+                <button type="button" onClick={() => setSafetyFactorsOpen(v=>!v)} aria-expanded={safetyFactorsOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', cursor:'pointer', background:'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02))', border:'none', borderBottom: safetyFactorsOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
+                  <span style={{ fontSize:10, fontWeight:800, color:'#fff', opacity:0.7, letterSpacing:0.3, textTransform:'uppercase' }}>🧮 Расчёт по факторам — откуда баллы</span>
+                  <span style={{ width:24, height:24, borderRadius:7, display:'inline-flex', alignItems:'center', justifyContent:'center', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'#fff', fontSize:11, transform: safetyFactorsOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition:'transform 0.2s' }}>▼</span>
+                </button>
+                <div style={{ display: safetyFactorsOpen ? 'grid' : 'none', padding:'8px 12px', gridTemplateColumns:'1fr', gap:6 }}>-
                 {safetyScore.details.factorBreakdown.map(f=> (
                   <div key={f.key} style={{ padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -4155,9 +4160,10 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   </div>
                 </div>
+                </div>
               </div>
             )}
-
+            </div>
           </div>
         )}
         <div style={{ marginBottom:8, padding:'12px 14px', borderRadius:14, background:'linear-gradient(135deg, rgba(96,165,250,0.18), rgba(96,165,250,0.05))', border:'1px solid rgba(96,165,250,0.24)' }}>
@@ -4549,7 +4555,7 @@ export const BbAutoConstructor: React.FC = () => {
                                 if (!proQ) return null;
                                 const findPat = proQ.patterns.find((p:any)=> p.muscle===m.muscle || (m.muscle==='chest' && p.muscle==='chest') || (m.muscle==='back' && p.muscle==='back') || (['quads','hamstrings','glutes','calves'].includes(m.muscle) && p.muscle==='legs') || (['delt_front','delt_mid','delt_rear'].includes(m.muscle) && p.muscle==='shoulders') || (['biceps','triceps','forearms'].includes(m.muscle) && p.muscle==='arms') || (m.muscle==='abs' && p.muscle==='core'));
                                 const findAng = proQ.angles.find((a:any)=> a.muscle===m.muscle || (['quads','hamstrings','glutes'].includes(m.muscle) && a.muscle==='legs') || (['delt_front','delt_mid','delt_rear'].includes(m.muscle) && a.muscle==='shoulders') || (m.muscle==='chest' && a.muscle==='chest') || (m.muscle==='back' && a.muscle==='back'));
-                                const findStr = proQ.stretches.find((s:any)=> s.muscle===m.muscle);
+                                const findStr = proQ.stretches.find((s:any)=> s.muscle===m.muscle || (['delt_front','delt_mid','delt_rear'].includes(m.muscle) && s.muscle==='shoulders') || (['quads','hamstrings','glutes','calves'].includes(m.muscle) && s.muscle==='legs') || (['biceps','triceps','forearms'].includes(m.muscle) && s.muscle==='arms') || (m.muscle==='abs' && s.muscle==='core'));
                                 if (!findPat && !findAng && !findStr) return null;
                                 return (
                                   <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)', fontSize:10, color:'#fff', lineHeight:1.35 }}>
