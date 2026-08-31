@@ -1,7 +1,7 @@
 /**
  * CombatUI.tsx — Apple-уровень UI-слой для единоборств (фиолетовая ветка).
- * Human Interface Guidelines: SF Pro, 8pt grid, hairline, vibrancy, spring motion.
- * Тёмная тема — системный фон, inset-grouped карточки, sheets.
+ * HIG: SF Pro, hairline 0.5, vibrancy 20px saturate 180%, spring motion, sheets.
+ * Полный редизайн: попапы-карточки, заголовки, выделения — premium native.
  */
 import React from 'react';
 
@@ -73,7 +73,7 @@ export const LABEL: React.CSSProperties = {
 export const HINT: React.CSSProperties = { fontSize: 13, color: TEXT_2, lineHeight: 1.45, fontFamily: SF, fontWeight: 400 };
 export const HINT_SM: React.CSSProperties = { fontSize: 11, color: TEXT_3, lineHeight: 1.4, fontFamily: SF };
 
-// Apple buttons — 14pt, semibold, 10pt radius, 44pt min, no heavy glow
+// Apple buttons — 15pt, semibold, 10pt radius, 44pt min
 export const BTN: React.CSSProperties = {
   padding: '11px 18px',
   borderRadius: RADIUS_MD,
@@ -201,19 +201,19 @@ export const SectionCard: React.FC<{
         {icon && (
           <span style={{
             width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: accent ? ACCENT : 'rgba(58,58,60,0.72)',
+            background: accent ? ACCENT : 'rgba(58,58,60,0.72)', border: `0.5px solid ${accent ? ACCENT_BORDER : SEPARATOR}`,
             fontSize: 14, flexShrink: 0, fontFamily: SF,
           }}>{icon}</span>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_1, letterSpacing: -0.02 * 15, fontFamily: SF }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1 }}>{subtitle}</div>}
+          {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1, lineHeight: 1.35 }}>{subtitle}</div>}
         </div>
         {right}
       </div>
     )}
     {children}
-    {hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12 }}>{hint}</div>}
+    {hint && <div style={{ ...HINT, background: 'rgba(58,58,60,0.36)', border: `0.5px solid ${SEPARATOR}`, borderRadius: 8, padding: '8px 10px', fontSize: 12, lineHeight: 1.4 }}>{hint}</div>}
   </div>
 );
 
@@ -226,7 +226,7 @@ export const StatTile: React.FC<{ label: string; value: string; color?: string; 
     <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF, display: 'flex', alignItems: 'center', gap: 4 }}>
       {icon && <span style={{ fontSize: 11 }}>{icon}</span>}{label}
     </span>
-    <span style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1, letterSpacing: -0.02 * 22, fontFamily: SF }}>{value}</span>
+    <span style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1, letterSpacing: -0.02 * 22, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}</span>
     {sub && <span style={{ fontSize: 11, color: TEXT_3, fontFamily: SF }}>{sub}</span>}
   </div>
 );
@@ -240,16 +240,16 @@ export const Badge: React.FC<{ color?: string; bg?: string; border?: string; ico
 );
 
 export const InfoBanner: React.FC<{ tone?: 'ok' | 'warn' | 'info' | 'accent'; children: React.ReactNode }> = ({ tone = 'info', children }) => {
-  const pal = tone === 'warn' ? { color: '#FF9F0A', bg: 'rgba(255,159,10,0.12)', border: 'rgba(255,159,10,0.24)' }
-    : tone === 'ok' ? { color: '#30D158', bg: 'rgba(48,209,88,0.10)', border: 'rgba(48,209,88,0.20)' }
-    : tone === 'accent' ? { color: '#BF5AF2', bg: 'rgba(175,82,222,0.10)', border: 'rgba(175,82,222,0.18)' }
-    : { color: '#64D2FF', bg: 'rgba(100,210,255,0.10)', border: 'rgba(100,210,255,0.18)' };
+  const pal = tone === 'warn' ? { color: '#FF9F0A', bg: 'rgba(255,159,10,0.12)', border: 'rgba(255,159,10,0.24)', icon: '⚠️' }
+    : tone === 'ok' ? { color: '#30D158', bg: 'rgba(48,209,88,0.10)', border: 'rgba(48,209,88,0.20)', icon: '✓' }
+    : tone === 'accent' ? { color: '#BF5AF2', bg: 'rgba(175,82,222,0.10)', border: 'rgba(175,82,222,0.18)', icon: '◆' }
+    : { color: '#64D2FF', bg: 'rgba(100,210,255,0.10)', border: 'rgba(100,210,255,0.18)', icon: 'ℹ︎' };
   return (
     <div role="status" style={{
       fontSize: 13, color: pal.color, background: pal.bg, border: `0.5px solid ${pal.border}`,
-      borderRadius: 10, padding: '10px 12px', lineHeight: 1.4, fontFamily: SF, display: 'flex', gap: 8, alignItems: 'flex-start',
+      borderRadius: 10, padding: '10px 12px', lineHeight: 1.45, fontFamily: SF, display: 'flex', gap: 8, alignItems: 'flex-start',
     }}>
-      <span style={{ fontSize: 13, marginTop: 0, flexShrink: 0, fontFamily: SF }}>{tone === 'warn' ? '⚠️' : tone === 'ok' ? '✓' : tone === 'accent' ? '◆' : 'ℹ︎'}</span>
+      <span style={{ fontSize: 13, marginTop: 0, flexShrink: 0, fontFamily: SF }}>{pal.icon}</span>
       <span style={{ flex: 1, fontWeight: 400 }}>{children}</span>
     </div>
   );
@@ -271,7 +271,7 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[]; acti
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   return (
-    <div style={{ display: 'flex', gap: 6, padding: 4, background: 'rgba(58,58,60,0.72)', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, alignSelf: 'flex-start' }}>
+    <div style={{ display: 'flex', gap: 6, padding: 4, background: 'rgba(58,58,60,0.72)', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, backdropFilter: VIBRANCY, WebkitBackdropFilter: VIBRANCY, alignSelf: 'flex-start', maxWidth: '100%', overflowX: 'auto' }}>
       {items.map(n => {
         const active = activeId ? activeId === n.id : false;
         return (
@@ -285,7 +285,7 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[]; acti
               background: active ? '#fff' : 'transparent',
               color: active ? '#000' : TEXT_2,
               boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
-              transition: 'all 0.20s cubic-bezier(0.2,0,0,1)', whiteSpace: 'nowrap',
+              transition: 'all 0.20s cubic-bezier(0.2,0,0,1)', whiteSpace: 'nowrap', flexShrink: 0,
             }}
           >
             {n.label}
@@ -368,12 +368,12 @@ export const CardHeader: React.FC<{ icon: string; title: string; subtitle?: stri
     <span style={{
       width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0, fontFamily: SF,
       background: accent ? ACCENT : 'rgba(58,58,60,0.72)',
-      border: `0.5px solid ${accent ? ACCENT : SEPARATOR}`,
+      border: `0.5px solid ${accent ? ACCENT_BORDER : SEPARATOR}`,
       color: accent ? '#fff' : TEXT_1,
     }}>{icon}</span>
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_1, letterSpacing: -0.02 * 15, fontFamily: SF }}>{title}</div>
-      {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1 }}>{subtitle}</div>}
+      {subtitle && <div style={{ fontSize: 12, color: TEXT_2, fontFamily: SF, marginTop: 1, lineHeight: 1.35 }}>{subtitle}</div>}
     </div>
     {right}
   </div>
@@ -381,7 +381,7 @@ export const CardHeader: React.FC<{ icon: string; title: string; subtitle?: stri
 
 // ─── Apple выделения ───
 export const Highlight: React.FC<{ color?: string; children: React.ReactNode }> = ({ color = ACCENT, children }) => (
-  <span style={{ background: `${color}14`, color, padding: '2px 6px', borderRadius: 6, fontWeight: 590, fontSize: '0.94em', fontFamily: SF }}>{children}</span>
+  <span style={{ background: `${color}14`, color, padding: '2px 6px', borderRadius: 6, fontWeight: 590, fontSize: '0.94em', fontFamily: SF, border: `0.5px solid ${color}18` }}>{children}</span>
 );
 export const AccentText: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <span style={{ color: ACCENT, fontWeight: 600, fontFamily: SF }}>{children}</span>
@@ -398,17 +398,10 @@ const POP_SHEET: React.CSSProperties = {
   boxShadow: '0 -8px 32px rgba(0,0,0,0.32)', paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
 };
 const POP_HANDLE: React.CSSProperties = { width: 36, height: 5, borderRadius: 3, background: 'rgba(120,120,128,0.36)', margin: '8px auto 0' };
-const popOption = (active: boolean): React.CSSProperties => ({
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 16px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
-  fontSize: 17, fontWeight: active ? 600 : 400, fontFamily: SF,
-  background: active ? 'rgba(175,82,222,0.12)' : 'transparent',
-  border: 'none', color: active ? '#BF5AF2' : TEXT_1,
-  borderBottom: `0.5px solid ${SEPARATOR}`,
-});
 const popCardBtn: React.CSSProperties = {
   width: '100%', padding: '10px 12px', borderRadius: 10, cursor: 'pointer', fontSize: 11, fontWeight: 600, textAlign: 'center', minHeight: 52,
   display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, fontFamily: SF,
-  background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_2,
+  background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_2, transition: 'all 0.18s',
 };
 
 export const CombatPopupSelect: React.FC<{ label: string; value: string | undefined; options: { id: string; label: string; desc?: string }[]; onChange: (v: string) => void }> = ({ label, value, options, onChange }) => {
@@ -416,25 +409,36 @@ export const CombatPopupSelect: React.FC<{ label: string; value: string | undefi
   const sel = options.find(o => o.id === (value ?? ''));
   return (
     <>
-      <button onClick={() => setOpen(true)} style={popCardBtn}>
+      <button onClick={() => setOpen(true)} style={popCardBtn} aria-haspopup="dialog" aria-label={label}>
         <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
-        <span style={{ fontSize: 15, color: '#BF5AF2', fontWeight: 590, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF }}>{sel ? sel.label : 'Выбрать…'}</span>
+        <span style={{ fontSize: 15, color: '#BF5AF2', fontWeight: 590, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontFamily: SF, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>{sel ? sel.label : 'Выбрать…'}<span style={{ fontSize: 10, color: TEXT_3 }}>▾</span></span>
       </button>
       {open && (
-        <div style={POP_OVERLAY} onClick={() => setOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={POP_SHEET}>
+        <div style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
+          <div onClick={e => e.stopPropagation()} style={POP_SHEET} role="dialog" aria-modal="true" aria-label={label}>
             <div style={POP_HANDLE} />
-            <div style={{ padding: '12px 16px 8px', borderBottom: `0.5px solid ${SEPARATOR}` }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, textAlign: 'center', fontFamily: SF }}>{label}</div>
+            <div style={{ padding: '12px 16px 8px', borderBottom: `0.5px solid ${SEPARATOR}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: TEXT_2, textAlign: 'center', fontFamily: SF, flex: 1 }}>{label}</div>
+              {sel?.desc && <span style={{ fontSize: 11, color: TEXT_3, background: 'rgba(255,255,255,0.06)', padding: '3px 8px', borderRadius: 20, border: '0.5px solid rgba(255,255,255,0.08)', fontFamily: SF }}>{sel.desc}</span>}
             </div>
-            <div style={{ padding: 8 }}>
-              {options.map(o => (
-                <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={popOption(value === o.id)}>
-                  <span><span style={{ fontWeight: value === o.id ? 600 : 400 }}>{o.label}</span>{value === o.id ? '  ✓' : ''}</span>
-                </button>
-              ))}
-              {options.find(o=> o.desc) && <div style={{ fontSize: 12, color: TEXT_3, padding: '8px 16px', fontFamily: SF }}>{options.find(o=> o.id===(value??''))?.desc ?? ''}</div>}
+            <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {options.map(o => {
+                const active = value === o.id;
+                return (
+                  <button key={o.id} onClick={() => { onChange(o.id); setOpen(false); }} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '12px 14px', borderRadius: 10, cursor: 'pointer', textAlign: 'left' as const,
+                    fontFamily: SF, background: active ? 'rgba(175,82,222,0.12)' : 'transparent',
+                    border: 'none', borderBottom: `0.5px solid ${SEPARATOR}`,
+                  }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 17, fontWeight: active ? 600 : 400, color: active ? '#BF5AF2' : TEXT_1, display: 'flex', alignItems: 'center', gap: 8 }}>{o.label}{active && <span style={{ fontSize: 13, color: '#BF5AF2' }}>✓</span>}</span>
+                      {o.desc && <span style={{ fontSize: 12, color: active ? '#BF5AF2' : TEXT_2, display: 'block', marginTop: 2, lineHeight: 1.35, opacity: active ? 0.92 : 0.78 }}>{o.desc}</span>}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+            {sel?.desc && <div style={{ margin: '0 8px', padding: '8px 12px', fontSize: 12, color: TEXT_2, background: 'rgba(175,82,222,0.08)', border: '0.5px solid rgba(175,82,222,0.12)', borderRadius: 8, fontFamily: SF, lineHeight: 1.4 }}>{sel.desc}</div>}
             <div style={{ padding: '8px 16px' }}>
               <button onClick={() => setOpen(false)} style={{ width: '100%', padding: '12px', borderRadius: 10, background: 'rgba(58,58,60,0.72)', border: `0.5px solid ${SEPARATOR}`, color: TEXT_1, fontSize: 17, fontWeight: 590, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
             </div>
@@ -451,20 +455,22 @@ export const CombatPopupNumber: React.FC<{ label: string; value: number; min?: n
   React.useEffect(() => { if (!open) setEdit(String(value)); }, [value, open]);
   return (
     <>
-      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={popCardBtn}>
+      <button onClick={() => { setEdit(String(value)); setOpen(true); }} style={popCardBtn} aria-haspopup="dialog">
         <span style={{ fontSize: 11, color: TEXT_2, textTransform: 'uppercase', letterSpacing: 0.06 * 11, fontWeight: 600, fontFamily: SF }}>{label}</span>
         <span style={{ fontSize: 17, color: '#BF5AF2', fontWeight: 600, fontFamily: SF, fontVariantNumeric: 'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</span>
       </button>
       {open && (
-        <div style={POP_OVERLAY} onClick={() => setOpen(false)}>
-          <div onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360 }}>
+        <div style={POP_OVERLAY} onClick={() => setOpen(false)} role="presentation">
+          <div onClick={e => e.stopPropagation()} style={{ ...POP_SHEET, maxWidth: 360 }} role="dialog" aria-modal="true" aria-label={label}>
             <div style={POP_HANDLE} />
-            <div style={{ padding: 16 }}>
+            <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ fontSize: 17, fontWeight: 600, color: TEXT_1, textAlign: 'center', fontFamily: SF }}>{label}</div>
-              <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: ACCENT, margin: '16px 0' }} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '10px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF }} />
-                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer' }}>Готово</button>
+              <input type="range" min={min ?? 0} max={max ?? 300} step={step} value={parseFloat(edit) || 0} onChange={e => setEdit(e.target.value)} style={{ width: '100%', accentColor: ACCENT, height: 6, borderRadius: 999 }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: TEXT_3, fontFamily: SF }}><span>{min ?? 0}</span><span>{max ?? 300}</span></div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input type="number" value={edit} onChange={e => setEdit(e.target.value)} style={{ flex: 1, padding: '11px 12px', borderRadius: 10, border: `0.5px solid ${SEPARATOR}`, background: 'rgba(58,58,60,0.72)', color: TEXT_1, fontSize: 17, fontWeight: 400, textAlign: 'center', outline: 'none', fontFamily: SF, fontVariantNumeric: 'tabular-nums' }} />
+                {suffix && <span style={{ fontSize: 13, color: TEXT_2, fontFamily: SF }}>{suffix}</span>}
+                <button onClick={() => { let v = parseFloat(edit); if (isNaN(v)) v = min ?? 0; if (min !== undefined) v = Math.max(min, v); if (max !== undefined) v = Math.min(max, v); onChange(v); setOpen(false); }} style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: ACCENT, color: '#fff', fontWeight: 600, fontFamily: SF, cursor: 'pointer', minHeight: 44 }}>{'Готово'}</button>
               </div>
             </div>
           </div>

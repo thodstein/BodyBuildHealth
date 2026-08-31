@@ -6,7 +6,7 @@ import React from 'react';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
-import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3 } from './CombatUI';
+import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight } from './CombatUI';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 
@@ -206,11 +206,11 @@ export const CombatPlanView: React.FC<Props> = ({
                           border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 10, display: 'flex', flexDirection: 'column', gap: 7,
                         }}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 12.5, fontWeight: 900, color: '#fff', flex: '1 1 160px' }}>
-                              {ex.name} <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.58)' }}>— {ex.sets}×{ex.reps}{ex.weight ? ` · ${ex.weight}кг` : ''} · RIR{ex.rir}</span>
-                              <span style={{ fontSize: 10.5, color: TEXT_3, marginLeft: 6 }}>· {ex.tempo} · {ex.restSeconds}с</span>
-                              {ex.comment?.includes('Тапер') && <span style={{ marginLeft: 6, fontSize: 10 }}>🔵</span>}
-                              {ex.comment?.includes('Весогонка') && <span style={{ marginLeft: 4, fontSize: 10 }}>🟠</span>}
+                            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', flex: '1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>
+                              {ex.name} <span style={{ fontWeight: 500, color: 'rgba(235,235,245,0.62)' }}>— <Highlight color="#a855f7">{ex.sets}×{ex.reps}</Highlight>{ex.weight ? <> · <Highlight>{ex.weight}кг</Highlight></> : ''} · <Highlight>RIR{ex.rir}</Highlight></span>
+                              <span style={{ fontSize: 10.5, color: TEXT_3, marginLeft: 6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с</span>
+                              {ex.comment?.includes('Тапер') && <Highlight color="#60a5fa">тапер</Highlight>}
+                              {ex.comment?.includes('Весогонка') && <Highlight color="#ff9f0a">весогонка</Highlight>}
                             </span>
                           </div>
 

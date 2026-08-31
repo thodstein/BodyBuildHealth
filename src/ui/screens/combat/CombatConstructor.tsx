@@ -384,15 +384,17 @@ export const CombatConstructor: React.FC = () => {
                 { id:'enhanced', label:'💊 На курсе', desc:'+объём, PED' },
               ]} />
               <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
-                <Field label={`Недель · ${weeks}`}>
-                  <input type="range" min={2} max={12} value={weeks} onChange={e => setWeeks(Number(e.target.value))} />
+                <Field label={`Недель`} hint={`${weeks} нед — ATR блок`}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={12} value={weeks} onChange={e => setWeeks(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{weeks}</Highlight></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}><span>2</span><span>12</span></div>
                 </Field>
-                <Field label={`Дней/нед · ${days}`}>
-                  <input type="range" min={2} max={4} value={days} onChange={e => setDays(Number(e.target.value))} />
+                <Field label={`Дней/нед`} hint={`${days}× — зал`}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={2} max={4} value={days} onChange={e => setDays(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{days}×</Highlight></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.32)', marginTop: 2 }}><span>2</span><span>4</span></div>
                 </Field>
               </div>
+              <div style={{ height:0.5, background:'rgba(84,84,88,0.36)', margin:'4px 0' }} />
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}><span style={{ fontSize:11, color:'rgba(235,235,245,0.60)' }}>Акценты: <Highlight>шея</Highlight> · <Highlight>хват</Highlight> · <Highlight>ротация</Highlight> · <Highlight>кор</Highlight></span></div>
             </div>
           </SectionCard>
 
@@ -433,19 +435,16 @@ export const CombatConstructor: React.FC = () => {
             <InfoBanner tone="info">Тапер по Bosquet: объём 0.65 → 0.45, интенсивность 90-95%, спарринг ↓, сауна 15-20′×3/нед</InfoBanner>
           </SectionCard>
 
-          {/* Антропометрия */}
-          <SectionCard icon="👤" title="Антропометрия">
+          {/* Антропометрия — Apple highlights */}
+          <SectionCard icon="👤" title="Антропометрия" subtitle="Вес и возраст — % от ПМ и тонус">
+            <div style={{ display: 'flex', gap:6, flexWrap:'wrap', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'rgba(235,235,245,0.60)' }}>Профиль: <Highlight color="#a855f7">{sex==='male'?'Мужской':'Женский'}</Highlight> · <Highlight>{bodyweight}кг</Highlight> · <Highlight>{age} лет</Highlight></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <CombatPopupSelect label="Пол" value={sex} onChange={v=> setSex(v as any)} options={[
                 { id:'male', label:'Мужской' },
                 { id:'female', label:'Женский' },
               ]} />
-              <Field label="Вес тела, кг">
-                <input type="number" value={bodyweight} onChange={e => setBodyweight(Number(e.target.value) || 80)} style={INPUT} />
-              </Field>
-              <Field label="Возраст">
-                <input type="number" value={age} onChange={e => setAge(Number(e.target.value) || 28)} style={INPUT} />
-              </Field>
+              <CombatPopupNumber label="Вес тела" value={bodyweight} min={40} max={140} suffix="кг" onChange={v=> setBodyweight(v)} />
+              <CombatPopupNumber label="Возраст" value={age} min={14} max={65} onChange={v=> setAge(v)} />
             </div>
             {acwr && (
               <InfoBanner tone={acwr.zone === 'dangerous' ? 'warn' : acwr.zone === 'caution' ? 'warn' : 'ok'}>
@@ -455,14 +454,14 @@ export const CombatConstructor: React.FC = () => {
             {hrvLine && <InfoBanner tone={hrvLine.includes('dangerous') ? 'warn' : hrvLine.includes('caution') ? 'warn' : 'ok'}>{hrvLine}</InfoBanner>}
           </SectionCard>
 
-          {/* VBT */}
-          <SectionCard icon="⚡" title="VBT — потеря скорости" subtitle="Vitruve: >20% → RIR+1, >25% → вес −5%">
+          {/* VBT — Apple highlights */}
+          <SectionCard icon="⚡" title="VBT — потеря скорости" subtitle="Vitruve: >20% → RIR+1, >25% → вес −5%" accent>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Field label={`Потеря скорости · ${velocityLoss}%`}>
-                <input type="range" min={0} max={40} value={velocityLoss} onChange={e => setVelocityLoss(Number(e.target.value))} />
+              <Field label="Потеря скорости" hint={`${velocityLoss}% — бюджет`}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={40} value={velocityLoss} onChange={e => setVelocityLoss(Number(e.target.value))} style={{ flex:1 }} /><Highlight color={velocityLoss>25?'#ff3b30': velocityLoss>20?'#ff9f0a':'#a855f7'}>{velocityLoss}%</Highlight></div>
               </Field>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.52)', alignSelf: 'center', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
-                Бюджет ×{velocityLoss > 20 ? '0.90' : '1.00'} {velocityLoss > 20 ? '— снижение объёма' : '— норма'}
+              <div style={{ fontSize: 11, color: 'rgba(235,235,245,0.60)', alignSelf: 'center', background: velocityLoss>20?'rgba(245,158,11,0.08)':'rgba(168,85,247,0.08)', padding: '8px 10px', borderRadius: 10, border: `0.5px solid ${velocityLoss>20?'rgba(245,158,11,0.18)':'rgba(168,85,247,0.14)'}`, display:'flex', gap:6, alignItems:'center' }}>
+                Бюджет <Highlight color={velocityLoss>20?'#ff9f0a':'#a855f7'}>×{velocityLoss > 20 ? '0.90' : '1.00'}</Highlight> {velocityLoss > 20 ? '— снижение объёма' : '— норма'}
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -629,16 +628,16 @@ export const CombatConstructor: React.FC = () => {
                 </Field>
 
                 {!sparringEnabled && outside && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.14)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Field label={`Сессий вне зала · ${outside.sessionsPerWeek} ×/нед`}>
-                      <input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, background: 'rgba(0,0,0,0.14)', padding: 12, borderRadius: 12, border: '0.5px solid rgba(255,255,255,0.06)' }}>
+                    <Field label="Сессий вне зала" hint={`${outside.sessionsPerWeek}×/нед`}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={6} value={outside.sessionsPerWeek} onChange={e => setOutside(o => o ? { ...o, sessionsPerWeek: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight color="#a855f7">{outside.sessionsPerWeek}×</Highlight></div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: TEXT_3 }}><span>0</span><span>6</span></div>
                     </Field>
-                    <Field label={`Длительность · ${outside.avgDurationMin} мин`}>
-                      <input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} />
+                    <Field label="Длительность" hint={`${outside.avgDurationMin} мин`}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={30} max={180} step={10} value={outside.avgDurationMin} onChange={e => setOutside(o => o ? { ...o, avgDurationMin: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight>{outside.avgDurationMin}′</Highlight></div>
                     </Field>
-                    <Field label={`RPE · ${outside.avgSRPE}`}>
-                      <input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} />
+                    <Field label="RPE" hint={`RPE ${outside.avgSRPE}`}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={1} max={10} value={outside.avgSRPE} onChange={e => setOutside(o => o ? { ...o, avgSRPE: Number(e.target.value) } : o)} style={{ flex:1 }} /><Highlight color={outside.avgSRPE>=8?'#ff3b30': outside.avgSRPE>=6?'#ff9f0a':'#a855f7'}>RPE {outside.avgSRPE}</Highlight></div>
                     </Field>
                     <Field label="Высокие дни" hint="Тяжёлые ноги не ставим за день до высокого дня">
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -653,24 +652,24 @@ export const CombatConstructor: React.FC = () => {
                 )}
 
                 {sparringEnabled && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10, background: 'rgba(0,0,0,0.14)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Field label={`Hard spar · ${sparringHard}×`} hint="RPE 8.5 · 90мин">
-                      <input type="range" min={0} max={4} value={sparringHard} onChange={e => setSparringHard(Number(e.target.value))} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px,1fr))', gap: 10, background: 'rgba(0,0,0,0.14)', padding: 12, borderRadius: 12, border: '0.5px solid rgba(255,255,255,0.06)' }}>
+                    <Field label="Hard spar" hint={`RPE 8.5 · 90мин`}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={4} value={sparringHard} onChange={e => setSparringHard(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#ff3b30">{sparringHard}×</Highlight></div>
                     </Field>
-                    <Field label={`Tech spar · ${sparringTech}×`} hint="RPE 5.5 · 60мин">
-                      <input type="range" min={0} max={4} value={sparringTech} onChange={e => setSparringTech(Number(e.target.value))} />
+                    <Field label="Tech spar" hint={`RPE 5.5 · 60мин`}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={4} value={sparringTech} onChange={e => setSparringTech(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#64d2ff">{sparringTech}×</Highlight></div>
                     </Field>
-                    <Field label={`Борьба · ${sparringWrest}×`} hint="RPE 7.5 · 75мин">
-                      <input type="range" min={0} max={4} value={sparringWrest} onChange={e => setSparringWrest(Number(e.target.value))} />
+                    <Field label="Борьба" hint={`RPE 7.5 · 75мин`}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8 }}><input type="range" min={0} max={4} value={sparringWrest} onChange={e => setSparringWrest(Number(e.target.value))} style={{ flex:1 }} /><Highlight color="#a855f7">{sparringWrest}×</Highlight></div>
                     </Field>
                     <div style={{ gridColumn: '1 / -1' }}>
-                      <InfoBanner tone="accent">Спарринг load = {sparringHard * 90 * 8.5 + sparringTech * 60 * 5.5 + sparringWrest * 75 * 7.5} load → {sparringHard + sparringTech + sparringWrest}×/нед</InfoBanner>
+                      <InfoBanner tone="accent"><Highlight>{sparringHard * 90 * 8.5 + sparringTech * 60 * 5.5 + sparringWrest * 75 * 7.5} load</Highlight> → <Highlight>{sparringHard + sparringTech + sparringWrest}×/нед</Highlight> · декомпозиция</InfoBanner>
                     </div>
                   </div>
                 )}
 
-                <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : 'accent'}>
-                  {outsideMetrics ? `${outsideMetrics.weeklyLoad} load → объём зала ×${outsideMetrics.volumeMultiplier} (${outsideMetrics.interference === 'high' ? 'высокая' : outsideMetrics.interference === 'medium' ? 'средняя' : outsideMetrics.interference === 'low' ? 'низкая' : outsideMetrics.interference} интерференция)` : 'Вне зала: нет данных — объём 100%'}
+                <InfoBanner tone={outsideMetrics?.interference === 'high' ? 'warn' : outsideMetrics?.interference === 'medium' ? 'info' : 'accent'}>
+                  {outsideMetrics ? <span><Highlight color={outsideMetrics.interference==='high'?'#ff9f0a':'#a855f7'}>{outsideMetrics.weeklyLoad} load</Highlight> → объём зала <Highlight>×{outsideMetrics.volumeMultiplier}</Highlight> ({outsideMetrics.interference === 'high' ? 'высокая' : outsideMetrics.interference === 'medium' ? 'средняя' : outsideMetrics.interference === 'low' ? 'низкая' : outsideMetrics.interference} интерференция)</span> : 'Вне зала: нет данных — объём 100%'}
                 </InfoBanner>
               </>
             )}
