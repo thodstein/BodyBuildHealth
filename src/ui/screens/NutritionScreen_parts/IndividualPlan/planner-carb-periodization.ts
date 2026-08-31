@@ -148,7 +148,7 @@ export function expectedWeekKcal(
     const offset = base + i;
     const isTrain = !!(isTrainDays && isTrainDays[i]);
     let mod = applyCarbPeriodizationMods(mode, offset, isTrain).dayKcalMod;
-    if (isHeavyDayForOffset(heavyTrainDay, offset, dayLabels)) mod *= 1.05;
+    if (Array.isArray(dayLabels) && dayLabels.length === 7 && isHeavyDayForOffset(heavyTrainDay, offset, dayLabels)) mod *= 1.05;
     total += Math.round(kcal * mod);
   }
   return total;
