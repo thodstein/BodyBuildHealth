@@ -19,6 +19,20 @@
 - **NEW тесты**: planner-carb-periodization (17), planner-goal-phase (12), planner-quality-levels (10), planner-micro-pools (18), planner-cycle-calendar (16), planner-meal-targets (9), planner-integration-guarantees (7) + обновлённые.
 - **ВНИМАНИЕ**: полный vitest ~8363 тестов — 90 падений пред-существующие/чужие (bb-агент, дневниковый агент, .tmp/combat) — доказано worktree на базе 35d5b6a63 (идентичные наборы). Чужие файлы не тронуты.
 
+## Планировщик питания: остатки-средние + хвост-1 (god-component) (Sep 1 2026, pushed)
+
+Закрытие «осознанных остатков» плана NUTRITION-PROFESSIONAL-PLAN.md (долги, не баги) +
+начало декомпозиции god-компонента. Коммиты: dae9bca9, 50fe2769, 544e1faa, 7d5decf3, 6a92d456.
+Область IndividualPlan: **631/631** (52 файла), tsc 0 по проекту (NODE_OPTIONS=6GB).
+
+- **Гигиена (низкий приоритет)**: AGENTS.md помечены старые удалённые планы (NUTRITION-PLANNER-QUALITY-PLAN/V2-ROADMAP/OVERHAUL-PLAN) как «🔥 ПЛАН УДАЛЁН»; docs-статус пополнен хвостами-2 и остатками. v7-миграция (`migratePlannerStorage`) чистит мёртвые legacy-поля `he_planner_prefs` (cyclingMode/dietPauseMode/periodizationEnabled/nutrLevel/useRecipesInPlan/hungerLevel/carbCapGPerKg). NEW `clearDayScores()` в day-score-trend + кнопка «🗑 Сброс истории» в бейдже тренда качества. Двусторонняя подпись V2-фаза vs фарма-фаза в Settings (обе карточки ссылаются друг на друга — UI не путает два «фазовых» механизма).
+- **Хвост-4 «Неделя vs план»**: NEW `expectedWeekKcal(effectiveKcal, mode, weekIndex, isTrainDays, heavyTrainDay, dayLabels)` в planner-carb-periodization — план недели месяца теперь считает ВОЛНУ 2+1 (каждая 3-я неделя ×0.9) и дневные моды (refeed/carb_cycle/butch/two_one/five_two) + тяжёлый день (+5%), вместо `effectiveKcal × 7`. UI показывает заметку волны/режима. Тесты +7 (в т.ч. волна 6-й недели, heavy-день ровно +5%).
+- **Хвост-3 planTypeMod**: декоративные pMult/fMult/cMult из PLAN_TYPES **удалены** (types.ts). NEW `planTypeFloorMods(planType)` в planner-day-targets — ЕДИНЫЙ источник floor/MPS-модификаторов; движок получает `planType` и сам выводит ptm (поле `planTypeMod` из MealPlanInput и поиск по PLAN_TYPES в Context удалены). Реальный макро-профиль дня по-прежнему задаёт `buildDayTargets(dietStyle)` — одна семантика, ноль дублей.
+- **Хвост-2 _pickCtx**: 9 разрозненных module-level `let` в meal-plan-engine (_tasteProfile/_deprioritizedIds/_categoryPref/_qualityMode/_currentBudget/_currentWeightKg/_currentExcludedIds/_currentCarbGPerKg) консолидированы в единый типизированный `_pickCtx` объект — одна точка мутации в buildDayPlan и очистки в finally.
+- **Хвост-1 (god-component IndividualPlanContext ~3500 строк)**: вынесены два изолированных кластера в под-хуки — `planner-report-state.ts` (7 useState отчётов + 6 генераторов + 2 авто-эффекта) и `planner-special-meal-state.ts` (спец-приёмы/спец-планы/рекомендации + 6 генераторов + авто-эффект). API (`usePlanCtx()`/PlanCtx) и единый merged-value **без изменений** — потребители (`ctx as any`) не тронуты. Остальные ~140 состояний сильно связаны с generatePlan/useMemo и НЕ вынесены (осознанный остаток — полный сплит на под-контексты остаётся рискованным).
+- **NEW тесты**: planner-carb-periodization +7 (expectedWeekKcal), planner-storage +2 (v7-миграция legacy-полей), day-score-trend +1 (clearDayScores).
+- **ВНИМАНИЕ**: параллельный агент оставил untracked `docs/BB-AUTO-PROFESSIONAL-LEVEL-PLAN.md` — НЕ коммитился (чужой). Коммиты строго pathspec.
+
 ## Планировщик питания: эпики A–G по плану NUTRITION-PLANNER-QUALITY-PLAN (Aug 30 2026) — 🔥 ПЛАН УДАЛЁН
 
 > ⚠️ План `docs/NUTRITION-PLANNER-QUALITY-PLAN.md` (и `NUTRITION-V2-ROADMAP.md`, `NUTRITION-PLANNER-OVERHAUL-PLAN.md`) **удалён** — заменён единым `docs/NUTRITION-PROFESSIONAL-PLAN.md` (см. секцию «профессиональный диетолог» выше). Эта секция — историческая запись выполненной работы; её содержание уже перекрыто эпиками 1–9 нового плана. Не использовать как источник актуальных требований.
