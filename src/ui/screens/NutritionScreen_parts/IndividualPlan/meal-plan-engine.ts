@@ -2455,12 +2455,36 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   let breakC = _carbFor('breakfast');
   let lunchC = _carbFor('lunch');
   let dinnerC = _carbFor('dinner');
-  const prewCarbG = _carbFor('prew');
-  const postwCarbG = _carbFor('postw');
+  let prewCarbG = _carbFor('prew');
+  let postwCarbG = _carbFor('postw');
+  let intraCarbG = _carbFor('intra');
   const snackC = _carbFor('snack');
   const snack2C = _carbFor('snack2');
   const snack3C = _carbFor('snack3');
   const snack4C = _carbFor('snack4');
+  // ─── Физиологический кап пери-углеводов (предтрен/пост-трен/intra) ───
+  // Пери-слоты раньше масштабировались ЛИНЕЙНО от дневного бюджета (800г → ~320г пери:
+  // «300г амилопектина на тренировке»), оставляя обычным приёмам крохи («100г каши утром»).
+  // Кап = физиологический потолок (prew медленные ~60г, postw быстрые ~80г, intra 40г/ч),
+  // излишек возвращается в основные приёмы (завтрак/обед/ужин) пропорционально.
+  {
+    // Пери-углеводы — ФИЗИОЛОГИЧЕСКОЕ ОКНО, а не полноценный приём: не растут от дневного
+    // бюджета и веса. Избыток уходит в основные приёмы (завтрак/обед/ужин).
+    const _prewCap = 60;   // медленных углеводов за 90 мин до тренировки
+    const _postwCap = 75;  // быстрых углеводов в анаболическое окно (не «300г амилопектина»)
+    const _intraCap = Math.round(Math.max(30, Math.min(90, INTRA_CARB_G_PER_H * (input.trainDurationMin ?? 75) / 60)));
+    const _prew0 = prewCarbG, _postw0 = postwCarbG, _intra0 = intraCarbG;
+    prewCarbG = Math.min(prewCarbG, _prewCap);
+    postwCarbG = Math.min(postwCarbG, _postwCap);
+    intraCarbG = Math.min(intraCarbG, _intraCap);
+    const _periExcess = Math.max(0, (_prew0 - prewCarbG) + (_postw0 - postwCarbG) + (_intra0 - intraCarbG));
+    if (_periExcess > 0) {
+      const _wB = 1.0, _wL = 1.7, _wD = 0.7, _wSum2 = _wB + _wL + _wD;
+      breakC += Math.round(_periExcess * _wB / _wSum2);
+      lunchC += Math.round(_periExcess * _wL / _wSum2);
+      dinnerC += Math.round(_periExcess * _wD / _wSum2);
+    }
+  }
   // ─── Кап углеводов на основной приём + перераспределение излишка ───
   // CARB_W даёт обеду 1.7× (для высокоуглеводных дней на 3 приёмах — 400г+ углеводов),
   // а физический потолок приёма = лимит каши (сухая крупа ~70% углей). Излишек сверх капа
@@ -2865,9 +2889,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // intraEligible объявлен выше (блок carb-distribution); gate по mealsCount через _keep.
   if (intraEligible && _keep.has('intra') && input.trainStartMin) {
     const intraTime = fmtTime(input.trainStartMin + 30);
-    const intra = buildIntraWorkout(intraTime, seedBase + 4, pool, _carbFor('intra'));
+    const intra = buildIntraWorkout(intraTime, seedBase + 4, pool, intraCarbG);
     meals.push(intra);
-    notes.push(`Intra-workout: EAA + циклодекстрин (${_carbFor('intra')} г — доля от дневного КБЖУ, поддержание глюкозы на длинной тренировке)`);
+    notes.push(`Intra-workout: EAA + циклодекстрин (${intraCarbG} г — 40 г/ч физиологический потолок, поддержание глюкозы на длинной тренировке)`);
   }
 
   // 5. Post-workout (через 30 мин после окончания сессии).
