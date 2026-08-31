@@ -92,8 +92,8 @@ export function weightCutNutritionForWeek(
     water = Math.round(bodyweightKg * 35);
     sodium = 5000;
   }
-  // жиры: female ≥0.8г/кг (мин 40г RED-S), male ≥0.6 (мин 30г)
-  const fatPerKg = sex === 'female' ? 0.8 : 0.8; // пока единый, но floor разный
+  // жиры: female ≥0.8г/кг (мин 40г RED-S), male ≥0.6 (мин 30г) — как bb-contest-prep + recovery-budget
+  const fatPerKg = sex === 'female' ? 0.8 : 0.6;
   let fat = Math.round(bodyweightKg * fatPerKg);
   if (sex === 'female' && fat < 40) fat = 40;
   if (sex !== 'female' && fat < 30) fat = 30;

@@ -14,11 +14,15 @@ export function applyCombatMesocycle(prev: CombatPlan | null, nextInput: CombatI
   if (!prev) return nextInput;
   const next: CombatInput = { ...nextInput, previousPlanId: prev.id } as any;
   const prevSnap: any = prev.inputSnapshot || {};
-  // если ACWR dangerous — не бампаем, даже снижаем
+  // ACWR guard + diary plateau guard (как у strength-sport и BB)
   const acwrDanger = (nextInput as any).acwr?.zone === 'dangerous';
   const acwrCaution = (nextInput as any).acwr?.zone === 'caution';
-  const factor = acwrDanger ? 0.97 : acwrCaution ? 1.0 : 1.0;
-  const busted = acwrDanger;
+  const trends: any[] = (nextInput as any).diaryTrendCB || [];
+  const hasPlateau = Array.isArray(trends) && trends.some((t:any)=> typeof t.changePct==='number' && t.changePct < -5);
+  const hasWarnings = Array.isArray((nextInput as any).warnings) && (nextInput as any).warnings.length > 4;
+  const plateauHold = hasPlateau || hasWarnings;
+  const factor = acwrDanger ? 0.97 : acwrCaution || plateauHold ? 1.0 : 1.0;
+  const busted = acwrDanger || plateauHold;
 
   // workMaxByExercise прогрессия
   const prevWmEx: Record<string, number> = (prevSnap as any).workMaxByExercise || (prev as any).workMaxByExercise || {};

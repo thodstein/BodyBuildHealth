@@ -14,7 +14,7 @@ import { filterByTierCB, filterByInjuryCB, selectDiverseCB, tierForCB } from './
 import { accentForDiscipline } from './combat-specialization';
 import { tempoForCB, restForCB } from './combat-loading';
 import { adaptForPEDsCombat } from './combat-ped-adaptation';
-import { filterByMobilityCB, isAxialLoadExerciseCB } from './combat-mobility';
+import { filterByMobilityCB, isAxialLoadExerciseCB, isMobilityRestrictedCB } from './combat-mobility';
 import { applyCombatDUP } from './combat-dup';
 import { applyCombatIntensity } from './combat-intensity';
 import { weightForCombatExerciseResolved } from './combat-workmax';
@@ -182,15 +182,31 @@ function filterPool(ids: string[], input: CombatInput): string[] {
   if (!hasCable) for (const orig of before) if (!out.includes(orig) && COMBAT_FALLBACK[orig] && !out.includes(COMBAT_FALLBACK[orig])) out.push(COMBAT_FALLBACK[orig]);
   const beforeInjury=[...out];
   out = filterByInjuryCB(out, input.injuries as any);
-  if (out.length===0 && (input.injuries||[]).length>0) out = beforeInjury.slice(0,2);
+  if (out.length===0 && (input.injuries||[]).length>0) {
+    // безопасный fallback: берём из beforeInjury только те что НЕ исключены
+    const safeInjury = beforeInjury.filter(id => filterByInjuryCB([id], input.injuries as any).length > 0);
+    const globalSafe = ['landmine_rotation','pallof_rotation_press','plate_pinch','deadbug','side_plank','band_pull_apart'];
+    const fallback = safeInjury.length ? safeInjury.slice(0,2) : globalSafe.filter(id => filterByInjuryCB([id], input.injuries as any).length>0).slice(0,2);
+    out = fallback.length ? fallback : beforeInjury.filter(id => !isAxialLoadExerciseCB(id)).slice(0,2);
+    if (out.length===0) out = ['landmine_rotation','deadbug'];
+  }
   const mob = input.mobilityRestrictions as string[] | undefined;
   const beforeMob=[...out];
   out = filterByMobilityCB(out, mob);
-  if (out.length===0 && mob && mob.length>0) out = beforeMob.slice(0,2);
+  if (out.length===0 && mob && mob.length>0) {
+    const safeMob = beforeMob.filter(id => !isMobilityRestrictedCB(id, mob));
+    const globalSafeMob = ['landmine_rotation','pallof_rotation_press','plate_pinch','deadbug','side_plank','band_pull_apart','ytw_raise'];
+    out = safeMob.length ? safeMob.slice(0, Math.min(3, safeMob.length)) : globalSafeMob.slice(0,2);
+  }
   if (input.avoidAxialLoad) {
     const beforeAxial=[...out];
     out = out.filter(id => !isAxialLoadExerciseCB(id));
-    if (out.length===0 && beforeAxial.length) out = beforeAxial.slice(0,2);
+    if (out.length===0 && beforeAxial.length) {
+      const safeAxial = beforeAxial.filter(id => !isAxialLoadExerciseCB(id));
+      const globalSafeAxial = ['bulgarian_split_heavy','single_leg_rdl_combat','landmine_rotation','pallof_rotation_press','plate_pinch','deadbug','side_plank'];
+      out = safeAxial.length ? safeAxial.slice(0,2) : globalSafeAxial.filter(id => !beforeAxial.includes(id)).slice(0,2);
+      if (out.length===0) out = ['deadbug','side_plank'];
+    }
   }
   return out;
 }
@@ -247,6 +263,17 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   if (!pattern || pattern.sessionsPerRotation !== daysPerWeek) {
     pattern = recommendCombatPattern(daysPerWeek, outsideSessions, level);
   }
+  // форсим снижение частоты зала при высокой внезальной даже при явном patternId (C-P0-6)
+  // sparring hard 3× + 5× татами = 7 high-дней — 4× зал опасен
+  let forceDowngraded = false;
+  const origPatternId = pattern.id;
+  if (outsideSessions >= 4 && pattern.sessionsPerRotation >= 4) {
+    const downgraded = recommendCombatPattern(3, outsideSessions, level);
+    if (downgraded.sessionsPerRotation < pattern.sessionsPerRotation) {
+      pattern = downgraded;
+      forceDowngraded = true;
+    }
+  }
 
   const outsideMetrics = computeOutsideMetrics(effectiveOutsideLoad as OutsideLoad);
   // изолированные мультипликаторы — делегируем в единый движок (P1-1)
@@ -274,6 +301,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   const taperCfg = input.fightDate ? { fightDate: input.fightDate, taperWeeks: input.taperWeeks || (goal === 'camp' ? 2 : 1), startDate: input.startDate || null } as any : null;
   const wcProtocol = input.weightCutProtocol || (goal === 'weight_cut' && input.weightCutKg ? buildWeightCutProtocol(input.weightCutKg, { startWeightKg: input.bodyweight } as any) : null);
   const rationale: string[] = [];
+  if (forceDowngraded) rationale.push(`Частота зала снижена ${origPatternId}→${pattern.id} из-за высокой внезальной ${outsideSessions}×/нед (sparring) — перегруз предотвращён`);
   rationale.push(`Дисциплина: ${discipline} · цель ${goal} · ${weeks} нед · ${pattern.name} · модель ${periodModelEarly}`);
   if (input.sparringLoad) rationale.push(sparringSummary(input.sparringLoad));
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load (${outsideMetrics.interference}) → объём зала ×${outsideMetrics.volumeMultiplier}`);
@@ -314,10 +342,10 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
       if (!slot || slot.kind !== 'тренировка') continue;
       const tag = slot.sessionTag || 'full_power';
       const character = slot.character as any;
-      // outside конфликт: тяж ноги за день до high вне зала → делаем лёг/памп
+      // outside конфликт: тяж ноги/плио за день до high вне зала → делаем памп (расширено: full_conditioning тоже плио)
       const conflict = isDayConflictWithOutside(d, effectiveOutsideLoad as OutsideLoad);
-      const isLegDay = tag === 'lower_power' || tag === 'full_power';
-      const effectiveCharacter = (conflict && isLegDay && character === 'тяж') ? 'памп' : character;
+      const isLegOrPlyo = tag === 'lower_power' || tag === 'full_power' || tag === 'full_conditioning';
+      const effectiveCharacter = (conflict && isLegOrPlyo && character === 'тяж') ? 'памп' : character;
       const poolIds = POOL_BY_TAG[tag] || POOL_BY_TAG.full_power;
       let pool = filterPool(poolIds, input);
       const primaryCount = effectiveCharacter === 'тяж' ? 3 : 2;
@@ -357,12 +385,12 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         const fs = input.fightStyle as string | undefined;
         if (fs === 'striker' && (id.includes('landmine') || id.includes('med_ball') || id.includes('sledge') || id.includes('rotation'))) sets = Math.min(6, sets + 1);
         else if (fs === 'grappler' && (id.includes('neck') || id.includes('grip') || id.includes('wrist') || id.includes('towel') || id.includes('rope') || id.includes('pullup'))) sets = Math.min(6, sets + 1);
-        // весогонка + тапер: не умножать, а взять мин (тапер уже включает стресс весогонки, ISSN). Для делода — только wcm, тапер игнорим (приоритет делода)
+        // весогонка + тапер: ISSN — дефицит и тапер умножаются (Helms), не min. Для делода — только wcm.
         const wcm = wcProtocol ? weightCutVolumeMultiplier(w, weeks, wcProtocol) : 1;
         const legacyWc = !wcProtocol && goal === 'weight_cut' ? 0.85 : 1;
         const tmult = taper && !deload ? (taperCfg ? taperVolumeMultiplier(w, weeks, taperCfg, false) : 0.62) : 1;
         let effCut = 1;
-        if (!deload && wcProtocol && taper) effCut = Math.min(wcm, tmult);
+        if (!deload && wcProtocol && taper) effCut = Math.max(0.30, wcm * tmult);
         else if (wcProtocol) effCut = wcm;
         else if (legacyWc < 1) effCut = legacyWc;
         else if (taper && !deload) effCut = tmult;
@@ -413,7 +441,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           warmupSets: isPrimary && weight > 20 ? [{ reps: 8, rir: 5, weight: Math.round(weight * 0.5 / 2.5) * 2.5, tempo, restSeconds: 60 }] : [],
           tempo,
           restSeconds: rest,
-          comment: (conflict && isLegDay) ? 'Снижена интенсивность: завтра высокая внезальная' : wcComment ? wcComment : deload ? 'Делод' : taper ? 'Тапер к бою: объём ↓ 35-55%, интенсивность 90-95%, спарринг ↓' : gentle < 1 ? 'Щадящий: снижен вес, +RIR' : (meta as any).technique || undefined,
+          comment: (conflict && isLegOrPlyo) ? 'Снижена интенсивность: завтра высокая внезальная' : wcComment ? wcComment : deload ? 'Делод' : taper ? 'Тапер к бою: объём ↓ 35-55%, интенсивность 90-95%, спарринг ↓' : gentle < 1 ? 'Щадящий: снижен вес, +RIR' : (meta as any).technique || undefined,
         };
         exercises.push(ex);
       }
@@ -482,10 +510,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     rationale.push(...intRationale);
   }
 
-  // бюджет enforcement: если недельный объём > бюджета, режем accessory до floor 2
+  // бюджет enforcement с учётом кондиции: каждый зал-сет ≠ кондиция-мин, 12мин zone2 ≈1 сет
   for (const wk of weeksData) {
+    const condForWk = (input as any).conditioningMode !== 'off' ? conditioningSessionsForWeek(wk.week, wk.phase as any, goal, outsideSessions) : [];
+    const condCost = Math.round(condForWk.reduce((a:number,c:any)=> a + (c.durationMin||0),0) * 0.08);
+    const effectiveBudget = Math.max(12, weeklyBudget - condCost);
     let total = wk.totalSets || 0;
-    if (total > weeklyBudget) {
+    if (total > effectiveBudget) {
       // собираем все упражнения недели, сортируем: accessory first, затем по убыванию sets
       const allEx: Array<{ sess: CombatSession; ex: CombatExercise }> = [];
       for (const sess of wk.sessions) for (const ex of sess.exercises) allEx.push({ sess, ex });
@@ -494,7 +525,7 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
         return b.ex.sets - a.ex.sets;
       });
       let idx = 0;
-      while (total > weeklyBudget && idx < allEx.length * 3) {
+      while (total > effectiveBudget && idx < allEx.length * 3) {
         const cur = allEx[idx % allEx.length];
         if (cur.ex.sets > 2) {
           cur.ex.sets -= 1;
@@ -525,10 +556,13 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   // проверка шеи: группа neck или id содержит neck
   const hasNeck = weeksData.some(w => w.sessions.some(s => s.exercises.some(e => e.group === 'neck' || e.id.includes('neck'))));
   if (!hasNeck) warnings.push('Шея не покрыта ни в одной сессии — добавьте neck_harness.');
-  // бюджет warning (после enforcement — если всё ещё over, предупредить)
+  // бюджет warning с учётом кондиции
   for (const wk of weeksData) {
-    if ((wk.totalSets || 0) > weeklyBudget) {
-      warnings.push(`Нед ${wk.week}: ${wk.totalSets} сетов > бюджета ${weeklyBudget}.`);
+    const condForWk = (input as any).conditioningMode !== 'off' ? conditioningSessionsForWeek(wk.week, wk.phase as any, goal, outsideSessions) : [];
+    const condCost = Math.round(condForWk.reduce((a:number,c:any)=> a + (c.durationMin||0),0) * 0.08);
+    const effectiveBudget = Math.max(12, weeklyBudget - condCost);
+    if ((wk.totalSets || 0) > effectiveBudget) {
+      warnings.push(`Нед ${wk.week}: ${wk.totalSets} сетов > бюджета ${effectiveBudget} (зал ${weeklyBudget} - кондиц ${condCost}).`);
       break;
     }
   }

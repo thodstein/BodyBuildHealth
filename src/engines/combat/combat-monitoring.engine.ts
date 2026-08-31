@@ -64,7 +64,7 @@ export function hrvFromHistory(history: number[]): { mean:number; sd:number; las
 
 export function loadHrvHistory(): number[] {
   try {
-    for (const key of ['he_hrv_log','he_hrv_history','he_diary_hrv']) {
+    for (const key of ['he_hrv_log','he_hrv_history','he_diary_hrv','he_hrv_log_v2','he_hrv_history_v2']) {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
       if (raw) {
         const arr = JSON.parse(raw);
@@ -74,12 +74,34 @@ export function loadHrvHistory(): number[] {
         }
       }
     }
-    // fallback из профиля lifestyle
+    // cardio sessions содержат HRV точки (как в cardio-diary.engine)
+    try {
+      const csRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_cardio_sessions') : null;
+      if (csRaw) {
+        const cs = JSON.parse(csRaw);
+        if (Array.isArray(cs)) {
+          const nums = cs.map((x:any)=> x.hrv ?? x.hrvMs ?? x.HRV).filter((v:any)=> typeof v==='number' && v>10 && v<250);
+          if (nums.length >= 7) return nums.slice(-28);
+        }
+      }
+    } catch {}
+    // srpe sessions тоже могут хранить hrv
+    try {
+      const srpeRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_srpe_sessions') : null;
+      if (srpeRaw) {
+        const sr = JSON.parse(srpeRaw);
+        if (Array.isArray(sr)) {
+          const nums = sr.map((x:any)=> x.hrvMs ?? x.hrv).filter((v:any)=> typeof v==='number' && v>10 && v<250);
+          if (nums.length >= 7) return nums.slice(-28);
+        }
+      }
+    } catch {}
+    // fallback из профиля lifestyle — один замер → вернём его, EWMA сделает из него базу
     const pr = typeof localStorage !== 'undefined' ? localStorage.getItem('he_profile_v2') : null;
     if (pr) {
       const p = JSON.parse(pr);
-      const v = p?.lifestyle?.morningHRV ?? p?.lifestyle?.hrvMs;
-      if (typeof v==='number') return [v];
+      const v = p?.lifestyle?.morningHRV ?? p?.lifestyle?.hrvMs ?? p?.health?.hrvMs;
+      if (typeof v==='number' && v>10 && v<250) return [v];
     }
   } catch {}
   return [];

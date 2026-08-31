@@ -23,16 +23,19 @@ export function filterByMobilityCB(pool: string[], restrictions: string[] | unde
   return pool.filter(id => !isMobilityRestrictedCB(id, restrictions));
 }
 
-const AXIAL_IDS_CB = new Set(['squat','front_squat','trap_bar_dead','zercher_squat','hang_clean','high_pull']);
+const AXIAL_IDS_CB = new Set(['squat','front_squat','trap_bar_dead','zercher_squat','hang_clean','high_pull','yoke_walk','farmer_carry','farmers_walk_heavy','atlas_stone_load','log_press','yoke','stone','farmers_walk']);
 export function isAxialLoadExerciseCB(id: string): boolean {
   // core явно не осевые — исключаем до проверки dead/squat
-  if (['deadbug','ab_wheel','hollow_hold','side_plank','copenhagen_plank','deadbug'].includes(id)) return false;
+  if (['deadbug','ab_wheel','hollow_hold','side_plank','copenhagen_plank','deadbug','suitcase_carry','pallof_rotation_press','plate_pinch'].includes(id)) return false;
   if (AXIAL_IDS_CB.has(id)) return true;
-  // dead — но не deadbug (уже исключён)
-  if ((id.includes('squat') || id.includes('dead') || id.includes('yoke') || id.includes('stone')) && !id.includes('bug')) return true;
-  if (id.includes('carry') && !['suitcase_carry','farmer_carry','deadbug','ab_wheel'].includes(id)) {
-    // carry с нагрузкой может быть осевым, но suitcase/farmer — удержание, не осевая компрессия позвоночника как squat
-    return id.includes('sled');
+  const low = id.toLowerCase();
+  // осевая компрессия: присед/тяга + тяж. переноски/камни/йок (JSI >2.5×BW)
+  if ((low.includes('squat') || low.includes('dead') || low.includes('yoke') || low.includes('stone') || low.includes('atlas') || low.includes('log_press')) && !low.includes('bug')) return true;
+  // carry: farmer/yoke тяжёлые — осевые; suitcase — нет (односторонний anti-lateral)
+  if (low.includes('carry')) {
+    if (low.includes('suitcase')) return false;
+    if (low.includes('farmer') || low.includes('farmers') || low.includes('yoke') || low.includes('sled')) return low.includes('farmer') || low.includes('farmers') || low.includes('yoke') ? true : low.includes('sled') ? true : false;
   }
+  if (low.includes('farmer') || low.includes('farmers') || low.includes('yoke')) return true;
   return false;
 }

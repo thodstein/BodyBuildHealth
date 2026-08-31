@@ -18,6 +18,8 @@ export type CombatLiftId = string;
 
 function mapCombatLift(id: string): VBTLift {
   const low = id.toLowerCase();
+  // ротационные/взрывные — скорость выше, ближе к жиму/скоростно-силовой (1.0-1.6м/с), не присед 0.30
+  if (low.includes('landmine_rotation') || low.includes('landmine_180') || low.includes('med_ball_rot') || low.includes('med_ball_throw') || low.includes('med_ball_slam') || low.includes('sledge') || low.includes('battle_rope')) return 'bench';
   if (low.includes('bench') || low.includes('ohp') || low.includes('push_press') || low.includes('landmine_press')) return 'bench';
   if (low.includes('squat') || low.includes('lunge') || low.includes('step_up') || low.includes('jump')) return 'squat';
   if (low.includes('dead') || low.includes('rdl') || low.includes('trap_bar') || low.includes('pull') || low.includes('row')) return 'deadlift';

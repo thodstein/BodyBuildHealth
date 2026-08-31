@@ -2,6 +2,7 @@
  * combat-ped-adaptation.ts — изолированный PED адаптер для единоборств.
  * Кап ниже чем в ББ/стронге (масса не всегда плюс). Учитывает GH/ins, дисциплину.
  */
+import { canonPedId, resolvePedAlias } from '../../data/ped-alias-map';
 export type PedDoses = Record<string, number>;
 
 function parseDose(v: any): number {
@@ -40,13 +41,21 @@ export function adaptForPEDsCombat(
   goal?: string
 ): { mrvMult: number; details: string } {
   const doses = pedDoses || {};
-  const has = (k: string) => (peds || []).some(p => p.toLowerCase().includes(k.toLowerCase()));
-  const aasTeq = has('tren') ? 2.5 : has('nand') || has('deca') ? 1.3 : has('bold') || has('eq') ? 1.1 : 1.0;
+  const resolvedPeds = (peds || []).map(p => {
+    try { const c = resolvePedAlias(canonPedId(p)); return c || p.toLowerCase(); } catch { return p.toLowerCase(); }
+  });
+  const has = (k: string) => resolvedPeds.some(p => p.includes(k.toLowerCase())) || (peds||[]).some(p=> p.toLowerCase().includes(k.toLowerCase()));
+  // doses keys тоже каноникализуем для aasTeq проверки
+  const doseKeysCanon = Object.keys(doses).map(k=> { try { return resolvePedAlias(canonPedId(k)) || k.toLowerCase(); } catch { return k.toLowerCase(); } });
+  const hasDose = (k: string) => doseKeysCanon.some(dk=> dk.includes(k.toLowerCase()));
+  const aasTeq = has('tren') || hasDose('tren') ? 2.5 : (has('nand')||has('deca')||hasDose('nand')||hasDose('deca')) ? 1.3 : (has('bold')||has('eq')||hasDose('bold')||hasDose('bold_undec')) ? 1.1 : 1.0;
   let aasDose = 0;
-  const aasKeys = ['aas','test','tren','deca','nand','bold','eq','primo','mast','drol','anavar','winstrol','oxan','stan'];
+  const aasKeys = ['aas','test','tren','deca','nand','bold','eq','primo','mast','drol','anavar','winstrol','oxan','stan','bold_undec','tren_acet','tren_enan','deca','npp','drostanolone'];
   for (const [k,v] of Object.entries(doses)) {
-    const lk = String(k).toLowerCase();
+    let lk: string;
+    try { lk = resolvePedAlias(canonPedId(k)) || String(k).toLowerCase(); } catch { lk = String(k).toLowerCase(); }
     if (aasKeys.some(x=> lk.includes(x))) aasDose += parseDose(v);
+    else if (['test','sustanon','enanthate','cypionate','propionate'].some(x=> lk.includes(x))) aasDose += parseDose(v);
   }
   if (aasDose===0) aasDose = parseDose((doses as any)['mg'] ?? doses['aas'] ?? doses['AAS'] ?? 0);
   const ghDose = parseDose((doses as any)['gh'] ?? (doses as any)['hgh'] ?? 0);
@@ -56,7 +65,7 @@ export function adaptForPEDsCombat(
 
   let mult = 1.0;
   const parts: string[] = [];
-  if (has('aas') || has('tren') || has('deca') || has('nand') || has('test') || aasDose > 0) {
+  if (has('aas') || has('tren') || has('deca') || has('nand') || has('test') || has('sust') || has('enanthate') || has('cyp') || has('primo') || has('mast') || has('bold') || has('eq') || aasDose > 0) {
     const eff = Math.round(aasDose * aasTeq);
     const m = curveAAS(eff || (has('tren')||has('aas') ? 500 : 0));
     mult *= m;

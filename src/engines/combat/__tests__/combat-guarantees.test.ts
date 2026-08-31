@@ -183,11 +183,12 @@ describe('combat guarantees — P0 critical', () => {
     expect([hasRot, hasCore].filter(Boolean).length >=1).toBe(true);
   });
 
-  it('mobility axial не содержит deadbug/ab_wheel/carry', () => {
+  it('mobility axial не содержит deadbug/ab_wheel/suitcase', () => {
     expect(isAxialLoadExerciseCB('deadbug')).toBe(false);
     expect(isAxialLoadExerciseCB('ab_wheel')).toBe(false);
     expect(isAxialLoadExerciseCB('suitcase_carry')).toBe(false);
-    expect(isAxialLoadExerciseCB('farmer_carry')).toBe(false);
+    // heavy carry — осевая (JSI >2.5×BW, P0-3 fix)
+    expect(isAxialLoadExerciseCB('farmer_carry')).toBe(true);
     expect(isAxialLoadExerciseCB('squat')).toBe(true);
     expect(isAxialLoadExerciseCB('trap_bar_dead')).toBe(true);
     expect(isAxialLoadExerciseCB('hang_clean')).toBe(true);

@@ -55,11 +55,14 @@ export function computeBudgetMultiplier(input: {
   proteinPerKg?: number;
   labMrvMultiplier?: number;
   female?: boolean;
+  recovery?: RecoveryInput;
+  recoveryMult?: number;
   // PED адаптер делегируется вызывающему (bb/combat/strength)
   pedMrvMult?: number;
 }): number {
   const ped = input.pedMrvMult ?? 1;
   const lab = input.labMrvMultiplier ?? 1;
+  const rec = input.recoveryMult ?? (input.recovery ? computeRecoveryMultiplier(input.recovery) : 1);
   const nut = computeNutritionMultiplier({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, female: input.female });
-  return Math.round(ped * lab * nut * 100) / 100;
+  return Math.round(ped * lab * nut * rec * 100) / 100;
 }

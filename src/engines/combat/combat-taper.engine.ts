@@ -9,18 +9,30 @@ export interface TaperConfig {
   startDate?: string | null; // ISO start of plan, default today
 }
 
+function isValidIsoDate(str: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const d = new Date(str);
+  if (!Number.isFinite(d.getTime())) return false;
+  // проверяем что 2025-02-30 не превратился в 2025-03-02
+  return d.toISOString().slice(0, 10) === str;
+}
+
 export function fightWeekIndex(fightDate: string, startDate: string | null | undefined, totalWeeks: number): number {
   try {
+    if (!isValidIsoDate(fightDate)) return totalWeeks;
     const f = new Date(fightDate).getTime();
-    if (!Number.isFinite(f)) return totalWeeks;
     if (!startDate) {
       // детерминированный fallback: если старт не задан — бой в конце плана (последняя неделя), не завязываемся на Date.now()
       return totalWeeks;
     }
+    if (!isValidIsoDate(startDate)) return totalWeeks;
     const s = new Date(startDate).getTime();
-    if (!Number.isFinite(s)) return totalWeeks;
+    if (f < s) {
+      // бой до старта — невалидно, считаем бой в конце (не в начале кэмпа)
+      return totalWeeks;
+    }
     const diffDays = Math.round((f - s) / 86400000);
-    // неделя 1 = дни 0-6, неделя 2 = 7-13 etc; если бой до старта — кламп к 1, если после — к totalWeeks
+    // неделя 1 = дни 0-6, неделя 2 = 7-13 etc; если после — к totalWeeks
     const w = Math.floor(diffDays / 7) + 1;
     return Math.max(1, Math.min(totalWeeks, w));
   } catch {

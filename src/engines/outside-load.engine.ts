@@ -48,7 +48,7 @@ export function normalizeOutsideLoad(input: OutsideLoad | null | undefined): Out
   const d = Math.max(30, Math.min(240, Math.round(Number(input.avgDurationMin) || 90)));
   const r = Math.max(1, Math.min(10, Number(input.avgSRPE) || 6));
   const type: OutsideType = (input.type as OutsideType) || 'mixed';
-  const interference: OutsideInterference = (input.interference as OutsideInterference) || (s >= 4 ? 'high' : s >= 2 ? 'medium' : 'low');
+  const interference: OutsideInterference = (input.interference as OutsideInterference) ?? (s >= 4 ? 'high' : s >= 2 ? 'medium' : 'low');
   const highDays = Array.isArray(input.highIntensityDays)
     ? [...new Set(input.highIntensityDays.map(n => Math.max(0, Math.min(6, Math.round(Number(n))))))].sort((a, b) => a - b)
     : [];

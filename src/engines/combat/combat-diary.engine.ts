@@ -70,12 +70,25 @@ export function buildDiaryTrendCB(logs: any[]): DiaryTrendCB[] | null {
 
 export function loadDiaryLogsCB(): any[] {
   try {
-    for (const key of ['he_workout_log', 'he_training_log', 'he_workout_history']) {
+    const keys = ['he_workout_log','he_training_log','he_workout_history','he_srpe_sessions','he_combined_log','he_strength_log','he_combat_log','he_training_log_v2'];
+    for (const key of keys) {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
       if (!raw) continue;
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr) && arr.length) return arr;
+      if (Array.isArray(arr) && arr.length) {
+        // нормализуем: поддержка sRPE-сессий (с полем exercises/workSets) и flat-логов
+        // если элементы имеют поле sessions или exercises — считаем их уже логами
+        if (arr.length > 0 && typeof arr[0] === 'object') return arr;
+      }
     }
+    // IndexedDB mirror через LS (cloud-kv sync пишет he_idb_* mirror если LS переполнен?)
+    try {
+      const idbMirror = typeof localStorage !== 'undefined' ? localStorage.getItem('he_idb_training_log') : null;
+      if (idbMirror) {
+        const arr = JSON.parse(idbMirror);
+        if (Array.isArray(arr) && arr.length) return arr;
+      }
+    } catch {}
   } catch {}
   return [];
 }

@@ -39,6 +39,13 @@ function atrBounds(totalWeeks: number): { accum: number; trans: number; real: nu
     return { accum, trans, real: Math.max(1, real) };
   }
   if (totalWeeks >= 6) {
+    // короткие <8нед — линейная логика, не чистый ATR (Issurin <8нед → linear)
+    if (totalWeeks < 8) {
+      const accum = Math.round(totalWeeks * 0.5);
+      const real = 1;
+      const trans = Math.max(0, totalWeeks - accum - real);
+      return { accum, trans, real };
+    }
     const [accum, trans, real] = largestRemainder(totalWeeks, [0.4, 0.4, 0.2]);
     return { accum, trans, real: Math.max(1, real) };
   }
@@ -47,6 +54,12 @@ function atrBounds(totalWeeks: number): { accum: number; trans: number; real: nu
 }
 
 export function isDeloadWeekATR(week: number, totalWeeks: number, model: CombatPeriodizationModel, goal: string): boolean {
+  // делод не ставится в тапер-недели — иначе 3 недели подряд низкий объём (deload 0.60 × taper 0.45 = 0.27)
+  if (isTaperWeek(week, totalWeeks, model, goal)) return false;
+  // короткие циклы <8нед — Issurin: linear, не ATR — делод реже
+  if (totalWeeks < 8 && model === 'atr_10') {
+    return week % 4 === 0 && week !== totalWeeks;
+  }
   // camp/conjugate — делод чаще: каждые 3 недели (2/1)
   if (goal === 'camp' || model === 'conjugate' || model === 'camp_8') {
     return week % 3 === 0 && week !== totalWeeks; // последняя — taper, не deload

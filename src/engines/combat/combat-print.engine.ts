@@ -4,7 +4,7 @@
  */
 import type { CombatPlan } from './combat.types';
 
-function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/`/g,'&#96;'); }
 function escCsv(v: any): string { const s = String(v ?? ''); if (/[",\n;]/.test(s)) return `"${s.replace(/"/g,'""')}"`; return s; }
 
 export function buildCombatPrintHtml(plan: CombatPlan): string {
@@ -36,7 +36,7 @@ export function buildCombatCsv(plan: CombatPlan): string {
 
 export function downloadCombatCsv(plan: CombatPlan): void {
   try {
-    const csv = buildCombatCsv(plan);
+    const csv = '\uFEFF' + buildCombatCsv(plan);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = `combat-${plan.discipline}-${plan.weeks}w.csv`; a.click(); setTimeout(()=> URL.revokeObjectURL(url), 1000);
@@ -52,7 +52,8 @@ export function buildCombatPlanIcs(plan: CombatPlan, startDate?: string | null):
     for (const s of w.sessions) {
       const dayOffset = (w.week-1)*7 + (s.day-1);
       const d = new Date(start.getTime() + dayOffset*86400000);
-      const e = new Date(d.getTime() + 90*60000);
+      const dur = (s as any).durationMin || (s.sessionTag==='full_conditioning' ? 60 : 90);
+      const e = new Date(d.getTime() + dur*60000);
       lines.push('BEGIN:VEVENT', `UID:cb-${plan.id}-w${w.week}d${s.day}@bodybuild`, `DTSTAMP:${fmt(new Date())}`, `DTSTART:${fmt(d)}`, `DTEND:${fmt(e)}`, `SUMMARY:${escIcs(`${w.phase} ${s.sessionTag} ${s.character} — ${s.exercises.map(x=>x.name).slice(0,3).join(', ')}`)}`, `DESCRIPTION:${escIcs(s.exercises.map(x=> `${x.name} ${x.sets}×${x.reps} ${x.weight}кг RIR${x.rir}`).join('\\n'))}`, 'END:VEVENT');
     }
   }

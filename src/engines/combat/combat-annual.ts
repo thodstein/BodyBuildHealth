@@ -57,18 +57,31 @@ export function annualCBPhaseForWeek(annual: AnnualCB | null, week: number): Ann
   return null;
 }
 
+function isValidIsoDateAnnual(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s);
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10)===s;
+}
 export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetition, startDate?: string | null): AnnualCB {
   const next: AnnualCB = { ...annual, competitions: [...annual.competitions, comp], updatedAt: new Date().toISOString(), blocks: annual.blocks.map(b=> ({...b})) } as AnnualCB;
   try {
+    if (!isValidIsoDateAnnual(comp.date)) return next;
     const d = new Date(comp.date).getTime();
     // детерм: если передан startDate — считаем от него, иначе от сегодня (fallback)
-    const startRef = startDate ? new Date(startDate).getTime() : Date.now();
+    const startRef = (startDate && isValidIsoDateAnnual(startDate)) ? new Date(startDate).getTime() : Date.now();
+    if (d < startRef) return next; // бой до старта — не вставляем тапер
     const w = Math.floor((d - startRef)/ (7*86400000)) +1;
     if (w>=1 && w<=annual.totalWeeks) {
-      // P1-5: вставляем taper-блок 2нед перед боем (w-1..w) если влезает
+      // P1-5: вставляем taper-блок 2нед перед боем (w-1..w) если влезает, с проверкой перекрытия таперов
       if (w >= 2 && w <= annual.totalWeeks) {
         const taperStart = w - 1;
         const taperEnd = w;
+        const hasOverlap = next.blocks.some(b=> b.phase==='taper' && !(taperEnd < b.startWeek || taperStart > b.startWeek + b.weeks -1));
+        if (hasOverlap) {
+          // перекрытие таперов — не вставляем второй, просто помечаем ближайший блок
+          for(const b of next.blocks) if (w>=b.startWeek && w< b.startWeek+b.weeks) b.fightDate = comp.date;
+          return next;
+        }
         // найдём блок, содержащий taperStart
         const idx = next.blocks.findIndex(b => taperStart >= b.startWeek && taperStart < b.startWeek + b.weeks);
         if (idx >= 0) {
@@ -101,7 +114,7 @@ export function addCompetitionToAnnual(annual: AnnualCB, comp: AnnualCBCompetiti
 }
 
 export function buildAnnualPrintHtml(annual: AnnualCB): string {
-  const esc = (s:string)=> s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const esc = (s:string)=> String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   const phaseColor: Record<string,string> = { accumulation:'#3b82f6', transmutation:'#a855f7', realization:'#ef4444', transition:'#f59e0b', gpp:'#10b981', power:'#f97316', taper:'#06b6d4', deload:'#eab308', conjugate:'#6366f1' };
   const rows = annual.blocks.map(b=>{
     const col = phaseColor[b.phase] || '#6b7280';

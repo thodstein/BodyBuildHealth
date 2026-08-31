@@ -19,6 +19,7 @@ import { combatToNutritionPayload, combatToCardioPayload } from '../../../engine
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
 import { getDiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
+import { loadHrvHistory, hrvEwma } from '../../../engines/combat/combat-monitoring.engine';
 import { useCombatWizard } from './useCombatWizard';
 import {
   CARD, CARD_ACCENT, CARD_HERO, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
@@ -113,12 +114,24 @@ export const CombatConstructor: React.FC = () => {
         const ph = p.pharma || {};
         extra.bodyFat = typeof personal.bodyFat === 'number' ? personal.bodyFat : undefined;
         extra.leanMass = typeof personal.bodyFat === 'number' && typeof personal.weight === 'number' ? Math.round(personal.weight * (1 - personal.bodyFat / 100)) : undefined;
-        extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined;
+        // HRV EWMA — берём сглаженное из истории если есть 7+ замеров, иначе одиночный morningHRV
+        try {
+          const hist = loadHrvHistory();
+          if (hist.length >= 7) {
+            const ew = hrvEwma(hist);
+            if (ew) extra.hrvMs = ew;
+            else extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined;
+          } else {
+            extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined;
+          }
+        } catch { extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined; }
         extra.sleepHours = typeof lifestyle.sleepHours === 'number' ? lifestyle.sleepHours : undefined;
         extra.stressLevel = typeof lifestyle.stressLevel === 'number' ? lifestyle.stressLevel : undefined;
         extra.calorieSurplus = typeof p.nutrition?.calorieSurplus === 'number' ? p.nutrition.calorieSurplus : undefined;
         extra.proteinPerKg = typeof p.nutrition?.proteinPerKg === 'number' ? p.nutrition.proteinPerKg : undefined;
         if (Array.isArray(ph.currentSubstances) && ph.currentSubstances.length) extra.peds = ph.currentSubstances;
+        if (ph.currentSubstancesDoses && typeof ph.currentSubstancesDoses === 'object') extra.pedDoses = ph.currentSubstancesDoses;
+        else if (p.pharma?.doses && typeof p.pharma.doses === 'object') extra.pedDoses = p.pharma.doses;
         extra.labMrvMultiplier = typeof p.labs?.mrvMultiplier === 'number' ? p.labs.mrvMultiplier : undefined;
       }
     } catch {}
@@ -145,6 +158,10 @@ export const CombatConstructor: React.FC = () => {
       patternId: patternId || undefined,
       ...extra,
     } as any;
+    try {
+      const trend = getDiaryTrendCB();
+      if (trend && trend.length) (input as any).diaryTrendCB = trend;
+    } catch {}
     try { const prev = loadCombatPlans()[0]; if (prev) input = applyCombatMesocycle(prev, input) as any; } catch {}
     let p = buildCombatPlan(input);
     p = finalizeCombatPlan(p);
