@@ -3,7 +3,7 @@
  * Только силовая часть зала. Внешняя нагрузка (ринг/татами) — через OutsideLoad.
  * Приоритеты: шея, хват, кор-ротация, унилатеральные ноги, тяги.
  */
-import { computeOutsideMetrics, outsideVolumeMultiplier, isDayConflictWithOutside, type OutsideLoad } from '../outside-load.engine';
+import { computeOutsideMetrics, outsideVolumeMultiplier, outsideFrequencyPenalty, isDayConflictWithOutside, type OutsideLoad } from '../outside-load.engine';
 import { getCombatPattern, recommendCombatPattern, type CombatPattern } from './combat-split-patterns';
 import { phaseForCombatWeek, rirForCombat, repsForCombat } from './combat-progression';
 import { phaseForCombatWeekATR, rirForCombatPhase, repsForCombatPhase, isDeloadWeekATR, isTaperWeek } from './combat-periodization.engine';
@@ -263,21 +263,20 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
   if (!pattern || pattern.sessionsPerRotation !== daysPerWeek) {
     pattern = recommendCombatPattern(daysPerWeek, outsideSessions, level);
   }
-  // форсим снижение частоты зала при высокой внезальной даже при явном patternId (C-P0-6)
-  // sparring hard 3× + 5× татами = 7 high-дней — 4× зал опасен
+  const outsideMetrics = computeOutsideMetrics(effectiveOutsideLoad as OutsideLoad);
+  const freqPenalty = outsideFrequencyPenalty(effectiveOutsideLoad as OutsideLoad);
+  // форсим снижение частоты зала при высокой внезальной даже при явном patternId (C-P0-6) — градированный 0.5/1
+  // high 4× + 2520 load = 0.5, high 5×/2500+ =1
   let forceDowngraded = false;
   const origPatternId = pattern.id;
-  if (outsideSessions >= 4 && pattern.sessionsPerRotation >= 4) {
+  if ((outsideSessions >= 4 || freqPenalty >= 0.5) && pattern.sessionsPerRotation >= 4) {
     const downgraded = recommendCombatPattern(3, outsideSessions, level);
     if (downgraded.sessionsPerRotation < pattern.sessionsPerRotation) {
       pattern = downgraded;
       forceDowngraded = true;
     }
   }
-
-  const outsideMetrics = computeOutsideMetrics(effectiveOutsideLoad as OutsideLoad);
-  // изолированные мультипликаторы — делегируем в единый движок (P1-1)
-  const recoveryMult = computeRecoveryMultiplier({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
+  const recoveryMult = computeRecoveryMultiplier({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel, hrvGrade: (input as any).hrvGrade });
   const nutritionMult = computeNutritionMultiplier({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg, female: input.sex === 'female' });
   const outsideMult = outsideVolumeMultiplier(effectiveOutsideLoad as OutsideLoad) || 1;
   const acwrMult = input.acwr?.zone === 'dangerous' ? 0.60 : input.acwr?.zone === 'caution' ? 0.85 : input.acwr?.zone === 'undertrained' ? 1.1 : 1;

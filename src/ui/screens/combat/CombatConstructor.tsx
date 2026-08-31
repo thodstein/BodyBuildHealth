@@ -19,7 +19,7 @@ import { combatToNutritionPayload, combatToCardioPayload } from '../../../engine
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
 import { getDiaryTrendCB, getDiaryTrendCBAsync } from '../../../engines/combat/combat-diary.engine';
-import { loadHrvHistory, hrvEwma } from '../../../engines/combat/combat-monitoring.engine';
+import { loadHrvHistory, hrvEwma, hrvGrade, hrvFromHistory } from '../../../engines/combat/combat-monitoring.engine';
 import { useCombatWizard } from './useCombatWizard';
 import {
   CARD, CARD_ACCENT, CARD_HERO, ROW, COL, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_GHOST,
@@ -114,13 +114,18 @@ export const CombatConstructor: React.FC = () => {
         const ph = p.pharma || {};
         extra.bodyFat = typeof personal.bodyFat === 'number' ? personal.bodyFat : undefined;
         extra.leanMass = typeof personal.bodyFat === 'number' && typeof personal.weight === 'number' ? Math.round(personal.weight * (1 - personal.bodyFat / 100)) : undefined;
-        // HRV EWMA — берём сглаженное из истории если есть 7+ замеров, иначе одиночный morningHRV
+        // HRV EWMA + grade — как cardio-diary: EWMA устойчивее выбросов, grade даёт 0.85/0.95/1.05 в recovery
         try {
           const hist = loadHrvHistory();
           if (hist.length >= 7) {
             const ew = hrvEwma(hist);
             if (ew) extra.hrvMs = ew;
             else extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined;
+            const h = hrvFromHistory(hist);
+            if (h) {
+              const g = hrvGrade(h.last, h.mean, h.sd);
+              extra.hrvGrade = g.grade;
+            }
           } else {
             extra.hrvMs = typeof lifestyle.morningHRV === 'number' ? lifestyle.morningHRV : typeof lifestyle.hrvMs === 'number' ? lifestyle.hrvMs : undefined;
           }

@@ -10,13 +10,15 @@ export interface RecoveryInput {
   hrvMs?: number;
   sleepHours?: number;
   stressLevel?: number;
+  hrvGrade?: 'optimal' | 'caution' | 'dangerous';
 }
 
 export function computeRecoveryMultiplier(input: RecoveryInput): number {
   let v = 1;
   if (input.bodyFat != null) v *= input.bodyFat > 25 ? 0.9 : input.bodyFat > 20 ? 0.95 : 1;
   if (input.leanMass != null) v *= input.leanMass >= 90 ? 1.15 : input.leanMass >= 75 ? 1.05 : input.leanMass >= 60 ? 1 : 0.9;
-  if (input.hrvMs != null) v *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1 : 0.85;
+  if (input.hrvGrade) v *= input.hrvGrade === 'dangerous' ? 0.85 : input.hrvGrade === 'caution' ? 0.95 : 1.05;
+  else if (input.hrvMs != null) v *= input.hrvMs > 70 ? 1.1 : input.hrvMs >= 50 ? 1 : 0.85;
   if (input.sleepHours != null) v *= input.sleepHours >= 7 ? 1.05 : input.sleepHours >= 6 ? 1 : 0.85;
   if (input.stressLevel != null) v *= input.stressLevel < 3 ? 1.05 : input.stressLevel < 6 ? 1 : 0.85;
   return Math.max(0.6, Math.min(1.5, v));
