@@ -18,7 +18,7 @@ import { buildWeightCutProtocol } from '../../../engines/combat/combat-weight-cu
 import { combatToNutritionPayload, combatToCardioPayload } from '../../../engines/combat/combat-integration.engine';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { diagnoseVelocityLossCombat } from '../../../engines/combat/combat-vbt.engine';
-import { getDiaryTrendCB } from '../../../engines/combat/combat-diary.engine';
+import { getDiaryTrendCB, getDiaryTrendCBAsync } from '../../../engines/combat/combat-diary.engine';
 import { loadHrvHistory, hrvEwma } from '../../../engines/combat/combat-monitoring.engine';
 import { useCombatWizard } from './useCombatWizard';
 import {
@@ -103,7 +103,7 @@ export const CombatConstructor: React.FC = () => {
     } catch {}
   };
 
-  const build = () => {
+  const build = async () => {
     let extra: any = {};
     try {
       const raw = localStorage.getItem('he_profile_v2');
@@ -159,7 +159,9 @@ export const CombatConstructor: React.FC = () => {
       ...extra,
     } as any;
     try {
-      const trend = getDiaryTrendCB();
+      let trend: any = null;
+      try { trend = await getDiaryTrendCBAsync(); } catch { trend = getDiaryTrendCB(); }
+      if (!trend) try { trend = getDiaryTrendCB(); } catch {}
       if (trend && trend.length) (input as any).diaryTrendCB = trend;
     } catch {}
     try { const prev = loadCombatPlans()[0]; if (prev) input = applyCombatMesocycle(prev, input) as any; } catch {}

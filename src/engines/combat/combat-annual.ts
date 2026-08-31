@@ -121,7 +121,16 @@ export function buildAnnualPrintHtml(annual: AnnualCB): string {
     return `<tr style="background:${col}14; border-left:4px solid ${col}"><td>${b.startWeek}-${b.startWeek+b.weeks-1}</td><td><span style="background:${col};color:#fff;padding:2px 6px;border-radius:4px;font-size:10px">${esc(b.phase)}</span></td><td>${esc(b.discipline)}</td><td>${b.weeks}нед</td><td>${b.status}</td><td>${b.fightDate? esc(b.fightDate):''}</td></tr>`;
   }).join('');
   const comps = annual.competitions.map(c=> `<li>${esc(c.name)} — ${esc(c.date)} ${c.weightClass? '('+esc(c.weightClass)+')':''}</li>`).join('');
-  return `<html><head><meta charset="utf-8"><title>Годовой план ${esc(annual.discipline)} ${annual.totalWeeks}нед</title><style>body{font-family:Inter,Arial,sans-serif;padding:16px}table th{background:#f3f4f6} h1{margin:0 0 8px}</style></head><body><h1>${esc(annual.discipline.toUpperCase())} · ${annual.totalWeeks}нед · ATR</h1><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th>Недели</th><th>Фаза</th><th>Дисциплина</th><th>Длит.</th><th>Статус</th><th>Бой</th></tr>${rows}</table><h3>Соревнования (${annual.competitions.length})</h3><ul>${comps||'<li>нет</li>'}</ul></body></html>`;
+  // Gantt — горизонтальная полоса ATR (как annual-training-print)
+  const ganttSegs = annual.blocks.map(b=> {
+    const col = phaseColor[b.phase] || '#6b7280';
+    const w = (b.weeks / annual.totalWeeks * 100).toFixed(2);
+    const label = `${esc(b.phase)} ${b.weeks}н`;
+    return `<div title="${label} нед ${b.startWeek}-${b.startWeek+b.weeks-1}${b.fightDate? ' бой '+esc(b.fightDate):''}" style="width:${w}%;background:${col};display:flex;align-items:center;justify-content:center;color:#fff;font-size:7px;font-weight:700;overflow:hidden;white-space:nowrap;border-right:0.5px solid #fff">${b.weeks>=3? label : ''}</div>`;
+  }).join('');
+  const gantt = `<div style="display:flex;height:14px;border-radius:6px;overflow:hidden;border:0.5px solid #e5e7eb;margin:8px 0 4px">${ganttSegs}</div><div style="display:flex;justify-content:space-between;font-size:8px;color:#6b7280"><span>Нед 1</span><span>Нед ${annual.totalWeeks}</span></div>`;
+  const hash = `cb-${annual.discipline}-${annual.totalWeeks}w-${annual.blocks.map(b=> b.phase[0]).join('')}`;
+  return `<html><head><meta charset="utf-8"><title>Годовой план ${esc(annual.discipline)} ${annual.totalWeeks}нед</title><style>body{font-family:Inter,Arial,sans-serif;padding:16px;color:#111}table th{background:#f3f4f6} h1{margin:0 0 8px} @media print{body{padding:8px}}</style></head><body><h1>${esc(annual.discipline.toUpperCase())} · ${annual.totalWeeks}нед · ATR</h1>${gantt}<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;margin-top:8px"><tr><th>Недели</th><th>Фаза</th><th>Дисциплина</th><th>Длит.</th><th>Статус</th><th>Бой</th></tr>${rows}</table><h3>Соревнования (${annual.competitions.length})</h3><ul>${comps||'<li>нет</li>'}</ul><div style="margin-top:12px;padding:8px 10px;background:#f3f4f6;border-radius:6px;font-size:10px;color:#6b7280">hash: ${esc(hash)} · #combat-annual · печать: Ctrl+P → PDF</div></body></html>`;
 }
 
 export function buildAnnualIcs(annual: AnnualCB, startDate?: string | null): string {

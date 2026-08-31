@@ -453,18 +453,24 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
     if (coreAntiCount < 4 && !deload && !taper) {
       const target = sessions.find(s=> s.sessionTag.includes('upper_power') || s.sessionTag.includes('full_power')) || sessions[0];
       if (target && target.exercises.length < 8 && target.exercises.reduce((a,e)=>a+e.sets,0) < 22) {
-        // выбираем недостающую функцию
+        // выбираем недостающую функцию — с прогрессией уровня/фазы
         const eq = (input.equipment || []).map((s: string) => String(s).toLowerCase());
         const hasCable = eq.includes('cable') || eq.includes('other') || eq.length===0;
         const needExt = !sessions.flatMap(s=> s.exercises).some(e=> ['deadbug','hollow_hold','ab_wheel'].includes(e.id));
         const needRot = !sessions.flatMap(s=> s.exercises).some(e=> e.id==='pallof_rotation_press');
         const needLat = !sessions.flatMap(s=> s.exercises).some(e=> ['side_plank','copenhagen_plank','suitcase_carry'].includes(e.id));
-        let coreId: string | null = null;
-        if (needExt) coreId = 'deadbug';
-        else if (needRot) coreId = hasCable ? 'pallof_rotation_press' : 'deadbug';
-        else if (needLat) coreId = 'side_plank';
-        else coreId = 'deadbug';
-        const coreMeta = getExerciseMeta(coreId) || { name: coreId, group: 'core', pattern: 'anti_extension' };
+        const corePlans = coreWeeklyPlan(level, w, phase);
+        let prog: any = null;
+        if (needExt) prog = corePlans.find((p:any)=> p.function==='anti_extension') || corePlans[0];
+        else if (needRot) prog = corePlans.find((p:any)=> p.function==='anti_rotation') || corePlans[1];
+        else if (needLat) prog = corePlans.find((p:any)=> p.function==='anti_lateral') || corePlans[2];
+        else prog = corePlans[0];
+        // кабель-фильтр: если нет кабеля, заменяем pallof на deadbug
+        let coreId: string = prog.exercises[0];
+        if (!hasCable && coreId==='pallof_rotation_press') { coreId = 'deadbug'; prog = corePlans.find((p:any)=> p.function==='anti_extension') || prog; }
+        const coreMeta = getExerciseMeta(coreId) || { name: coreId, group: 'core', pattern: prog.function || 'anti_extension' };
+        const isHold = prog.reps.includes('с') || prog.reps.includes('с/'); // планка
+        const repsNum = isHold ? 1 : parseInt(prog.reps) || 8;
         const coreEx: any = {
           id: coreId,
           name: coreMeta.name,
@@ -472,14 +478,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           pattern: coreMeta.pattern,
           role: 'accessory',
           character: 'памп',
-          sets: 3,
-          reps: coreId==='side_plank' ? '30с' : '8-10',
+          sets: prog.sets,
+          reps: prog.reps,
           rir: 3,
           weight: 0,
-          workSets: Array.from({length:3}, ()=> ({ reps: coreId==='side_plank'? 1 : 8, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: 60 })),
+          workSets: Array.from({length: prog.sets}, ()=> ({ reps: repsNum, rir:3, weight: 0, tempo: '2-1-1-0', restSeconds: prog.rest })),
           tempo: '2-1-1-0',
-          restSeconds: 60,
-          comment: 'Core Boxing Science: обязательный anti-функция (авто)',
+          restSeconds: prog.rest,
+          comment: `Core Boxing Science: ${prog.function} L${prog.level} (${prog.cue}) — авто`,
         };
         target.exercises.push(coreEx);
         target.durationMin = (target.durationMin||0)+6;

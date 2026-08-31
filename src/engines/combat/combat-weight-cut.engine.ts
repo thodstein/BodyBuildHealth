@@ -77,20 +77,29 @@ export function weightCutNutritionForWeek(
   let sodium = 5000;
   if (ph === 'taper') {
     carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 1) : Math.round(bodyweightKg * 3);
-    water = protocol.waterMode === 'load_cut' ? Math.min(8000, Math.round(bodyweightKg * 100)) : Math.round(bodyweightKg * 30);
+    const rawWater = Math.round(bodyweightKg * 100);
+    water = protocol.waterMode === 'load_cut' ? Math.min(bodyweightKg > 110 ? 5000 : 8000, rawWater) : Math.round(bodyweightKg * 30);
+    if (bodyweightKg > 110 && water > 5000) water = 5000;
     sodium = protocol.sodiumMode === 'moderate_cut' ? 3000 : 4000;
+    if (bodyweightKg > 110) sodium = Math.min(sodium, 5000);
     notes.push('Тапер: углеводы ↓, вода ↑ (load) перед сливом');
+    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода cap 5л, Na ≤5г');
   } else if (ph === 'fight_week') {
     carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 1) : Math.round(bodyweightKg * 2);
     water = protocol.waterMode === 'load_cut' ? 2000 : Math.round(bodyweightKg * 20);
+    if (bodyweightKg > 110 && water > 3500) water = 3500;
     sodium = protocol.sodiumMode === 'moderate_cut' ? 1500 : 2500;
+    if (bodyweightKg > 110) sodium = Math.min(sodium, 3500);
     notes.push('Fight week: вода 2л + натрий 1.5г + углеводы 1г/кг (деплитация) → взвешивание → рефид 8г/кг + вода 150% + Na 1г/кг за 12-24ч');
     if (protocol.heatSessions) notes.push('Сауна 15-20′×3 + sweat suit — компенсация ↓ объёма зала');
+    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода/Na скорректированы под массу');
   } else {
     // camp — дефицит -15-20% TDEE, но ккал считаем вне (нужен TDEE), здесь только макро-ориентир
     carbs = protocol.carbMode === 'deplete_reload' ? Math.round(bodyweightKg * 4) : Math.round(bodyweightKg * 5);
     water = Math.round(bodyweightKg * 35);
+    if (bodyweightKg > 110 && water > 4500) water = 4500;
     sodium = 5000;
+    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода cap 4.5л');
   }
   // жиры: female ≥0.8г/кг (мин 40г RED-S), male ≥0.6 (мин 30г) — как bb-contest-prep + recovery-budget
   const fatPerKg = sex === 'female' ? 0.8 : 0.6;

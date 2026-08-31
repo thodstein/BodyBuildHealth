@@ -299,7 +299,7 @@ export const SectionNav: React.FC<{ items: { id: string; label: string }[]; acti
 export const ProgressBar: React.FC<{ value: number; max?: number; color?: string; height?: number }> = ({ value, max = 100, color = ACCENT, height = 4 }) => {
   const pct = Math.max(0, Math.min(100, (value / max) * 100));
   return (
-    <div style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden' }}>
+    <div role="progressbar" aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} aria-label="прогресс" style={{ height, borderRadius: height / 2, background: 'rgba(58,58,60,0.72)', overflow: 'hidden' }}>
       <div style={{
         height: '100%', borderRadius: height / 2, width: pct + '%',
         background: color,

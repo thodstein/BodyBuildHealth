@@ -84,13 +84,16 @@ export function outsideVolumeMultiplier(load: OutsideLoad | null | undefined): n
   return Math.max(0.55, Math.min(1.0, Math.round(m * 100) / 100));
 }
 
-/** Штраф частоты: при высокой внешней нагрузке ноги/тяж. тяги не 3×/нед */
+/** Штраф частоты: градированный 0 / 0.5 / 1 — как BB per-muscle frequency */
 export function outsideFrequencyPenalty(load: OutsideLoad | null | undefined): number {
   const n = normalizeOutsideLoad(load);
   if (!n) return 0;
-  if (n.interference === 'high' && n.sessionsPerWeek >= 4) return 1;
-  if (n.interference === 'medium' && n.sessionsPerWeek >= 5) return 1;
-  if (outsideWeeklyLoad(n) >= 1800) return 1;
+  const wl = outsideWeeklyLoad(n);
+  if (wl >= 2500 || (n.interference === 'high' && n.sessionsPerWeek >= 5)) return 1;
+  if (n.interference === 'high' && n.sessionsPerWeek >= 4) return 0.5;
+  if (n.interference === 'medium' && n.sessionsPerWeek >= 5) return 0.5;
+  if (wl >= 1800) return 0.5;
+  if (wl >= 1200 && n.interference === 'high') return 0.5;
   return 0;
 }
 

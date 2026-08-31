@@ -76,12 +76,9 @@ export function loadDiaryLogsCB(): any[] {
       if (!raw) continue;
       const arr = JSON.parse(raw);
       if (Array.isArray(arr) && arr.length) {
-        // нормализуем: поддержка sRPE-сессий (с полем exercises/workSets) и flat-логов
-        // если элементы имеют поле sessions или exercises — считаем их уже логами
         if (arr.length > 0 && typeof arr[0] === 'object') return arr;
       }
     }
-    // IndexedDB mirror через LS (cloud-kv sync пишет he_idb_* mirror если LS переполнен?)
     try {
       const idbMirror = typeof localStorage !== 'undefined' ? localStorage.getItem('he_idb_training_log') : null;
       if (idbMirror) {
@@ -93,7 +90,45 @@ export function loadDiaryLogsCB(): any[] {
   return [];
 }
 
+export async function loadDiaryLogsCBAsync(): Promise<any[]> {
+  // Пробуем IndexedDB (реальный дневник силы — idb:training_log/workout_log), fallback на LS
+  try {
+    const { db } = await import('../../core/db');
+    try { await db.init(); } catch {}
+    const out: any[] = [];
+    for (const store of ['training_log','workout_log'] as const) {
+      try {
+        const recs: any[] = await db.getAll(store);
+        if (Array.isArray(recs) && recs.length) {
+          for (const r of recs) {
+            if (r?.exercises && Array.isArray(r.exercises)) {
+              // workout session → разворачиваем каждое упражнение в отдельный лог-энтри
+              for (const ex of r.exercises) {
+                const sets = ex.sets || ex.workSets || [];
+                if (!Array.isArray(sets) || sets.length===0) continue;
+                out.push({ date: r.date, exerciseId: ex.id || ex.exerciseId, exerciseName: ex.name || ex.exerciseName, sets });
+              }
+            } else if (r?.exerciseId || r?.exerciseName) {
+              // flat entry
+              if (Array.isArray(r.sets) && r.sets.length) out.push(r);
+            } else if (r?.date && r?.sets) {
+              out.push(r);
+            }
+          }
+        }
+      } catch {}
+    }
+    if (out.length) return out;
+  } catch {}
+  return loadDiaryLogsCB();
+}
+
 export function getDiaryTrendCB(): DiaryTrendCB[] | null {
   const logs = loadDiaryLogsCB();
+  return buildDiaryTrendCB(logs);
+}
+
+export async function getDiaryTrendCBAsync(): Promise<DiaryTrendCB[] | null> {
+  const logs = await loadDiaryLogsCBAsync();
   return buildDiaryTrendCB(logs);
 }

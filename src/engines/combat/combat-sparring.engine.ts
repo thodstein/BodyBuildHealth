@@ -16,6 +16,7 @@ export interface SparringLoad {
 }
 
 export function sparringWeeklyLoad(s: SparringLoad): number {
+  // scale: hard 90×8.5=765 vs outside generic 90×7=630 — намеренно выше: hard spar RPE 8-9 (ЦНС-удар, 6мин раунд) vs тех 5.5; дельта 0.10 в volumeMultiplier обоснована Boxing Science
   const hard = Math.max(0, Math.min(4, Math.round(s.hardSparSessions || 0))) * 90 * 8.5;
   const tech = Math.max(0, Math.min(4, Math.round(s.techSparSessions || 0))) * 60 * 5.5;
   const wrest = Math.max(0, Math.min(4, Math.round(s.wrestlingSessions || 0))) * 75 * 7.5;

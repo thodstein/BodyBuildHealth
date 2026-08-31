@@ -284,6 +284,8 @@ addSnackComboToMeal: (dayIdx: number, mealIdx: number) => void;
   renderMealList: (dayData: any, editable?: boolean, dayIdx?: number) => React.ReactNode;
   /** п.18: активный блок года для сегодня ({ week, block } | null) — карточка «📍 текущий блок года». */
   annualPhase: { week: number; block: AnnualBlockState } | null;
+  /** Combat/Strength интеграция: payload питания от плана единоборств/силы */
+  combatNutrition: any;
   cyclePhase: string; setCyclePhase: (v: any) => void;
   bbCategory: BBCategory; setBBCategory: (v: any) => void;
   peakWeekEnabled: boolean; setPeakWeekEnabled: (v: boolean) => void;
@@ -528,6 +530,24 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try { setAnnualPlan(loadAnnualTrainingPlan()); } catch { /* ignore */ }
     window.addEventListener('he-annual-training-plan-updated', onAnnualUpdated);
     return () => window.removeEventListener('he-annual-training-plan-updated', onAnnualUpdated);
+  }, []);
+  // Combat/Strength интеграция — слушаем he-combat-updated / he-strength-updated
+  const [combatNutrition, setCombatNutrition] = useState<any>(null);
+  useEffect(() => {
+    const onCombatNutrition = () => {
+      try {
+        const raw = localStorage.getItem('he_combat_nutrition_payload') || localStorage.getItem('he_strength_nutrition_payload');
+        if (raw) setCombatNutrition(JSON.parse(raw));
+        else setCombatNutrition(null);
+      } catch { setCombatNutrition(null); }
+    };
+    onCombatNutrition();
+    window.addEventListener('he-combat-updated' as any, onCombatNutrition);
+    window.addEventListener('he-strength-updated' as any, onCombatNutrition);
+    return () => {
+      window.removeEventListener('he-combat-updated' as any, onCombatNutrition);
+      window.removeEventListener('he-strength-updated' as any, onCombatNutrition);
+    };
   }, []);
   // п.18: активный блок года для сегодня (карточка «📍 текущий блок года» в UI плана).
   const annualPhase = useMemo(
@@ -3352,7 +3372,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // P1-7: renderMealList вынесен в MealListRender.tsx (267 строк → 1 строка)
   const ctx = useMemo<Omit<PlanCtx, 'renderMealList'>>(() => ({
-    profile, s, courseEntries, annualPhase,
+    profile, s, courseEntries, annualPhase, combatNutrition,
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
     cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking,
