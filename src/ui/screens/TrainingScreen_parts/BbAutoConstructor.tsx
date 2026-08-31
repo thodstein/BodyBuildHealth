@@ -4358,6 +4358,8 @@ export const BbAutoConstructor: React.FC = () => {
             </div>
           </div>
         )}
+        </div>
+        </div>
         <div style={{ ...CARD, padding:0, overflow:'hidden', marginBottom:8, border:'1px solid rgba(0,230,138,0.22)', background:'rgba(6,22,18,0.32)' }}>
           <button type="button" onClick={() => setQualityOpen(v => !v)} aria-expanded={qualityOpen} style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', cursor:'pointer', background:'linear-gradient(135deg, rgba(0,230,138,0.16), rgba(16,185,129,0.06))', border:'none', borderBottom: qualityOpen ? '1px solid rgba(255,255,255,0.06)' : 'none', textAlign:'left' }}>
             <span style={{ fontSize:14, fontWeight:900, color:'#fff' }}>🏋️ Тренировочная нагрузка плана</span>
@@ -4859,8 +4861,6 @@ export const BbAutoConstructor: React.FC = () => {
             />
           </div>
         )}</CollapsibleCard>
-        </div>
-        </div>
       </div>
     );
   };
