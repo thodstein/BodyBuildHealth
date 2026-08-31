@@ -21,11 +21,10 @@ import { applyMealTargetOverrides } from "./planner-meal-targets";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 // P1-7: чистые функции отчётов вынесены в planner-report-state.ts (Хвост-1)
-import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
-import { buildRecommendations } from "./planner-recommendations"; // P1-7: generateRecommendations вынесен
 import { buildMealPrep } from "./planner-mealprep"; // P1-7: generateMealPrep вынесен
 import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList вынесен
 import { usePlannerReportState } from "./planner-report-state"; // Хвост-1: состояние отчётов вынесено в под-хук
+import { usePlannerSpecialMealState } from "./planner-special-meal-state"; // Хвост-1: спец-режимы/рекомендации в под-хук
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
 import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
@@ -3143,44 +3142,32 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [planTab, setPlanTab] = useState<string>(() => { try { return localStorage.getItem('he_plan_active_tab') || 'settings'; } catch { return 'settings'; } });
   useEffect(() => { try { localStorage.setItem('he_plan_active_tab', planTab); } catch {} }, [planTab]);
 
-  const [specialMealMode, setSpecialMealMode] = useState(false);
-  const [specialMealGoal, setSpecialMealGoal] = useState('custom');
-  const [specialMealProteinG, setSpecialMealProteinG] = useState(40);
-  const [specialMealFatG, setSpecialMealFatG] = useState(15);
-  const [specialMealCarbsG, setSpecialMealCarbsG] = useState(50);
-  const [specialMealTiming, setSpecialMealTiming] = useState('snack');
-  const [specialMealReplaceMode, setSpecialMealReplaceMode] = useState(false);
-  const [specialMealReplaceTarget, setSpecialMealReplaceTarget] = useState('Ужин');
+  // Хвост-1 (god-component рефактор): спец-приёмы/спец-планы/рекомендации вынесены
+  // в под-хук (planner-special-meal-state.ts). Возвращает те же имена — в PlanCtx ниже.
+  const {
+    specialMealMode, setSpecialMealMode, specialMealGoal, setSpecialMealGoal,
+    specialMealProteinG, setSpecialMealProteinG, specialMealFatG, setSpecialMealFatG,
+    specialMealCarbsG, setSpecialMealCarbsG, specialMealTiming, setSpecialMealTiming,
+    specialMealReplaceMode, setSpecialMealReplaceMode, specialMealReplaceTarget, setSpecialMealReplaceTarget,
+    cheatMealPlan, setCheatMealPlan, carbloadPlan, setCarbloadPlan, butchPlan, setButchPlan,
+    cravingPlan, setCravingPlan, lazyDayPlan, setLazyDayPlan,
+    recommendations, setRecommendations,
+    generateCheatMeal, generateCarbload, generateBUTCH, generateCravingPlan, generateLazyDayPlan,
+    generateRecommendations,
+  } = usePlannerSpecialMealState({
+    isTrainDay, allergens, dietPrefs, plannerModeRef, goal, phase, weight,
+    effectiveKcal, effectiveP, effectiveF, effectiveC, cravingDays, lazyDayDays,
+    injections, linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType,
+    v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {},
+    v2Labs: v2Labs && typeof v2Labs === 'object' ? v2Labs : {},
+    histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, carbPeriodization,
+  });
+
   // E7: модалка имени плана (замена window.prompt)
   const [savePlanPrompt, setSavePlanPrompt] = useState<{ open: boolean; value: string } | null>(null);
-  const [cheatMealPlan, setCheatMealPlan] = useState<any>(null);
-  const [carbloadPlan, setCarbloadPlan] = useState<any>(null);
-  const [butchPlan, setButchPlan] = useState<any>(null);
-  const [cravingPlan, setCravingPlan] = useState<any>(null);
-  const [lazyDayPlan, setLazyDayPlan] = useState<any>(null);
-  const [recommendations, setRecommendations] = useState<string[]>([]);
-
-  // FIX train-bind: спец-режимы получают тренировочные дни как производный 7-дневный
-  // массив (weekly/eod/pattern → единый формат boolean[7]).
+  // FIX train-bind: тренировочные дни как производный 7-дневный массив — нужен и отчётам
+  // (generateFullNutritionReport), поэтому остаётся в провайдере.
   const _trainDaysArr = Array.from({ length: 7 }, (_, i) => isTrainDay(i));
-  // FIX allergens-restrictions: спец-режимы уважают исключения пользователя
-  const _smExcludedIds = [...resolveAllExcludedFoodIds(FOOD_DB, allergens || [], dietPrefs || [])];
-  const generateCheatMeal = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCheatMealPlan(generateCheatMealSm(_smDeps)); };
-
-  const generateCarbload = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCarbloadPlan(generateCarbloadSm(_smDeps)); };
-
-  const generateBUTCH = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setButchPlan(generateBUTCHSm(_smDeps)); };
-
-  const generateCravingPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setCravingPlan(generateCravingPlanSm(_smDeps)); };
-
-  const generateLazyDayPlan = () => { const _smDeps = { weight, effectiveKcal, effectiveP, effectiveF, effectiveC, goal, cravingDays, lazyDayDays, trainingDays: _trainDaysArr, excludedIds: _smExcludedIds }; setLazyDayPlan(generateLazyDayPlanSm(_smDeps)); };
-
-  const generateRecommendations = () => {
-    if (plannerModeRef.current !== 'pro') { setRecommendations([]); return; }
-    setRecommendations(buildRecommendations({ goal, phase, weight, effectiveKcal, effectiveP, effectiveF, effectiveC, injections: Array.isArray(injections) ? injections : [], linkToTraining, trainStart, trainEnd, sex, bodyFatPct, trainType, v2Phase, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, v2Labs: v2Labs && typeof v2Labs === 'object' ? v2Labs : {}, histamineSensitive, generated, planDays, dayPlan, threeDayPlan, weekPlan, carbPeriodization }));
-  };
-
-  useEffect(() => { if (generated && dayPlan) { try { generateRecommendations(); } catch (e: any) { try { console.warn('[Planner] recommendations useEffect failed:', e); } catch {} } } }, [Array.isArray(injections) ? injections.length : 0]);
 
   const saveCurrentPlan = () => {
     // E7: prompt() → модалка (мобильный UX, нативный prompt блокировался в Telegram WebApp)
