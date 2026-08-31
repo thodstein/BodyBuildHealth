@@ -189,8 +189,8 @@ export function phaseForWeek(week: number, totalWeeks: number, goal?: string, mo
 }
 
 /** Привязка к дате старта: taper неделя перед competitionDate (P0 fix: старта = peaking, не deload) */
-export function phaseForDate(week: number, totalWeeks: number, goal?: string, competitionDate?: string, startDate?: string): string {
-  if (!competitionDate || !startDate) return phaseForWeek(week, totalWeeks, goal);
+export function phaseForDate(week: number, totalWeeks: number, goal?: string, competitionDate?: string, startDate?: string, mode?: string): string {
+  if (!competitionDate || !startDate) return phaseForWeek(week, totalWeeks, goal, mode);
   try {
     const start = new Date(startDate);
     const comp = new Date(competitionDate);
@@ -199,9 +199,9 @@ export function phaseForDate(week: number, totalWeeks: number, goal?: string, co
     const diffWeeks = Math.floor(diffDays / 7);
     if (diffWeeks <= 1 && diffWeeks >= 0) return 'peaking'; // неделя старта и за 1 нед до — пик
     if (goal === 'peaking' && diffWeeks <= 2 && diffWeeks >= 0) return 'peaking';
-    if (diffWeeks < 0) return phaseForWeek(week, totalWeeks, goal); // после старта — обычная периодизация
+    if (diffWeeks < 0) return phaseForWeek(week, totalWeeks, goal, mode); // после старта — обычная периодизация
   } catch {}
-  return phaseForWeek(week, totalWeeks, goal);
+  return phaseForWeek(week, totalWeeks, goal, mode);
 }
 
 /** Classic progression row для отчёта */

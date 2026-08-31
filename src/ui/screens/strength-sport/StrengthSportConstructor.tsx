@@ -54,7 +54,9 @@ export const StrengthSportConstructor: React.FC = () => {
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
-  const [vbtMap, setVbtMap] = useState<Record<string, number>>({});
+  const [vbtMap, setVbtMap] = useState<Record<string, number>>(() => {
+    try { const raw = localStorage.getItem('he_vbt_ss_v1'); return raw ? JSON.parse(raw) as Record<string,number> : {}; } catch { return {}; }
+  });
   const [plan, setPlan] = useState<StrengthSportPlan | null>(null);
   const [annual, setAnnual] = useState(() => loadAnnualSS());
   const [diaryLoad, setDiaryLoad] = useState<number | null>(null);
@@ -62,6 +64,7 @@ export const StrengthSportConstructor: React.FC = () => {
   const [msg, setMsg] = useState('');
 
   const outsideMetrics = useMemo(() => computeOutsideMetrics(outsideEnabled ? outside : null), [outside, outsideEnabled]);
+  React.useEffect(() => { try { localStorage.setItem('he_vbt_ss_v1', JSON.stringify(vbtMap)); } catch {} }, [vbtMap]);
 
   React.useEffect(() => {
     try {
@@ -605,12 +608,15 @@ export const StrengthSportConstructor: React.FC = () => {
             const log = (plan.workMax as any).logPress || (plan.workMax as any).overheadPress;
             const yPlan = yoke ? buildSMEventPlan('yoke_walk', yoke) : null;
             const lPlan = log ? buildSMEventPlan('log_press', log) : null;
-            return (yPlan || lPlan) ? (
-              <SectionCard icon="🪨" title="Попытки стронг" subtitle="шаг йок 10кг / лог 2.5кг" strong>
+            // medley для ивент-дня: берём первые 2 carries недели 1
+            const medleyEx = plan.weeksData[0]?.sessions.find(s=> s.sessionTag==='event_day')?.exercises.filter(e=> ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','sled_push_sprint'].includes(e.id)).slice(0,2) || [];
+            return (yPlan || lPlan || medleyEx.length>=2) ? (
+              <SectionCard icon="🪨" title="Попытки стронг + Medley" subtitle="шаг йок 10кг / лог 2.5кг · medley 90с переход cap 180с" strong>
                 <div style={{ display:'grid', gridTemplateColumns: yPlan && lPlan ? '1fr 1fr' : '1fr', gap:10 }}>
-                  {yPlan && <div style={{ background:'rgba(255,159,10,0.08)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,159,10,0.18)' }}><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🚜 Йок 20м</div><div style={{ display:'flex', gap:6, marginTop:6, fontVariantNumeric:'tabular-nums' }}><HighlightStrong>{yPlan.attempts.opener}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.second}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.third}кг</HighlightStrong></div></div>}
+                  {yPlan && <div style={{ background:'rgba(255,159,10,0.08)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,159,10,0.18)' }}><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🚜 Йок {(yPlan.warmup[0] as any)?.distanceM||20}м cap {(yPlan.warmup[0] as any)?.timeCapS||60}с</div><div style={{ display:'flex', gap:6, marginTop:6, fontVariantNumeric:'tabular-nums' }}><HighlightStrong>{yPlan.attempts.opener}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.second}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.third}кг</HighlightStrong></div>{yPlan.ladder && <div style={{ fontSize:10, color:TEXT_3, marginTop:4 }}>Лестница: {yPlan.ladder.weights.slice(0,3).join('→')}кг</div>}</div>}
                   {lPlan && <div style={{ background:'rgba(255,159,10,0.08)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,159,10,0.18)' }}><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🪵 Лог</div><div style={{ display:'flex', gap:6, marginTop:6, fontVariantNumeric:'tabular-nums' }}><HighlightStrong>{lPlan.attempts.opener}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{lPlan.attempts.second}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{lPlan.attempts.third}кг</HighlightStrong></div></div>}
                 </div>
+                {medleyEx.length>=2 && <div style={{ background:'rgba(59,130,246,0.08)', border:'0.5px solid rgba(59,130,246,0.18)', padding:'8px 10px', borderRadius:10, fontSize:11, color:TEXT_2 }}><b style={{ color:'#60a5fa' }}>Medley</b> · {medleyEx.map(e=> `${e.name} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м`).join(' → ')} <span style={{ color:TEXT_3 }}>· переход 90с · cap 180с</span></div>}
                 <div style={{ fontSize:10, color:TEXT_3, lineHeight:1.4 }}>{yPlan && smEventRationale(yPlan).slice(0,2).join(' · ')} {lPlan && smEventRationale(lPlan).slice(0,2).join(' · ')}</div>
               </SectionCard>
             ) : null;

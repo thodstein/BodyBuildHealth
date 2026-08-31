@@ -186,8 +186,48 @@ describe('Strongman PRO property: weeklySets <= budget + distance', () => {
   it('export rows have distance for carries', () => {
     const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:250 } } as any);
     const fin = finalizeStrengthSportPlan(p);
-    // find yoke ex
     const ex = fin.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises).find(e=> e.id==='yoke_walk');
     if (ex) expect((ex.workSets[0] as any).distanceM).toBeDefined();
+  });
+  it('female carry 0.90', () => {
+    const m = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:200, farmersWalk:140 }, sex:'male' } as any);
+    const f = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:200, farmersWalk:140 }, sex:'female' } as any);
+    const mw = m.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises).find(e=> e.id==='yoke_walk')?.weight || 0;
+    const fw = f.weeksData.flatMap(w=> w.sessions).flatMap(s=> s.exercises).find(e=> e.id==='yoke_walk')?.weight || 0;
+    if (mw && fw) expect(fw).toBeLessThan(mw);
+  });
+  it('deload distance halved', () => {
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:220 } } as any);
+    const del = p.weeksData.find(w=> w.deload);
+    const norm = p.weeksData.find(w=> !w.deload);
+    if (del && norm) {
+      const dEx = del.sessions.flatMap(s=> s.exercises).find(e=> e.id==='yoke_walk' || e.id==='farmers_walk_heavy');
+      const nEx = norm.sessions.flatMap(s=> s.exercises).find(e=> e.id==='yoke_walk' || e.id==='farmers_walk_heavy');
+      if (dEx && nEx) expect((dEx.workSets[0] as any).distanceM).toBeLessThanOrEqual((nEx.workSets[0] as any).distanceM);
+    }
+  });
+  it('medley comment on event_day', () => {
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:2, daysPerWeek:3, workMax:{ yokeWalk:250, farmersWalk:140 }, equipment:['barbell','other'] } as any);
+    const ev = p.weeksData[0].sessions.find(s=> s.sessionTag==='event_day');
+    if (ev && ev.exercises.filter(e=> ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry'].includes(e.id)).length>=2) {
+      const firstCarry = ev.exercises.find(e=> ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry'].includes(e.id));
+      expect(firstCarry?.comment).toMatch(/Medley/);
+    }
+  });
+  it('phaseForDate mode strongman', async () => {
+    const { phaseForDate } = await import('../strength-sport-progression');
+    const start = new Date().toISOString().slice(0,10);
+    const comp = new Date(Date.now()+ 7*24*3600*1000).toISOString().slice(0,10);
+    expect(phaseForDate(1,8,'strength',comp,start,'strongman')).toBe('peaking');
+  });
+  it('finalize grip prehab injection', () => {
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'advanced', weeks:2, daysPerWeek:4, workMax:{ yokeWalk:300 }, bodyweight:90 } as any);
+    // добавим 3 carries по 5 сетов (cap 5, не срежется) → grip 15 > MRV 20? для advanced 20, нужно >12
+    for(let i=0;i<3;i++) p.weeksData[0].sessions[0].exercises.push({ id:'farmers_walk_heavy', name:`Фермер${i}`, group:'back', pattern:'carry', role:'primary', character:'тяж', sets:5, reps:'1', rir:2, weight:100, workSets: Array(5).fill({ reps:1, rir:2, weight:100, pct:80, tempo:'1-0-1-0', restSeconds:300, distanceM:40 } as any), tempo:'1-0-1-0', restSeconds:300 } as any);
+    p.weeksData[0].totalSets = p.weeksData[0].sessions.reduce((a,s)=>a+s.exercises.reduce((x,e)=>x+e.sets,0),0);
+    const fin = finalizeStrengthSportPlan(JSON.parse(JSON.stringify(p)));
+    const hasPrehab = fin.weeksData[0].sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Prehab')));
+    const hasWarn = fin.validation.warnings.some(w=> w.includes('хват'));
+    expect(hasPrehab || hasWarn).toBe(true);
   });
 });

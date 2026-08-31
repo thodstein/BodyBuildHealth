@@ -153,9 +153,10 @@ function weightForExercise(id: string, input: StrengthSportInput, pct: number, w
     const coeff = (STRONG_FALLBACK_COEFF as any)[id] ?? 0.85;
     w = Math.round(w * coeff / 2.5) * 2.5;
   }
-  // P2-3: female overhead — 15% ниже из-за антропометрии (аналог BB femaleAdjust)
-  if ((input as any).sex === 'female' && (id.includes('press') || id.includes('ohp') || id.includes('log') || id === 'bench_bar')) {
-    w = Math.round(w * 0.88 / 2.5) * 2.5;
+  // female adjust: overhead 0.88, carry 0.90 (антропометрия + хват)
+  if ((input as any).sex === 'female') {
+    if (id.includes('press') || id.includes('ohp') || id.includes('log') || id === 'bench_bar') w = Math.round(w * 0.88 / 2.5) * 2.5;
+    else if (isCarryEvent(id) || id.includes('farmers') || id.includes('yoke') || id.includes('carry') || id.includes('husafell') || id.includes('frame')) w = Math.round(w * 0.90 / 2.5) * 2.5;
   }
   return w;
 }
@@ -505,7 +506,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   if (effectiveDaysPerWeek !== daysPerWeek) rationale.push(`Частота скорректирована: внезальная высокая → зал ${daysPerWeek}× → ${effectiveDaysPerWeek}× (frequencyPenalty)`);
 
   for (let w = 1; w <= weeks; w++) {
-    const phase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate) : phaseForWeek(w, weeks, goal, mode)) as any;
+    const phase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate, mode) : phaseForWeek(w, weeks, goal, mode)) as any;
     const deload = phase === 'deload';
     const sessions: StrengthSportSession[] = [];
     let absoluteDay = 0;
@@ -545,7 +546,13 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         if (taper && !deload) { finalSets = Math.max(2, Math.round(built.sets * 0.55)); finalWeight = Math.round(built.weight * 0.92 / 2.5) * 2.5; finalRir = 1; }
         else if (taper && deload) { finalSets = Math.max(2, Math.round(built.sets * 0.45)); finalWeight = Math.round(built.weight * 0.90 / 2.5) * 2.5; finalRir = 1; }
         else if (deload) { finalSets = Math.max(2, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
-        const workSets: StrengthSportSet[] = built.workSets.slice(0, finalSets).map(s => ({ ...s, weight: finalWeight, rir: finalRir }));
+        const workSets: StrengthSportSet[] = built.workSets.slice(0, finalSets).map(s => {
+          const ns:any = { ...s, weight: finalWeight, rir: finalRir };
+          // D3 deload: дистанция у carries ×0.5, камни ×0.7
+          if (deload && isCarryEvent(id) && ns.distanceM) ns.distanceM = Math.max(10, Math.round(ns.distanceM * 0.5));
+          if (deload && ['atlas_stone_load','sandbag_load','stone_lift'].includes(id)) ns.reps = Math.max(1, Math.round(ns.reps * 0.7));
+          return ns;
+        });
         const gentle = gentleFactor(id, input.injuries as any);
         let techniqueNote: string | undefined = (meta as any).technique || undefined;
         const eqFallback = (input.equipment || []).map((s: string)=> String(s).toLowerCase());
@@ -586,6 +593,26 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           isCompetitionLift: isOly(id) || isStrong(id),
         };
         exercises.push(ex);
+      }
+      // C2 medley: strongman event_day с ≥2 carries → пометка цепи на первой carries
+      if (tag === 'event_day' && mode === 'strongman') {
+        const carries = exercises.filter(e => isCarryEvent(e.id));
+        if (carries.length >= 2) {
+          const medleyIds = carries.slice(0,2).map(c=> c.id);
+          const medleyNames = carries.slice(0,2).map(c=> c.name).join(' → ');
+          const totalDist = carries.slice(0,2).reduce((a,c)=> a + ((c.workSets[0] as any)?.distanceM||20),0);
+          const note = `Medley: ${medleyNames} ${totalDist}м (90с переход, cap 180с)`;
+          // добавляем заметку к первой carries, остальные получают cap 180 shared
+          const first = carries[0];
+          first.comment = first.comment ? `${first.comment} · ${note}` : note;
+          // синхронизируем timeCap для medley
+          carries.slice(0,2).forEach(c=> { c.workSets.forEach((ws:any)=> ws.timeCapS = 180); });
+          // если есть камень третьим — добавляем как финишер в medley
+          const stone = exercises.find(e=> ['atlas_stone_load','sandbag_load','stone_lift'].includes(e.id));
+          if (stone && carries.length===2) {
+            stone.comment = stone.comment ? `${stone.comment} · Medley финишер` : 'Medley финишер';
+          }
+        }
       }
       const ordered = orderByMethod(exercises, input.methodology);
       const sess: StrengthSportSession = {

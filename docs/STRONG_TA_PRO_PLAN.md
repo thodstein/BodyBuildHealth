@@ -1,6 +1,6 @@
-# Strongman + ТА — PRO план (выполнен)
+# Strongman + ТА — PRO план (выполнен 100%)
 
-## Статус: PRO 95% (как BB-auto)
+## Статус: PRO 100% — 338/338 (11 файлов), матрица 192, medley, grip, axial, EWMA
 
 ### P0 — критические баги (выполнено)
 - `basePmFor` pull→snatch занижение 2× → проверка `snatch_pull` до `snatch`
@@ -30,7 +30,8 @@
 - `WL/Strong` раздельная периодизация (`PCT_BY_PHASE_WL` vs `PCT_BY_PHASE`)
 
 ### Тесты
-- `311/311` (10 файлов), матрица `192` + property `weeklySets <= budget`
+- `338/338` (11 файлов) — `strongman-pro 27`, `phase6-pro 30`, `matrix 192`, `p4/p0/p3/loading...`
+- `strongman-pro`: EVENT_META 6, fallback 0.73, carry/deload 50%, medley chain, female 0.90, phaseForDate mode, grip prehab inject, ladder/medley, EWMA, property weeklySets≤budget + distance
 - `strength-sport-phase6-pro.test.ts` 30: P0, VBT, weakpoint, attempts, Sinclair/Robi, ICS, Brzycki, mesocycle (PED риски исключены из планировщика)
 
 ### Файлы
@@ -48,7 +49,20 @@
 - **Hybrid 4× rolling 3/1**: 4-дневный цикл `snatch/clean/strength` → 6 сессий/7д, DUP wave `90/80/70%` per-lift, ACWR `0.85` при outside high
 - **WL Rolling 3/1** (NEW): `rotationDays 4` → 5.25 сесс/нед, `WL_LANDMARKS` 65 лифтов MRV, `deload 50%` + `MRV enforce`
 
-### Осталось (опционально)
-- xlsx на `exceljs` (сейчас HTML-XLS, Excel открывает — 100% совместимо)
-- DUP per-lift wave уже via `sessionTag` (snatch vs squat разные волны в `strength_day` vs `snatch_day`)
-- Полная IWF/WSM дока — в `strength-sport-types.ts` комменты + `docs/RETAIL`
+### Что добавлено в раунде 100% (3dc07ddbe → HEAD)
+- **A.** `strength-sport-event-types.ts` NEW 20 ивентов `yoke/frame/husafell/sandbag_load/keg_toss/car_deadlift/axle_press`, `STRICT 8→10` (carry_heavy без sled), `EXOTIC 15`
+- **B.** `strength-sport-volume.ts` `carry 160/210/260/310`, `grip 12/18/20/24`, `overhead 11/14/16/19` + `axial`/`grip` enforce в `finalize`
+- **C.** `StrengthSportSet.distanceM/timeCapS` + `EVENT_META` дистанция `yoke 20/ farmers 40`, `tempo brace 2с — walk`, `rest 15 видов`
+- **D.** `progression.ts` `mode==='strongman' 40/35/20` vs Torokhtiy, `phaseForWeek/phaseForDate(mode)` + `car_deadlift 0.88`
+- **E.** BFS `STRONG_FALLBACK 17 пар` `yoke→farmers 0.73, stone→sandbag 0.66` + `AXIAL_HIGH vs LOW` (farmers low не режется)
+- **F.** `warmup` carry 3 ступень `50/70/85%`, `finalize` `axialSets+300м→кор 2×`, `grip>12→prehab inject` (plate_pinch+dead_hang)
+- **G.** `strongman-attempts` `buildStoneLadder 0.70→1.00` + `buildMedleyPlan` `12/28с +5с`
+- **H.** `acwrEwmaSS α=0.25` + `buildLastE1RMIndexSS` + `Constructor EWMA` + `vbtMap persist he_vbt_ss_v1` + `medley badge 20м cap 60с`
+- **I-J.** `weight-cut` heavy `>110кг water cap 5/3.5л Na 5г` + `female carry 0.90`
+- **K.** `Constructor` `WM 10 полей`, `EventCard medley 180с`, `export 16 колонок дист/cap`, `StrengthUI` токены
+- **Build:** `333→338`, `medley chain event_day 2 carries + stone finisher`, `deload distance ×0.5`, `female 0.90`, `phaseForDate mode`
+
+### Осталось (P2 backlog, не блокер PRO)
+- `annual-training-print` единый PrintLayout + Gantt `phase/peaking` отдельный
+- `exceljs` XLS форматирование (сейчас HTML-XLS совместим)
+- HRV EWMA уже, миграция `he_strength_sport_plans_v1 → v3` (при необходимости)
