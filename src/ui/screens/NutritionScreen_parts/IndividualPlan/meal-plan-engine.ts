@@ -241,9 +241,9 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // Aug 28 2026 (жалоба «110 кг атлет — не соответствует»): капы масштабируются от ЦЕЛИ
 // приёма (scale = clamp(kcal приёма / 900, 1, 2)) — большой обед на массе больше не
 // упирается в кап «нормального» приёма. Фрукт/овощ НЕ масштабируются (объёмные добавки).
-function maxGramPerItem(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 600 : 500) * scale * ws); }
-function maxGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale * ws); }
-function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 200 : 150) * scale * ws); }
+function maxGramPerItem(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 600 : 500) * scale * ws); }
+function maxGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale * ws); }
+function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 200 : 150) * scale * ws); }
 // Масштаб порционных капов от макро-цели приёма (p/c/f в граммах).
 function mealCapScale(pG: number, cG: number, fG: number): number {
   const kcal = (pG || 0) * 4 + (cG || 0) * 4 + (fG || 0) * 9;
@@ -271,7 +271,7 @@ function carbPortionCap(food: FoodItem, scale = 1): number {
   // dry cereals at 150g. Low-density cooked starches that are still cooked-weight
   // (potato, corn on the cob ~17-21g/100g) keep the 280g cooked cap. Bread and other
   // ready-to-eat medium-density carbs keep the global 500g ceiling.
-  const _budget = _currentBudget;
+  const _budget = _pickCtx.currentBudget;
   if (carbPer100 >= 55) return maxDryGrainPerMeal(_budget, scale);   // dry grains/pasta
   if (carbPer100 > 0 && carbPer100 < 30) return maxGrainPerMeal(_budget, scale); // cooked starch (potato)
   // medium density 30-55 (oat bran, muesli, bread) — realistic bowl ~300g (max 350 for max budget)
@@ -740,14 +740,14 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
   if (carbs.length === 0) {
     carbs = source.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id));
     if (carbs.length === 0) {
-      carbs = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
+      carbs = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
     }
   }
   let fruits = pool.carbFruit.filter((f) => match(f, BREAKFAST_FRUIT_KEYWORDS));
   if (fruits.length === 0) {
     fruits = pool.carbFruit.filter((f) => BREAKFAST_FRUIT_FALLBACK_IDS.includes(f.id));
     if (fruits.length === 0) {
-      fruits = FOOD_DB.filter(f => BREAKFAST_FRUIT_FALLBACK_IDS.includes(f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
+      fruits = FOOD_DB.filter(f => BREAKFAST_FRUIT_FALLBACK_IDS.includes(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
     }
   }
   // D-28 П10: овсяная основа — «завтрашние» злаки ранжируем: овсянка/хлопья/рисовый крем/мюсли
@@ -770,11 +770,11 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
       const name = (f.name || '').toLowerCase(); const id = (f.id || '').toLowerCase();
       return styleKwsForOat.some(k => name.includes(k) || id.includes(k));
     };
-    const extra = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && oatScore(f) >= 2 && matchOat(f) && !carbs.some(c => c.id === f.id) && (f.carbs || 0) >= 15 && (f.gi || 0) <= 55 && !(_currentExcludedIds && _currentExcludedIds.has(f.id))).slice(0, 2 - oatFamily.length);
+    const extra = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && oatScore(f) >= 2 && matchOat(f) && !carbs.some(c => c.id === f.id) && (f.carbs || 0) >= 15 && (f.gi || 0) <= 55 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id))).slice(0, 2 - oatFamily.length);
     if (extra.length > 0) {
       carbs = [...oatFamily, ...extra];
       if (carbs.length < 2) {
-        carbs = [...carbs, ...FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_currentExcludedIds && _currentExcludedIds.has(f.id))).slice(0, 2 - carbs.length)];
+        carbs = [...carbs, ...FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id))).slice(0, 2 - carbs.length)];
       }
       if (carbs.length >= 2) {
         // oatFamily дополнен — теперь приоритетно, исключаем не-овсяные (лапшу)
@@ -792,7 +792,7 @@ function breakfastCarbPool(pool: ReturnType<typeof buildFoodPools>, style: Break
   carbs = carbs.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id));
   if (carbs.length === 0) {
     // fallback к овсяному семейству из FOOD_DB
-    const fb = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_currentExcludedIds && _currentExcludedIds.has(f.id)));
+    const fb = FOOD_DB.filter(f => BREAKFAST_CARB_FALLBACK_IDS.includes(f.id) && oatScore(f) >= 2 && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)));
     if (fb.length > 0) carbs = fb.slice(0, 2);
     else carbs = source.filter(f => !BREAKFAST_FORBIDDEN_RE.test(f.id) && !_forbiddenIds.has(f.id)).slice(0, 3);
   }
@@ -903,35 +903,50 @@ function pick<T>(arr: T[], seed: number): T | undefined {
 // FIX 2: Quality-weighted pick — foods with higher bb_quality_score get proportionally higher selection probability
 // FIX week-perf: LRU-кэш пулов продуктов (сигнатура входов → пулы). Кап 12 записей.
 const _poolCache = new Map<string, ReturnType<typeof buildFoodPools>>();
-// D-28+ P0-4: module-scoped preference vars — установлены в начале buildDayPlan, ОБЯЗАТЕЛЬНО
-// очищаются в finally(). buildDayPlan НЕ РЕЕНТЕРАБЕЛЕН (синхронный JS это гарантирует при отсутствии
-// callback-yield точек); если внутри buildDayPlan появится await/Promise — refactor required.
-const _pickCtx: { tasteProfile: any; deprioritizedIds: Set<string> | undefined; categoryPref: any; _locked: boolean } = {
-  tasteProfile: undefined, deprioritizedIds: undefined, categoryPref: undefined, _locked: false,
+// D-28+ P0-4: ЕДИНЫЙ mutable-контекст вызова — установлен в начале buildDayPlan, ОБЯЗАТЕЛЬНО
+// очищается в finally(). buildDayPlan НЕ РЕЕНТЕРАБЕЛЕН (синхронный JS это гарантирует при
+// отсутствии callback-yield точек); если внутри buildDayPlan появится await/Promise — refactor
+// required. Консолидированы все ранее разрозненные module-level `let` (tasteProfile,
+// deprioritizedIds, categoryPref, qualityMode, currentBudget, currentWeightKg,
+// currentExcludedIds, currentCarbGPerKg) в один типизированный объект — единая точка
+// мутации и очистки, минимум поверхности для утечки состояния между вызовами.
+const _pickCtx: {
+  tasteProfile: any;
+  deprioritizedIds: Set<string> | undefined;
+  categoryPref: any;
+  qualityMode: 'full' | 'basic';
+  currentBudget: string;
+  currentWeightKg: number;
+  currentExcludedIds: Set<string> | undefined;
+  currentCarbGPerKg: number;
+  _locked: boolean;
+} = {
+  tasteProfile: undefined,
+  deprioritizedIds: undefined,
+  categoryPref: undefined,
+  qualityMode: 'full',
+  currentBudget: 'medium',
+  currentWeightKg: 80,
+  currentExcludedIds: undefined,
+  currentCarbGPerKg: 0,
+  _locked: false,
 };
-// Совместимые алиасы (не удалять — избежать массы рефактора на pickWeighted внутри helpers).
-let _tasteProfile: any = undefined;
-let _deprioritizedIds: Set<string> | undefined = undefined;
-let _categoryPref: any = undefined;
-let _qualityMode: 'full' | 'basic' = 'full';
-let _currentBudget: string = 'medium';
-let _currentWeightKg: number = 80;
-let _currentExcludedIds: Set<string> | undefined = undefined;
-// F1 (Эпик F): г/кг углей текущего дня — включает второй гарнир на high-carb bulk-днях.
-let _currentCarbGPerKg: number = 0;
+
+// Совместимые читающие псевдонимы — исключены: чтение идёт напрямую из _pickCtx (см. хвост-2).
+// (Ниже все обращения обновлены на _pickCtx.*, отдельные let-алиасы удалены.)
 
 function pickWeighted(arr: FoodItem[], seed: number): FoodItem | undefined {
   if (arr.length === 0) return undefined;
   if (arr.length === 1) return arr[0];
   const weights = arr.map((f, i) => {
     const score = (f as any).bb_quality_score ?? 5;
-    let w = _qualityMode === 'full' ? Math.max(0.5, Math.pow(score, 1.5)) : 1;
+    let w = _pickCtx.qualityMode === 'full' ? Math.max(0.5, Math.pow(score, 1.5)) : 1;
     // A: taste profile boost — foods matching user's taste preferences get higher weight
-    if (_tasteProfile) { const ts = tasteMatchScore(f, _tasteProfile); if (ts > 0) w *= (1 + ts * 0.3); }
+    if (_pickCtx.tasteProfile) { const ts = tasteMatchScore(f, _pickCtx.tasteProfile); if (ts > 0) w *= (1 + ts * 0.3); }
     // B: deprioritize frequently-replaced foods
-    if (_deprioritizedIds && _deprioritizedIds.has((f as any).id)) w *= 0.3;
+    if (_pickCtx.deprioritizedIds && _pickCtx.deprioritizedIds.has((f as any).id)) w *= 0.3;
     // C: category-preferred boost
-    if (_categoryPref && isPreferredCategory(f, _categoryPref)) w *= 1.5;
+    if (_pickCtx.categoryPref && isPreferredCategory(f, _pickCtx.categoryPref)) w *= 1.5;
     return w;
   });
   const total = weights.reduce((s, w) => s + w, 0);
@@ -1000,7 +1015,7 @@ function gramsForMacro(food: FoodItem, targetG: number, macro: 'protein' | 'carb
   // D-18: realistic per-item gram ceiling. Default to maxGramPerItem; caller may pass a
   // tighter cap (e.g. maxGrainPerMeal for cooked grains so a 140g-carb target doesn't
   // produce a 600g bowl of buckwheat).
-  const ceiling = Math.min(maxGramPerItem(_currentBudget), capG ?? maxGramPerItem(_currentBudget));
+  const ceiling = Math.min(maxGramPerItem(_pickCtx.currentBudget), capG ?? maxGramPerItem(_pickCtx.currentBudget));
   let base = Math.min(ceiling, Math.max(minG, Math.round(targetG / per100 * 100)));
   // Человеческие порции — snap к сетке (каша 50-100-125-150-200-250, жидкость 250-500, орехи/сухофрукты 25-50-75-100, протеин 30-60-90, мясо/рыба 100-150-200-250)
   // вне сетки — снапим к ближайшему целому шагу (5г для мяса/овощей, 25г для каши) чтобы граммовки были целые
@@ -1190,7 +1205,7 @@ function buildFoodPools(excludedIds: Set<string>, isVeg: boolean, budget: MealPl
   const _cpref = opts?.categoryPref; if (_cpref) _baseFiltered = _baseFiltered.filter(f => matchesCategoryPref(f, _cpref));
   const basePool = _baseFiltered;
   const byBudget = <T extends FoodItem>(arr: T[]): T[] => {
-    if (_qualityMode === 'basic') return arr.filter(f => !isPremiumOrExotic(f.id));
+    if (_pickCtx.qualityMode === 'basic') return arr.filter(f => !isPremiumOrExotic(f.id));
     if (budget === 'max' || budget === 'enhanced') return arr.filter(f => (f.bb_quality_score ?? 5) >= 7);
     // Д-3: 'low' budget = affordable quality AND not premium/exotic (abalone, game, macadamia, etc.)
     if (budget === 'low') return arr.filter(f => (f.bb_quality_score ?? 5) <= 7 && !isPremiumOrExotic(f.id));
@@ -1487,7 +1502,7 @@ function buildWholeMeal(
       if (dense.length < 2) {
         // дополняем из FOOD_DB (иначе variety-лимит мог выбросить плотные) — любые плотные, не только common
         // FIX portable: extraDense должен уважать portableMode, иначе в рабочее окно попадает рисовая лапша
-        const extraDense = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 40 && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && !dense.some(d => d.id === f.id) && !carbPickPool.some(c => c.id === f.id) && !(_currentExcludedIds && _currentExcludedIds.has(f.id)) && (!_needPortable || isPortableFood(f)) && (!_quotaBlockedIds || foodAvailableWithQuota(f, _quotaBlockedIds, _quotaAllowIds)));
+        const extraDense = FOOD_DB.filter(f => (f.category === 'grain' || f.category === 'carb') && (f.carbs || 0) >= 40 && (f.gi || 0) > 0 && (f.gi || 0) <= 55 && !dense.some(d => d.id === f.id) && !carbPickPool.some(c => c.id === f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && (!_needPortable || isPortableFood(f)) && (!_quotaBlockedIds || foodAvailableWithQuota(f, _quotaBlockedIds, _quotaAllowIds)));
         dense = [...dense, ...extraDense].slice(0, 3);
       }
       if (dense.length >= 2) carbPickPool = dense;
@@ -1524,7 +1539,7 @@ function buildWholeMeal(
       // Бодибилдерская тарелка: гарнир 60г/30г*scale (иначе 36г сухо — пусто), без перегруза ЖКТ
       let grams = gramsForMacro(carbSource, carbTarget, 'carbs', carbPortionCap(carbSource, _capScale));
       const isMainCarbDense2 = breakfast || label === 'Обед' || label === 'Ужин';
-      const carbFloorDense2 = Math.round((isMainCarbDense2 ? 60 : 30) * Math.max(1, Math.min(1.6, _currentWeightKg / 80)));
+      const carbFloorDense2 = Math.round((isMainCarbDense2 ? 60 : 30) * Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)));
       if (grams > 0 && grams < carbFloorDense2) grams = carbFloorDense2;
       if (grams > 0) {
         const item = makeItem(carbSource, grams, 'carb_slow');
@@ -1574,7 +1589,7 @@ function buildWholeMeal(
       // F1 (Эпик F): ИСКЛЮЧЕНИЕ — высокоуглеводные дни (≥6 г/кг, bulk 8-10 г/кг): E5-фрукт
       // не закрывает остаток, «Перегрузка приёма» неизбежна. Второй гарнир из ДРУГОГО
       // семейства (не «гречка+рис» одного вида) с реалистичной порцией ≤250 г.
-      if (!breakfast && _currentCarbGPerKg >= 6 && remC > 40 && pool.carbSlow.length > 0) {
+      if (!breakfast && _pickCtx.currentCarbGPerKg >= 6 && remC > 40 && pool.carbSlow.length > 0) {
         const usedIds2 = new Set(items.map(i => i.id));
         const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
         const alt2 = pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id)
@@ -2134,12 +2149,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   if (input.weightKg <= 70 && input.mealsCount >= 7) {
     // keep as requested but note degeneracy will be flagged in matrix; no auto-clamp to preserve user intent
   }
-  _qualityMode = input.quality === 'basic' ? 'basic' : 'full';
-  _currentBudget = input.budget || 'medium';
-  _currentWeightKg = Number.isFinite(input.weightKg) && input.weightKg > 0 ? input.weightKg : 80;
+  _pickCtx.qualityMode = input.quality === 'basic' ? 'basic' : 'full';
+  _pickCtx.currentBudget = input.budget || 'medium';
+  _pickCtx.currentWeightKg = Number.isFinite(input.weightKg) && input.weightKg > 0 ? input.weightKg : 80;
   // F1 (Эпик F): г/кг углей дня — для включения второго гарнира на high-carb днях.
-  _currentCarbGPerKg = (input.goalCarbsG || 0) / Math.max(1, input.weightKg || 80);
-  _currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
+  _pickCtx.currentCarbGPerKg = (input.goalCarbsG || 0) / Math.max(1, input.weightKg || 80);
+  _pickCtx.currentExcludedIds = (input.excludedIds as Set<string>) || undefined;
   const randomSalt = input.randomSalt ?? 0;
   // FIX 4: Use user-set times (fallback to defaults)
   let tBreakfast = input.wakeTime || '07:30';
@@ -2218,7 +2233,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         [...combinedExcluded].sort(), !!input.isVegetarian, input.budget, varietyPoolSize,
         [...(input.preferredIds || [])].sort(), [...(input.allergenTags || [])].sort(),
         input.specificity || null, input.categoryPref || null, input.intolerances || null,
-        // FIX 2.3 (БАГ-14): пулы зависят от _qualityMode (basic фильтрует premium/exotic),
+        // FIX 2.3 (БАГ-14): пулы зависят от _pickCtx.qualityMode (basic фильтрует premium/exotic),
         // но quality не входил в сигнатуру кэша — смена full↔basic возвращала старые пулы.
         input.quality || 'full',
         // D-28: portableMode (еда на работе) — иначе кэш вернул бы не-портативные пулы.
@@ -2251,9 +2266,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   _pickCtx.tasteProfile = input.tasteProfile;
   _pickCtx.deprioritizedIds = input.deprioritizedIds;
   _pickCtx.categoryPref = input.categoryPref;
-  _tasteProfile = input.tasteProfile;
-  _deprioritizedIds = input.deprioritizedIds;
-  _categoryPref = input.categoryPref;
   // P0-4: тело функции под lock — освобождаем state в finally (sync JS гарантирует отсутствие reentrancy в отсутствии await).
   try {
   // Ротация: разные группы белка в разные приёмы (раньше — одна на весь день)
@@ -3043,7 +3055,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // Плотный сытный рацион без перегруза ЖКТ: 350-600г/приём, гарнир 80-120г сухо для 100кг, псиллиум ≤10г, орехи ≤15г
   for (const m of meals) {
-    const weightScaleDense2 = Math.max(1, Math.min(1.6, _currentWeightKg / 80));
+    const weightScaleDense2 = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80));
     for (const it of m.items) {
       if (['psyllium_husk','glucomannan','inulin','Benefiber','wheat_bran_supplement','cocoa'].includes(it.id) && it.amount > 10) {
         const r = 10 / it.amount;
@@ -3342,7 +3354,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
           const addGrams = Math.round(kcalPerItem / (food.kcal || 1) * 100);
-          const newAmount = snapPortionG(food, Math.min(maxGramPerItem(_currentBudget, mealCapScaleOf(meal)), item.amount + addGrams));
+          const newAmount = snapPortionG(food, Math.min(maxGramPerItem(_pickCtx.currentBudget, mealCapScaleOf(meal)), item.amount + addGrams));
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
@@ -3410,12 +3422,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
       }
     }
   }
-  if (_qualityMode === 'full') notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
+  if (_pickCtx.qualityMode === 'full') notes.push(`Сводка MPS: ${feedings} feedings × ${mpsSummary.avg_protein_per_meal_g} г/meal, ${mpsSummary.avg_leucine_g} г лейцина (порог ${LEU_THRESHOLD_MG / 1000} г)`);
   notes.push(`Диверсификация: ${uniqueFoods} уникальных продуктов (${Object.keys(categories).length} категорий)`);
   if (input.refeedDay) notes.push('🔄 Refeed-день: быстрые/низкоклетчаточные углеводы, овощи легче — приоритет гликогеновому ре-синтезу (лептин/психологическая разгрузка)');
   if (morningTrainLoad) notes.push('🌅 Загрузка под утреннюю тренировку: вечером много углеводов, минимум жиров, умеренный белок — гликоген и энергия к утренней сессии.');
   if (input.isCutting) notes.push('Сушка: повышенная плотность белка, заниженные углеводы у ужина');
-  if (_qualityMode === 'full' && mpsSummary.prePostWindow) notes.push('Pre/post-workout окно реализовано (полноценное анаболическое обеспечение тренировки)');
+  if (_pickCtx.qualityMode === 'full' && mpsSummary.prePostWindow) notes.push('Pre/post-workout окно реализовано (полноценное анаболическое обеспечение тренировки)');
   // Fiber check
   const fiberG = Math.round(totals.fiber);
   const fiberTarget = input.sex === 'female' ? 25 : 35;
@@ -3448,7 +3460,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
           const food = FOOD_DB.find(f => f.id === item.id);
           if (!food || !food.fat) return;
           const addGrams = Math.min(Math.round(item.amount * 1.5), Math.round(addPerItem / food.fat * 100));
-          const newAmount = snapPortionG(food, Math.min(maxGramPerItem(_currentBudget, mealCapScaleOf(meal)), item.amount + addGrams));
+          const newAmount = snapPortionG(food, Math.min(maxGramPerItem(_pickCtx.currentBudget, mealCapScaleOf(meal)), item.amount + addGrams));
           const factor = newAmount / (item.amount || 1);
           item.amount = newAmount; item.kcal = Math.round(item.kcal * factor); item.p = Math.round(item.p * factor); item.f = Math.round(item.f * factor); item.c = Math.round(item.c * factor); item.fiber = Math.round(item.fiber * factor); item.leucine_mg = Math.round((item.leucine_mg || 0) * factor);
         });
@@ -3491,7 +3503,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         // close a carb deficit. A small total shortfall is preferable to an absurd portion.
         // Aug 28: капы масштабируются от цели приёма (mealCapScaleOf) — большие приёмы не режутся капом «среднего».
         const _ms = mealCapScaleOf(meal);
-        let upCap = maxGramPerItem(_currentBudget, _ms);
+        let upCap = maxGramPerItem(_pickCtx.currentBudget, _ms);
         if (item.role === 'carb_slow' || item.role === 'carb_fast') {
           const fd = FOOD_DB.find(f => f.id === item.id);
           if (fd) upCap = carbPortionCap(fd, _ms);
@@ -3622,7 +3634,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     const suppMax = SUPPLEMENT_MAX_G[best.food.id];
     // Aug 28: капы точной подгонки — от цели приёма-хозяина item'а.
     const _bestMs = mealCapScaleOf(best.meal);
-    let maxAmount = suppMax ?? maxGramPerItem(_currentBudget, _bestMs);
+    let maxAmount = suppMax ?? maxGramPerItem(_pickCtx.currentBudget, _bestMs);
     // D-18: grain carb items are capped at maxGrainPerMeal even during precise
     // adjustment — don't push a single buckwheat/rice portion above a realistic bowl.
     if (!suppMax && (best.item.role === 'carb_slow' || best.item.role === 'carb_fast') && carbPortionCap(best.food, _bestMs) < maxAmount) {
@@ -3685,7 +3697,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // микронутриентно-адекватным, а не только диагностированным). Добавляем целевой
   // продукт для самого критичного дефицита (<60% RDA) в самый лёгкий приём, затем
   // пересчитываем макро-totals — kcal пересчитается блоком Atwater ниже.
-  const microBoost = _qualityMode === 'full'
+  const microBoost = _pickCtx.qualityMode === 'full'
     ? activelyCloseTopDeficiency(meals, !!input.isVegetarian, input.sex || 'male', input.excludedIds || new Set(), { allergenTags: input.allergenTags, intolerances: input.intolerances, categoryPref: input.categoryPref })
     : { note: null };
   if (microBoost.note) {
@@ -3719,14 +3731,14 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // ─── Atwater kcal: totals.kcal = P*4 + C*4 + F*9 (соответствует макросам) ───
   totals.kcal = Math.round(totals.p * 4 + totals.c * 4 + totals.f * 9);
   meals.forEach(m => { m.totals.kcal = Math.round(m.totals.p * 4 + m.totals.c * 4 + m.totals.f * 9); });
-  const deficiencyClosure = _qualityMode === 'full'
+  const deficiencyClosure = _pickCtx.qualityMode === 'full'
     ? closeFoodDeficiencies(meals, !!input.isVegetarian, input.sex || 'male')
     : [];
   if (deficiencyClosure.length > 0) notes.push(...deficiencyClosure);
   // #1 Микронутриентный coverage: фазо-зависимые RDA + верхние пределы + structured summary.
   // Считаем ПОСЛЕ activelyCloseTopDeficiency (учитывает добавленный продукт).
   const _microItems = meals.flatMap(m => m.items.map(it => ({ id: it.id, amount: it.amount })));
-  const _microRes = _qualityMode === 'full' ? analyzeMicroCoverage(
+  const _microRes = _pickCtx.qualityMode === 'full' ? analyzeMicroCoverage(
     sumMicros(_microItems, FOOD_DB as any),
     input.sex || 'male', input.weightKg, input.cyclePhase as any, !!input.isTrainingDay, input.calciumTargetOverride, input.sodiumTargetOverride,
   ) : { coverage: [], topDeficitNutrient: null, surpluses: [], totals: {} };
@@ -3734,7 +3746,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // изотоник добавлялся ТОЛЬКО в intra-workout длинных сессий (≥75 мин). Теперь при
   // дефиците Na/электролитов на ЛЮБОМ тренировочном дне изотоник попадает в
   // пост-тренировочный/intra приём (регидратация + электролиты + углеводы).
-  if (_qualityMode === 'full' && input.isTrainingDay) {
+  if (_pickCtx.qualityMode === 'full' && input.isTrainingDay) {
     const _mt = (_microRes.totals || {}) as Record<string, number>;
     const _naNow = _mt['Na'] || 0;
     const _kNow = _mt['K'] || 0;
@@ -3754,15 +3766,15 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   }
   // Nutrients already covered by closeFoodDeficiencies (avoid duplicate deficit notes).
   const _existingMicroKeys = new Set(['Fe','Mg','Zn','K','Ca','Omega3','Se','VitC','VitD','VitB12','VitB9']);
-  for (const c of _qualityMode === 'full' ? _microRes.coverage : []) {
+  for (const c of _pickCtx.qualityMode === 'full' ? _microRes.coverage : []) {
     if (c.status === 'low') { notes.push(`🟡 ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — близко к дефициту`); }
     else if (c.status === 'deficit' && !_existingMicroKeys.has(c.nutrient)) { notes.push(`⚠ ${c.nutrient}: ${c.actual}${c.unit}/${c.target}${c.unit} (${c.pct}%) — дефицит`); }
   }
-  if (_qualityMode === 'full' && _microRes.surpluses.length > 0) notes.push(..._microRes.surpluses);
+  if (_pickCtx.qualityMode === 'full' && _microRes.surpluses.length > 0) notes.push(..._microRes.surpluses);
   // #1 женская фаза цикла: проброс заметки в plan notes.
   if (input.menstrualPhaseNote) notes.push(input.menstrualPhaseNote);
   // #2 Электролиты: натриевый баланс + K:Na соотношение.
-  if (_qualityMode === 'full') {
+  if (_pickCtx.qualityMode === 'full') {
     const totals = _microRes.totals as Record<string, number>;
     const na = totals['Na'] || 0;
     const k = totals['K'] || 0;
@@ -4182,7 +4194,7 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _userAllerg: Set<string> = input.allergenTags || new Set<string>();
         const _foodAllowed = (f: any): boolean => {
           if (input.excludedIds?.has(f.id)) return false;
-          if (_currentExcludedIds && _currentExcludedIds.has(f.id)) return false;
+          if (_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) return false;
           if (f.category === 'supplement' && !['whey_isolate', 'whey_protein', 'casein', 'supp_pea_protein'].includes(f.id)) return false;
           const diet = FOOD_ALLERGEN_DIET[f.id];
           const tags = (diet && Array.isArray(diet.allergens)) ? diet.allergens : (f.allergens || []);
@@ -4263,12 +4275,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
         const _exist = targetMeal.items.find((x:any) => x.id === best.id);
         const _capForMerge = (() => {
           const _fdC = FOOD_DB.find((f:any) => f.id === best.id);
-          if (!_fdC) return maxGramPerItem(_currentBudget);
+          if (!_fdC) return maxGramPerItem(_pickCtx.currentBudget);
           if (effWorst === 'c' || (it as any).role === 'carb_slow' || (it as any).role === 'carb_fast') return carbPortionCap(_fdC, mealCapScaleOf(targetMeal));
           // Эпик B: белок — жёсткий кап 300 г (тест d28: «порция белка ≤300 г»; ×1.25 давал 374 г
           // лосося = 48 г жира в ужине при утренней загрузке).
           if (effWorst === 'p') return 300;
-          return maxGramPerItem(_currentBudget, mealCapScaleOf(targetMeal));
+          return maxGramPerItem(_pickCtx.currentBudget, mealCapScaleOf(targetMeal));
         })();
         if (_exist) {
           const _addG = Math.max(0, Math.min(grams, _capForMerge - (_exist.amount || 0)));
@@ -4488,15 +4500,12 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     _pickCtx.tasteProfile = undefined;
     _pickCtx.deprioritizedIds = undefined;
     _pickCtx.categoryPref = undefined;
-    _tasteProfile = undefined;
-    _deprioritizedIds = undefined;
-    _categoryPref = undefined;
-    _qualityMode = 'full';
-    _currentExcludedIds = undefined;
-    // A6 (санитария): _currentBudget/_currentWeight тоже сбрасывается — иначе протекал между вызовами
-    _currentBudget = 'medium';
-    _currentWeightKg = 80;
-    _currentCarbGPerKg = 0;
+    _pickCtx.qualityMode = 'full';
+    _pickCtx.currentExcludedIds = undefined;
+    // A6 (санитария): бюджет/вес/угли тоже сбрасываются — иначе протекали между вызовами
+    _pickCtx.currentBudget = 'medium';
+    _pickCtx.currentWeightKg = 80;
+    _pickCtx.currentCarbGPerKg = 0;
   }
 }
 
