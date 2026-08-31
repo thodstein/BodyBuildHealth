@@ -8,8 +8,9 @@
  * Порядок применения правил (каждое последующее видит результат предыдущего):
  *   1. PAL + BMR/TDEE через calcNutritionV2 (fallback calcNutrition)
  *   2. Bulk surplus % (если не дефолт 10%)
- *   3. Фаза курса (kcalMod + pAdd г/кг) с пересчётом Ж/У из остатка
- *   4. AAS: +0.3 г/кг белка
+ *   3. (Эпик 2) Фаза — фарма-контекст, ккал не меняет; только warning при конфликте
+ *      цель-масса + фаза ПКТ/мост. Направление ккал задаёт ТОЛЬКО goal.
+ *   4. AAS: +0.3 г/кг белка (правило инъекций)
  *   5. Короткий инсулин: минимум углеводов по дозе, потолок жира
  *   6. Любой инсулин: потолок жира 0.5 г/кг
  *   7. GLP-1: потолок жира 0.4 г/кг, +0.2 г/кг белка
@@ -17,7 +18,7 @@
  *   9. Metabolic adaptation %: масштаб всего
  *  10. Ручные г/кг (перезаписывают Б/Ж/У и пересчитывают kcal)
  *
- * Возвращает { bmr, tdee, kcal, protein, fats, carbs, adjustment }.
+ * Возвращает { bmr, tdee, kcal, protein, fats, carbs, adjustment, warnings? }.
  */
 
 import { calcNutrition } from "../../../../engines/nutrition.engine";
@@ -56,6 +57,8 @@ export interface PlannerTargets {
   fats: number;
   carbs: number;
   adjustment: number;
+  /** Эпик 2: предупреждения согласованности (напр. цель-масса + фаза ПКТ). */
+  warnings?: string[];
 }
 
 // ─── Диетологический потолок углеводов (П.4/П.1, Aug 22 2026; контекст Aug 28 2026) ──
@@ -178,18 +181,6 @@ export function plannerWeightAdjustAdvice(input: PlannerWeightAdviceInput): Plan
   return { status: 'ok', weeklyKg, targetWeeklyKg: Math.round(targetWeeklyKg * 100) / 100, kcalDelta: 0, reason: 'Темп в допустимом коридоре.' };
 }
 
-const PHASE_MULT: Record<string, { kcalMod: number; pAdd: number }> = {
-  course: { kcalMod: 1.0, pAdd: 0.3 },
-  bridge: { kcalMod: 0.95, pAdd: 0 },
-  pct: { kcalMod: 0.9, pAdd: 0 },
-  recovery: { kcalMod: 1.05, pAdd: 0.3 },
-  cutting: { kcalMod: 0.8, pAdd: 0.2 },
-  maintenance: { kcalMod: 1.0, pAdd: 0 },
-  recomp: { kcalMod: 0.9, pAdd: 0.1 },
-  fat_loss: { kcalMod: 0.75, pAdd: 0.2 },
-  post_cut: { kcalMod: 1.05, pAdd: 0.1 },
-};
-
 const GOAL_MAP: Record<string, string> = {
   mass: 'bulk', strength: 'strength', fat_loss: 'cut', cutting: 'cut',
   post_cut: 'maintenance', maintenance: 'maintenance', recomposition: 'recomp', rehab: 'rehab',
@@ -285,27 +276,20 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
     }
   }
 
-  // 2. Bulk surplus
+  // ─── Эпик 2 (NUTRITION-PROFESSIONAL-PLAN): цель vs фаза ─────────────────────
+  // Фаза — ФАРМА-контекст (курс/мост/ПКТ/восстановление), а НЕ источник калорий:
+  // направление ккал задаёт ТОЛЬКО goal. Прежние kcalMod/pAdd фазы удалены —
+  // они дублировали goal и правила инъекций (ААС +0.3 г/кг, GLP +0.2, инсулин-капы).
+  // Белок задаёт пресет пользователя; фарма-гейты жиров/углей — только через инъекции.
+  const warnings: string[] = [];
+  const _phaseGoalCat = plannerGoalCategory(goal || '');
+  if ((phase === 'pct' || phase === 'bridge') && _phaseGoalCat === 'bulk') {
+    warnings.push(`⚠ Фаза «${phase}» + цель «${goal}»: калории считаются по цели (профицит), фарма-фаза их не снижает. На ПКТ/мосте обычно держат поддержание/дефицит — проверьте цель.`);
+  }
+  // ─── 2. Bulk surplus ─────────────────────────────────────────────────────────
   if (engineGoal === 'bulk' && surplusPct !== 10) {
     targets.kcal = Math.round((targets.tdee || targets.kcal) * (1 + surplusPct / 100));
     targets.carbs = Math.round((targets.kcal - targets.protein * 4 - targets.fats * 9) / 4);
-  }
-
-  // 3. Phase multipliers
-  const pm = PHASE_MULT[phase] || { kcalMod: 1.0, pAdd: 0 };
-  targets.kcal = Math.round(targets.kcal * pm.kcalMod);
-  targets.protein = Math.round(targets.protein + weight * pm.pAdd);
-  if (pm.kcalMod !== 1.0 || pm.pAdd !== 0) {
-    const pKcal = targets.protein * 4;
-    const remaining = Math.max(0, targets.kcal - pKcal);
-    if (targets.fats > 0 || targets.carbs > 0) {
-      const fRatio = (targets.fats * 9) / Math.max(1, targets.fats * 9 + targets.carbs * 4);
-      targets.fats = Math.round((remaining * fRatio) / 9);
-      targets.carbs = Math.round((remaining * (1 - fRatio)) / 4);
-    } else {
-      targets.fats = Math.round((remaining * 0.25) / 9);
-      targets.carbs = Math.round((remaining * 0.75) / 4);
-    }
   }
 
   // 4-7. Pharma adjustments
@@ -377,6 +361,8 @@ export function computePlannerTargets(input: PlannerTargetInput): PlannerTargets
   if (manualGPerKg.protein > 0 || manualGPerKg.fat > 0 || manualGPerKg.carbs > 0) {
     targets.kcal = targets.protein * 4 + targets.fats * 9 + targets.carbs * 4;
   }
+
+  if (warnings.length > 0) targets.warnings = warnings;
 
   return targets as PlannerTargets;
 }

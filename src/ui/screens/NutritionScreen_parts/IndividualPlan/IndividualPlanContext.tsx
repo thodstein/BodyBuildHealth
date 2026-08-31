@@ -639,14 +639,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // E4-sync: эффект объявлен НИЖЕ (после weekPlan/weekEditDay — TDZ-guard).
   const [goal, setGoal] = useState<GoalId>((s?.primaryGoal as GoalId) || 'maintenance');
   const [phase, setPhase] = useState<PhaseId>((_pf.phase && (GOALS.some(g => g.id === _pf.phase) || PHASES.some(p => p.id === _pf.phase))) ? _pf.phase as PhaseId : 'course');
-  const phaseToGoal: Record<PhaseId, GoalId> = { course: 'mass', bridge: 'maintenance', pct: 'maintenance', recovery: 'maintenance', cutting: 'cutting', maintenance: 'maintenance', recomp: 'recomposition', fat_loss: 'fat_loss', post_cut: 'post_cut' };
-  const autoGoal = phaseToGoal[phase] || 'maintenance';
-  const [goalUserSet, setGoalUserSet] = useState(false);
-  // FIX 1.2: авто-цель из фазы применяется ТОЛЬКО если пользователь явно не выбрал цель
-  // И в профиле нет не-нейтральной первичной цели. Раньше фаза 'course' (по умолчанию)
-  // принудительно ставила goal='mass' (набор), затирая primaryGoal=fat_loss/cut из профиля —
-  // калории считались на «набор» при сушке.
+  // Эпик 2: авто-цель НЕ выводится из фазы (фаза — фарма-контекст, не цель).
+  // Рекомендация — из профиля (primaryGoal) либо нейтральная.
   const profilePrimaryGoal = (s?.primaryGoal as GoalId) || 'maintenance';
+  const autoGoal: GoalId = profilePrimaryGoal !== 'maintenance' ? profilePrimaryGoal : 'maintenance';
+  const [goalUserSet, setGoalUserSet] = useState(false);
+  // FIX 1.2: авто-цель применяется ТОЛЬКО если пользователь явно не выбрал цель
+  // И в профиле нет не-нейтральной первичной цели (иначе goal = primaryGoal из профиля).
   useEffect(() => {
     if (goalUserSet) return;
     if (profilePrimaryGoal && profilePrimaryGoal !== 'maintenance') return;

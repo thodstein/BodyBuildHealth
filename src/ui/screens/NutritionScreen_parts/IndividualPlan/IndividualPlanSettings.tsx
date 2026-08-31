@@ -703,7 +703,7 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         </div>
         {autoGoal !== goal && goalUserSet && (
           <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.85)', textAlign: 'center' }}>
-            Фаза «{PHASES.find(p => p.id === phase)?.label}» → рекомендована цель «{GOALS.find(g => g.id === autoGoal)?.label}».
+            Профиль → рекомендована цель «{GOALS.find(g => g.id === autoGoal)?.label}».
             <span onClick={() => { setGoal(autoGoal); setGoalUserSet(false); }} style={{ color: '#00e68a', cursor: 'pointer', fontWeight: 600, marginLeft: 2 }}>Применить</span>
           </div>
         )}
@@ -729,6 +729,9 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
 
       {plannerMode === 'pro' && (
       <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', marginBottom: 6, lineHeight: 1.5 }}>
+          Фаза — фарма-контекст (курс/ПКТ/мост/восстановление): влияет на фарма-гейты и рекомендации, но НЕ меняет направление калорий — его задаёт цель выше. Препараты и инъекции (ААС/инсулин/ГР/GLP) применяют свои правила белка и жиров автоматически.
+        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 8 }}>
           {PHASES.map(p => (
             <PillBtn key={p.id} active={phase === p.id} onClick={() => setPhase(p.id)}>{p.icon} {p.label}</PillBtn>

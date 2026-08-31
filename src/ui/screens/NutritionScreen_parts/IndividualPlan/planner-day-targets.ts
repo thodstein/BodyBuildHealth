@@ -113,6 +113,8 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   const breakdown: string[] = [];
   breakdown.push(`TDEE ${Math.round(base.tdee || 0)} ккал → с фазой/фармой/адаптациями ${kcalTarget} ккал`);
   if (base.adjustment) breakdown.push(`Коррекция движка питания: ${base.adjustment > 0 ? '+' : ''}${Math.round(base.adjustment)} ккал`);
+  // Эпик 2: предупреждения согласованности (цель vs фарма-фаза) — в карточке целей.
+  if (Array.isArray((base as any).warnings)) (base as any).warnings.forEach((w: string) => breakdown.push(w));
   breakdown.push(`Белок: пресет ${preset} г/кг → ${protein} г`);
   if (base.protein > protein * 1.12) breakdown.push(`Научный белок ${Math.round(base.protein)} г выше пресета — пресет приоритетен (поднимите «🥩 Пресет белка» при необходимости)`);
   breakdown.push(insulinUnits > 0

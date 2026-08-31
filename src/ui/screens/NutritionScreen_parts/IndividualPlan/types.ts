@@ -24,16 +24,16 @@ export const GOALS: { id: GoalId; label: string; icon: string; desc: string }[] 
   { id: 'health', label: 'Здоровье', icon: '🩸', desc: 'Сосуды/вязкость/почки: 1.8г/кг · 30г клетчатки · PRAL±5' },
 ];
 
+// ─── Эпик 2 (NUTRITION-PROFESSIONAL-PLAN): фаза = ФАРМА-контекст, а не цель.
+// Прежние дубли-цели (cutting/maintenance/recomp/fat_loss/post_cut) удалены —
+// направление калорий задаёт goal (карточка «Цель»). Фаза только уточняет
+// фарма-гейты (курс/ПКТ/мост/восстановление). PhaseId сохранён широким для
+// обратной совместимости старых сохранений.
 export const PHASES: { id: PhaseId; label: string; icon: string; desc: string }[] = [
   { id: 'course', label: 'Курс', icon: '💉', desc: 'Активная фаза с фармакологической поддержкой' },
   { id: 'bridge', label: 'Мост', icon: '🌉', desc: 'Переход между курсами, низкие дозировки' },
   { id: 'pct', label: 'ПКТ', icon: '🔄', desc: 'Послекурсовая терапия, восстановление оси ГГЯ' },
   { id: 'recovery', label: 'Восстановление', icon: '🩹', desc: 'Повышенный белок, витамины, отдых' },
-  { id: 'cutting', label: 'Сушка', icon: '✂️', desc: 'Дефицит 300-500 ккал, рельеф' },
-  { id: 'maintenance', label: 'Поддержка', icon: '⚖️', desc: 'Баланс, сохранение формы' },
-  { id: 'recomp', label: 'Рекомпозиция', icon: '🔄', desc: 'Одновременный рост + жиросжигание' },
-  { id: 'fat_loss', label: 'Похудение', icon: '🔥', desc: 'Дефицит калорий, жиросжигание' },
-  { id: 'post_cut', label: 'Выход из сушки', icon: '📈', desc: 'Плавный выход, обратная метаболическая' },
 ];
 
 export const BUDGET_LEVELS: { id: BudgetLevel; label: string; icon: string; desc: string; color: string }[] = [
