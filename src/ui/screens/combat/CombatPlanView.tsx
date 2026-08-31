@@ -6,7 +6,7 @@ import React from 'react';
 import type { CombatPlan } from '../../../engines/combat/combat.types';
 import { getCombat } from '../../../engines/combat/combat-volume';
 import { buildCombatReport } from '../../../engines/combat/combat-finalize.engine';
-import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight } from './CombatUI';
+import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider } from './CombatUI';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
 
@@ -66,73 +66,85 @@ export const CombatPlanView: React.FC<Props> = ({
         {msg && <span style={{ fontSize: 11, color: '#fff', background: 'rgba(168,85,247,0.14)', padding: '5px 10px', borderRadius: 20, border: '1px solid rgba(168,85,247,0.22)' }}>{msg}</span>}
       </div>
 
-      {/* Отчёт */}
-      <div style={{
-        background: 'linear-gradient(135deg, rgba(168,85,247,0.14), rgba(236,72,153,0.08), rgba(18,16,28,0.72))',
-        border: '1px solid rgba(168,85,247,0.22)', borderRadius: 16, padding: 14, color: '#fff', fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap',
-        boxShadow: '0 10px 28px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter: 'blur(14px)',
-      }}>
-        <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: 0.6, textTransform: 'uppercase', color: 'rgba(255,255,255,0.52)', marginBottom: 6 }}>Сводка плана</div>
-        {buildCombatReport(plan)}
-      </div>
+      {/* Отчёт — Apple glass + Highlights + StatTiles */}
+      <SectionCard icon="📋" title="Сводка плана" subtitle={`${plan.discipline} · ${plan.goal} · ${plan.level} · ${plan.weeks} нед`} accent>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px,1fr))', gap:8 }}>
+          <StatTile label="Недель" value={String(plan.weeks)} color="#a855f7" sub={plan.patternId} icon="📅" />
+          <StatTile label="Сессий" value={String(plan.weeksData.reduce((a,w)=>a+w.sessions.length,0))} color="#a855f7" sub="за цикл" icon="🗓️" />
+          <StatTile label="Сетов" value={String(plan.weeksData.reduce((a,w)=>a+(w.totalSets||0),0))} color="#a855f7" sub="за цикл" icon="📊" />
+          <StatTile label="Тоннаж" value={`${Math.round(plan.weeksData.reduce((a,w)=>a+((w as any).totalTonnage||0),0)/1000)}т`} color="#a855f7" sub="за цикл" icon="⚖️" />
+        </div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.22)">{plan.discipline}</Badge>
+          <Badge color="#a855f7" bg="rgba(168,85,247,0.12)" border="rgba(168,85,247,0.22)">{plan.goal}</Badge>
+          <Badge>{plan.patternId}</Badge>
+          {(plan.inputSnapshot as any)?.fightDate && <Badge color="#ef4444" bg="rgba(239,68,68,0.10)" border="rgba(239,68,68,0.18)">🏁 бой {(plan.inputSnapshot as any).fightDate}</Badge>}
+        </div>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          {plan.weeksData.map(w=> (
+            <span key={w.week} style={{ padding:'4px 8px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'#fff', fontVariantNumeric:'tabular-nums' }}>Н{w.week} · <Highlight color={w.deload?'#f59e0b': (w as any).taper?'#60a5fa':'#a855f7'}>{w.totalSets}</Highlight> сетов</span>
+          ))}
+        </div>
+        {plan.outsideMetrics && <InfoBanner tone={plan.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={plan.outsideMetrics.interference==='high'?'#ff9f0a':'#a855f7'}>{plan.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{plan.outsideMetrics.volumeMultiplier}</Highlight> · {plan.outsideMetrics.interference}</InfoBanner>}
+        {plan.rationale?.length ? <div style={{ fontSize:11, color:'rgba(235,235,245,0.58)', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:'#a855f7' }}>•</span><span>{r}</span></div>)}</div> : null}
+        <details style={{ background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+          <summary style={{ fontSize:11, fontWeight:700, color:'#d8b4fe', cursor:'pointer' }}>📄 Подробный отчёт (текст)</summary>
+          <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', whiteSpace:'pre-wrap', marginTop:8, lineHeight:1.5 }}>{buildCombatReport(plan)}</div>
+        </details>
+      </SectionCard>
 
       {plan.validation?.warnings.map((w, i) => (
         <InfoBanner key={i} tone="warn">{w}</InfoBanner>
       ))}
 
-      {/* Кондиция */}
+      {/* Кондиция — Apple 3-системы с Highlights */}
       {(plan as any).conditioning && (
-        <div style={{ ...CARD, padding: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg,#3b82f6,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>🏃</span>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>Кондиция — 3 системы</div>
-              <div style={{ fontSize: 11, color: TEXT_3 }}>Вне зала {outside?.sessionsPerWeek ?? 0}× · объём ×{outsideMetrics?.volumeMultiplier ?? 1}</div>
-            </div>
-          </div>
+        <SectionCard icon="🏃" title="Кондиция — 3 системы" subtitle={`Вне зала ${outside?.sessionsPerWeek ?? 0}× · объём ×${outsideMetrics?.volumeMultiplier ?? 1}`} accent>
+          <GroupHeading icon="⚡️" text="Alactic / Lactic / Aerobic" desc="Issurin ATR — кондиция по неделям" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {(plan as any).conditioning.sessions.map((week: any[], wi: number) => (
-              <div key={wi} style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' }}>
-                <span style={{ fontWeight: 800, color: '#60a5fa' }}>Нед {wi + 1} {ruLabel(PHASE_RU, plan.weeksData[wi]?.phase)}:</span>{' '}
-                {week.length ? week.map((s: any) => `${s.modality} ${s.durationMin}′ ${s.intervals || ''}`).join(' · ') : <span style={{ color: TEXT_3 }}>внезал покрывает</span>}
+              <div key={wi} style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 10, border: '0.5px solid rgba(255,255,255,0.05)', display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                <Highlight color="#60a5fa">Нед {wi + 1}</Highlight><span style={{ fontWeight:700, color:'#fff' }}>{ruLabel(PHASE_RU, plan.weeksData[wi]?.phase)}</span><span style={{ color:TEXT_3 }}>·</span>
+                {week.length ? week.map((s: any, si:number) => <Highlight key={si} color={s.modality==='alactic'?'#a855f7': s.modality==='lactic'?'#ef4444':'#0ea5e9'}>{`${s.modality} ${s.durationMin}′ ${s.intervals || ''}`.trim()}</Highlight>) : <span style={{ color: TEXT_3 }}>внезал покрывает</span>}
               </div>
             ))}
           </div>
-        </div>
+          <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(59,130,246,0.08)', padding:'6px 10px', borderRadius:8, border:'0.5px solid rgba(59,130,246,0.14)' }}><Highlight color="#3b82f6">Alactic 8×10с</Highlight> · <Highlight color="#ef4444">Lactic 5×3′</Highlight> · <Highlight color="#0ea5e9">Aerobic 40′ Zone2</Highlight></div>
+        </SectionCard>
       )}
 
-      {/* Карта качества */}
-      <div style={CARD}>
-        <div style={{ fontSize: 12, fontWeight: 900, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg,#a855f7,#ec4899)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>✦</span>
-          Карта качества — сеты/нед vs MEV/MRV
-        </div>
-        {(['neck', 'grip', 'core'] as const).map(kind => (
-          <div key={kind} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: 0.5, textTransform: 'uppercase', color: kind === 'neck' ? '#c4b5fd' : kind === 'grip' ? '#fbbf24' : '#6ee7b7', minWidth: 42 }}>{kind === 'neck' ? 'Шея' : kind === 'grip' ? 'Хват' : 'Core'}</span>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
-              {plan.weeksData.map(wk => {
-                let sets = 0;
-                if (kind === 'neck') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
-                if (kind === 'grip') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip') || e.id.includes('pinch') || e.id.includes('wrist') || e.id.includes('farmer') || e.id.includes('towel')).reduce((a, e) => a + e.sets, 0), 0);
-                if (kind === 'core') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => ['deadbug', 'hollow_hold', 'side_plank', 'ab_wheel', 'copenhagen_plank', 'pallof_rotation_press', 'suitcase_carry', 'landmine_rotation'].includes(e.id)).reduce((a, e) => a + e.sets, 0), 0);
-                let col = '#a855f7';
-                if (kind === 'core') col = sets < 4 ? '#f59e0b' : sets <= 10 ? '#a855f7' : '#eab308';
-                else {
-                  const lm = getCombat(plan.level, kind as any);
-                  const st = lm ? (sets < lm.mev ? 'below' : sets <= lm.mav ? 'optimal' : sets <= lm.mrv ? 'high' : 'over') : 'optimal';
-                  col = st === 'below' ? '#f59e0b' : st === 'optimal' ? '#a855f7' : st === 'high' ? '#eab308' : '#ef4444';
-                }
-                return (
-                  <span key={wk.week} style={{ padding: '4px 8px', borderRadius: 10, background: col + '14', border: `1px solid ${col}2e`, color: col, fontSize: 10.5, fontWeight: 800 }}>
-                    Н{wk.week} · {sets}{wk.deload ? ' · разгрузка' : (wk as any).taper ? ' · тапер' : ''}
-                  </span>
-                );
-              })}
+      {/* Карта качества — Apple с Highlights */}
+      <SectionCard icon="✦" title="Карта качества" subtitle="Сеты/нед vs MEV/MRV — шея/хват/core" accent>
+        <CardHeader icon="✦" title="Карта качества — сеты/нед" subtitle="vs MEV/MRV · подсветка зон" accent />
+        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+          {(['neck', 'grip', 'core'] as const).map(kind => (
+            <div key={kind} style={{ display: 'flex', gap: 8, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.04)' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', color: kind === 'neck' ? '#c4b5fd' : kind === 'grip' ? '#fbbf24' : '#6ee7b7', minWidth: 48, display:'flex', alignItems:'center', gap:4 }}><span style={{ fontSize:11 }}>{kind==='neck'?'🦴': kind==='grip'?'✊':'🌀'}</span>{kind === 'neck' ? 'Шея' : kind === 'grip' ? 'Хват' : 'Core'}</span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                {plan.weeksData.map(wk => {
+                  let sets = 0;
+                  if (kind === 'neck') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('neck')).reduce((a, e) => a + e.sets, 0), 0);
+                  if (kind === 'grip') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => e.id.includes('grip') || e.id.includes('pinch') || e.id.includes('wrist') || e.id.includes('farmer') || e.id.includes('towel')).reduce((a, e) => a + e.sets, 0), 0);
+                  if (kind === 'core') sets = wk.sessions.reduce((s, sess) => s + sess.exercises.filter(e => ['deadbug', 'hollow_hold', 'side_plank', 'ab_wheel', 'copenhagen_plank', 'pallof_rotation_press', 'suitcase_carry', 'landmine_rotation'].includes(e.id)).reduce((a, e) => a + e.sets, 0), 0);
+                  let col = '#a855f7';
+                  if (kind === 'core') col = sets < 4 ? '#f59e0b' : sets <= 10 ? '#a855f7' : '#eab308';
+                  else {
+                    const lm = getCombat(plan.level, kind as any);
+                    const st = lm ? (sets < lm.mev ? 'below' : sets <= lm.mav ? 'optimal' : sets <= lm.mrv ? 'high' : 'over') : 'optimal';
+                    col = st === 'below' ? '#f59e0b' : st === 'optimal' ? '#a855f7' : st === 'high' ? '#eab308' : '#ef4444';
+                  }
+                  return (
+                    <span key={wk.week} style={{ padding: '4px 8px', borderRadius: 10, background: col + '14', border: `0.5px solid ${col}2e`, color: col, fontSize: 10.5, fontWeight: 700, fontVariantNumeric:'tabular-nums' }}>
+                      Н{wk.week} · <Highlight color={col}>{sets}</Highlight>{wk.deload ? ' · разгрузка' : (wk as any).taper ? ' · тапер' : ''}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+        <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'6px 10px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight color="#a855f7">Фиолетовый</Highlight> оптимум · <Highlight color="#f59e0b">янтарь</Highlight> недобор · <Highlight color="#eab308">жёлтый</Highlight> высоко · <Highlight color="#ef4444">красный</Highlight> перебор</div>
+      </SectionCard>
 
       {diaryLoad != null && (
         <InfoBanner tone={diaryLoad > 30 ? 'warn' : 'info'}>
@@ -160,10 +172,8 @@ export const CombatPlanView: React.FC<Props> = ({
                 boxShadow: '0 4px 14px rgba(0,0,0,0.18)',
               }}>{wk.week}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>
-                  {ruLabel(PHASE_RU, wk.phase)}{wk.deload ? ' · разгрузка' : (wk as any).taper ? ' · тапер' : ''} · {wk.totalSets} сетов{(wk as any).totalTonnage ? ` · ${((wk as any).totalTonnage / 1000).toFixed(1)}т` : ''}
-                </div>
-                <div style={{ fontSize: 11, color: TEXT_3, marginTop: 1 }}>Неделя {wk.week} · {wk.sessions.length} сессий · {wk.sessions.reduce((a, s) => a + s.exercises.length, 0)} упр.</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', lineHeight: 1.1, display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}><Highlight color={wk.deload?'#f59e0b': (wk as any).taper?'#60a5fa':'#a855f7'}>{ruLabel(PHASE_RU, wk.phase)}</Highlight>{wk.deload ? <Highlight color="#f59e0b">разгрузка</Highlight> : (wk as any).taper ? <Highlight color="#60a5fa">тапер</Highlight> : null}<span style={{ fontWeight:400, color:TEXT_3 }}>· <Highlight>{wk.totalSets}</Highlight> сетов{(wk as any).totalTonnage ? <> · <Highlight>{((wk as any).totalTonnage / 1000).toFixed(1)}т</Highlight></> : ''}</span></div>
+                <div style={{ fontSize: 11, color: TEXT_3, marginTop: 1, fontVariantNumeric:'tabular-nums' }}>Неделя {wk.week} · {wk.sessions.length} сессий · {wk.sessions.reduce((a, s) => a + s.exercises.length, 0)} упр.</div>
               </div>
               <span style={{ width: 32, height: 32, borderRadius: 10, background: isOpen ? 'rgba(168,85,247,0.14)' : 'rgba(255,255,255,0.06)', border: `1px solid ${isOpen ? 'rgba(168,85,247,0.22)' : 'rgba(255,255,255,0.08)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
             </button>
@@ -192,10 +202,10 @@ export const CombatPlanView: React.FC<Props> = ({
                     background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: 10,
                     backdropFilter: 'blur(8px)',
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <span style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>{sess.sessionTag} <span style={{ fontWeight: 600, color: TEXT_3 }}>· {sess.character} · день {sess.day} · {sess.durationMin} мин</span></span>
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.42)', background: 'rgba(0,0,0,0.18)', padding: '3px 7px', borderRadius: 20, border: '1px solid rgba(255,255,255,0.06)' }}>
-                        ⏱ {Math.round(sess.exercises.reduce((a, e) => a + e.workSets.length * (e.restSeconds || 75), 0) / 60)} мин отдыха
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap:'wrap', gap:6 }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily:'-apple-system, system-ui, sans-serif' }}>{sess.sessionTag} <span style={{ fontWeight:500, color:TEXT_3 }}>· <Highlight color={sess.character==='тяж'?'#ff9f0a': sess.character==='памп'?'#a855f7':'#60a5fa'}>{sess.character}</Highlight> · день {sess.day} · {sess.durationMin}′</span></span>
+                      <span style={{ fontSize: 10, color: TEXT_3, background:'rgba(0,0,0,0.16)', padding:'3px 7px', borderRadius:20, border:'0.5px solid rgba(255,255,255,0.06)', fontVariantNumeric:'tabular-nums' }}>
+                        ⏱ {Math.round(sess.exercises.reduce((a, e) => a + e.workSets.length * (e.restSeconds || 75), 0) / 60)}′ отдыха
                       </span>
                     </div>
 
@@ -242,53 +252,40 @@ export const CombatPlanView: React.FC<Props> = ({
         );
       })}
 
-      {/* Годовой */}
+      {/* Годовой — Apple premium */}
       {annual && onBuildATR && (
-        <div style={{ ...CARD, gap: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,#0ea5e9,#6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>🗓️</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>Годовой ATR — {annual.totalWeeks} нед · {annual.blocks.length} блоков {annual.discipline ? `· ${annual.discipline}` : ''}</div>
-                <div style={{ fontSize: 11, color: TEXT_3 }}>Блоки с тапером строятся автоматически</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-              <button onClick={onBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '1px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед</button>
-              {setAnnualWeeks && (
-                <select value={annualWeeks} onChange={e => setAnnualWeeks(Number(e.target.value))} style={{ ...INPUT, width: 100, padding: '7px 8px', fontSize: 12 }}>
-                  <option value={12}>12 нед</option><option value={24}>24 нед</option><option value={36}>36 нед</option><option value={52}>52 нед</option>
-                </select>
-              )}
-            </div>
+        <SectionCard icon="🗓️" title={`Годовой ATR · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · синхронизация`} accent>
+          <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед · ${annual.blocks.length} блоков`} subtitle={`${annual.discipline ? `${annual.discipline} · ` : ''}тапер строится автоматически`} accent />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems:'center' }}>
+            <button onClick={onBuildATR} style={{ ...BTN_SMALL, background: 'rgba(168,85,247,0.14)', color: '#d8b4fe', border: '0.5px solid rgba(168,85,247,0.24)' }}>↻ Построить {annualWeeks} нед</button>
+            {setAnnualWeeks && (
+              <select value={annualWeeks} onChange={e => setAnnualWeeks(Number(e.target.value))} style={{ ...INPUT, width: 100, padding: '7px 8px', fontSize: 12, fontVariantNumeric:'tabular-nums' }}>
+                <option value={12}>12 нед</option><option value={24}>24 нед</option><option value={36}>36 нед</option><option value={52}>52 нед</option>
+              </select>
+            )}
+            <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">{annual.totalWeeks} нед</Badge>
           </div>
 
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {annual.blocks.map((b: any) => (
-              <span key={b.id} style={{
-                padding: '5px 9px', borderRadius: 10, fontSize: 10.5, fontWeight: 800,
-                background: b.phase === 'accumulation' ? 'rgba(59,130,246,0.12)' : b.phase === 'transmutation' ? 'rgba(168,85,247,0.12)' : b.phase === 'realization' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
-                border: `1px solid ${b.phase === 'accumulation' ? 'rgba(59,130,246,0.22)' : b.phase === 'transmutation' ? 'rgba(168,85,247,0.22)' : b.phase === 'realization' ? 'rgba(239,68,68,0.22)' : 'rgba(245,158,11,0.22)'}`,
-                color: b.phase === 'accumulation' ? '#60a5fa' : b.phase === 'transmutation' ? '#c4b5fd' : b.phase === 'realization' ? '#f87171' : '#fbbf24',
-              }}>
-                Нед {b.startWeek}-{b.startWeek + b.weeks - 1}: {b.phase} · {b.weeks}нед{b.fightDate ? ' 🏁' : ''}
-              </span>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', height: 16, borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.18)' }}>
             {annual.blocks.map((b: any) => {
-              const w = (b.weeks / annual.totalWeeks * 100).toFixed(2);
-              const col = b.phase === 'accumulation' ? '#3b82f6' : b.phase === 'transmutation' ? '#a855f7' : b.phase === 'realization' ? '#ef4444' : '#f59e0b';
-              return <div key={b.id} title={`${b.phase} ${b.weeks}нед`} style={{ width: `${w}%`, background: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: '#fff', fontWeight: 900 }}>{b.weeks}</div>;
+              const col = b.phase === 'accumulation' ? '#60a5fa' : b.phase === 'transmutation' ? '#a855f7' : b.phase === 'realization' ? '#ff3b30' : '#f59e0b';
+              return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, fontSize:10.5, fontWeight:700, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek + b.weeks - 1}</Highlight> · {ruLabel(PHASE_RU, b.phase)} · <Highlight color={col}>{b.weeks}нед</Highlight>{b.fightDate ? ' 🏁' : ''}</span>;
             })}
           </div>
-          <div style={{ fontSize: 9, color: TEXT_3, display: 'flex', justifyContent: 'space-between' }}><span>Нед 1 · {startDate}</span><span>Нед {annual.totalWeeks}</span></div>
+
+          <div style={{ display: 'flex', height: 16, borderRadius: 10, overflow: 'hidden', border: '0.5px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.18)' }}>
+            {annual.blocks.map((b: any) => {
+              const w = (b.weeks / annual.totalWeeks * 100).toFixed(2);
+              const col = b.phase === 'accumulation' ? '#3b82f6' : b.phase === 'transmutation' ? '#a855f7' : b.phase === 'realization' ? '#ff3b30' : '#f59e0b';
+              return <div key={b.id} title={`${b.phase} ${b.weeks}нед`} style={{ width: `${w}%`, background: col, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#fff', fontWeight: 700, fontVariantNumeric:'tabular-nums' }}>{b.weeks}</div>;
+            })}
+          </div>
+          <div style={{ fontSize: 9, color: TEXT_3, display: 'flex', justifyContent: 'space-between', fontVariantNumeric:'tabular-nums' }}><span>Нед 1 · {startDate}</span><span>Нед {annual.totalWeeks}</span></div>
 
           {annual.competitions?.length > 0 && (
-            <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 900, color: '#f87171' }}>Бои ({annual.competitions.length}):</div>
-              {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)' }}>🏁 {c.name} — {c.date} {c.weightClass ? `(${c.weightClass})` : ''}</div>)}
+            <div style={{ background: 'rgba(239,68,68,0.06)', border: '0.5px solid rgba(239,68,68,0.14)', borderRadius: 12, padding: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', display:'flex', alignItems:'center', gap:6 }}>🏁 Бои <Highlight color="#ff3b30">{annual.competitions.length}</Highlight></div>
+              {annual.competitions.map((c: any) => <div key={c.id} style={{ fontSize: 11, color: 'rgba(255,255,255,0.82)', marginTop:4 }}><Highlight color="#ff3b30">🏁 {c.name}</Highlight> — {c.date} {c.weightClass ? <Highlight>{c.weightClass}</Highlight> : ''}</div>)}
             </div>
           )}
 
@@ -301,20 +298,28 @@ export const CombatPlanView: React.FC<Props> = ({
             </div>
           )}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button onClick={onPrintAnnual} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', color: '#fff' }}>🖨 Печать года</button>
-            <button onClick={onDownloadIcs} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', color: '#fff' }}>📅 .ics</button>
+            <button onClick={onPrintAnnual} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>🖨 Печать года</button>
+            <button onClick={onDownloadIcs} style={{ ...BTN_SMALL, background: 'rgba(255,255,255,0.06)', color: '#fff', border:'0.5px solid rgba(255,255,255,0.08)' }}>📅 .ics</button>
           </div>
-        </div>
+        </SectionCard>
       )}
 
-      {/* Экспорт */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
-        <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={BTN}>⎙ Копировать отчёт</button>
-        <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={BTN}>🖨 Печать</button>
-        <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={BTN}>📊 CSV</button>
-        <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={BTN}>📅 План .ics</button>
-        <button onClick={onExportProgram} style={BTN_PRIMARY}>✦ Экспорт в программу</button>
-      </div>
+      {/* Экспорт — Apple glass */}
+      <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV · ICS · в программу">
+        <GroupHeading icon="⎙" text="Копировать и печать" desc="Быстрый обмен" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
+          <button onClick={() => { const txt = buildCombatReport(plan); navigator.clipboard?.writeText(txt); doMsg('Скопировано'); }} style={BTN}>⎙ Копировать</button>
+          <button onClick={() => { const html = buildCombatPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } else { navigator.clipboard?.writeText(html); doMsg('HTML скопирован'); } }} style={BTN}>🖨 Печать</button>
+          <button onClick={onExportProgram} style={BTN_PRIMARY}>✦ В программу</button>
+        </div>
+        <Divider />
+        <GroupHeading icon="📊" text="Файлы" desc="CSV для Excel · ICS для календаря" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px,1fr))', gap: 8 }}>
+          <button onClick={() => { downloadCombatCsv(plan); doMsg('CSV скачан'); }} style={BTN}>📊 CSV</button>
+          <button onClick={() => { const ics = buildCombatPlanIcs(plan, startDate || null); const blob = new Blob([ics], { type: 'text/calendar' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `combat-plan-${plan.discipline}-${plan.weeks}w.ics`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); doMsg('ICS скачан'); }} style={BTN}>📅 План .ics</button>
+        </div>
+        <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight>Экспорт</Highlight> — библиотека программ · печать · ICS · CSV</div>
+      </SectionCard>
     </div>
   );
 };

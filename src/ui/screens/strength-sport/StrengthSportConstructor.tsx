@@ -20,7 +20,7 @@ import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } f
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
-import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_GRAD, STRONG_GRAD, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
+import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, STRONG_GRAD, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
@@ -539,19 +539,68 @@ export const StrengthSportConstructor: React.FC = () => {
 
       {step === 'plan' && plan && (
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <div style={{ background:'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(14,165,233,0.06), rgba(18,16,28,0.72))', border:'1px solid rgba(0,230,138,0.18)', borderRadius:16, padding:14, color:'#fff', fontSize:11, whiteSpace:'pre-wrap', boxShadow:'0 10px 28px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.06)', backdropFilter:'blur(14px)' }}>
-            <div style={{ fontSize:10, fontWeight:900, letterSpacing:0.6, textTransform:'uppercase', color:'rgba(255,255,255,0.52)', marginBottom:6 }}>Сводка плана</div>
-            {buildStrengthSportReport(plan)}
-          </div>
+          {/* Сводка — Apple glass + Highlights + StatTiles */}
+          <SectionCard icon="📋" title="Сводка плана" subtitle={`${ruLabel(MODE_RU, plan.mode)} · ${ruLabel(PHASE_RU, plan.weeksData[0]?.phase || 'accumulation')} · ${plan.weeks} нед`} accent>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(110px,1fr))', gap:8 }}>
+              <StatTile label="Недель" value={String(plan.weeks)} color={modeColor} sub={plan.patternId} icon="📅" />
+              <StatTile label="Дней/нед" value={`${days}×`} color={modeColor} sub={ruLabel(LEVEL_RU, plan.level)} icon="🗓️" />
+              <StatTile label="Сетов" value={String(plan.weeksData.reduce((a,w)=>a+(w.totalSets||0),0))} color={modeColor} sub="за цикл" icon="📊" />
+              <StatTile label="Тоннаж" value={`${Math.round(plan.weeksData.reduce((a,w)=>a+(w.totalTonnage||0),0)/1000)}т`} color={modeColor} sub="за цикл" icon="⚖️" />
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`}>{ruLabel(MODE_RU, plan.mode)}</Badge>
+              <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`}>{ruLabel(PHASE_RU, plan.weeksData[0]?.phase || '')}</Badge>
+              <Badge>{plan.patternId}</Badge>
+              {plan.inputSnapshot?.focus && <Badge color={mode==='strongman'?ACCENT_STRONG:ACCENT} bg={mode==='strongman'?STRONG_SOFT:ACCENT_SOFT} border={mode==='strongman'?STRONG_BORDER:ACCENT_BORDER}>Фокус {plan.inputSnapshot.focus}</Badge>}
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {plan.weeksData.map(w=> (
+                <span key={w.week} style={{ padding:'4px 8px', borderRadius:10, background:'rgba(255,255,255,0.04)', border:'0.5px solid rgba(255,255,255,0.06)', fontSize:11, color:'#fff', fontFamily:'-apple-system, system-ui, sans-serif', fontVariantNumeric:'tabular-nums' }}>Н{w.week} · <Highlight color={w.deload?'#f59e0b': (w as any).taper?'#60a5fa':modeColor}>{w.totalSets}</Highlight> сетов · <Highlight>{Math.round((w.totalTonnage||0)/1000)}т</Highlight></span>
+              ))}
+            </div>
+            {/* Sinclair / DOTS блок */}
+            {(() => {
+              const bw = (plan.inputSnapshot as any)?.bodyweight as number | undefined;
+              const sex = (plan.inputSnapshot as any)?.sex as string | undefined;
+              if (!bw || !plan.workMax) return null;
+              const wm: any = plan.workMax || {};
+              let total = 0;
+              if (plan.mode === 'weightlifting') total = (wm.snatch||0)+(wm.cleanJerk||wm.clean||0);
+              else if (plan.mode === 'strongman') total = (wm.deadlift||0)+(wm.logPress||wm.overheadPress||0)+(wm.backSquat||0);
+              else total = (wm.snatch||0)+(wm.cleanJerk||0)+(wm.backSquat||0);
+              if (!total) return null;
+              const reportLines = buildStrengthSportReport(plan).split('\n');
+              const sinLine = reportLines.find(l=> l.includes('Sinclair') || l.includes('DOTS'));
+              return sinLine ? <div style={{ fontSize:11, color:'rgba(235,235,245,0.72)', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.4 }}>{sinLine.split('·').map((p,i)=> <span key={i} style={{ marginRight:6 }}>{p.trim().split(' ').map((w,j)=> /[0-9]/.test(w) ? <Highlight key={j} color={modeColor}>{w}</Highlight> : w+' ').reduce((a,c)=> <>{a} {c}</> as any, null as any)}</span>)}</div> : null;
+            })()}
+            {plan.outsideMetrics && <InfoBanner tone={plan.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={plan.outsideMetrics.interference==='high'?'#ff9f0a':'#30d158'}>{plan.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{plan.outsideMetrics.volumeMultiplier}</Highlight> · {plan.outsideMetrics.interference}</InfoBanner>}
+            {plan.rationale?.length ? <div style={{ fontSize:11, color:'rgba(235,235,245,0.58)', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:modeColor }}>•</span><span>{r}</span></div>)}</div> : null}
+          </SectionCard>
 
           {plan.mode === 'weightlifting' && (plan.workMax.snatch || 0) > 0 && (plan.workMax.cleanJerk || (plan.workMax as any).clean || 0) > 0 && (() => {
             const meet = buildWLMeetPlan(plan.workMax.snatch as number, (plan.workMax.cleanJerk || (plan.workMax as any).clean) as number, 'balanced', { bodyweight, sex });
             return meet ? (
-              <div style={{ ...CARD, borderColor:'rgba(59,130,246,0.22)', background:'linear-gradient(180deg, rgba(59,130,246,0.10), rgba(18,16,28,0.62))' }}>
-                <CardHeader icon="🏋️" title="Попытки ТА · IWF 1кг" subtitle={`Тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''} ${(meet as any).robi?`· Robi ${(meet as any).robi}`:''}`} />
-                <div style={{ fontSize:11, color:'#fff' }}><b>Рывок:</b> {meet.snatch.opener} / {meet.snatch.second} / {meet.snatch.third} кг · <b>Толчок:</b> {meet.cleanJerk.opener} / {meet.cleanJerk.second} / {meet.cleanJerk.third} кг</div>
-                <div style={{ fontSize:10, color:TEXT_3 }}>{wlAttemptRationale(meet).slice(2).join(' · ')}</div>
-              </div>
+              <SectionCard icon="🏋️" title="Попытки ТА · IWF 1кг" subtitle={`Тотал ${meet.total}кг`} accent>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  <Badge color="#0a84ff" bg="rgba(10,132,255,0.12)" border="rgba(10,132,255,0.22)">Тотал <Highlight color="#0a84ff">{meet.total}кг</Highlight></Badge>
+                  {meet.sinclair && <Badge color="#30d158" bg="rgba(48,209,88,0.10)" border="rgba(48,209,88,0.18)">Sinclair <Highlight color="#30d158">{meet.sinclair}</Highlight></Badge>}
+                  {(meet as any).robi && <Badge color="#a855f7" bg="rgba(168,85,247,0.10)" border="rgba(168,85,247,0.18)">Robi <Highlight color="#a855f7">{(meet as any).robi}</Highlight></Badge>}
+                  <Badge>кат. {(() => { try{ const c=(plan.inputSnapshot as any)?.bodyweight; return c? c+'кг':'' }catch{return ''} })()}</Badge>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  <div style={{ background:'rgba(255,255,255,0.03)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>⚡️ Рывок <Badge color="#0a84ff" bg="rgba(10,132,255,0.12)" border="rgba(10,132,255,0.22)">{meet.total? Math.round(meet.snatch.opener/meet.total*100)+'%' : ''}</Badge></div>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', fontSize:12, fontVariantNumeric:'tabular-nums' }}><Highlight color="#30d158">{meet.snatch.opener}кг</Highlight><span style={{ color:TEXT_3 }}>→</span><Highlight color="#ff9f0a">{meet.snatch.second}кг</Highlight><span style={{ color:TEXT_3 }}>→</span><Highlight color="#ff3b30">{meet.snatch.third}кг</Highlight></div>
+                    <div style={{ fontSize:10, color:TEXT_3, marginTop:4 }}>92% · 97% · 102% от ПМ</div>
+                  </div>
+                  <div style={{ background:'rgba(255,255,255,0.03)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#fff', marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>🏋️ Толчок <Badge color="#0a84ff" bg="rgba(10,132,255,0.12)" border="rgba(10,132,255,0.22)">{meet.total? Math.round(meet.cleanJerk.opener/meet.total*100)+'%' : ''}</Badge></div>
+                    <div style={{ display:'flex', gap:6, flexWrap:'wrap', fontSize:12, fontVariantNumeric:'tabular-nums' }}><Highlight color="#30d158">{meet.cleanJerk.opener}кг</Highlight><span style={{ color:TEXT_3 }}>→</span><Highlight color="#ff9f0a">{meet.cleanJerk.second}кг</Highlight><span style={{ color:TEXT_3 }}>→</span><Highlight color="#ff3b30">{meet.cleanJerk.third}кг</Highlight></div>
+                    <div style={{ fontSize:10, color:TEXT_3, marginTop:4 }}>92% · 97% · 102% от ПМ</div>
+                  </div>
+                </div>
+                <div style={{ fontSize:11, color:'rgba(235,235,245,0.58)', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.4 }}>{wlAttemptRationale(meet).slice(0,3).map((t,i)=> <span key={i} style={{ marginRight:8 }}>{t.includes('кг') ? t.split(' ').map((w,j)=> /[0-9]/.test(w) ? <Highlight key={j} color="#0a84ff">{w}</Highlight> : w+' ') : t}</span>)}</div>
+              </SectionCard>
             ) : null;
           })()}
           {plan.mode !== 'weightlifting' && (() => {
@@ -560,11 +609,13 @@ export const StrengthSportConstructor: React.FC = () => {
             const yPlan = yoke ? buildSMEventPlan('yoke_walk', yoke) : null;
             const lPlan = log ? buildSMEventPlan('log_press', log) : null;
             return (yPlan || lPlan) ? (
-              <div style={{ ...CARD_STRONG, padding:14 }}>
-                <CardHeader icon="🪨" title="Попытки стронг" subtitle="шаг йок 10кг / лог 2.5кг" strong />
-                {yPlan && <div style={{ fontSize:11, color:'#fff' }}>Йок: {yPlan.attempts.opener} / {yPlan.attempts.second} / {yPlan.attempts.third} кг</div>}
-                {lPlan && <div style={{ fontSize:11, color:'#fff' }}>Лог: {lPlan.attempts.opener} / {lPlan.attempts.second} / {lPlan.attempts.third} кг</div>}
-              </div>
+              <SectionCard icon="🪨" title="Попытки стронг" subtitle="шаг йок 10кг / лог 2.5кг" strong>
+                <div style={{ display:'grid', gridTemplateColumns: yPlan && lPlan ? '1fr 1fr' : '1fr', gap:10 }}>
+                  {yPlan && <div style={{ background:'rgba(255,159,10,0.08)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,159,10,0.18)' }}><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🚜 Йок 20м</div><div style={{ display:'flex', gap:6, marginTop:6, fontVariantNumeric:'tabular-nums' }}><HighlightStrong>{yPlan.attempts.opener}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.second}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{yPlan.attempts.third}кг</HighlightStrong></div></div>}
+                  {lPlan && <div style={{ background:'rgba(255,159,10,0.08)', padding:'10px 12px', borderRadius:12, border:'0.5px solid rgba(255,159,10,0.18)' }}><div style={{ fontSize:11, fontWeight:700, color:'#fff' }}>🪵 Лог</div><div style={{ display:'flex', gap:6, marginTop:6, fontVariantNumeric:'tabular-nums' }}><HighlightStrong>{lPlan.attempts.opener}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{lPlan.attempts.second}кг</HighlightStrong><span style={{ color:TEXT_3 }}>→</span><HighlightStrong>{lPlan.attempts.third}кг</HighlightStrong></div></div>}
+                </div>
+                <div style={{ fontSize:10, color:TEXT_3, lineHeight:1.4 }}>{yPlan && smEventRationale(yPlan).slice(0,2).join(' · ')} {lPlan && smEventRationale(lPlan).slice(0,2).join(' · ')}</div>
+              </SectionCard>
             ) : null;
           })()}
 
@@ -631,7 +682,7 @@ export const StrengthSportConstructor: React.FC = () => {
                       {sess.exercises.map(ex => (
                         <div key={ex.id} style={{ background:'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))', border:'0.5px solid rgba(255,255,255,0.06)', borderRadius:12, padding:10, display:'flex', flexDirection:'column', gap:7 }}>
                           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                            <span style={{ fontSize:12.5, fontWeight:700, color:'#fff', flex:'1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>{ex.name} <span style={{ fontWeight:500, color:'rgba(235,235,245,0.62)' }}>— <Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{ex.sets}×{ex.reps}</Highlight> · <Highlight>{ex.weight}кг</Highlight> · RIR{ex.rir}</span><span style={{ fontSize:10.5, color:TEXT_3, marginLeft:6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
+                            <span style={{ fontSize:12.5, fontWeight:700, color:'#fff', flex:'1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>{ex.name} <span style={{ fontWeight:500, color:'rgba(235,235,245,0.62)' }}>— <Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{ex.sets}×{ex.reps}</Highlight> · <Highlight>{ex.weight}кг</Highlight> · <Highlight color={ex.rir<=1?'#ff3b30': ex.rir<=2?'#ff9f0a':'#30d158'}>RIR{ex.rir}</Highlight></span><span style={{ fontSize:10.5, color:TEXT_3, marginLeft:6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
                           </div>
                           <div style={{ display:'grid', gridTemplateColumns:'64px 64px 64px auto', gap:6, alignItems:'center' }}>
                             <input type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'7px 8px', fontSize:12, textAlign:'center', fontVariantNumeric:'tabular-nums' }} placeholder="кг" />
@@ -665,31 +716,44 @@ export const StrengthSportConstructor: React.FC = () => {
           })}
 
           {annual && (
-            <div style={{ ...CARD, borderColor:'rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize:12, fontWeight:900, color:'#fff' }}>Годовой план · {annual.totalWeeks} нед · {annual.blocks.length} блоков</div>
+            <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков · синхронизация Stark`} >
+              <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · ${plan.weeks} нед текущий`} />
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {annual.blocks.map((b:any) => <span key={b.id} style={{ padding:'4px 8px', borderRadius:10, background:'rgba(0,230,138,0.12)', border:'1px solid rgba(0,230,138,0.18)', color:'#00e68a', fontSize:10, fontWeight:800 }}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}: {b.mode} ×{b.weeks}</span>)}
-              </div>
-              <div style={{ display:'flex', height:14, borderRadius:10, overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)' }}>
-                {annual.blocks.map((b:any)=> {
-                  const w = (b.weeks/annual.totalWeeks*100).toFixed(1);
-                  const col = b.mode==='weightlifting'?'#00e68a': b.mode==='strongman'?'#f59e0b':'#3b82f6';
-                  return <div key={b.id} style={{ width: `${w}%`, background: col, display:'flex', alignItems:'center', justifyContent:'center', fontSize:8, color: b.mode==='weightlifting'?'#06281c':'#fff', fontWeight:900 }}>{b.weeks}</div>;
+                {annual.blocks.map((b:any) => {
+                  const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';
+                  return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontSize:10, fontWeight:700, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}</Highlight>: {ruLabel(MODE_RU, b.mode)} ×{b.weeks}</span>;
                 })}
               </div>
-            </div>
+              <div style={{ display:'flex', height:16, borderRadius:10, overflow:'hidden', border:'0.5px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.18)' }}>
+                {annual.blocks.map((b:any)=> {
+                  const w = (b.weeks/annual.totalWeeks*100).toFixed(1);
+                  const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';
+                  return <div key={b.id} title={`${b.mode} ${b.weeks}нед`} style={{ width: `${w}%`, background: col, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color: b.mode==='weightlifting'?'#06281c':'#fff', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{b.weeks}</div>;
+                })}
+              </div>
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:TEXT_3 }}><span>Нед 1</span><span>Нед {annual.totalWeeks}</span></div>
+              <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>Синхронизация: <Highlight>he_strength_annual_sync_v1</Highlight> · годовой доступен в дневнике и общем плане</div>
+            </SectionCard>
           )}
 
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px,1fr))', gap:8 }}>
-            <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); setTimeout(()=>setMsg(''),1800); }} style={BTN}>⎙ Копировать</button>
-            <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); } setMsg('Печать'); }} style={BTN}>🖨 Печать</button>
-            <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV'); }} style={BTN}>📊 CSV</button>
-            <button onClick={() => { downloadStrengthXlsx(plan); setMsg('XLS'); }} style={{ ...BTN, background:'rgba(34,197,94,0.12)', color:'#4ade80', border:'1px solid rgba(34,197,94,0.20)' }}>📗 XLS</button>
-            <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS'); }} style={BTN}>📅 ICS</button>
-            <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест'); }} style={BTN}>📋 Дайджест</button>
-            <button onClick={exportToUserProgram} style={BTN_PRIMARY}>✦ В программу</button>
-          </div>
-          {msg && <InfoBanner tone="ok">{msg}</InfoBanner>}
+          <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV/XLS · ICS · дайджест · в программу">
+            <GroupHeading icon="⎙" text="Копировать и печать" desc="Быстрый обмен и печать" />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px,1fr))', gap:8 }}>
+              <button onClick={() => { const txt = buildStrengthSportReport(plan); navigator.clipboard?.writeText(txt); setMsg('Скопировано'); setTimeout(()=>setMsg(''),1800); }} style={BTN}>⎙ Копировать</button>
+              <button onClick={() => { const html = buildStrengthPrintHtml(plan); const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.print(); } setMsg('Печать'); }} style={BTN}>🖨 Печать</button>
+              <button onClick={()=> { const d=shareStrengthDigest(plan); navigator.clipboard?.writeText(d); setMsg('Дайджест'); }} style={BTN}>📋 Дайджест</button>
+            </div>
+            <Divider />
+            <GroupHeading icon="📊" text="Файлы" desc="CSV / XLS для Excel · ICS для календаря" />
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(120px,1fr))', gap:8 }}>
+              <button onClick={() => { downloadStrengthCsv(plan); setMsg('CSV'); }} style={BTN}>📊 CSV</button>
+              <button onClick={() => { downloadStrengthXlsx(plan); setMsg('XLS'); }} style={{ ...BTN, background:'rgba(48,209,88,0.12)', color:'#30d158', border:'0.5px solid rgba(48,209,88,0.20)' }}>📗 XLS</button>
+              <button onClick={() => { downloadStrengthIcs(plan, (plan as any).inputSnapshot?.startDate); setMsg('ICS'); }} style={BTN}>📅 ICS</button>
+              <button onClick={exportToUserProgram} style={BTN_PRIMARY}>✦ В программу</button>
+            </div>
+            <div style={{ fontSize:11, color:TEXT_3, background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', display:'flex', gap:6, flexWrap:'wrap' }}><Highlight>Экспорт</Highlight> — библиотека программ · печать · шаринг в ТГ · ICS · CSV/XLS</div>
+          </SectionCard>
+          {msg && <InfoBanner tone="ok"><Highlight>{msg}</Highlight></InfoBanner>}
         </div>
       )}
     </div>
