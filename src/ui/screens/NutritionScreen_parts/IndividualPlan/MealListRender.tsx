@@ -94,6 +94,26 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
       </div>
     );
   };
+  // Эпик 6: ручные цели на приём (🎯) — персистентные Б/Ж/У слота
+  const [mealTargetEditor, setMealTargetEditor] = React.useState<{ mi: number; label: string; p: string; f: string; c: string } | null>(null);
+  const saveMealTarget = (label: string) => {
+    try {
+      const cur: any[] = JSON.parse(localStorage.getItem('he_meal_target_overrides') || '[]');
+      const next = cur.filter((o: any) => !o || o.label !== label);
+      const p = parseFloat(mealTargetEditor!.p) || 0;
+      const f = parseFloat(mealTargetEditor!.f) || 0;
+      const c = parseFloat(mealTargetEditor!.c) || 0;
+      if (p > 0 || f > 0 || c > 0) next.push({ label, p: p > 0 ? p : undefined, f: f > 0 ? f : undefined, c: c > 0 ? c : undefined });
+      localStorage.setItem('he_meal_target_overrides', JSON.stringify(next));
+    } catch {}
+    setMealTargetEditor(null);
+  };
+  const readMealTarget = (label: string): { p?: number; f?: number; c?: number } | undefined => {
+    try {
+      const cur: any[] = JSON.parse(localStorage.getItem('he_meal_target_overrides') || '[]');
+      return cur.find((o: any) => o && o.label === label);
+    } catch { return undefined; }
+  };
   return (dayData: any, editable = false, dayIdx = 0) => {
     if (!dayData) return null;
     const d = dayData; const totalKcal = Math.round(d.totals?.kcal || 0); const totalP = Math.round(d.totals?.p || 0); const totalF = Math.round(d.totals?.f || 0); const totalC = Math.round(d.totals?.c || 0); const totalFiber = Math.round(d.totals?.fiber || 0);
@@ -230,6 +250,7 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:4}}>
                   <span style={{fontSize:10,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{mealKcal} ккал</span>
+                  <span onClick={()=>{ const ov = readMealTarget(m.label); setMealTargetEditor({ mi, label: m.label, p: ov?.p ? String(ov.p) : '', f: ov?.f ? String(ov.f) : '', c: ov?.c ? String(ov.c) : '' }); }} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(249,115,22,0.08)',border:'1px solid rgba(249,115,22,0.15)',color:'#fb923c',cursor:'pointer',fontWeight:600}} title="Цель приёма (Б/Ж/У слота)">🎯</span>
                   <span onClick={()=>timeEdit.open(mi, dayPlan)} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(59,130,246,0.06)',border:'1px solid rgba(59,130,246,0.12)',color:'#60a5fa',cursor:'pointer',fontWeight:600}} title="Изменить время приёма">🕒</span>
                   <span onClick={()=>setRecipePickerMeal({dayIdx,mealIdx:mi,label:m.label})} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(139,92,246,0.08)',border:'1px solid rgba(139,92,246,0.15)',color:'#a78bfa',cursor:'pointer',fontWeight:600}}>🍳</span>
                   <span onClick={()=>{setQuickAddMealIdx(mi);setQuickAddSearch('');}} style={{fontSize:10,padding:'2px 5px',borderRadius:4,background:'rgba(0,230,138,0.08)',border:'1px solid rgba(0,230,138,0.15)',color:'#00e68a',cursor:'pointer',fontWeight:600}}>+</span>
@@ -525,6 +546,26 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
           );
         })()}
         {timeEdit.modal}
+        {mealTargetEditor && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 210, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)' }} onClick={() => setMealTargetEditor(null)}>
+            <div onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: 340, padding: 16, borderRadius: 16, background: '#18181b', border: '1px solid rgba(249,115,22,0.2)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fb923c', marginBottom: 8, textAlign: 'center' }}>🎯 Цель приёма «{mealTargetEditor.label}»</div>
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', marginBottom: 8, textAlign: 'center', lineHeight: 1.5 }}>Граммы Б/Ж/У слота (0 = не менять). Применяется при следующей генерации плана — порции приёма масштабируются к цели (0.7–1.4×, белок не режется ниже 0.8×).</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
+                {(['p', 'f', 'c'] as const).map(k => (
+                  <div key={k}>
+                    <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.7)', marginBottom: 3, textAlign: 'center' }}>{k === 'p' ? '🥩 Белок' : k === 'f' ? '🧈 Жиры' : '🍚 Углеводы'} (г)</div>
+                    <input type="number" min={0} value={mealTargetEditor[k]} onChange={e => setMealTargetEditor({ ...mealTargetEditor, [k]: e.target.value })} placeholder="0" style={{ width: '100%', padding: '7px 4px', borderRadius: 8, textAlign: 'center', background: '#202023', border: '1px solid rgba(249,115,22,0.25)', color: '#fb923c', fontSize: 13, fontWeight: 700, outline: 'none', boxSizing: 'border-box' }} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setMealTargetEditor(null)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.12)', background: '#202023', color: 'rgba(255,255,255,0.85)', fontSize: 10 }}>Отмена</button>
+                <button onClick={() => saveMealTarget(mealTargetEditor.label)} style={{ flex: 1, padding: '8px', borderRadius: 8, cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontSize: 10, fontWeight: 700 }}>✓ Сохранить</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

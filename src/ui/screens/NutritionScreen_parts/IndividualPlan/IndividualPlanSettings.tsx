@@ -1037,6 +1037,23 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               {trainScheduleType === 'pattern' && `🔢 Цикл ${trainPattern.work}+${trainPattern.off}: ${trainPattern.work} тр / ${trainPattern.off} отдых`}
               {trainScheduleType === 'weekly' && `📅 ${trainingDays.filter(Boolean).length} тренировочных дней: ${DAY_LABELS.filter((_, i) => trainingDays[i]).join(', ') || '—'}`}
             </div>
+            {/* Эпик 6: день тяжёлых ног/объёма — угли +25%, ккал +5% */}
+            {trainScheduleType === 'weekly' && (
+              <div style={{ marginBottom: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.1)' }}>
+                <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>🏋️ День тяжёлых ног/объёма (углеводы +25%):</div>
+                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                  {DAY_LABELS.map((label, idx) => (
+                    <button key={idx} onClick={() => setHeavyTrainDay(heavyTrainDay === label ? '' : label)} style={{
+                      padding: '3px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700,
+                      background: heavyTrainDay === label ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.03)',
+                      border: heavyTrainDay === label ? '1px solid #f97316' : '1px solid rgba(255,255,255,0.06)',
+                      color: heavyTrainDay === label ? '#fb923c' : 'rgba(255,255,255,0.7)',
+                    }}>{label}</button>
+                  ))}
+                </div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.55)', marginTop: 3 }}>Только при недельном графике. Helms 2014/2019: legs/high-volume — максимальная гликогеновая ёмкость.</div>
+              </div>
+            )}
             {/* Синхронизация с профилем — только по кнопке */}
             <div style={{ display: 'flex', gap: 6 }}>
               <button onClick={autofillFromProfile} style={{ flex: 1, padding: '6px 4px', borderRadius: 8, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: '#202023', border: '1px solid rgba(96,165,250,0.3)', color: '#60a5fa' }} title="Загрузить график тренировок из Профиля">📋 Из профиля</button>

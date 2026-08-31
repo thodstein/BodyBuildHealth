@@ -17,6 +17,7 @@ import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } f
 import { buildDayTargets } from "./planner-day-targets";
 import { applyCarbPeriodizationMods, carbPeriodizationLabel } from "./planner-carb-periodization";
 import { microDeficitToPreferIds, diaasWeakLinkToPreferIds } from "./planner-micro-pools";
+import { applyMealTargetOverrides } from "./planner-meal-targets";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
@@ -2633,6 +2634,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _perio = applyCarbPeriodizationMods(carbPeriodization, offset, isTrain);
         let dayKcalMod = _perio.dayKcalMod, dayCarbMod = _perio.dayCarbMod;
         let isRefeedDay = _perio.isRefeedDay;
+        // Эпик 6: день тяжёлых ног/высокого объёма — угли +25%, ккал +5%
+        // (Helms 2014/2019: legs/high-volume день — максимальная гликогеновая ёмкость).
+        // heavyTrainDay — день недели из DAY_LABELS; применяется поверх периодизации.
+        const _dowOffset = ((new Date().getDay() + 6) % 7 + offset) % 7;
+        const _isHeavyDay = !!heavyTrainDay && DAY_LABELS[_dowOffset] === heavyTrainDay;
+        if (_isHeavyDay) { dayKcalMod *= 1.05; dayCarbMod *= 1.25; }
         // #1 Женская фаза цикла: калорийно-углеводные моды + преферты (apply поверх cycling).
         const _mp = (sex === 'female') ? getMenstrualPhaseNutrition((cyclePhase as MenstrualPhase) || 'none') : null;
         if (_mp) { dayKcalMod *= _mp.kcalMod; dayCarbMod *= _mp.carbMod; }
@@ -2907,6 +2914,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           meals.splice(0, meals.length, ...(_asm.meals as any[]));
           if (_asm.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._asm.notes];
         }
+        // Эпик 6: ручные цели на приём (🎯) — пост-проход масштабирования к Б/Ж/У слота.
+        try {
+          const _ovRaw = JSON.parse(localStorage.getItem('he_meal_target_overrides') || '[]');
+          if (Array.isArray(_ovRaw) && _ovRaw.length > 0) {
+            const _ov = _ovRaw.filter((o: any) => o && typeof o.label === 'string');
+            const _applied = applyMealTargetOverrides(meals as any, _ov as any);
+            meals.splice(0, meals.length, ...(_applied.meals as any[]));
+            if (_applied.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._applied.notes];
+          }
+        } catch {}
         // 🍳 Режим «по рецептам»: итоги дня пересчитываются из фактических приёмов
         // (после замены основных приёмов и ребаланса), а не из V2-тоталов.
         const _finalDayTotals = _genRecipes ? sumDayTotals(meals as any) : null;
@@ -2956,6 +2973,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.2 (восстановление гликогена/лептина), жиры снижены, белок удержан. Психологическая разгрузка на сушке.' : undefined,
           // Эпик 1: волна 2+1 — заметка недели из единой функции периодизации.
           periodizationWeekNote: _perio.weekNote,
+          heavyDayNote: _isHeavyDay ? '🏋️ День тяжёлых ног/объёма: углеводы +25%, ккал +5% (гликоген к сессии).' : undefined,
           menstrualPhaseNote: _mp ? _mp.note : undefined,
           boneNotes: _boneNotes.length > 0 ? _boneNotes : undefined,
           sleepNote: _sleepNote,
