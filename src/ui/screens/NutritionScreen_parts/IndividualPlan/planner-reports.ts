@@ -71,6 +71,9 @@ export function generateNutrientReportDetailed(
 }
 
 export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: FoodItem[]): QualityReport {
+  // Эпик 4 (NUTRITION-PROFESSIONAL-PLAN): ЕДИНЫЙ источник качества — bb_quality_score
+  // (V2-скоринг продукта, product-usefulness-v2). Прежняя самодельная эвристика
+  // (pd/fiber/tier) удалена — отчёт «Качество» и V2-карточки показывают одну шкалу.
   // P2-fix: guard на budget=null — раньше давал "Ваш бюджет «undefined»" в UI
   const b = budget || 'medium';
   if (!dayPlan) return { avgScore: 0, bbsAvg: 0, budget: b, budgetRange: '?', budgetOk: true, bestItems: [], weakItems: [], recommendations: [] };
@@ -78,14 +81,15 @@ export function generateQualityReportPure(dayPlan: any, budget: string, foodDb: 
   planItems(dayPlan).forEach((it: any) => {
     const food = foodDb.find(f => f.id === it.id || f.name === it.name);
     if (!food) return;
-    let score = 5;
-    const pd = (food.protein * 4) / Math.max(food.kcal, 1);
-    if (pd > 0.6) score += 2; else if (pd > 0.3) score += 1;
-    if ((food.fiber || 0) >= 3) score += 1;
-    if (food.tier === 'max') score = 10;
-    else if (food.tier === 'mid') score = Math.max(score, 8);
-    else if (food.tier === 'basic') score = Math.max(score, 6);
-    scores.push({ name: it.name, score: Math.min(10, score), bbs: food.bb_quality_score || 0, category: food.category });
+    const bbs = Number(food.bb_quality_score) || 0;
+    // fallback-эвристика только для продуктов без V2-скора (не должно случаться в FOOD_DB)
+    let score = bbs > 0 ? bbs : 5;
+    if (bbs <= 0) {
+      const pd = (food.protein * 4) / Math.max(food.kcal, 1);
+      if (pd > 0.6) score += 2; else if (pd > 0.3) score += 1;
+      if ((food.fiber || 0) >= 3) score += 1;
+    }
+    scores.push({ name: it.name, score: Math.min(10, score), bbs, category: food.category });
   });
   const avg = Math.round(scores.reduce((s, x) => s + x.score, 0) / Math.max(1, scores.length) * 10) / 10;
   const bbsAvg = Math.round(scores.reduce((s, x) => s + x.bbs, 0) / Math.max(1, scores.length) * 10) / 10;

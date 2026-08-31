@@ -16,6 +16,7 @@ import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
 import { buildDayTargets } from "./planner-day-targets";
 import { applyCarbPeriodizationMods, carbPeriodizationLabel } from "./planner-carb-periodization";
+import { microDeficitToPreferIds, diaasWeakLinkToPreferIds } from "./planner-micro-pools";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
 import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
@@ -2398,6 +2399,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // recent-продукты, окно последних 2 дней и использованные рецепты НЕ сбрасываются
   // при переходе между неделями месяца (weekIndex-defined вызовы).
   const varietyLedgerRef = useRef<{ foods: Set<string>; recipes: Set<string>; recent: string[][] }>({ foods: new Set(), recipes: new Set(), recent: [] });
+  // Эпик 4: микро/DIAAS-контур между днями (дефициты вчера → prefer-источники сегодня).
+  const microLedgerRef = useRef<{ preferIds: Set<string>; notes: string[] }>({ preferIds: new Set(), notes: [] });
   const manualGPerKgRef = useRef(manualGPerKg);
   manualGPerKgRef.current = manualGPerKg;
   const injectionsSignature = (Array.isArray(injections) ? injections : [])
@@ -2577,6 +2580,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       // D (Эпик D): в месяце леджер не сбрасывается между неделями.
       const _usedRecipeNames = _ledger.recipes;
 
+      // Эпик 4: микро/DIAAS-контур — сброс лидера для обычной генерации, сквозной в месяце.
+      const _microLedger = weekIndex !== undefined
+        ? microLedgerRef.current
+        : (microLedgerRef.current = { preferIds: new Set(), notes: [] });
+
       // 🧪 Собираем lab values из v2Labs (строки → числа) для диетической коррекции.
       // ВАЖНО (units-fix): v2Labs содержит и СЫВОРОТОЧНЫЕ анализы (ALT/AST/LDL/гематокрит/…),
       // и ЦЕЛЕВЫЕ дневные электролиты питания (Натрий/Калий/Магний в мг). Движок
@@ -2755,7 +2763,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           carbAutoCycle: (carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch' || (carbPeriodization as any) === 'auto'),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
-          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); return s; })(),
+          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); if (hungerLevel >= 6) ['broccoli','cucumber','cabbage','zucchini','spinach','kale','green_bean','oats','lentils','cottage_cheese_5'].forEach((id: string) => s.add(id)); _microLedger.preferIds.forEach((id: string) => s.add(id)); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
           specificity, intolerances, tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
@@ -2815,6 +2823,22 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           mpsSummary: rawV2?.mpsSummary || { feedings: 0 },
           microSummary: rawV2?.microSummary || { coverage: [] },
         };
+        // Эпик 4: микро/DIAAS-контур — дефициты/слабые звенья дня становятся prefer-сигналом
+        // для СЛЕДУЮЩЕГО дня серии (мягкий буст, не хард-фильтр). Заметка вчерашнего контура
+        // попадает в proNotes сегодняшнего дня (offset > 0).
+        try {
+          const _def = microDeficitToPreferIds(v2.microSummary?.coverage, dietPrefs.includes('vegetarian'), excludedIds);
+          const _diaasMeals = v2.meals.map((m: any) => ({
+            label: m?.label || '',
+            diaas: (() => { try { return calcMealDIAAS((Array.isArray(m?.items) ? m.items : []).map((it: any) => ({ foodId: it.id, weightGrams: it.amount || 0 }))).diaas; } catch { return null; } })(),
+          }));
+          const _weak = diaasWeakLinkToPreferIds(_diaasMeals, excludedIds);
+          _microLedger.preferIds = new Set<string>([..._def.preferIds, ..._weak.preferIds]);
+          _microLedger.notes = [_def.note, _weak.note].filter((n): n is string => Boolean(n));
+        } catch { /* контур не должен ломать генерацию */ }
+        if (offset > 0 && _microLedger.notes.length > 0 && Array.isArray(v2.notes)) {
+          v2.notes = [...v2.notes, ..._microLedger.notes];
+        }
         // #8 Health-score дня: composite 0-100 (микро/fiber/MPS/EA/диверс − конфликты).
         const _fiberT = sex === 'female' ? 25 : 35;
         const _cov = (v2.microSummary?.coverage || []).filter((c:any) => !['Na','VitA'].includes(c.nutrient));
