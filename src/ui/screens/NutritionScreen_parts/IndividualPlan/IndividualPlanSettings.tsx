@@ -624,7 +624,7 @@ export const IndividualPlanSettings: React.FC = () => {
             </div>
           </div>
           <div style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Фаза</div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>Фаза (V2-скоринг — не путать с «💉 Фазой и препаратами»)</div>
             <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
               {['LEAN_MASS', 'EXTREME_CUT', 'PEAK_WEEK', 'POST_CYCLE', 'MOST'].map(ph => (
                 <button key={ph} onClick={() => setV2Phase(ph)} style={{
@@ -1659,8 +1659,21 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           ))}
         </div>
         <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.5 }}>
-          🥑 «Кето» — угли ≤6% ккал, жиры = остаток; 🍚 «Высоко-углеводный» — жиры на полу 0.8 г/кг, угли до потолка. Эти два стиля реально меняют цели дня (видно в 🧮-разборе). «Средиземноморский» — вкусовой пул (рыба/оливки). Вегетарианство — отдельная опция в «Предпочтения».
+          🥑 «Кето» — угли ≤6% ккал, жиры = остаток; 🍚 «Высоко-углеводный» — жиры на полу 0.8 г/кг, угли до потолка. Эти два стиля реально меняют цели дня (видно в 🧮-разборе). «Средиземноморский» — вкусовой пул (рыба/оливки/овощи). Вегетарианство — отдельная опция в «Предпочтения».
         </div>
+        {/* Эпик-хвост (5): кето-цель не сходится жирами — действие переключения */}
+        {planType === 'keto' && (() => {
+          const ketoOk = (() => { try { return !dayTargetsBreakdown.some((s: string) => s.includes('угли подняты до минимума закрытия')); } catch { return true; } })();
+          if (ketoOk) return null;
+          return (
+            <div style={{ marginTop: 6, padding: '6px 8px', borderRadius: 8, background: 'rgba(249,115,22,0.07)', border: '1px solid rgba(249,115,22,0.2)' }}>
+              <div style={{ fontSize: 8, color: '#fbbf24', lineHeight: 1.5, marginBottom: 4 }}>
+                ⚠ Кето-цель не закрывается жирами в безопасном капе 3 г/кг — угли подняты до минимума закрытия. Для полного кето снизьте цель калорий (дефицит), либо переключитесь на высоко-углеводный профиль.
+              </div>
+              <button onClick={() => setPlanType('highcarb')} style={{ padding: '4px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 9, fontWeight: 700, background: 'rgba(249,115,22,0.14)', border: '1px solid rgba(249,115,22,0.35)', color: '#fb923c' }}>🍚 Переключить на «Высоко-углеводный»</button>
+            </div>
+          );
+        })()}
       </GlassCard>
       )}
 
@@ -2007,7 +2020,9 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
       })()}
 
       {plannerMode === 'pro' && (
-      <GlassCard title="Периодизация углеводов" icon="🔄" color="#3b82f6">
+      <GlassCard title="⚡ Периодизация и адаптация" icon="🔄" color="#3b82f6">
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 6 }}>Углеводная периодизация, адаптация веса/метаболизма, гибкие дни и спецприём — в одной карточке (общие для дня механизмы).</div>
+        <div style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', marginBottom: 4 }}>🔄 Периодизация углеводов</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
           {CARB_PERIODIZATION_OPTIONS.map(opt => (
             <PillBtn key={opt.id} active={carbPeriodization === opt.id} onClick={() => setCarbPeriodization(opt.id)} color={carbPeriodization === opt.id ? '#3b82f6' : undefined}>
@@ -2051,7 +2066,8 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
             </div>
           </div>
         )}
-        <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: weightAdaptMode ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.02)', border: weightAdaptMode ? '1px solid rgba(167,139,250,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed rgba(255,255,255,0.08)', fontSize: 9, fontWeight: 700, color: '#a78bfa', marginBottom: 6 }}>⚖️ Адаптация и гибкие дни</div>
+        <div style={{ marginTop: 4, padding: 12, borderRadius: 12, background: weightAdaptMode ? 'rgba(167,139,250,0.05)' : 'rgba(255,255,255,0.02)', border: weightAdaptMode ? '1px solid rgba(167,139,250,0.15)' : '1px solid rgba(255,255,255,0.04)' }}>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: weightAdaptMode ? 8 : 0 }}>
             <div style={{ display:'flex', alignItems:'center', gap:6 }}>
               <span style={{ fontSize:14 }}>⚖️</span>

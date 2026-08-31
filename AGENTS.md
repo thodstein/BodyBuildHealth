@@ -1,5 +1,24 @@
 # AGENTS.md - BioStackAIScreen + BB-builder
 
+## Планировщик питания: «профессиональный диетолог» — 9 эпиков + финальные хвосты (Aug 31 2026)
+
+Полное выполнение плана `docs/NUTRITION-PROFESSIONAL-PLAN.md` (заменил 3 старых плана; удалены: NUTRITION-PLANNER-QUALITY-PLAN, NUTRITION-V2-ROADMAP, NUTRITION-PLANNER-OVERHAUL-PLAN).
+Коммиты: c35b339d+376492b6 (эп.1), 51004960 (2), 1ef718d5 (3), 1f795220 (4), b34941f4 (5), cfe9c3da (6), 77f9855c (7), 6032f54e (8), cf285d46 (9), 9a8cbf0b (хвосты) + финальный (хвосты-2).
+Область IndividualPlan: **641+ тестов зелёные** (49+ файлов), tsc 0 по проекту; полный прогон: 90 падений — пред-существующие (доказано worktree-прогоном на базе 35d5b6a63: наборы файлов/тестов идентичны).
+
+- **Эп.1**: 4 механизма периодизации (cyclingMode/dietPauseMode/periodizationEnabled/carbPeriodization) → один `carbPeriodization` (8 режимов) + NEW `planner-carb-periodization.ts` (`applyCarbPeriodizationMods`/`carbPeriodizationLabel`/`isHeavyDayForOffset`). legacy-поля удалены из state/ctx/генерации/UI.
+- **Эп.2**: цель vs фаза — PHASES = 4 фарма-фазы (дубли-цели удалены), PHASE_MULT (kcalMod/pAdd) удалён (направление ккал задаёт goal), ААС-белок не дублируется, конфликт mass+ПКТ → warning в breakdown; autoGoal из профиля, не из фазы.
+- **Эп.3**: nutrLevel (ложный множитель) удалён полностью; budget 3 уровня (enhanced→max миграция); planType-стили РЕАЛЬНЫЕ: keto (У ≤6% ккал/≤60 г, жиры остаток, кап 3 г/кг, честный fallback + кнопка переключения на highcarb), highcarb (жиры 0.8 г/кг, угли до потолка), mediterranean — вкусовой пул (рыба/оливки/овощи в preferIds).
+- **Эп.4**: V2 в генерации — отчёт «Качество» на bb_quality_score (avgScore=bbsAvg), NEW `planner-micro-pools.ts` (микро-контур: дефициты дня N → prefer-источники N+1; DIAAS-контур междневной + **внутридневной ремонт** `repairDiaasWeakLinks` — комплиментарный белок в приёме с растительным протеином); единый dayScore в отчёте.
+- **Эп.5**: скользящая компенсация — `computeRollingCompensation(target, daysBack, refDateISO)`; день N компенсирует факт N−1 (per-offset в buildOneDay по _prepDate).
+- **Эп.6**: heavyTrainDay ожил (+25% У/+5% ккал, персист в he_planner_prefs) + ручные цели приёма 🎯 (NEW `planner-meal-targets.ts`: масштаб 0.7-1.4, белок-флор 0.8, **инвариант дня ±5%** через dayTargets-откат).
+- **Эп.7**: NEW `planner-cycle-calendar.ts` (лог начал he_cycle_log → средняя длина → авто-фаза, ручной оверрайд), EA-карточка с «+250 ккал» в Settings.
+- **Эп.8**: useRecipesInPlan удалён (подсказки рецептов всегда), histamineSensitive ↔ intolerances.lowHistamine синк (сеттер + инит), legacy peak-week UI удалён, specificity убран из генерации.
+- **Эп.9**: месяц — перегенерация отдельной недели 🔄 + «Неделя vs план» (ккал ±5% и Б/Ж/У против целей); тренд качества 7/30 (addDayScore при генерации, бейдж ▲/▼/►, подсказка «N из 7 дн»); печать дня со скором дня + микро-покрытием.
+- **Хвосты-2**: hungerLevel удалён из генерации ПОЛНОСТЬЮ (множители/prefer/hungerNote/state); детерминизм — seeded-соль (счётчик he_planner_gen_salt вместо Math.random()); рендер дневных заметок (refeed/волна/тяжёлый день/календарь цикла) в Results; CycleType удалён; legacy-ветки phase==='cutting' (рекомендации/микро) вычищены; budget 'enhanced' из движка/отчёта; `_dbg.test.ts` удалён; карточка «⚡ Периодизация и адаптация» с подзаголовками; подпись «Фаза (V2-скоринг)».
+- **NEW тесты**: planner-carb-periodization (17), planner-goal-phase (12), planner-quality-levels (10), planner-micro-pools (18), planner-cycle-calendar (16), planner-meal-targets (9), planner-integration-guarantees (7) + обновлённые.
+- **ВНИМАНИЕ**: полный vitest ~8363 тестов — 90 падений пред-существующие/чужие (bb-агент, дневниковый агент, .tmp/combat) — доказано worktree на базе 35d5b6a63 (идентичные наборы). Чужие файлы не тронуты.
+
 ## Планировщик питания: эпики A–G по плану NUTRITION-PLANNER-QUALITY-PLAN (Aug 30 2026)
 
 Полное выполнение плана «качественный рацион для бодибилдинга» (docs/NUTRITION-PLANNER-QUALITY-PLAN.md).

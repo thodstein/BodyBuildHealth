@@ -900,6 +900,31 @@ const doImportPlan = (raw: string): boolean => {
              <span style={{ color: '#00e68a', fontWeight: 700 }}>📊 За неделю: {Math.round(weekPlan.totals?.kcal || 0)} ккал</span>
              <span style={{ color: 'rgba(255,255,255,0.85)' }}>Среднее: {Math.round((weekPlan.totals?.kcal || 0) / 7)} ккал/день</span>
           </div>
+          {/* Эпик-хвост (9а): неделя vs план — ккал и Б/Ж/У против целей */}
+          {(() => {
+            const planK = effectiveKcal * 7;
+            const factK = Math.round(weekPlan.totals?.kcal || 0);
+            const devK = planK > 0 ? Math.round((factK - planK) / planK * 100) : 0;
+            const okK = Math.abs(devK) <= 5;
+            const rows: [string, number, number, string][] = [
+              ['Б', Math.round(weekPlan.totals?.p || 0), effectiveP * 7, '#3b82f6'],
+              ['Ж', Math.round(weekPlan.totals?.f || 0), effectiveF * 7, '#f59e0b'],
+              ['У', Math.round(weekPlan.totals?.c || 0), effectiveC * 7, '#f97316'],
+            ];
+            return (
+              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, color: okK ? '#22c55e' : '#fbbf24' }}>🎯 Неделя vs план: {factK} / {Math.round(planK)} ккал ({devK > 0 ? '+' : ''}{devK}%)</span>
+                  <span style={{ color: okK ? '#22c55e' : '#fbbf24' }}>{okK ? '✓ в коридоре ±5%' : 'вне ±5%'}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {rows.map(([lab, fact, plan, col]) => (
+                    <span key={lab} style={{ color: col }}>● {lab}: {fact}г / {Math.round(plan)}г</span>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 6, display: 'flex', gap: 6, justifyContent: 'center' }}>
              <span style={{ color: '#3b82f6' }}>● Б: {Math.round(weekPlan.totals?.p || 0)}г</span>
              <span style={{ color: '#f59e0b' }}>● Ж: {Math.round(weekPlan.totals?.f || 0)}г</span>

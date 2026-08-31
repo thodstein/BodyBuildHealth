@@ -87,3 +87,63 @@ export function diaasWeakLinkToPreferIds(
     note: `🛡 DIAAS-контур: слабое аминозвено дня (${weak.map(w => w.label).join(', ')}) — в следующий день приоритет полным белкам (яйца/мясо/рыба/сыворотка).`,
   };
 }
+
+/** Растительные белковые продукты (неполный аминопрофиль, DIAAS < 0.85 типичен). */
+export const VEG_PROTEIN_IDS = ['tofu', 'tempeh', 'lentils', 'chickpeas', 'quinoa'];
+
+/**
+ * Эпик-хвост (4в, внутридневной контур): комплиментарный белок — если приём
+ * содержит растительный белок (слабое аминозвено), до 50% его граммовки
+ * заменяется полным белком (яйца/мясо/рыба/сыворотка), не присутствующим
+ * в приёме и не исключённым. Пропорции и ккал приёма почти не меняются
+ * (замена 1:1 по граммам, белок приёма растёт — это и есть цель).
+ * Возвращает новые meals + notes.
+ */
+export function repairDiaasWeakLinks(
+  meals: Array<{ label: string; items: any[]; totals: any }>,
+  excludedIds?: Set<string>,
+): { meals: Array<{ label: string; items: any[]; totals: any }>; notes: string[] } {
+  const notes: string[] = [];
+  if (!Array.isArray(meals) || meals.length === 0) return { meals, notes };
+  const next = meals.map(m => {
+    if (!Array.isArray(m.items) || m.items.length === 0) return m;
+    const vegIdx = m.items.findIndex(it => VEG_PROTEIN_IDS.includes(it.id) && (it.p || 0) > 3);
+    if (vegIdx < 0) return m;
+    const veg = m.items[vegIdx];
+    const inMeal = new Set(m.items.map((it: any) => it.id));
+    const repl = COMPLETE_PROTEIN_IDS.find(id => !inMeal.has(id) && !(excludedIds && excludedIds.has(id)) && FOOD_DB.some(f => f.id === id));
+    if (!repl) return m;
+    const food = FOOD_DB.find(f => f.id === repl)!;
+    const swapGrams = Math.max(20, Math.min(Math.round(veg.amount * 0.5), 150));
+    const factor = swapGrams / 100;
+    const pG = Math.round(food.protein * factor);
+    if (pG < 5) return m; // слишком маленькая замена — не имеет смысла
+    const items = [...m.items];
+    const restG = veg.amount - swapGrams;
+    if (restG > 0) {
+      const rf = restG / 100;
+      items[vegIdx] = {
+        ...veg,
+        amount: restG,
+        kcal: Math.round((veg.kcal || 0) * (restG / veg.amount)),
+        p: Math.round((veg.p || 0) * (restG / veg.amount)),
+        f: Math.round((veg.f || 0) * (restG / veg.amount)),
+        c: Math.round((veg.c || 0) * (restG / veg.amount)),
+      };
+    } else {
+      items.splice(vegIdx, 1);
+    }
+    items.push({
+      id: food.id, name: food.name, amount: swapGrams,
+      kcal: Math.round(food.kcal * factor), p: pG, f: Math.round(food.fat * factor), c: Math.round(food.carbs * factor),
+      fiber: Math.round((food.fiber || 0) * factor), role: 'protein',
+    });
+    const totals = items.reduce((acc, it) => ({
+      kcal: acc.kcal + (it.kcal || 0), p: acc.p + (it.p || 0), f: acc.f + (it.f || 0),
+      c: acc.c + (it.c || 0), fiber: acc.fiber + (it.fiber || 0),
+    }), { kcal: 0, p: 0, f: 0, c: 0, fiber: 0 });
+    notes.push(`🛡 DIAAS-ремонт приёма «${m.label}»: ${veg.name} ${veg.amount}г → ${veg.name} ${restG}г + ${food.name} ${swapGrams}г (комплиментарный белок, слабое аминозвено)`);
+    return { ...m, items, totals };
+  });
+  return { meals: next, notes };
+}

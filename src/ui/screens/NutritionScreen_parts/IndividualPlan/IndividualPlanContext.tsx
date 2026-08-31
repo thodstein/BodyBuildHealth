@@ -16,7 +16,7 @@ import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { computePlannerTargets, contextualCarbCapGPerKg, plannerGoalCategory } from "./planner-targets";
 import { buildDayTargets } from "./planner-day-targets";
 import { applyCarbPeriodizationMods, carbPeriodizationLabel, isHeavyDayForOffset } from "./planner-carb-periodization";
-import { microDeficitToPreferIds, diaasWeakLinkToPreferIds } from "./planner-micro-pools";
+import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks } from "./planner-micro-pools";
 import { applyMealTargetOverrides } from "./planner-meal-targets";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
@@ -2414,6 +2414,14 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   // recent-продукты, окно последних 2 дней и использованные рецепты НЕ сбрасываются
   // при переходе между неделями месяца (weekIndex-defined вызовы).
   const varietyLedgerRef = useRef<{ foods: Set<string>; recipes: Set<string>; recent: string[][] }>({ foods: new Set(), recipes: new Set(), recent: [] });
+  // Эпик-хвост (детерминизм): seeded-счётчик соли генерации (персист, инкремент на вызов).
+  const genSaltRef = useRef<number>(0);
+  useEffect(() => {
+    try {
+      const v = parseInt(localStorage.getItem('he_planner_gen_salt') || '0');
+      if (Number.isFinite(v) && v >= 0) genSaltRef.current = v;
+    } catch {}
+  }, []);
   // Эпик 4: микро/DIAAS-контур между днями (дефициты вчера → prefer-источники сегодня).
   const microLedgerRef = useRef<{ preferIds: Set<string>; notes: string[] }>({ preferIds: new Set(), notes: [] });
   const manualGPerKgRef = useRef(manualGPerKg);
@@ -2588,8 +2596,16 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
        }
        const dayIdx = days === 1 ? selectedDayIndex : 0;
         const isTrainingDay = isTrainDay(dayIdx);
-      // Каждый вызов generatePlan → новый salt → разный набор продуктов
-      const planRandomSalt = Math.floor(Math.random() * 1000000);
+      // Эпик-хвост (детерминизм): seeded-соль — персистентный счётчик (he_planner_gen_salt).
+      // Первая генерация при равных входах всегда даёт один план (соль 0), каждая
+      // следующая «Перегенерировать» инкрементирует — новый вариант. Инвариант плана
+      // «детерминизм (seeded)» соблюдается: одинаковые входные + счётчик = тот же выход.
+      const planRandomSalt = (() => {
+        const s = genSaltRef.current;
+        genSaltRef.current = s + 1;
+        try { localStorage.setItem('he_planner_gen_salt', String(genSaltRef.current)); } catch {}
+        return s % 1000000;
+      })();
       // 🍳 Режим «по рецептам»: имена рецептов, уже использованные в МНОГОДНЕВНОМ плане
       // (разнообразие между днями — один рецепт не повторяется на протяжении генерации).
       // D (Эпик D): в месяце леджер не сбрасывается между неделями.
@@ -2790,9 +2806,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           carbAutoCycle: (carbPeriodization === 'carb_cycle' || carbPeriodization === 'butch' || (carbPeriodization as any) === 'auto'),
           excludedIds: (() => { const s: Set<string> = new Set<string>(excludedIds); if (_mp) _mp.avoidIds.forEach((id: string) => s.add(id)); return s; })(),
           allergenTags: (() => { const t = new Set<string>(); (allergens || []).forEach(a => (USER_ALLERGEN_TO_TAGS[a] || [a]).forEach(v => t.add(v))); dietRestrictionTags(dietPrefs || []).forEach(v => t.add(v)); return t; })(),
-          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); _microLedger.preferIds.forEach((id: string) => s.add(id)); return s; })(),
+          preferredIds: (() => { const s = new Set(expandRecipePreferred(preferredFoods, [...getRecipes(), ...(userRecipes||[])], FOOD_DB)); if (_mp) _mp.priorityIds.forEach((id: string) => s.add(id)); _microLedger.preferIds.forEach((id: string) => s.add(id)); if (planType === 'mediterranean') ['salmon','mackerel','olive_oil','tomato','cucumber','yogurt_greek','avocado'].forEach((id: string) => { if (!excludedIds.has(id) && FOOD_DB.some(f => f.id === id)) s.add(id); }); return s; })(),
           preferredByMeal: Object.fromEntries(Object.entries(preferredByMeal || {}).map(([k, v]) => [k, new Set(v as string[] || [])])),
-          specificity, intolerances, tasteProfile,
+          // Эпик-хвост (8г): specificity удалён из генерации (legacy no-op, UI нет) — движок использует default
+          intolerances, tasteProfile,
           categoryPref: { preferred: [], excluded: excludedCategories },
           deprioritizedIds: getDeprioritizedIds(),
           lockedIds, recentFoodIds,
@@ -2877,8 +2894,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _conflicts = v2.meals.reduce((s:number,m:any)=>s + (m.rationale||[]).filter((r:string)=>r.startsWith('⚠')).length, 0);
         const _healthScore = Math.max(0, Math.min(100, Math.round(_microAvg*0.3 + _fiberScore*0.15 + _mpsScore*0.2 + _eaScore*0.2 + _divScore*0.15) - _conflicts*5));
         const _healthStatus: 'green' | 'yellow' | 'red' = _healthScore >= 75 ? 'green' : _healthScore >= 55 ? 'yellow' : 'red';
-        // Эпик 9в: тренд качества — запись скора дня (0-10) в историю.
-        try { if (plannerModeRef.current === 'pro') addDayScore(_prepDate, _healthScore / 10); } catch {}
+        // Эпик 9в: тренд качества — запись скора дня (0-10) в историю (все режимы).
+        try { addDayScore(_prepDate, _healthScore / 10); } catch {}
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
         const meals = v2.meals.map((m: any) => ({
           label: m?.label || 'Приём пищи', time: m?.time || '', items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({
@@ -2938,12 +2955,22 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           meals.splice(0, meals.length, ...(_asm.meals as any[]));
           if (_asm.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._asm.notes];
         }
+        // Эпик-хвост (4в): внутридневной DIAAS-ремонт — растительный белок в приёме
+        // частично заменяется полным (комплиментарность), до оверрайдов целей.
+        try {
+          const _diaasRepair = repairDiaasWeakLinks(meals as any, excludedIds);
+          if (_diaasRepair.notes.length > 0) {
+            meals.splice(0, meals.length, ...(_diaasRepair.meals as any[]));
+            v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._diaasRepair.notes];
+          }
+        } catch {}
         // Эпик 6: ручные цели на приём (🎯) — пост-проход масштабирования к Б/Ж/У слота.
+        // Инвариант: день не выходит за ±5% от цели (applyMealTargetOverrides с dayTargets).
         try {
           const _ovRaw = JSON.parse(localStorage.getItem('he_meal_target_overrides') || '[]');
           if (Array.isArray(_ovRaw) && _ovRaw.length > 0) {
             const _ov = _ovRaw.filter((o: any) => o && typeof o.label === 'string');
-            const _applied = applyMealTargetOverrides(meals as any, _ov as any);
+            const _applied = applyMealTargetOverrides(meals as any, _ov as any, { kcal: input.goalKcal, p: input.goalProteinG, f: input.goalFatG, c: input.goalCarbsG });
             meals.splice(0, meals.length, ...(_applied.meals as any[]));
             if (_applied.notes.length > 0) v2.notes = [...(Array.isArray(v2.notes) ? v2.notes : []), ..._applied.notes];
           }

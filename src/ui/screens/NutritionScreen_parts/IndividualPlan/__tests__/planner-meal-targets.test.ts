@@ -64,4 +64,32 @@ describe('applyMealTargetOverrides', () => {
     const sum = m.items.reduce((s, it) => s + (it.p * 4 + it.f * 9 + it.c * 4), 0);
     expect(Math.abs(m.totals.kcal - sum) / Math.max(1, m.totals.kcal)).toBeLessThanOrEqual(0.03);
   });
+
+  it('инвариант дня ±5%: агрессивные оверрайды откатываются пропорционально', () => {
+    // 3 приёма × цель ×1.4 (макс масштаб) — день ушёл бы далеко за +5%
+    const meals = [
+      meal('Завтрак', [{ id: 'egg_whole', name: 'Яйца', amount: 100, kcal: 155, p: 13, f: 11, c: 1.1, fiber: 0 }]),
+      meal('Обед', [{ id: 'chicken_breast', name: 'Курица', amount: 150, kcal: 165, p: 31, f: 3.6, c: 0, fiber: 0 }]),
+      meal('Ужин', [{ id: 'rice_white', name: 'Рис', amount: 200, kcal: 260, p: 5.4, f: 0.6, c: 58, fiber: 0.6 }]),
+    ];
+    const dayTargets = { kcal: 600, p: 50, f: 16, c: 60 };
+    const r = applyMealTargetOverrides(meals, [
+      { label: 'Завтрак', p: 999 },
+      { label: 'Обед', p: 999 },
+      { label: 'Ужин', p: 999 },
+    ], dayTargets);
+    const dayKcal = r.meals.reduce((s, m) => s + m.totals.kcal, 0);
+    const dev = (dayKcal - dayTargets.kcal) / dayTargets.kcal;
+    expect(Math.abs(dev)).toBeLessThanOrEqual(0.05);
+    // пропорции приёмов сохранены (все масштабированы одинаково в откате)
+    expect(r.meals[0].items[0].amount).toBeGreaterThan(100);
+    expect(r.meals[2].items[0].amount).toBeGreaterThan(200);
+  });
+
+  it('без dayTargets — прежнее поведение (кламп 0.7-1.4, без отката)', () => {
+    const meals = [chickenMeal()];
+    const r = applyMealTargetOverrides(meals, [{ label: 'Обед', p: 999 }]);
+    expect(r.meals[0].totals.kcal / 425).toBeLessThanOrEqual(1.4 + 0.02);
+    expect(r.notes.length).toBe(1);
+  });
 });

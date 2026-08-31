@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, MICRO_SOURCE_POOLS, COMPLETE_PROTEIN_IDS } from '../planner-micro-pools';
+import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks, MICRO_SOURCE_POOLS, COMPLETE_PROTEIN_IDS, VEG_PROTEIN_IDS } from '../planner-micro-pools';
 import { generateQualityReportPure } from '../planner-reports';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 
@@ -89,6 +89,43 @@ describe('diaasWeakLinkToPreferIds (4в)', () => {
   it('null-значения (нет аминопрофиля) не считаются слабым звеном', () => {
     const r = diaasWeakLinkToPreferIds([{ label: 'Перекус', diaas: null }]);
     expect(r.preferIds).toEqual([]);
+  });
+});
+
+describe('repairDiaasWeakLinks (4в, внутридневной комплиментарный белок)', () => {
+  const vegMeal = (label: string) => ({
+    label,
+    items: [{ id: 'tofu', name: 'Тофу', amount: 200, kcal: 152, p: 16, f: 9, c: 4, fiber: 1, role: 'protein' }],
+    totals: { kcal: 152, p: 16, f: 9, c: 4, fiber: 1 },
+  });
+  it('растительный белок заменяется полным (комплиментарность)', () => {
+    const meals = [vegMeal('Обед')];
+    const r = repairDiaasWeakLinks(meals as any);
+    const m = r.meals[0];
+    const names = m.items.map((it: any) => it.id);
+    expect(names).toContain('tofu');
+    expect(names.some((id: string) => COMPLETE_PROTEIN_IDS.includes(id))).toBe(true);
+    expect(m.totals.p).toBeGreaterThan(16);
+    expect(r.notes.length).toBe(1);
+    expect(r.notes[0]).toContain('DIAAS-ремонт');
+  });
+  it('без растительного белка — без изменений', () => {
+    const meals = [{ label: 'Обед', items: [{ id: 'chicken_breast', name: 'Курица', amount: 150, kcal: 165, p: 31, f: 3.6, c: 0, fiber: 0 }], totals: { kcal: 165, p: 31, f: 3.6, c: 0, fiber: 0 } }];
+    const r = repairDiaasWeakLinks(meals as any);
+    expect(r.meals[0].items[0].id).toBe('chicken_breast');
+    expect(r.notes).toEqual([]);
+  });
+  it('исключённые полные белки не используются', () => {
+    const excluded = new Set<string>(COMPLETE_PROTEIN_IDS);
+    const meals = [vegMeal('Обед')];
+    const r = repairDiaasWeakLinks(meals as any, excluded);
+    expect(r.meals[0].items.length).toBe(1); // нечем заменить — приём не тронут
+    expect(r.notes).toEqual([]);
+  });
+  it('VEG_PROTEIN_IDS валидны в FOOD_DB', () => {
+    for (const id of VEG_PROTEIN_IDS) {
+      expect(FOOD_DB.some(f => f.id === id), `${id} не найден`).toBe(true);
+    }
   });
 });
 
