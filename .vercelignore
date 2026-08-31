@@ -6,6 +6,14 @@ dist
 docs
 _tools
 _tmp*
+.tmp
+.tmp.driveupload
+.kilo
+.idea
+.vscode
+.gigacode
+scratch
+dev
 tmp_scripts
 test_dir
 scripts/*
