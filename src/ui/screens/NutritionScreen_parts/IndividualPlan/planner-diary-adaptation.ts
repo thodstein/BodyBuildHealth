@@ -12,6 +12,7 @@
 
 import { formatDate } from '../../../../core/utils/date-utils';
 import { readDiaryV2 } from '../diary-storage-v2';
+import { isoAddDays, isoToday } from '../../../../engines/bb/bb-contest-prep.engine';
 
 export interface DiaryDaySummary {
   date: string;
@@ -188,17 +189,23 @@ export function computeCompensation(
  * дефицит/профицит за предыдущие дни (2..daysBack). Вчера — 50% (основная
  * компенсация), старшие дни — 25% от среднего дневного отклонения (плавное
  * выравнивание недельного баланса без рывков).
+ *
+ * Эпик 5 (NUTRITION-PROFESSIONAL-PLAN): refDateISO — база дат. По умолчанию
+ * «сегодня» (прежнее поведение). Для многодневных планов передаётся дата
+ * КАЖДОГО дня серии (dayOffset): день N компенсирует факт дня N−1 — скользящая
+ * компенсация по всей неделе/месяцу, а не только для offset 0.
  */
 export function computeRollingCompensation(
   target: MacroTargets,
   daysBack = 7,
+  refDateISO?: string,
 ): CompensationResult {
-  const yesterday = getYesterdaySummary();
+  const refDate = refDateISO && /^\d{4}-\d{2}-\d{2}$/.test(refDateISO) ? refDateISO : isoToday();
+  const yesterday = getDiaryDaySummary(isoAddDays(refDate, -1));
   const diary = readDiaryV2();
   const summaries: { day: number; s: DiaryDaySummary | null }[] = [];
   for (let i = 1; i <= daysBack; i++) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const iso = formatDate(d);
+    const iso = isoAddDays(refDate, -i);
     const day = diary?.[iso];
     summaries.push({ day: i, s: day?.meals ? getDiaryDaySummary(iso) : null });
   }

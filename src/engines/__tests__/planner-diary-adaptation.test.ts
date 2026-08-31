@@ -109,4 +109,47 @@ describe('planner-diary-adaptation', () => {
       expect(summary!.kcal).toBe(400);
     });
   });
+
+  describe('computeRollingCompensation — скользящая по датам (Эпик 5)', () => {
+    it('refDateISO: день N компенсирует факт дня N−1 (не только сегодня)', () => {
+      // «сегодня» — 2026-08-10 (фикс). План дня 2026-08-11 (offset 1) смотрит на 10-е.
+      setDiary({
+        '2026-08-09': { meals: { 'Обед': [{ name: 'X', kcal: 700, p: 60, f: 20, c: 80 }] } },
+        '2026-08-10': { meals: { 'Обед': [{ name: 'X', kcal: 3000, p: 150, f: 80, c: 350 }] } },
+      });
+      const target = { kcal: 2500, p: 160, f: 70, c: 300 };
+      // День плана 11-е: «вчера» = 10-е (перебор 3000 vs 2500) → знак компенсации
+      // определяется недельным балансом (9-е был сильный недобор — rolling суммирует)
+      const r1 = computeRollingCompensation(target, 3, '2026-08-11');
+      expect(r1.applied).toBe(true);
+      expect(r1.yesterday?.date).toBe('2026-08-10');
+      expect(r1.note).toContain('вчера перебор');
+      // День плана 10-е: «вчера» = 9-е (недобор 700 vs 2500) → компенсация вверх
+      const r2 = computeRollingCompensation(target, 3, '2026-08-10');
+      expect(r2.applied).toBe(true);
+      expect(r2.delta.kcal).toBeGreaterThan(0);
+      expect(r2.yesterday?.date).toBe('2026-08-09');
+    });
+    it('база = переданная дата (явный refDateISO как «сегодня»)', () => {
+      setDiary({
+        '2026-08-09': { meals: { 'Обед': [{ name: 'X', kcal: 3000, p: 150, f: 80, c: 350 }] } },
+      });
+      const r = computeRollingCompensation({ kcal: 2500, p: 160, f: 70, c: 300 }, 3, '2026-08-10');
+      expect(r.applied).toBe(true);
+      expect(r.yesterday?.date).toBe('2026-08-09');
+    });
+    it('будущий день без данных «вчера» — компенсация не применяется', () => {
+      setDiary({
+        '2026-08-10': { meals: { 'Обед': [{ name: 'X', kcal: 1000, p: 60, f: 20, c: 80 }] } },
+      });
+      // 12-е: «вчера» = 11-е (нет данных), старшие дни 10-е/9-е — 10-е есть
+      const r = computeRollingCompensation({ kcal: 2500, p: 160, f: 70, c: 300 }, 3, '2026-08-12');
+      expect(r.applied).toBe(true); // старшие дни (10-е) дают накопленную компенсацию
+      expect(r.yesterday).toBeNull();
+    });
+    it('некорректный refDateISO — fallback на сегодня без бросков', () => {
+      setDiary({});
+      expect(() => computeRollingCompensation({ kcal: 2500, p: 160, f: 70, c: 300 }, 3, 'bad-date')).not.toThrow();
+    });
+  });
 });

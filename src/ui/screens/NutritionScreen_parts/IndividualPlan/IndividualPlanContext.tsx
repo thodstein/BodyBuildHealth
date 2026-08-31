@@ -2611,10 +2611,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       const baseGoalP = Math.max(80, effectiveP || weight * 2 || 160);
       const baseGoalF = Math.max(30, effectiveF || weight * 0.8 || 70);
       const baseGoalC = Math.max(50, effectiveC || weight * 3.5 || 300);
-      // #6 rolling 7-day компенсация (вчера 50% + старшие дни 25% от среднего; алкоголь-осведомлённая #15)
-      const diaryComp: CompensationResult | null = diaryAdaptation
-        ? computeRollingCompensation({ kcal: baseGoalKcal, p: baseGoalP, f: baseGoalF, c: baseGoalC }, 7)
-        : null;
+      // Эпик 5: rolling-компенсация считается ВНУТРИ buildOneDay по дате каждого дня
+      // (день N компенсирует факт дня N−1) — см. ниже.
       // Smart 7-day variety: rolling window of food IDs from the last 2 built days.
       // recentFoodIds (existing) accumulates ALL prior days; hardWindow holds the last 2
       // for the stricter hard-exclusion (adjacent days don't repeat products).
@@ -2660,9 +2658,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _sleepNote: string | undefined = (sleepHours < 7 || sleepQuality < 6)
           ? '😴 Сон слабый: добавьте tryptophan-источники (индейка, яйцо, творог, овсянка) + Mg glycinate на ночь. Тарт-вишня (мелатонин) перед сном. Избегать кофеин/алкоголя после 15:00.'
           : undefined;
+        // Эпик 5: скользящая компенсация — база даты КАЖДОГО дня серии (день N
+        // компенсирует факт дня N−1). Раньше применялась только к offset 0.
+        const _prepDate = isoAddDays(isoToday(), offset);
+        const diaryComp: CompensationResult | null = diaryAdaptation
+          ? computeRollingCompensation({ kcal: baseGoalKcal, p: baseGoalP, f: baseGoalF, c: baseGoalC }, 7, _prepDate)
+          : null;
         // #7 Anti-oscillation: если компенсация и cycling толкают в одну сторону —
         // демпфируем компенсацию (не стекаем +15% training-day с +200 недобора).
-        const _diaryActive = (offset === dayIdx && diaryComp && diaryComp.applied);
+        const _diaryActive = !!(diaryComp && diaryComp.applied);
         const _cycDir = dayKcalMod - 1; // >0 = up-day, <0 = down-day
         const _dampK = (_diaryActive && Math.sign(_cycDir) === Math.sign(diaryComp.delta.kcal)) ? (1 - Math.abs(_cycDir)) : 1;
         const _dampC = (_diaryActive && Math.sign(dayCarbMod - 1) === Math.sign(diaryComp.delta.c)) ? (1 - Math.abs(dayCarbMod - 1)) : 1;
@@ -2671,10 +2675,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // (today + offset) — приоритет над cycling/компенсацией.
         // Приоритет источников: единый план (goals.bbContestPrepPlan, покрывает и подготовку)
         // → legacy конфиг (goals.bbPeakConfig, только пик-неделя).
-        const _prepDate = isoAddDays(isoToday(), offset);
-        // D-28 fix (жалоба «рефид/читмил/фастинг не работают»): спец-приёмы из календаря
-        // (he_special_meals: refeed/cheat_meal/fast) теперь реально перестраивают план на дату —
-        // раньше записи только показывались в календаре, но не влияли на генерацию.
         const _specialNotes: string[] = [];
         const _specialMealOverrides: { targetLabel: string; kind: 'cheat' | 'refeed' | 'fast' | 'custom'; p?: number; c?: number; f?: number }[] = [];
         let _fastingDay = false;
@@ -2773,7 +2773,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           specialMealOverride: _specialMealOverrides.length > 0 ? _specialMealOverrides : undefined,
           hardRecentIds: new Set(hardWindow.flat()),
           varietyStrictness,
-          diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? { kcalDelta: diaryComp.delta.kcal, pDelta: diaryComp.delta.p, fDelta: diaryComp.delta.f, cDelta: diaryComp.delta.c, note: diaryComp.note, severity: diaryComp.severity } : undefined,
+          diaryCompensation: _diaryActive ? { kcalDelta: diaryComp.delta.kcal, pDelta: diaryComp.delta.p, fDelta: diaryComp.delta.f, cDelta: diaryComp.delta.c, note: diaryComp.note, severity: diaryComp.severity } : undefined,
           budget: plannerModeRef.current === 'minimal' ? 'low' : plannerModeRef.current === 'simple' ? 'medium' : budget, isVegetarian: dietPrefs.includes('vegetarian'),
           isCutting: goal === 'cutting' || goal === 'fat_loss',
           dayOffset: offset, cyclePhase: phase as any,
@@ -2951,7 +2951,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           dietDiversity: { uniqueFoods: v2.diversity.uniqueFoods, totalPortions: 0, categories: v2.diversity.categories, score: Math.min(10, v2.diversity.uniqueFoods), note: `${v2.diversity.uniqueFoods} уникальных продуктов` },
           timingScores: [], intraWorkout: null, mpsSummary: v2.mpsSummary, proNotes: v2.notes,
           microSummary: v2.microSummary,
-          diaryCompensation: (offset === dayIdx && diaryComp && diaryComp.applied) ? diaryComp : undefined,
+          diaryCompensation: _diaryActive ? diaryComp : undefined,
           isRefeedDay,
           refeedNote: isRefeedDay ? '🔄 Refeed-день: углеводы ×2.2 (восстановление гликогена/лептина), жиры снижены, белок удержан. Психологическая разгрузка на сушке.' : undefined,
           // Эпик 1: волна 2+1 — заметка недели из единой функции периодизации.
