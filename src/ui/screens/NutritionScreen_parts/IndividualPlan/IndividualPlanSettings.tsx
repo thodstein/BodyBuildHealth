@@ -6,7 +6,6 @@ import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import {
   GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
-  type CycleType,
 } from "./types";
 import { GlassCard, PillBtn, inputStyle, selectStyle, greenBtn } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
@@ -69,7 +68,6 @@ export const IndividualPlanSettings: React.FC = () => {
     householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
     sleepHours, setSleepHours, sleepQuality, setSleepQuality,
     stressLevel, setStressLevel, cyclePhase, setCyclePhase, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, applyBBPeakToPlan, planTab, setPlanTab, lifeStage, setLifeStage,
-    hungerLevel, setHungerLevel,
     weightAdaptMode, setWeightAdaptMode, weightLogWeek, setWeightLogWeek,
     expectedLossKgWeek, setExpectedLossKgWeek,
     showWeightAdaptModal, setShowWeightAdaptModal,
@@ -510,7 +508,7 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
-            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана (авто по календарю)'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
+            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана (авто по календарю)'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as any)} />
             {/* Эпик 7: календарь цикла — лог начал периодов → авто-фаза */}
             {(() => {
               const cal = autoCyclePhase();

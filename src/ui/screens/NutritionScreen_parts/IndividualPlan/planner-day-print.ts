@@ -13,7 +13,7 @@ const chip = (label: string, ok: boolean, detail = ''): string => {
   return `<div style="padding:4px 8px;border-radius:6px;border:1px solid ${color}33;background:${color}0d;color:${color};font-size:12px">${esc(label)} ${ok ? '✓' : '⚠'} <span style="color:inherit;opacity:.8">${esc(detail)}</span></div>`;
 };
 
-export function buildDayReportPrintHtml(r: DailyDietReport): string {
+export function buildDayReportPrintHtml(r: DailyDietReport, extra?: { dayScore?: number | null; dayStatus?: string | null; coverage?: { nutrient: string; pct: number; status: string }[] }): string {
   const flags: string[] = [];
   const add = (label: string, ok: boolean, detail = '') => flags.push(chip(label, ok, detail));
   add('mTOR', r.mtorTriggered, r.mtorTriggered ? '' : `дефицит ${Math.round(r.mtorDeficitMg)} мг лейцина`);
@@ -40,12 +40,25 @@ export function buildDayReportPrintHtml(r: DailyDietReport): string {
     <p style="font-size:13px;color:#333"><b>Суммарный анализ дня</b> — ${r.mtorTriggered ? 'рацион близок к энергетически полному' : 'есть зоны для улучшения'} (${Math.round(r.totalKcal)} ккал, DIAAS ${r.diaas.toFixed(2)})</p>
   `;
 
+  // Эпик 4а/9б: скор дня + микро-покрытие (единая цифра качества дня)
+  const scoreBlock = extra && typeof extra.dayScore === 'number'
+    ? `<div style="font-size:13px;margin:8px 0;padding:8px 10px;border-radius:8px;border:1px solid ${extra.dayStatus === 'green' ? '#22c55e33' : extra.dayStatus === 'yellow' ? '#f59e0b33' : '#ef444433'};background:${extra.dayStatus === 'green' ? '#22c55e0d' : extra.dayStatus === 'yellow' ? '#f59e0b0d' : '#ef44440d'};color:#333"><b>🩺 Скор дня: ${Math.round(extra.dayScore)}/100</b> (${extra.dayStatus === 'green' ? 'отлично' : extra.dayStatus === 'yellow' ? 'норма' : 'внимание'})</div>`
+    : '';
+  const coverageBlock = extra && Array.isArray(extra.coverage) && extra.coverage.length > 0
+    ? `<div style="font-size:12px;margin:8px 0"><b>🧪 Микронутриенты (покрытие RDA):</b><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:4px">${extra.coverage.slice(0, 12).map(c => {
+        const col = c.pct >= 80 ? '#22c55e' : c.pct >= 50 ? '#f59e0b' : '#ef4444';
+        return `<div style="padding:3px 6px;border-radius:6px;border:1px solid ${col}33;background:${col}0d;color:${col}">${esc(c.nutrient)} ${Math.round(c.pct)}%</div>`;
+      }).join('')}</div></div>`
+    : '';
+
   return `<!doctype html><html><head><meta charset="utf-8"><title>Дневной отчёт питания</title>
 <style>body{font-family:system-ui,sans-serif;margin:24px;color:#1a1a1a}h1{font-size:18px;border-bottom:2px solid #8b5cf6;padding-bottom:8px}</style></head>
 <body>
 <h1>📊 Дневной отчёт питания — ${esc(r.date)}</h1>
 <div style="font-size:14px;margin:12px 0">Калорийность: <b>${Math.round(r.totalKcal)}</b> ккал · Гликемическая нагрузка: <b>${Math.round(r.giLoad)}</b></div>
 ${brief}
+${scoreBlock}
+${coverageBlock}
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">${flags.join('')}</div>
 ${mood}
 </body></html>`;

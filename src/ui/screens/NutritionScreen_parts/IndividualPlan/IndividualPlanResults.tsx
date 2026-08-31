@@ -566,6 +566,12 @@ const doImportPlan = (raw: string): boolean => {
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', fontWeight:600, marginTop:2 }}>7д / {trend.avg30.toFixed(1)} за 30д</div>
               </div>
             )}
+            {trend && !trend.has30 && (() => { const n = loadDayScores().length; return n > 0 ? (
+              <div style={{ textAlign:'center', minWidth:64, padding:'6px 8px', borderRadius:12, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.05)' }} title="Тренд появится после 7 записей дневных скоров">
+                <div style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.5)' }}>📈</div>
+                <div style={{ fontSize:7, color:'rgba(255,255,255,0.45)', fontWeight:600, marginTop:1 }}>тренд: {n} из 7 дн</div>
+              </div>
+            ) : null; })()}
             {hs.conflicts > 0 && <span style={{ fontSize:11, color:'#f87171', fontWeight:800, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', padding:'4px 8px', borderRadius:999, whiteSpace:'nowrap' }}>⚠ {hs.conflicts}</span>}
           </div>
         );
@@ -654,6 +660,23 @@ const doImportPlan = (raw: string): boolean => {
       {generated && dayPlan && (dayPlan as any).dietBreakNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).dietBreakNote}</div>
       )}
+      {/* Дневные заметки: рефид / волна / тяжёлый день / календарь цикла */}
+      {generated && dayPlan && (() => {
+        const notes = [
+          { v: (dayPlan as any).refeedNote, c: '#22c55e' },
+          { v: (dayPlan as any).periodizationWeekNote, c: '#8b5cf6' },
+          { v: (dayPlan as any).heavyDayNote, c: '#fb923c' },
+          { v: (dayPlan as any).cycleCalendarNote, c: '#ec4899' },
+        ].filter((n: any) => !!n.v);
+        if (notes.length === 0) return null;
+        return (
+          <div style={{ marginBottom:6, display:'flex', flexDirection:'column', gap:4 }}>
+            {notes.map((n: any, i: number) => (
+              <div key={i} style={{ padding:'6px 10px', borderRadius:10, background:`${n.c}0a`, border:`1px solid ${n.c}22`, fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{n.v}</div>
+            ))}
+          </div>
+        );
+      })()}
       {/* #5 Категория бодибилдинга */}
       {generated && dayPlan && (dayPlan as any).categoryNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(168,85,247,0.08)', border:'1px solid rgba(168,85,247,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).categoryNote}</div>
@@ -690,10 +713,7 @@ const doImportPlan = (raw: string): boolean => {
           ⚡ Energy Availability: {(dayPlan as any).energyAvailability.ea} ккал/кг FFM ({(dayPlan as any).energyAvailability.status}) — трен. расход {(dayPlan as any).energyAvailability.exerciseKcal} ккал
         </div>
       )}
-      {/* #2 Голод */}
-      {generated && dayPlan && (dayPlan as any).hungerNote && (
-        <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.25)', fontSize:9, color:'rgba(255,255,255,0.85)', lineHeight:1.4 }}>{(dayPlan as any).hungerNote}</div>
-      )}
+      {/* #2 Голод — hungerNote удалён из генерации (шумовый сигнал) */}
       {plannerMode === 'pro' && generated && dayPlan && <DailyDietDashboard />}
       {plannerMode === 'pro' && generated && dayPlan && (
         <NutritionQualityCard
@@ -1576,14 +1596,23 @@ const doImportPlan = (raw: string): boolean => {
           )}
           {plannerMode === 'pro' && qualityReport && activeReports.includes('quality') && (
             <div style={{ padding: '6px 8px', borderRadius: 8, marginBottom: 4, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.12)' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3, flexWrap:'wrap', gap:4 }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
-                  ⭐ Качество: {qualityReport.avgScore}/10
+                  ⭐ Скор продуктов (bb_quality): {qualityReport.avgScore}/10
                 </div>
                 <div style={{ fontSize:10, padding:'1px 5px', borderRadius:4, background: qualityReport.budgetOk ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)', color: qualityReport.budgetOk ? '#22c55e' : '#f59e0b' }}>
                   {qualityReport.budgetRange} · bb_quality {qualityReport.bbsAvg}
                 </div>
               </div>
+              {/* Эпик 4а: ЕДИНЫЙ скор дня — тот же, что в карточке «Качество дня» выше */}
+              {typeof qualityReport.dayScore === 'number' && (
+                <div style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:9, fontWeight:700, padding:'2px 7px', borderRadius:999, marginBottom:3,
+                  background: (qualityReport.dayStatus === 'green' ? 'rgba(34,197,94,0.10)' : qualityReport.dayStatus === 'yellow' ? 'rgba(245,158,11,0.10)' : 'rgba(239,68,68,0.10)'),
+                  border: `1px solid ${qualityReport.dayStatus === 'green' ? 'rgba(34,197,94,0.2)' : qualityReport.dayStatus === 'yellow' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                  color: qualityReport.dayStatus === 'green' ? '#86efac' : qualityReport.dayStatus === 'yellow' ? '#fbbf24' : '#fca5a5' }}>
+                  🩺 Скор дня: {qualityReport.dayScore}/100 ({qualityReport.dayStatus === 'green' ? 'отлично' : qualityReport.dayStatus === 'yellow' ? 'норма' : 'внимание'})
+                </div>
+              )}
               {qualityReport.bestItems.length > 0 && <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>Лучшие: {qualityReport.bestItems.join(', ')}</div>}
               {qualityReport.weakItems.length > 0 && <div style={{ fontSize: 8, color: '#ef4444' }}>Слабые: {qualityReport.weakItems.join(', ')}</div>}
               {qualityReport.recommendations.map((r: string, i: number) => <div key={i} style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', padding: '1px 0' }}>• {r}</div>)}
@@ -2393,7 +2422,11 @@ const doImportPlan = (raw: string): boolean => {
                     <div style={{ fontSize:9, fontWeight:700, color:'#8b5cf6', marginBottom:6, display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:4 }}>
                       <span>📈 Совокупный анализ ({calcResults.length} приёма)</span>
                       <span style={{ display:'flex', gap:4 }}>
-                        <button onClick={() => printDayReport(buildDayReportPrintHtml(calcDailyReport))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
+                        <button onClick={() => printDayReport(buildDayReportPrintHtml(calcDailyReport, {
+                          dayScore: (dayPlan as any)?.healthScore?.score ?? null,
+                          dayStatus: (dayPlan as any)?.healthScore?.status ?? null,
+                          coverage: (Array.isArray((dayPlan as any)?.microSummary?.coverage) ? (dayPlan as any).microSummary.coverage : []).map((c: any) => ({ nutrient: c.nutrient, pct: c.pct, status: c.status })),
+                        }))} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:9, fontWeight:700, background:'rgba(139,92,246,0.1)', border:'1px solid rgba(139,92,246,0.3)', color:'#a78bfa' }}>🖨 Печать отчёта</button>
                         <button onClick={() => printMealTimeline(buildMealTimelinePrintHtml(
                           (Array.isArray(dayPlan?.meals) ? dayPlan.meals : []).map((m: any) => ({ time: m.time, label: m.label, type: m.type, items: (m.items || []).map((it: any) => ({ name: it.name, amount: it.amount })), totals: m.totals || {} })),
                           { title: 'План на день', kcal: dayPlan?.totals?.kcal, trainStart }

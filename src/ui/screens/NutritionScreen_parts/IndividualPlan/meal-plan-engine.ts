@@ -2348,9 +2348,9 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
     else _capPerKg = Math.max(0, input.carbCapGPerKg);
   } else {
     const _isBulk = !input.isCutting && (input.cyclePhase === 'course' || input.cyclePhase === 'recovery' || !input.cyclePhase || input.cyclePhase === 'maintenance');
-    // bulk + max/enhanced бюджет → 10 г/кг (независимо от объёма — пользователь явно high-carb)
+    // bulk + max бюджет → 10 г/кг (независимо от объёма — пользователь явно high-carb)
     // также bulk + длинная тренировка ≥75 мин (прокси высокого недельного объёма) → 10
-    if (_isBulk && ((input.budget === 'max' || input.budget === 'enhanced') || (input.isTrainingDay && (input.trainDurationMin ?? 0) >= 75))) _capPerKg = 10;
+    if (_isBulk && ((input.budget === 'max') || (input.isTrainingDay && (input.trainDurationMin ?? 0) >= 75))) _capPerKg = 10;
   }
   const _carbCeiling = _capDisabled ? Infinity : Math.max(50, Math.round(input.weightKg * _capPerKg));
   let _baseCarbsTotal = _carbCeiling === Infinity ? Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG) : Math.min(Math.max(impossibleGoal ? carbFloorG : _floorCarbG, adjustedCarbsG), _carbCeiling);

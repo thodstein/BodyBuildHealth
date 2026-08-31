@@ -5,7 +5,6 @@ export type PhaseId = 'course' | 'bridge' | 'pct' | 'recovery' | 'cutting' | 'ma
 export type BudgetLevel = 'low' | 'medium' | 'max' | 'enhanced';
 export type NutritionLevel = 'base' | 'medium' | 'enhanced' | 'max';
 export type PlanType = 'classic' | 'keto' | 'highcarb' | 'mediterranean' | 'vegetarian';
-export type CycleType = 'none' | 'macro' | 'butch' | 'cheatmeal' | 'carbload';
 export type PlannerMode = 'pro' | 'simple' | 'minimal';
 
 export interface DrugInjection { id: string; name: string; time: string; dose: number; unit: string; type: string; esterType: 'rapid' | 'short' | 'long' | 'none'; halfLifeHours: number; trainLinked: boolean; trainTiming: 'before' | 'after' | 'both' | 'none'; }

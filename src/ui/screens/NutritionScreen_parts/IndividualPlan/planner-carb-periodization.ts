@@ -104,3 +104,17 @@ export function carbPeriodizationLabel(mode: CarbPeriodization | undefined | nul
   const m = mode || 'none';
   return CARB_PERIODIZATION_RU[m] || m;
 }
+
+/**
+ * Эпик 6: день тяжёлых ног/высокого объёма — совпадает ли offset с выбранным
+ * днём недели (dayLabels: ['Пн'..'Вс']). Чистая, тестируемая.
+ */
+export function isHeavyDayForOffset(
+  heavyTrainDay: string | undefined | null,
+  offset: number,
+  dayLabels: string[],
+): boolean {
+  if (!heavyTrainDay || !Array.isArray(dayLabels) || dayLabels.length !== 7) return false;
+  const dow = ((new Date().getDay() + 6) % 7 + offset) % 7;
+  return dayLabels[dow] === heavyTrainDay;
+}

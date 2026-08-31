@@ -45,7 +45,6 @@ export function buildRecommendations(d: RecsInput): string[] {
   if (d.goal === 'rehab') recs.push('🩹 Белок 2.5-3г/кг. ВСАА 15-20г/день. Омега-3 3-5г/день.');
   if (d.phase === 'course') recs.push('💉 Курс: белок 2.5г/кг, контроль печени, вода 40мл/кг.');
   if (d.phase === 'pct') recs.push('🔄 ПКТ: белок 2.2г/кг, цинк 50мг, D 5000МЕ, магний.');
-  if (d.phase === 'cutting') recs.push('✂️ Сушка: 5-6 приёмов, контроль натрия, клетчатка.');
   if (d.injections.length > 0) {
     const hasInsulin = d.injections.some(i => i.type === 'инсулин');
     const hasShortInsulin = d.injections.some(i => i.type === 'инсулин' && i.esterType !== 'long');

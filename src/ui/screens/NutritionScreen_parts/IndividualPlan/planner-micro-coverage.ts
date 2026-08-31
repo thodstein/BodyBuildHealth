@@ -87,7 +87,6 @@ export function getMicroTargets(sex: Sex, weightKg: number, phase: CyclePhase, i
     // Натрий: тренировочный день — выше (потеря с потом ~1г/ч тренинга)
     if (nutrient === 'Na') {
       if (isTrainingDay) target = Math.max(target, 3000 + Math.round(weightKg * 5));
-      if (phase === 'cutting') target = Math.max(target, 2500); // не урезать Na на сушке
     }
     if (nutrient === 'K') {
       target = Math.max(target, 3500 + (isTrainingDay ? 500 : 0));
