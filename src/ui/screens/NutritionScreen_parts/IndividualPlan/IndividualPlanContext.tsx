@@ -38,6 +38,7 @@ import { buildDayPlan as buildDayPlanV2, snapPortionG, type DayPlanV2, type Meal
 import { stapleFamilyOf } from "./food-availability";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
+import { autoCyclePhase, CYCLE_PHASE_RU } from "./planner-cycle-calendar";
 import { getBBCategory, type BBCategory, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
 import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
 import { saveContestPrepEverywhere, clearContestPrepEverywhere, migrateLegacyContestPrepIfNeeded, CONTEST_PREP_UPDATED_EVENT } from "../../../../engines/bb/bb-contest-prep-sync";
@@ -2640,11 +2641,18 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _dowOffset = ((new Date().getDay() + 6) % 7 + offset) % 7;
         const _isHeavyDay = !!heavyTrainDay && DAY_LABELS[_dowOffset] === heavyTrainDay;
         if (_isHeavyDay) { dayKcalMod *= 1.05; dayCarbMod *= 1.25; }
-        // #1 Женская фаза цикла: калорийно-углеводные моды + преферты (apply поверх cycling).
-        const _mp = (sex === 'female') ? getMenstrualPhaseNutrition((cyclePhase as MenstrualPhase) || 'none') : null;
+        // #1 Женская фаза цикла: ручной выбор — оверрайд; иначе авто-фаза из календаря
+        // (Эпик 7: средняя длина + последний лог начала периода, he_cycle_log).
+        const _cyclePhaseEff: MenstrualPhase = (sex === 'female')
+          ? (((cyclePhase as MenstrualPhase) && (cyclePhase as MenstrualPhase) !== 'none') ? (cyclePhase as MenstrualPhase) : (autoCyclePhase().phase))
+          : 'none';
+        const _cycleCalendarNote = (sex === 'female' && (!cyclePhase || cyclePhase === 'none') && _cyclePhaseEff !== 'none')
+          ? `📅 Фаза цикла рассчитана по календарю: ${CYCLE_PHASE_RU[_cyclePhaseEff]} (длина цикла ${autoCyclePhase().length} дн). Ручной выбор в настройках перекрывает.`
+          : undefined;
+        const _mp = (sex === 'female') ? getMenstrualPhaseNutrition(_cyclePhaseEff) : null;
         if (_mp) { dayKcalMod *= _mp.kcalMod; dayCarbMod *= _mp.carbMod; }
         // #2 Кости/кальций для женщин: повышенный Ca при низком %жира/аменорее/менопаузе.
-        const _caInfo = (sex === 'female') ? getCalciumTarget('female', bfPct, (cyclePhase as MenstrualPhase) || 'none', age) : null;
+        const _caInfo = (sex === 'female') ? getCalciumTarget('female', bfPct, _cyclePhaseEff, age) : null;
         const _boneNotes: string[] = [];
         if (_caInfo && _caInfo.boneRisk) _boneNotes.push(_caInfo.note, calciumDoseSplitNote());
         // #7 Сон-питание: при плохом сне/дефиците — триптофан/Mg/вишня.
@@ -2795,8 +2803,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           labValues: Object.keys(labValuesForPlan).length > 0 ? labValuesForPlan : undefined,
           calciumTargetOverride: _caInfo ? _caInfo.target : undefined,
           sodiumTargetOverride: _peakTargets?.phase ? _peakTargets.sodiumMg : undefined,
-           menstrualPhaseNote: _mp ? _mp.note : undefined,
-           carbGiPref: _mp ? _mp.carbGiPref : undefined,
+          menstrualPhaseNote: _mp ? _mp.note : undefined,
+          carbGiPref: _mp ? _mp.carbGiPref : undefined,
            quality: plannerModeRef.current === 'pro' ? 'full' : 'basic',
            // Этап 4 (БАГ-15/16): инъекции в V2-движок для привязки приёмов к уколам.
            injections: injections.map(i => ({ type: i.type, name: i.name, time: i.time, dose: i.dose, esterType: i.esterType, trainLinked: i.trainLinked, trainTiming: i.trainTiming })),
@@ -2975,6 +2983,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           periodizationWeekNote: _perio.weekNote,
           heavyDayNote: _isHeavyDay ? '🏋️ День тяжёлых ног/объёма: углеводы +25%, ккал +5% (гликоген к сессии).' : undefined,
           menstrualPhaseNote: _mp ? _mp.note : undefined,
+          cycleCalendarNote: _cycleCalendarNote,
           boneNotes: _boneNotes.length > 0 ? _boneNotes : undefined,
           sleepNote: _sleepNote,
           dietBreakNote: _dietBreakNote,

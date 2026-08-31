@@ -15,6 +15,8 @@ import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { plannerWeightAdjustAdvice } from './planner-targets';
 import { applyCarbPeriodizationMods, carbPeriodizationLabel } from './planner-carb-periodization';
+import { autoCyclePhase, getCycleLog, saveCyclePeriod, clearCycleLog, CYCLE_PHASE_RU } from './planner-cycle-calendar';
+import { computeEnergyAvailability } from './planner-female-cycle';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 
 
@@ -511,9 +513,43 @@ export const IndividualPlanSettings: React.FC = () => {
         </div>
         {sex === 'female' && (
           <div style={{ marginBottom: 6 }}>
-            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
+            <PopupSelect label="🌸 Фаза цикла" value={cyclePhase} options={[{id:'none',label:'Не указана (авто по календарю)'},{id:'follicular',label:'Фолликулярная'},{id:'ovulation',label:'Овуляция'},{id:'luteal',label:'Лютеиновая'},{id:'menstrual',label:'Менструация'}]} onChange={v => setCyclePhase(v as CycleType)} />
+            {/* Эпик 7: календарь цикла — лог начал периодов → авто-фаза */}
+            {(() => {
+              const cal = autoCyclePhase();
+              const logLen = getCycleLog().length;
+              return (
+                <div style={{ padding: '6px 8px', borderRadius: 8, marginTop: 4, background: logLen > 0 ? 'rgba(236,72,153,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${logLen > 0 ? 'rgba(236,72,153,0.18)' : 'rgba(255,255,255,0.05)'}` }}>
+                  <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
+                    {logLen > 0
+                      ? `📅 Календарь: ${logLen} ${logLen === 1 ? 'отметка' : 'отметок'} · длина цикла ~${cal.length} дн · сейчас: ${CYCLE_PHASE_RU[cal.phase]}${cyclePhase && cyclePhase !== 'none' ? ' (ручной оверрайд)' : ' (авто)'}`
+                      : '📅 Календарь цикла: отметьте день начала периода — фаза будет рассчитываться автоматически.'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    <button onClick={() => { saveCyclePeriod(_toLocalIso(new Date())); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 700, background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.25)', color: '#f472b6' }}>📅 Отметить начало (сегодня)</button>
+                    {logLen > 0 && <button onClick={() => { clearCycleLog(); }} style={{ flex: 1, padding: '4px 6px', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 600, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>Сбросить лог</button>}
+                  </div>
+                </div>
+              );
+            })()}
+            {/* Эпик 7б: энергетическая доступность (RED-S) — карточка + действие */}
+            {(() => {
+              try {
+                const _bf = bodyFatPct > 3 ? bodyFatPct : 22;
+                const _lbm = weight * (1 - _bf / 100);
+                const _ea = computeEnergyAvailability(kbjuMode !== 'manual' ? effectiveKcal : (manualKcal ?? effectiveKcal), weight, _lbm, true, 60, (trainIntensity as any) || 'medium', 'female');
+                if (!_ea || _ea.status === 'optimal') return null;
+                const col = _ea.status === 'risk' ? '#ef4444' : '#f59e0b';
+                return (
+                  <div style={{ padding: '6px 8px', borderRadius: 8, marginTop: 4, background: `${col}0a`, border: `1px solid ${col}22` }}>
+                    <div style={{ fontSize: 8, color: col, lineHeight: 1.5 }}>⚠️ {_ea.note}</div>
+                    <button onClick={() => { switchKbjuMode('manual'); setManualKcal(Math.max(1200, (manualKcal ?? effectiveKcal) + 250)); }} style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 8, fontWeight: 700, background: `${col}14`, border: `1px solid ${col}30`, color: col }}>⚡ +250 ккал к цели (защита энергии)</button>
+                  </div>
+                );
+              } catch { return null; }
+            })()}
             <PopupSelect label="🏋 Категория" value={bbCategory} options={[{id:'none',label:'Не указана'}, ...categoriesForSex(sex).map(c => ({id:c.id,label:c.label}))]} onChange={v => setBBCategory(v as any)} />
-            {sex === 'female' && <PopupSelect label="🌿 Жизненный этап" value={lifeStage} options={[{id:'none',label:'Нет'},{id:'pregnancy',label:'Беременность'},{id:'lactation',label:'Лактация'},{id:'menopause',label:'Менопауза'},{id:'contraception',label:'Контрацепция'}]} onChange={v => setLifeStage(v as any)} />}
+            <PopupSelect label="🌿 Жизненный этап" value={lifeStage} options={[{id:'none',label:'Нет'},{id:'pregnancy',label:'Беременность'},{id:'lactation',label:'Лактация'},{id:'menopause',label:'Менопауза'},{id:'contraception',label:'Контрацепция'}]} onChange={v => setLifeStage(v as any)} />
           </div>
         )}
         {sex !== 'female' && (
