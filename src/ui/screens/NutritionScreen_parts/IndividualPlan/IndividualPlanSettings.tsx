@@ -63,7 +63,7 @@ export const IndividualPlanSettings: React.FC = () => {
   const {
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
-    cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking, useRecipesInPlan, setUseRecipesInPlan,
+    cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking,
     trainType, setTrainType, trainIntensity, setTrainIntensity,
     intraWorkoutEnabled, setIntraWorkoutEnabled,
     householdActivity, setHouseholdActivity, bodyFatPct, setBodyFatPct,
@@ -489,9 +489,6 @@ export const IndividualPlanSettings: React.FC = () => {
           <button onClick={() => setBatchCooking(!batchCooking)} style={{ flex: 1, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, textAlign: 'left', background: batchCooking ? 'rgba(34,197,94,0.08)' : '#202023', border: `1px solid ${batchCooking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.1)'}`, color: batchCooking ? '#22c55e' : 'rgba(255,255,255,0.5)' }}>
             🍳 Готовка впрок: {batchCooking ? 'ВКЛ' : 'ВЫКЛ'}
           </button>
-          <button onClick={() => setUseRecipesInPlan(!useRecipesInPlan)} style={{ flex: 1, padding: '6px 8px', borderRadius: 8, cursor: 'pointer', fontSize: 9, fontWeight: 600, textAlign: 'left', background: useRecipesInPlan ? 'rgba(249,115,22,0.08)' : '#202023', border: `1px solid ${useRecipesInPlan ? 'rgba(249,115,22,0.3)' : 'rgba(255,255,255,0.1)'}`, color: useRecipesInPlan ? '#f97316' : 'rgba(255,255,255,0.5)' }}>
-            🍲 Рецепты в рационе: {useRecipesInPlan ? 'ВКЛ' : 'ВЫКЛ'}
-          </button>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
           <PopupSelect label="🏋️ Тип тренировок" value={trainType} options={[{id:'strength',label:'Силовые'},{id:'cardio',label:'Кардио'},{id:'mixed',label:'Смешанные'},{id:'hiit',label:'HIIT'}]} onChange={v => setTrainType(v as string)} />
@@ -557,12 +554,7 @@ export const IndividualPlanSettings: React.FC = () => {
             <PopupSelect label="🏋 Категория" value={bbCategory} options={[{id:'none',label:'Не указана'}, ...categoriesForSex(sex).map(c => ({id:c.id,label:c.label}))]} onChange={v => setBBCategory(v as any)} />
           </div>
         )}
-        <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom: 6 }}>
-          <button onClick={() => { if (peakWeekEnabled) { setPeakWeekEnabled(false); } else { setPlanTab('peak'); } }} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:700, border:'none', background: peakWeekEnabled ? '#f59e0b' : 'rgba(255,255,255,0.08)', color: peakWeekEnabled ? '#000' : 'rgba(255,255,255,0.7)' }}>🏋 Peak-week {peakWeekEnabled ? 'ON' : 'OFF'}</button>
-          {peakWeekEnabled && <select value={peakWeekShowDay} onChange={e => setPeakWeekShowDay(parseInt(e.target.value))} style={{ fontSize:10, padding:'2px', background:'#202023', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4 }}>
-            {[0,1,2,3,4,5,6].map(d => <option key={d} value={d}>Show: день {d}</option>)}
-          </select>}
-        </div>
+        {/* Эпик 8: legacy peak-week UI (кнопка+день шоу) удалён — единый путь «🏁 Тапер ББ» (bbPrepConfig) */}
         {/* Роунд-2 v5: hungerLevel удалён из генерации — шумовый сигнал (+10% белка при голоде) */}
       </GlassCard>
       )}

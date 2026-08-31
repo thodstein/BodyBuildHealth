@@ -70,7 +70,6 @@ export interface PlanCtx {
   cookingSkill: 'basic' | 'medium' | 'advanced'; setCookingSkill: (v: 'basic' | 'medium' | 'advanced') => void;
   cookingFrequency: 'daily' | 'every_3_days' | 'weekly'; setCookingFrequency: (v: 'daily' | 'every_3_days' | 'weekly') => void;
   batchCooking: boolean; setBatchCooking: (v: boolean) => void;
-  useRecipesInPlan: boolean; setUseRecipesInPlan: (v: boolean) => void;
   cravingMode: boolean; setCravingMode: (v: boolean) => void;
   cravingDays: number; setCravingDays: (v: number) => void;
   lazyDayMode: boolean; setLazyDayMode: (v: boolean) => void;
@@ -342,7 +341,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const [cookingSkill, setCookingSkill] = useState<'basic' | 'medium' | 'advanced'>((_pf as any).cookingSkill === 'advanced' ? 'advanced' : (_pf as any).cookingSkill === 'medium' ? 'medium' : 'basic');
   const [cookingFrequency, setCookingFrequency] = useState<'daily' | 'every_3_days' | 'weekly'>((_pf as any).cookingFrequency === 'weekly' ? 'weekly' : (_pf as any).cookingFrequency === 'every_3_days' ? 'every_3_days' : 'daily');
   const [batchCooking, setBatchCooking] = useState<boolean>(!!(_pf as any).batchCooking);
-  const [useRecipesInPlan, setUseRecipesInPlan] = useState<boolean>(_pf.useRecipesInPlan !== false);
   const [cravingMode, setCravingMode] = useState<boolean>(!!_pf.cravingMode);
   const [cravingDays, setCravingDays] = useState<number>(typeof _pf.cravingDays === 'number' ? _pf.cravingDays : 1);
   const [lazyDayMode, setLazyDayMode] = useState<boolean>(!!_pf.lazyDayMode);
@@ -949,10 +947,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct,
         weightLogPeriod, phase, proteinPreset, budget, variety,
         lunchTime, dinnerTime, workFood, planType, morningTrainLoad,
-        cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan,
+        cookingSkill, cookingFrequency, batchCooking,
       });
     } catch {}
-  }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, weightLogPeriod, phase, proteinPreset, budget, variety, lunchTime, dinnerTime, workFood, planType, morningTrainLoad, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan]);
+  }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, weightLogPeriod, phase, proteinPreset, budget, variety, lunchTime, dinnerTime, workFood, planType, morningTrainLoad, cookingSkill, cookingFrequency, batchCooking]);
 
   // P1-fix: preferredFoods из Profile (UnifiedSettings.nutrition.preferredFoods) + legacy
   const [preferredFoods, setPreferredFoods] = useState<string[]>(() => {
@@ -1260,6 +1258,13 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     try { const v = (s as any)?.nutrition?.histamineSensitive; if (typeof v === 'boolean') return v; } catch {}
     try { return localStorage.getItem('he_planner_histamine') === 'true'; } catch { return false; }
   });
+  // Эпик 8: histamineSensitive — СИНХРОНИЗИРОВАННЫЙ алиас intolerances.lowHistamine
+  // (один источник для генерации — гейт движка по lowHistamine; тумблеры в двух
+  // карточках всегда согласованы).
+  const setHistamineSynced = useCallback((v: boolean) => {
+    setHistamineSensitive(v);
+    setIntolerances((prev: any) => ({ ...prev, lowHistamine: v }));
+  }, []);
   const [plannerMode, setPlannerMode] = useState<PlannerMode>(() => {
     try {
       const value = localStorage.getItem('he_planner_mode');
@@ -2876,9 +2881,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         // 🍳 Режим генерации: 'recipes' → основные приёмы (Завтрак/Обед/Ужин) собираются
         // из готовых рецептов, перекусы остаются продуктами. 'products' → классика.
         const _genRecipes = generationModeRef.current === 'recipes';
-        // 🍲 Рецепты-подсказки: к каждому приёму подбираем 1-3 подходящих рецепта (если useRecipesInPlan)
-        const _cookProf: CookProfile | undefined = useRecipesInPlan || _genRecipes ? cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking }) : undefined;
-        const _allRecipes = useRecipesInPlan || _genRecipes ? [...getRecipes(), ...(userRecipes||[])] : [];
+        // 🍲 Рецепты-подсказки: к каждому приёму подбираем 1-3 подходящих рецепта
+        // (Эпик 8: тумблер useRecipesInPlan удалён — подсказки работают всегда;
+        // в режиме «по рецептам» основные приёмы пересобираются assembleRecipeDay).
+        const _cookProf: CookProfile | undefined = cookProfileFromSettings({ cookingSkill, cookingFrequency, cookTimeMin, batchCooking });
+        const _allRecipes = [...getRecipes(), ...(userRecipes||[])];
         const _recipeBudget = _cookProf ? prepTimeBudgetPerMeal(_cookProf, _effMealsCount) : 60;
         const _filteredRecipes = _cookProf ? filterByCookSkill(_allRecipes, _cookProf.skill) : _allRecipes;
         if (_filteredRecipes.length > 0) {
@@ -3313,7 +3320,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     profile, s, courseEntries, annualPhase,
     weight, setWeight, height, setHeight, age, setAge, sex, setSex,
     dailySteps, setDailySteps, cookTimeMin, setCookTimeMin,
-    cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking, useRecipesInPlan, setUseRecipesInPlan,
+    cookingSkill, setCookingSkill, cookingFrequency, setCookingFrequency, batchCooking, setBatchCooking,
     cravingMode, setCravingMode, cravingDays, setCravingDays,
     lazyDayMode, setLazyDayMode, lazyDayDays, setLazyDayDays,
     trainType, setTrainType, trainIntensity, setTrainIntensity,
@@ -3405,14 +3412,14 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
      customNotes, setCustomNotes,
     dietPrefs, setDietPrefs,
     v2Phase, setV2Phase, v2Labs, setV2Labs, v2Pharma, setV2Pharma,
-     histamineSensitive, setHistamineSensitive,
+     histamineSensitive, setHistamineSensitive: setHistamineSynced,
      plannerMode, setPlannerMode,
     labAnalysis,
     errorMsg, setErrorMsg,
     useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);
