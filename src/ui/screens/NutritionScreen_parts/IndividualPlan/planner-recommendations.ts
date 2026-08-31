@@ -32,7 +32,7 @@ export interface RecsInput {
   dayPlan: any;
   threeDayPlan: any;
   weekPlan: any;
-  dietPauseMode: string;
+  carbPeriodization: string;
 }
 
 export function buildRecommendations(d: RecsInput): string[] {
@@ -145,11 +145,11 @@ export function buildRecommendations(d: RecsInput): string[] {
       }
     }
   }
-  if (d.dietPauseMode === 'refeed') {
+  if (d.carbPeriodization === 'refeed') {
     recs.push(`🍽 Refeed активен: ${d.weight > 0 ? Math.round(d.weight * 5) : '300'}г углеводов, жиры ${d.weight > 0 ? Math.round(d.weight * 0.5) : '40'}г. Не чаще 1р/нед на дефиците.`);
   }
-  if (d.dietPauseMode === 'diet_5_2') {
-    recs.push(`📅 5:2 протокол: 5 дней maintenance + 2 дня дефицит (~${Math.round(d.effectiveKcal * 0.7)} ккал). Поддерживает метаболизм.`);
+  if (d.carbPeriodization === 'five_two') {
+    recs.push(`📅 5:2 протокол: 5 дней дефицит + 2 дня maintenance (~${Math.round(d.effectiveKcal)} ккал). Поддерживает метаболизм.`);
   }
   return recs;
 }

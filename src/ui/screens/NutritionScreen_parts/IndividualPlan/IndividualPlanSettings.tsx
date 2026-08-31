@@ -14,6 +14,7 @@ import { getProfile } from "../../../../core/profile-manager";
 import { categoriesForSex } from "./planner-categories";
 import { PopupNumber, PopupSelect, PopupText } from '../../../components/PopupXxx';
 import { plannerWeightAdjustAdvice } from './planner-targets';
+import { applyCarbPeriodizationMods, carbPeriodizationLabel } from './planner-carb-periodization';
 import { getRecipes, type Recipe } from '../../../../engines/nutrition-periodization.engine';
 
 
@@ -73,7 +74,7 @@ export const IndividualPlanSettings: React.FC = () => {
     weightLogEntries, setWeightLogEntries,
     weightLogPeriod, setWeightLogPeriod,
     metabolicAdaptEnabled, setMetabolicAdaptEnabled, metabolicAdaptPct, setMetabolicAdaptPct,
-    dietPauseMode, setDietPauseMode, manualGPerKg, setManualGPerKg,
+    manualGPerKg, setManualGPerKg,
     goal, setGoal, autoGoal, goalUserSet, setGoalUserSet,
     phase, setPhase,
     injections, setInjections,
@@ -98,14 +99,13 @@ export const IndividualPlanSettings: React.FC = () => {
     preferredFoods, setPreferredFoods, preferredByMeal, setPreferredByMeal, excludedFoods, setExcludedFoods,
     specificity, setSpecificity, intolerances, setIntolerances, tasteProfile, setTasteProfile, excludedCategories, setExcludedCategories,
     customNotes, setCustomNotes,
-    cyclingMode, setCyclingMode, carbPeriodization, setCarbPeriodization, trainingDays, setTrainingDays, DAY_LABELS,
+    carbPeriodization, setCarbPeriodization, trainingDays, setTrainingDays, DAY_LABELS,
     heavyTrainDay, setHeavyTrainDay,
     workScheduleEnabled, setWorkScheduleEnabled,
     workStartTime, setWorkStartTime, workEndTime, setWorkEndTime,
     workDays, setWorkDays, workScheduleType, setWorkScheduleType,
     cravingMode, setCravingMode, cravingDays, setCravingDays,
     lazyDayMode, setLazyDayMode, lazyDayDays, setLazyDayDays,
-    periodizationEnabled, setPeriodizationEnabled,
     surplusPct, setSurplusPct,
     specialMealMode, setSpecialMealMode,
     specialMealGoal, setSpecialMealGoal,
@@ -726,22 +726,6 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
         )}
       </GlassCard>
       )}
-      {goal === 'mass' && periodizationEnabled && (
-        <div style={{ marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.08)' }}>
-          <div style={{ fontSize: 9, fontWeight: 600, color: '#8b5cf6', marginBottom: 6 }}>🕐 Таймлайн фаз</div>
-          <div style={{ display:'flex', gap: 1, height: 20, borderRadius: 6, overflow: 'hidden', marginBottom: 4 }}>
-            <div style={{ flex: 1, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.2)', color:'#00e68a', fontSize: 7, fontWeight: 700 }}>ПРОФ.</div>
-            <div style={{ flex: 1, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.2)', color:'#60a5fa', fontSize: 7, fontWeight: 700 }}>ПОДД.</div>
-            <div style={{ flex: 1, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(239,68,68,0.2)', color:'#ef4444', fontSize: 7, fontWeight: 700 }}>ДЕФ.</div>
-            <div style={{ flex: 1, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(59,130,246,0.2)', color:'#60a5fa', fontSize: 7, fontWeight: 700 }}>ПОДД.</div>
-            <div style={{ flex: 1, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,230,138,0.2)', color:'#00e68a', fontSize: 7, fontWeight: 700 }}>ПРОФ.</div>
-          </div>
-          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5 }}>
-            Чередование 2 нед профицит (+{surplusPct}%) → 2 нед поддержание → 2 нед дефицит (−20%) → 2 нед поддержание → повтор. 
-            <span style={{ color: '#8b5cf6' }}> Метаболическая адаптация: {(surplusPct > 15 ? 'высокая' : 'низкая')}</span>
-          </div>
-        </div>
-      )}
 
       {plannerMode === 'pro' && (
       <GlassCard title="Фаза и препараты" icon="💉" color="#06b6d4">
@@ -1174,13 +1158,15 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel);
               return <div style={{ fontSize: 8, color: 'rgba(0,230,138,0.5)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)' }}>📈 Уровень «{nm?.label}» (×{nm?.mult}) — план будет на {Math.round(((nm?.mult||1)-1)*100)}% больше: ~{Math.round(effectiveKcal * (nm?.mult||1))} ккал, Б {Math.round(effectiveP * (nm?.mult||1))} / Ж {Math.round(effectiveF * (nm?.mult||1))} / У {Math.round(effectiveC * (nm?.mult||1))}</div>;
             })()}
-            {cyclingMode !== 'none' && (() => {
-              const trainDayC = Math.round(effectiveC * (cyclingMode === 'butch' ? 1.3 : cyclingMode === 'carbload' ? 1.5 : 1.0));
-              const restDayC = Math.round(effectiveC * (cyclingMode === 'macro' ? 0.7 : cyclingMode === 'butch' ? 0.5 : 1.0));
-              const trainDayK = Math.round(effectiveKcal * (cyclingMode === 'macro' ? 1.0 : cyclingMode === 'butch' ? 1.0 : cyclingMode === 'cheatmeal' ? 0.85 : 1.0));
-              const restDayK = Math.round(effectiveKcal * (cyclingMode === 'macro' ? 0.85 : 1.0));
-              const cycleLabel = ({ macro: '🔄 Макросы', butch: '⤴️⤵️ БУЧ', cheatmeal: '🍔 Читмил', carbload: '🍚 Угл.загр.' })[cyclingMode] || '';
-              return <div style={{ fontSize: 8, color: 'rgba(59,130,246,0.5)', marginTop: 2, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.08)' }}>{cycleLabel}: в тренировочный день ~{trainDayK} ккал / {trainDayC}г угл. · в день отдыха ~{restDayK} ккал / {restDayC}г угл.</div>;
+            {carbPeriodization !== 'none' && (() => {
+              // Эпик 1: единая периодизация — реальные моды дня из одной функции.
+              const _t = applyCarbPeriodizationMods(carbPeriodization, 0, true);
+              const _r = applyCarbPeriodizationMods(carbPeriodization, 0, false);
+              const trainDayK = Math.round(effectiveKcal * _t.dayKcalMod);
+              const trainDayC = Math.round(effectiveC * _t.dayCarbMod);
+              const restDayK = Math.round(effectiveKcal * _r.dayKcalMod);
+              const restDayC = Math.round(effectiveC * _r.dayCarbMod);
+              return <div style={{ fontSize: 8, color: 'rgba(59,130,246,0.5)', marginTop: 2, padding: '4px 8px', borderRadius: 6, background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.08)' }}>{carbPeriodizationLabel(carbPeriodization)}: в тренировочный день ~{trainDayK} ккал / {trainDayC}г угл. · в день отдыха ~{restDayK} ккал / {restDayC}г угл.</div>;
             })()}
           </div>
         ) : (
@@ -2552,41 +2538,6 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
           </div>
         </div>
       )}
-
-      {(cyclingMode === 'cheatmeal' || cyclingMode === 'carbload') && true && (
-        <GlassCard title={cyclingMode === 'cheatmeal' ? 'Читмил' : 'Углеводная загрузка'} icon="📅">
-          <div style={{ marginTop: 4, padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.12)' }}>
-            <div style={{ fontSize: 9, fontWeight: 600, color: '#60a5fa', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-              📅 Выберите тренировочные дни (влияют на циклирование и привязку рациона):
-            </div>
-            <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-              {DAY_LABELS.map((label, idx) => {
-                const isHeavy = trainingDays[idx];
-                return (
-                  <button key={idx} onClick={() => {
-                    setTrainingDays(trainingDays.map((d, i) => i === idx ? !d : d));
-                  }} style={{
-                    width: 36, height: 36, borderRadius: '50%', cursor: 'pointer',
-                    border: isHeavy ? '2px solid #22c55e' : '2px solid #3f3f46',
-                    background: isHeavy ? 'rgba(34,197,94,0.2)' : '#202023',
-                    color: isHeavy ? '#22c55e' : 'rgba(255,255,255,0.85)',
-                    fontSize: 10, fontWeight: isHeavy ? 800 : 500,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'all 0.15s',
-                  }}>
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-            <div style={{ marginTop: 4, fontSize: 8, color: 'rgba(255,255,255,0.85)' }}>
-              🏋️ Тренировочные дни: {trainingDays.map((d,i) => d ? DAY_LABELS[i] : null).filter(Boolean).join(', ') || '—'}
-            </div>
-          </div>
-        </GlassCard>
-      )}
-
-
 
       {/* B1 — SpecialMealPopup */}
       {plannerMode === 'pro' && (

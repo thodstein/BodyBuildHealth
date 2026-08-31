@@ -8,6 +8,7 @@ import { resolveAllergenFoodIds } from "./planner-restrictions";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
+import { carbPeriodizationLabel } from "./planner-carb-periodization";
 import { DailyDietDashboard } from "../DailyDietDashboard";
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
@@ -49,7 +50,7 @@ export const IndividualPlanResults: React.FC = () => {
     renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
     dayPlanNotes, setDayPlanNotes,
     autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, healthIssues,
-    cyclingMode, waterCalc, setWaterCalc,
+    carbPeriodization, waterCalc, setWaterCalc,
     showRecipeCreator, setShowRecipeCreator, newRecipe, setNewRecipe,
     userRecipes, setUserRecipes,
     shoppingList, setShoppingList, injections,
@@ -717,8 +718,8 @@ const doImportPlan = (raw: string): boolean => {
       )}
 
       {generated && planDays === 1 && dayPlan && (<>
-        <GlassCard title={`План на день${cyclingMode !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
-          {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{cyclingMode !== 'none' && ` · циклирование: ${{macro:'макросы',butch:'БУЧ',cheatmeal:'читмил',carbload:'угл.загрузка'}[cyclingMode] || ''}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
+        <GlassCard title={`План на день${carbPeriodization !== 'none' ? (dayPlan.isTrainingDay ? ' 🏋️ Тренировочный' : ' 🛌 Отдых') : ''}`} icon="📋" color={dayPlan.isTrainingDay ? '#00e68a' : '#8b5cf6'} style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
+          {dayPlan.isTrainingDay !== undefined && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.85)', marginBottom: 4 }}>{dayPlan.isTrainingDay ? 'Тренировочный день' : 'День отдыха'}{carbPeriodization !== 'none' && ` · циклирование: ${carbPeriodizationLabel(carbPeriodization)}`}{workScheduleEnabled && ` · 💼${dayPlan.isWorkDay ? ' Рабочий' : ' Выходной'}${dayPlan.isWorkDay && workStartTime ? ` ${workStartTime}-${workEndTime}` : ''}`}</div>}
           {weekEditDay !== null && (
             <div style={{ marginBottom: 6, padding: '6px 10px', borderRadius: 8, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)', fontSize: 9, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>✏️ Редактируете {DAY_LABELS[weekEditDay]} из недельного плана — изменения сохранятся в неделе.</span>

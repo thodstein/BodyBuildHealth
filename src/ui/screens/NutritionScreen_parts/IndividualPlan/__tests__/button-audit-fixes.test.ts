@@ -227,7 +227,7 @@ describe('P1-8: buildRecommendations — daysCount=0 guard', () => {
       dayPlan: null,
       threeDayPlan: null,
       weekPlan: null,
-      dietPauseMode: 'none',
+      carbPeriodization: 'none',
     };
     const result = buildRecommendations(deps);
     const allRecs = result.join(' ');
