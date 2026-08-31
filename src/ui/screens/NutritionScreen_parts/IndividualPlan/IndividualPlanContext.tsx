@@ -422,6 +422,11 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const cfg = deserializeBBPrepConfig(raw);
         if (cfg) return cfg;
       }
+      // Единый версионированный план (bbContestPrepPlan) без зеркала конфига: восстановить
+      // конфиг из плана — иначе «Отключить тапер» не рендерится (bbPrepConfig === null),
+      // но план остаётся активным и режет углеводы до пик-недельных (~300 г).
+      const p = planFromStored((s as any)?.goals?.bbContestPrepPlan, null, (s as any)?.goals, (s as any)?.personal);
+      if (p) return configFromPlan(p);
       return legacyConfigFromProfile((s as any)?.goals, (s as any)?.personal);
     } catch { return null; }
   });

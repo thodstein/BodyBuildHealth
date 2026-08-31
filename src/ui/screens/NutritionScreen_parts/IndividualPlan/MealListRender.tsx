@@ -288,6 +288,19 @@ export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
                     <button onClick={()=>moreRecipeOptions(dayIdx,mi)} title="Подобрать другие варианты рецептов" style={{alignSelf:'flex-start',marginTop:1,padding:'2px 7px',borderRadius:6,border:'1px solid rgba(249,115,22,0.25)',background:'transparent',color:'#f97316',cursor:'pointer',fontSize:8,fontWeight:700}}>🔄 Другие варианты</button>
                   </div>
                 )}
+                {m.recipeApplied && (
+                  <button onClick={() => setRecipePickerMeal({ dayIdx, mealIdx: mi, label: m.label })}
+                    title={m.recipeApplied2 ? `Заменить второй рецепт (сейчас «${m.recipeApplied2}»)` : 'Добавить второе блюдо к этому приёму (не дубль — совместимое)'}
+                    style={{
+                      display:'flex', alignItems:'center', gap:6, width:'100%', marginTop:6,
+                      padding:'7px 10px', borderRadius:10, cursor:'pointer', fontSize:9, fontWeight:700, minHeight:44,
+                      background: m.recipeApplied2 ? 'rgba(245,158,11,0.08)' : 'rgba(139,92,246,0.08)',
+                      border: m.recipeApplied2 ? '1px dashed rgba(245,158,11,0.4)' : '1px dashed rgba(139,92,246,0.45)',
+                      color: m.recipeApplied2 ? '#fbbf24' : '#c4b5fd',
+                    }}>
+                    {m.recipeApplied2 ? '🍳 Заменить второй рецепт' : '➕ Добавить второй рецепт в приём'}
+                  </button>
+                )}
                 {m.recipeSuggestions && Array.isArray(m.recipeSuggestions) && m.recipeSuggestions.length > 0 && (
                   <div style={{marginTop:4,display:'flex',flexDirection:'column',gap:3}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'2px 0'}}>
