@@ -6,7 +6,7 @@ import { updateProfile, getProfile } from "../../../../core/profile-manager";
 import { getRecipes, getRecipesByMeal, type Recipe } from "../../../../engines/nutrition-periodization.engine";
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type DailyDietReport, type MealScoreV2 } from "../../../../engines/product-usefulness-v2.engine";
 import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU, parseServingSizeGrams } from "../../../../engines/kbju-food-match.engine";
-import { generateNutritionReport, type NutritionReport } from "../../../../engines/nutrition-report.engine";
+import type { NutritionReport } from "../../../../engines/nutrition-report.engine";
 import type { UserProfile, LabPoint } from "../../../../core/types";
 import { getContraindications, saveContraindications } from "../../../../core/contraindications";
 import { updateSection } from "../../../../core/profile-manager";
@@ -20,11 +20,12 @@ import { microDeficitToPreferIds, diaasWeakLinkToPreferIds, repairDiaasWeakLinks
 import { applyMealTargetOverrides } from "./planner-meal-targets";
 import { correctDayToTargets } from "./day-target-corrector";
 import { safeWriteJSON, migratePlannerStorage } from "./planner-storage";
-import { generateAllergenReportPure, generateNutrientReportPure, generateQualityReportPure, generateRiskReportPure, generateDrugCompatReportPure } from "./planner-reports"; // P1-7: чистые функции отчётов вынесены из context
+// P1-7: чистые функции отчётов вынесены в planner-report-state.ts (Хвост-1)
 import { generateCheatMeal as generateCheatMealSm, generateCarbload as generateCarbloadSm, generateBUTCH as generateBUTCHSm, generateCravingPlan as generateCravingPlanSm, generateLazyDayPlan as generateLazyDayPlanSm } from "./planner-special-meals"; // P1-7: генераторы специальных режимов еды вынесены
 import { buildRecommendations } from "./planner-recommendations"; // P1-7: generateRecommendations вынесен
 import { buildMealPrep } from "./planner-mealprep"; // P1-7: generateMealPrep вынесен
 import { useRenderMealList } from "./MealListRender"; // P1-7: renderMealList вынесен
+import { usePlannerReportState } from "./planner-report-state"; // Хвост-1: состояние отчётов вынесено в под-хук
 import { getAutoExcludedFoodIds } from "./OrganLoadBadges"; // P2-12: organ-load auto restrictions
 import { loadReplaceHistory, recordReplacement, getDeprioritizedIds, clearReplaceHistory, expandRecipePreferred, type Specificity, type CategoryPref, type Intolerances, type TasteProfile } from "./planner-preferences"; // Bug-infra: квота-безопасная запись // Bug-4: чистая функция расчёта КБЖУ-целей
 import { resolveAllExcludedFoodIds, countExcludedByAllergens, matchesSelectedAllergen, allergenTextMatches, getFoodAllergenTags, USER_ALLERGEN_TO_TAGS, dietRestrictionTags } from "./planner-restrictions"; // FIX allergens-restrictions: единый резолвер аллергенов/ограничений
@@ -3346,32 +3347,21 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     }
   }, [dayPlan, planDays, selectedDayIndex, threeDayPlan, weekPlan]);
 
-  const [activeReports, setActiveReports] = useState<string[]>([]);
-  const [allergenReport, setAllergenReport] = useState<any>(null);
-  const [nutrientReport, setNutrientReport] = useState<any>(null);
-  const [qualityReport, setQualityReport] = useState<any>(null);
-  const [riskReport, setRiskReport] = useState<any>(null);
-  const [drugCompatReport, setDrugCompatReport] = useState<any>(null);
-  const [nutritionReport, setNutritionReport] = useState<any>(null);
-
-  const generateAllergenReport = () => { if (!dayPlan) return; setAllergenReport(generateAllergenReportPure(dayPlan, allergens, FOOD_DB)); setActiveReports(prev => prev.includes('allergen') ? prev : [...prev, 'allergen']); };
-  const generateNutrientReport = () => { if (!dayPlan) return; setNutrientReport(generateNutrientReportPure(dayPlan, FOOD_DB)); setActiveReports(prev => prev.includes('nutrient') ? prev : [...prev, 'nutrient']); };
-  const generateQualityReport = () => { if (!dayPlan) return; const _r = generateQualityReportPure(dayPlan, budget, FOOD_DB); setQualityReport({ ..._r, dayScore: (dayPlan as any).healthScore?.score ?? null, dayStatus: (dayPlan as any).healthScore?.status ?? null }); setActiveReports(prev => prev.includes('quality') ? prev : [...prev, 'quality']); };
-  const generateRiskReport = () => { if (!dayPlan) return; setRiskReport(generateRiskReportPure(dayPlan, weight)); setActiveReports(prev => prev.includes('risk') ? prev : [...prev, 'risk']); };
-  const generateDrugCompatReport = () => { const safeInjections = Array.isArray(injections) ? injections : []; if (!dayPlan || safeInjections.length === 0) return; setDrugCompatReport(generateDrugCompatReportPure({ dayPlan, injections: safeInjections, weight, v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {}, phase, takenSupplements: Array.isArray(takenSupplements) ? takenSupplements : [] })); setActiveReports(prev => prev.includes('drug') ? prev : [...prev, 'drug']); };
-  const generateFullNutritionReport = (planArg?: any, archive = true) => {
-    const src = planArg || dayPlan; if (!src) return;
-    try { const rep = generateNutritionReport({ meals: src.meals.map((m:any)=>({ label:m.label, items:m.items.map((i:any)=>({name:i.name||'',id:i.id||'',amount:i.amount||100,kcal:i.kcal||0,p:i.p||0,f:i.f||0,c:i.c||0,fiber:i.fiber||0})), totals:m.totals||{kcal:0,p:0,f:0,c:0}, time:m.time||'' })), totals: src.totals||{kcal:0,p:0,f:0,c:0}, targets: planTargets, userWeight: getProfileSafe()?.settings?.weight||80, userTDEE: planTargets.kcal, healthIssues, planType, variety, budget, allergens, cyclingMode: carbPeriodizationLabel(carbPeriodization), goal: getProfileSafe()?.settings?.primaryGoal||'maintenance', waterMl: waterCalc?.total?Math.round(waterCalc.total*1000):0, injections: injections.map(i=>({type:i.type,dose:i.dose,name:i.name,time:i.time})), workoutTime: linkToTraining&&_trainDaysArr.some(Boolean)?trainStart:undefined });
-      if (rep) { setNutritionReport(rep); setActiveReports(prev=>prev.includes('nutrition')?prev:[...prev,'nutrition']);
-        if (archive) { try { const arch = JSON.parse(localStorage.getItem('he_nutrition_report_archive')||'[]'); arch.unshift(rep); safeWriteJSON('he_nutrition_report_archive', arch.slice(0,50)); safeWriteJSON('he_nutrition_report_current', rep); try { safeWriteJSON('he_profile_nutrition_reports', arch.slice(0,20)); } catch {} } catch {} }
-      }
-    } catch(e) { try { console.error('Report failed:', e); } catch {} }
-  };
-  // D-26: auto-run drug-compat check when the plan changes (live food-drug warnings).
-  useEffect(() => { try { generateDrugCompatReport(); } catch (e: any) { try { console.warn('[Planner] drug-compat report failed:', e); } catch {} } }, [dayPlan, injections, v2Pharma, phase, takenSupplements]);
-  // D-25: auto-generate the report (without archiving) whenever the day plan changes,
-  // so the dietology scorecard in the day card is live without opening the Отчёт tab.
-  useEffect(() => { if (dayPlan) generateFullNutritionReport(dayPlan, false); }, [dayPlan]);
+  // Хвост-1 (god-component рефактор): состояние отчётов + генераторы вынесены в под-хук
+  // (planner-report-state.ts). Возвращает те же имена — раскладываются в PlanCtx ниже.
+  const {
+    activeReports, setActiveReports, allergenReport, setAllergenReport, nutrientReport, setNutrientReport,
+    qualityReport, setQualityReport, riskReport, setRiskReport,
+    drugCompatReport, setDrugCompatReport, nutritionReport, setNutritionReport,
+    generateAllergenReport, generateNutrientReport, generateQualityReport, generateRiskReport,
+    generateDrugCompatReport, generateFullNutritionReport,
+  } = usePlannerReportState({
+    dayPlan, allergens, budget, weight, injections,
+    v2Pharma: v2Pharma && typeof v2Pharma === 'object' ? v2Pharma : {},
+    phase, takenSupplements: Array.isArray(takenSupplements) ? takenSupplements : [],
+    planTargets, planType, variety, healthIssues, waterCalc,
+    linkToTraining, trainStart, trainDaysArr: _trainDaysArr, carbPeriodization,
+  });
 
   // P1-7: renderMealList вынесен в MealListRender.tsx (267 строк → 1 строка)
   const ctx = useMemo<Omit<PlanCtx, 'renderMealList'>>(() => ({
