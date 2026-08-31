@@ -2197,10 +2197,20 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       return;
     }
     saveUndo();
-    const items2 = buildRecipeMealItems(recipe) || [];
-    if (items2.length === 0) { setRecipePickerMeal(null); return; }
+    // Масштабирование ВТОРОГО рецепта к ОСТАТКУ цели приёма (цель − факт первого).
+    // Оба рецепта остаются и оба масштабируются под КБЖУ приёма атлета. Если первый уже
+    // закрыл/перебрал приём — второй берётся минимальной порцией (право пользователя,
+    // не «выдавливаем» первый рецепт).
+    const _mt = m?.target || { p: m?.totals?.p ?? 30, c: m?.totals?.c ?? 40, f: m?.totals?.f ?? 15 };
+    const _targetKcal = Math.round((_mt.p || 0) * 4 + (_mt.f || 0) * 9 + (_mt.c || 0) * 4) || m?.totals?.kcal || 300;
+    const _firstKcal = m?.totals?.kcal || 0;
+    const _roomKcal = Math.max(150, _targetKcal - _firstKcal);
+    const scaled2 = scaleRecipeToTarget(recipe, { kcal: _roomKcal, p: _mt.p || 30, f: _mt.f || 15, c: _mt.c || 40 }, weight);
+    const items2 = scaled2 ? scaled2.items : buildRecipeMealItems(recipe);
+    if (!items2 || items2.length === 0) { setRecipePickerMeal(null); return; }
     const mergedItems = [...(m.items || []), ...items2];
     const flat2 = flattenRecipeOption(recipe);
+    if (scaled2) flat2.appliedScale = scaled2.scale;
     const patched = resolved.meals.map((x: any, i: number) => i === mealIdx
       ? { ...x, items: mergedItems, totals: sumMealTotals(mergedItems), recipeApplied2: recipe.name, recipeAppliedData2: flat2 }
       : x);
