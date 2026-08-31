@@ -7,7 +7,7 @@
  * - addDayScore/loadDayScores roundtrip (localStorage mock из setup).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { computeDayScoreTrend, addDayScore, loadDayScores } from '../day-score-trend';
+import { computeDayScoreTrend, addDayScore, loadDayScores, clearDayScores } from '../day-score-trend';
 
 describe('computeDayScoreTrend (доп. 1)', () => {
   beforeEach(() => { try { localStorage.clear(); } catch {} });
@@ -45,5 +45,13 @@ describe('computeDayScoreTrend (доп. 1)', () => {
     const list = loadDayScores();
     expect(list.filter(r => r.date === '2026-08-11')).toHaveLength(1);
     expect(list.find(r => r.date === '2026-08-11')?.score).toBe(9);
+  });
+
+  it('clearDayScores очищает всю историю', () => {
+    addDayScore('2026-08-10', 7.2);
+    addDayScore('2026-08-11', 8);
+    expect(loadDayScores().length).toBeGreaterThan(0);
+    clearDayScores();
+    expect(loadDayScores()).toEqual([]);
   });
 });

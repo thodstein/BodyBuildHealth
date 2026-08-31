@@ -73,12 +73,15 @@ export const VARIETY_LEVELS: { id: VarietyLevel; label: string; icon: string; de
   { id: 'high', label: 'Максимум', icon: '🎪', desc: '20 продуктов/кат, строгое разнообразие', color: '#8b5cf6' },
 ];
 
-export const PLAN_TYPES: { id: PlanType; label: string; icon: string; desc: string; pMult?: number; fMult?: number; cMult?: number }[] = [
+// Хвост-3: декоративные pMult/fMult/cMult удалены — floor/MPS-модификаторы стиля питания
+// теперь в ЕДИНОМ источнике planTypeFloorMods (planner-day-targets.ts). PLAN_TYPES — только
+// отображение (label/icon/desc); реальный макро-профиль дня задаёт buildDayTargets(dietStyle).
+export const PLAN_TYPES: { id: PlanType; label: string; icon: string; desc: string }[] = [
   { id: 'classic', label: 'Классический', icon: '🥩', desc: 'Сбалансированное питание' },
-  { id: 'keto', label: 'Кето', icon: '🥑', desc: 'Низкоуглеводный, высокожировой', cMult: 0.1, fMult: 2.5 },
-  { id: 'highcarb', label: 'Высоко-углеводный', icon: '🍚', desc: '60% углеводов', cMult: 1.35, pMult: 0.85 },
-  { id: 'mediterranean', label: 'Средиземноморский', icon: '⚖️', desc: 'Рыба, оливки, овощи', fMult: 1.3, cMult: 0.85 },
-  { id: 'vegetarian', label: 'Вегетарианский', icon: '🌱', desc: 'Растительный белок', pMult: 0.8, fMult: 1.2 },
+  { id: 'keto', label: 'Кето', icon: '🥑', desc: 'Низкоуглеводный, высокожировой' },
+  { id: 'highcarb', label: 'Высоко-углеводный', icon: '🍚', desc: '60% углеводов' },
+  { id: 'mediterranean', label: 'Средиземноморский', icon: '⚖️', desc: 'Рыба, оливки, овощи' },
+  { id: 'vegetarian', label: 'Вегетарианский', icon: '🌱', desc: 'Растительный белок' },
 ];
 
 export const ALLERGEN_LIST = [

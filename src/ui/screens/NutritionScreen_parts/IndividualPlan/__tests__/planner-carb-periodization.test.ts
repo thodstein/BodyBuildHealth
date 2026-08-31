@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { applyCarbPeriodizationMods, carbPeriodizationLabel } from '../planner-carb-periodization';
+import { applyCarbPeriodizationMods, carbPeriodizationLabel, expectedWeekKcal } from '../planner-carb-periodization';
 
 describe('applyCarbPeriodizationMods: none', () => {
   it('не меняет день (1.0/1.0), не рефид', () => {
@@ -145,5 +145,40 @@ describe('детерминизм и чистота', () => {
   });
   it('не мутирует вход', () => {
     expect(() => applyCarbPeriodizationMods('wave', 14, true)).not.toThrow();
+  });
+});
+
+describe('expectedWeekKcal (хвост-4: «Неделя vs план» с учётом периодизации)', () => {
+  it('none: неделя = effectiveKcal × 7', () => {
+    expect(expectedWeekKcal(3000, 'none', 0, Array(7).fill(false))).toBe(21000);
+  });
+  it('wave неделя 2 (weekIndex 2) = поддержание ×0.9 → 18900', () => {
+    expect(expectedWeekKcal(3000, 'wave', 2, Array(7).fill(false))).toBe(18900);
+  });
+  it('wave рабочие недели 0 и 1 = ×1.0', () => {
+    expect(expectedWeekKcal(3000, 'wave', 0, Array(7).fill(false))).toBe(21000);
+    expect(expectedWeekKcal(3000, 'wave', 1, Array(7).fill(false))).toBe(21000);
+  });
+  it('wave 6-я неделя месяца (weekIndex 5) = поддержание (волна продолжается)', () => {
+    expect(expectedWeekKcal(3000, 'wave', 5, Array(7).fill(false))).toBe(18900);
+  });
+  it('heavyTrainDay применяет +5% ровно на один день недели', () => {
+    // Какой бы ни был сегодняшний день недели, ровно один offset из [0..6] совпадает
+    // с выбранным тяжёлым днём → +5% на одну порцию (150 ккал при цели 3000).
+    const heavy = expectedWeekKcal(3000, 'none', 0, Array(7).fill(false), 'Пн', ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']);
+    expect(heavy).toBe(21000 + Math.round(3000 * 0.05));
+  });
+  it('heavyTrainDay не задан → без бонуса', () => {
+    expect(expectedWeekKcal(3000, 'none', 0, Array(7).fill(false), undefined, undefined)).toBe(21000);
+  });
+  it('refeed: 1 рефид-день ×1.12 + 6 дней ×0.85', () => {
+    const k = expectedWeekKcal(3000, 'refeed', 0, Array(7).fill(false));
+    // offset%7===6 → рефид, остальные 0.85
+    expect(k).toBe(Math.round(3000 * 1.12) + 6 * Math.round(3000 * 0.85));
+  });
+  it('детерминизм', () => {
+    const a = expectedWeekKcal(3000, 'wave', 2, Array(7).fill(true));
+    const b = expectedWeekKcal(3000, 'wave', 2, Array(7).fill(true));
+    expect(a).toBe(b);
   });
 });

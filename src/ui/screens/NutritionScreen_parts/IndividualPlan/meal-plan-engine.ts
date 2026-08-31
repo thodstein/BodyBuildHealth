@@ -39,6 +39,7 @@ import {
 } from "./food-availability";
 import { correctDayToTargets as _correctDayToTargets } from "./day-target-corrector";
 import { computeEA } from "./planner-ea.engine";
+import { planTypeFloorMods } from "./planner-day-targets";
 
 // ─── Публичные типы ────────────────────────────────────────────────────
 export interface MealItem {
@@ -125,8 +126,9 @@ export interface MealPlanInput {
   lunchTime?: string;
   dinnerTime?: string;
   bedTime?: string;
-  // Plan type multipliers (keto, highcarb, mediterranean, vegetarian)
-  planTypeMod?: { pMult: number; fMult: number; cMult: number };
+  // Стиль питания (keto/highcarb/mediterranean/vegetarian/classic) — ЕДИНЫЙ источник
+  // floor/MPS-модификаторов через planTypeFloorMods (хвост-3: удалён декоративный planTypeMod).
+  planType?: string;
   // Evening low-carb: reduce dinner carbs, increase lunch carbs
   eveningLowCarb?: boolean;
   // Lab values for dietary adjustments (key = lab code from REFERENCE_RANGES)
@@ -2191,7 +2193,10 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
 
   // Early declarations needed for lab adjustments
   const notes: string[] = [];
-  const ptm = input.planTypeMod || { pMult: 1.0, fMult: 1.0, cMult: 1.0 };
+  // Хвост-3: floor/MPS-модификаторы из ЕДИНОГО источника (planTypeFloorMods), а не из
+  // отдельного декоративного planTypeMod. Реальный макро-профиль дня задаёт buildDayTargets.
+  const _ptm = planTypeFloorMods(input.planType);
+  const ptm = { pMult: _ptm.pMult, cMult: _ptm.cMult };
 
   // 🧪 Lab-driven dietary adjustments (compute BEFORE building pools)
   const labAdj = computeLabDietAdjustment(input);
@@ -2201,7 +2206,6 @@ export function buildDayPlan(input: MealPlanInput): DayPlanV2 {
   // Apply macro multipliers from labs
   if (labAdj.macroAdjustments.proteinMult) ptm.pMult = (ptm.pMult || 1) * labAdj.macroAdjustments.proteinMult;
   if (labAdj.macroAdjustments.carbMult) ptm.cMult = (ptm.cMult || 1) * labAdj.macroAdjustments.carbMult;
-  if (labAdj.macroAdjustments.fatMult) ptm.fMult = (ptm.fMult || 1) * labAdj.macroAdjustments.fatMult;
   // Merge lab restrictions/preferences with user's
   const combinedExcluded = new Set([...(input.excludedIds || []), ...labAdj.restrictFoodIds]);
   const combinedPreferred = new Set([...(input.preferredIds || []), ...labAdj.preferFoodIds]);

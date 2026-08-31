@@ -61,12 +61,32 @@ export function readJSONSafe<T>(key: string, fallback: T, validate: (v: any) => 
 
 /** Run once on app load. Wipes localStorage keys whose JSON shape no longer matches the
  *  expected schema. Prevents old-version corruption from breaking the planner. */
-export const PLANNER_SCHEMA_VERSION = 6;
+export const PLANNER_SCHEMA_VERSION = 7;
 export function migratePlannerStorage(): void {
   try {
     const vRaw = localStorage.getItem('he_planner_schema_version');
     const v = vRaw ? parseInt(vRaw, 10) : 0;
     if (v >= PLANNER_SCHEMA_VERSION) return;
+    // v7: почистить мёртвый груз legacy-полей из he_planner_prefs — больше не читаются
+    // генерацией (заменены единым carbPeriodization / proteinPreset / generationMode).
+    if (v < 7) {
+      try {
+        const raw = localStorage.getItem('he_planner_prefs');
+        if (raw) {
+          const p = JSON.parse(raw);
+          if (p && typeof p === 'object' && !Array.isArray(p)) {
+            const legacyKeys = ['cyclingMode', 'dietPauseMode', 'periodizationEnabled', 'nutrLevel', 'useRecipesInPlan', 'hungerLevel', 'carbCapGPerKg'];
+            let dirty = false;
+            for (const k of legacyKeys) {
+              if (k in p) { delete p[k]; dirty = true; }
+            }
+            if (dirty) {
+              try { localStorage.setItem('he_planner_prefs', JSON.stringify(p)); } catch {}
+            }
+          }
+        }
+      } catch {}
+    }
     // v6: nutrLevel→protein preset (same ids, new semantics), variety+strictness→varietyLevel, cycling+dietPause+wave→carbPeriodization, classic removed
     if (v < 6) {
       try {

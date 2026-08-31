@@ -2844,7 +2844,10 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           randomSalt: planRandomSalt,
           variety: plannerModeRef.current === 'minimal' ? 'minimal' : plannerModeRef.current === 'simple' ? 'medium' : variety,
           wakeTime, lunchTime, dinnerTime, bedTime,
-          planTypeMod: (() => { const pt = PLAN_TYPES.find(p => p.id === (dietPrefs.includes('vegetarian') ? 'vegetarian' : planType)); return { pMult: pt?.pMult || 1.0, fMult: pt?.fMult || 1.0, cMult: pt?.cMult || 1.0 }; })(),
+          // Хвост-3: floor/MPS-модификаторы стиля питания теперь из ЕДИНОГО источника
+          // (planTypeFloorMods в planner-day-targets) — движок сам выводит их из planType.
+          // Декоративный planTypeMod (PLAN_TYPES pMult/fMult/cMult) удалён.
+          planType,
           eveningLowCarb,
           addMilkToBreakfast,
           breakfastStyle,

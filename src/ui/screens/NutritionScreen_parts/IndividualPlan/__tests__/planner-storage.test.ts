@@ -87,4 +87,32 @@ describe('planner-storage — defensive localStorage', () => {
      expect(memStore['he_planner_pharma']).toBe('{"insulin":true}');
    });
 
+   it('migratePlannerStorage v7: чистит мёртвые legacy-поля из he_planner_prefs', () => {
+     memStore['he_planner_prefs'] = JSON.stringify({
+       cyclingMode: 'macro', dietPauseMode: 'refeed', periodizationEnabled: true,
+       nutrLevel: 'enhanced', useRecipesInPlan: true, hungerLevel: 3,
+       carbPeriodization: 'none', proteinPreset: 'base', generationMode: 'products',
+     });
+     migratePlannerStorage();
+     const prefs = JSON.parse(memStore['he_planner_prefs']);
+     expect(prefs.cyclingMode).toBeUndefined();
+     expect(prefs.dietPauseMode).toBeUndefined();
+     expect(prefs.periodizationEnabled).toBeUndefined();
+     expect(prefs.nutrLevel).toBeUndefined();
+     expect(prefs.useRecipesInPlan).toBeUndefined();
+     expect(prefs.hungerLevel).toBeUndefined();
+     // Актуальные поля не тронуты
+     expect(prefs.carbPeriodization).toBe('none');
+     expect(prefs.proteinPreset).toBe('base');
+     expect(prefs.generationMode).toBe('products');
+     expect(memStore['he_planner_schema_version']).toBe(String(PLANNER_SCHEMA_VERSION));
+   });
+
+   it('migratePlannerStorage v7: пустые/необъектные prefs не ломают миграцию', () => {
+     memStore['he_planner_prefs'] = '"not-an-object"';
+     migratePlannerStorage();
+     expect(memStore['he_planner_prefs']).toBe('"not-an-object"');
+     expect(memStore['he_planner_schema_version']).toBe(String(PLANNER_SCHEMA_VERSION));
+   });
+
 });

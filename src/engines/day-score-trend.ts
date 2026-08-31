@@ -30,6 +30,10 @@ export function loadDayScores(): DayScoreRecord[] {
   } catch { return []; }
 }
 
+export function clearDayScores(): void {
+  try { localStorage.removeItem(KEY); } catch {}
+}
+
 export function addDayScore(date: string, score: number): void {
   if (!Number.isFinite(score)) return;
   try {

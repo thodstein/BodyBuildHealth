@@ -23,6 +23,31 @@
 import { computeDieteticCarbTarget, plannerGoalCategory } from './planner-targets';
 import type { PlannerTargets } from './planner-targets';
 
+/**
+ * ЕДИНЫЙ источник floor/MPS-модификаторов стиля питания (planType) — Эпик «хвост-3».
+ *
+ * Раньше было ДВА механизма для одного решения:
+ *  1. `buildDayTargets(dietStyle)` — РЕАЛЬНЫЙ макро-профиль дня (кето: угли ≤6% ккал,
+ *     highcarb: жиры на полу 0.8 г/кг и т.д.) → цели день, генерируемые движком;
+ *  2. «декоративный» `planTypeMod` {pMult/fMult/cMult} из PLAN_TYPES, который приезжал
+ *     в движок отдельным полем и умножал ТОЛЬКО флоры (CARB_FLOOR через cMult, MPS-порции
+ *     через pMult), никак не влияя на реальные цели дня.
+ *
+ * Это была двойная семантика: стиль питания влиял на день и через профиль, и через
+ * отдельный декоративный множитель флоров. Унификация: множители флоров/MPS выводятся
+ * здесь (единственный источник), движок получает `planType` и сам их применяет — поле
+ * `planTypeMod` из входа движка и поиск по PLAN_TYPES в Context удалены.
+ */
+export function planTypeFloorMods(planType?: string | null): { pMult: number; cMult: number } {
+  switch (planType) {
+    case 'keto': return { pMult: 1.0, cMult: 0.1 };              // низкоуглеводный → флор углей вниз
+    case 'highcarb': return { pMult: 0.85, cMult: 1.35 };        // больше углей → флор выше, MPS-порция меньше
+    case 'mediterranean': return { pMult: 1.0, cMult: 0.85 };
+    case 'vegetarian': return { pMult: 0.8, cMult: 1.0 };        // растительный → MPS-порция ниже (лейцин реже)
+    default: return { pMult: 1.0, cMult: 1.0 };
+  }
+}
+
 export interface DayTargetsInput {
   weightKg: number;
   presetGPerKg: number;          // пресет белка пользователя (1.6-2.6), v6

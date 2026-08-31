@@ -19,7 +19,9 @@
 - **NEW тесты**: planner-carb-periodization (17), planner-goal-phase (12), planner-quality-levels (10), planner-micro-pools (18), planner-cycle-calendar (16), planner-meal-targets (9), planner-integration-guarantees (7) + обновлённые.
 - **ВНИМАНИЕ**: полный vitest ~8363 тестов — 90 падений пред-существующие/чужие (bb-агент, дневниковый агент, .tmp/combat) — доказано worktree на базе 35d5b6a63 (идентичные наборы). Чужие файлы не тронуты.
 
-## Планировщик питания: эпики A–G по плану NUTRITION-PLANNER-QUALITY-PLAN (Aug 30 2026)
+## Планировщик питания: эпики A–G по плану NUTRITION-PLANNER-QUALITY-PLAN (Aug 30 2026) — 🔥 ПЛАН УДАЛЁН
+
+> ⚠️ План `docs/NUTRITION-PLANNER-QUALITY-PLAN.md` (и `NUTRITION-V2-ROADMAP.md`, `NUTRITION-PLANNER-OVERHAUL-PLAN.md`) **удалён** — заменён единым `docs/NUTRITION-PROFESSIONAL-PLAN.md` (см. секцию «профессиональный диетолог» выше). Эта секция — историческая запись выполненной работы; её содержание уже перекрыто эпиками 1–9 нового плана. Не использовать как источник актуальных требований.
 
 Полное выполнение плана «качественный рацион для бодибилдинга» (docs/NUTRITION-PLANNER-QUALITY-PLAN.md).
 Коммиты: 3f8526d8 (A), dcfede32a (B), 8a9f08267 + b748bb88b + 97e6f8512 (C), f22fab3cc (D), 035a6417f (E+F), 74a0d4222 (G), b550160f5 (nutrition-db plant milks). Область IndividualPlan: **527/527 тестов зелёные**, tsc 0 по моим файлам.

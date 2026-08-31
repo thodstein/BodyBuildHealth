@@ -8,8 +8,8 @@ import { resolveAllergenFoodIds } from "./planner-restrictions";
 import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
-import { carbPeriodizationLabel } from "./planner-carb-periodization";
-import { computeDayScoreTrend, loadDayScores } from "../../../../engines/day-score-trend";
+import { carbPeriodizationLabel, expectedWeekKcal } from "./planner-carb-periodization";
+import { computeDayScoreTrend, loadDayScores, clearDayScores } from "../../../../engines/day-score-trend";
 import { DailyDietDashboard } from "../DailyDietDashboard";
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
@@ -51,7 +51,7 @@ export const IndividualPlanResults: React.FC = () => {
     renderMealList, effectiveKcal, effectiveP, effectiveF, effectiveC,
     dayPlanNotes, setDayPlanNotes,
     autoCorrectPlan, allergens, allergenExcludedCount, excludedFoods, healthIssues,
-    carbPeriodization, waterCalc, setWaterCalc,
+    carbPeriodization, waterCalc, setWaterCalc, heavyTrainDay,
     showRecipeCreator, setShowRecipeCreator, newRecipe, setNewRecipe,
     userRecipes, setUserRecipes,
     shoppingList, setShoppingList, injections,
@@ -564,6 +564,7 @@ const doImportPlan = (raw: string): boolean => {
               <div style={{ textAlign:'center', minWidth:64, padding:'6px 8px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }} title={`Средний скор за 7 дней: ${trend.avg7}/10 · за 30 дней: ${trend.avg30}/10`}>
                 <div style={{ fontSize:13, fontWeight:900, color: trend.direction === 'up' ? '#4ade80' : trend.direction === 'down' ? '#f87171' : 'rgba(255,255,255,0.6)', lineHeight:1 }}>{trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '►'} {trend.delta > 0 ? '+' : ''}{trend.delta.toFixed(1)}</div>
                 <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', fontWeight:600, marginTop:2 }}>7д / {trend.avg30.toFixed(1)} за 30д</div>
+                <button onClick={() => { try { clearDayScores(); (window as any).showToast?.('🗑 История качества дня сброшена', 'info'); } catch {} }} title="Сбросить историю качества дня" style={{ marginTop:2, fontSize:7, padding:'1px 6px', borderRadius:999, cursor:'pointer', background:'rgba(239,68,68,0.12)', color:'#f87171', border:'1px solid rgba(239,68,68,0.25)' }}>🗑</button>
               </div>
             )}
             {trend && !trend.has30 && (() => { const n = loadDayScores().length; return n > 0 ? (
@@ -902,19 +903,31 @@ const doImportPlan = (raw: string): boolean => {
           </div>
           {/* Эпик-хвост (9а): неделя vs план — ккал и Б/Ж/У против целей */}
           {(() => {
-            const planK = effectiveKcal * 7;
+            // Хвост-4: «Неделя vs план» учитывает недельную периодизацию углеводов (волна 2+1 —
+            // каждая 3-я неделя поддержание ×0.9; рефид/цикл/БУЧ меняют дневные цели). Раньше
+            // сравнение шло против effectiveKcal × 7 → для недель месяца ложно «вне ±5%».
+            const weekIdx = monthPlanMode ? (selectedWeek || 0) : 0;
+            const isTrainArr = (Array.isArray(weekPlan?.days) ? weekPlan.days : []).map((d: any) => !!d?.isTrainingDay);
+            const planK = monthPlanMode
+              ? expectedWeekKcal(effectiveKcal, carbPeriodization, weekIdx, isTrainArr, heavyTrainDay, DAY_LABELS)
+              : Math.round((effectiveKcal || 0) * 7);
             const factK = Math.round(weekPlan.totals?.kcal || 0);
             const devK = planK > 0 ? Math.round((factK - planK) / planK * 100) : 0;
             const okK = Math.abs(devK) <= 5;
             const rows: [string, number, number, string][] = [
-              ['Б', Math.round(weekPlan.totals?.p || 0), effectiveP * 7, '#3b82f6'],
-              ['Ж', Math.round(weekPlan.totals?.f || 0), effectiveF * 7, '#f59e0b'],
-              ['У', Math.round(weekPlan.totals?.c || 0), effectiveC * 7, '#f97316'],
+              ['Б', Math.round(weekPlan.totals?.p || 0), Math.round((effectiveP || 0) * 7), '#3b82f6'],
+              ['Ж', Math.round(weekPlan.totals?.f || 0), Math.round((effectiveF || 0) * 7), '#f59e0b'],
+              ['У', Math.round(weekPlan.totals?.c || 0), Math.round((effectiveC || 0) * 7), '#f97316'],
             ];
+            const waveNote = monthPlanMode && carbPeriodization === 'wave' && (weekIdx % 3 === 2)
+              ? ' · волна 2+1: неделя поддержания ×0.9'
+              : monthPlanMode && carbPeriodization !== 'none'
+                ? ` · ${carbPeriodizationLabel(carbPeriodization)}`
+                : '';
             return (
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.85)', marginBottom: 8, padding: '6px 10px', borderRadius: 8, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.1)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <span style={{ fontWeight: 700, color: okK ? '#22c55e' : '#fbbf24' }}>🎯 Неделя vs план: {factK} / {Math.round(planK)} ккал ({devK > 0 ? '+' : ''}{devK}%)</span>
+                  <span style={{ fontWeight: 700, color: okK ? '#22c55e' : '#fbbf24' }}>🎯 Неделя vs план: {factK} / {Math.round(planK)} ккал ({devK > 0 ? '+' : ''}{devK}%){waveNote}</span>
                   <span style={{ color: okK ? '#22c55e' : '#fbbf24' }}>{okK ? '✓ в коридоре ±5%' : 'вне ±5%'}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 10 }}>

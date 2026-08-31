@@ -118,3 +118,38 @@ export function isHeavyDayForOffset(
   const dow = ((new Date().getDay() + 6) % 7 + offset) % 7;
   return dayLabels[dow] === heavyTrainDay;
 }
+
+/**
+ * Ожидаемая калорийность НЕДЕЛИ плана с учётом недельной периодизации углеводов.
+ *
+ * Зачем: «Неделя vs план» раньше сравнивал факт недели с `effectiveKcal × 7`, что
+ * не учитывало волну 2+1 (каждая 3-я неделя — поддержание ×0.9) и дневные моды
+ * (refeed/carb_cycle/butch/two_one/five_two). Для недель месяца сравнение ложно
+ * показывало «вне ±5%» при корректном плане.
+ *
+ * Считает сумму ожидаемых целей дней недели: для каждого offset из диапазона
+ * [weekIndex*7, weekIndex*7+6] применяет dayKcalMod из applyCarbPeriodizationMods
+ * (волна/рефид/цикл) + тяжелый день (+5%). Тренировочность дня берётся из фактически
+ * сгенерированного дня (weekPlan.days[i].isTrainingDay), тяжёлый день — по выбранному
+ * дню недели. Возвращает округлённое ожидаемое значение недели.
+ */
+export function expectedWeekKcal(
+  effectiveKcal: number,
+  mode: CarbPeriodization | undefined | null,
+  weekIndex: number,
+  isTrainDays: boolean[],
+  heavyTrainDay?: string | undefined | null,
+  dayLabels?: string[],
+): number {
+  const kcal = Math.max(1200, effectiveKcal || 0);
+  let total = 0;
+  const base = weekIndex * 7;
+  for (let i = 0; i < 7; i++) {
+    const offset = base + i;
+    const isTrain = !!(isTrainDays && isTrainDays[i]);
+    let mod = applyCarbPeriodizationMods(mode, offset, isTrain).dayKcalMod;
+    if (isHeavyDayForOffset(heavyTrainDay, offset, dayLabels)) mod *= 1.05;
+    total += Math.round(kcal * mod);
+  }
+  return total;
+}
