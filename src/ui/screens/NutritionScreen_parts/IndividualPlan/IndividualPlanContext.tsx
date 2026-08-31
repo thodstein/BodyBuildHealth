@@ -39,6 +39,7 @@ import { stapleFamilyOf } from "./food-availability";
 import { getYesterdaySummary, computeCompensation, computeRollingCompensation, type CompensationResult } from "./planner-diary-adaptation";
 import { getMenstrualPhaseNutrition, getCalciumTarget, calciumDoseSplitNote, getFemaleSupplementRules, type MenstrualPhase, getLifeStageNote, type LifeStage, computeEnergyAvailability } from "./planner-female-cycle";
 import { autoCyclePhase, CYCLE_PHASE_RU } from "./planner-cycle-calendar";
+import { addDayScore } from "../../../../engines/day-score-trend";
 import { getBBCategory, type BBCategory, getCategoryDeficitMod, getCombinedDeficitMod } from "./planner-categories";
 import { computePeakWeekNutritionTargets, deserializeBBPrepConfig, serializeBBPrepConfig, legacyConfigFromProfile, isoToday, isoAddDays, planFromStored, configFromPlan, nutritionTargetsForPrepDate, prepPhaseForDate, type BBContestPrepConfig, type BBContestPrepPlan } from "../../../../engines/bb/bb-contest-prep.engine";
 import { saveContestPrepEverywhere, clearContestPrepEverywhere, migrateLegacyContestPrepIfNeeded, CONTEST_PREP_UPDATED_EVENT } from "../../../../engines/bb/bb-contest-prep-sync";
@@ -2870,6 +2871,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         const _conflicts = v2.meals.reduce((s:number,m:any)=>s + (m.rationale||[]).filter((r:string)=>r.startsWith('⚠')).length, 0);
         const _healthScore = Math.max(0, Math.min(100, Math.round(_microAvg*0.3 + _fiberScore*0.15 + _mpsScore*0.2 + _eaScore*0.2 + _divScore*0.15) - _conflicts*5));
         const _healthStatus: 'green' | 'yellow' | 'red' = _healthScore >= 75 ? 'green' : _healthScore >= 55 ? 'yellow' : 'red';
+        // Эпик 9в: тренд качества — запись скора дня (0-10) в историю.
+        try { if (plannerModeRef.current === 'pro') addDayScore(_prepDate, _healthScore / 10); } catch {}
         // Преобразуем DayPlanV2 → совместимый формат старого dayPlan
         const meals = v2.meals.map((m: any) => ({
           label: m?.label || 'Приём пищи', time: m?.time || '', items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({

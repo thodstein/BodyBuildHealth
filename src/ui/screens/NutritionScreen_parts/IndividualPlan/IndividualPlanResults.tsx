@@ -9,6 +9,7 @@ import type { DrugInjection } from "./types";
 import { GlassCard, greenBtn, reportPillStyle } from "./ui";
 import { usePlanCtx } from "./IndividualPlanContext";
 import { carbPeriodizationLabel } from "./planner-carb-periodization";
+import { computeDayScoreTrend, loadDayScores } from "../../../../engines/day-score-trend";
 import { DailyDietDashboard } from "../DailyDietDashboard";
 import { NutritionQualityCard } from '../../../components/NutritionQualityCard';
 import { calcMealScoreV2, calcMealDIAAS, analyzeDailyDiet, getDefaultProfile, type MealTiming, type DailyDietReport, type MealScoreV2 } from '../../../../engines/product-usefulness-v2.engine';
@@ -541,6 +542,9 @@ const doImportPlan = (raw: string): boolean => {
         const bg = hs.status === 'green' ? 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.04))' : hs.status === 'yellow' ? 'linear-gradient(135deg, rgba(245,158,11,0.10), rgba(245,158,11,0.04))' : 'linear-gradient(135deg, rgba(239,68,68,0.10), rgba(239,68,68,0.04))';
         const bor = hs.status === 'green' ? '1px solid rgba(34,197,94,0.22)' : hs.status === 'yellow' ? '1px solid rgba(245,158,11,0.22)' : '1px solid rgba(239,68,68,0.22)';
         const bars = [['Микро', hs.micro], ['Клетч', hs.fiber], ['MPS', hs.mps], ['EA', hs.ea], ['Диверс', hs.diversity]] as [string,number][];
+        // Эпик 9в: тренд качества 7/30 дней (движок day-score-trend)
+        let trend: { avg7: number; avg30: number; delta: number; direction: string; has30: boolean } | null = null;
+        try { trend = computeDayScoreTrend(loadDayScores()); } catch {}
         return (
           <div style={{ padding:'12px 14px', borderRadius:16, background:bg, border:bor, marginBottom:10, display:'flex', alignItems:'center', gap:12, boxShadow:'0 4px 16px rgba(0,0,0,0.12)' }}>
             <div style={{ textAlign:'center', minWidth:56, padding:'6px 0', borderRadius:12, background:`${col}14`, border:`1px solid ${col}22` }}>
@@ -556,6 +560,12 @@ const doImportPlan = (raw: string): boolean => {
                 </div>
               ))}
             </div>
+            {trend && trend.has30 && (
+              <div style={{ textAlign:'center', minWidth:64, padding:'6px 8px', borderRadius:12, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)' }} title={`Средний скор за 7 дней: ${trend.avg7}/10 · за 30 дней: ${trend.avg30}/10`}>
+                <div style={{ fontSize:13, fontWeight:900, color: trend.direction === 'up' ? '#4ade80' : trend.direction === 'down' ? '#f87171' : 'rgba(255,255,255,0.6)', lineHeight:1 }}>{trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '►'} {trend.delta > 0 ? '+' : ''}{trend.delta.toFixed(1)}</div>
+                <div style={{ fontSize:8, color:'rgba(255,255,255,0.5)', fontWeight:600, marginTop:2 }}>7д / {trend.avg30.toFixed(1)} за 30д</div>
+              </div>
+            )}
             {hs.conflicts > 0 && <span style={{ fontSize:11, color:'#f87171', fontWeight:800, background:'rgba(239,68,68,0.10)', border:'1px solid rgba(239,68,68,0.18)', padding:'4px 8px', borderRadius:999, whiteSpace:'nowrap' }}>⚠ {hs.conflicts}</span>}
           </div>
         );
@@ -849,17 +859,16 @@ const doImportPlan = (raw: string): boolean => {
       {generated && planDays === 7 && weekPlan && (
         <GlassCard title={monthPlanMode ? `Месячный план — Неделя ${selectedWeek + 1} / 4` : 'Недельный план'} icon="📋" color="#00e68a" style={{ border: '1px solid rgba(0,230,138,0.15)' }}>
           {monthPlanMode && monthPlan.length > 0 && (
-            <div style={{ display:'flex', gap:4, marginBottom:8, justifyContent:'center' }}>
+            <div style={{ display:'flex', gap:4, marginBottom:8, justifyContent:'center', flexWrap:'wrap' }}>
               {monthPlan.map((_, wi) => (
-                <button key={wi} onClick={() => {
-                  setSelectedWeek(wi);
-                  if (monthPlan[wi]) setWeekPlan(monthPlan[wi]);
-                }} style={{
-                  padding:'5px 12px', borderRadius:8, fontSize:9, fontWeight:700, cursor:'pointer',
+                <div key={wi} style={{ display:'flex', alignItems:'center', gap:2, padding:'4px 6px 4px 10px', borderRadius:8, cursor:'pointer', fontSize:9, fontWeight:700,
                   background: selectedWeek === wi ? 'linear-gradient(135deg,#a78bfa,#7c3aed)' : '#202023',
                   color: selectedWeek === wi ? '#fff' : 'rgba(255,255,255,0.85)',
                   border: selectedWeek === wi ? 'none' : '1px solid rgba(255,255,255,0.06)',
-                }}>Н{wi + 1}</button>
+                }} onClick={() => { setSelectedWeek(wi); if (monthPlan[wi]) setWeekPlan(monthPlan[wi]); }}>
+                  Н{wi + 1}{monthPlan[wi]?.totals?.kcal ? ` · ${Math.round((monthPlan[wi].totals.kcal || 0) / 7)}` : ''}
+                  <span title={`Перегенерировать неделю ${wi + 1} (без сброса остальных)`} onClick={(e) => { e.stopPropagation(); setSelectedWeek(wi); generatePlan(7, wi, undefined, { skipUndo: true, async: true }); }} style={{ cursor:'pointer', fontSize:10, padding:'1px 4px', borderRadius:5, color: selectedWeek === wi ? 'rgba(255,255,255,0.85)' : '#a78bfa', background: 'rgba(255,255,255,0.1)' }}>🔄</span>
+                </div>
               ))}
               <button onClick={() => { setMonthPlanMode(false); }} style={{
                 padding:'5px 8px', borderRadius:8, fontSize:9, cursor:'pointer',
