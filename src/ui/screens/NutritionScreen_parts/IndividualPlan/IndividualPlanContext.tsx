@@ -43,7 +43,7 @@ import { annualPlanPhaseForDate } from "../../../../engines/annual-training/bloc
 import { loadAnnualTrainingPlan } from "../../../../engines/annual-training/annual-training-storage";
 import type { AnnualTrainingPlan, AnnualBlockState } from "../../../../engines/annual-training/annual-training.types";
 import {
-  GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PROTEIN_PRESETS, PLAN_TYPES,
+  GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
   type GoalId, type PhaseId, type BudgetLevel, type NutritionLevel,
   type PlanType, type PlannerMode, type CarbPeriodization, type VarietyLevel,
@@ -127,8 +127,7 @@ export interface PlanCtx {
   manualC: number | null; setManualC: (v: any) => void;
   resultsRef: React.RefObject<HTMLDivElement | null>;
   budget: BudgetLevel; setBudget: (v: BudgetLevel) => void;
-  nutrLevel: NutritionLevel; setNutrLevel: (v: NutritionLevel) => void;
-  /** v6: protein preset (same ids as nutrLevel, семантика г/кг). nutrLevel оставлен как алиас. */
+  /** Эпик 3: белок-пресет (1.6-2.6 г/кг) — единственный «уровень белка» (legacy nutrLevel удалён). */
   proteinPreset: NutritionLevel; setProteinPreset: (v: NutritionLevel) => void;
   variety: string; setVariety: (v: any) => void;
   diaryAdaptation: boolean; setDiaryAdaptation: (v: boolean) => void;
@@ -800,19 +799,17 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s?.weight, s?.height, s?.age, s?.sex, s?.workoutsPerWeek, s?.avgWorkoutMinutes, bodyFatPct, dailySteps, householdActivity, trainType, trainIntensity]);
 
-  // v6 (Aug 28 2026): nutrLevel → пресет белка (г/кг). Те же id, новая семантика:
-  // белок = вес × gPerKg пресета, жиры — физиологический пол 0.8 г/кг (без множителя),
-  // угли — диетпотолок. NUTRITION_LEVELS оставлен для обратной совместимости.
-  const [nutrLevel, setNutrLevel] = useState<NutritionLevel>((['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base');
-  const _proteinGPerKg = PROTEIN_PRESETS.find(p => p.id === nutrLevel)?.gPerKg || 2.0;
-  // Алиас v6 для UI: proteinPreset === nutrLevel (одна сущность)
-  const proteinPreset: NutritionLevel = nutrLevel;
-  const setProteinPreset = setNutrLevel;
+  // Эпик 3: белок-пресет (г/кг) — единственный «уровень белка»; legacy nutrLevel
+  // (ложный множитель «план на N% больше») удалён полностью.
+  const [proteinPreset, setProteinPreset] = useState<NutritionLevel>((['base', 'medium', 'enhanced', 'max'] as const).includes((_pf as any).proteinPreset as any) ? (_pf as any).proteinPreset : (['base', 'medium', 'enhanced', 'max'] as const).includes(_pf.nutrLevel as any) ? _pf.nutrLevel : 'base');
+  const _proteinGPerKg = PROTEIN_PRESETS.find(p => p.id === proteinPreset)?.gPerKg || 2.0;
   // Эпик A (NUTRITION-PLANNER-QUALITY-PLAN): фактические цели дня — единая чистая функция
   // buildDayTargets (planner-day-targets.ts). Наука (TDEE→surplus→фаза→фарма→weight-adapt→
   // metabolic→female gate) задаёт КАЛОРАЖ, пресет белка — оверрайд, угли — остаток до цели.
   // effectiveP/F/C/Kcal сохраняют прежние имена (100+ потребителей).
-  const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? _pf.budget : 'medium');
+  const [budget, setBudget] = useState<BudgetLevel>((['low', 'medium', 'max', 'enhanced'] as const).includes(_pf.budget as any) ? (_pf.budget === 'enhanced' ? 'max' : _pf.budget) : 'medium');
+  // Эпик 3: стиль питания (planType) — реальные макро-профили keto/highcarb в целях дня.
+  const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
   const [variety, setVariety] = useState<'minimal' | 'medium' | 'max'>((['minimal', 'medium', 'max'] as const).includes(_pf.variety as any) ? _pf.variety : 'max');
   const _insulinUnits = (injections || []).filter((i: any) => String(i?.type || '').toLowerCase().includes('инсулин')).reduce((s: number, i: any) => s + (Number(i?.dose) || 0), 0);
   const _trainVolMin = (() => { try { return trainingDays.filter(Boolean).length * ((s as any)?.training?.minutesPerSession || 60); } catch { return 0; } })();
@@ -828,7 +825,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     trainingVolumeMinPerWeek: _trainVolMin,
     budget,
     insulinTotalUnits: _insulinUnits,
-  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits]);
+    dietStyle: planType,
+  }), [weight, _proteinGPerKg, kbjuMode, manualKcal, manualP, manualF, manualC, calcTargets, profileTargets, goal, _trainVolMin, budget, _insulinUnits, planType]);
   const dayTargetsBreakdown: string[] = dayTargets.breakdown;
   const effectiveP = dayTargets.protein;
   const effectiveF = dayTargets.fats;
@@ -938,8 +936,6 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
     } catch {}
     return 'auto';
   });
-
-  const [planType, setPlanType] = useState<PlanType>((['classic', 'keto', 'highcarb', 'mediterranean', 'vegetarian'] as const).includes(_pf.planType as any) ? _pf.planType : 'classic');
   // FIX persist-settings: пишем все локальные предпочтения в he_planner_prefs (debounce не нужен —
   // пишем на каждое изменение, объём крошечный). Раньше эти настройки не сохранялись вообще.
   useEffect(() => {
@@ -948,12 +944,12 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
         cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays,
         trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel,
         weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct,
-        weightLogPeriod, phase, nutrLevel, budget, variety,
+        weightLogPeriod, phase, proteinPreset, budget, variety,
         lunchTime, dinnerTime, workFood, planType, morningTrainLoad,
         cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan,
       });
     } catch {}
-  }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, weightLogPeriod, phase, nutrLevel, budget, variety, lunchTime, dinnerTime, workFood, planType, morningTrainLoad, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan]);
+  }, [cookTimeMin, cravingMode, cravingDays, lazyDayMode, lazyDayDays, trainType, trainIntensity, intraWorkoutEnabled, householdActivity, cyclePhase, hungerLevel, weightAdaptMode, expectedLossKgWeek, metabolicAdaptEnabled, metabolicAdaptPct, weightLogPeriod, phase, proteinPreset, budget, variety, lunchTime, dinnerTime, workFood, planType, morningTrainLoad, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan]);
 
   // P1-fix: preferredFoods из Profile (UnifiedSettings.nutrition.preferredFoods) + legacy
   const [preferredFoods, setPreferredFoods] = useState<string[]>(() => {
@@ -3294,7 +3290,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     effectiveKcal, effectiveP, effectiveF, effectiveC, dayTargetsBreakdown, carbCapClipped, carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
-    resultsRef, budget, setBudget, nutrLevel, setNutrLevel, proteinPreset, setProteinPreset,
+    resultsRef, budget, setBudget, proteinPreset, setProteinPreset,
     variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel, bbCategory, setBBCategory, peakWeekEnabled, setPeakWeekEnabled, peakWeekShowDay, setPeakWeekShowDay, bbPrepConfig, setBBPrepConfig, applyBBPeakToPlan, lifeStage, setLifeStage, wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime, mealsCount, setMealsCount,
     workFood, setWorkFood, allergens, setAllergens, healthIssues, setHealthIssues,
@@ -3365,7 +3361,7 @@ const [errorMsg, setErrorMsg] = useState<string | null>(null);
     useProEngine,
     planTab, setPlanTab,
     labs,
-  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, nutrLevel, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
+  }), [addPlanToDiary, weight, height, age, sex, dailySteps, cookTimeMin, cookingSkill, cookingFrequency, batchCooking, useRecipesInPlan, cravingMode, cravingDays, lazyDayMode, lazyDayDays, surplusPct, trainType, trainIntensity, householdActivity, bodyFatPct, sleepHours, sleepQuality, stressLevel, cyclePhase, hungerLevel, weightAdaptMode, weightLogWeek, expectedLossKgWeek, showWeightAdaptModal, weightLogEntries, weightLogPeriod, metabolicAdaptEnabled, metabolicAdaptPct, manualGPerKg, monthPlanMode, monthPlan, selectedWeek, goal, phase, goalUserSet, injections, injName, injTime, injDose, injUnit, injType, injEster, trainStart, trainEnd, linkToTraining, trainScheduleType, trainPattern, manualKcal, manualP, manualF, manualC, kbjuMode, budget, proteinPreset, variety, varietyLevel, wakeTime, bedTime, lunchTime, dinnerTime, workFood, morningTrainLoad, mealsCount, allergens, healthIssues, eveningLowCarb, addMilkToBreakfast, breakfastStyle, breakfastTemplate, planType, preferredFoods, quickAddMealIdx, quickAddSearch, customNotes, excludedFoods, dietPrefs, allergenExcludedCount, planTargets, carbPeriodization, heavyTrainDay, workScheduleEnabled, workStartTime, workEndTime, workDays, workScheduleType, trainingDays, generated, planDays, selectedDayIndex, planView, dayPlan, threeDayPlan, weekPlan, shoppingList, waterCalc, savedPlans, lockedFoodIds, expandedSavedId, editItem, editAmount, replacingItem, recipePickerMeal, mealPrep, dayPlanNotes, draggedItem, dropTarget, undoStack, userRecipes, showRecipeCreator, showAddDrug, showDrugTypePicker, takenSupplements, showSuppPicker, suppSearch, newRecipe, v2Phase, v2Labs, v2Pharma, histamineSensitive, errorMsg, planTab, specialMealMode, specialMealGoal, specialMealProteinG, specialMealFatG, specialMealCarbsG, specialMealTiming, specialMealReplaceMode, specialMealReplaceTarget, cheatMealPlan, carbloadPlan, butchPlan, cravingPlan, lazyDayPlan, recommendations, mealPrepPlan, mealPrepDays, activeReports, allergenReport, nutrientReport, qualityReport, riskReport, drugCompatReport, nutritionReport, profile, s, courseEntries, labAnalysis, labs, bbPrepConfig, autoGoal, injectDrugTypes, calcTargets, profileTargets, effectiveKcal, effectiveP, effectiveF, effectiveC, allergenExcludedCount]);
 
   const renderMealList = useRenderMealList({ ...ctx, plannerMode });
   const finalCtx = useMemo<PlanCtx>(() => ({ ...ctx, plannerMode, setPlannerMode, generationMode, setGenerationMode, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase }), [ctx, plannerMode, generationMode, favoriteRecipes, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, removeMealRebalanced, updateMealTime, duplicateMeal, renderMealList, annualPhase]);

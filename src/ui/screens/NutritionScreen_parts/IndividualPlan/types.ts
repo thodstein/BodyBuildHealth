@@ -36,28 +36,21 @@ export const PHASES: { id: PhaseId; label: string; icon: string; desc: string }[
   { id: 'recovery', label: 'Восстановление', icon: '🩹', desc: 'Повышенный белок, витамины, отдых' },
 ];
 
+// ─── Эпик 3: бюджет = качество продуктов (2 оси: белок-пресет + бюджет).
+// Уровень 'enhanced' удалён из UI (неотличим от 'max'); тип оставлен для legacy-сохранений.
 export const BUDGET_LEVELS: { id: BudgetLevel; label: string; icon: string; desc: string; color: string }[] = [
   { id: 'low', label: 'Низкий', icon: '🟢', desc: 'Бюджетные продукты, базовый набор', color: '#22c55e' },
   { id: 'medium', label: 'Средний', icon: '🟡', desc: 'Качество + цена, фермерские аналоги', color: '#f59e0b' },
   { id: 'max', label: 'Максимум', icon: '🟠', desc: 'Премиум продукты, органика', color: '#f97316' },
-  { id: 'enhanced', label: 'Усиленный', icon: '🔴', desc: 'Элитные продукты, спецсорта', color: '#ef4444' },
 ];
 
-export const NUTRITION_LEVELS: { id: NutritionLevel; label: string; icon: string; mult: number; desc: string }[] = [
-  { id: 'base', label: 'База', icon: '🟢', mult: 1.0, desc: '0%' },
-  { id: 'medium', label: '+15%', icon: '🟡', mult: 1.15, desc: 'Средний' },
-  { id: 'enhanced', label: '+30%', icon: '🟠', mult: 1.3, desc: 'Усиленный' },
-  { id: 'max', label: '+50%', icon: '🔴', mult: 1.5, desc: 'Максимум' },
-];
-
-// v6: nutrLevel → пресет белка (1.6–2.6 г/кг). Те же id, новая семантика — только белок,
-// жиры фиксируются на физиологическом поле 0.8 г/кг, угли — остаток в диетпотолке.
-// NUTRITION_LEVELS оставлен как алиас-совместимость для старых импортов/тестов.
+// ─── Эпик 3: белок-пресет (1.6–2.6 г/кг) — единственный «уровень белка».
+// Legacy NUTRITION_LEVELS (ложный множитель «план на N% больше») удалён полностью.
 export const PROTEIN_PRESETS: { id: NutritionLevel; label: string; icon: string; gPerKg: number; desc: string }[] = [
   { id: 'base', label: 'База', icon: '🟢', gPerKg: 1.6, desc: '1.6 г/кг' },
   { id: 'medium', label: 'Стандарт', icon: '🟡', gPerKg: 2.0, desc: '2.0 г/кг' },
   { id: 'enhanced', label: 'Актив', icon: '🟠', gPerKg: 2.2, desc: '2.2 г/кг' },
-  { id: 'max', label: 'Макс', icon: '🔴', gPerKg: 2.6, desc: '2.6 г/кг' },
+  { id: 'max', label: 'Макс белка', icon: '🔴', gPerKg: 2.6, desc: '2.6 г/кг' },
 ];
 
 // ─── v6: Единая периодизация углеводов (cyclingMode+dietPause+periodizationEnabled → одно) ──

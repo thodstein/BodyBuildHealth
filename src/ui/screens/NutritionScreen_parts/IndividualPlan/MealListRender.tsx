@@ -10,7 +10,7 @@ import { FOOD_DB } from "../../../../core/nutrition-database";
 import { calcMealDIAAS } from "../../../../engines/product-usefulness-v2.engine";
 import { scoreFoodsForKBJU, getMealKBJUTarget, getMealCurrentKBJU } from "../../../../engines/kbju-food-match.engine";
 import type { PlanCtx } from "./IndividualPlanContext";
-import { NUTRITION_LEVELS, PROTEIN_PRESETS } from "./types";
+import { PROTEIN_PRESETS } from "./types";
 import { OrganLoadBadgeGroup } from "./OrganLoadBadges";
 import { readDiaryV2, writeDiaryV2 } from "../diary-storage-v2";
 import { kbjuFormulaDeviationPct, RECIPE_PRESETS, recipeMatchesPreset } from "./planner-recipe-mode";
@@ -62,8 +62,8 @@ function useMealTimeEdit(saveUndo: () => void, applyTime: (mealIdx: number, time
 }
 
 export function useRenderMealList(ctx: Omit<PlanCtx, 'renderMealList'>) {
-  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, nutrLevel, proteinPreset, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal, addSnackComboToMeal, generationMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, removeMealRebalanced } = ctx as any;
-  const _proteinPreset = PROTEIN_PRESETS.find(p => p.id === (proteinPreset || nutrLevel))?.gPerKg || 2.0;
+  const { calcTargets, dayPlan, draggedItem, dropTarget, drugCompatReport, editAmount, editItem, effectiveC, effectiveF, effectiveKcal, effectiveP, excludedFoods, findSimilarFoods, healthIssues, injections, linkToTraining, lockedFoodIds, moveFoodItem, nutritionReport, proteinPreset, phase, plannerMode, preferredFoods, quickAddMealIdx, quickAddSearch, removeFoodItem, replaceFoodItem, replacingItem, saveUndo, setDayPlan: _setDayPlan, setDraggedItem, setDropTarget, setEditAmount: _setEditAmount, setEditItem, setExcludedFoods, setQuickAddMealIdx, setQuickAddSearch, setRecipePickerMeal, setReplacingItem, toggleLockFood, trainEnd, trainStart, updateItemAmount, waterCalc, weight, weightLogEntries, addFoodToMeal, addSnackComboToMeal, generationMode, pickRecipeOption, moreRecipeOptions, refreshRecipeSuggestions, favoriteRecipes, toggleFavoriteRecipe, isFavoriteRecipe, removeMealRebalanced } = ctx as any;
+  const _proteinPreset = PROTEIN_PRESETS.find(p => p.id === (proteinPreset || 'base'))?.gPerKg || 2.0;
   const setDayPlan = _setDayPlan as any;
   const setEditAmount = _setEditAmount as any;
   const timeEdit = useMealTimeEdit(saveUndo, (typeof (ctx as any).updateMealTime === 'function' ? (ctx as any).updateMealTime : (_i: number, _t: string) => {}));

@@ -37,6 +37,8 @@ export interface DayTargetsInput {
   trainingVolumeMinPerWeek?: number;
   budget?: string;
   insulinTotalUnits?: number;
+  /** Эпик 3: стиль питания (planType): 'keto'/'highcarb' реально меняют макро-профиль дня. */
+  dietStyle?: string;
 }
 
 export interface DayTargetsResult {
@@ -104,11 +106,39 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   const carbsRaw = Math.max(0, (kcalTarget - protein * 4 - fats * 9) / 4);
   const vol = Math.max(0, Number(input.trainingVolumeMinPerWeek) || 0);
   const goalPhase = plannerGoalCategory(input.goal || '');
+  // Эпик 3: стиль питания — РЕАЛЬНЫЙ макро-профиль (не декорация):
+  //   keto     — угли ≤6% ккал (кето-порог), жиры = остаток (кап 2.5 г/кг);
+  //   highcarb — жиры на физиологическом полу 0.8 г/кг, угли = максимум до потолка;
+  //   classic/mediterranean/vegetarian — без изменения целей (веган через пул).
+  const dietStyle = input.dietStyle || 'classic';
+  let fatsFinal = fats;
+  let carbsFinal: number;
+  if (dietStyle === 'keto') {
+    // Кето: угли ≤6% ккал (или ≤60 г — кето-порог), жиры = остаток с безопасным капом 3 г/кг.
+    // Если цель НЕ закрывается жирами в капе — угли честно поднимаются до минимума закрытия
+    // (кето-набор на 4300+ ккал физически невозможен без углей; это фиксируется в breakdown).
+    const ketoCarbCap = Math.max(20, Math.min(Math.round(kcalTarget * 0.06 / 4), 60));
+    let carbsKeto = Math.min(carbsRaw, ketoCarbCap);
+    const fatsKeto = Math.max(fatFloorAbs, Math.round((kcalTarget - protein * 4 - carbsKeto * 4) / 9));
+    const fatsCapKeto = Math.round(weight * 3.0);
+    if (fatsKeto > fatsCapKeto) {
+      fatsFinal = fatsCapKeto;
+      carbsKeto = Math.max(0, Math.round((kcalTarget - protein * 4 - fatsFinal * 9) / 4));
+    } else {
+      fatsFinal = fatsKeto;
+    }
+    carbsFinal = carbsKeto;
+  } else if (dietStyle === 'highcarb') {
+    fatsFinal = fatFloorAbs;
+    carbsFinal = Math.max(0, Math.round((kcalTarget - protein * 4 - fatsFinal * 9) / 4));
+  } else {
+    carbsFinal = Math.round(carbsRaw);
+  }
   const carbs = computeDieteticCarbTarget({
-    weightKg: weight, rawCarbsG: carbsRaw, insulinTotalUnits: insulinUnits,
+    weightKg: weight, rawCarbsG: carbsFinal, insulinTotalUnits: insulinUnits,
     goalPhase, trainingVolumeMinPerWeek: vol, budget: input.budget,
   });
-  const kcal = atwater(protein, fats, carbs);
+  const kcal = atwater(protein, fatsFinal, carbs);
 
   const breakdown: string[] = [];
   breakdown.push(`TDEE ${Math.round(base.tdee || 0)} ккал → с фазой/фармой/адаптациями ${kcalTarget} ккал`);
@@ -118,10 +148,12 @@ export function buildDayTargets(input: DayTargetsInput): DayTargetsResult {
   breakdown.push(`Белок: пресет ${preset} г/кг → ${protein} г`);
   if (base.protein > protein * 1.12) breakdown.push(`Научный белок ${Math.round(base.protein)} г выше пресета — пресет приоритетен (поднимите «🥩 Пресет белка» при необходимости)`);
   breakdown.push(insulinUnits > 0
-    ? `Жиры: ${fats} г (инсулин: кап 0.5 г/кг сильнее пола)`
-    : `Жиры: ${fats} г (пол ${fatFloor} г/кг)`);
+    ? `Жиры: ${fatsFinal} г (инсулин: кап 0.5 г/кг сильнее пола)`
+    : `Жиры: ${fatsFinal} г (пол ${fatFloor} г/кг)`);
   breakdown.push(`Углеводы: остаток до ${kcalTarget} ккал → ${carbs} г (диетологический потолок ${goalPhase})`);
-  breakdown.push(`Итог дня: ${kcal} ккал = Б ${protein}×4 + Ж ${fats}×9 + У ${carbs}×4`);
+  if (dietStyle === 'keto') breakdown.push(`🥑 Стиль «Кето»: угли ≤6% ккал / ≤60 г, жиры = остаток (кап 3 г/кг)${fatsFinal >= Math.round(weight * 3.0) ? ' — ⚠ цель не закрывается жирами, угли подняты до минимума закрытия' : ''}`);
+  if (dietStyle === 'highcarb') breakdown.push(`🍚 Стиль «Высоко-углеводный»: жиры на полу ${fatFloor} г/кг, угли = максимум до потолка`);
+  breakdown.push(`Итог дня: ${kcal} ккал = Б ${protein}×4 + Ж ${fatsFinal}×9 + У ${carbs}×4`);
   if (kcal < kcalTarget * 0.92) breakdown.push(`⚠ Потолок углей срезал ${Math.round(kcalTarget - kcal)} ккал — увеличьте объём тренировок или бюджет («💰»), либо снимите потолок`);
-  return { kcal, protein, fats, carbs, breakdown };
+  return { kcal, protein, fats: fatsFinal, carbs, breakdown };
 }

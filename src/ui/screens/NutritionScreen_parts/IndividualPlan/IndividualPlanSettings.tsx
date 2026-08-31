@@ -4,7 +4,7 @@ import { PHARMA_DB } from "../../../../core/pharma-database";
 import { ALL_SUBSTANCES } from "../../../../data/support-substances";
 import { SUPPORT_CATALOG_DATA } from "../../../../data/support-catalog-data";
 import {
-  GOALS, PHASES, BUDGET_LEVELS, NUTRITION_LEVELS, PROTEIN_PRESETS, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
+  GOALS, PHASES, BUDGET_LEVELS, PROTEIN_PRESETS, CARB_PERIODIZATION_OPTIONS, VARIETY_LEVELS, PLAN_TYPES,
   ALLERGEN_LIST, HEALTH_ISSUES,
   type CycleType,
 } from "./types";
@@ -85,7 +85,7 @@ export const IndividualPlanSettings: React.FC = () => {
     carbCapClipped, carbCapGPerKg,
     kbjuMode, setKbjuMode, switchKbjuMode,
     manualKcal, setManualKcal, manualP, setManualP, manualF, setManualF, manualC, setManualC,
-    budget, setBudget, nutrLevel, setNutrLevel, proteinPreset, setProteinPreset,
+    budget, setBudget, proteinPreset, setProteinPreset,
     variety, setVariety, diaryAdaptation, setDiaryAdaptation, varietyStrictness, setVarietyStrictness, varietyLevel, setVarietyLevel,
     wakeTime, setWakeTime, bedTime, setBedTime,
     lunchTime, setLunchTime, dinnerTime, setDinnerTime,
@@ -1157,10 +1157,6 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
                 </div>
               );
             })()}
-            {nutrLevel !== 'base' && (() => {
-              const nm = NUTRITION_LEVELS.find(n => n.id === nutrLevel);
-              return <div style={{ fontSize: 8, color: 'rgba(0,230,138,0.5)', marginTop: 4, padding: '4px 8px', borderRadius: 6, background: 'rgba(0,230,138,0.04)', border: '1px solid rgba(0,230,138,0.08)' }}>📈 Уровень «{nm?.label}» (×{nm?.mult}) — план будет на {Math.round(((nm?.mult||1)-1)*100)}% больше: ~{Math.round(effectiveKcal * (nm?.mult||1))} ккал, Б {Math.round(effectiveP * (nm?.mult||1))} / Ж {Math.round(effectiveF * (nm?.mult||1))} / У {Math.round(effectiveC * (nm?.mult||1))}</div>;
-            })()}
             {carbPeriodization !== 'none' && (() => {
               // Эпик 1: единая периодизация — реальные моды дня из одной функции.
               const _t = applyCarbPeriodizationMods(carbPeriodization, 0, true);
@@ -1618,6 +1614,9 @@ if (labPoints.length === 0) { setErrorMsg('Нет анализов в «Лабо
               {pt.icon} {pt.label}
             </PillBtn>
           ))}
+        </div>
+        <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.65)', marginTop: 6, lineHeight: 1.5 }}>
+          🥑 «Кето» — угли ≤6% ккал, жиры = остаток; 🍚 «Высоко-углеводный» — жиры на полу 0.8 г/кг, угли до потолка. Эти два стиля реально меняют цели дня (видно в 🧮-разборе). «Средиземноморский» — вкусовой пул (рыба/оливки). Вегетарианство — отдельная опция в «Предпочтения».
         </div>
       </GlassCard>
       )}
