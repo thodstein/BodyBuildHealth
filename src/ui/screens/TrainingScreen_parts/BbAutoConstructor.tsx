@@ -20,6 +20,7 @@ import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
 import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, buildBBPlanWithDUP, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
+import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay } from '../../../engines/bb/bb-dup.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
@@ -153,7 +154,7 @@ const CollapsibleCard: React.FC<{
   );
 };
 
-type Step = 'params' | 'ped' | 'split' | 'plan' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
+type Step = 'params' | 'ped' | 'split' | 'plan' | 'weights' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
 type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 type PlanMode = 'generic_split' | 'bb_cycle' | 'programs';
 
@@ -596,6 +597,9 @@ export const BbAutoConstructor: React.FC = () => {
     ...(prof.workMax || {}),
   }));
   const [weakPoints, setWeakPoints] = useState<string[]>(prof.weakPoints || []);
+  // Шаг «Реальные веса»: фактический ввод весов по упражнениям плана + число применённых
+  const [weightEntries, setWeightEntries] = useState<PlanWeightEntry[]>([]);
+  const [weightsApplied, setWeightsApplied] = useState(0);
   // weakPoints — зеркало specTargets (единый источник выбора в UI).
   useEffect(() => { setWeakPoints(specTargets); }, [specTargets]);
   const [injuries, setInjuries] = useState<InjurySelectEntry[]>(prof.injuries || []);
@@ -1876,6 +1880,19 @@ export const BbAutoConstructor: React.FC = () => {
         `💪 Слабые группы: ${weakPoints.length > 0 ? weakPoints.join(', ') : 'нет'}`,
       ],
     });
+    // ⚖️ Авто-калибровка реальных весов из training.workMaxByExercise (сохранённых на шаге «Реальные веса»)
+    try {
+      const stored = loadTrainingProfile().workMaxByExercise;
+      const calib = autoCalibrateFromStored(plan, stored, (n) => /подтягив|отжимани|скручив|планка|пловец|альпинист|tgu|мостик|отведение.*стоя|икры.*одной|выпад.*назад|болгарск/i.test(n));
+      if (calib.applied > 0) {
+        plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${calib.applied} вхождений упражнений).`] };
+      }
+    } catch { /* ignore */ }
+    setBuiltPlan({
+      ...plan,
+      // Слепок всех кнопок — чтобы отчёт соответствовал реальным настройкам, а не «от новичка»
+      trainingVolumeMode,
+    });
     // PRO: per-muscle frequency optimization
     try {
       const sessions = loadSessions();
@@ -2282,18 +2299,18 @@ export const BbAutoConstructor: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const stepList: Step[] = planMode === 'programs' ? ['params','ped','plan','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','quality','adjust','contest','annual','tools'];
-  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'programs' ? '3 План' : '4 План', quality: planMode === 'programs' ? '4 Тренировочная нагрузка плана' : '5 Тренировочная нагрузка плана', adjust: planMode === 'programs' ? '5 Коррекция' : '6 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
+  const stepList: Step[] = planMode === 'programs' ? ['params','ped','plan','weights','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','weights','quality','adjust','contest','annual','tools'];
+  const stepLabels: Record<Step,string> = { params:'1 Параметры', ped:'2 PED+Вес', split:'3 Сплит', plan: planMode === 'programs' ? '3 План' : '4 План', weights: planMode === 'programs' ? '4 Реальные веса' : '5 Реальные веса', quality: planMode === 'programs' ? '5 Тренировочная нагрузка плана' : '6 Тренировочная нагрузка плана', adjust: planMode === 'programs' ? '6 Коррекция' : '7 Коррекция', contest: '🏁 Contest prep', annual:'🗓 Годовой план', tools:'🔧 Инструменты' };
   const renderStepNav = () => {
     const groups: Record<string, string[]> = planMode === 'programs'
-      ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
-      : { 'ПАРАМЕТРЫ': ['params','ped','split'], 'ПЛАН': ['plan','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] };
+      ? { 'ПАРАМЕТРЫ': ['params','ped'], 'ПЛАН': ['plan','weights','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] }
+      : { 'ПАРАМЕТРЫ': ['params','ped','split'], 'ПЛАН': ['plan','weights','quality','adjust'], 'ЦИКЛ': ['contest','annual','tools'] };
     const groupEndKeys = new Set(Object.values(groups).map(arr => (arr as string[])[(arr as string[]).length - 1]).filter(Boolean) as string[]);
     return (
       <div style={{ background: 'rgba(24,24,27,0.55)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '5px 6px', marginBottom: 8, display: 'flex', gap: 4, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const, alignItems: 'center' }}>
         {stepList.map(s => {
           const active = step === s;
-          const disabled = (s === 'plan' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan;
+          const disabled = (s === 'plan' || s === 'weights' || s === 'quality' || s === 'adjust' || s === 'contest') && !builtPlan;
           return (
             <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 as const }}>
               <button disabled={disabled} onClick={() => { if (disabled) return; if (s === 'annual') { goAnnual(); return; } setStep(s); }} style={{ ...STEP_PILL(active), flexShrink: 0 as const, opacity: disabled ? 0.45 : 1 }}>{stepLabels[s]}</button>
@@ -3861,10 +3878,76 @@ export const BbAutoConstructor: React.FC = () => {
 
         {/* Summary */}
         <div style={{ display:'flex', gap:12, marginTop:10 }}>
-          <button style={{ ...BTN, flex:1 }} onClick={() => setStep('quality')}>Далее: отчёт качества →</button>
+          <button style={{ ...BTN, flex:1 }} onClick={() => { setWeightEntries(collectPlanExercises(builtPlan)); setWeightsApplied(0); setStep('weights'); }}>Далее: реальные веса →</button>
           <button style={BTN_GHOST} onClick={() => setBbWeekSel(1)}>На первую нед</button>
         </div>
         {renderActionRow(false)}
+      </div>
+    );
+  };
+
+  // ── ⚖️ Реальные веса: фактический ввод весов по упражнениям плана ──
+  const renderWeights = () => {
+    if (!builtPlan) return null;
+    const entries = weightEntries.length ? weightEntries : collectPlanExercises(builtPlan);
+    const filled = entries.filter(e => e.actualWeight != null && e.actualWeight > 0).length;
+    const setEntry = (i: number, v: number | null) =>
+      setWeightEntries(prev => { const c = prev.length ? prev.slice() : collectPlanExercises(builtPlan); c[i] = { ...c[i], actualWeight: v }; return c; });
+    const apply = () => {
+      if (!builtPlan) return;
+      const res = recalibratePlanWeights(builtPlan, entries);
+      setBuiltPlan({ ...res.plan, rationale: [...res.plan.rationale, `⚖️ Реальные веса: применено к ${res.applied} вхождений упражнений (${filled} заполнено).`] });
+      setWeightsApplied(res.applied);
+      // Персистентность в training.workMaxByExercise (ключ = id упражнения)
+      try {
+        const saved: Record<string, number> = {};
+        for (const e of entries) if (e.id && e.actualWeight != null && e.actualWeight > 0) saved[e.id] = e.actualWeight;
+        if (Object.keys(saved).length) {
+          const prof = loadTrainingProfile();
+          saveTrainingProfile({ ...prof, workMaxByExercise: { ...(prof.workMaxByExercise || {}), ...saved } });
+        }
+      } catch { /* ignore */ }
+    };
+    return (
+      <div>
+        <div style={H}>⚖️ Реальные веса по упражнениям плана</div>
+        <div style={{ fontSize: 12, color: '#fff', opacity: 0.85, marginBottom: 10, lineHeight: 1.5 }}>
+          Введите <b style={{ color: '#00e68a' }}>фактические рабочие веса</b> (кг) для упражнений, реально используемых в плане.
+          Движок пересчитает все сеты и тоннаж от этих значений (масштабируя плановую прогрессию к введённому базовому весу),
+          вместо формульной экстраполяции от рабочего максимума по группе мышц. Сохранённые веса применятся и при следующей пересборке.
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+          <button style={{ ...BTN, flex: 1 }} onClick={apply} disabled={filled === 0}>
+            {weightsApplied > 0 ? `✓ Применено к ${weightsApplied} вхождений` : '⚖️ Применить реальные веса'}
+          </button>
+          <button style={BTN_GHOST} onClick={() => { setWeightEntries(collectPlanExercises(builtPlan)); setWeightsApplied(0); }}>⟲ Сбросить</button>
+        </div>
+        {filled === 0 && <div style={{ fontSize: 11, color: '#fbbf24', marginBottom: 8 }}>Введите хотя бы один фактический вес, чтобы пересчитать нагрузку.</div>}
+        {entries.length === 0
+          ? <div style={{ fontSize: 12, color: '#fff', opacity: 0.7, padding: 20, textAlign: 'center' }}>План пуст — сначала соберите план.</div>
+          : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {entries.map((e, i) => (
+                <div key={e.id || e.name} style={{ ...CARD, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
+                    <div style={{ fontSize: 10, color: '#fff', opacity: 0.55 }}>{e.muscle} · {e.role === 'primary' ? 'основное' : 'добивка'} · план {e.referenceWeight} кг</div>
+                  </div>
+                  <input
+                    type="number" inputMode="decimal" min={0} step={0.5}
+                    value={e.actualWeight ?? ''}
+                    placeholder={String(e.referenceWeight)}
+                    onChange={ev => setEntry(i, ev.target.value === '' ? null : Number(ev.target.value))}
+                    style={{ ...IN, width: 84, textAlign: 'center', flexShrink: 0 }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button style={{ ...BTN, flex: 1 }} onClick={() => setStep('quality')}>Далее: отчёт качества →</button>
+          <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
+        </div>
       </div>
     );
   };
@@ -4835,7 +4918,7 @@ export const BbAutoConstructor: React.FC = () => {
         </CollapsibleCard>
         <div style={{ display:'flex', gap:8, marginTop:10 }}>
           <button style={{ ...BTN, flex:1 }} onClick={() => setStep('adjust')}>Далее: ручная коррекция →</button>
-          <button style={BTN_GHOST} onClick={() => setStep('plan')}>← Назад</button>
+          <button style={BTN_GHOST} onClick={() => setStep('weights')}>← Назад</button>
         </div>
         {renderActionRow(true)}
           </div>
@@ -6683,6 +6766,7 @@ export const BbAutoConstructor: React.FC = () => {
       {step === 'ped' && renderPedWorkMax()}
       {step === 'split' && renderSplit()}
       {step === 'plan' && renderPlanWithComments()}
+      {step === 'weights' && renderWeights()}
       {step === 'quality' && renderQuality()}
       {step === 'adjust' && renderAdjust()}
       {step === 'contest' && renderContestPrep()}
