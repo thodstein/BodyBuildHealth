@@ -162,12 +162,19 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     const liftsClean = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
     const liftsSquat = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
     const liftsPull = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
-    const liftsOverhead = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['log_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
-    // P0-4 carry per-exercise дистанция (yoke 20, farmers 40, sled 25, tire 15)
-    const CARRY_DIST: Record<string, number> = { yoke_walk:20, farmers_walk_heavy:40, zercher_carry:20, sled_push_sprint:25, tire_flip:15, sandbag_shoulder:15 };
-    const carrySets = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint','tire_flip','sandbag_shoulder'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
-    const carryMeters = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint','tire_flip','sandbag_shoulder'].includes(e.id))).reduce((a,e)=> a + e.sets * (CARRY_DIST[e.id] || 20), 0);
-    const stoneLifts = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['atlas_stone_load','stone_lift','sandbag_shoulder','tire_flip'].includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
+    const liftsOverhead = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['log_press','axle_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar'].includes(e.id))).reduce((a,e)=> a + e.sets,0);
+    // carry дистанция из EVENT_META + fallback
+    const CARRY_DIST: Record<string, number> = { yoke_walk:20, farmers_walk_heavy:40, frame_carry:20, husafell_carry:40, zercher_carry:20, sled_push_sprint:25, sled_push:20, tire_flip:15, sandbag_shoulder:15, sandbag_carry:30, sandbag_load:0, keg_toss:0, car_deadlift_18:0 };
+    const carryIds = ['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sled_push_sprint','tire_flip','sandbag_shoulder','sandbag_carry','sled_push','sled_drag'];
+    const carrySets = wk.sessions.flatMap(s=> s.exercises.filter(e=> carryIds.includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    const carryMeters = wk.sessions.flatMap(s=> s.exercises.filter(e=> carryIds.includes(e.id))).reduce((a,e)=> {
+      const d = (e.workSets[0] as any)?.distanceM ?? CARRY_DIST[e.id] ?? 20;
+      return a + e.sets * d;
+    }, 0);
+    const stoneIds = ['atlas_stone_load','stone_lift','sandbag_shoulder','sandbag_load','tire_flip','keg_toss'];
+    const stoneLifts = wk.sessions.flatMap(s=> s.exercises.filter(e=> stoneIds.includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
+    const gripIds = ['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sandbag_carry','farmers_walk'];
+    const gripSets = wk.sessions.flatMap(s=> s.exercises.filter(e=> gripIds.includes(e.id))).reduce((a,e)=> a+e.sets,0);
     const lvl = plan.level;
     const lmS = getWL(lvl,'snatch');
     const lmC = getWL(lvl,'cleanJerk');
@@ -176,6 +183,7 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     const lmPress = plan.mode === 'strongman' ? getStrong(lvl,'overhead') : getWL(lvl,'press');
     const lmCarry = getStrong(lvl,'carry');
     const lmStone = getStrong(lvl,'stone');
+    const lmGrip = getStrong(lvl,'grip');
     if (lmS && liftsSnatch > lmS.mrv) warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} подъёмов > MRV ${lmS.mrv} — перебор.`);
     if (lmC && liftsClean > lmC.mrv) warnings.push(`Нед ${wk.week}: толчок ${liftsClean} подъёмов > MRV ${lmC.mrv}.`);
     if (lmS && liftsSnatch < lmS.mev && plan.mode !== 'strongman') warnings.push(`Нед ${wk.week}: рывок ${liftsSnatch} < MEV ${lmS.mev} — недобор объёма.`);
@@ -184,6 +192,7 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
     if (lmPress && liftsOverhead > lmPress.mrv) warnings.push(`Нед ${wk.week}: жим/лог ${liftsOverhead} сетов > MRV ${lmPress.mrv}.`);
     if (lmCarry && carryMeters > lmCarry.mrv) warnings.push(`Нед ${wk.week}: переноски ${carryMeters}м > MRV ${lmCarry.mrv}м.`);
     if (lmStone && stoneLifts > lmStone.mrv) warnings.push(`Нед ${wk.week}: камни ${stoneLifts} подъёмов > MRV ${lmStone.mrv}.`);
+    if (lmGrip && gripSets > lmGrip.mrv) warnings.push(`Нед ${wk.week}: хват ${gripSets} сетов > MRV ${lmGrip.mrv} — перебор (фермер+йок+рама).`);
     // PRO enforce: если перебор > MRV — режем accessory до MRV (как BB normalizeWeekMrv)
     const enforceCategory = (ids: string[], current: number, mrv: number, isLifts: boolean) => {
       if (current <= mrv) return;
@@ -205,11 +214,25 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
       wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
     };
     if (lmSq && liftsSquat > lmSq.mrv) enforceCategory(['back_squat','front_squat','squat','hack_squat','front_squat_clean_grip','overhead_squat_v2','pause_squat','tempo_squat'], liftsSquat, lmSq.mrv, false);
-    if (lmPull && liftsPull > lmPull.mrv) enforceCategory(['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift','deficit_pull','pause_pull'], liftsPull, lmPull.mrv, false);
-    if (lmPress && liftsOverhead > lmPress.mrv) enforceCategory(['log_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar','pin_press'], liftsOverhead, lmPress.mrv, false);
-    if (lmCarry && carryMeters > lmCarry.mrv) enforceCategory(['farmers_walk_heavy','yoke_walk','zercher_carry','sled_push_sprint'], carrySets, lmCarry.mrv / 20, false);
+    if (lmPull && liftsPull > lmPull.mrv) enforceCategory(['snatch_pull','clean_pull','rdl','deadlift','sumo_dl','axle_deadlift','car_deadlift_18','deficit_pull','pause_pull'], liftsPull, lmPull.mrv, false);
+    if (lmPress && liftsOverhead > lmPress.mrv) enforceCategory(['log_press','axle_press','push_press','ohp','circus_db_press','push_jerk','split_jerk','db_press','bench_bar','pin_press'], liftsOverhead, lmPress.mrv, false);
+    if (lmCarry && carryMeters > lmCarry.mrv) enforceCategory(['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sled_push_sprint','sandbag_carry','sled_push'], carrySets, Math.round(lmCarry.mrv / 25), false);
+    if (lmGrip && gripSets > lmGrip.mrv) enforceCategory(['farmers_walk_heavy','yoke_walk','frame_carry','husafell_carry','zercher_carry','sandbag_carry'], gripSets, lmGrip.mrv, false);
     if (lmS && liftsSnatch > lmS.mrv) enforceCategory(['snatch','hang_snatch','power_snatch','muscle_snatch','snatch_balance','overhead_squat_v2','deficit_snatch','block_snatch','pause_snatch'], liftsSnatch, lmS.mrv, true);
     if (lmC && liftsClean > lmC.mrv) enforceCategory(['clean_and_jerk','hang_clean','power_clean','muscle_clean','push_jerk','split_jerk','clean_pull','deficit_clean','block_clean','pause_clean'], liftsClean, lmC.mrv, true);
+    // Weekly axial load score (High axial: yoke, stone, squat, dead) — Winwood
+    const maxYokeAll = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> ['yoke_walk','frame_carry'].includes(e.id)).flatMap(e=> e.workSets.map(ws=> ws.weight))));
+    const maxStoneAll = Math.max(0, ...wk.sessions.flatMap(s=> s.exercises.filter(e=> ['atlas_stone_load','sandbag_load','stone_lift'].includes(e.id)).flatMap(e=> e.workSets.map(ws=> ws.weight))));
+    const axialSets = wk.sessions.flatMap(s=> s.exercises.filter(e=> ['yoke_walk','frame_carry','atlas_stone_load','sandbag_load','back_squat','deadlift','car_deadlift_18'].includes(e.id))).reduce((a,e)=> a+e.sets,0);
+    if (axialSets >= 12 && (carryMeters > 300 || stoneLifts > 18)) {
+      const axWarn = `Нед ${wk.week}: осевая недельная ${axialSets} сетов + ${carryMeters}м + ${stoneLifts} камней — высокая компрессия, добавьте кор 2× и +1 отдых.`;
+      if (!warnings.includes(axWarn)) warnings.push(axWarn);
+    }
+    // Grip prehab auto — если перебор хвата >12 сетов
+    if (gripSets > 12 && plan.mode === 'strongman') {
+      const hasGripPrehab = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('wrist') || e.id.includes('hang')));
+      if (!hasGripPrehab) warnings.push(`Нед ${wk.week}: хват ${gripSets} сетов — добавьте wrist_curl 2×15 + вис 30с.`);
+    }
     // P2: Joint JSI — тяжёлые йок/лог >2.2×BW риск поясницы/плеча
     const bwAny = (plan.inputSnapshot as any)?.bodyweight as number | undefined;
     if (typeof bwAny === 'number' && bwAny > 0) {

@@ -14,6 +14,7 @@ import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sp
 import { syncStrengthAnnualToGeneral } from '../../../engines/strength-sport/strength-sport-annual-bridge';
 import { estimate1RMFromVelocitySS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
+import { acwrEwmaSS } from '../../../engines/strength-sport/strength-sport-diary.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
 import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
@@ -24,7 +25,7 @@ import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, B
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
-const WM_LABEL_RU: Record<string,string> = { backSquat:'Присед', frontSquat:'Фронт. присед', deadlift:'Тяга', snatch:'Рывок', cleanJerk:'Толчок', overheadPress:'Жим стоя', yokeWalk:'Йок', farmersWalk:'Фермер', atlasStone:'Камень', axleDeadlift:'Аксель', logPress:'Лог' };
+const WM_LABEL_RU: Record<string,string> = { backSquat:'Присед', frontSquat:'Фронт. присед', deadlift:'Тяга', snatch:'Рывок', cleanJerk:'Толчок', overheadPress:'Жим стоя', yokeWalk:'Йок', farmersWalk:'Фермер', frameCarry:'Рама', husafellCarry:'Хусафелл', sandbagLoad:'Мешок загр.', kegToss:'Бочка', carDeadlift:'Автотяга', axlePress:'Аксель-жим', atlasStone:'Камень', axleDeadlift:'Аксель', logPress:'Лог' };
 
 export const StrengthSportConstructor: React.FC = () => {
   const [step, setStep] = useState<Step>('params');
@@ -73,14 +74,8 @@ export const StrengthSportConstructor: React.FC = () => {
           const daily: Record<string, number> = {};
           for(const s of arr){ const d=(s.date||'').slice(0,10); if(d) daily[d]=(daily[d]||0)+(s.load||s.sRPE||s.rpe||0); }
           const vals = Object.values(daily).slice(-28);
-          if(vals.length>=14){
-            const acute = vals.slice(-7).reduce((a,c)=>a+c,0)/7;
-            const chronic = vals.reduce((a,c)=>a+c,0)/vals.length;
-            const ratio = chronic>0? acute/chronic : 0;
-            let zone='optimal';
-            if(ratio>1.5) zone='dangerous'; else if(ratio>1.3) zone='caution'; else if(ratio<0.8) zone='undertrained';
-            setAcwr({ ratio: Math.round(ratio*100)/100, zone });
-          }
+          const ew = acwrEwmaSS(vals as number[]);
+          if(ew) setAcwr({ ratio: ew.ratio, zone: ew.zone });
         }catch{}
       }
     } catch {}
@@ -231,8 +226,10 @@ export const StrengthSportConstructor: React.FC = () => {
         if (['snatch','hang_snatch','power_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','snatch_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2'].includes(lid) || lid.includes('snatch')) base = wmAny.snatch || 60;
         else if (['clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','pause_clean','push_jerk','split_jerk','clean_pull','front_squat_clean_grip','jerk_dip','jerk_recovery','behind_neck_jerk'].includes(lid) || lid.includes('clean') || lid.includes('jerk')) base = wmAny.cleanJerk || wmAny.clean || wmAny.frontSquat || 80;
         else if (['squat','back_squat','front_squat','hack_squat','front_squat_clean_grip','pause_squat','overhead_squat_v2'].includes(lid) || lid.includes('squat')) base = wmAny.backSquat || wmAny.frontSquat || 100;
-        else if (['deadlift','sumo_dl','axle_deadlift','rdl','deficit_pull','pause_pull'].includes(lid)) base = wmAny.deadlift || 120;
-        else if (['ohp','push_press','log_press','circus_db_press','bench_bar','jerk_recovery','behind_neck_jerk'].includes(lid)) base = wmAny.overheadPress || wmAny.bench || wmAny.logPress || 60;
+        else if (['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','rdl','deficit_pull','pause_pull'].includes(lid)) base = wmAny.deadlift || 120;
+        else if (['yoke_walk','frame_carry','husafell_carry','farmers_walk_heavy','sandbag_carry','zercher_carry'].includes(lid)) base = wmAny.farmersWalk || wmAny.yokeWalk || 140;
+        else if (['atlas_stone_load','stone_lift','sandbag_load','sandbag_shoulder','keg_toss'].includes(lid)) base = wmAny.atlasStone || 100;
+        else if (['ohp','push_press','log_press','axle_press','circus_db_press','bench_bar','jerk_recovery','behind_neck_jerk'].includes(lid)) base = wmAny.overheadPress || wmAny.bench || wmAny.logPress || 60;
         const newPct = base ? Math.round(patch.weight / base * 100) : 0;
         ex.workSets = ex.workSets.map(s => ({ ...s, weight: patch.weight!, pct: newPct || s.pct }));
       }
@@ -423,9 +420,9 @@ export const StrengthSportConstructor: React.FC = () => {
             {mode !== 'weightlifting' && (
               <>
                 <Divider />
-                <GroupHeading icon="🪨" text="Стронг-ивенты" desc="Йок / фермер / камень / лог — отдельные ПМ" strong />
+                <GroupHeading icon="🪨" text="Стронг-ивенты" desc="Йок / фермер / рама / хус / камень / лог · отдельные ПМ" strong />
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(130px,1fr))', gap:8 }}>
-                  {(['yokeWalk','farmersWalk','atlasStone','logPress'] as const).map(k => (
+                  {(['yokeWalk','farmersWalk','frameCarry','husafellCarry','atlasStone','sandbagLoad','kegToss','carDeadlift','axlePress','logPress'] as const).map(k => (
                     <Field key={k} label={WM_LABEL_RU[k]||k}><input type="number" value={(workMax as any)[k] || ''} onChange={e => setWorkMax(s => ({ ...s, [k]: Number(e.target.value)||0 }))} style={{ ...INPUT, fontVariantNumeric:'tabular-nums', borderColor:'rgba(255,159,10,0.22)' }} placeholder="кг" /></Field>
                   ))}
                 </div>
@@ -682,7 +679,7 @@ export const StrengthSportConstructor: React.FC = () => {
                       {sess.exercises.map(ex => (
                         <div key={ex.id} style={{ background:'linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015))', border:'0.5px solid rgba(255,255,255,0.06)', borderRadius:12, padding:10, display:'flex', flexDirection:'column', gap:7 }}>
                           <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                            <span style={{ fontSize:12.5, fontWeight:700, color:'#fff', flex:'1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>{ex.name} <span style={{ fontWeight:500, color:'rgba(235,235,245,0.62)' }}>— <Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{ex.sets}×{ex.reps}</Highlight> · <Highlight>{ex.weight}кг</Highlight> · <Highlight color={ex.rir<=1?'#ff3b30': ex.rir<=2?'#ff9f0a':'#30d158'}>RIR{ex.rir}</Highlight></span><span style={{ fontSize:10.5, color:TEXT_3, marginLeft:6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
+                            <span style={{ fontSize:12.5, fontWeight:700, color:'#fff', flex:'1 1 160px', fontFamily:'-apple-system, system-ui, sans-serif' }}>{ex.name} <span style={{ fontWeight:500, color:'rgba(235,235,245,0.62)' }}>— <Highlight color={mode==='strongman'?ACCENT_STRONG:ACCENT}>{ex.sets}×{ex.reps}</Highlight>{(ex.workSets[0] as any)?.distanceM ? <> · <Highlight color={ACCENT_STRONG}>{(ex.workSets[0] as any).distanceM}м</Highlight></> : null}{(ex.workSets[0] as any)?.timeCapS ? <> · <Highlight>{(ex.workSets[0] as any).timeCapS}с cap</Highlight></> : null} · <Highlight>{ex.weight}кг</Highlight> · <Highlight color={ex.rir<=1?'#ff3b30': ex.rir<=2?'#ff9f0a':'#30d158'}>RIR{ex.rir}</Highlight></span><span style={{ fontSize:10.5, color:TEXT_3, marginLeft:6, fontVariantNumeric:'tabular-nums' }}>· {ex.tempo} · {ex.restSeconds}с{ex.isCompetitionLift?' ★':''}</span></span>
                           </div>
                           <div style={{ display:'grid', gridTemplateColumns:'64px 64px 64px auto', gap:6, alignItems:'center' }}>
                             <input type="number" value={ex.weight} onChange={e=> updateEx(wk.week-1, sess.day, ex.id, { weight: Number(e.target.value)||0 })} style={{ ...INPUT, padding:'7px 8px', fontSize:12, textAlign:'center', fontVariantNumeric:'tabular-nums' }} placeholder="кг" />

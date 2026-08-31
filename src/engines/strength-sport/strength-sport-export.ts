@@ -8,14 +8,15 @@ import { buildWLMeetPlan } from './strength-sport-attempts.engine';
 function escHtml(s: string): string { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function escCsv(s: string | number): string { const v = String(s).replace(/"/g,'""'); return /[",\n;]/.test(v) ? `"${v}"` : v; }
 
-export interface StrengthExportRow { week:number; phase:string; day:number; tag:string; character:string; exercise:string; sets:number; reps:string; weight:number; pct:number; rir:number; tempo:string; rest:number; comment:string; }
+export interface StrengthExportRow { week:number; phase:string; day:number; tag:string; character:string; exercise:string; sets:number; reps:string; weight:number; pct:number; rir:number; tempo:string; rest:number; comment:string; distanceM?: number; timeCapS?: number; }
 
 export function strengthExportRows(plan: StrengthSportPlan): StrengthExportRow[] {
   const rows: StrengthExportRow[] = [];
   for(const wk of plan.weeksData){
     for(const sess of wk.sessions){
       for(const ex of sess.exercises){
-        rows.push({ week: wk.week, phase: wk.phase, day: sess.day, tag: sess.sessionTag, character: sess.character, exercise: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight, pct: ex.workSets[0]?.pct || 0, rir: ex.rir, tempo: ex.tempo || '', rest: ex.restSeconds || 0, comment: ex.comment || '' });
+        const ws0: any = ex.workSets[0];
+        rows.push({ week: wk.week, phase: wk.phase, day: sess.day, tag: sess.sessionTag, character: sess.character, exercise: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight, pct: ws0?.pct || 0, rir: ex.rir, tempo: ex.tempo || '', rest: ex.restSeconds || 0, comment: ex.comment || '', distanceM: ws0?.distanceM, timeCapS: ws0?.timeCapS });
       }
     }
   }
@@ -23,18 +24,18 @@ export function strengthExportRows(plan: StrengthSportPlan): StrengthExportRow[]
 }
 
 export function buildStrengthCsv(plan: StrengthSportPlan): string {
-  const header = ['Неделя','Фаза','День','Тренировка','Характер','Упражнение','Сеты','Повторы','Вес','%ПМ','RIR','Темп','Отдыхс','Комментарий'];
+  const header = ['Неделя','Фаза','День','Тренировка','Характер','Упражнение','Сеты','Повторы','Вес','%ПМ','RIR','Темп','Отдыхс','Дист','ВремяCap','Комментарий'];
   const rows = strengthExportRows(plan);
   const lines = [header.map(escCsv).join(';')];
-  for(const r of rows) lines.push([r.week,r.phase,r.day,r.tag,r.character,r.exercise,r.sets,r.reps,r.weight,r.pct,r.rir,r.tempo,r.rest,r.comment].map(escCsv).join(';'));
+  for(const r of rows) lines.push([r.week,r.phase,r.day,r.tag,r.character,r.exercise,r.sets,r.reps,r.weight,r.pct,r.rir,r.tempo,r.rest,r.distanceM||'',r.timeCapS||'',r.comment].map(escCsv).join(';'));
   return lines.join('\n');
 }
 
 export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
   const title = `Стронг+ТА ${escHtml(plan.mode)} ${plan.weeks}нед ${escHtml(plan.level)}`;
   const rows = strengthExportRows(plan);
-  const header = `<tr>${['Нед','Фаза','День','Тренировка','Упражнение','Сеты×Повт','Вес','%','RIR','Темп','Отдых','Коммент'].map(h=>`<th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">${escHtml(h)}</th>`).join('')}</tr>`;
-  const body = rows.map(r=> `<tr>${[r.week, escHtml(r.phase), r.day, escHtml(r.tag), escHtml(r.exercise), `${r.sets}×${escHtml(r.reps)}`, `${r.weight}кг`, r.pct?`${r.pct}%`:'', r.rir, escHtml(r.tempo), r.rest?`${r.rest}с`:'', escHtml(r.comment)].map(v=>`<td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${v}</td>`).join('')}</tr>`).join('');
+  const header = `<tr>${['Нед','Фаза','День','Тренировка','Упражнение','Сеты×Повт','Вес','%','RIR','Темп','Отдых','Дист','Кап','Коммент'].map(h=>`<th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">${escHtml(h)}</th>`).join('')}</tr>`;
+  const body = rows.map(r=> `<tr>${[r.week, escHtml(r.phase), r.day, escHtml(r.tag), escHtml(r.exercise), `${r.sets}×${escHtml(r.reps)}`, `${r.weight}кг`, r.pct?`${r.pct}%`:'', r.rir, escHtml(r.tempo), r.rest?`${r.rest}с`:'', r.distanceM?`${r.distanceM}м`:'', r.timeCapS?`${r.timeCapS}с`:'', escHtml(r.comment)].map(v=>`<td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${v}</td>`).join('')}</tr>`).join('');
   let extra = '';
   try {
     const snap: any = plan.inputSnapshot || {};
@@ -66,9 +67,9 @@ export function downloadStrengthCsv(plan: StrengthSportPlan){
 export function buildStrengthXlsxHtml(plan: StrengthSportPlan): string {
   const rows = strengthExportRows(plan);
   const esc = escHtml;
-  const header = ['Неделя','Фаза','День','Тренировка','Характер','Упражнение','Сеты','Повторы','Вес','%ПМ','RIR','Темп','Отдыхс','Комментарий'];
+  const header = ['Неделя','Фаза','День','Тренировка','Характер','Упражнение','Сеты','Повторы','Вес','%ПМ','RIR','Темп','Отдыхс','Дист','ВремяCap','Комментарий'];
   const th = header.map(h=> `<th>${esc(h)}</th>`).join('');
-  const tr = rows.map(r=> `<tr>${[r.week, esc(r.phase), r.day, esc(r.tag), esc(r.character), esc(r.exercise), r.sets, esc(r.reps), r.weight, r.pct, r.rir, esc(r.tempo), r.rest, esc(r.comment)].map(v=> `<td>${v}</td>`).join('')}</tr>`).join('');
+  const tr = rows.map(r=> `<tr>${[r.week, esc(r.phase), r.day, esc(r.tag), esc(r.character), esc(r.exercise), r.sets, esc(r.reps), r.weight, r.pct, r.rir, esc(r.tempo), r.rest, r.distanceM||'', r.timeCapS||'', esc(r.comment)].map(v=> `<td>${v}</td>`).join('')}</tr>`).join('');
   // Excel-compatible HTML with BOM and meta
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Strength</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1"><tr>${th}</tr>${tr}</table></body></html>`;
 }

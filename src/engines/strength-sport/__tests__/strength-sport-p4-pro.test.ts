@@ -19,10 +19,10 @@ describe('P4 carry per-exercise', () => {
     const fin = finalizeStrengthSportPlan(p);
     expect(fin.validation).toBeDefined();
   });
-  it('CSV header has 14 columns', () => {
+  it('CSV header has 16 columns (include dist/time)', () => {
     const p = buildStrengthSportPlan({ mode:'weightlifting', goal:'strength', level:'beginner', weeks:2, daysPerWeek:2, workMax:{} } as any);
     const csv = buildStrengthCsv(p);
-    expect(csv.split('\n')[0].split(';').length).toBe(14);
+    expect(csv.split('\n')[0].split(';').length).toBe(16);
     expect(csv).toContain('Неделя');
   });
   it('HTML contains title', () => {

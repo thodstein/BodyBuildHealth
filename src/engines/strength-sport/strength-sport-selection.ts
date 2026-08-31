@@ -18,19 +18,19 @@ export const SS_ANGLE_CLASSES: Record<string, Record<string, string[]>> = {
     pull: ['clean_pull', 'pause_pull', 'snatch_pull', 'deficit_pull'],
   },
   overhead_day: {
-    press: ['log_press', 'ohp', 'push_press', 'circus_db_press', 'push_jerk', 'pause_jerk', 'pin_press'],
+    press: ['log_press', 'axle_press', 'ohp', 'push_press', 'circus_db_press', 'push_jerk', 'pause_jerk', 'pin_press'],
     tricep: ['db_press', 'bench_bar', 'pin_press'],
-    carry: ['farmers_walk_heavy', 'zercher_carry'],
+    carry: ['farmers_walk_heavy', 'zercher_carry', 'husafell_carry'],
   },
   deadlift_day: {
-    hinge: ['deadlift', 'sumo_dl', 'axle_deadlift', 'rdl', 'deficit_pull', 'pause_pull'],
-    carry: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry'],
+    hinge: ['deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18', 'rdl', 'deficit_pull', 'pause_pull'],
+    carry: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry', 'frame_carry', 'husafell_carry'],
     pull: ['row_bar', 'pullup', 'snatch_pull', 'clean_pull'],
   },
   event_day: {
-    carry: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry'],
-    load: ['atlas_stone_load', 'stone_lift', 'sandbag_shoulder'],
-    push: ['tire_flip', 'sled_push_sprint'],
+    carry: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry', 'frame_carry', 'husafell_carry', 'sandbag_carry'],
+    load: ['atlas_stone_load', 'stone_lift', 'sandbag_shoulder', 'sandbag_load', 'keg_toss'],
+    push: ['tire_flip', 'sled_push_sprint', 'car_deadlift_18'],
   },
   strength_day: {
     squat: ['back_squat', 'front_squat', 'pause_squat', 'tempo_squat', 'hack_squat'],
@@ -64,16 +64,18 @@ export const SS_ANGLE_CLASSES: Record<string, Record<string, string[]>> = {
   },
 };
 
-// Жёсткие группы: упражнение меняется только внутри группы — P0-5 расширение 5→8
+// Жёсткие группы: упражнение меняется только внутри группы — PRO расширение 8→10
 export const SS_STRICT_GROUPS: Record<string, string[]> = {
   snatch_full: ['snatch', 'hang_snatch', 'power_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch'],
   clean_full: ['clean_and_jerk', 'hang_clean', 'power_clean', 'deficit_clean', 'block_clean', 'pause_clean'],
   jerk: ['push_jerk', 'split_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk'],
-  carry_heavy: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry', 'sled_push_sprint'],
-  stone: ['atlas_stone_load', 'stone_lift', 'sandbag_shoulder', 'tire_flip'],
+  carry_heavy: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry', 'frame_carry', 'husafell_carry', 'sandbag_carry'],
+  stone: ['atlas_stone_load', 'stone_lift', 'sandbag_shoulder', 'sandbag_load', 'tire_flip', 'keg_toss'],
   squat: ['back_squat', 'front_squat', 'front_squat_clean_grip', 'hack_squat', 'overhead_squat_v2', 'pause_squat'],
-  press: ['log_press', 'push_press', 'ohp', 'circus_db_press', 'bench_bar', 'db_press'],
+  press_overhead_log: ['log_press', 'axle_press', 'push_press', 'ohp'],
+  press_db: ['circus_db_press', 'db_press', 'bench_bar'],
   pull: ['snatch_pull', 'clean_pull', 'pause_pull', 'rdl', 'deficit_pull'],
+  deadlift_variant: ['deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18'],
 };
 
 export function strictGroupFor(id: string): string | null {
@@ -86,8 +88,8 @@ export function groupMembers(group: string): string[] {
 }
 
 // Tier-фильтр PRO: beginner — только power/muscle вариации, не классика
-const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'yoke_walk', 'log_press', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'high_hang_snatch', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'pause_jerk', 'tempo_squat']);
-const EXOTIC_STRONG = new Set(['log_press','atlas_stone_load','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift','tire_flip','stone_lift','sandbag_shoulder']);
+const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'yoke_walk', 'log_press', 'axle_press', 'car_deadlift_18', 'frame_carry', 'husafell_carry', 'sandbag_load', 'keg_toss', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'high_hang_snatch', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'pause_jerk', 'tempo_squat']);
+const EXOTIC_STRONG = new Set(['log_press','axle_press','atlas_stone_load','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift','tire_flip','stone_lift','sandbag_shoulder','husafell_carry','frame_carry','sandbag_load','keg_toss','car_deadlift_18']);
 
 export function filterByTier(pool: string[], level: string, allowExotic?: boolean, hasSpecialty?: boolean): string[] {
   let out = [...pool];
@@ -117,7 +119,7 @@ export function filterByInjury(pool: string[], injuries: any[] | undefined): str
   const hasWord = (w: string) => new RegExp(`\\b${w}\\b`).test(txt);
   let out = [...pool];
   if (hasWord('knee') || txt.includes('колен') || txt.includes('мениск') || txt.includes('acl')) out = out.filter(id => !['back_squat','front_squat','hack_squat','bulgarian_split','squat','overhead_squat_v2','snatch_balance','pause_squat','tempo_squat'].includes(id));
-  if (hasWord('back') || txt.includes('спин') || txt.includes('поясниц')) out = out.filter(id => !['deadlift','sumo_dl','axle_deadlift','yoke_walk','atlas_stone_load','snatch_pull','clean_pull','deficit_pull','pause_pull','rdl'].includes(id));
+  if (hasWord('back') || txt.includes('спин') || txt.includes('поясниц')) out = out.filter(id => !['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','yoke_walk','frame_carry','husafell_carry','atlas_stone_load','sandbag_load','sandbag_shoulder','keg_toss','snatch_pull','clean_pull','deficit_pull','pause_pull','rdl'].includes(id));
   if (hasWord('shoulder') || txt.includes('плеч')) out = out.filter(id => !['snatch','deficit_snatch','block_snatch','pause_snatch','high_hang_snatch','log_press','push_jerk','split_jerk','overhead_squat_v2','jerk_recovery','behind_neck_jerk','push_press','snatch_balance'].includes(id));
   if (hasWord('wrist') || txt.includes('запяст')) out = out.filter(id => !['clean_and_jerk','front_squat_clean_grip','hang_clean','power_clean','deficit_clean','block_clean','low_block_clean','pause_clean'].includes(id));
   return out;

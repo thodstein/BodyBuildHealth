@@ -39,32 +39,36 @@ export const WL_LANDMARKS: Record<Level, Record<string, Landmarks>> = {
 
 export const STRONG_LANDMARKS: Record<Level, Record<string, Landmarks>> = {
   beginner: {
-    overhead: { mev: 6, mav: 10, mrv: 15, unit: 'sets' },
+    overhead: { mev: 6, mav: 11, mrv: 16, unit: 'sets' },
     deadlift: { mev: 4, mav: 8, mrv: 12, unit: 'sets' },
     squat: { mev: 6, mav: 10, mrv: 15, unit: 'sets' },
-    carry: { mev: 80, mav: 150, mrv: 250, unit: 'meters' },
-    stone: { mev: 6, mav: 10, mrv: 16, unit: 'lifts' },
+    carry: { mev: 80, mav: 160, mrv: 280, unit: 'meters' },
+    stone: { mev: 8, mav: 13, mrv: 18, unit: 'lifts' },
+    grip: { mev: 4, mav: 8, mrv: 12, unit: 'sets' },
   },
   intermediate: {
-    overhead: { mev: 8, mav: 14, mrv: 20, unit: 'sets' },
+    overhead: { mev: 8, mav: 14, mrv: 22, unit: 'sets' },
     deadlift: { mev: 6, mav: 10, mrv: 16, unit: 'sets' },
     squat: { mev: 8, mav: 14, mrv: 20, unit: 'sets' },
-    carry: { mev: 100, mav: 200, mrv: 350, unit: 'meters' },
-    stone: { mev: 8, mav: 12, mrv: 20, unit: 'lifts' },
+    carry: { mev: 100, mav: 210, mrv: 380, unit: 'meters' },
+    stone: { mev: 10, mav: 15, mrv: 22, unit: 'lifts' },
+    grip: { mev: 6, mav: 12, mrv: 18, unit: 'sets' },
   },
   advanced: {
-    overhead: { mev: 10, mav: 16, mrv: 24, unit: 'sets' },
+    overhead: { mev: 10, mav: 16, mrv: 26, unit: 'sets' },
     deadlift: { mev: 8, mav: 12, mrv: 18, unit: 'sets' },
     squat: { mev: 10, mav: 16, mrv: 24, unit: 'sets' },
-    carry: { mev: 120, mav: 250, mrv: 400, unit: 'meters' },
-    stone: { mev: 10, mav: 16, mrv: 24, unit: 'lifts' },
+    carry: { mev: 120, mav: 260, mrv: 420, unit: 'meters' },
+    stone: { mev: 12, mav: 18, mrv: 28, unit: 'lifts' },
+    grip: { mev: 8, mav: 14, mrv: 20, unit: 'sets' },
   },
   enhanced: {
-    overhead: { mev: 12, mav: 18, mrv: 28, unit: 'sets' },
+    overhead: { mev: 12, mav: 19, mrv: 30, unit: 'sets' },
     deadlift: { mev: 10, mav: 14, mrv: 22, unit: 'sets' },
     squat: { mev: 12, mav: 18, mrv: 28, unit: 'sets' },
-    carry: { mev: 150, mav: 300, mrv: 500, unit: 'meters' },
-    stone: { mev: 12, mav: 18, mrv: 28, unit: 'lifts' },
+    carry: { mev: 150, mav: 310, mrv: 520, unit: 'meters' },
+    stone: { mev: 14, mav: 22, mrv: 32, unit: 'lifts' },
+    grip: { mev: 10, mav: 16, mrv: 24, unit: 'sets' },
   },
 };
 

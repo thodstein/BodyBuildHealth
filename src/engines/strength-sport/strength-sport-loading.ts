@@ -16,7 +16,7 @@ const PCT_BY_PHASE_WL: Record<string, number> = {
 const TEMPO_OVERRIDES: Record<string,string> = {
   snatch:'X-0-X-0', hang_snatch:'X-0-X-0', power_snatch:'X-0-X-0', muscle_snatch:'X-0-X-0', high_hang_snatch:'X-0-X-0', deficit_snatch:'X-0-X-0', block_snatch:'X-0-X-0', pause_snatch:'X-0-X-0', snatch_pull:'X-0-X-0', clean_pull:'X-0-X-0', hang_clean:'X-0-X-0', power_clean:'X-0-X-0', muscle_clean:'X-0-X-0', deficit_clean:'X-0-X-0', block_clean:'X-0-X-0', low_block_clean:'X-0-X-0', pause_clean:'X-0-X-0', pause_jerk:'X-0-X-0', push_jerk:'X-0-X-0', split_jerk:'X-0-X-0', push_press:'X-0-X-0',
   rdl:'3-1-1-0', bulgarian_split:'3-0-1-0', cossack_squat:'3-0-1-0', overhead_squat_v2:'3-0-1-0', snatch_balance:'3-0-1-0',
-  log_press:'2-0-1-0', yoke_walk:'1-0-1-0', farmers_walk_heavy:'1-0-1-0', atlas_stone_load:'2-0-1-0', tire_flip:'1-0-1-0', sled_push_sprint:'1-0-1-0',
+  log_press:'2-0-1-0', axle_press:'2-0-1-0', yoke_walk:'brace 2с — walk', farmers_walk_heavy:'1-0-1-0', frame_carry:'1-0-1-0', husafell_carry:'1-0-1-0', atlas_stone_load:'lap 2с — load', sandbag_load:'lap 2с — load', keg_toss:'X-0-X-0', car_deadlift_18:'2-0-1-0', tire_flip:'1-0-1-0', sled_push_sprint:'1-0-1-0', sandbag_shoulder:'2-0-X-0',
   bench_bar:'2-0-1-0', squat:'2-0-1-0', back_squat:'2-0-1-0', front_squat:'2-0-1-0', deadlift:'2-0-1-0', sumo_dl:'2-0-1-0',
 };
 export function tempoForSS(id: string, character: DayCharacter, phase: string): string {
@@ -29,8 +29,8 @@ export function tempoForSS(id: string, character: DayCharacter, phase: string): 
 }
 // P0-6: рест по ивентам + по % — памп всегда короче (даже для стронга)
 export function restForSS(character: DayCharacter, isPrimary: boolean, id?: string, pct?: number): number {
-  const strongCarry = id && ['yoke_walk','farmers_walk_heavy','zercher_carry','sled_push_sprint','tire_flip','atlas_stone_load','stone_lift','sandbag_shoulder'].some(k => id.includes(k));
-  const strongPress = id && ['log_press','circus_db_press','axle_deadlift'].some(k => id.includes(k));
+  const strongCarry = id && ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','zercher_carry','sled_push_sprint','tire_flip','atlas_stone_load','stone_lift','sandbag_shoulder','sandbag_load','keg_toss','sandbag_carry','car_deadlift_18'].some(k => id.includes(k));
+  const strongPress = id && ['log_press','axle_press','circus_db_press','axle_deadlift','car_deadlift_18'].some(k => id.includes(k));
   const p = pct ?? 0.80;
   if (character === 'памп') {
     if (strongCarry) return p >= 0.85 ? 180 : 120;

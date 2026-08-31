@@ -37,11 +37,17 @@ const LIFT_K_FACTOR: Record<string, number> = {
   sumo_dl: 0.90,
   rdl: 0.75,
   log_press: 0.70,
+  axle_press: 0.68,
   farmers_walk_heavy: 0.60,
   yoke_walk: 0.55,
+  frame_carry: 0.58,
+  husafell_carry: 0.57,
   atlas_stone_load: 0.60,
+  sandbag_load: 0.60,
   stone_lift: 0.60,
   sandbag_shoulder: 0.60,
+  keg_toss: 0.65,
+  car_deadlift_18: 0.88,
 };
 
 function intensityK(input: StrengthSportInput): number {
@@ -110,8 +116,9 @@ export function intensityZoneFor(pct: number): 'technique' | 'strength' | 'heavy
 /**
  * P0-1 Block-периодизация Torokhtiy 3/3/3/1 + адаптив для коротких циклов.
  * goal technique → accumulation дольше, peaking короче; goal peaking → taper обязателен.
+ * mode strongman → GPP 40 / Strength 35 / Event-peak 20 (Winwood), иначе Torokhtiy.
  */
-export function buildPhaseDistribution(totalWeeks: number, goal?: string): string[] {
+export function buildPhaseDistribution(totalWeeks: number, goal?: string, mode?: string): string[] {
   if (totalWeeks <= 3) return Array(totalWeeks).fill('accumulation');
   const out: string[] = [];
   // Последняя неделя — всегда deload (для всех целей кроме peaking где taper)
@@ -123,6 +130,17 @@ export function buildPhaseDistribution(totalWeeks: number, goal?: string): strin
     const intens = Math.max(1, effective - acc);
     for (let i = 0; i < acc; i++) out.push('accumulation');
     for (let i = 0; i < intens; i++) out.push('intensification');
+    if (hasDeload) out.push('deload');
+    return out.slice(0, totalWeeks);
+  }
+  if (mode === 'strongman' && totalWeeks >= 8) {
+    // Strongman: GPP/acc 40 / Strength 35 / Event-peak 20 (Winwood 2014)
+    const acc = Math.max(2, Math.round(effective * 0.40));
+    const intens = Math.max(2, Math.round(effective * 0.35));
+    const peak = Math.max(1, effective - acc - intens);
+    for (let i = 0; i < acc; i++) out.push('accumulation');
+    for (let i = 0; i < intens; i++) out.push('intensification');
+    for (let i = 0; i < peak; i++) out.push('peaking');
     if (hasDeload) out.push('deload');
     return out.slice(0, totalWeeks);
   }
@@ -165,8 +183,8 @@ export function buildPhaseDistribution(totalWeeks: number, goal?: string): strin
   return out.slice(0, totalWeeks);
 }
 
-export function phaseForWeek(week: number, totalWeeks: number, goal?: string): string {
-  const dist = buildPhaseDistribution(totalWeeks, goal);
+export function phaseForWeek(week: number, totalWeeks: number, goal?: string, mode?: string): string {
+  const dist = buildPhaseDistribution(totalWeeks, goal, mode);
   return dist[Math.max(0, Math.min(totalWeeks - 1, week - 1))] || 'accumulation';
 }
 

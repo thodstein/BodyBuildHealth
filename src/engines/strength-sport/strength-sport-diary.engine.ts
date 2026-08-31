@@ -107,3 +107,39 @@ export function getDiaryTrendSS(): DiaryTrendSS[] | null {
   const logs = loadDiaryLogsSS();
   return buildDiaryTrendSS(logs);
 }
+
+// ACWR EWMA как в cardio-diary.engine: α=0.25 acute 7д, chronic 28д
+export function acwrEwmaSS(dailyLoads: number[], alpha = 0.25): { acute: number; chronic: number; ratio: number; zone: 'undertrained'|'optimal'|'caution'|'dangerous' } | null {
+  if (!Array.isArray(dailyLoads) || dailyLoads.length < 7) return null;
+  const ewma = (arr: number[]) => {
+    let v = arr[0];
+    for (let i=1;i<arr.length;i++) v = alpha*arr[i] + (1-alpha)*v;
+    return v;
+  };
+  const acuteArr = dailyLoads.slice(-7);
+  const chronicArr = dailyLoads.slice(-28);
+  const acute = ewma(acuteArr);
+  const chronic = ewma(chronicArr);
+  const ratio = chronic > 0 ? acute/chronic : 0;
+  let zone: 'undertrained'|'optimal'|'caution'|'dangerous' = 'optimal';
+  if (ratio < 0.8) zone = 'undertrained';
+  else if (ratio > 1.5) zone = 'dangerous';
+  else if (ratio > 1.3) zone = 'caution';
+  return { acute: Math.round(acute*10)/10, chronic: Math.round(chronic*10)/10, ratio: Math.round(ratio*100)/100, zone };
+}
+
+// Per-exercise last e1RM index как в bb-progression-feedback
+export function buildLastE1RMIndexSS(logs: any[]): Record<string, number> {
+  const idx: Record<string, number> = {};
+  for (const e of logs) {
+    const name = String(e.exerciseName || e.name || '');
+    const sets = Array.isArray(e.sets) ? e.sets : [];
+    let best = 0;
+    for (const s of sets) {
+      const w = Number(s.weight)||0; const r = Number(s.reps)||0;
+      if (w>0 && r>0) best = Math.max(best, epleyForLift(w,r,name));
+    }
+    if (best>0) idx[name.toLowerCase()] = Math.max(idx[name.toLowerCase()]||0, best);
+  }
+  return idx;
+}

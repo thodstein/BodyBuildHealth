@@ -13,9 +13,10 @@ describe('strength-sport-loading tempo overrides', () => {
   it('bulgarian = 3-0-1-0', () => {
     expect(tempoForSS('bulgarian_split', 'тяж', 'intensification')).toBe('3-0-1-0');
   });
-  it('yoke = carry 1-0-1-0', () => {
-    expect(tempoForSS('yoke_walk', 'тяж', 'accumulation')).toBe('1-0-1-0');
+  it('yoke = brace walk / farmers 1-0-1-0', () => {
+    expect(tempoForSS('yoke_walk', 'тяж', 'accumulation')).toBe('brace 2с — walk');
     expect(tempoForSS('farmers_walk_heavy', 'тяж', 'accumulation')).toBe('1-0-1-0');
+    expect(tempoForSS('husafell_carry', 'тяж', 'accumulation')).toBe('1-0-1-0');
   });
   it('deload overrides to 3-1-1-0', () => {
     expect(tempoForSS('bench_bar', 'тяж', 'deload')).toBe('3-1-1-0');

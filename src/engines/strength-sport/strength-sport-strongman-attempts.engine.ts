@@ -1,6 +1,6 @@
 /**
- * strength-sport-strongman-attempts.engine.ts — план попыток для стронг-ивентов (лог, йок, камни).
- * Изолировано. Для каждого ивента — 3 попытки по % от ПМ + разминка.
+ * strength-sport-strongman-attempts.engine.ts — план попыток для стронг-ивентов.
+ * Max: лог/аксель 85/92/98-102%; Reps: 60с AMRAP; Medley: дистанция+время; Ladder: камни 5 ступеней.
  */
 
 export type SMStrategy = 'conservative' | 'balanced' | 'aggressive';
@@ -30,19 +30,21 @@ export function smAttemptsFor(pm: number, strategy: SMStrategy = 'balanced', ste
 }
 
 export const SM_EVENT_STEP: Record<string, number> = {
-  log_press: 2.5, circus_db_press: 2.5, axle_deadlift: 5, deadlift: 5,
-  yoke_walk: 10, farmers_walk_heavy: 5, atlas_stone_load: 5, stone_lift: 5,
+  log_press: 2.5, axle_press: 2.5, circus_db_press: 2.5, axle_deadlift: 5, deadlift: 5, car_deadlift_18: 10,
+  yoke_walk: 10, frame_carry: 10, husafell_carry: 5, farmers_walk_heavy: 5, atlas_stone_load: 5, stone_lift: 5, sandbag_load: 5, keg_toss: 2, sandbag_carry: 5,
 };
 
 export const SM_EVENT_LABEL: Record<string, string> = {
-  log_press: 'Лог-пресс', yoke_walk: 'Йок', farmers_walk_heavy: 'Фермер', atlas_stone_load: 'Атлас-камень', axle_deadlift: 'Аксель-тяга',
+  log_press: 'Лог-пресс', axle_press: 'Аксель-пресс', yoke_walk: 'Йок', frame_carry: 'Рама', husafell_carry: 'Хусафелл', farmers_walk_heavy: 'Фермер', atlas_stone_load: 'Атлас-камень', sandbag_load: 'Мешок загрузка', keg_toss: 'Бочка бросок', axle_deadlift: 'Аксель-тяга', car_deadlift_18: 'Автодедлифт', sandbag_carry: 'Мешок переноска',
 };
 
 export interface SMEventPlan {
   event: string;
   attempts: SMAttemptSet;
-  warmup: { pct: number; weight: number; reps?: number }[];
+  warmup: { pct: number; weight: number; reps?: number; distanceM?: number; timeCapS?: number }[];
   strategy: SMStrategy;
+  medley?: { events: string[]; totalTimeS: number; timeCapS: number; transitionsS: number };
+  ladder?: { weights: number[]; platformHeights?: number[] };
 }
 
 export function buildSMEventPlan(
@@ -53,17 +55,74 @@ export function buildSMEventPlan(
   if (!Number.isFinite(pm) || pm <= 0) return null;
   const step = SM_EVENT_STEP[eventId] || 2.5;
   const attempts = smAttemptsFor(pm, strategy, step);
+  const isCarry = ['yoke_walk','frame_carry','husafell_carry','farmers_walk_heavy','sandbag_carry','zercher_carry'].includes(eventId);
+  const isStone = ['atlas_stone_load','stone_lift','sandbag_load'].includes(eventId);
   const warmupPct = [0.50, 0.65, 0.75, 0.85];
-  const warmup = warmupPct.map(p => ({ pct: p, weight: Math.round(pm * p / step) * step, reps: p < 0.65 ? 3 : p < 0.80 ? 2 : 1 }));
+  const warmup = warmupPct.map(p => ({
+    pct: p,
+    weight: Math.round(pm * p / step) * step,
+    reps: isCarry ? 1 : p < 0.65 ? 3 : p < 0.80 ? 2 : 1,
+    distanceM: isCarry ? (p >= 0.85 ? 10 : 20) : undefined,
+    timeCapS: isCarry ? 60 : undefined,
+  }));
+  // для камней — ladder по умолчанию
+  if (isStone) {
+    const ladder = buildStoneLadder(pm, 5, step);
+    return { event: eventId, attempts, warmup, strategy, ladder: { weights: ladder } };
+  }
   return { event: eventId, attempts, warmup, strategy };
+}
+
+export function buildStoneLadder(pm: number, count = 5, step = 5): number[] {
+  const pcts = [0.70, 0.78, 0.85, 0.92, 1.00].slice(0, count);
+  return pcts.map(p => Math.round(pm * p / step) * step);
+}
+
+export interface MedleyPlan {
+  events: { id: string; weight: number; distanceM: number; timeCapS: number }[];
+  totalTimeS: number;
+  timeCapS: number;
+  strategy: SMStrategy;
+}
+export function buildMedleyPlan(events: { id: string; pm: number; distanceM?: number }[], strategy: SMStrategy = 'balanced'): MedleyPlan | null {
+  if (!events.length) return null;
+  const mapped = events.map(e => {
+    const metaStep = SM_EVENT_STEP[e.id] || 5;
+    const base = e.pm;
+    // для medley берём 85-95% от ПМ (не max)
+    const pct = strategy === 'conservative' ? 0.85 : strategy === 'aggressive' ? 0.95 : 0.90;
+    const w = Math.round(base * pct / metaStep) * metaStep;
+    const dist = e.distanceM ?? (e.id.includes('yoke') ? 20 : e.id.includes('farmers') ? 40 : 20);
+    const cap = e.id.includes('yoke') ? 60 : e.id.includes('farmers') ? 75 : 60;
+    return { id: e.id, weight: w, distanceM: dist, timeCapS: cap };
+  });
+  const transitionsS = (mapped.length - 1) * 5;
+  // оценка времени: yoke 20м ~12с, farmers 40м ~28с, sled 25м ~15с
+  const timeMap: Record<string, number> = { yoke_walk: 12, frame_carry: 12, husafell_carry: 18, farmers_walk_heavy: 28, sled_push_sprint: 15, sled_push: 15, tire_flip: 20, sandbag_carry: 20 };
+  const totalTimeS = mapped.reduce((a,e)=> a + (timeMap[e.id] ?? 15), 0) + transitionsS;
+  const timeCapS = mapped.reduce((a,e)=> a + e.timeCapS, 0) - 10; // запас 10с
+  return { events: mapped, totalTimeS, timeCapS: Math.max(totalTimeS+20, timeCapS), strategy };
 }
 
 export function smEventRationale(plan: SMEventPlan | null): string[] {
   if (!plan) return ['Нет данных для ивента'];
   const label = SM_EVENT_LABEL[plan.event] || plan.event;
-  return [
+  const lines: string[] = [
     `${label} ${plan.strategy} ${SM_STRATEGY_PCT[plan.strategy].opener * 100}/${SM_STRATEGY_PCT[plan.strategy].second * 100}/${SM_STRATEGY_PCT[plan.strategy].third * 100}% — шаг ${SM_EVENT_STEP[plan.event] || 2.5}кг`,
     `Попытки: ${plan.attempts.opener} / ${plan.attempts.second} / ${plan.attempts.third} кг`,
-    `Разминка: ${plan.warmup.map(w => `${w.weight}кг×${w.reps}`).join(' → ')}`,
+    `Разминка: ${plan.warmup.map(w => `${w.weight}кг${(w as any).distanceM ? ` ${ (w as any).distanceM}м` : `×${w.reps}`}`).join(' → ')}`,
   ];
+  if (plan.ladder) lines.push(`Лестница камней: ${plan.ladder.weights.join(' → ')} кг`);
+  if (plan.medley) lines.push(`Medley: ${plan.medley.events.join(' → ')} · ${plan.medley.totalTimeS}с / cap ${plan.medley.timeCapS}с`);
+  return lines;
+}
+export function medleyRationale(m: MedleyPlan | null): string[] {
+  if (!m) return ['Нет medley'];
+  return [
+    `Medley ${m.strategy}: ${m.events.map(e=> `${SM_EVENT_LABEL[e.id]||e.id} ${e.weight}кг ${e.distanceM}м`).join(' → ')}`,
+    `Оценка ${m.totalTimeS}с / cap ${m.timeCapS}с · переходы 5с · запас ${m.timeCapS - m.totalTimeS}с`,
+  ];
+}
+export function stoneLadderRationale(weights: number[]): string[] {
+  return [`Лестница: ${weights.join(' → ')} кг · платформы 120→160см · тактика: слабые — скорость, тяжёлые — lap 2с`];
 }

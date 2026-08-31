@@ -79,26 +79,46 @@ export function weightCutNutritionForWeekSS(
   let sodium = 5000;
   if (ph === 'taper') {
     carbs = protocol.carbMode === 'moderate_cut' ? Math.round(bodyweightKg * 2.5) : Math.round(bodyweightKg * 4);
-    const loadWater = Math.min(6000, Math.round(bodyweightKg * 40));
+    const loadWaterRaw = Math.round(bodyweightKg * 40);
+    const loadWater = Math.min(bodyweightKg > 110 ? 5000 : 6000, loadWaterRaw);
     water = protocol.waterMode === 'load_cut' ? loadWater : Math.round(bodyweightKg * (sex === 'female' ? 28 : 30));
+    if (bodyweightKg > 110 && water > 5000) water = 5000;
     sodium = protocol.sodiumMode === 'moderate_cut' ? 3000 : 4000;
+    if (bodyweightKg > 110) sodium = Math.min(sodium, 5000);
     notes.push('Тапер: угли умеренно ↓, вода load перед сливом (для ТА мягче чем у единоборств)');
     if (sex === 'female') notes.push('Female: вода 30мл/кг (vs male 35), Na стабильно, угли не <2г/кг');
+    if (bodyweightKg > 110) notes.push('Heavy >110кг: вода cap 5л, Na ≤5г');
   } else if (ph === 'fight_week') {
     carbs = protocol.carbMode === 'moderate_cut' ? Math.max(Math.round(bodyweightKg * 2), 120) : Math.round(bodyweightKg * 3);
     if (protocol.heatSessions && ph === 'fight_week') notes.push('⚠ Сауна НЕ в fight week — ЦНС риск, только в taper/camp');
     water = protocol.waterMode === 'load_cut' ? 2000 : Math.round(bodyweightKg * (sex === 'female' ? 20 : 22));
+    if (bodyweightKg > 110 && water > 3500) water = 3500;
     sodium = protocol.sodiumMode === 'moderate_cut' ? 2000 : 3000;
+    if (bodyweightKg > 110) sodium = Math.min(sodium, 3500);
     notes.push('Fight week: вода 2л + Na 2г + угли ≥2г/кг (сохраняем ЦНС для техники) → взвешивание → рефид 4-5г/кг + 125% воды');
     if (protocol.heatSessions && ph !== 'fight_week') notes.push('Сауна 12-15′×2 — только при сгонке ≥3кг, не в fight week');
   } else {
     // camp: при сгонке 5кг угли 4г/кг уже, не 5
     carbs = protocol.targetLossKg >= 5 ? Math.round(bodyweightKg * 4) : protocol.targetLossKg >= 3 ? Math.round(bodyweightKg * 4.5) : Math.round(bodyweightKg * 5);
     water = Math.round(bodyweightKg * (sex === 'female' ? 30 : 35));
-    sodium = 5000;
+    if (bodyweightKg > 110 && water > 4500) water = 4500;
+    sodium = Math.min(5000, bodyweightKg > 110 ? 5000 : 5000);
   }
-  const fat = Math.round(bodyweightKg * 0.9);
-  const kcal = protein * 4 + carbs * 4 + fat * 9;
+  // жиры: female ≥0.8г/кг (мин 40г), male ≥0.6 (мин 30) как у combat + RED-S floor
+  const fatPerKg = sex === 'female' ? 0.8 : 0.6;
+  let fat = Math.round(bodyweightKg * fatPerKg);
+  if (sex === 'female' && fat < 40) fat = 40;
+  else if (sex !== 'female' && fat < 30) fat = 30;
+  let kcal = protein * 4 + carbs * 4 + fat * 9;
+  const floor = sex === 'female' ? 1400 : 1500;
+  if (sex && kcal < floor) {
+    const neededCarbs = Math.ceil((floor - protein * 4 - fat * 9) / 4);
+    if (neededCarbs > carbs) {
+      notes.push(`Ккал ${kcal} < floor ${floor} (RED-S) — угли подняты с ${carbs}г до ${neededCarbs}г`);
+      carbs = neededCarbs;
+      kcal = floor;
+    }
+  }
   return { kcal, proteinG: protein, carbsG: carbs, waterMl: water, sodiumMg: sodium, notes };
 }
 

@@ -12,9 +12,28 @@ export function applyDUP(plan: StrengthSportPlan, mode: DUPMode = 'heavy_light')
   // PRO: beginner не получает DUP (только intermediate+)
   const lvl = (plan as any).level || 'intermediate';
   if (lvl === 'beginner') return plan;
+  const isStrongman = (plan as any).mode === 'strongman';
   for (const wk of plan.weeksData) {
     if (wk.deload) continue;
     wk.sessions.forEach((sess, idx) => {
+      // Strongman event_day conjugate: max / dynamic / rep ротация внутри ивента
+      if (isStrongman && sess.sessionTag === 'event_day') {
+        const wave = idx % 3;
+        for (const ex of sess.exercises) {
+          const isCarry = ['yoke','farmers','carry','husafell','frame','zercher'].some(k=> ex.id.includes(k));
+          const isStone = ['stone','sandbag','keg','tire'].some(k=> ex.id.includes(k));
+          if (wave === 0 && isCarry) { // max
+            ex.rir = Math.max(0, ex.rir - 1);
+            ex.workSets = ex.workSets.map(s=> ({...s, rir: ex.rir, pct: Math.min(95,(s.pct||80)+5), weight: Math.round(s.weight*1.05/2.5)*2.5 }));
+          } else if (wave === 1 && isStone) { // dynamic — скорость
+            ex.workSets = ex.workSets.map(s=> ({...s, tempo: 'X-0-X-0', rir: Math.min(3, ex.rir+1)}));
+          } else if (wave === 2) { // rep — объём
+            ex.rir = Math.min(4, ex.rir+1);
+            ex.workSets = ex.workSets.map(s=> ({...s, rir: ex.rir, reps: Math.min(6, s.reps+1), pct: Math.max(60,(s.pct||80)-5), weight: Math.round(s.weight*0.95/2.5)*2.5 }));
+          }
+        }
+        return;
+      }
       if (mode === 'wave') {
         // wave: тяж(90%) / средн(80%) / лёгк(70%) — pct относительно исходного 75-88
         const wave = idx % 3;

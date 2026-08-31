@@ -17,9 +17,18 @@ export function warmupRampFor(weight: number, id?: string, level?: string): Warm
     return out;
   }
   if (isCarry) {
-    // PRO: фермер/йок — дистанция, не reps: 50% на 20м лёгкая проходка
+    // PRO: фермер/йок — дистанция, brace: 50% 20м + 70% 20м + 85% 10м
     const out: WarmSet[] = [];
     out.push({ reps: 1, rir: 4, weight: Math.round(weight * 0.50 / 2.5) * 2.5 });
+    if (weight > 80) out.push({ reps: 1, rir: 3, weight: Math.round(weight * 0.70 / 2.5) * 2.5 });
+    if (weight > 140) out.push({ reps: 1, rir: 2, weight: Math.round(weight * 0.85 / 2.5) * 2.5 });
+    return out;
+  }
+  // камень/мешок — lap техника
+  if (id && ['stone','sandbag','keg','tire'].some(k=> id.includes(k))) {
+    const out: WarmSet[] = [];
+    out.push({ reps: 1, rir: 4, weight: Math.round(weight * 0.50 / 2.5) * 2.5 }); // lap
+    if (weight > 60) out.push({ reps: 1, rir: 3, weight: Math.round(weight * 0.70 / 2.5) * 2.5 });
     return out;
   }
   const out: WarmSet[] = [];

@@ -26,6 +26,12 @@ export interface StrengthSportWorkMax {
   atlasStone?: number;
   axleDeadlift?: number;
   circusDbPress?: number;
+  frameCarry?: number;
+  husafellCarry?: number;
+  sandbagLoad?: number;
+  kegToss?: number;
+  carDeadlift?: number;
+  axlePress?: number;
 }
 
 export interface StrengthSportInput {
@@ -91,6 +97,8 @@ export interface StrengthSportSet {
   pct?: number; // % от ПМ движения
   tempo?: string;
   restSeconds?: number;
+  distanceM?: number; // для carries: дистанция
+  timeCapS?: number; // лимит времени для medley/AMRAP
 }
 
 export interface StrengthSportExercise {
