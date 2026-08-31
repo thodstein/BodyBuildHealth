@@ -522,7 +522,7 @@ export const IndividualPlanSettings: React.FC = () => {
           </div>
         )}
         <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom: 6 }}>
-          <button onClick={() => setPeakWeekEnabled(!peakWeekEnabled)} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:700, border:'none', background: peakWeekEnabled ? '#f59e0b' : 'rgba(255,255,255,0.08)', color: peakWeekEnabled ? '#000' : 'rgba(255,255,255,0.7)' }}>🏋 Peak-week {peakWeekEnabled ? 'ON' : 'OFF'}</button>
+          <button onClick={() => { if (peakWeekEnabled) { setPeakWeekEnabled(false); } else { setPlanTab('peak'); } }} style={{ padding:'4px 8px', borderRadius:6, cursor:'pointer', fontSize:10, fontWeight:700, border:'none', background: peakWeekEnabled ? '#f59e0b' : 'rgba(255,255,255,0.08)', color: peakWeekEnabled ? '#000' : 'rgba(255,255,255,0.7)' }}>🏋 Peak-week {peakWeekEnabled ? 'ON' : 'OFF'}</button>
           {peakWeekEnabled && <select value={peakWeekShowDay} onChange={e => setPeakWeekShowDay(parseInt(e.target.value))} style={{ fontSize:10, padding:'2px', background:'#202023', color:'#fff', border:'1px solid rgba(255,255,255,0.1)', borderRadius:4 }}>
             {[0,1,2,3,4,5,6].map(d => <option key={d} value={d}>Show: день {d}</option>)}
           </select>}
@@ -540,27 +540,37 @@ export const IndividualPlanSettings: React.FC = () => {
                : 'Пикинг к шоу настраивается во вкладке «🏁 Тапер ББ» (полный редактор).'}
            </div>
            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-             <button
-               onClick={() => setPlanTab('peak')}
-               style={{
-                 flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
-                 background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
-               }}
-             >
-               ⚙ Настроить во вкладке «Тапер ББ»
-             </button>
-            {bbPrepConfig && (
               <button
-                onClick={() => applyBBPeakToPlan(null)}
+                onClick={() => setPlanTab('peak')}
                 style={{
                   flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
-                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444',
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(245,158,11,0.3)', color: '#f59e0b',
                 }}
               >
-                ✕ Отключить тапер
+                ⚙ Настроить во вкладке «Тапер ББ»
               </button>
-            )}
-          </div>
+             {bbPrepConfig ? (
+               <button
+                 onClick={() => applyBBPeakToPlan(null)}
+                 style={{
+                   flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
+                   background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.35)', color: '#ef4444',
+                 }}
+               >
+                 ✕ Отключить тапер
+               </button>
+             ) : (
+               <button
+                 onClick={() => setPlanTab('peak')}
+                 style={{
+                   flex: 1, padding: '8px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 10, fontWeight: 700, minHeight: 44,
+                   background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.35)', color: '#22c55e',
+                 }}
+               >
+                 🏁 Включить тапер (пикинг к шоу)
+               </button>
+             )}
+           </div>
         </GlassCard>
       )}
 
