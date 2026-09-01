@@ -135,3 +135,18 @@ export function validateWeightCutProtocol(p: WeightCutProtocol): string[] {
   if (p.targetLossKg > 5 && p.weeksOut < 8) errs.push('При сгонке >5кг нужно ≥8 нед');
   return errs;
 }
+
+/** Интеграция с планировщиком питания: весогонка → MealPlanInput (как bb-contest-prep prepToMealPlanInput). */
+export function combatWeightCutToMealInput(
+  week: number,
+  totalWeeks: number,
+  protocol: WeightCutProtocol | null,
+  bodyweightKg: number,
+  sex?: 'male' | 'female'
+): { kcal: number; protein: number; fat: number; carbs: number; waterMl: number; sodiumMg: number; fiberMaxG: number } | null {
+  const nut = weightCutNutritionForWeek(week, totalWeeks, protocol, bodyweightKg, sex);
+  if (nut.kcal == null || nut.proteinG == null) return null;
+  const fat = Math.round(bodyweightKg * (sex === 'female' ? 0.8 : 0.6));
+  const fiberMaxG = protocol?.carbMode === 'deplete_reload' && weightCutPhaseForWeek(week, totalWeeks, protocol) === 'fight_week' ? 15 : 28;
+  return { kcal: nut.kcal!, protein: nut.proteinG!, fat: fat < 30 ? 30 : fat, carbs: nut.carbsG!, waterMl: nut.waterMl!, sodiumMg: nut.sodiumMg!, fiberMaxG };
+}
