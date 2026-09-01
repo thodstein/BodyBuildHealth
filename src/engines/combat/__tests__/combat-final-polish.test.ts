@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildCombatPlan } from '../combat-builder.engine';
 import { applyPedDiminishing } from '../../shared/ped-diminishing.engine';
+import { buildWeightCutProtocol, combatWeightCutToMealInput } from '../combat-weight-cut.engine';
 
 describe('combat final polish PRO', () => {
   it('female carry ×0.90 vs male', () => {
@@ -27,5 +28,13 @@ describe('combat final polish PRO', () => {
     // оба должны собраться без throw и иметь шею
     expect(withCable.weeksData.length).toBe(4);
     expect(noCable.weeksData.length).toBe(4);
+  });
+  it('weight-cut → meal input', () => {
+    const proto = buildWeightCutProtocol(5, { startWeightKg:80 } as any)!;
+    const meal = combatWeightCutToMealInput(8, 8, proto, 80, 'male');
+    expect(meal).not.toBeNull();
+    expect(meal!.kcal).toBeGreaterThan(1400);
+    expect(meal!.protein).toBeGreaterThan(150);
+    expect(meal!.fiberMaxG).toBe(15);
   });
 });
