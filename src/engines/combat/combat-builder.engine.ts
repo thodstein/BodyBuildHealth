@@ -239,6 +239,14 @@ function weightForCombatExercise(id: string, input: CombatInput, goal: string): 
     else if (id.includes('grip') || id.includes('wrist') || id.includes('pinch')) w = Math.round(w * 0.80 / 2.5) * 2.5;
     else if (id.includes('bench') || id.includes('ohp') || id.includes('press')) w = Math.round(w * 0.88 / 2.5) * 2.5;
   }
+  // equipment fallback — вес скорректирован ×0.85-0.90 (COMBAT_FALLBACK)
+  if (w > 0) {
+    const eq = (input.equipment||[]).map((s:string)=> String(s).toLowerCase());
+    const hasCable = eq.includes('cable') || eq.includes('other') || eq.length===0;
+    const hasSled = eq.includes('other') || eq.includes('sled') || eq.length===0;
+    if (!hasCable && id==='landmine_rotation') w = Math.round(w*0.85/2.5)*2.5;
+    if (!hasSled && ['squat','row_bar','rdl'].includes(id)) w = Math.round(w*0.90/2.5)*2.5;
+  }
   return w;
 }
 

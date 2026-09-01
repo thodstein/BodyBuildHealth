@@ -3,6 +3,7 @@
  * Кап ниже чем в ББ/стронге (масса не всегда плюс). Учитывает GH/ins, дисциплину.
  */
 import { canonPedId, resolvePedAlias } from '../../data/ped-alias-map';
+import { applyPedDiminishing } from '../shared/ped-diminishing.engine';
 export type PedDoses = Record<string, number>;
 
 function parseDose(v: any): number {
@@ -90,9 +91,7 @@ export function adaptForPEDsCombat(
   else if (courseIntensity === 'mild') mult *= 0.97;
 
   const count = [has('aas')||aasDose>0, has('gh')||ghDose>0, has('insulin')||insDose>0, has('mgf'), has('igf')].filter(Boolean).length;
-  if (count >= 2) mult = 1 + (mult - 1) * 0.85;
-  // весогонка — дефицит съедает PED-выгоду
-  if (goal === 'weight_cut') mult = 1 + (mult - 1) * 0.70;
+  mult = applyPedDiminishing(mult, count, goal === 'weight_cut');
 
   // cap по дисциплине: борьба выигрывает от массы чуть больше
   let cap = 1.35;
