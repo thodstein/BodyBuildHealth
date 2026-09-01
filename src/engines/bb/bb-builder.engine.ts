@@ -47,7 +47,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../engines/pro/training-load
 import type { Macrocycle, MacroPhase, BBMacrocycle, BBMacroPhase } from '../lms/macrocycle.engine';
 import { syncBBPlanSetShape, validateBBPlan } from './bb-validator.engine';
 import { finalizeBBPlan } from './bb-finalize.engine';
-import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap } from './bb-volume.engine';
+import { buildBBVolumeTarget, type BBVolumeTarget, computeRegimeMrvMult, computeMrvMult, regimeMrvMultFor, computeBBRecoveryScore, computeBBWeeklyBudget, sessionLimitsFor, computeBBRecoveryMultiplier, computeBBNutritionMultiplier, perExerciseCap } from './bb-volume.engine';
 import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive } from './bb-insulin-window.engine';
@@ -1624,7 +1624,7 @@ function buildSession(
   const levelMult = levelMultMap[level] ?? 1.0;
   // Экзотика (гиря/олимп/стронгмен/мобилити) — только для advanced/enhanced; каноника по умолчанию.
   const allowExotic = level === 'advanced' || level === 'enhanced';
-  const dayRegimeMult = computeRegimeMrvMult({ onCourse: !!(pedAdapt && pedAdapt.activePEDs && pedAdapt.activePEDs.length > 0), courseIntensity: pedAdapt?.courseIntensity });
+  const dayRegimeMult = computeMrvMult({ onCourse: !!(pedAdapt && pedAdapt.activePEDs && pedAdapt.activePEDs.length > 0), courseIntensity: pedAdapt?.courseIntensity, doseAwareMrv: pedAdapt?.combinedMrvMultiplier });
   const dayFatigueBudget = Math.round(dailyCap * S_MRV_FACTOR * dayRegimeMult * levelMult);
   
   // Pre-calculate each muscle's expected volume to allocate budget proportionally
@@ -2710,9 +2710,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const v = typeof d === 'string' ? parseFloat(String(d).replace(',', '.').replace(/[^0-9.\-eE]/g, '')) : Number(d);
       return Number.isFinite(v) && v > 0;
     });
-  const regimeMult = computeRegimeMrvMult({
+  // Фаза 2.11: единый MRV-конвейер — PED-кривые (doseAwareMrv) как вход, вместо
+  // плоского ×2.0. Согласует per-muscle caps с landmarks/валидацией (убирает
+  // риск двойного масштабирования: лёгкий курс больше не получает caps ×2.0 при
+  // landmarks ×1.3).
+  const regimeMult = computeMrvMult({
     onCourse,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
+    doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
   });
   const recoveryScore = computeBBRecoveryScore({
     bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs,

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, normalizeBBMuscle } from '../bb-volume.engine';
+﻿import { describe, expect, it } from 'vitest';
+import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, normalizeBBMuscle, computeMrvMult, computeRegimeMrvMult } from '../bb-volume.engine';
 
 describe('BB volume model', () => {
   it('normalizes granular shoulder keys to the canonical group', () => {
@@ -51,5 +51,27 @@ describe('BB volume model', () => {
     expect(target.targetSets).toBeGreaterThanOrEqual(target.mev);
     expect(target.minSetsPerSession).toBeGreaterThanOrEqual(2);
     expect(target.rationale).toContain('weak-point multiplier ×1.2');
+  });
+});
+
+
+describe('computeMrvMult — единый MRV-конвейер (Фаза 2.11)', () => {
+  it('натурал → 1.0', () => {
+    expect(computeMrvMult({ onCourse: false })).toBe(1.0);
+  });
+  it('на курсе без doseAware → плоский ×2.0 (прежнее поведение)', () => {
+    expect(computeMrvMult({ onCourse: true })).toBe(2.0);
+    expect(computeMrvMult({ onCourse: true })).toBe(computeRegimeMrvMult({ onCourse: true }));
+  });
+  it('на курсе с doseAware → отслеживает PED-кривую (нижний флор 1.9)', () => {
+    expect(computeMrvMult({ onCourse: true, doseAwareMrv: 2.0 })).toBe(2.0);
+    expect(computeMrvMult({ onCourse: true, doseAwareMrv: 1.3 })).toBe(1.9);
+  });
+  it('не на курсе, но doseAware передан → 1.0', () => {
+    expect(computeMrvMult({ onCourse: false, doseAwareMrv: 2.0 })).toBe(1.0);
+  });
+  it('тяжёлая интенсивность даёт чуть выше (≤2.15)', () => {
+    expect(computeMrvMult({ onCourse: true, courseIntensity: 'heavy' })).toBeLessThanOrEqual(2.15);
+    expect(computeMrvMult({ onCourse: true, courseIntensity: 'heavy' })).toBeGreaterThan(2.0);
   });
 });

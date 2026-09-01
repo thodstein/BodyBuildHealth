@@ -61,6 +61,36 @@ export function regimeMrvMultFor(muscle: string, regimeMult: number): number {
 }
 
 /**
+ * Фаза 2.11: ЕДИНЫЙ конвейер MRV-множителя режима.
+ *
+ * Устраняет риск двойного масштабирования: раньше per-muscle caps использовали
+ * ПЛОСКИЙ ×2.0 (computeRegimeMrvMult), а landmarks/валидация — дозо-зависимые
+ * кривые adaptForPEDs (combinedMrvMultiplier, ×1.3–2.0). Два механизма расходились
+ * (лёгкий курс: caps ×2.0, landmarks ×1.3 → ложные MRV-overflow).
+ *
+ * Теперь PED-кривые (doseAwareMrv = adaptForPEDs().combinedMrvMultiplier) — ВХОД в
+ * единый множитель: если передан doseAwareMrv (на курсе), режим-множитель отслеживает
+ * кривую, а не плоское ×2.0. Без doseAwareMrv — прежнее плоское поведение.
+ */
+export function computeMrvMult(input: {
+  onCourse?: boolean;
+  peds?: string[];
+  courseIntensity?: string;
+  /** Дозо-зависимый MRV-множитель от adaptForPEDs (combinedMrvMultiplier). */
+  doseAwareMrv?: number;
+}): number {
+  const onCourse = input.onCourse || (Array.isArray(input.peds) && input.peds.length > 0);
+  if (!onCourse) return 1.0;
+  const dose = Number(input.doseAwareMrv);
+  if (Number.isFinite(dose) && dose > 1) {
+    // Дозо-зависимый: отслеживает PED-кривую (лёгкий курс → меньше, мега-стек → до 2.15).
+    // Нижний флор 1.9 сохраняет «режим курса» (не ниже нативного расширения объёма).
+    return Math.min(2.15, Math.max(1.9, dose));
+  }
+  return computeRegimeMrvMult(input);
+}
+
+/**
  * Единая оценка восстановления (0–100) из данных пользователя.
  * Неизвестные сигналы — нейтрально (не штрафуют).
  */
