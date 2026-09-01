@@ -10,7 +10,6 @@ import type { LMSBuildOutput, LMSPlanDay, LMSPlanExercise } from './lms/lms-buil
 import type { BBPlan, BBSession, BBExercise } from './bb/bb-builder.engine';
 import { calculatePlates, type PlateMathResult } from './gym-competition.engine';
 import { autoregulate, type AutoregInput, type AutoregOutput } from './autoregulation-engine';
-import { generatePLPeaking, generateBBPeaking, type PLPeakingInput, type BBPeakingInput } from './peaking-engine';
 
 // ── workout-logger shape (локальные типы-мосты, чтобы не тащить весь workout-logger) ──
 export interface BridgeSet { setNumber: number; weightKg: number; reps: number; rpe: number; rir: number; isPR: boolean; notes: string; }
@@ -95,25 +94,6 @@ export function autoregPlan(r: ReadinessInput): AutoregOutput {
     plannedReps: r.plannedReps, plannedFrequency: r.plannedFrequency, exerciseJointStress: {},
   };
   return autoregulate(input);
-}
-
-// ── INT3: выход на пик / соревновательная подготовка ──
-/**
- * @deprecated НЕ подключён ни к одному UI. Канон тапера/пика ПЛ:
- * lms-taper.engine (buildPLTaperCurve) + lms-builder.engine (appendPLTaperWeeks)
- * + lms-macro-taper.engine (макроцикл) + pro/taper.engine (калькулятор TaperPlannerTab).
- */
-export function peakForPLMeet(input: PLPeakingInput) {
-  return generatePLPeaking(input);
-}
-/**
- * @deprecated — BB-шоу-пик переведён на canonical engine
- * (bb-contest-prep.engine.ts: buildBBContestPrep / applyTrainingTaperToBBPlan /
- * applyPeakWeekOverlayToBBPlan / computePeakWeekNutritionTargets).
- * Функция нигде не вызывается и сохранена только для совместимости сигнатуры.
- */
-export function peakForBBShow(input: BBPeakingInput) {
-  return generateBBPeaking(input);
 }
 
 /** Сводка: применить autorég к сессии → рекомендации по объёму/интенсивности. */

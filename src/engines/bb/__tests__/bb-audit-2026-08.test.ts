@@ -7,7 +7,6 @@ import { buildBBPlan, bbRir, defaultWorkMax, backoffWeights, type BBBuilderInput
 import { prescribeLoad, suggestFeeders, roundToPlate, plateStepFor, rirDrift } from '../bb-autocoach.engine';
 import { summarizeAutoRegulation } from '../bb-progression-feedback.engine';
 import { optimizeMuscleFrequency } from '../bb-frequency-optimizer.engine';
-import { buildPeakWeekProtocol, applyPeakWeekToPlan } from '../bb-peak-week.engine';
 import { epley1RM } from '../../e1rm';
 import type { BBPlan, BBExercise, BBSession, BBWeek } from '../bb-builder.engine';
 
@@ -174,48 +173,6 @@ describe('C1: weight progression skips through multiple deload weeks', () => {
         }
       }
     }
-  });
-});
-
-// ─── C2: peak week floor=2 ───
-describe('C2: peak week exercises have floor=2 sets', () => {
-  it('applyPeakWeekToPlan leaves at least 2 sets per exercise', () => {
-    const protocol = buildPeakWeekProtocol('moderate');
-    const mockPlan: any = {
-      pattern: { name: 'Test', rotationDays: 7, sessionsPerRotation: 4 },
-      rationale: [],
-      rotationMuscleVolume: {},
-      weeks: [{
-        week: 1,
-        phase: 'peaking',
-        deload: false,
-        sessions: [{
-          day: 1,
-          sessionTag: 'Push',
-          character: 'тяж',
-          exercises: [{
-            muscle: 'chest',
-            name: 'Жим лёжа',
-            role: 'primary',
-            character: 'тяж',
-            sets: 4,
-            repsRange: [6, 8],
-            rir: 2,
-            workSets: [
-              { reps: 8, rir: 2, weight: 100 },
-              { reps: 8, rir: 2, weight: 100 },
-              { reps: 8, rir: 2, weight: 100 },
-              { reps: 8, rir: 2, weight: 100 },
-            ],
-          }],
-        }],
-      }],
-    };
-    const result = applyPeakWeekToPlan(mockPlan, protocol);
-    const ex = result.weeks[0].sessions[0].exercises[0];
-    // C2: floor=2 (was 1 before fix)
-    expect(ex.sets).toBeGreaterThanOrEqual(2);
-    expect(ex.workSets.length).toBeGreaterThanOrEqual(2);
   });
 });
 

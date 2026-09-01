@@ -469,36 +469,6 @@ describe('P1-7: cross-mesocycle continuity — previousPlan', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// P2-8: peak week — категория
-// (тестируем buildPeakWeekProtocol с разными категориями)
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('P2-8: peak week — категории', () => {
-  it('buildPeakWeekProtocol для разных категорий', async () => {
-    const { buildPeakWeekProtocol } = await import('../bb-peak-week.engine');
-
-    const mensProto = buildPeakWeekProtocol(80, 'mens_physique', 'male');
-    const openProto = buildPeakWeekProtocol(80, 'open', 'male');
-    const bikiniProto = buildPeakWeekProtocol(60, 'bikini', 'female');
-
-    expect(mensProto.days).toHaveLength(7);
-    expect(openProto.days).toHaveLength(7);
-    expect(bikiniProto.days).toHaveLength(7);
-
-    // Open BB — больше carbs чем mens_physique (больше масса)
-    const openCarbs = openProto.days.reduce((s, d) => s + d.carbGrams, 0);
-    const mensCarbs = mensProto.days.reduce((s, d) => s + d.carbGrams, 0);
-    // Open должен быть >= mens_physique по carbs (тяжелее категория)
-    expect(openCarbs).toBeGreaterThanOrEqual(mensCarbs);
-
-    // Bikini — lighter category, меньше sodium
-    const bikiniSodium = bikiniProto.days.reduce((s, d) => s + d.sodiumGrams, 0);
-    const mensSodium = mensProto.days.reduce((s, d) => s + d.sodiumGrams, 0);
-    expect(bikiniSodium).toBeLessThan(mensSodium);
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // P2-9: post_exhaust — различие с compound_first
 // ─────────────────────────────────────────────────────────────────────────────
 
