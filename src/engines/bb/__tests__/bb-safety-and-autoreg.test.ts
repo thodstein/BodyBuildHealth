@@ -171,6 +171,26 @@ describe('bb-auto-regulation.engine', () => {
     expect(override.volumeMultiplier).toBeLessThan(1.0);
   });
 
+  it('assessReadiness — ACWR dangerous (передан) → фактор установлен и штраф применён', () => {
+    const result = assessReadiness({ sleepHours: 8, stressLevel: 2, acwrRatio: 1.8 });
+    expect(result.factors.acwr).toBe('dangerous');
+    // 100 - 25 (ACWR) - 0 (сон good) - 0 (стресс low) = 75 → moderate/reduced
+    expect(result.score).toBeLessThanOrEqual(75);
+    expect(result.recommendations.some(r => r.includes('ACWR'))).toBe(true);
+  });
+
+  it('assessReadiness — ACWR caution (передан) → фактор caution', () => {
+    const result = assessReadiness({ sleepHours: 8, stressLevel: 2, acwrRatio: 1.4 });
+    expect(result.factors.acwr).toBe('caution');
+    expect(result.score).toBeLessThan(100);
+  });
+
+  it('assessReadiness — ACWR оптимальный (передан) → фактор optimal, штрафа нет', () => {
+    const result = assessReadiness({ sleepHours: 8, stressLevel: 2, acwrRatio: 1.0 });
+    expect(result.factors.acwr).toBe('optimal');
+    expect(result.score).toBe(100);
+  });
+
   it('calculateACWR — не падает', () => {
     const ratio = calculateACWR();
     expect(ratio).toBeGreaterThanOrEqual(0);

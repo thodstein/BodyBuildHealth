@@ -52,7 +52,7 @@ import { buildBBExpandedSummary } from './bb-summary.engine';
 import { jointGuardScorePenalty, jointGuardActive } from './bb-joint-guard.engine';
 import { insulinWindowActive } from './bb-insulin-window.engine';
 import { recommendPEDMethodology, applyPEDMethodologyToPlan } from './bb-ped-methodology.engine';
-import { REP_SCHEMES, schemeFor, schemeToLoading } from './bb-rep-schemes.engine';
+import { REP_SCHEMES, schemeFor, schemeToLoading, applySchemeToPlan } from './bb-rep-schemes.engine';
 import type { BBRotationReport } from './bb-rotation.engine';
 import type { BBSessionCost } from './bb-fatigue.engine';
 import type { BBPlanReport } from './bb-report.engine';
@@ -3848,6 +3848,21 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         const ps = pumpScheme ? REP_SCHEMES[pumpScheme] : null;
         if (hs) withMeth.rationale.push(`📋 Схема тяж: ${hs.nameRu} ${hs.repRange[0]}-${hs.repRange[1]} RIR${hs.rir} (${hs.evidence})`);
         if (ps) withMeth.rationale.push(`📋 Схема памп: ${ps.nameRu} ${ps.repRange[0]}-${ps.repRange[1]} RIR${ps.rir} (${ps.evidence})`);
+        // Фаза 1.1: rep-схемы применяются к РЕАЛЬНОЙ загрузке (не только rationale).
+        // Тяж-primary → схема тяж; памп-accessory → схема памп. Инварианты: cap 5 сетов,
+        // deload и warmup не трогаются, вес пересчитывается по Brzycki от workMax.
+        const schemeOpts = {
+          weightForRepMax,
+          workMax,
+          defaultWorkMax,
+          proWorkmaxRatio: (m: string) => PRO_WORKMAX_RATIO[m] as any,
+          intensityMult: 1,
+        };
+        const heavyApplied = applySchemeToPlan(withMeth, hs, 'heavy_primary', schemeOpts);
+        const pumpApplied = applySchemeToPlan(withMeth, ps, 'pump_accessory', schemeOpts);
+        if (heavyApplied > 0 || pumpApplied > 0) {
+          withMeth.rationale.push(`⚙️ Схемы применены к загрузке: ${heavyApplied} тяж-primary + ${pumpApplied} памп-accessory (reps/rest/tempo/вес пересчитаны).`);
+        }
       }
       // Все сплиты адаптируются: показать адаптированный объём для выбранного сплита
       const adaptNote = `🔄 Сплит «${pattern.name}» адаптирован: целевые объёмы пересчитаны под фарму (режим ×${regimeMult.toFixed(2)}, бюджет ${weeklyBudget} сетов/нед) — все сплиты масштабируются, выбор сохранён`;

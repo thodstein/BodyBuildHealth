@@ -43,6 +43,8 @@ export function assessReadiness(input: {
   sleepDays?: number[];
   stressLevel?: number;
   subjectiveReadiness?: number;
+  /** Текущий ACWR (acute:chronic workload ratio). Если не передан — вычисляется из дневника. */
+  acwrRatio?: number;
 }): ReadinessAssessment {
   let score = 100;
   const factors: ReadinessAssessment['factors'] = {
@@ -52,6 +54,31 @@ export function assessReadiness(input: {
     stress: 'unknown',
   };
   const recommendations: string[] = [];
+
+  // ACWR — вычисляем, если не передан. Фаза 1.2: фактор больше не «мёртвый».
+  let acwr: number | undefined = input.acwrRatio;
+  if (acwr == null || !Number.isFinite(acwr)) {
+    try {
+      const r = calculateACWR();
+      if (Number.isFinite(r) && r !== 1.0) acwr = r;
+    } catch { /* ignore */ }
+  }
+  if (acwr != null) {
+    if (acwr > 1.5) {
+      factors.acwr = 'dangerous';
+      score -= 25;
+      recommendations.push(`ACWR ${acwr.toFixed(2)} (>1.5) — опасная зона: объём растёт быстрее восстановления, необходима разгрузка.`);
+    } else if (acwr > 1.3) {
+      factors.acwr = 'caution';
+      score -= 15;
+      recommendations.push(`ACWR ${acwr.toFixed(2)} (1.3-1.5) — зона осторожности: снизьте объём.`);
+    } else if (acwr >= 0.8) {
+      factors.acwr = 'optimal';
+    } else {
+      factors.acwr = 'optimal';
+      recommendations.push(`ACWR ${acwr.toFixed(2)} (<0.8) — недогруз: окно для прогрессии объёма.`);
+    }
+  }
 
   // HRV
   if (Number.isFinite(input.hrvMs) && Number.isFinite(input.hrvBaseline) && (input.hrvBaseline as number) > 0) {

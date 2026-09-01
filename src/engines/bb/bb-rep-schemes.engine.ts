@@ -273,3 +273,74 @@ export function schemeLabel(id: RepSchemeId): string {
   const s = REP_SCHEMES[id];
   return s ? `${s.nameRu} (${s.repRange[0]}-${s.repRange[1]} · RIR${s.rir} · ${s.restSec}с)` : id;
 }
+
+/** Целевой тип упражнения для применения схемы: тяж-primary (сила) или памп-accessory (памп/GVT). */
+export type SchemeTarget = 'heavy_primary' | 'pump_accessory';
+
+/**
+ * Применяет rep-схему к реальной загрузке упражнений плана.
+ * Это закрывает «декоративность» схем: раньше schemeFor давал только строку rationale,
+ * теперь repsRange/rir/rest/tempo/workSets перезаписываются выбранной схемой.
+ *
+ * Ограничения безопасности:
+ *  - применяется ТОЛЬКО к целевым упражнениям (тяж-primary / памп-accessory);
+ *  - НЕ трогает разминочные (warmupActivator) и делод-недели;
+ *  - сохраняется кап 5 сетов (не увеличивает sets — только переписывает loading существующих сетов);
+ *  - вес пересчитывается через weightForRepMax от workMax мышцы (Brzycki + RIR-adj + intensityMult);
+ *  - deload-фаза и warmup-активаторы исключены.
+ */
+export function applySchemeToPlan(
+  plan: any,
+  scheme: RepScheme | null,
+  target: SchemeTarget,
+  opts: {
+    weightForRepMax: (reps: number, workMax: number, rir: number, intensityMult: number) => number;
+    workMax: Record<string, number>;
+    defaultWorkMax?: (muscle: string) => number;
+    proWorkmaxRatio?: (muscle: string) => ((wm: Record<string, number>) => number) | undefined;
+    intensityMult?: number;
+  },
+): number {
+  if (!scheme) return 0;
+  const { weightForRepMax, workMax, defaultWorkMax, proWorkmaxRatio, intensityMult = 1 } = opts;
+  const loading = schemeToLoading(scheme);
+  const isHeavyTarget = target === 'heavy_primary';
+  let applied = 0;
+
+  for (const week of plan.weeks || []) {
+    if (week?.phase === 'deload' || week?.deload) continue;
+    for (const sess of week.sessions || []) {
+      const isPumpSession = sess.character === 'памп' || sess.character === 'лёг';
+      const isHeavySession = sess.character === 'тяж';
+      for (const ex of sess.exercises || []) {
+        if (!ex || ex.warmupActivator) continue;
+        // Целевой фильтр по роли + характеру сессии.
+        const heavyMatch = isHeavyTarget && isHeavySession && ex.role === 'primary';
+        const pumpMatch = !isHeavyTarget && isPumpSession && ex.role === 'accessory';
+        if (!heavyMatch && !pumpMatch) continue;
+        // Сохраняем число сетов (кап 5), меняем только loading.
+        const setCount = Math.max(1, Math.min(5, ex.workSets?.length || ex.sets || 3));
+        // Вес: Brzycki от workMax мышцы (как в buildSession), с intensityMult.
+        const wm = workMax[ex.muscle] || proWorkmaxRatio?.(ex.muscle)?.(workMax) || defaultWorkMax?.(ex.muscle) || 50;
+        const weight = weightForRepMax(loading.reps, wm, loading.rir, intensityMult);
+        ex.repsRange = [scheme.repRange[0], scheme.repRange[1]];
+        ex.rir = loading.rir;
+        ex.restSeconds = loading.restSec;
+        ex.tempoSpec = loading.tempo;
+        ex.sets = setCount;
+        ex.workSets = Array.from({ length: setCount }, () => ({
+          reps: loading.reps,
+          rir: loading.rir,
+          weight: Math.round(weight * 10) / 10,
+          tempo: loading.tempo,
+          restSeconds: loading.restSec,
+        }));
+        if (!ex.comment?.includes(scheme.nameRu)) {
+          ex.comment = `${ex.comment || ''} | 📋 ${scheme.nameRu} (${scheme.evidence})`.trim().replace(/^\|\s*/, '');
+        }
+        applied++;
+      }
+    }
+  }
+  return applied;
+}
