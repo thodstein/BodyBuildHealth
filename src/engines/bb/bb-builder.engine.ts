@@ -834,6 +834,20 @@ export function weightForRepMax(reps: number, workMax: number, rir: number, inte
 }
 
 /**
+ * Фаза 1.4: топ-сет + back-off сеты.
+ * Про-практика — первый (топ) сет упражнения выполняется с базовым весом (целевой RIR),
+ * последующие сеты — с −10–15% (back-off), чтобы накопить объём без потери техники/отказа.
+ * Применяется только к primary-упражнениям на тяж-днях (НЕ deload), с ≥2 сетами.
+ * Машины/кабели держат меньше снижение, чем свободные веса (стабильная траектория).
+ */
+export function backoffWeights(baseWeight: number, setCount: number, isCompound: boolean, isDeload: boolean, character: string): number[] {
+  const n = Math.max(1, setCount);
+  if (isDeload || n < 2 || character !== 'тяж') return Array.from({ length: n }, () => baseWeight);
+  const drop = isCompound ? 0.10 : 0.075; // compound −10%, изоляция −7.5%
+  return Array.from({ length: n }, (_, i) => (i === 0 ? baseWeight : Math.round(baseWeight * (1 - drop) * 10) / 10));
+}
+
+/**
  * RIR упражнения в ББ-плане = фаза + характер дня + training focus.
  * strength: RIR 1-2 (Schoenfeld 2021), hypertrophy: RIR 2-3 (Roberts 2022), endurance: RIR 3-4.
  * Памп всегда ≥3 (Schoenfeld 2017: metabolic stress, не failure).
@@ -2374,11 +2388,11 @@ function buildSession(
           else wave = k % 2 === 1 ? repMax : repMin;
           dupReps.push(Math.min(wave, repsCap));
         }
-        const workSets: BBSet[] = dupReps.map(reps => ({
-          reps, rir: finalRir,
-          weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
-          tempo: tempoStr, restSeconds: exRest,
-        }));
+        const workSets: BBSet[] = dupReps.map((reps, i) => {
+          const baseW = Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10;
+          const ws = backoffWeights(baseW, dupReps.length, (exData as any).exerciseType !== 'isolation', phase === 'deload', pl.resolved as string);
+          return { reps, rir: finalRir, weight: ws[i] ?? baseW, tempo: tempoStr, restSeconds: exRest };
+        });
         // P0-1 (audit 2026-07): _pumpOverride удалён. Тяжёлый сет остаётся тяжёлым.
         const effChar: DayCharacter = pl.resolved as DayCharacter;
         const effReps: [number, number] = [Math.min(repMin, repsCap), Math.min(repMax, repsCap)];
@@ -2412,11 +2426,11 @@ function buildSession(
         if (k >= 2 && exSets >= 4 && phase !== 'deload') wave = Math.max(repMin, wave - 1);
         dupReps.push(Math.min(wave, repsCap));
       }
-      const workSets: BBSet[] = dupReps.map(reps => ({
-        reps, rir: finalRir,
-        weight: Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
-        tempo: tempoStr, restSeconds: exRest,
-      }));
+      const workSets: BBSet[] = dupReps.map((reps, i) => {
+        const baseW = Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10;
+        const ws = backoffWeights(baseW, dupReps.length, (exData as any).exerciseType !== 'isolation', phase === 'deload', pl.resolved as string);
+        return { reps, rir: finalRir, weight: ws[i] ?? baseW, tempo: tempoStr, restSeconds: exRest };
+      });
       exercises.push({
         muscle: pl.muscle, name: (exData as any).name || (exData as any).id, role: pl.role, character: pl.resolved as DayCharacter,
         sets: exSets, repsRange: [Math.min(repMin, repsCap), Math.min(repMax, repsCap)] as [number,number],

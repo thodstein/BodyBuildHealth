@@ -39,6 +39,8 @@ export function prescribeLoad(
    *  прогрессию по отклонению факта от цели: RIR≥planned+1 → +reps/+weight,
    *  RIR≤planned−2 → −5% weight (too heavy). */
   plannedRir?: number,
+  /** Фаза 1.3: микрозагрузка — доступные микропластины (1.25 кг) для компаундов. */
+  microPlates?: boolean,
 ): LoadStrategyPrescription {
   // P1-7: success-aware коррекция по RIR-отклонению факта от цели.
   // Если plannedRir задан — корректируем прогрессию.
@@ -50,7 +52,10 @@ export function prescribeLoad(
     }
     if (rirDeviation <= -2) {
       // Слишком тяжело (RIR на 2+ ниже цели) → −5% weight, сохранить reps
-      return { nextWeight: Math.round(currentWeight * 0.95 * 10) / 10, nextReps: currentReps, nextRIR: Math.min(5, plannedRir + 1), label: `Перегруз: RIR${currentRIR} < цели ${plannedRir} → −5% вес` };
+      // Фаза 1.3: микрозагрузка — снижение к доступной пластине, а не жёсткие −5%.
+      const plate = plateStepFor(exType, role, microPlates);
+      const reduced = roundToPlate(currentWeight * 0.95, plate);
+      return { nextWeight: reduced, nextReps: currentReps, nextRIR: Math.min(5, plannedRir + 1), label: `Перегруз: RIR${currentRIR} < цели ${plannedRir} → −5% вес` };
     }
     // RIR в пределах ±1 от цели → нормальная прогрессия (fallthrough)
   }
@@ -67,19 +72,26 @@ export function prescribeLoad(
       if (currentReps < repCap) {
         return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: Math.max(0, currentRIR - 1), label: `Добейте ${currentReps + 1} повторов (цель ${repCap})` };
       }
-      return { nextWeight: Math.round(currentWeight * 1.05), nextReps: Math.max(6, repCap - 4), nextRIR: Math.max(0, currentRIR - 1), label: `Повысьте вес до ${Math.round(currentWeight * 1.05)} кг` };
+      // Фаза 1.3: микрозагрузка — скачок на ОДНУ доступную пластину (+2.5 кг компаунд,
+      // +1 кг изоляция/кабель, +1.25 кг с микропластинами), а не жёсткие +5%
+      // (для жима 150 кг +5% = +7.5 кг — нереалистично).
+      const plate = plateStepFor(exType, role, microPlates);
+      const safeJump = roundToPlate(currentWeight + plate, plate);
+      return { nextWeight: safeJump, nextReps: Math.max(6, repCap - 4), nextRIR: Math.max(0, currentRIR - 1), label: `Повысьте вес до ${safeJump} кг` };
     }
     case 'linear': {
       const phaseMult = week < totalWeeks * 0.75 ? 1.0 : 0.5;
       const typeBase: Record<string, number> = { compound: 2.5, machine_compound: 1.5, cable: 1.25, machine: 1.0, isolation: 1.0, accessory: 0.5 };
       const baseIncr = typeBase[exType || 'compound'] ?? (role === 'accessory' ? 0.5 : 1.5);
       const increment = baseIncr * phaseMult;
-      return { nextWeight: Math.round((currentWeight + increment) * 10) / 10, nextReps: currentReps, nextRIR: Math.max(0, currentRIR - 1), label: `Линейная +${increment.toFixed(1)} кг/нед` };
+      const plate = plateStepFor(exType, role, microPlates);
+      return { nextWeight: roundToPlate(currentWeight + increment, plate), nextReps: currentReps, nextRIR: Math.max(0, currentRIR - 1), label: `Линейная +${increment.toFixed(1)} кг/нед` };
     }
     case 'wave': {
       const pos = (week - 1) % 3;
       const waveMult = pos === 0 ? 1.05 : pos === 1 ? 1.0 : 0.92;
-      return { nextWeight: Math.round(currentWeight * waveMult * 10) / 10, nextReps: currentReps, nextRIR: currentRIR, label: `Волновая: нед ${week}` };
+      const plate = plateStepFor(exType, role, microPlates);
+      return { nextWeight: roundToPlate(currentWeight * waveMult, plate), nextReps: currentReps, nextRIR: currentRIR, label: `Волновая: нед ${week}` };
     }
     case 'rpe_based': {
       const phaseStartRir: Record<string, [number, number]> = { accumulation: [3, 1], intensification: [2, 0], peaking: [1, 0], deload: [4, 4] };
@@ -92,6 +104,21 @@ export function prescribeLoad(
     }
     default: return { nextWeight: currentWeight, nextReps: currentReps, nextRIR: currentRIR, label: 'Продолжайте по плану' };
   }
+}
+
+/** Округление веса к доступной пластине (микрозагрузка). */
+export function roundToPlate(weight: number, plateStep: number = 2.5): number {
+  if (!Number.isFinite(weight) || weight <= 0) return Math.max(0, Math.round(weight * 10) / 10);
+  const step = plateStep > 0 ? plateStep : 2.5;
+  return Math.round((weight + 0.0001) / step) * step;
+}
+
+/** Пластиночный шаг для упражнения: compound/штанга → 2.5, микропластины → 1.25, изоляция/кабель → 1.0. */
+export function plateStepFor(exType?: string, role?: 'primary' | 'accessory', microPlates = false): number {
+  if (microPlates) return 1.25;
+  const isLight = exType === 'isolation' || exType === 'cable' || exType === 'accessory';
+  if (isLight) return 1.0;
+  return 2.5;
 }
 
 /* ──────────── Deload protocols ──────────── */
@@ -188,6 +215,9 @@ export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWee
 /* ──────────── RIR drift within phase ──────────── */
 /**
  * RIR дрейф внутри фазы: RIR снижается на 1 каждые N недель внутри фазы.
+ * ЕДИНАЯ формула с bbRir (bb-builder): drift = floor(weekInPhase/2) —
+ * W2→−1, W4→−2 (дрейф каждые 2 недели). Ранее использовалось
+ * floor((weekInPhase-1)/2), что давало медленнее снижение и рассинхрон с bbRir.
  * @param baseRir — базовый RIR фазы (из PHASE_RIR)
  * @param weekInPhase — номер недели внутри текущей фазы (1-based)
  * @param phaseWeeks — общая длительность фазы
@@ -195,7 +225,7 @@ export function applyDeloadToWeek(week: BBWeek, protocol: DeloadProtocol): BBWee
 export function rirDrift(baseRir: [number, number], weekInPhase: number, phaseWeeks: number): number {
   const [start, end] = baseRir;
   if (phaseWeeks <= 1) return start;
-  const drift = Math.floor((weekInPhase - 1) / 2); // снижение на 1 каждые 2 недели
+  const drift = Math.floor(weekInPhase / 2); // единая формула с bbRir
   return Math.max(end, start - drift);
 }
 

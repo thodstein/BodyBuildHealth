@@ -3,8 +3,8 @@
  * Покрывает: A1, A5, B1, B4, B5, B6, C1, C2, C6, C7, D1, D2, D3, D4, E1, E3.
  */
 import { describe, it, expect } from 'vitest';
-import { buildBBPlan, bbRir, defaultWorkMax, type BBBuilderInput } from '../bb-builder.engine';
-import { prescribeLoad, suggestFeeders } from '../bb-autocoach.engine';
+import { buildBBPlan, bbRir, defaultWorkMax, backoffWeights, type BBBuilderInput } from '../bb-builder.engine';
+import { prescribeLoad, suggestFeeders, roundToPlate, plateStepFor, rirDrift } from '../bb-autocoach.engine';
 import { summarizeAutoRegulation } from '../bb-progression-feedback.engine';
 import { optimizeMuscleFrequency } from '../bb-frequency-optimizer.engine';
 import { buildPeakWeekProtocol, applyPeakWeekToPlan } from '../bb-peak-week.engine';
@@ -513,7 +513,7 @@ describe('E3: prescribeLoad repCap depends on exercise type', () => {
     expect(result.nextWeight).toBe(21); // 20*1.05=21
     expect(result.nextReps).toBe(11);   // Math.max(6, 15-4)=11
   });
-  it('compound at repCap=12 → weight jump in accumulation', () => {
+  it('compound at repCap=12 → weight jump in accumulation (микрозагрузка: +1 пластина 2.5)', () => {
     const result = prescribeLoad(
       'double_progression',
       80,
@@ -526,8 +526,43 @@ describe('E3: prescribeLoad repCap depends on exercise type', () => {
       'compound',
       'primary',
     );
-    // At repCap → weight jump +5%, reps drop to repCap-4=8
-    expect(result.nextWeight).toBe(84); // 80*1.05=84
+    // At repCap → weight jump +одна пластина (compound 2.5 кг), reps drop to repCap-4=8
+    expect(result.nextWeight).toBe(82.5); // 80 + 2.5 (микрозагрузка вместо +5% = 84)
     expect(result.nextReps).toBe(8);    // 12-4=8
+  });
+
+  it('микрозагрузка: isolation +1 кг, microPlates compound +1.25 кг, roundToPlate', () => {
+    const iso = prescribeLoad('double_progression', 20, 15, 3, 30, 3, 8, 'accumulation', 'isolation', 'accessory');
+    expect(iso.nextWeight).toBe(21); // +1 кг (изоляция)
+    const micro = prescribeLoad('double_progression', 80, 12, 2, 100, 3, 8, 'accumulation', 'compound', 'primary', undefined, true);
+    expect(micro.nextWeight).toBe(81.25); // +1.25 кг (микропластины)
+    expect(roundToPlate(83.7, 2.5)).toBe(82.5);
+    expect(roundToPlate(82.4, 2.5)).toBe(82.5);
+    expect(plateStepFor('compound', 'primary')).toBe(2.5);
+    expect(plateStepFor('isolation', 'accessory')).toBe(1.0);
+    expect(plateStepFor('compound', 'primary', true)).toBe(1.25);
+  });
+
+  it('backoffWeights: топ-сет + back-off −10% compound на тяж-дне', () => {
+    const ws = backoffWeights(100, 3, true, false, 'тяж');
+    expect(ws[0]).toBe(100);
+    expect(ws[1]).toBe(90);
+    expect(ws[2]).toBe(90);
+  });
+
+  it('backoffWeights: нет back-off для deload, изоляции и памп-дней', () => {
+    expect(backoffWeights(100, 3, true, true, 'тяж')).toEqual([100, 100, 100]); // deload
+    expect(backoffWeights(100, 3, false, false, 'тяж')).toEqual([100, 92.5, 92.5]); // изоляция −7.5%
+    expect(backoffWeights(100, 3, true, false, 'памп')).toEqual([100, 100, 100]); // памп
+    expect(backoffWeights(100, 1, true, false, 'тяж')).toEqual([100]); // 1 сет
+  });
+
+  it('rirDrift унифицирован с bbRir: W2→−1, W4→−2', () => {
+    expect(rirDrift([3, 1], 1, 5)).toBe(3);
+    expect(rirDrift([3, 1], 2, 5)).toBe(2); // W2 дрейф −1 (как bbRir floor(2/2)=1)
+    expect(rirDrift([3, 1], 3, 5)).toBe(2);
+    expect(rirDrift([3, 1], 4, 5)).toBe(1); // W4 дрейф −2
+    expect(rirDrift([2, 0], 5, 5)).toBe(0); // кап к end
+    expect(rirDrift([3, 1], 2, 1)).toBe(3); // фаза из 1 недели → без дрейфа
   });
 });
