@@ -25,7 +25,7 @@ import { PCT_FOR_RIR, S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
-import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR } from './bb-progression-feedback.engine';
+import { applyFeedbackToBuild, autoUpdateWeakPoints, autoReplaceOnPlateau, computePerMuscleACWR, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
 import { extractMesocycleProgression, applyWeightProgression, applyVolumeProgression, wasInPreviousMeso, type MesocycleProgression } from './bb-mesocycle-progression.engine';
 import { buildExerciseInstructions, formatExerciseInstructions, cleanInstructionsText, tempoExplain } from './bb-exercise-instructions.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
@@ -3681,6 +3681,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
     // 2) Feedback-driven rebuild (веса из факта)
     finalPlan = applyFeedbackToBuild(finalPlan, workoutSessions, workMax, input.loadStrategy || 'double_progression');
+    // Фаза 2.10: замкнуть per-muscle ACWR + adherence в ОБЪЁМ (сеты перегруженной
+    // мышцы ↓, adherence<80% → масштаб). No-op без дневника.
+    const volCorrection = applyDiaryVolumeCorrection(finalPlan, workoutSessions);
+    if (volCorrection.changes.length > 0) {
+      finalPlan = volCorrection.plan;
+      rationale.push(...volCorrection.changes);
+    }
     // 3) Auto-replace на плато
     const plateauResult = autoReplaceOnPlateau(finalPlan, workoutSessions);
     if (plateauResult.changes.length > 0) {

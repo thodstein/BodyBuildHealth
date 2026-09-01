@@ -281,6 +281,77 @@ export function applyFeedbackToBuild(
 }
 
 /**
+ * Фаза 2.10: замкнуть per-muscle ACWR + adherence в пересборку объёма.
+ *
+ * Раньше per-muscle ACWR давал только rationale-строки (danger/caution), а
+ * adherence<80% — только рекомендации. Теперь они РЕАЛЬНО корректируют план:
+ *  - мышца в зоне 'dangerous' (per-muscle ACWR > 1.5) — сеты этой мышцы −25%;
+ *  - мышца в зоне 'caution' (1.3-1.5) — сеты −12%;
+ *  - общая adherence < 80% — объём масштабируется к adherence (флор 0.75).
+ * Сеты не опускаются ниже 2 (инвариант floor), deload не трогается.
+ * Без дневника — no-op (не ломает существующие планы/тесты).
+ */
+export function applyDiaryVolumeCorrection(
+  plan: BBPlan,
+  sessions: WorkoutSession[],
+  opts?: { maxAdherenceFloor?: number },
+): { plan: BBPlan; changes: string[] } {
+  if (!sessions || sessions.length === 0 || !plan || !plan.weeks?.length) return { plan, changes: [] };
+  let perMuscleACWR: Record<string, { ratio: number; zone: string }> = {};
+  try { perMuscleACWR = computePerMuscleACWR(sessions); } catch { return { plan, changes: [] }; }
+
+  const changes: string[] = [];
+  // 1) per-muscle ACWR → muscle → set-cut factor
+  const muscleReduction: Record<string, number> = {};
+  for (const [m, v] of Object.entries(perMuscleACWR)) {
+    if (v.zone === 'dangerous') muscleReduction[m] = 0.25;
+    else if (v.zone === 'caution') muscleReduction[m] = 0.12;
+  }
+  // 2) adherence: completed sessions / planned sessions
+  const plannedSessions = plan.weeks.reduce((s, w) => s + (w.sessions?.length || 0), 0);
+  const adherence = plannedSessions > 0 ? sessions.length / plannedSessions : 1;
+  let adherenceMult = 1;
+  if (adherence < 0.8) {
+    adherenceMult = Math.max(opts?.maxAdherenceFloor ?? 0.75, adherence);
+    changes.push(`📉 Adherence ${Math.round(adherence * 100)}% (<80%) — объём недель масштабирован ×${adherenceMult.toFixed(2)} (флор 0.75)`);
+  }
+
+  const affected = Object.keys(muscleReduction).filter(m => muscleReduction[m]);
+  if (affected.length) changes.push(`🚨 Per-muscle ACWR: снижены сеты [${affected.join(', ')}] (${affected.map(m => `${m}=${perMuscleACWR[m].ratio}`).join(', ')})`);
+
+  const hasCorrection = adherenceMult < 1 || affected.length > 0;
+  if (!hasCorrection) return { plan, changes: [] };
+
+  const newWeeks = plan.weeks.map(w => {
+    if ((w as any).deload || String((w as any).phase || '').toLowerCase() === 'deload') return w;
+    return {
+      ...w,
+      sessions: w.sessions.map(s => ({
+        ...s,
+        exercises: s.exercises.map(ex => {
+          const muscle = String((ex as any).muscle || '');
+          const cut = muscleReduction[muscle] || 0;
+          const factor = adherenceMult * (1 - cut);
+          if (factor >= 1) return ex;
+          const curSets = ex.sets || 0;
+          const newSets = Math.max(2, Math.round(curSets * factor));
+          if (newSets >= curSets) return ex;
+          const comment = (ex.comment || '') + ` | 📉 объём скорректирован по дневнику ×${factor.toFixed(2)}${cut ? ` (ACWR ${perMuscleACWR[muscle]?.ratio?.toFixed(2)})` : ' (adherence)'}`;
+          return {
+            ...ex,
+            sets: newSets,
+            workSets: (ex.workSets || []).slice(0, newSets),
+            comment,
+          };
+        }),
+      })),
+    };
+  });
+  return { plan: { ...plan, weeks: newWeeks }, changes };
+}
+
+
+/**
  * PRO: извлечь сводный отчёт о auto-regulation корректировках из плана.
  * Сканирует комментарии упражнений на наличие "↻ из факта:" маркеров.
  */

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * cycle-to-plan.ts — конвертер SRCycleTemplate (BB-цикл) → BBPlan.
  *
  * Позволяет BbAutoConstructor и TrainingConstructor использовать
@@ -26,7 +26,7 @@ import type { BBTrainingFocus } from './bb-goal-types';
 import { FOCUS_RIR_TABLE } from './bb-goal-types';
 import { finalizeBBPlan } from './bb-finalize.engine';
 import { computeBBRecoveryMultiplier, computeBBNutritionMultiplier } from './bb-volume.engine';
-import { applyFeedbackToBuild, autoReplaceOnPlateau } from './bb-progression-feedback.engine';
+import { applyFeedbackToBuild, autoReplaceOnPlateau, applyDiaryVolumeCorrection } from './bb-progression-feedback.engine';
 import { loadSessions as loadWorkoutSessions } from '../workout-logger.engine';
 import { extractMesocycleProgression, applyWeightProgression } from './bb-mesocycle-progression.engine';
 import { resolveSpecialization, specializationVolumeFactor, specializationEmphasisFactor, specializationMrvFactor, isSpecializationWeak, isSpecializationFocus, canonicalMuscle, buildSpecializationSchedule, specResForWeekSchedule, tradeoffForWeek, specializationScheduleText, type SpecializationBlock } from './bb-specialization.engine';
@@ -1236,6 +1236,8 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
     const workoutSessions = loadWorkoutSessions();
     if (workoutSessions.length > 0) {
       finalPlan = applyFeedbackToBuild(finalPlan, workoutSessions, workMax, loadStrategy as LoadStrategy);
+      const volCorr = applyDiaryVolumeCorrection(finalPlan, workoutSessions);
+      if (volCorr.changes.length > 0) finalPlan = volCorr.plan;
       const plateau = autoReplaceOnPlateau(finalPlan, workoutSessions);
       if (plateau.changes.length > 0) {
         finalPlan = plateau.plan;
@@ -2181,6 +2183,8 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     const workoutSessions = loadWorkoutSessions();
     if (workoutSessions.length > 0) {
       finalPlan = applyFeedbackToBuild(finalPlan, workoutSessions, workMax, opts.loadStrategy as LoadStrategy);
+      const volCorr2 = applyDiaryVolumeCorrection(finalPlan, workoutSessions);
+      if (volCorr2.changes.length > 0) finalPlan = volCorr2.plan;
       const plateau = autoReplaceOnPlateau(finalPlan, workoutSessions);
       if (plateau.changes.length > 0) {
         finalPlan = plateau.plan;
@@ -2321,3 +2325,4 @@ function _getLandmarksForMuscle(level: 'beginner' | 'intermediate' | 'advanced',
     return (all as any)[muscle] || null;
   } catch { return null; }
 }
+
