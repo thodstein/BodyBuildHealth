@@ -28,7 +28,7 @@ const Badge: React.FC<{ color: string; children: React.ReactNode }> = ({ color, 
 
 
 // Canvas-график fitness-fatigue (performance кривая) + ACWR-зона (P12 wire #3)
-const FFChart: React.FC<{ series: { date: string; fitness: number; fatigue: number; performance: number }[] }> = ({ series }) => {
+export const FFChart: React.FC<{ series: { date: string; fitness: number; fatigue: number; performance: number }[] }> = ({ series }) => {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current; if (!cv) return;

@@ -1,11 +1,8 @@
-/**
+﻿/**
  * bb-visual.test.ts — Фаза 4: наглядность/экспорт ББ-плана (чистые data-билдеры).
  */
 import { describe, it, expect } from 'vitest';
-import {
-  buildBBMuscleHeatmap, buildBBTaperCurve, buildBBMesocycleTable,
-  bbWeekDateRanges, buildBBPlanPrintHtml, buildBBPlanIcs, compareBBVariants,
-} from '../bb-visual.engine';
+import { buildBBMuscleHeatmap, buildBBTaperCurve, buildBBMesocycleTable, bbWeekDateRanges, buildBBPlanPrintHtml, buildBBPlanIcs, compareBBVariants, buildBBFitnessFatigue } from '../bb-visual.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 
 describe('Фаза 4.19: heatmap мышца×неделя', () => {
@@ -79,5 +76,18 @@ describe('Фаза 4.27: сравнение вариантов', () => {
   });
   it('пустой план → []', () => {
     expect(compareBBVariants({ weeks: [] } as any, { weeks: [] } as any)).toEqual([]);
+  });
+});
+
+describe('Фаза 4.20: fitness-fatigue (Banister)', () => {
+  it('прогноз по неделям плана от даты старта', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 6 } as any);
+    const ff = buildBBFitnessFatigue(plan, { startDate: '2026-01-05' });
+    expect(ff.length).toBe(6);
+    expect(ff[0].date).toBe('2026-01-05');
+    expect(ff.every(p => typeof p.performance === 'number')).toBe(true);
+  });
+  it('пустой план → []', () => {
+    expect(buildBBFitnessFatigue({ weeks: [] } as any)).toEqual([]);
   });
 });

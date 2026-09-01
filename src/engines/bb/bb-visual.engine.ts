@@ -102,6 +102,41 @@ export function buildBBTaperCurve(plan: BBPlan): TaperCurvePoint[] {
     });
 }
 
+export interface BBFitnessFatiguePoint {
+  date: string;
+  fitness: number;
+  fatigue: number;
+  performance: number;
+}
+
+/**
+ * Фаза 4.20: прогноз утомления fitness–fatigue (модель Банистера) по неделям плана.
+ * Нагрузка = недельный объём (рабочие сеты); fitness и fatigue — экспоненциальные
+ * следы (tau_fit ≈ 42 дня, tau_fat ≈ 7 дней), performance = fitness − fatigue.
+ * Берётся от даты старта (или с 1 января для относительного ряда).
+ */
+export function buildBBFitnessFatigue(plan: BBPlan, opts?: { startDate?: string }): BBFitnessFatiguePoint[] {
+  if (!plan?.weeks?.length) return [];
+  const weeklyLoad = plan.weeks.map(w => (w.sessions || []).reduce((a, s) => a + (s.exercises || []).reduce((b, e) => b + (e.sets || 0), 0), 0));
+  const start = opts?.startDate || '2026-01-01';
+  const addDays = (iso: string, d: number): string => {
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const dt = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(NaN);
+    if (Number.isNaN(dt.getTime())) return iso;
+    dt.setDate(dt.getDate() + d);
+    const y = dt.getFullYear(); const mo = String(dt.getMonth() + 1).padStart(2, '0'); const da = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${da}`;
+  };
+  const TAU_FIT = 42; const TAU_FAT = 7;
+  const kFit = 1 - Math.exp(-7 / TAU_FIT); const kFat = 1 - Math.exp(-7 / TAU_FAT);
+  let fitness = 0, fatigue = 0;
+  return weeklyLoad.map((load, i) => {
+    fitness = fitness * (1 - kFit) + load * kFit;
+    fatigue = fatigue * (1 - kFat) + load * kFat;
+    return { date: addDays(start, i * 7), fitness: Math.round(fitness * 10) / 10, fatigue: Math.round(fatigue * 10) / 10, performance: Math.round((fitness - fatigue) * 10) / 10 };
+  });
+}
+
 export interface MesocycleRow {
   week: number;
   phase: string;

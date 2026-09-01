@@ -45,6 +45,7 @@ import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-l
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
 import { subscribePlannerApply, applyToPlanner } from './planner-bridge';
+import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
@@ -103,7 +104,7 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
-import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants } from '../../../engines/bb/bb-visual.engine';
+import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue } from '../../../engines/bb/bb-visual.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -5057,6 +5058,8 @@ export const BbAutoConstructor: React.FC = () => {
                 <span><span style={{ color: '#ef4444' }}>■</span> {'>'} MRV</span>
               </div>
               {taper.length > 0 && <div style={{ fontSize: 11, color: '#fff' }}>📉 Кривая тапера (финальные недели): {taper.map(t => `${t.label}: ${Math.round(t.volumePct * 100)}% · RIR ${t.rir[0]}-${t.rir[1]}`).join(' → ')}</div>}
+              <div style={{ fontSize: 11, color: '#fff' }}>⚡ Прогноз утомления fitness–fatigue (Banister):</div>
+              <FFChart series={buildBBFitnessFatigue(plan, { startDate: startDateInput || undefined })} />
             </div>;
           })()}
         </CollapsibleCard>
