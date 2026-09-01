@@ -2249,7 +2249,35 @@ const ANTAGONIST_PAIRS: Array<[string, string]> = [
   ['chest', 'back'], ['back', 'chest'],
   ['biceps', 'triceps'], ['triceps', 'biceps'],
   ['quads', 'hamstrings'], ['hamstrings', 'quads'],
-];export function markAntagonistSupersets(plan: BBPlan): void {
+];
+
+/** Фаза 2.8: закодировать структуру пары — supersetGroup/supersetSlot + rest=0
+ *  на первом упражнении (сразу на партнёра, отдых после второго). Детерминизм:
+ *  groupId вычисляется из week/session/pair, без module-level счётчика. */
+function pairSupersetStructure(
+  a: any, b: any,
+  groupId: number,
+  label: string,
+): void {
+  a.supersetWith = b.name;
+  b.supersetWith = a.name;
+  a.supersetGroup = groupId;
+  b.supersetGroup = groupId;
+  a.supersetSlot = 0;
+  b.supersetSlot = 1;
+  // rest=0 на первом: после A1 сразу B1, отдых после B.
+  if (Array.isArray(a.workSets)) {
+    a.workSets = a.workSets.map((ws: any) => ({ ...ws, restSeconds: 0 }));
+  }
+  const aLetter = a.supersetSlot === 0 ? 'A' : 'B';
+  const bLetter = a.supersetSlot === 0 ? 'B' : 'A';
+  const aComment = `🔗 Суперсет с «${b.name}» (${label}) — ${aLetter}→${bLetter}, без отдыха`;
+  const bComment = `🔗 Суперсет с «${a.name}» (${label}) — ${aLetter}${bLetter}`;
+  a.comment = (a.comment || '') + (a.comment ? ' · ' : '') + aComment;
+  b.comment = (b.comment || '') + (b.comment ? ' · ' : '') + bComment;
+}
+
+export function markAntagonistSupersets(plan: BBPlan): void {
   for (const week of plan.weeks) {
     if (week.phase === 'deload') continue;
     for (const session of week.sessions) {
@@ -2260,10 +2288,7 @@ const ANTAGONIST_PAIRS: Array<[string, string]> = [
         if (paired.has(ex)) continue;
         const mate = working.find((o: any) => !paired.has(o) && o !== ex && ANTAGONIST_PAIRS.some(([a, b]) => a === ex.muscle && b === o.muscle));
         if (!mate) continue;
-        ex.supersetWith = mate.name;
-        mate.supersetWith = ex.name;
-        ex.comment = (ex.comment || '') + (ex.comment ? ' · ' : '') + `🔗 Суперсет с «${mate.name}» (антагонист)`;
-        mate.comment = (mate.comment || '') + (mate.comment ? ' · ' : '') + `🔗 Суперсет с «${ex.name}» (антагонист)`;
+        pairSupersetStructure(ex, mate, week.week * 100 + (session.weekOffset || 0) * 10 + pairs, 'антагонист');
         paired.add(ex); paired.add(mate);
         pairs++;
         if (pairs >= 3) break;
@@ -2292,10 +2317,7 @@ export function markSameMuscleSupersets(plan: BBPlan): void {
         const compound = exs.find(e => !paired.has(e) && isCompoundEx(e));
         const iso = exs.find(e => !paired.has(e) && e !== compound && !isCompoundEx(e) && (e.role === 'accessory' || e.character === 'памп'));
         if (!compound || !iso) continue;
-        compound.supersetWith = iso.name;
-        iso.supersetWith = compound.name;
-        compound.comment = (compound.comment || '') + (compound.comment ? ' · ' : '') + `🔗 Суперсет с «${iso.name}» (одна группа — добить)`;
-        iso.comment = (iso.comment || '') + (iso.comment ? ' · ' : '') + `🔗 Суперсет с «${compound.name}» (одна группа — пробить)`;
+        pairSupersetStructure(compound, iso, week.week * 100 + (session.weekOffset || 0) * 10 + pairs + 20, 'одна группа — добить');
         paired.add(compound); paired.add(iso);
         pairs++;
       }
@@ -2319,10 +2341,8 @@ export function markPreExhaustPairs(plan: BBPlan): void {
       // Изоляция той же мышцы, идущая ПЕРЕД компаундом (pre-exhaust).
       const iso = working.find(e => e !== compound && e.muscle === muscle && !isCompoundEx(e) && working.indexOf(e) < working.indexOf(compound) && !e.supersetWith);
       if (!iso) continue;
-      iso.supersetWith = compound.name;
-      compound.supersetWith = iso.name;
-      iso.comment = (iso.comment || '') + (iso.comment ? ' · ' : '') + `⚡ Пред-истощение: без отдыха → «${compound.name}»`;
-      compound.comment = (compound.comment || '') + (compound.comment ? ' · ' : '') + `⚡ Сразу после «${iso.name}» (пред-истощение) — пробить группу`;
+      // Пред-истощение: изоляция идёт ПЕРВОЙ, компаунд сразу за ней (rest=0 на изоляции).
+      pairSupersetStructure(iso, compound, week.week * 100 + (session.weekOffset || 0) * 10 + 40, 'пред-истощение');
     }
   }
 }
