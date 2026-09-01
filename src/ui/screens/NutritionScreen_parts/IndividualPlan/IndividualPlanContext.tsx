@@ -2950,6 +2950,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
           label: m?.label || 'Приём пищи', time: m?.time || '', items: (Array.isArray(m?.items) ? m.items : []).map((it: any) => ({
             name: it.name, id: it.id, amount: it.amount, kcal: it.kcal, p: it.p, f: it.f, c: it.c, fiber: it.fiber, leucine_mg: it.leucine_mg,
           })), totals: { kcal: m?.totals?.kcal || 0, p: m?.totals?.p || 0, f: m?.totals?.f || 0, c: m?.totals?.c || 0, fiber: m?.totals?.fiber || 0 },
+          type: m?.type,
           conflictWarnings: undefined, synergyNotes: undefined,
            rationale: m.rationale, mpsCheck: plannerModeRef.current === 'pro' ? m.mpsCheck : undefined, target: m.target,
         }));

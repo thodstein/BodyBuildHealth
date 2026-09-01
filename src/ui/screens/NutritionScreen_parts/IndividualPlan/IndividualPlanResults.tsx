@@ -56,7 +56,7 @@ export const IndividualPlanResults: React.FC = () => {
     userRecipes, setUserRecipes,
     shoppingList, setShoppingList, injections,
     recipePickerMeal, setRecipePickerMeal,
-    replaceMealWithRecipe, undoStack, setUndoStack, undoLast,
+    replaceMealWithRecipe, addSecondRecipeToMeal, undoStack, setUndoStack, undoLast,
     saveCurrentPlan, savedPlans, setSavedPlans, expandedSavedId, setExpandedSavedId,
     loadSavedPlan, weight, budget, age, sex, bodyFatPct, trainType,
     generateCheatMeal, cheatMealPlan, setCheatMealPlan,
@@ -1099,14 +1099,14 @@ const doImportPlan = (raw: string): boolean => {
           onClick={() => setRecipePickerMeal(null)}>
           <div onClick={e => e.stopPropagation()} style={{ width:'100%', maxWidth:400, padding:'14px 20px 28px', borderRadius:'20px', background:'#18181b', boxShadow:'0 18px 54px rgba(0,0,0,0.5)', border:'1px solid rgba(255,255,255,0.08)' }}>
             <div style={{ width:36, height:4, borderRadius:2, background:'rgba(255,255,255,0.15)', margin:'0 auto 16px' }} />
-            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4, letterSpacing:'-0.3px' }}>🍳 Заменить «{recipePickerMeal.label}» рецептом</div>
-            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:12 }}>Подходящие рецепты</div>
+            <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:4, letterSpacing:'-0.3px' }}>{(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied ? (_m?.recipeApplied2 ? '🍳 Заменить второй рецепт' : '➕ Добавить второй рецепт') : '🍳 Заменить'; })()} «{recipePickerMeal.label}» рецептом</div>
+            <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', marginBottom:12 }}>{(function(){ const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; return _m?.recipeApplied2 ? `Уже: «${_m.recipeApplied}» + «${_m.recipeApplied2}» — выберите на замену второго` : _m?.recipeApplied ? `Уже: «${_m.recipeApplied}» — выберите второй рецепт (совместимый)` : 'Подходящие рецепты'; })()}</div>
             <div style={{ maxHeight:300, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
               {getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').length === 0 ? (
                 <div style={{ fontSize:9, color:'rgba(255,255,255,0.85)', textAlign:'center', padding:10 }}>Нет рецептов для этого приёма.</div>
               ) : getRecipesByMeal(recipePickerMeal.label === 'Завтрак' ? 'breakfast' : recipePickerMeal.label === 'Обед' || recipePickerMeal.label === 'Второй завтрак' ? 'lunch' : recipePickerMeal.label === 'Ужин' ? 'dinner' : 'snack').map((r, i) => (
                 <div key={i} style={{ display:'flex', gap:4, width:'100%' }}>
-                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
+                  <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); const _m = dayPlan?.meals?.[recipePickerMeal.mealIdx]; if (_m?.recipeApplied && !_m?.recipeApplied2) { addSecondRecipeToMeal(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } else { replaceMealWithRecipe(r, recipePickerMeal.mealIdx, recipePickerMeal.dayIdx); } setRecipePickerMeal(null); }} style={{ flex:1, padding:'10px 12px', borderRadius:12, cursor:'pointer', textAlign:'left', background:'#202023', border:'1px solid rgba(255,255,255,0.06)', color:'#fff', fontSize:9, transition:'all 0.15s' }}
                     onMouseEnter={e => (e.target as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'}
                     onMouseLeave={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'}>
                     <div style={{ fontWeight:700, color:'#a78bfa', fontSize:10, marginBottom:2 }}>{r.name}</div>

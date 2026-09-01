@@ -261,7 +261,7 @@ function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein'];
-export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'banana', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati'];
+export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati', 'pasta_durum', 'bulgur'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
 
 // C5 (Эпик C): субротация фиксированных пулов по seed дня — иначе каждый недобор
@@ -280,13 +280,41 @@ function topupFoods(ids: string[], excludedIds?: Set<string>): FoodItem[] {
 function flexMealIndex(meals: PlanMealLike[]): number {
   for (let i = meals.length - 1; i >= 0; i--) {
     const l = meals[i]?.label || '';
-    if (/Перекус|Полдник|Второй завтрак|Пост-трен|Перед сном/i.test(l)) return i;
+    const t = (meals[i] as any)?.type;
+    if (/Перекус|Полдник|Второй завтрак|Пост-трен|Перед сном|Pre-sleep/i.test(l)) return i;
+    if (t && ['snack', 'snack2', 'snack3', 'snack4', 'postworkout', 'presleep'].includes(t)) return i;
   }
   // нет перекусов — берём последний приём, который НЕ собран из рецепта (не портим авторские порции)
   for (let i = meals.length - 1; i >= 0; i--) {
     if (!meals[i]?.recipeApplied) return i;
   }
   return -1; // все приёмы из рецептов — вызывающий код создаст «Добор»
+}
+
+/**
+ * Приём для УГЛЕВОДНОГО добора: основной приём (Завтрак/Обед/Ужин) с «комнатой» под
+ * свою углеводную цель. Распределяет углеводы по основным приёмам round-robin
+ * (смещение iter), а не сваливает весь избыток в один перекус (жалоба «все углеводы
+ * в один приём»). Пери-приёмы и pre-sleep не кандидаты.
+ */
+function carbMealIndex(meals: PlanMealLike[], iter: number): number {
+  const mains: { i: number; room: number }[] = [];
+  for (let i = 0; i < meals.length; i++) {
+    const m = meals[i];
+    const l = m?.label || '';
+    if (!/Завтрак|Обед|Ужин/i.test(l)) continue;
+    if (/предтрен|пост-трен|intra|Перед сном|Pre-sleep|Intra-workout/i.test(l)) continue;
+    const t = (m as any)?.type;
+    if (t && ['preworkout', 'postworkout', 'intra', 'presleep'].includes(t)) continue;
+    const tC = m.target?.c ?? 0;
+    if (tC <= 0) continue;
+    const room = tC - (m.totals?.c || 0);
+    if (room >= 8) mains.push({ i, room });
+  }
+  if (mains.length === 0) return flexMealIndex(meals);
+  // round-robin по порядку приёмов (распределяем, не копим в одном)
+  mains.sort((a, b) => a.i - b.i);
+  return mains[iter % mains.length].i;
 }
 
 function maxDeviationPct(totals: PlanTotalsLike, t: DayMacroTargets): number {
@@ -349,8 +377,17 @@ export function rebalanceDayAfterRecipes(
     // иначе микро-хвосты (например +7 г углеводов при переборе жиров на 80 г) не должны
     // блокировать резку перебора.
     if (dKcalEquiv >= 120) {
-      // ── Недобор: добавляем топ-ап в гибкий слот ──
-      let fi = flexMealIndex(work);
+      // ── Недобор: добавляем топ-ап. Роль дефицита определяет цель:
+      // углеводы → ОБЕД/УЖИН/ЗАВТРАК (carbMealIndex, распределяет по основным приёмам,
+      // а не сваливает в один перекус — жалоба «все углеводы в один приём»);
+      // белок/жиры → гибкий слот (перекус/pre-sleep/не-рецептурный приём).
+      const relP = dP / Math.max(1, validTargets.p);
+      const relF = dF / Math.max(1, validTargets.f);
+      const relC = dC / Math.max(1, validTargets.c);
+      const dominant = Math.max(relP, relC, relF);
+      if (dominant <= 0) break; // все дефициты закрыты — дальше резаем перебор
+      const chosenRole: 'p' | 'c' | 'f' = (relP >= relC && relP >= relF) ? 'p' : (relC >= relF) ? 'c' : 'f';
+      let fi = chosenRole === 'c' ? carbMealIndex(work, iter) : flexMealIndex(work);
       if (fi < 0 || !work[fi]) {
         // Все приёмы из рецептов — создаём «Добор», чтобы не портить основные приёмы
         // (раньше флекс падал на последний РЕЦЕПТУРНЫЙ приём и «ужимал» обед).
@@ -358,16 +395,11 @@ export function rebalanceDayAfterRecipes(
         fi = work.length - 1;
         notes.push('➕ Добавлен приём «Добор» — основные приёмы собраны из рецептов');
       }
-      const relP = dP / Math.max(1, validTargets.p);
-      const relF = dF / Math.max(1, validTargets.f);
-      const relC = dC / Math.max(1, validTargets.c);
-      const dominant = Math.max(relP, relC, relF);
-      if (dominant <= 0) break; // все дефициты закрыты — дальше резаем перебор
       // Выбор роли доминирующего дефицита
-      let rolePool: FoodItem[]; let chosenRole: 'p' | 'c' | 'f';
-      if (relP >= relC && relP >= relF) { rolePool = topupFoods(_sub(TOPUP_PROTEIN_IDS), opts?.excludedIds); chosenRole = 'p'; }
-      else if (relC >= relF) { rolePool = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds); chosenRole = 'c'; }
-      else { rolePool = topupFoods(_sub(TOPUP_FAT_IDS), opts?.excludedIds); chosenRole = 'f'; }
+      let rolePool: FoodItem[];
+      if (chosenRole === 'p') { rolePool = topupFoods(_sub(TOPUP_PROTEIN_IDS), opts?.excludedIds); }
+      else if (chosenRole === 'c') { rolePool = topupFoods(_sub(TOPUP_CARB_IDS), opts?.excludedIds); }
+      else { rolePool = topupFoods(_sub(TOPUP_FAT_IDS), opts?.excludedIds); }
       if (rolePool.length === 0) break;
       const macroOf = (f: FoodItem) => chosenRole === 'p' ? (f.protein || 0) : chosenRole === 'c' ? (f.carbs || 0) : (f.fat || 0);
       const dMacro = chosenRole === 'p' ? dP : chosenRole === 'c' ? dC : dF;
@@ -389,7 +421,14 @@ export function rebalanceDayAfterRecipes(
       const gramsForMacroG = dMacro / per100 * 100;
       const gramsForKcalG = dKcal > 0 ? dKcal / Math.max(1, chosen.kcal || 1) * 100 : gramsForMacroG;
       let grams = Math.min(gramsForMacroG, gramsForKcalG);
-      grams = Math.floor(Math.min(grams, 500) / 10) * 10;
+      // Углеводы: порцию ограничиваем «комнатой» выбранного основного приёма (tgt.c − факт.c).
+      // Тогда большой недобор распределяется ПО ВСЕМ основным приёмам через итерации цикла,
+      // а не сваливается в один Обед (жалоба «все углеводы в один приём»).
+      if (chosenRole === 'c' && work[fi]?.target?.c) {
+        const roomC = (work[fi].target?.c ?? 0) - (work[fi].totals?.c || 0);
+        if (roomC > 0) grams = Math.min(grams, roomC / per100 * 100);
+      }
+      grams = Math.floor(Math.min(grams, 400) / 10) * 10;
       if (grams < 30) {
         // этот дефицит не пролезает без перебора ккал — переходим к резке перебора
       } else {
@@ -540,7 +579,7 @@ export function rebalanceDayAfterRecipes(
           };
           const dv = maxDeviationPct(nt as any, validTargets);
           if (dv >= bestDev - 0.0005) continue; // строгое улучшение — иначе осцилляции
-          const isSnackish = /Перекус|Полдник|Второй завтрак|Перед сном/i.test(m.label || '');
+          const isSnackish = /Перекус|Полдник|Второй завтрак|Перед сном|Pre-sleep/i.test(m.label || '') || ['snack', 'snack2', 'snack3', 'snack4', 'presleep'].includes(String((m as any).type));
           const score = (isSnackish ? 0 : 1e6) + (1000 - Math.min(999, a - v));
           if (!bestCut || score < bestCut.score || (score === bestCut.score && v < bestCut.newAmount)) {
             bestDev = dv;
@@ -902,9 +941,19 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
   // перед сном продуктами в 100% дней.
   const PERI_LABEL_TYPES: Record<string, 'preworkout' | 'postworkout' | 'presleep'> = {
     'Предтрен': 'preworkout', 'Пост-трен': 'postworkout', 'Перед сном': 'presleep',
+    '🌙 Pre-sleep': 'presleep',
   };
   // C2: пери-рецепты не должны красться ОБЫЧНЫМИ слотами (ужин = «PostW-шейкер» — нет).
   const PERI_TYPES_SET = new Set<string>(['preworkout', 'postworkout', 'presleep']);
+
+  // P0-фикс: peri-тип приёма определяем по `type` (первичен — не зависит от лейбла языка),
+  // с фоллбэком на лейбл. Раньше лейбл «🌙 Pre-sleep»/«🏋 Intra-workout» (англ.) не матчился
+  // словарём русских лейблов → предсонный/intra слоты оставались продуктовыми и получали
+  // углеводный «хвост» (банан/декстрин) из ребаланса/корректора.
+  const periTypeOf = (m: any): 'preworkout' | 'postworkout' | 'presleep' | null => {
+    if (m?.type && PERI_TYPES_SET.has(m.type)) return m.type as any;
+    return PERI_LABEL_TYPES[m?.label || ''] || null;
+  };
 
   // Aug 28: снек-рецепты в режиме «по рецептам» — только на САМЫЙ БОЛЬШОЙ снек-слот дня
   // (остальные перекусы остаются продуктовыми и служат гибкими слотами ребаланса).
@@ -919,7 +968,7 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
     const mealAny = m as any;
     const label = mealAny.label || '';
     const isMain = isMainMealLabel(label);
-    const periType = PERI_LABEL_TYPES[label] || null;
+    const periType = periTypeOf(mealAny);
     // C2: peri-рецепт ставим только если тип доступен в пуле; пред/пост-трен — только в трен-день.
     const isPeriSlot = !!periType
       && pool.some(r => r.meal === periType)
@@ -1058,11 +1107,17 @@ export function assembleRecipeDay(args: AssembleRecipeDayArgs): AssembleRecipeDa
         // Сайд добивка — пока <0.90 (для тяжей до 2 сайдов)
         const maxSides = (args.athleteWeightKg ?? 80) >= 100 ? 2 : 1;
         let sidesAdded = 0;
-        while (targetKcal > 0 && kcalNow < targetKcal * 0.90 && sidesAdded < maxSides) {
+        while (sidesAdded < maxSides) {
           const dP = (tgt.p || 0) - tNow.p;
           const dC = (tgt.c || 0) - tNow.c;
           const dF = (tgt.f || 0) - tNow.f;
           const rel = (v: number, t: number) => v / Math.max(1, t);
+          // P1: порог добивки — НЕ только ккал. Высокоуглеводные приёмы (тяж/булк) часто
+          // закрывают калорийность белком/жиром рецепта, оставляя дефицит углей → гарнир
+          // не добавлялся и завтрак/обед недобирали углеводы в 2-3 раза («диетологии нет»).
+          const kcalDeficit = targetKcal > 0 && kcalNow < targetKcal * 0.90;
+          const carbDeficit = (tgt.c || 0) >= 50 && dC >= 25 && kcalNow < targetKcal * 1.03;
+          if (!kcalDeficit && !carbDeficit) break;
           const used = new Set(finalItems.map(i => i.id));
           const sidePoolFor = (ids: string[]) => ids.map(id => FOOD_DB.find(f => f.id === id)).filter((f): f is FoodItem => !!f && !used.has(f.id) && !excludedIds.has(f.id));
           let pool: FoodItem[]; let macroOf: (f: FoodItem) => number; let dMacro: number; let role: string;
