@@ -32,6 +32,7 @@ const STATUS_COLOR: Record<AnnualBlockState['status'], string> = {
 const KIND_LABEL: Record<AnnualBlockState['ref']['kind'], string> = {
   PL: 'ПЛ (СРЦ-цикл)',
   BB: 'ББ (ББ-авто)',
+  ARM: 'АРМ (арм-авто)',
   MANUAL: 'ручной',
 };
 

@@ -6,6 +6,7 @@
  * выполняет конструктор, выбранный для блока:
  *   - PL     → СРЦ-цикл (cycleTemplateToFullProgram) + фазовый оверлей + taper;
  *   - BB     → autodraftBBPlan (BB-авто) + фазы + пик-неделя (bb-contest-prep);
+ *   - ARM    → autodraftArmPlan (арм-авто) + фазы + тейпер;
  *   - MANUAL → скелет фаз (пользователь наполняет в ручном редакторе).
  *
  * Идемпотентность: собранный результат кэшируется в AnnualBlockState; повторный
@@ -35,6 +36,7 @@ import { makeEmptySessionsForWeek } from '../periodization/designer-to-program';
 import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import type { BBPlan } from '../bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, type BBContestPrepConfig } from '../bb/bb-contest-prep.engine';
+import { buildArmBlock as buildArmBlockInternal } from '../arm/arm-annual';
 import { buildPrepCycle } from '../bb/bb-prep-cycle.engine';
 import { buildPLTaperCurve, type TaperMode, type TaperWeightGoal } from '../lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
@@ -106,7 +108,13 @@ function refFromBlock(block: MacroBlock | BBMacroBlock, idx: number, isBbMacro: 
 /** Направление плана из набора типов блоков. */
 export function directionFromKinds(kinds: AnnualBlockKind[]): AnnualTrainingPlan['direction'] {
   const hasPL = kinds.some(k => k === 'PL');
+  const hasBB = kinds.some(k => k === 'BB');
+  const hasARM = kinds.some(k => k === 'ARM');
   const hasOther = kinds.some(k => k !== 'PL');
+  if ((hasPL && hasBB) || (hasPL && hasARM) || (hasBB && hasARM)) return 'mixed';
+  if (hasARM && !hasPL && !hasBB) return 'arm';
+  if (hasPL && !hasBB && !hasARM) return 'pl';
+  if (hasBB && !hasPL && !hasARM) return 'bb';
   if (hasPL && hasOther) return 'mixed';
   if (hasPL) return 'pl';
   return 'bb';
@@ -758,6 +766,21 @@ export function buildAnnualBlock(
     switch (state.ref.kind) {
       case 'PL': result = buildPLBlock(state, macro, opts); break;
       case 'BB': result = buildBBBlock(state, macro, opts); break;
+      case 'ARM': {
+        const armRes: any = buildArmBlockInternal({ blockKey: state.ref.blockKey, weeks: state.ref.weeks, phase: state.ref.phase }, { ...state.config as any, level: (state.config.level || opts.level) as any }, { level: opts.level });
+        result = {
+          blockKey: armRes.blockKey,
+          kind: 'ARM' as any,
+          weeks: armRes.weeks as any,
+          program: armRes.program,
+          bbPlan: armRes.armPlan,
+          warnings: armRes.warnings,
+          taperApplied: armRes.taperApplied,
+          peakApplied: armRes.peakApplied,
+          configHash: armRes.configHash,
+        } as any;
+        break;
+      }
       case 'MANUAL': result = buildManualBlock(state, plan, opts); break;
       default:
         throw new Error(`Неизвестный тип конструктора блока: ${(state.ref as any).kind}`);

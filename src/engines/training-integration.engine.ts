@@ -14,7 +14,7 @@ import { autoregulate, type AutoregInput, type AutoregOutput } from './autoregul
 // ── workout-logger shape (локальные типы-мосты, чтобы не тащить весь workout-logger) ──
 export interface BridgeSet { setNumber: number; weightKg: number; reps: number; rpe: number; rir: number; isPR: boolean; notes: string; }
 export interface BridgeExercise { exerciseId: string; exerciseName: string; pattern: string; muscleGroup: string; order: number; sets: BridgeSet[]; totalVolume: number; best1RM: number; avgRPE: number; }
-export interface BridgeSession { sessionId: string; date: string; focus: string; exercises: BridgeExercise[]; totalVolume: number; totalSets: number; totalReps: number; weekNumber: number; planned: boolean; source: 'SRC' | 'BB'; macroPhase?: string; taperWeek?: boolean; mockMeet?: boolean; meetWeek?: boolean; postMeet?: boolean; }
+export interface BridgeSession { sessionId: string; date: string; focus: string; exercises: BridgeExercise[]; totalVolume: number; totalSets: number; totalReps: number; weekNumber: number; planned: boolean; source: 'SRC' | 'BB' | 'ARM'; macroPhase?: string; taperWeek?: boolean; mockMeet?: boolean; meetWeek?: boolean; postMeet?: boolean; }
 
 // ── INT1: конвертация планов в сессии workout-logger ──
 function uid(prefix: string, i: number): string { return `${prefix}-${i}`; }
@@ -59,6 +59,25 @@ export function bbPlanToSessions(plan: BBPlan): BridgeSession[] {
       const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
       const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
       out.push({ sessionId: uid('bb', i), date: '', focus: `${sess.sessionTag || ''} ${sess.character}`, exercises, totalVolume, totalSets, totalReps: 0, weekNumber: wk.week, planned: true, source: 'BB' });
+      i++;
+    }
+  }
+  return out;
+}
+
+export function armPlanToSessions(plan: import('./arm/arm-types').ArmPlan): BridgeSession[] {
+  const out: BridgeSession[] = [];
+  let i = 0;
+  for (const wk of (plan as any).weeks) {
+    for (const sess of wk.sessions) {
+      const exercises: BridgeExercise[] = sess.exercises.map((ex: any, idx: number) => {
+        const sets: BridgeSet[] = (ex.workSets || []).map((ws: any, k: number) => ({ setNumber: k + 1, weightKg: ws.weight || 0, reps: typeof ws.reps === 'number' ? ws.reps : 5, rpe: ws.rir != null ? 10 - ws.rir : 7, rir: ws.rir ?? 2, isPR: false, notes: `${ex.character}/${ex.muscle}${ex.workingAngle ? ` РУ${ex.workingAngle.elbowDeg}` : ''}${ex.isTable ? ' 🖐️' : ''}` }));
+        const totalVolume = sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0);
+        return { exerciseId: uid('armex', i * 100 + idx), exerciseName: ex.name || ex.muscle, pattern: sess.sessionTag || '', muscleGroup: ex.muscle, order: idx + 1, sets, totalVolume, best1RM: 0, avgRPE: 0 };
+      });
+      const totalVolume = exercises.reduce((s, e) => s + e.totalVolume, 0);
+      const totalSets = exercises.reduce((s, e) => s + e.sets.length, 0);
+      out.push({ sessionId: uid('arm', i), date: '', focus: `${sess.sessionTag || ''} ${sess.character}${sess.tableTime ? ' 🖐️' : ''}`, exercises, totalVolume, totalSets, totalReps: 0, weekNumber: wk.week, planned: true, source: 'ARM', macroPhase: wk.phase, taperWeek: !!wk.taper });
       i++;
     }
   }

@@ -55,7 +55,7 @@ import {
   type TrainingTab, type TrainingPage,
   type PlanningTrack, getPlanningTrack, setPlanningTrack,
 } from './TrainingScreen_parts/shared';
-import { ZONES, ZONE_ORDER, zoneForTab, PLANNER_MODES, type TrainingZone } from './TrainingScreen_parts/nav';
+import { ZONES, ZONE_ORDER, zoneForTab, PLANNER_MODES, type PlannerMode, type TrainingZone } from './TrainingScreen_parts/nav';
 import { hapticImpact } from '../../core/telegram';
 import { InfoErrorBoundary } from './SupportScreen_parts/SupportScreenData';
 import { subscribePlannerApply, setPlannerSource } from './TrainingScreen_parts/planner-bridge';
@@ -73,15 +73,15 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   const [tab, setTab] = useState<TrainingTab>('runtime');
   const [page, setPage] = useState<TrainingPage>('hero');
   const [zone, setZone] = useState<TrainingZone | null>(null);
-  const switchPlanningTrack = (t: PlanningTrack) => {
-    setPlanningTrack(t);
-    setPlanningTrackState(t);
+  const switchPlanningTrack = (t: PlanningTrack | PlannerMode) => {
+    setPlanningTrack(t as PlanningTrack);
+    setPlanningTrackState(t as PlanningTrack);
     setZone('planner');
     setPage('constructor');
   };
   // 3-уровневая иерархия: hero → planning → constructor (каждый в новом окне)
   const openPlanning = useCallback(() => { setZone('planner'); setPage('planning'); }, []);
-  const openConstructor = useCallback((t: PlanningTrack) => { setPlanningTrack(t); setPlanningTrackState(t); setZone('planner'); setPage('constructor'); }, []);
+  const openConstructor = useCallback((t: PlanningTrack | PlannerMode) => { setPlanningTrack(t as PlanningTrack); setPlanningTrackState(t as PlanningTrack); setZone('planner'); setPage('constructor'); }, []);
   // Переход в зону «Планировщик» → режим «Ручной сбор» (внешние ссылки setTab('constructor'))
   const goPlannerManual = useCallback(() => { openConstructor('manual'); }, [openConstructor]);
   // Внешнее переключение режима планировщика (напр., из CardioLinkCard «Открыть кардио-конструктор»)

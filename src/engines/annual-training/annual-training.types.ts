@@ -14,13 +14,13 @@
 import type { UserWeek, UserProgram } from '../user-program/user-program.types';
 
 /** Тип конструктора блока годового плана. */
-export type AnnualBlockKind = 'PL' | 'BB' | 'MANUAL';
+export type AnnualBlockKind = 'PL' | 'BB' | 'ARM' | 'MANUAL';
 
 /** Статус сборки блока. */
 export type MacroBlockBuildStatus = 'unbuilt' | 'built' | 'stale' | 'error';
 
 /** Направление годового плана (производное от типов блоков). */
-export type AnnualPlanDirection = 'pl' | 'bb' | 'hybrid' | 'mixed';
+export type AnnualPlanDirection = 'pl' | 'bb' | 'arm' | 'hybrid' | 'mixed';
 
 /** Ссылка на макро-блок раскладки (MacroBlock | BBMacroBlock). */
 export interface AnnualBlockRef {
