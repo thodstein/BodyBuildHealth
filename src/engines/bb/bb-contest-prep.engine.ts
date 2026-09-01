@@ -1093,7 +1093,7 @@ export function coordinateLastHeavyDay(plan: BBPlan): LastHeavyCoord | null {
   if (!plan?.weeks?.length) return null;
   let best: LastHeavyCoord | null = null;
   plan.weeks.forEach((w, wi) => {
-    if (w.peakWeek) return;
+    if ((w as any).peakWeek) return;
     (w.sessions || []).forEach((s, si) => {
       if (s.character !== 'тяж') return;
       const working = s.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((a, e) => a + (e.sets || 0), 0);
@@ -1114,7 +1114,7 @@ export function addPeakPriming(plan: BBPlan, workMax: Record<string, number>): {
   if (!plan?.weeks?.length) return { plan, added: 0 };
   let added = 0;
   const weeks = plan.weeks.map(w => {
-    if (!w.peakWeek) return w;
+    if ((w as any).peakWeek) return w;
     const sessions = w.sessions.map((s, si) => {
       // Последние 2 сессии пик-недели (D-2/D-1), которые не отдых.
       const restOfWeeks = w.sessions.length;

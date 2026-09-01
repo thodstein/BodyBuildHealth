@@ -1883,7 +1883,7 @@ export const BbAutoConstructor: React.FC = () => {
     });
     // ⚖️ Авто-калибровка реальных весов из training.workMaxByExercise (сохранённых на шаге «Реальные веса»)
     try {
-      const stored = loadTrainingProfile().workMaxByExercise;
+      const stored = getProfile().settings?.training?.workMaxByExercise;
       const calib = autoCalibrateFromStored(plan, stored, (n) => /подтягив|отжимани|скручив|планка|пловец|альпинист|tgu|мостик|отведение.*стоя|икры.*одной|выпад.*назад|болгарск/i.test(n));
       if (calib.applied > 0) {
         plan = { ...calib.plan, rationale: [...calib.plan.rationale, `⚖️ Применены сохранённые реальные веса (${calib.applied} вхождений упражнений).`] };
@@ -3933,8 +3933,11 @@ export const BbAutoConstructor: React.FC = () => {
         const saved: Record<string, number> = {};
         for (const e of entries) if (e.id && e.actualWeight != null && e.actualWeight > 0) saved[e.id] = e.actualWeight;
         if (Object.keys(saved).length) {
-          const prof = loadTrainingProfile();
-          saveTrainingProfile({ ...prof, workMaxByExercise: { ...(prof.workMaxByExercise || {}), ...saved } });
+          const cur = getProfile();
+          const next: any = JSON.parse(JSON.stringify(cur.settings || {}));
+          if (!next.training) next.training = {};
+          next.training.workMaxByExercise = { ...(next.training.workMaxByExercise || {}), ...saved };
+          updateProfile({ settings: next });
         }
       } catch { /* ignore */ }
     };
