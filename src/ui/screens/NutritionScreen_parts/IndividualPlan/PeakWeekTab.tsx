@@ -66,8 +66,8 @@ function defaultConfig(sex: 'male' | 'female', weightKg: number, bbCategory: str
     weeksOut: 3,
     trainingProtocol: 'bb',
     carbLoadStrategy: 'moderate',
-    waterStrategy: 'minimal',
-    sodiumStrategy: 'constant',
+    waterStrategy: 'stable',
+    sodiumStrategy: 'stable',
   };
 }
 

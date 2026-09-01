@@ -1,88 +1,97 @@
 /**
- * bb-trial-peak.engine.ts — PRO trial peak (репетиция пика за 21-28 дней)
- * Хранит фото-front/back, вес, талию, spillScore, digestion. Даёт рекомендацию carb стратегии.
- * Чистый движок, без UI.
+ * bb-trial-peak.engine.ts — PRO trial peak (репетиция пика за 21-28 дней).
+ *
+ * Фаза 3.29: СЛИТО с канонической системой `TestPeakWeekResult` (bb-contest-prep.engine,
+ * ключ `he_bb_test_peak_weeks`). Раньше существовали ДВЕ параллельные системы с разными
+ * ключами (he_bb_trial_peaks_v2 здесь и he_bb_test_peak_weeks в prep-движке), но с
+ * ИДЕНТИЧНОЙ логикой вердиктов. Теперь этот модуль — тонкий совместимый слой ПОВЕРХ
+ * канона: единый сторадж, единые пороги (scoreTestPeakWeek), единый recommend.
+ * `he_bb_trial_peaks_v2` остаётся только для чтения legacy-записей (миграция).
  */
+import {
+  type TestPeakWeekResult,
+  TEST_PEAK_WEEK_STORAGE_KEY,
+  saveTestPeakWeekResult,
+  scoreTestPeakWeek,
+  latestTestPeakWeek,
+  recommendCarbStrategyFromTrial,
+} from './bb-contest-prep.engine';
 
-export interface TrialPeakEntry {
-  id: string;
-  planId: string;
-  date: string; // ISO yyyy-mm-dd of trial show
-  createdAt: string;
-  photos?: { front?: string; back?: string; side?: string }; // dataURL or path
-  weightKg: number;
+/** Legacy-ключ (только чтение, для миграции). */
+const LEGACY_KEY = 'he_bb_trial_peaks_v2';
+
+export interface TrialPeakEntry extends TestPeakWeekResult {
+  carbStrategyUsed?: string;
+  weightKg?: number;
   waistCm?: number;
-  carbStrategyUsed: string;
-  responses: {
-    carbTolerance: number; // 1-5
-    digestion: number;
-    fullness: number;
-    waterRetention: number; // 1=заливает 5=сухо
-    pump: number;
-    sleep: number;
-  };
-  weightDeltaKg: number;
-  spillScore?: number; // 1-5
-  notes?: string;
-  verdict: 'tested_ok' | 'conservative' | 'adjust';
-  recommendation: string;
+  photos?: { front?: string; back?: string; side?: string };
+  spillScore?: number;
 }
 
-const KEY = 'he_bb_trial_peaks_v2';
-const CAP = 3;
-
-function loadAll(): TrialPeakEntry[] {
+function readLegacy(): TrialPeakEntry[] {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(LEGACY_KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
+    return Array.isArray(arr) ? arr as TrialPeakEntry[] : [];
   } catch { return []; }
 }
-function saveAll(list: TrialPeakEntry[]) {
-  try { localStorage.setItem(KEY, JSON.stringify(list.slice(0, CAP))); } catch {}
+
+function readCanonical(): TestPeakWeekResult[] {
+  try {
+    const raw = localStorage.getItem(TEST_PEAK_WEEK_STORAGE_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr as TestPeakWeekResult[] : [];
+  } catch { return []; }
 }
 
+/** Все trial-записи (канон + legacy-миграция). */
 export function getTrialPeaks(planId?: string): TrialPeakEntry[] {
-  const all = loadAll();
+  const canon = readCanonical() as TrialPeakEntry[];
+  const legacy = readLegacy();
+  const seen = new Set(canon.map(t => t.id));
+  const all = [...canon, ...legacy.filter(l => !seen.has(l.id))];
   if (planId) return all.filter(e => e.planId === planId);
   return all;
 }
 
-export function saveTrialPeak(entry: Omit<TrialPeakEntry,'id'|'createdAt'|'verdict'|'recommendation'> & { weightDeltaKg:number }): TrialPeakEntry {
-  const avg = (entry.responses.carbTolerance + entry.responses.digestion + entry.responses.fullness + entry.responses.pump)/4;
-  let verdict: TrialPeakEntry['verdict'] = 'conservative';
-  let recommendation = '';
-  if (entry.responses.waterRetention >=4 && avg>=3.5 && Math.abs(entry.weightDeltaKg)<=1.5) {
-    verdict='tested_ok'; recommendation='Протокол подходит — используйте ту же стратегию на основном пике (tested).';
-  } else if (entry.responses.waterRetention<=2 || avg<=2 || entry.weightDeltaKg>2) {
-    verdict='adjust'; recommendation='Коррекция нужна: spill/плоско — смените стратегию (back/front/undulating).';
-  } else {
-    verdict='conservative'; recommendation='Консервативный режим — moderate/linear, stable вода/натрий.';
-  }
-  const rec: TrialPeakEntry = {
-    id: `trial_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,6)}`,
-    createdAt: new Date().toISOString(),
-    verdict, recommendation,
-    spillScore: entry.responses.waterRetention <=2 ? 5 : entry.responses.waterRetention >=4 ? 1 : 3,
-    ...entry,
-  };
-  const list = [rec, ...loadAll().filter(e => e.planId !== entry.planId || e.date !== entry.date)];
-  saveAll(list);
-  // also set hasTrialPeak flag in config storage helper
-  try { localStorage.setItem('he_has_trial_peak', '1'); } catch {}
-  return rec;
+/** Сохранить trial peak — ДЕЛЕГИРУЕТ в канонический saveTestPeakWeekResult (единый сторадж/пороги). */
+export function saveTrialPeak(
+  entry: Omit<TrialPeakEntry, 'id' | 'createdAt' | 'verdict' | 'recommendation'> & { weightDeltaKg: number },
+): TrialPeakEntry {
+  const result = saveTestPeakWeekResult(
+    entry.planId,
+    entry.showDate,
+    entry.responses,
+    entry.weightDeltaKg,
+    entry.notes,
+  );
+  // Доп. поля trial (не входящие в канон) сохраняем как расширение канонной записи.
+  try {
+    const list = readCanonical();
+    const idx = list.findIndex(t => t.id === result.id);
+    if (idx >= 0) {
+      list[idx] = {
+        ...list[idx],
+        carbStrategyUsed: entry.carbStrategyUsed,
+        weightKg: entry.weightKg,
+        waistCm: entry.waistCm,
+        photos: entry.photos,
+        spillScore: entry.spillScore,
+      } as TestPeakWeekResult;
+      localStorage.setItem(TEST_PEAK_WEEK_STORAGE_KEY, JSON.stringify(list.slice(0, 10)));
+    }
+  } catch { /* storage недоступен */ }
+  return { ...result, carbStrategyUsed: entry.carbStrategyUsed, weightKg: entry.weightKg, waistCm: entry.waistCm, photos: entry.photos, spillScore: entry.spillScore };
 }
 
+/** Рекомендация карб-стратегии из trial — делегирует в канон recommendCarbStrategyFromTrial. */
 export function recommendFromTrial(entry: TrialPeakEntry | null): string {
-  if (!entry) return 'moderate';
-  if (entry.verdict==='adjust' && entry.responses.waterRetention<=2) return 'back';
-  if (entry.responses.waterRetention>=4 && entry.responses.fullness<=2) return 'front';
-  if (entry.responses.carbTolerance<=2) return 'undulating';
-  return 'moderate';
+  return recommendCarbStrategyFromTrial(entry as TestPeakWeekResult | null);
 }
 
-/** FODMAP / low-residue листы для пика */
+/** FODMAP / low-residue листы для пика. */
 export const PEAK_FOODS_ALLOW = ['рис белый','рисовые хлебцы','картофель','мёд','джем','банан 0.5','овсянка малая','курица','белая рыба','яйцо'];
 export const PEAK_FOODS_DENY = ['бобовые','лук','чеснок','капуста','брокколи','газировка','жвачка','алкоголь','острое'];
 export const PEAK_FIBER_CAP = { deplete:22, load:16, peak:12, show:10 };

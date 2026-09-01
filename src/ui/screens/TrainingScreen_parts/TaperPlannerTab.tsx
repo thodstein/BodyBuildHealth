@@ -247,8 +247,8 @@ export const TaperPlannerTab: React.FC = () => {
         weeksOut: 1,
         trainingProtocol: 'bb',
         carbLoadStrategy: 'moderate',
-        waterStrategy: 'minimal',
-        sodiumStrategy: 'constant',
+        waterStrategy: 'stable',
+        sodiumStrategy: 'stable',
       };
       const res2 = buildBBContestPrep(cfg);
       return {

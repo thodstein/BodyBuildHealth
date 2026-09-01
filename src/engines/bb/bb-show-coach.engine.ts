@@ -15,7 +15,7 @@
  */
 import {
   type BBContestPrepPlan, type BBContestPrepConfig,
-  professionalReviewConditions,
+  professionalReviewConditions, CATEGORY_PROFILES,
 } from './bb-contest-prep.engine';
 
 export interface BBShowCoachCtx {
@@ -54,11 +54,11 @@ function bodyReadiness(ctx: BBShowCoachCtx): { score: number; note: BBShowNote |
   if (bf == null) {
     return { score: 0, note: { severity: 'info', icon: '⚖️', text: 'Укажите текущий % жира — без него оценка готовности тела неполная.' } };
   }
-  // Целевой % жира по категории (эвристика: bikini/wellness — выше, mens_bb — ниже).
+  // Фаза 3.31: единый источник targetBodyFat — CATEGORY_PROFILES (bikini 13,
+  // wellness 14, figure 11, mens_bb 5 и т.д.), а не локальная эвристика 10/7/5,
+  // которая противоречила категорийным таблицам.
   const cat = ctx.plan.category;
-  const targetBf = cat === 'bikini' || cat === 'wellness' || cat === 'figure'
-    ? 10 : cat === 'womens_physique' || cat === 'mens_physique' || cat === 'classic_physique'
-      ? 7 : 5;
+  const targetBf = CATEGORY_PROFILES[cat]?.targetBodyFatPct ?? (cat === 'bikini' || cat === 'wellness' ? 13 : cat === 'figure' ? 11 : cat === 'womens_physique' ? 9 : cat === 'mens_physique' || cat === 'classic_physique' ? 7 : 5);
   const gap = bf - targetBf;
   if (gap <= 0) return { score: 100, note: { severity: 'ok', icon: '✅', text: `% жира ${bf}% — в целевой зоне (${targetBf}%).` } };
   if (gap <= 2) return { score: 80, note: { severity: 'info', icon: '⚖️', text: `% жира ${bf}% — чуть выше цели (${targetBf}%), сушитесь дальше.` } };
@@ -162,7 +162,8 @@ export function scoreBBShowPrep(ctx: BBShowCoachCtx): BBShowCoachVerdict {
 export function recommendBBShowConfig(plan: BBContestPrepPlan): Partial<BBContestPrepConfig> {
   const patch: Partial<BBContestPrepConfig> = {};
   if (!plan.taper.enabled) patch.trainingProtocol = 'bb';
-  if (!plan.peakWeek.enabled) { patch.waterStrategy = 'minimal'; patch.sodiumStrategy = 'constant'; patch.carbLoadStrategy = 'moderate'; }
-  if (plan.safety.requiresReview) { patch.waterStrategy = 'minimal'; patch.sodiumStrategy = 'constant'; }
+  // Фаза 3.32: legacy-алиасы 'minimal'/'constant' → канон 'stable'.
+  if (!plan.peakWeek.enabled) { patch.waterStrategy = 'stable'; patch.sodiumStrategy = 'stable'; patch.carbLoadStrategy = 'moderate'; }
+  if (plan.safety.requiresReview) { patch.waterStrategy = 'stable'; patch.sodiumStrategy = 'stable'; }
   return patch;
 }

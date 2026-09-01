@@ -1766,35 +1766,6 @@ export function applyContestPrepToBBPlan(
   return result as BBPlanWithPrep;
 }
 
-/** Достроить план В НАЧАЛО недостающими неделями подготовки (клон недели 1).
- *  НЕ используется автоматически (applyContestPrepToBBPlan не сдвигает цикл) —
- *  зарезервировано для явных сценариев расширения. */
-function prependPreparationWeeks(plan: BBPlanWithPrep, addWeeks: number): BBPlanWithPrep {
-  const add = Math.max(1, Math.round(addWeeks));
-  const weeks = plan.weeks as any[];
-  const template = weeks[0];
-  if (!template || add <= 0) return plan;
-  const clone = (w: any) => ({
-    ...w,
-    week: w.week,
-    deload: false,
-    phase: 'accumulation',
-    taper: false,
-    peakWeek: false,
-    prepProtocol: undefined,
-    contestPhase: 'preparation' as BBWeekPrepPhase,
-    sessions: w.sessions.map((s: any) => ({
-      ...s,
-      exercises: s.exercises.map((e: any) => ({ ...e, workSets: (e.workSets || []).map((ws: any) => ({ ...ws })) })),
-    })),
-  });
-  const inserted: any[] = [];
-  for (let k = 0; k < add; k++) inserted.push(clone(template));
-  const newWeeks = [...inserted, ...weeks];
-  newWeeks.forEach((w, i) => { w.week = i + 1; });
-  return { ...plan, weeks: newWeeks } as BBPlanWithPrep;
-}
-
 /**
  * Расширить ТОЛЬКО подготовительный блок плана (пик и тапер не трогаются):
  * дублирует последнюю неделю подготовки перед началом тапера.

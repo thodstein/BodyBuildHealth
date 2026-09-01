@@ -61,7 +61,7 @@ describe('scoreBBShowPrep', () => {
 
   it('рекомендации: безопасные дефолты при требует-сопровождение', () => {
     const cfg = recommendBBShowConfig(plan({ safety: { contraindications: ['kidney'], warnings: [], requiresReview: true, blockedProtocol: true } }));
-    expect(cfg.waterStrategy).toBe('minimal');
-    expect(cfg.sodiumStrategy).toBe('constant');
+    expect(cfg.waterStrategy).toBe('stable');
+    expect(cfg.sodiumStrategy).toBe('stable');
   });
 });

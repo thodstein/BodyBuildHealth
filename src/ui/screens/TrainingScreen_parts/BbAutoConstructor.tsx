@@ -1162,8 +1162,8 @@ export const BbAutoConstructor: React.FC = () => {
       weeksOut: 3,
       trainingProtocol: 'bb',
       carbLoadStrategy: 'moderate',
-      waterStrategy: 'minimal',
-      sodiumStrategy: 'constant',
+      waterStrategy: 'stable',
+      sodiumStrategy: 'stable',
       specialization: peakSpec,
     };
   };
@@ -5717,7 +5717,7 @@ export const BbAutoConstructor: React.FC = () => {
                   </div>
                   <div style={{ color:'#fff', marginTop:2 }}>{lastTest.recommendation}</div>
                   <div style={{ color:'#a78bfa', marginTop:4 }}>PRO рекомендация загрузки: <b>{recommendCarbStrategyFromTrial(lastTest)}</b> (spill→back, flat→front, волна→undulating)</div>
-                  <div style={{ color:'#38bdf8', marginTop:2 }}>Live-adjust D-1: {liveAdjustForPeakDay(lastTest.responses.fullness, lastTest.responses.waterRetention<=2?5:1, lastTest.responses.waterRetention).note}</div>
+                  <div style={{ color:'#38bdf8', marginTop:2 }}>Live-adjust D-1: {liveAdjustForPeakDay(lastTest.responses.fullness, 6 - lastTest.responses.waterRetention, lastTest.responses.waterRetention).note}</div>
                   {prepPlan.testPeakWeekId && (
                     <div style={{ color:'#fff', marginTop:4 }}>
                       Стратегия основной пик-недели: <b>{resolvePeakStrategy(prepPlan)}</b>

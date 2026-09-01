@@ -122,8 +122,8 @@ export const PeakingPanel: React.FC<{ defaultKind?: 'pl' | 'bb' }> = ({ defaultK
       weeksOut: 3,
       trainingProtocol: 'bb',
       carbLoadStrategy: 'moderate',
-      waterStrategy: 'minimal',
-      sodiumStrategy: 'constant',
+      waterStrategy: 'stable',
+      sodiumStrategy: 'stable',
     };
   };
   const [bbCfg, setBbCfg] = useState<BBContestPrepConfig>(() => {
