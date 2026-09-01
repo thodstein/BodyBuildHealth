@@ -2,7 +2,8 @@
  * StrengthSportConstructor.tsx — премиальный конструктор Стронгмен / ТА.
  * Стекло + градиенты, современный мобильный стиль. Полностью изолирован.
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { subscribePlannerApply, getPlannerApply } from '../TrainingScreen_parts/planner-bridge';
 import { buildStrengthSportPlan } from '../../../engines/strength-sport/strength-sport-builder.engine';
 import { finalizeStrengthSportPlan, buildStrengthSportReport } from '../../../engines/strength-sport/strength-sport-finalize.engine';
 import { STRENGTH_SPORT_PATTERNS, recommendStrengthSportPattern } from '../../../engines/strength-sport/strength-sport-split-patterns';
@@ -65,6 +66,24 @@ export const StrengthSportConstructor: React.FC = () => {
     { id:'atlas_stone_load', label:'Камень', distanceM:0, timeCapS:60 },
   ]);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
+  // Приём из хабов ТА/стронг (planner-bridge weakpoints → weightlifting/strongman)
+  useEffect(() => {
+    const apply = (payload: any) => {
+      if (!payload || payload.kind !== 'weakpoints') return;
+      const groups: string[] | undefined = payload.data?.groups || payload.data?.smWeakPoints || payload.data?.wlWeakPoints;
+      if (Array.isArray(groups) && groups.length > 0) {
+        setWeakPoints(groups.slice(0, 3).map((s: string) => String(s)));
+        if (payload.data?.smWeakPoints) setMode('strongman' as any);
+        if (payload.data?.wlWeakPoints) setMode('weightlifting' as any);
+      }
+    };
+    try {
+      const cur = getPlannerApply() as any;
+      if (cur) apply(cur);
+    } catch {}
+    const unsub = subscribePlannerApply((p) => { try { apply(p as any); } catch {} });
+    return () => { try { unsub(); } catch {} };
+  }, []);
   const [vbtMap, setVbtMap] = useState<Record<string, number>>(() => {
     try { const raw = localStorage.getItem('he_vbt_ss_v1'); return raw ? JSON.parse(raw) as Record<string,number> : {}; } catch { return {}; }
   });
@@ -490,12 +509,15 @@ export const StrengthSportConstructor: React.FC = () => {
                     </div>
                     <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                       {contest.events.map((ev, idx)=> (
-                        <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
-                          <span style={{ fontSize:11, color:'#fff', minWidth:110 }}>{(EVENT_META as any)[ev.id]?.label || ev.id}</span>
-                          <span style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{ev.format}</span>
-                          <input type="number" value={ev.weight||''} placeholder="кг" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, weight: Number(e.target.value)||0 } : x)} : c)} style={{ width:64, padding:'4px 6px', fontSize:11, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#fff', textAlign:'center' }} />
-                          {(ev.id.includes('yoke')||ev.id.includes('farmers')||ev.id.includes('conan')||ev.id.includes('truck')||ev.id.includes('carry')) && <input type="number" value={ev.distanceM||''} placeholder="м" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, distanceM: Number(e.target.value)||0 } : x)} : c)} style={{ width:52, padding:'4px 6px', fontSize:11, background:'rgba(255,159,10,0.08)', border:'0.5px solid rgba(255,159,10,0.18)', borderRadius:6, color:'#fff', textAlign:'center' }} />}
-                          {(ev.format==='ladder' || ev.id.includes('stone')) && <input type="text" value={(ev.ladderWeights||[]).join(',')} placeholder="100,110,120" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, ladderWeights: e.target.value.split(',').map(v=> Number(v.trim())).filter(v=> v>0) } : x)} : c)} style={{ flex:1, padding:'4px 6px', fontSize:10, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#fff' }} />}
+                        <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                          <span style={{ fontSize:11, color:'#fff', minWidth:100 }}>{(EVENT_META as any)[ev.id]?.label || ev.id}</span>
+                          <span style={{ fontSize:10, color:'rgba(255,255,255,0.52)', minWidth:72 }}>{ev.format}</span>
+                          <input type="number" value={ev.weight||''} placeholder="кг" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, weight: Number(e.target.value)||0 } : x)} : c)} style={{ width:62, padding:'4px 6px', fontSize:11, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#fff', textAlign:'center' }} />
+                          {(ev.id.includes('yoke')||ev.id.includes('farmers')||ev.id.includes('conan')||ev.id.includes('truck')||ev.id.includes('carry')||ev.id.includes('shield')||ev.id.includes('duck')) && <input type="number" value={ev.distanceM||''} placeholder="м" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, distanceM: Number(e.target.value)||0 } : x)} : c)} style={{ width:50, padding:'4px 6px', fontSize:11, background:'rgba(255,159,10,0.08)', border:'0.5px solid rgba(255,159,10,0.18)', borderRadius:6, color:'#fff', textAlign:'center' }} />}
+                          <input type="number" value={ev.timeCapS||''} placeholder="capс" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, timeCapS: Number(e.target.value)||0 } : x)} : c)} style={{ width:54, padding:'4px 6px', fontSize:11, background:'rgba(59,130,246,0.08)', border:'0.5px solid rgba(59,130,246,0.18)', borderRadius:6, color:'#fff', textAlign:'center' }} />
+                          <label style={{ display:'flex', gap:4, alignItems:'center', fontSize:10, color:'#fff' }}><input type="checkbox" checked={!!ev.turn} onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, turn: e.target.checked } : x)} : c)} /> разв.</label>
+                          <input type="number" value={ev.heightCm||''} placeholder="высота" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, heightCm: Number(e.target.value)||0 } : x)} : c)} style={{ width:66, padding:'4px 6px', fontSize:10, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#fff', textAlign:'center' }} />
+                          {(ev.format==='ladder' || ev.id.includes('stone') || ev.id.includes('sandbag')) && <input type="text" value={(ev.ladderWeights||[]).join(',')} placeholder="100,110,120" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, ladderWeights: e.target.value.split(',').map(v=> Number(v.trim())).filter(v=> v>0) } : x)} : c)} style={{ flex:1, minWidth:90, padding:'4px 6px', fontSize:10, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#fff' }} />}
                           <button onClick={()=> setContest(c=> c ? { ...c, events: c.events.filter((_,i)=> i!==idx)} : c)} style={{ width:26, height:26, borderRadius:7, background:'rgba(239,68,68,0.14)', border:'0.5px solid rgba(239,68,68,0.22)', color:'#fecaca', cursor:'pointer' }}>✕</button>
                         </div>
                       ))}
@@ -693,10 +715,20 @@ export const StrengthSportConstructor: React.FC = () => {
             <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · taper Winwood 8.6д`} strong>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {(plan.inputSnapshot as any).contest.events.map((e:any, i:number)=> (
-                  <span key={i} style={{ padding:'5px 8px', borderRadius:9, background:'rgba(245,158,11,0.10)', border:'0.5px solid rgba(245,158,11,0.18)', fontSize:11, color:'#fff' }}><HighlightStrong>{(EVENT_META as any)[e.id]?.label || e.id}</HighlightStrong> {e.format} {e.weight?`${e.weight}кг`:''} {e.distanceM?`${e.distanceM}м`:''} {(TAPER_CESSATION_DAYS as any)[e.id] ? `· cess ${(TAPER_CESSATION_DAYS as any)[e.id]}д`:''}</span>
+                  <span key={i} style={{ padding:'5px 8px', borderRadius:9, background:'rgba(245,158,11,0.10)', border:'0.5px solid rgba(245,158,11,0.18)', fontSize:11, color:'#fff' }}><HighlightStrong>{(EVENT_META as any)[e.id]?.label || e.id}</HighlightStrong> {e.format} {e.weight?`${e.weight}кг`:''} {e.distanceM?`${e.distanceM}м`:''} {e.timeCapS?`cap${e.timeCapS}с`:''} {e.heightCm?`${e.heightCm}см`:''} {e.turn?'разв.':''} {(TAPER_CESSATION_DAYS as any)[e.id] ? `· cess ${(TAPER_CESSATION_DAYS as any)[e.id]}д`:''}</span>
                 ))}
               </div>
-              <InfoBanner tone="strong">Прогрессия: 85%→100% к контесту · дистанции/высота из пакета · medley по implements контеста</InfoBanner>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginTop:6 }}>
+                {(() => {
+                  const rows = (plan.inputSnapshot as any).contest.events.map((e:any)=> {
+                    const pm = (()=>{ const wm:any=plan.workMax||{}; if(e.id==='yoke_walk') return wm.yokeWalk||wm.deadlift||180; if(['farmers_walk_heavy','frame_carry','husafell_carry','conan_wheel','shield_carry'].includes(e.id)) return wm.farmersWalk||wm.deadlift||140; if(['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load'].includes(e.id)) return wm.atlasStone||100; if(['log_press','axle_press','viking_press','circus_db_press'].includes(e.id)) return wm.logPress||wm.overheadPress||60; return 100; })();
+                    const ratio = e.weight ? Math.round(pm/e.weight*100) : 100; const place = ratio>=100?1: ratio>=95?2: ratio>=90?3:4;
+                    return <span key={e.id} style={{ padding:'4px 7px', borderRadius:8, background: ratio>=100?'rgba(48,209,88,0.12)':'rgba(255,159,10,0.10)', border:`0.5px solid ${ratio>=100?'rgba(48,209,88,0.22)':'rgba(255,159,10,0.18)'}`, fontSize:10, color:'#fff' }}>{(EVENT_META as any)[e.id]?.label||e.id} {ratio}% · P{place}</span>;
+                  });
+                  return rows;
+                })()}
+              </div>
+              <InfoBanner tone="strong">Прогрессия: 85%→100% к контесту · дистанции/высота/cap/разворот из пакета · medley по implements контеста · стратегия { (plan.inputSnapshot as any).contestStrategy } → 85/92/98 vs 90/97/102%</InfoBanner>
             </SectionCard>
           ) : null}
           {(() => {

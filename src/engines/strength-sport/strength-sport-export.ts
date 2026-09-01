@@ -31,8 +31,8 @@ export function buildStrengthCsv(plan: StrengthSportPlan): string {
   return lines.join('\n');
 }
 
-const PHASE_COLOR_SS: Record<string,string> = { accumulation:'#0A84FF', intensification:'#FF9F0A', peaking:'#FF3B30', deload:'#8E8E93', transition:'#636366', taper:'#30D158' };
-const PHASE_RU_SS: Record<string,string> = { accumulation:'Накопление', intensification:'Интенсиф.', peaking:'Пик', deload:'Разгр.', transition:'Переход', taper:'Тапер' };
+const PHASE_COLOR_SS: Record<string,string> = { accumulation:'#0A84FF', intensification:'#FF9F0A', integration:'#7C3AED', peaking:'#FF3B30', deload:'#8E8E93', transition:'#636366', taper:'#30D158' };
+const PHASE_RU_SS: Record<string,string> = { accumulation:'Накопление', intensification:'Интенсиф.', integration:'Интеграция', peaking:'Пик', deload:'Разгр.', transition:'Переход', taper:'Тапер' };
 
 function buildPrintHeader(plan: StrengthSportPlan): string {
   const title = `Стронг+ТА ${escHtml(plan.mode)} ${plan.weeks}нед · ${escHtml(plan.level)}`;
@@ -65,11 +65,15 @@ function buildPhaseGantt(plan: StrengthSportPlan): string {
 }
 
 function buildMedleySection(plan: StrengthSportPlan): string {
-  const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley') || (e.comment||'').includes('Contest Medley'))));
-  if (!hasMedley || plan.mode!=='strongman') return '';
+  const contestImplements: string[] | null = (()=> { const c=(plan.inputSnapshot as any)?.contest; if(c?.events?.length){ const ce=c.events.find((e:any)=> e.implements?.length>=2); if(ce) return ce.implements as string[]; } return null; })();
+  const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley') || (e.comment||'').includes('Contest Medley')))) || !!contestImplements;
+  if (!hasMedley || plan.mode!=='strongman') {
+    // если контест задал implements но medley comment ещё не в плане (короткий цикл) — всё равно секция по контесту
+    if (!contestImplements) return '';
+  }
   const rows = plan.weeksData
     .flatMap(w=> w.sessions.filter(s=> s.sessionTag==='event_day').flatMap(s=> s.exercises.filter(e=> (e.comment||'').includes('Medley')).map(e=> ({ w, e }))))
-    .map(({w,e})=> `<tr><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">Н${w.week} · ${escHtml(w.phase)}${(w as any).taper?' · taper':''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.name)} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м cap ${(e.workSets[0] as any)?.timeCapS||60}с · 90с переход ${(e.comment||'').includes('Contest')?' · Contest':''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.comment||'')}</td></tr>`).join('');
+    .map(({w,e})=> `<tr><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">Н${w.week} · ${escHtml(w.phase)}${(w as any).taper?' · taper':''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.name)} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м cap ${(e.workSets[0] as any)?.timeCapS||60}с · 90с переход ${(e.comment||'').includes('Contest')?' · Contest':''} ${contestImplements?`· implements ${contestImplements.join('→')}`:''} ${(plan.inputSnapshot as any)?.contest?.events?.find((ev:any)=> ev.id===e.id)?.heightCm?`· ${ (plan.inputSnapshot as any).contest.events.find((ev:any)=> ev.id===e.id).heightCm }см`:''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.comment||'')}</td></tr>`).join('');
   if (!rows) return '';
   return `<section style="margin:10px 0"><h3 style="font-size:13px;font-weight:700;margin:0 0 6px">⛓️ Medley цепь — 2+1 (carry+stone)</h3><table style="width:100%;border-collapse:collapse">${`<tr><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Неделя/фаза</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Ивент (дист · cap)</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Состав цепи</th></tr>`}${rows}</table></section>`;
 }

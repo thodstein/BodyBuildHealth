@@ -7,10 +7,10 @@ export type DayCharacter = 'тяж' | 'памп' | 'лёг';
 export interface LoadingOut { reps: [number, number]; rir: number; pct: number; tempo: string; rest: number; }
 
 const PCT_BY_PHASE: Record<string, number> = {
-  accumulation: 0.75, intensification: 0.85, peaking: 0.92, deload: 0.60, transition: 0.65,
+  accumulation: 0.75, intensification: 0.85, integration: 0.88, peaking: 0.92, deload: 0.60, transition: 0.65,
 };
 const PCT_BY_PHASE_WL: Record<string, number> = {
-  accumulation: 0.75, intensification: 0.82, peaking: 0.88, deload: 0.60, transition: 0.65,
+  accumulation: 0.75, intensification: 0.82, integration: 0.85, peaking: 0.88, deload: 0.60, transition: 0.65,
 };
 
 const TEMPO_OVERRIDES: Record<string,string> = {
@@ -87,6 +87,7 @@ export function repsForSS(tag: string, phase: string, goal: string, isPrimary: b
   if (tag==='technique_day') return [1,2];
   if (tag==='event_day') return isPrimary ? [1,3] : [6,10];
   if (phase==='peaking') return isPrimary ? [1,3] : pri;
+  if (phase==='integration') return isPrimary ? [1,2] : [4,8];
   if (phase==='accumulation') return isPrimary ? pri : [8,12];
   if (phase==='intensification') return isPrimary ? pri : [6,10];
   if (phase==='deload') return isPrimary ? [2,4] : [8,12];

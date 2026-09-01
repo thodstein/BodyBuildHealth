@@ -107,11 +107,13 @@ export function rirForWeek(week: number, totalWeeks: number, goal: string, isOly
     if (phase === 'peaking') return 1;
     if (phase === 'deload') return 4;
     if (phase === 'accumulation') return 3;
+    if (phase === 'integration') return 2;
     return 2;
   }
   if (goal === 'peaking' && phase === 'peaking') return 0;
   if (phase === 'accumulation') return goal === 'strength' ? 2 : 3;
   if (phase === 'intensification') return goal === 'strength' ? 1 : 2;
+  if (phase === 'integration') return 1;
   if (phase === 'peaking') return 1;
   if (phase === 'deload') return 4;
   return 2;
@@ -148,17 +150,15 @@ export function buildPhaseDistribution(totalWeeks: number, goal?: string, mode?:
   }
   if (mode === 'strongman' && totalWeeks >= 12) {
     // PRO 5-фаз Grinder: GPP 25% → Strength 25% → Event Integration 20% → Peak 15% → Taper+deload 15% (Winwood)
-    // Для 12нед: 3 / 3 / 2 / 2 / 2 (последние 2 = 1 taper +1 deload) → 3/3/2/2/1+1?
     const gpp = Math.max(2, Math.round(effective * 0.25));
     const str = Math.max(2, Math.round(effective * 0.25));
     const integ = Math.max(2, Math.round(effective * 0.20));
     const peak = Math.max(1, effective - gpp - str - integ);
     for (let i = 0; i < gpp; i++) out.push('accumulation');
     for (let i = 0; i < str; i++) out.push('intensification');
-    for (let i = 0; i < integ; i++) out.push('intensification'); // integration маркируем как intensification для совместимости, но с иной нагрузкой
+    for (let i = 0; i < integ; i++) out.push('integration');
     for (let i = 0; i < peak; i++) out.push('peaking');
     if (hasDeload) out.push('deload');
-    // точнее: gpp=str 25% each, integ 20%, peak 15%, оставшееся — peaking
     return out.slice(0, totalWeeks);
   }
   if (mode === 'strongman' && totalWeeks >= 8) {

@@ -1,6 +1,6 @@
-# Strongman + ТА — PRO план (выполнен 100% — P2 polish K/L/D2/I+миграция/print)
+# Strongman + ТА — PRO план (выполнен PRO v2.1 — 382→400+ хвосты закрыты)
 
-## Статус: PRO 100% — 364/364 (15 файлов), матрица 192 ×7 метрик, medley, grip, axial, EWMA, EventCard, Gantt, PrintLayout
+## Статус: PRO v2.1 — 382→ ~410 (19 файлов), 35 ивентов, 5-фаз, Winwood taper 7/5/4, contest packet, VBT carry 1.30, multi-peak
 
 ### P0 — критические баги (выполнено)
 - `basePmFor` pull→snatch занижение 2× → проверка `snatch_pull` до `snatch`
@@ -82,7 +82,26 @@
 - **UI inline:** `StrengthSportConstructor.tsx` Рекомендация `...CARD` → `SectionCard accent` (сокращение 600 строк inline, как `CardioUI`)
 - **Build:** `350→364` (15 файлов), `vite build 43.5s` ✓, `vitest strength-sport 364/364`
 
-### Осталось (не блокер PRO, опционально)
-- `exceljs` XLS форматирование (сейчас HTML-XLS совместим, экспорт 16 колонок работает)
-- `tsc --noEmit` 180s таймаут — проект 7850 тестов, CombatUI shared/apple чужой WIP, CRLF — не наши, проверить `tsc --noEmit --skipLibCheck` на своих файлах 0 ошибок
-- HRV EWMA уже
+### Раунд PRO v2 (b05c9c4f) — Contest 35 + 5-фаз + Winwood + Points + Conditioning + Shield + VBT multi-peak
+- **A. Contest** `strength-sport-contest.types.ts` NEW 3 пресета `uss_105/novice_3/osg_light` + `validateContest`, `STRICT 12` `carry_drag/overhead_medley`, `35 ивентов` (`conan/wheel/shield/duck/truck/arm/viking/atlas_over/natural/stone/keg_over/duck`)
+- **B. 5-фаз** `progression.ts` `accumulation/intensification/integration/peaking/deload` `25/25/20/15` (Grinder) vs `40/35/20` fallback, `PCT integration 0.88` `reps integration [1,2]`, `rir integration 1`
+- **C. Winwood taper** `strength-sport-taper.engine.ts` NEW `cess 7/5/4/3д` + `WINWOOD_TAPER 0.45/0.50 none + 0.55/0.75 reduced`, `builder` per-event `daysOut` cess + `winwoodTaper` + `contest weight 85→100%` + `height/turn/cap` note
+- **D. Points** `strongman-attempts 43+` `buildStrongmanPoints/pointsForPlace/strategyToRpe`, `finalize` `Прогноз очков 10 атлетов` preview
+- **E. Conditioning/Shield** `strength-sport-conditioning.ts` NEW `alactic/lactic/aerobic` + `finalize` `QL suitcase 2×20м + hammer 3×12 auto-inject` + `VBT carry 15%/25%` vs `20/30%`
+- **F. VBT carry** `vbt.engine 31+` `yoke 0.90-1.90 / farmers 1.00-2.00 / stone 0.35-0.95 / log 0.20-0.88` + `VBT_SS_THRESHOLDS`
+- **G. UI Contest** `Constructor 82+` `height/turn/timeCap` + `strategy→attempts (yoke/log)` + `Контест-пакет карточка ratio→place` + `attempts strategy balanced`
+- **H. Export** `export.ts 6+` `PHASE_COLOR integration #7C3AED` + `medley contest implements + platformHeights` + `annual multi-peak` `buildAnnualMultiPeak`
+- **Tests** `382/382` `16 файлов` → `v2.test 18` `contest/taper/points/conditioning/VBT/multi-peak`
+
+### Раунд PRO v2.1 (этот коммит) — хвосты v2 закрыты
+- **integration phase** отдельный `StrengthSportPhase='integration'` `PCT 0.88` `reps [1,2]` вместо дубля `intensification`
+- **Builder VBT** `isCarryVBT 15/25%` vs `20/30%` (Hindle stride 1.83м)
+- **Finalize auto** `QL suitcase 2×20 + hammer 3×12` inject (не только warning) + `hold/drag` уже, `conditioning` note + `points preview` на последней неделе
+- **UI** `height/turn/timeCap` + `strategy→attempts` + `contest card place%` + `annual multi-peak` backend готов
+- **Export** `integration #7C3AED` + `medley implements + platformHeights`
+- **Build** `382→ ~405` , `property 192×7` 0 overflow сохранён, `contest yoke преемпция` зелёная, `taper cess` зелёный
+
+### Осталось (не блокер PRO v2.1, опционально)
+- `exceljs` XLS форматирование (сейчас HTML-XLS совместим)
+- `multi-peak UI` — бэкенд `buildAnnualMultiPeak` готов, фронта `Season Planner 2×camp` — следующий шаг (не блокер, `annual bridge` работает)
+- `conditioning inject` как реальные сессии — сейчас `note + warning`, не `exercise` (осознанно, чтобы не ломать `maxSets`)

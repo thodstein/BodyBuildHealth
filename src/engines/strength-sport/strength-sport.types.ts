@@ -7,7 +7,7 @@
 export type StrengthSportMode = 'weightlifting' | 'strongman' | 'hybrid';
 export type StrengthSportGoal = 'strength' | 'hypertrophy' | 'peaking' | 'technique' | 'maintenance';
 export type StrengthSportLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
-export type StrengthSportPhase = 'accumulation' | 'intensification' | 'peaking' | 'deload' | 'transition';
+export type StrengthSportPhase = 'accumulation' | 'intensification' | 'integration' | 'peaking' | 'deload' | 'transition';
 
 export interface StrengthSportWorkMax {
   snatch?: number;

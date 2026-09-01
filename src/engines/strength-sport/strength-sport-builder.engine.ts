@@ -244,8 +244,11 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   if (acwr?.zone === 'dangerous' && sets > 2) sets = Math.max(2, Math.round(sets * 0.65));
   else if (acwr?.zone === 'caution' && sets > 2) sets = Math.max(2, Math.round(sets * 0.85));
   else if (acwr?.zone === 'undertrained') sets = Math.min(6, sets + 1);
-  if (typeof vLoss === 'number' && vLoss > 20 && sets > 2) sets = Math.max(2, Math.round(sets * 0.90));
-  // H1: VelocityHistory 3 точки → zone 20/30%
+  // PRO carry: VBT порог 15% скорости (Hindle 1.83м stride)
+  const isCarryVBT = ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','conan_wheel','shield_carry','truck_pull','arm_over_arm','sandbag_carry','sled_push','sled_drag','duck_walk'].some(k=> id.includes(k.replace('_walk','')) || id===k);
+  const vbtThresh = isCarryVBT ? 15 : 20;
+  if (typeof vLoss === 'number' && vLoss > vbtThresh && sets > 2) sets = Math.max(2, Math.round(sets * 0.90));
+  // H1: VelocityHistory 3 точки → zone 20/30% (carry 15/25%)
   const vHist = (input as any).velocityHistory as Record<string, number[]> | undefined;
   let histLoss = 0;
   if (vHist) {
@@ -256,7 +259,11 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
       if (best > 0) histLoss = (best - last) / best * 100;
     }
   }
-  if (histLoss > 20 && sets > 2) sets = Math.max(2, Math.round(sets * (histLoss > 30 ? 0.80 : 0.90)));
+  // дублируем пороги для carry вне scope rir — объявляем заранее
+  // isCarryVBT уже определён выше для VBT, переиспользуем histThresh*
+  const histThreshLow = isCarryVBT ? 15 : 20;
+  const histThreshHigh = isCarryVBT ? 25 : 30;
+  if (histLoss > histThreshLow && sets > 2) sets = Math.max(2, Math.round(sets * (histLoss > histThreshHigh ? 0.80 : 0.90)));
   // P3 diary e1RM trend: -5% down → -15%, plateau <2% → +1 сет
   const trends: any[] = (input as any).diaryTrend || [];
   const myTrend = trends.find((t:any)=> t.lift===id || (id.includes('snatch')&&t.lift==='snatch') || (id.includes('clean')&&t.lift==='clean') || (id.includes('squat')&&t.lift==='squat') || (id.includes('deadlift')&&t.lift==='deadlift'));
@@ -270,9 +277,9 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   else {
     if (acwr?.zone === 'dangerous') finalRir = Math.min(4, finalRir + 2);
     else if (acwr?.zone === 'caution') finalRir = Math.min(4, finalRir + 1);
-    if (typeof vLoss === 'number' && vLoss > 20) finalRir = Math.min(4, finalRir + 1);
-    if (histLoss > 20) finalRir = Math.min(4, finalRir + 1);
-    if (histLoss > 30) finalRir = Math.min(4, finalRir + 1);
+    if (typeof vLoss === 'number' && vLoss > vbtThresh) finalRir = Math.min(4, finalRir + 1);
+    if (histLoss > histThreshLow) finalRir = Math.min(4, finalRir + 1);
+    if (histLoss > histThreshHigh) finalRir = Math.min(4, finalRir + 1);
     if (myTrend && myTrend.changePct < -5) finalRir = Math.min(4, finalRir + 1);
     if (outM < 0.75) finalRir = Math.min(4, finalRir + 1);
     // D2 conjugate RIR

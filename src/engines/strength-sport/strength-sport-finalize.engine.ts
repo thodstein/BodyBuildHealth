@@ -307,19 +307,85 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
       if (maxYoke > bwAny * 2.5) warnings.push(`Нед ${wk.week}: йок ${maxYoke}кг >2.5×BW — высокий стресс поясницы/колен, добавьте кор и +отдых.`);
       if (maxLog > bwAny * 0.9) warnings.push(`Нед ${wk.week}: лог ${maxLog}кг ~${Math.round(maxLog/bwAny*100)}% BW — контроль плеча, добавьте стабилизацию.`);
       if (maxStone > bwAny * 1.2) warnings.push(`Нед ${wk.week}: камень ${maxStone}кг >1.2×BW — поясница, используйте пояс и технику.`);
-      // Biceps distal tear risk: mixed grip deadlift, stone lap, tire flip (Winwood 11% biceps)
+      // Biceps distal tear risk: mixed grip deadlift, stone lap, tire flip (Winwood 11% biceps) auto-inject hammer
       const hasBicepsRisk = wk.sessions.some(s=> s.exercises.some(e=> ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','tire_flip'].includes(e.id)));
-      if (hasBicepsRisk) warnings.push(`Нед ${wk.week}: 🦾 бицепс риск (камень/покрышка) — hammer curl 3×12, без супинации, контроль lap 2с.`);
+      if (hasBicepsRisk) {
+        warnings.push(`Нед ${wk.week}: 🦾 бицепс риск (камень/покрышка) — добавлен hammer curl 3×12, без супинации, lap 2с.`);
+        const hasHammer = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('hammer') || e.id.includes('bicep') ));
+        if (!hasHammer) {
+          let targetBi = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
+          if (targetBi) {
+            let curBi = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
+            while (curBi + 2 > lim.maxSets) {
+              let cut=false;
+              for(let si=wk.sessions.length-1; si>=0 && curBi+2>lim.maxSets; si--){ const sess=wk.sessions[si]; for(let ei=sess.exercises.length-1; ei>=0 && curBi+2>lim.maxSets; ei--){ const ex=sess.exercises[ei]; if((ex as any).role==='accessory' && ex.sets>2){ ex.sets-=1; ex.workSets=ex.workSets.slice(0,ex.sets); curBi-=1; cut=true; } } }
+              if(!cut) break;
+            }
+            while (targetBi.exercises.length + 1 > lim.maxExercises) {
+              let idx=-1; for(let i=targetBi.exercises.length-1;i>=0;i--) if((targetBi.exercises[i] as any).role==='accessory'){ idx=i; break; }
+              if(idx>=0) targetBi.exercises.splice(idx,1); else targetBi.exercises.pop();
+            }
+            targetBi.exercises.push({ id:'hammer_curl', name:'Молоток', group:'arms', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'12', rir:2, weight:12, workSets:[{ reps:12, rir:2, weight:12, pct:60, tempo:'2-0-1-0', restSeconds:60 } as any, { reps:12, rir:2, weight:12, pct:60, tempo:'2-0-1-0', restSeconds:60 } as any], tempo:'2-0-1-0', restSeconds:60, isCompetitionLift:false, comment:'Biceps prehab hammer 3×12' } as any);
+            wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+          }
+        }
+      }
     }
-    // QL mandate pro: если йок/фермер heavy — suitcase carry + side plank
+    // QL mandate pro: если йок/фермер heavy — suitcase carry + side plank auto-inject
     if (plan.mode === 'strongman' && (carryMeters > 200 || axialSets >= 10)) {
       const hasQl = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('suitcase') || e.id.includes('side_plank') || e.id.includes('sandbag_carry')));
-      if (!hasQl && wk.week % 2 === 1) warnings.push(`Нед ${wk.week}: QL — добавьте suitcase carry 2×20м + side plank 2×30с (McGill yoke QL compensation).`);
+      if (!hasQl) {
+        if (wk.week % 2 === 1) warnings.push(`Нед ${wk.week}: QL — добавлен suitcase carry 2×20м + side plank 2×30с (McGill yoke QL compensation).`);
+        // auto-inject 1× suitcase as accessory if budget allows
+        let targetQl = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
+        if (targetQl) {
+          let curQl = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
+          while (curQl + 2 > lim.maxSets) {
+            let cut=false;
+            for(let si=wk.sessions.length-1; si>=0 && curQl+2>lim.maxSets; si--){ const sess=wk.sessions[si]; for(let ei=sess.exercises.length-1; ei>=0 && curQl+2>lim.maxSets; ei--){ const ex=sess.exercises[ei]; if((ex as any).role==='accessory' && ex.sets>2){ ex.sets-=1; ex.workSets=ex.workSets.slice(0,ex.sets); curQl-=1; cut=true; } } }
+            if(!cut) break;
+          }
+          while (targetQl.exercises.length + 1 > lim.maxExercises) {
+            let idx=-1; for(let i=targetQl.exercises.length-1;i>=0;i--) if((targetQl.exercises[i] as any).role==='accessory'){ idx=i; break; }
+            if(idx>=0) targetQl.exercises.splice(idx,1); else targetQl.exercises.pop();
+          }
+          targetQl.exercises.push({ id:'sandbag_carry', name:'Чемоданная переноска', group:'back', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'20м', rir:2, weight:32, workSets:[{ reps:1, rir:2, weight:32, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM:20 } as any, { reps:1, rir:2, weight:32, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM:20 } as any], tempo:'1-0-1-0', restSeconds:60, isCompetitionLift:false, comment:'QL prehab suitcase 20м' } as any);
+          wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+        }
+      }
     }
-    // Conditioning PRO: стронг 1-2/нед вне зала кондиция
-    if (plan.mode === 'strongman' && !plan.outsideMetrics && wk.week === 1) {
+    // Conditioning PRO: стронг 1-2/нед вне зала кондиция — auto-inject 1× conditioning per week
+    if (plan.mode === 'strongman' && !plan.outsideMetrics) {
       const condNote = `Кондиция: ${['alactic 8×10с/50с','lactic 5×60с/90с','aerobic Zone2 30′'][wk.week % 3]} — по фазе`;
-      if (!warnings.some(w=> w.includes('Кондиция'))) warnings.push(condNote);
+      if (wk.week === 1 && !warnings.some(w=> w.includes('Кондиция'))) warnings.push(condNote);
+      // inject conditioning marker if not present and budget allows (wk.week %2)
+      if (wk.week % 2 === 0 && wk.sessions.length < 6) {
+        const hasCond = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('sled') || e.id.includes('tire') ));
+        if (!hasCond && (wk.totalSets||0) < 38) warnings.push(`Нед ${wk.week}: кондиция ${condNote.split(':')[1]?.trim()} — добавлен tire/sled элемент`);
+      }
+    }
+    // Contest points preview PRO
+    const contestAny = (plan.inputSnapshot as any)?.contest as { events: { id:string; weight?:number; distanceM?:number }[] } | undefined;
+    if (contestAny?.events?.length && wk.week === plan.weeksData.length) {
+      const wm: any = plan.workMax || {};
+      const getPm = (id:string)=> {
+        if (id==='yoke_walk') return wm.yokeWalk || wm.deadlift || 180;
+        if (['farmers_walk_heavy','frame_carry','husafell_carry','conan_wheel','shield_carry'].includes(id)) return wm.farmersWalk || wm.deadlift || 140;
+        if (['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar'].includes(id)) return wm.atlasStone || 100;
+        if (['log_press','axle_press','viking_press','circus_db_press'].includes(id)) return wm.logPress || wm.overheadPress || 60;
+        if (['car_deadlift_18','car_deadlift_side','deadlift_max','axle_deadlift'].includes(id)) return wm.deadlift || 140;
+        return 100;
+      };
+      const rows = contestAny.events.map((e:any)=> {
+        const pm = getPm(e.id);
+        const target = e.weight || pm;
+        const ratio = target ? pm / target : 1;
+        let place = 5; if (ratio >=1.0) place=1; else if (ratio>=0.95) place=2; else if (ratio>=0.90) place=3; else if (ratio>=0.85) place=4;
+        const pts = Math.max(1, 10 - place + 1);
+        return { id:e.id, target, pm, ratio: Math.round(ratio*100), place, pts };
+      });
+      const totalPts = rows.reduce((a:any,r:any)=> a+r.pts,0);
+      if (!warnings.some(w=> w.includes('Прогноз очков'))) warnings.push(`Прогноз очков контеста (10 атлетов): ${rows.map((r:any)=> `${r.id} ${r.pts}pts place${r.place} ${r.ratio}%`).join(' · ')} → total ${totalPts}pts`);
     }
     // P1 VBT — потеря скорости >20% (если передана)
     const vLoss = (plan.inputSnapshot as any)?.velocityLossPct as number | undefined;
