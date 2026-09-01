@@ -663,7 +663,7 @@ export function getPerMuscleTaperMult(muscle: string, weekIdx: number): number {
   return arr[Math.min(weekIdx, arr.length - 1)] ?? 0.60;
 }
 
-export function buildTrainingTaper(cfg: BBContestPrepConfig): TrainingTaperWeek[] {
+export function buildTrainingTaper(cfg: BBContestPrepConfig, opts?: { volumeMult?: number }): TrainingTaperWeek[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
   const eff = applyForcedModes(cfg);
@@ -672,16 +672,75 @@ export function buildTrainingTaper(cfg: BBContestPrepConfig): TrainingTaperWeek[
     : getPeakingProtocol(eff.trainingProtocol).weeks;
   const selected = source.slice(-eff.weeksOut);
   const n = selected.length;
+  const vm = Number(opts?.volumeMult) && (opts?.volumeMult as number) > 0 ? Math.min(1, opts!.volumeMult as number) : 1;
   return selected.map((w, i) => ({
     weekOffset: -(n - i),
     label: w.label,
-    volumePct: w.volumePct,
+    volumePct: w.volumePct * vm,
     intensityPct: w.intensityPct,
     rirMin: w.rirMin,
     rirMax: w.rirMax,
     focus: w.focus,
     deloadBefore: w.deloadBefore,
   }));
+}
+
+/**
+ * Фаза 3.12: адаптивный тапер по усталости/ACWR/sRPE (аналог PL lms-taper-coach).
+ * Раньше длительность тапера была жёстко cfg.weeksOut (1-4). Теперь рекомендация
+ * удлиняет тапер/снижает объём при высокой усталости, ACWR danger, sRPE-перегрузке.
+ */
+export interface BBTaperRecommendation {
+  weeksOut: number;
+  volumeMult: number;
+  reasons: string[];
+}
+
+/** sRPE (Foster): монотонность = mean/sd, strain = mean × n. */
+export function sRPEAdjustment(sessions?: Array<{ sRPE?: number }>): { monotony: number; strain: number; mean: number } {
+  if (!sessions || sessions.length === 0) return { monotony: 0, strain: 0, mean: 0 };
+  const rpes = sessions.map(s => Number(s.sRPE)).filter(r => Number.isFinite(r) && r > 0);
+  if (rpes.length < 3) return { monotony: 0, strain: 0, mean: 0 };
+  const mean = rpes.reduce((a, b) => a + b, 0) / rpes.length;
+  const variance = rpes.reduce((a, b) => a + (b - mean) ** 2, 0) / rpes.length;
+  const sd = Math.sqrt(variance);
+  const monotony = sd > 0 ? mean / sd : (mean > 0 ? 2 : 0);
+  return { monotony: Math.round(monotony * 100) / 100, strain: Math.round(mean * rpes.length), mean: Math.round(mean * 100) / 100 };
+}
+
+export function recommendBBTaperConfig(input: {
+  fatigue?: number;
+  acwrRatio?: number;
+  recentSessions?: Array<{ sRPE?: number }>;
+  baseWeeksOut?: number;
+}): BBTaperRecommendation {
+  const reasons: string[] = [];
+  let weeksOut = Math.min(4, Math.max(1, Math.round(input.baseWeeksOut ?? 2)));
+  let volumeMult = 1;
+  const fatigue = Number(input.fatigue);
+  if (Number.isFinite(fatigue)) {
+    if (fatigue >= 80) { weeksOut = Math.max(weeksOut, 3); reasons.push('Высокая усталость — taper 3 нед'); }
+    else if (fatigue >= 60) { weeksOut = Math.max(weeksOut, 2); reasons.push('Умеренная усталость — taper ≥2 нед'); }
+  }
+  const acwr = Number(input.acwrRatio);
+  if (Number.isFinite(acwr)) {
+    if (acwr > 1.5) { weeksOut = Math.max(weeksOut, 3); volumeMult *= 0.85; reasons.push(`ACWR ${acwr.toFixed(2)} — опасная зона: taper удлинён, объём −15%`); }
+    else if (acwr > 1.3) { weeksOut = Math.max(weeksOut, 3); reasons.push(`ACWR ${acwr.toFixed(2)} — зона осторожности: taper 3 нед`); }
+    else if (acwr < 0.8) { weeksOut = Math.min(weeksOut, 2); reasons.push(`ACWR ${acwr.toFixed(2)} — недогруз: taper 2 нед`); }
+  }
+  const srpe = sRPEAdjustment(input.recentSessions);
+  // Высокая монотонность при высокой интенсивности (RPE ≥ 8) или большой strain → перегрузка.
+  if (srpe.strain > 200 || (srpe.monotony >= 2 && srpe.mean >= 8)) {
+    weeksOut = Math.max(weeksOut, 3);
+    volumeMult *= 0.9;
+    reasons.push(`sRPE: mean ${srpe.mean}, monotony ${srpe.monotony} — перегрузка: taper 3 нед, объём −10%`);
+  }
+  return { weeksOut: Math.min(4, Math.max(1, weeksOut)), volumeMult, reasons };
+}
+
+/** Применить адаптивную рекомендацию к конфигу тапера (для UI-применения). */
+export function applyAdaptiveTaper(cfg: BBContestPrepConfig, rec: BBTaperRecommendation): BBContestPrepConfig {
+  return { ...cfg, weeksOut: rec.weeksOut };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1016,9 +1075,162 @@ export function buildShowTimeline(cfg: BBContestPrepConfig): ShowTimelineItem[] 
   }));
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Готовность (bodyFat vs цель категории)
-// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Фаза 3.13: последний тяжёлый день + прайминг для ББ (аналог PL LAST_HEAVY_DAYS).
+ * ББ-тапер раньше имел только мягкую деплецию 60% без координаты последней тяжёлой
+ * сессии и без прайминга. Здесь:
+ *  - определяем последнюю тяжёлую сессию крупных групп в окне тапера (до пик-недели);
+ *  - для D-2/D-1 добавляем прайминг-сеты 50-70% (3×3-5) на паттерн дня — CNS-активация
+ *    без утомления (Pritchett 2009).
+ */
+export interface LastHeavyCoord {
+  weekOffset: number;
+  sessionIndex: number;
+  character: string;
+  totalWorkingSets: number;
+}
+export function coordinateLastHeavyDay(plan: BBPlan): LastHeavyCoord | null {
+  if (!plan?.weeks?.length) return null;
+  let best: LastHeavyCoord | null = null;
+  plan.weeks.forEach((w, wi) => {
+    if (w.peakWeek) return;
+    (w.sessions || []).forEach((s, si) => {
+      if (s.character !== 'тяж') return;
+      const working = s.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((a, e) => a + (e.sets || 0), 0);
+      if (!best || working >= best.totalWorkingSets) {
+        best = { weekOffset: w.week ?? wi, sessionIndex: si, character: s.character, totalWorkingSets: working };
+      }
+    });
+  });
+  return best;
+}
+
+/**
+ * Фаза 3.13: добавить прайминг-сеты (50-70% от workMax, 3×3-5, RIR 3) в последние
+ * 2 сессии перед шоу (D-2/D-1). НЕ добавляет новые упражнения — прикрепляет прайминг
+ * к существующему primary упражнению сессии как отдельные лёгкие сеты.
+ */
+export function addPeakPriming(plan: BBPlan, workMax: Record<string, number>): { plan: BBPlan; added: number } {
+  if (!plan?.weeks?.length) return { plan, added: 0 };
+  let added = 0;
+  const weeks = plan.weeks.map(w => {
+    if (!w.peakWeek) return w;
+    const sessions = w.sessions.map((s, si) => {
+      // Последние 2 сессии пик-недели (D-2/D-1), которые не отдых.
+      const restOfWeeks = w.sessions.length;
+      if (si < restOfWeeks - 2) return s;
+      const primable = (s.exercises || []).find((e: any) => !(e as any).warmupActivator && (e as any).role === 'primary');
+      if (!primable) return s;
+      const muscle = (primable as any).muscle || 'chest';
+      const wm = workMax[muscle] || 80;
+      const primeWeight = Math.max(20, Math.round(wm * 0.6 / 2.5) * 2.5);
+      // Дробим: прайминг-сеты 3×3-5 лёгкие, добавляем в начало (CNS-активация).
+      const exercises = [
+        {
+          ...(primable as any),
+          name: (primable as any).name,
+          muscle,
+          role: 'primary',
+          character: s.character,
+          sets: 3,
+          repsRange: [3, 5] as [number, number],
+          rir: 3,
+          tempoSpec: '2-0-1-0',
+          restSeconds: 90,
+          warmupActivator: false,
+          priming: true,
+          comment: `🧠 Прайминг (D-${restOfWeeks - si}): ${primeWeight} кг 3×3-5 @50-70% 1RM, RIR 3 — CNS-активация без утомления`,
+          workSets: Array.from({ length: 3 }, () => ({ reps: 4, rir: 3, weight: primeWeight, tempo: '2-0-1-0', restSeconds: 90 })),
+        },
+        ...s.exercises,
+      ];
+      added++;
+      return { ...s, exercises };
+    });
+    return { ...w, sessions };
+  });
+  return { plan: { ...plan, weeks }, added };
+}
+
+/**
+ * Фаза 3.18: двух-шоу секвенирование + overreach-неделя перед тапером.
+ * - overreach: неделя ПЕРЕД началом тапера получает +10-15% объёма (суперкомпенсация,
+ *   фаза функционального overreaching → отвечает на тапер);
+ * - возвращает массив тапер-окон по числу шоу (applyTrainingTaperToBBPlan и так
+ *   идемпотентен per-week — координируем только overreach-вставку).
+ */
+export function planTwoShowSequence(
+  plan: BBPlan,
+  shows: Array<{ weekNumber: number }>,
+  opts?: { overreachPct?: number },
+): { plan: BBPlan; applied: number; notes: string[] } {
+  if (!plan?.weeks?.length || !shows?.length) return { plan, applied: 0, notes: [] };
+  const overreachMult = 1 + (opts?.overreachPct ?? 0.12);
+  const applied: number[] = [];
+  const notes: string[] = [];
+  const weeks = plan.weeks.map((w, wi) => {
+    // Overreach-неделя = за 2 недели до шоу (одна неделя перед taper-окном).
+    if (shows.some(s => s.weekNumber === wi + 3)) {
+      if ((w as any).deload || String((w as any).phase || '').toLowerCase() === 'deload') return w;
+      applied.push(wi + 1);
+      return {
+        ...w,
+        sessions: w.sessions.map(s => ({
+          ...s,
+          exercises: s.exercises.map((e: any) => {
+            if ((e as any).warmupActivator || (e as any).priming) return e;
+            const newSets = Math.max(2, Math.round((e.sets || 0) * overreachMult));
+            return { ...e, sets: newSets, workSets: (e.workSets || []).slice(0, newSets), comment: (e.comment || '') + ` | ⚡ Overreach перед тапером ×${overreachMult.toFixed(2)}` };
+          }),
+        })),
+      };
+    }
+    return w;
+  });
+  if (applied.length) notes.push(`Overreach-недели перед тапером: ${applied.join(', ')} (объём ×${overreachMult.toFixed(2)})`);
+  return { plan: { ...plan, weeks }, applied: applied.length, notes };
+}
+
+
+/**
+ * Фаза 3.15: плавный pre-taper водно-натриевый каскад (7 дней до пик-недели).
+ * Для tapered/back вместо резкого скачка на D-7 (peak-day-1 высокая вода) —
+ * постепенная линейная рампа от базовой гидратации к целям дня 1 пик-недели.
+ * Возвращает 7 дневных целей воды (л) и натрия (мг).
+ */
+export interface PreTaperCascadeDay {
+  day: number;
+  waterLiters: number;
+  sodiumMg: number;
+}
+export function buildPreTaperCascade(
+  cfg: BBContestPrepConfig,
+  opts?: { baselineWaterL?: number; baselineSodiumMg?: number; rampDays?: number },
+): PreTaperCascadeDay[] {
+  const peak = buildPeakWeek(cfg);
+  if (!peak || peak.length < 7) return [];
+  const targetWater = peak[0].waterLiters;
+  const targetNa = peak[0].sodiumMg;
+  const baseWater = opts?.baselineWaterL ?? 3.0;
+  const baseNa = opts?.baselineSodiumMg ?? 2800;
+  const rampDays = Math.min(7, Math.max(1, opts?.rampDays ?? 7));
+  const canonWater = canonicalWaterStrategy(cfg.waterStrategy);
+  const smooth = canonWater === 'tapered' || canonWater === 'high';
+  const out: PreTaperCascadeDay[] = [];
+  for (let i = 0; i < 7; i++) {
+    // t от 0 (день 1) к 1 (последний день пре-тапера).
+    const t = (i + 1) / 7;
+    if (smooth && i < rampDays) {
+      // Плавная рампа к целям дня 1 пик-недели.
+      const w = round1(baseWater + (targetWater - baseWater) * t);
+      const na = Math.round(baseNa + (targetNa - baseNa) * t);
+      out.push({ day: i + 1, waterLiters: w, sodiumMg: na });
+    } else {
+      out.push({ day: i + 1, waterLiters: baseWater, sodiumMg: baseNa });
+    }
+  }
+  return out;
+}
 
 export function computeReadiness(cfg: BBContestPrepConfig): BBContestPrepResult['readiness'] {
   const profile = CATEGORY_PROFILES[cfg.category];
