@@ -104,7 +104,7 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
-import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue } from '../../../engines/bb/bb-visual.engine';
+import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants, buildBBFitnessFatigue, buildBBMesocycleTable } from '../../../engines/bb/bb-visual.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -5083,6 +5083,16 @@ export const BbAutoConstructor: React.FC = () => {
                 <span><span style={{ color: '#ef4444' }}>■</span> {'>'} MRV</span>
               </div>
               {taper.length > 0 && <div style={{ fontSize: 11, color: '#fff' }}>📉 Кривая тапера (финальные недели): {taper.map(t => `${t.label}: ${Math.round(t.volumePct * 100)}% · RIR ${t.rir[0]}-${t.rir[1]}`).join(' → ')}</div>}
+              <div style={{ fontSize: 11, color: '#fff' }}>📋 Вся таблица мезоцикла (неделя × день × упражнение):</div>
+              <div style={{ overflowX: 'auto', scrollbarWidth: 'none', maxHeight: 320, overflowY: 'auto' }}>
+                <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: 520 }}>
+                  <thead><tr style={{ position: 'sticky', top: 0, background: '#18181b' }}>
+                    <th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Нед</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Фаза</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>День</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Упражнение</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Мышца</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Сеты</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Повт</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Вес</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>RIR</th></tr></thead>
+                  <tbody>{buildBBMesocycleTable(plan).map((r, ri) => r.exercises.map((ex, xi) => (
+                    <tr key={`${ri}-${xi}`}><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', color: BB_PHASE_COLOR[r.phase] || '#fff' }}>{r.week}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{BB_PHASE_LABEL_RU[r.phase] || r.phase}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{r.day}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{ex.name}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{ex.muscle}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.sets}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.reps}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.weight}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.rir}</td></tr>
+                  )))}</tbody>
+                </table>
+              </div>
               <div style={{ fontSize: 11, color: '#fff' }}>⚡ Прогноз утомления fitness–fatigue (Banister):</div>
               <FFChart series={buildBBFitnessFatigue(plan, { startDate: startDateInput || undefined })} />
             </div>;
