@@ -61,6 +61,7 @@ export default function TrainingIntelligenceDashboard(p: Props) {
       tools: [
         { icon: '⭐', label: 'Качество', desc: '0-100 + MEV/MAV/MRV, проверка программы', tab: 'quality_hub' as any },
         { icon: '🔬', label: 'Диагностика', desc: 'Мастер движения 9 лифтов + видео + срывы (дневник)', tab: 'diagnostics_hub' as any },
+        { icon: '🤝', label: 'Арм-диагностика', desc: 'PRO арм: 8 движений × РУ/РА, хват, tendon, humerus → в Арм-конструктор', tab: 'arm_diagnostics_hub' as any },
       ],
     },
     {

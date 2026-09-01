@@ -3,7 +3,7 @@
  * Изолирован, как BbAutoConstructor, но для arm-движка.
  * 6 шагов: params → grip → split → plan → quality → export.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { buildArmPlan } from '../../../engines/arm/arm-builder.engine';
 import { finalizeArmPlan } from '../../../engines/arm/arm-finalize.engine';
 import { rankArmSplits, selectBestArmSplit } from '../../../engines/arm/arm-selector.engine';
@@ -19,6 +19,7 @@ import { ArmGripCard } from './ArmGripCard';
 import { ArmHeatmap } from './ArmHeatmap';
 import { CARD, H, SMALL, BTN, BTN_GHOST, ACCENT, STEP_PILL } from './training-ui';
 import { useDataLink } from '../../../core/data-link';
+import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 
 type Step = 'params'|'grip'|'split'|'plan'|'quality';
 
@@ -77,6 +78,29 @@ export function ArmAutoConstructor() {
       return wm;
     } catch { return {}; }
   }, [linked]);
+
+  // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор)
+  useEffect(() => {
+    const apply = (payload: any) => {
+      if (!payload || payload.kind !== 'weakpoints') return;
+      const groups: string[] | undefined = payload.data?.groups;
+      if (Array.isArray(groups) && groups.length > 0) {
+        setWeakPoints(groups.slice(0, 2).map((s: string) => String(s).toLowerCase()));
+        setSpecialization(true);
+        setStep('params');
+        flash(`↩ Из диагностики: ${groups.join(', ')}`);
+      }
+      const tech = payload.data?.armTechnique;
+      if (tech) setTechnique(String(tech));
+    };
+    // начальный снимок (если хаб уже отправил до монтирования)
+    try {
+      const cur = getPlannerApply();
+      if (cur) apply(cur);
+    } catch {}
+    const unsub = subscribePlannerApply((p) => { try { apply(p); } catch {} });
+    return () => { try { unsub(); } catch {} };
+  }, []);
 
   const ranked = useMemo(() => {
     return rankArmSplits({ level, goal: goal as any, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization });

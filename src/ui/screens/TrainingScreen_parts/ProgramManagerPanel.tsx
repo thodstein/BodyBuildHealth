@@ -121,8 +121,8 @@ function timeAgo(iso?: string): string {
   return `${Math.floor(mo / 12)} г назад`;
 }
 
-const DIR_COLOR: Record<string, string> = { bb: '#00e68a', pl: '#a78bfa', hybrid: '#3b82f6' };
-const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hybrid' };
+const DIR_COLOR: Record<string, string> = { bb: '#00e68a', pl: '#a78bfa', hybrid: '#3b82f6', arm: '#f59e0b' };
+const DIR_LABEL: Record<string, string> = { bb: 'ББ', pl: 'ПЛ', hybrid: 'Hybrid', arm: 'АРМ' };
 const SOURCE_LABEL: Record<string, string> = {
   custom: 'своя', cloned_library: 'из библиотеки', cloned_cycle: 'клон цикла', from_build: 'из сборки',
 };
