@@ -184,6 +184,11 @@ export interface BBBuilderInput {
    *  Если передан, buildBBPlan извлекает из него: peak-week веса → стартовые веса +2.5-5кг,
    *  список упражнений → ротация (избегаем повторов), per-muscle volume → +1-2 сета. */
   previousPlan?: BBPlan;
+  /** Фаза 2.7: cooldown-история упражнений (имена + паттерны), недавно
+   *  использованных в прошлых планах/дневнике. Подаётся в buildSession как
+   *  ротационное «понижение приоритета» (мягкое избегание повторов в течение
+   *  cooldown-окна), совместимо с cross-meso rotation. */
+  cooldownHistory?: Array<{ exerciseName: string; pattern?: string }>;
   /** Суперсеты-антагонисты (грудь↔спина, бицепс↔трицепс, квадры↔хамсы). */
   supersetMode?: 'none' | 'antagonist' | 'same_muscle' | 'giant';
   /** Схема объёма памп-изоляций: GVT 10×10 / FST-7 / 8×8 Gironda. */
@@ -3027,6 +3032,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       if (mesoProgression) {
         for (const name of mesoProgression.previousExercises) {
           if (!rotationNames.includes(name)) rotationNames.push(name);
+        }
+      }
+      // Фаза 2.7: cooldown-история из прошлых планов/дневника — те же мягкие
+      // имена ротации, что и cross-meso (избегаем повторов в cooldown-окне).
+      if (Array.isArray(input.cooldownHistory)) {
+        for (const c of input.cooldownHistory) {
+          const n = c?.exerciseName;
+          if (n && !rotationNames.includes(n)) rotationNames.push(n);
         }
       }
       // Solo-дни (1-2 группы мышц): увеличиваем бюджет на 50% — вся энергия дня идёт на эти мышцы
