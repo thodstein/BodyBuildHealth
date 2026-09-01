@@ -875,24 +875,44 @@ export const StrengthSportConstructor: React.FC = () => {
           })}
 
           {annual && (
+            <>
             <SectionCard icon="🗓️" title="Годовой план" subtitle={`${annual.totalWeeks} нед · ${annual.blocks.length} блоков · синхронизация Stark`} >
               <CardHeader icon="🗓️" title={`Годовой · ${annual.totalWeeks} нед`} subtitle={`${annual.blocks.length} блоков · ${plan.weeks} нед текущий`} />
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
                 {annual.blocks.map((b:any) => {
                   const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';
-                  return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontSize:10, fontWeight:700, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}</Highlight>: {ruLabel(MODE_RU, b.mode)} ×{b.weeks}</span>;
+                  return <span key={b.id} style={{ padding:'5px 8px', borderRadius:10, background:`${col}12`, border:`0.5px solid ${col}22`, color:col, fontSize:10, fontWeight:700, fontVariantNumeric:'tabular-nums' }}><Highlight color={col}>Нед {b.startWeek}-{b.startWeek+b.weeks-1}</Highlight>: {ruLabel(MODE_RU, b.mode)} ×{b.weeks}{b.competitionDate ? ' 🏁' : ''}</span>;
                 })}
               </div>
               <div style={{ display:'flex', height:16, borderRadius:10, overflow:'hidden', border:'0.5px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.18)' }}>
                 {annual.blocks.map((b:any)=> {
                   const w = (b.weeks/annual.totalWeeks*100).toFixed(1);
                   const col = b.mode==='weightlifting'?'#30d158': b.mode==='strongman'?'#ff9f0a':'#0a84ff';
-                  return <div key={b.id} title={`${b.mode} ${b.weeks}нед`} style={{ width: `${w}%`, background: col, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color: b.mode==='weightlifting'?'#06281c':'#fff', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{b.weeks}</div>;
+                  const grad = b.competitionDate ? `linear-gradient(90deg, ${col}, #fff)` : col;
+                  return <div key={b.id} title={`${b.mode} ${b.weeks}нед${b.competitionDate?` · 🏁 ${b.competitionDate}`:''}`} style={{ width: `${w}%`, background: grad, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, color: b.mode==='weightlifting'?'#06281c':'#fff', fontWeight:700, fontVariantNumeric:'tabular-nums' }}>{b.weeks}</div>;
                 })}
               </div>
               <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:TEXT_3 }}><span>Нед 1</span><span>Нед {annual.totalWeeks}</span></div>
               <div style={{ fontSize:11, color:'rgba(235,235,245,0.60)', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>Синхронизация: <Highlight>he_strength_annual_sync_v1</Highlight> · годовой доступен в дневнике и общем плане</div>
             </SectionCard>
+            {plan.mode==='strongman' && (
+              <SectionCard icon="🗓️" title="Сезон — Multi-peak (PRO)" subtitle="GPP 4w + 2×camp 8-12w + transition 2w (season planner)" >
+                <GroupHeading icon="🏁" text="Сезон 2 пика" desc="GPP + camp→пик + transition + camp→пик — backend готов, фронт Season Planner"/>
+                <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+                  <span style={{ fontSize:11, color:TEXT_2 }}>GPP</span><input type="number" value={4} style={{ width:56, ...INPUT, padding:'6px 8px', fontSize:11, textAlign:'center' }} readOnly />
+                  <span style={{ fontSize:11, color:TEXT_2 }}>Transition</span><input type="number" value={2} style={{ width:56, ...INPUT, padding:'6px 8px', fontSize:11, textAlign:'center' }} readOnly />
+                  <button onClick={()=>{
+                    try{
+                      const p2 = buildStrengthSportPlan({ mode:'strongman', goal:'peaking', level, weeks:6, daysPerWeek: days, workMax, competitionDate, startDate: new Date().toISOString().slice(0,10), contest, contestStrategy } as any);
+                      const ann2 = buildAnnualMultiPeak([plan, p2], { competitions: [{date: competitionDate || new Date(Date.now()+ 60*86400000).toISOString().slice(0,10)}, {date: new Date(Date.now()+ 150*86400000).toISOString().slice(0,10)}], gppWeeks:4, transitionWeeks:2 });
+                      saveAnnualSS(ann2); setAnnual(ann2); setMsg('✦ Сезон 2 пика собран'); setTimeout(()=>setMsg(''),2200);
+                    }catch{}
+                  }} style={{ ...BTN_SMALL, background:'linear-gradient(135deg, #f59e0b, #ef4444)', color:'#fff', border:'none' }}>✦ Собрать сезон 2 пика</button>
+                </div>
+                <InfoBanner tone="strong">Multi-peak: GPP 4w + peak1 ({plan.weeks}w) + trans 2w + peak2 6w — {annual.totalWeeks}w → ~{annual.totalWeeks+8}w сезон</InfoBanner>
+              </SectionCard>
+            )}
+            </>
           )}
 
           <SectionCard icon="📤" title="Экспорт и шаринг" subtitle="Печать · CSV/XLS · ICS · дайджест · в программу">

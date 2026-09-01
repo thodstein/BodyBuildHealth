@@ -826,12 +826,23 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
             techniqueNote = techniqueNote ? `${techniqueNote} · ${carryNote}` : carryNote;
           }
         }
-        // Платформа для stones
-        if (['atlas_stone_load','atlas_stone_over_bar','sandbag_over_bar','keg_over_bar','natural_stone_shoulder'].includes(id)) {
+        // Платформа для stones + разворот
+        if (['atlas_stone_load','atlas_stone_over_bar','sandbag_over_bar','keg_over_bar','natural_stone_shoulder','sandbag_load','keg_load'].includes(id)) {
           const ceStone = contest?.events?.find((e:any)=> e.id === id);
           if (ceStone?.heightCm) {
             const hNote = `платформа ${ceStone.heightCm}см`;
             techniqueNote = techniqueNote ? `${techniqueNote} · ${hNote}` : hNote;
+          }
+          if (ceStone?.turn) {
+            const tNote = `разворот 180°`;
+            techniqueNote = techniqueNote ? `${techniqueNote} · ${tNote}` : tNote;
+          }
+        }
+        if (isCarryEvent(id)) {
+          const ceCarry = contest?.events?.find((e:any)=> e.id === id);
+          if (ceCarry?.turn) {
+            const tNote = `разворот 180°`;
+            if (!techniqueNote?.includes('разворот')) techniqueNote = techniqueNote ? `${techniqueNote} · ${tNote}` : tNote;
           }
         }
         // medley hint for event_day with multiple carries

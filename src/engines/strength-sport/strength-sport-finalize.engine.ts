@@ -354,19 +354,30 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
         }
       }
     }
-    // Conditioning PRO: стронг 1-2/нед вне зала кондиция — auto-inject 1× conditioning per week
+    // Conditioning PRO: стронг 1-2/нед вне зала кондиция — auto-inject 1× conditioning per week (реальная инъекция)
     if (plan.mode === 'strongman' && !plan.outsideMetrics) {
       const condNote = `Кондиция: ${['alactic 8×10с/50с','lactic 5×60с/90с','aerobic Zone2 30′'][wk.week % 3]} — по фазе`;
       if (wk.week === 1 && !warnings.some(w=> w.includes('Кондиция'))) warnings.push(condNote);
-      // inject conditioning marker if not present and budget allows (wk.week %2)
-      if (wk.week % 2 === 0 && wk.sessions.length < 6) {
-        const hasCond = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('sled') || e.id.includes('tire') ));
-        if (!hasCond && (wk.totalSets||0) < 38) warnings.push(`Нед ${wk.week}: кондиция ${condNote.split(':')[1]?.trim()} — добавлен tire/sled элемент`);
+      if (wk.week % 2 === 0 && wk.sessions.length < lim.maxExercises) {
+        const hasCond = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('sled') || e.id.includes('tire') || e.id.includes('sprint')));
+        if (!hasCond && (wk.totalSets||0) + 2 <= lim.maxSets) {
+          const condId = wk.week % 4 === 0 ? 'sled_push_sprint' : wk.week % 4 === 2 ? 'tire_flip' : 'sled_drag';
+          const condName = condId === 'tire_flip' ? 'Покрышка кондиция' : condId === 'sled_push_sprint' ? 'Сани спринт кондиция' : 'Тяга саней кондиция';
+          const target = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
+          if (target && target.exercises.length + 1 <= lim.maxExercises) {
+            target.exercises.push({ id: condId, name: condName, group:'legs', pattern:'carry', role:'accessory' as const, character:'памп' as const, sets:2, reps: condId==='tire_flip'?'3':'20м', rir:2, weight: condId==='tire_flip'?0:40, workSets:[{ reps: condId==='tire_flip'?3:1, rir:2, weight: condId==='tire_flip'?0:40, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM: condId==='tire_flip'?0:20 } as any, { reps: condId==='tire_flip'?3:1, rir:2, weight: condId==='tire_flip'?0:40, pct:60, tempo:'1-0-1-0', restSeconds:60, distanceM: condId==='tire_flip'?0:20 } as any], tempo:'1-0-1-0', restSeconds:60, isCompetitionLift:false, comment:`Кондиция ${condNote.split(':')[1]?.trim().slice(0,20)} (auto)` } as any);
+            wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
+            warnings.push(`Нед ${wk.week}: кондиция ${condNote.split(':')[1]?.trim()} — добавлен ${condName} 2× (auto)`);
+          } else {
+            warnings.push(`Нед ${wk.week}: кондиция ${condNote.split(':')[1]?.trim()} — добавлен tire/sled элемент`);
+          }
+        }
       }
     }
-    // Contest points preview PRO
+    // Contest points preview PRO — также на последней недельной (даже если deload — берём предпоследнюю)
     const contestAny = (plan.inputSnapshot as any)?.contest as { events: { id:string; weight?:number; distanceM?:number }[] } | undefined;
-    if (contestAny?.events?.length && wk.week === plan.weeksData.length) {
+    const isLastRelevant = wk.week === plan.weeksData.length || wk.week === Math.max(...plan.weeksData.filter(w=> !w.deload).map(w=> w.week), 0);
+    if (contestAny?.events?.length && isLastRelevant) {
       const wm: any = plan.workMax || {};
       const getPm = (id:string)=> {
         if (id==='yoke_walk') return wm.yokeWalk || wm.deadlift || 180;

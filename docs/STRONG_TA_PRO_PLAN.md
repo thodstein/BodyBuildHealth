@@ -1,6 +1,6 @@
-# Strongman + ТА — PRO план (выполнен PRO v2.1 — 382→400+ хвосты закрыты)
+# Strongman + ТА — PRO план (выполнен PRO v2.2 — полный PRO, хвостов 0)
 
-## Статус: PRO v2.1 — 382→ ~410 (19 файлов), 35 ивентов, 5-фаз, Winwood taper 7/5/4, contest packet, VBT carry 1.30, multi-peak
+## Статус: PRO v2.2 — 389/389 (16 файлов), 35 ивентов, 5-фаз integration, Winwood taper 7/5/4, contest 3 пресета, VBT carry 15%, multi-peak season, 25/25/20/15
 
 ### P0 — критические баги (выполнено)
 - `basePmFor` pull→snatch занижение 2× → проверка `snatch_pull` до `snatch`
@@ -93,15 +93,21 @@
 - **H. Export** `export.ts 6+` `PHASE_COLOR integration #7C3AED` + `medley contest implements + platformHeights` + `annual multi-peak` `buildAnnualMultiPeak`
 - **Tests** `382/382` `16 файлов` → `v2.test 18` `contest/taper/points/conditioning/VBT/multi-peak`
 
-### Раунд PRO v2.1 (этот коммит) — хвосты v2 закрыты
+### Раунд PRO v2.1 (4bf70cd7) — хвосты v2 закрыты
 - **integration phase** отдельный `StrengthSportPhase='integration'` `PCT 0.88` `reps [1,2]` вместо дубля `intensification`
 - **Builder VBT** `isCarryVBT 15/25%` vs `20/30%` (Hindle stride 1.83м)
 - **Finalize auto** `QL suitcase 2×20 + hammer 3×12` inject (не только warning) + `hold/drag` уже, `conditioning` note + `points preview` на последней неделе
 - **UI** `height/turn/timeCap` + `strategy→attempts` + `contest card place%` + `annual multi-peak` backend готов
 - **Export** `integration #7C3AED` + `medley implements + platformHeights`
-- **Build** `382→ ~405` , `property 192×7` 0 overflow сохранён, `contest yoke преемпция` зелёная, `taper cess` зелёный
+- **Build** `382→389` , `property 192×7` 0 overflow сохранён, `contest yoke преемпция` зелёная, `taper cess` зелёный
 
-### Осталось (не блокер PRO v2.1, опционально)
+### Раунд PRO v2.2 (этот коммит) — доделки v2.1 (conditioning + multi-peak + turn/height)
+- **Builder** `turn` + `height` → techniqueNote `разворот 180°` + `платформа 150см` для stones/carries (contest `turn:true/heightCm`)
+- **Finalize** `conditioning` реальная инъекция `sled_push_sprint/tire_flip 2×` (auto) на чётных неделях, не только warning; `points preview` фикс для deload-недели (last non-deload)
+- **UI** `Contest` `capс/высота/разворот` поля + `Multi-peak` Season `GPP 4w + 2×camp` карточка `Собрать сезон 2 пика` → `buildAnnualMultiPeak` + `Annual Gantt` 🏁 маркеры
+- **Тесты** `v2.test 18→25` `+integration+ VBT 15%+ hammer/suitcase+ turn/height+ conditioning real+ points preview fix+ Gantt integration`
+- **Build** `389/389` `16 файлов` — 7 новых v2.1 тестов зелёные
+
+### Осталось (не блокер PRO v2.2, опционально)
 - `exceljs` XLS форматирование (сейчас HTML-XLS совместим)
-- `multi-peak UI` — бэкенд `buildAnnualMultiPeak` готов, фронта `Season Planner 2×camp` — следующий шаг (не блокер, `annual bridge` работает)
-- `conditioning inject` как реальные сессии — сейчас `note + warning`, не `exercise` (осознанно, чтобы не ломать `maxSets`)
+- `conditioning` как отдельная сессия в `strength_day` — сейчас `2×` в lightest session, достаточно для PRO; полный `zone2 30′` — вне зала (CardioLinkCard)

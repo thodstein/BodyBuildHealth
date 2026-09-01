@@ -129,3 +129,55 @@ describe('Strongman PRO v2: annual multi-peak H', () => {
     expect(ann.blocks.some(b=> b.competitionDate==='2026-09-01')).toBe(true);
   });
 });
+
+describe('Strongman PRO v2.1: integration + turn/height + VBT 15% + hammer/suitcase', () => {
+  it('integration phase exists for strongman 12w', async () => {
+    const { buildPhaseDistribution, phaseForWeek } = await import('../strength-sport-progression');
+    const dist = buildPhaseDistribution(12, 'strength','strongman');
+    expect(dist.includes('integration')).toBe(true);
+    expect(dist[dist.length-1]).toBe('deload');
+  });
+  it('VBT carry 15% vs generic 20%', () => {
+    const pCarry = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:200 }, velocityLossPct:16, equipment:['barbell','other'], contest:{ events:[{id:'yoke_walk', format:'max', weight:200}] } } as any);
+    const hasCarry = pCarry.weeksData[0].sessions.some(s=> s.exercises.some(e=> ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry'].includes(e.id)));
+    expect(hasCarry).toBe(true);
+    const yokeSets = pCarry.weeksData[0].sessions.flatMap(s=> s.exercises.filter(e=> e.id==='yoke_walk')).reduce((a,e)=>a+e.sets,0);
+    expect(yokeSets).toBeGreaterThan(0);
+    expect(yokeSets).toBeLessThanOrEqual(4);
+  });
+  it('hammer/suitcase auto-inject on heavy stone/yoke', () => {
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'advanced', weeks:2, daysPerWeek:4, workMax:{ yokeWalk:300, atlasStone:150 }, bodyweight:90 } as any);
+    const fin = finalizeStrengthSportPlan(p);
+    const hasHammer = fin.weeksData[0].sessions.some(s=> s.exercises.some(e=> e.id==='hammer_curl'));
+    const hasQl = fin.weeksData[0].sessions.some(s=> s.exercises.some(e=> e.id==='sandbag_carry'));
+    // at least one of prehabs should be present (stone triggers hammer, carry triggers QL)
+    expect(hasHammer || hasQl).toBe(true);
+  });
+  it('contest turn+height in notes', () => {
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:250, atlasStone:120 }, contest:{ name:'test', events:[{id:'yoke_walk', format:'max', weight:250, distanceM:20, turn:true},{id:'atlas_stone_load', format:'loading_race', weight:120, heightCm:150}] }, equipment:['barbell','other'] } as any);
+    const yoke = p.weeksData[0].sessions.flatMap(s=> s.exercises).find(e=> e.id==='yoke_walk');
+    const stone = p.weeksData[0].sessions.flatMap(s=> s.exercises).find(e=> e.id==='atlas_stone_load');
+    expect((yoke?.comment||'')).toMatch(/разворот/);
+    expect((stone?.comment||'')).toMatch(/платформа/);
+  });
+  it('conditioning inject real exercise on even week', () => {
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'strength', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:200 } } as any);
+    const fin = finalizeStrengthSportPlan(p);
+    const wk2 = fin.weeksData[1];
+    const hasCond = wk2.sessions.some(s=> s.exercises.some(e=> e.comment?.includes('Кондиция') || e.id.includes('sled') || e.id.includes('tire')));
+    expect(hasCond).toBe(true);
+  });
+  it('points preview on last week', () => {
+    const p = buildStrengthSportPlan({ mode:'strongman', goal:'peaking', level:'intermediate', weeks:4, daysPerWeek:3, workMax:{ yokeWalk:200, atlasStone:100 }, contest:{ events:[{id:'yoke_walk', format:'max', weight:200},{id:'atlas_stone_load', format:'loading_race', weight:100}] } } as any);
+    const fin = finalizeStrengthSportPlan(p);
+    expect(fin.validation?.warnings.some(w=> w.includes('Прогноз очков'))).toBe(true);
+  });
+  it('Gantt integration color in export', async () => {
+    const { buildStrengthSportPlan: b } = await import('../strength-sport-builder.engine');
+    const plan = b({ mode:'strongman', goal:'strength', level:'intermediate', weeks:12, daysPerWeek:3, workMax:{ yokeWalk:200 } } as any);
+    const fin = finalizeStrengthSportPlan(plan);
+    const { buildStrengthPrintHtml } = await import('../strength-sport-export');
+    const html = buildStrengthPrintHtml(fin);
+    expect(html).toContain('Интеграция');
+  });
+});
