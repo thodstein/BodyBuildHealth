@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+﻿import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { createBlank } from '../../../../engines/user-program/program-store';
 import { linkDesignToProgram, designFingerprint } from '../../../../engines/periodization/designer-to-program';
 import {
@@ -412,5 +412,27 @@ describe('planner bridge � cardio handler (���� ���� � ��
     const patched = onChange.mock.calls[0][0];
     const day0 = patched.pl.customWeeks[0].days[0];
     expect(day0.exercises.filter((e: any) => e.name === 'Присед на ящик (box squat)').length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('planner bridge bb_nutrition handler (ББ-план → питание, Фаза 4.25)', () => {
+  const NKEY = 'he_bb_nutrition_note';
+  beforeEach(() => { try { localStorage.removeItem(NKEY); } catch { /* ignore */ } });
+
+  it('bb_nutrition: пишет заметку калоража/белка/трен-дней/объёма + toast', () => {
+    const ctx = context('bb');
+    expect(applyBridgePayloadDispatch(payload('bb_nutrition', { kcal: 2900, proteinG: 180, trainDays: [1,3,5], weeklySets: 44, splitId: 'ppl_6' }), ctx)).toBe(true);
+    expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('передан в питание'));
+    const note = JSON.parse(localStorage.getItem(NKEY) ?? 'null');
+    expect(note?.kcal).toBe(2900);
+    expect(note?.trainDays).toEqual([1,3,5]);
+    expect(note?.weeklySets).toBe(44);
+    expect(note?.text).toContain('ккал/день');
+  });
+
+  it('bb_nutrition: без данных — всё равно пишет заметку (нет падения)', () => {
+    const ctx = context('bb');
+    expect(applyBridgePayloadDispatch(payload('bb_nutrition', {}), ctx)).toBe(true);
+    expect(localStorage.getItem(NKEY)).not.toBeNull();
   });
 });

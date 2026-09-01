@@ -552,6 +552,36 @@ const annualBlockHandler: Handler = (payload, { onChange, showToast }) => {
 
 /** Ключ заметки «кардио → питание» (читается планировщиком питания/другими UI). */
 export const CARDIO_KCAL_NOTE_KEY = 'he_cardio_kcal_note';
+export const BB_NUTRITION_NOTE_KEY = 'he_bb_nutrition_note';
+
+/**
+ * handler kind='bb_nutrition': передаёт ББ-план в планировщик питания —
+ * калораж/белок (payload.kcal/proteinG), трен-дни недели для циклирования
+ * углеводов (payload.trainDays), недельный объём (weeklySets), сплит.
+ * Пишет заметку в localStorage (he_bb_nutrition_note) + копирует текст в буфер.
+ */
+const bbNutritionHandler: Handler = (payload, { showToast }) => {
+  const d = payload.data as { kcal?: number; proteinG?: number; trainDays?: number[]; weeklySets?: number; splitId?: string };
+  const kcal = typeof d?.kcal === 'number' ? d.kcal : undefined;
+  const proteinG = typeof d?.proteinG === 'number' ? d.proteinG : undefined;
+  const trainDays = Array.isArray(d?.trainDays) ? d.trainDays : [];
+  const weeklySets = typeof d?.weeklySets === 'number' ? d.weeklySets : undefined;
+  const trainDaysLabel = trainDays.length
+    ? `Трен-дни: ${trainDays.map(day => ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][day - 1] ?? day).join(', ')} — углеводы выше в трен-дни, ниже в отдых.`
+    : '';
+  const kcalLabel = kcal ? `Целевой калораж: ~${kcal} ккал/день.` : '';
+  const proteinLabel = proteinG ? `Белок: ~${proteinG} г/день.` : '';
+  const volumeLabel = weeklySets ? `Недельный объём: ${weeklySets} рабочих сетов.` : '';
+  const text = ['🍽 Питание для ББ-плана:', kcalLabel, proteinLabel, volumeLabel, trainDaysLabel].filter(Boolean).join('\n');
+  try {
+    localStorage.setItem(BB_NUTRITION_NOTE_KEY, JSON.stringify({
+      kcal, proteinG, trainDays, weeklySets, splitId: d?.splitId,
+      text, updatedAt: new Date().toISOString(),
+    }));
+  } catch { /* ignore */ }
+  try { navigator.clipboard?.writeText(text) } catch { /* ignore */ }
+  showToast(`🍽 ББ-план передан в питание: ${kcalLabel ? '~' + kcal + ' ккал · ' : ''}${proteinG ? proteinG + ' г белка · ' : ''}${trainDays.length ? trainDays.length + ' трен-дня/нед' : 'сплит'} (в буфер)`);
+};
 
 /**
  * handler kind='cardio': передаёт расход кардио в питание —
@@ -595,6 +625,7 @@ export const BRIDGE_HANDLERS: Record<string, Handler> = {
   macrocycle: macrocycleHandler,
   annual_block: annualBlockHandler,
   cardio: cardioHandler,
+  bb_nutrition: bbNutritionHandler,
 };
 
 /** Apply a bridge payload using the dispatch table. Returns true if a handler matched.

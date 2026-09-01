@@ -44,7 +44,7 @@ import { loadSessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { autoRegulate, shouldTrainToday } from '../../../engines/pro/autoregulation-pro.engine';
 import { loadTrainingProfile, saveTrainingProfile, type TrainingProfile } from './training-profile';
-import { subscribePlannerApply } from './planner-bridge';
+import { subscribePlannerApply, applyToPlanner } from './planner-bridge';
 import { loadAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
 import { activeBlockForWeek, weekForDate } from '../../../engines/annual-training/block-builders.engine';
 import type { AnnualTrainingPlan } from '../../../engines/annual-training/annual-training.types';
@@ -2266,6 +2266,27 @@ export const BbAutoConstructor: React.FC = () => {
     const hmHtml = hmMuscles.length ? `<h2 style="font-size:14px;margin:16px 0 4px">🧬 Heatmap «мышца × неделя»</h2><table style="border-collapse:collapse;font-size:10px"><tr><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">Мышца</th>${hmWeeks.map(ww => `<th style="border:1px solid #ddd;padding:3px 6px">Нед ${ww}</th>`).join('')}</tr>${hmMuscles.map(m => `<tr><td style="border:1px solid #ddd;padding:3px 6px">${esc(m)}</td>${hmWeeks.map(ww => { const c = hm.find(h => h.muscle === m && h.week === ww); return `<td style="border:1px solid #ddd;text-align:center;background:${c ? hmColor[c.status] : '#fafafa'}">${c ? c.sets : ''}</td>`; }).join('')}</tr>`).join('')}</table>` : '';
     w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${weeksHtml}${hmHtml}<script>window.print()</script></body></html>`);
     w.document.close();
+  };
+
+  /** Фаза 4.25: передать ББ-план в планировщик питания (калораж/белок/трен-дни/объём). */
+  const handleSendToNutrition = () => {
+    if (!builtPlan) return;
+    const plan = applyEditsToPlan(builtPlan);
+    try {
+      const weeklySets = (plan.weeks || []).reduce((s, w) => s + (w.sessions || []).reduce((a, ses) => a + ses.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((b, e) => b + (e.sets || 0), 0), 0), 0);
+      // Трен-дни недели: индексы сессий с упражнениями (не отдых).
+      const w0 = plan.weeks[0];
+      const trainDays = (w0?.sessions || []).map((s, i) => ((s.exercises || []).some((e: any) => !(e as any).warmupActivator) ? i + 1 : 0)).filter(d => d > 0);
+      const kcal = Math.round((plan as any).mrvMultiplier && (plan as any).mrvMultiplier >= 1.3 ? 2800 : 2500 + trainDays.length * 150);
+      const proteinG = Math.round((plan.weeks[0]?.sessions || []).reduce((a, s) => a + s.exercises.reduce((b, e) => b + (e.sets || 0), 0), 0) > 0 ? 180 : 160);
+      applyToPlanner({
+        kind: 'bb_nutrition',
+        label: `ББ-план → питание (${trainDays.length} трен-дня, ~${weeklySets} сетов/нед)`,
+        data: { kcal, proteinG, trainDays, weeklySets, splitId: plan.pattern?.id },
+      });
+    } catch (e) {
+      flash('⚠ Ошибка передачи в питание: ' + ((e as Error)?.message || e));
+    }
   };
 
   /** PRO: CSV export — все сеты плана в CSV для Excel/Google Sheets. */
@@ -4993,6 +5014,7 @@ export const BbAutoConstructor: React.FC = () => {
               <button style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
               <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
               <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSendToNutrition}>🍽 В планировщик питания</button>
                <button style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
               <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => applyPeakWeekToCurrentPlan(peakWeekCategory)}>🎭 Peak week</button>
               <button style={{ ...BTN_GHOST, borderColor:'#f472b6', color:'#f472b6' }} onClick={() => setStep('contest')}>🏁 Contest prep</button>
