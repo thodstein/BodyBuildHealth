@@ -697,6 +697,15 @@ const doImportPlan = (raw: string): boolean => {
           </div>
         );
       })()}
+      {generated && ((usePlanCtx() as any).combatNutrition) && (() => {
+        const cn = (usePlanCtx() as any).combatNutrition as any;
+        return (
+          <div style={{ marginBottom: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)', fontSize: 9, color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}
+            title={cn.note || ''}>
+            🥊 План единоборств: {cn.kcal ? `${cn.kcal} ккал` : ''} {cn.proteinG ? `· P${cn.proteinG}` : ''} {cn.carbsG ? `· C${cn.carbsG}` : ''} {cn.note ? `· ${cn.note}` : ''} {cn.planId ? `· #${String(cn.planId).slice(0,6)}` : ''}
+          </div>
+        );
+      })()}
       {/* #4 Peak-week protocol */}
       {generated && dayPlan && (dayPlan as any).peakWeekNote && (
         <div style={{ marginBottom:6, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', fontSize:9, color:'#fbbf24', fontWeight:600, lineHeight:1.4 }}>{(dayPlan as any).peakWeekNote}</div>
