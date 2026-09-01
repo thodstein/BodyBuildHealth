@@ -527,15 +527,14 @@ export const StrengthSportConstructor: React.FC = () => {
 
       {step === 'split' && (
         <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-          <div style={{ ...CARD, padding:14, gap:10, borderColor: `${modeColor}22`, background: `linear-gradient(135deg, ${modeColor}10, rgba(18,16,28,0.72))` }}>
-            <CardHeader icon="✨" title="Рекомендация" subtitle="Подбор сплита по режиму · дням · уровню" />
+          <SectionCard icon="✨" title="Рекомендация" subtitle="Подбор сплита по режиму · дням · уровню" accent>
             <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
               <span style={{ fontSize:12, color: TEXT_3 }}>Рекомендуем:</span><Highlight color={modeColor}>{recommendStrengthSportPattern(mode, days, level).name}</Highlight>
               <Badge color={modeColor} bg={`${modeColor}12`} border={`${modeColor}22`}>{recommendStrengthSportPattern(mode, days, level).sessionsPerRotation}×/нед</Badge>
             </div>
             <div style={{ fontSize:11, color: TEXT_3 }}>{patternId ? <span>Выбран: <Highlight color={modeColor}>{STRENGTH_SPORT_PATTERNS.find(p=>p.id===patternId)?.name}</Highlight></span> : 'Авто по режиму/дням/уровню · тапните карточку ниже'}</div>
             <div style={{ fontSize:10, color:'rgba(235,235,245,0.36)', fontFamily:'-apple-system, system-ui, sans-serif', background:'rgba(0,0,0,0.16)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.04)' }}>Дней <Highlight>{days}×</Highlight> · Режим <Highlight color={modeColor}>{mode==='weightlifting'?'ТА':mode==='strongman'?'Стронг':'Гибрид'}</Highlight> · Уровень {ruLabel(LEVEL_RU, level)}</div>
-          </div>
+          </SectionCard>
           <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
             {STRENGTH_SPORT_PATTERNS.filter(p => p.mode===mode || p.mode==='any').map(p => {
               const active = patternId ? patternId===p.id : p.id===recommendStrengthSportPattern(mode, days, level).id;

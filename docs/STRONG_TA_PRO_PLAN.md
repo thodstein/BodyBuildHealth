@@ -1,6 +1,6 @@
 # Strongman + ТА — PRO план (выполнен 100% — P2 polish K/L/D2/I+миграция/print)
 
-## Статус: PRO 100% — 350/350 (12 файлов), матрица 192 ×7 метрик, medley, grip, axial, EWMA, EventCard, Gantt, PrintLayout
+## Статус: PRO 100% — 364/364 (15 файлов), матрица 192 ×7 метрик, medley, grip, axial, EWMA, EventCard, Gantt, PrintLayout
 
 ### P0 — критические баги (выполнено)
 - `basePmFor` pull→snatch занижение 2× → проверка `snatch_pull` до `snatch`
@@ -30,10 +30,13 @@
 - `WL/Strong` раздельная периодизация (`PCT_BY_PHASE_WL` vs `PCT_BY_PHASE`)
 
 ### Тесты
-- `350/350` (12 файлов) — `strongman-pro 27`, `phase6-pro 30`, `matrix 192`, `property 9`, `dup-wave 3`, `p4/p0/p3/loading...`
+- `364/364` (15 файлов) — `strongman-pro 27`, `phase6-pro 30`, `matrix 192`, `property 9`, `dup-wave 8`, `annual 6`, `storage 3`, `print 5`, `p4/p0/p3/loading...`
 - `strongman-pro`: EVENT_META 6, fallback 0.73, carry/deload 50%, medley chain 90с/180с, female 0.90, phaseForDate mode, grip prehab inject, ladder/medley, EWMA, property weeklySets≤budget + distance + full-combo (outside high + ACWR dangerous + VBT 30%)
 - `property`: 192 combos ×7 метрик 0 overflow/0 MRV/0 sync (carryMeters/grip/overhead/squat/pull/stone/snatch) + fallback deep barbell→farmers + female 0.90 + medley total<cap + VBT history 20/30% + full-combo
-- `dup-wave`: DUP wave heavy/medium/light + strongman conjugate max 90%/dynamic 70% X-0-X-0/rep — week%3 per lift
+- `dup-wave`: DUP wave heavy/medium/light + strongman conjugate max 90%/dynamic 70% X-0-X-0/rep — week%3 per lift — 8 тестов
+- `annual`: buildAnnualWithTaper 1нед/2нед taper separate + validate 3× peaking + taper mismatch + weeksUntilCompetition + bridge MANUAL taper 2 блока
+- `storage`: v1→v3 migration velocityHistory/distanceM/taper/phase sync — 3 теста
+- `print`: header/logo/QR + Gantt phase/taper + medley без хака + @media print + CSV 16 колонок — 5 тестов
 - `strength-sport-phase6-pro.test.ts` 30: P0, VBT, weakpoint, attempts, Sinclair/Robi, ICS, Brzycki, mesocycle (PED риски исключены из планировщика)
 
 ### Файлы
@@ -64,13 +67,20 @@
 - **K.** `Constructor` `WM 10 полей`, `EventCard medley 180с distance 10-50м / timeCap 30-180с слайдеры + Heatmap 4 rows (carry/stone/overhead / squat+deadlift) + Gantt phase/peaking/taper`, `StrengthUI` токены CARD_STRONG/EventCard/StrengthGantt/StrengthHeatmap (как CardioUI)
 - **L.** `property` 192×7 + full-combo (outside high + ACWR dangerous + VBT 30%) 0 overflow, `matrix 192` без outside, `female 0.90`, `medley total<cap`
 - **D2.** `DUP wave` week%3 per lift — builder `event_day max 90%/dynamic 70% X-0-X-0/rep` + `applyDUP wave heavy 90%/medium/light` — тесты `dup-wave`
-- **Build:** `338→350`, `medley chain event_day 2 carries + stone finisher`, `deload distance ×0.5`, `female 0.90`, `phaseForDate mode`, `Gantt taper отдельно`
+ - **Build:** `338→350→364`, `medley chain event_day 2 carries + stone finisher`, `deload distance ×0.5`, `female 0.90`, `phaseForDate mode`, `Gantt taper отдельно`
 
-### Раунд P2 polish (K/L/D2/I+миграция/print) — этот коммит
+### Раунд P2 polish (K/L/D2/I+миграция/print) — коммит 65cb4924
 - **K UI:** `StrengthUI.tsx` EventCard + StrengthGantt + StrengthHeatmap (4 rows) — превью medley до сборки с глобальными слайдерами 10-50м/30-180с; `StrengthSportConstructor.tsx` Gantt после сводки + Heatmap 4 rows + EventCard после плана с onChange (правит все недели)
 - **PrintLayout:** `strength-sport-export.ts` buildStrengthPrintHtml — единый PrintLayout header/logo/QR + Gantt phase/taper отдельно + Medley секция без хака + @media print Gantt break-inside; `annual.ts` taper отдельный `phase=taper` + `weeksUntilCompetition` fallback + `validateAnnualSSPhases` taper 1-2нед
 - **Миграция:** `strength-sport-storage.ts` he_strength_sport_plans_v1 → v3 migrateStrengthSportStorage (velocityHistory/distanceM/taper/phase/sets sync)
-- **Тесты:** `dup-intensity` +3, `property` 9 (full-combo, fallback deep, VBT 20/30%), `annual` taper 2нед, `print` Gantt+medley без хака
+- **Тесты:** `dup-intensity` +3 (8/8), `property` 9 (full-combo, fallback deep, VBT 20/30%)
+
+### Раунд P2.1 — продолжение (этот коммит): annual/print/storage + inline polish
+- **Annual:** `strength-sport-annual.test.ts` 6 тестов — 1нед/2нед taper separate + 3× peaking + taper mismatch + weeksUntilCompetition + bridge MANUAL 2 блока (taper phase)
+- **Storage:** `strength-sport-storage.test.ts` 3 теста — v1→v3 без velocityHistory/distanceM, idempotent, load migrates
+- **Print:** `strength-sport-print.test.ts` 5 тестов — header/QR/Gantt phase/taper + medley без хака + @media print + CSV 16
+- **UI inline:** `StrengthSportConstructor.tsx` Рекомендация `...CARD` → `SectionCard accent` (сокращение 600 строк inline, как `CardioUI`)
+- **Build:** `350→364` (15 файлов), `vite build 43.5s` ✓, `vitest strength-sport 364/364`
 
 ### Осталось (не блокер PRO, опционально)
 - `exceljs` XLS форматирование (сейчас HTML-XLS совместим, экспорт 16 колонок работает)
