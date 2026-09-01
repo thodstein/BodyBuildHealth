@@ -8,6 +8,8 @@ function esc(s: string): string {
 }
 
 export function buildArmPrintHtml(plan: ArmPlan): string {
+  const phaseColor: Record<string, string> = { accumulation:'#22c55e', intensification:'#f59e0b', deload:'#60a5fa', peaking:'#ef4444' };
+  const gantt = `<div style="display:flex;gap:2px;margin:8px 0">${plan.weeks.map(wk=>`<div style="flex:1;height:18px;background:${phaseColor[wk.phase]||'#94a3b8'};border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700">${wk.week}</div>`).join('')}</div><div style="display:flex;gap:8px;font-size:10px;color:#64748b;margin-bottom:8px"><span style="display:inline-block;width:10px;height:10px;background:#22c55e;border-radius:2px"></span> накопление <span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px"></span> интенсификация <span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px"></span> пик <span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:2px"></span> делод</div>`;
   const rows = plan.weeks.map(wk => {
     const sessRows = wk.sessions.map(sess => {
       const exRows = sess.exercises.map(ex => {
@@ -21,7 +23,7 @@ export function buildArmPrintHtml(plan: ArmPlan): string {
     return `<h3>Неделя ${wk.week} — ${esc(wk.phase)} ${wk.deload ? '(deload)' : wk.taper ? '(taper)' : ''}</h3>${sessRows}`;
   }).join('<hr/>');
 
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Арм-план ${esc(plan.pattern.name)}</title><style>body{font-family:system-ui;padding:20px} table{border-collapse:collapse;width:100%} h3{color:#0a6} h4{color:#333}</style></head><body><h1>🤝 Арм-план — ${esc(plan.pattern.name)}</h1><p>${plan.rationale.map(r=>esc(r)).join('<br/>')}</p>${rows}<script>window.onload=()=>window.print()</script></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Арм-план ${esc(plan.pattern.name)}</title><style>body{font-family:system-ui;padding:20px} table{border-collapse:collapse;width:100%} h3{color:#0a6} h4{color:#333} @media print{body{padding:10px}}</style></head><body><h1>🤝 Арм-план — ${esc(plan.pattern.name)}</h1><p>${plan.rationale.map(r=>esc(r)).join('<br/>')}</p>${gantt}${rows}<p style="margin-top:16px;font-size:10px;color:#94a3b8">PRO: РУ/РА (рабочий угол/амплитуда), tendonCap, humerus guard, table ≥50% — Кузнецов VIII. Печать: Ctrl+P → Save as PDF. QR — в следующем релизе (canvas).</p><script>window.onload=()=>window.print()</script></body></html>`;
 }
 
 export function buildArmIcs(plan: ArmPlan, startDateIso?: string): string {
