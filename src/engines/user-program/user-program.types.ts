@@ -23,7 +23,7 @@ import type { BBPlan } from '../bb/bb-builder.engine';
 
 /* ───────────────────────── Общие типы ───────────────────────── */
 
-export type ProgramDirection = 'bb' | 'pl' | 'hybrid';
+export type ProgramDirection = 'bb' | 'pl' | 'hybrid' | 'arm';
 export type ProgramSource = 'custom' | 'cloned_library' | 'cloned_cycle' | 'from_build';
 
 /** Фаза периодизации (зеркалирует BBPhase из phase-periodization, без UI-зависимости). */
@@ -317,11 +317,16 @@ export interface ProgramMeta {
   engineVersion?: string;
 }
 
+export interface ArmProgramBody extends Omit<BBProgramBody, 'direction'> {
+  direction: 'arm';
+}
+
 export interface UserProgram {
   meta: ProgramMeta;
   bb?: BBProgramBody;
   pl?: PLProgramBody;
   hybrid?: HybridProgramBody;
+  arm?: ArmProgramBody;
 }
 
 /* ───────────────────────── Утилиты id ───────────────────────── */

@@ -89,6 +89,22 @@ function migrateUserProgram(value: any): UserProgram | null {
       constraints: program.bb.constraints || { equipment: [] },
     };
   }
+  if ((program as any).arm) {
+    const armBody: any = (program as any).arm;
+    if (!Array.isArray(armBody.weeks)) return null;
+    const weeks = armBody.weeks.map((week: any, index: number) => ({
+      ...week,
+      week: week.week || index + 1,
+      phase: week.phase || 'accumulation',
+      deload: Boolean(week.deload || week.phase === 'deload'),
+      sessions: Array.isArray(week.sessions) ? week.sessions.map((ses: any) => ({
+        ...ses,
+        dayOfWeek: Number.isFinite(ses.dayOfWeek) ? ses.dayOfWeek : ses.dayOfWeek,
+        blocks: Array.isArray(ses.blocks) ? ses.blocks.map((b: any) => ({ ...b, sets: migrateSets(b.sets) })) : [],
+      })) : [],
+    }));
+    (program as any).arm = { ...armBody, weeks, volumeBudget: armBody.volumeBudget || {}, progression: armBody.progression || { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] }, constraints: armBody.constraints || { equipment: [] } };
+  }
   if (program.pl?.customWeeks) {
     for (const w of program.pl.customWeeks as any[]) {
       for (const d of (w.days ?? [])) {
@@ -276,6 +292,31 @@ export function validateProgram(program: UserProgram): ValidationIssue[] {
     }
   }
 
+  // 2b. Проверка АРМ — как ББ (день ≤10, RIR 0-5, делод)
+  if (dir === 'arm' && (program as any).arm) {
+    const armBody: any = (program as any).arm;
+    if (armBody.weeks.length === 0) {
+      issues.push({ level: 'warning', code: 'NO_WEEKS', message: 'Арм-программа без недель — добавьте хотя бы одну' });
+    }
+    for (const w of armBody.weeks) {
+      for (const s of w.sessions) {
+        if (s.blocks.length > 10) {
+          issues.push({ level: 'error', code: 'DAY_CAP_EXCEEDED', message: `Нед ${w.week} ${s.name}: ${s.blocks.length} упражнений (лимит 10)` });
+        }
+        for (const b of s.blocks) {
+          for (const st of (b.sets ?? [])) {
+            if (typeof st.rir === 'number' && (st.rir < 0 || st.rir > 5)) {
+              issues.push({ level: 'warning', code: 'RIR_RANGE', message: `${b.exerciseName}: RIR ${st.rir} вне 0-5` });
+            }
+          }
+        }
+      }
+    }
+    if (meta.weeks >= 6 && !armBody.weeks.some((w: any) => w.deload || w.phase === 'deload')) {
+      issues.push({ level: 'info', code: 'NO_DELOAD', message: 'Длинный арм-цикл без делода' });
+    }
+  }
+
   // 3. Проверка ПЛ
   if (dir === 'pl' && program.pl) {
     if (!program.pl.sourceCycleId && (!program.pl.customWeeks || program.pl.customWeeks.length === 0)) {
@@ -328,9 +369,24 @@ export function isUserProgramShape(value: unknown): value is UserProgram {
   const meta = candidate.meta;
   if (!meta || typeof meta !== 'object') return false;
   if (typeof meta.id !== 'string' || typeof meta.title !== 'string') return false;
-  if (!['bb', 'pl', 'hybrid'].includes(meta.direction)) return false;
+  if (!['bb', 'pl', 'hybrid', 'arm'].includes(meta.direction)) return false;
   if (!Number.isInteger(meta.daysPerWeek) || meta.daysPerWeek < 1 || meta.daysPerWeek > 7) return false;
   if (!Number.isInteger(meta.weeks) || meta.weeks < 1 || meta.weeks > 52) return false;
+  if (meta.direction === 'arm') {
+    return !!candidate.arm
+      && Array.isArray(candidate.arm.weeks)
+      && candidate.arm.weeks.every(week => !!week
+        && Array.isArray(week.sessions)
+        && new Set(week.sessions.map(session => session?.id)).size === week.sessions.length
+        && week.sessions.every(session => !!session
+          && typeof session.id === 'string'
+          && Array.isArray(session.blocks)
+          && new Set(session.blocks.map(block => block?.id)).size === session.blocks.length
+          && session.blocks.every(block => !!block
+            && typeof block.id === 'string'
+            && typeof block.exerciseName === 'string'
+            && Array.isArray(block.sets))));
+  }
   if (meta.direction === 'bb') {
     return !!candidate.bb
       && Array.isArray(candidate.bb.weeks)
@@ -690,6 +746,35 @@ export function createBlank(direction: ProgramDirection): UserProgram {
         daysPerWeek: 4, weeks: 8, direction: 'hybrid', source: 'custom', tags: ['custom', 'powerbuilder'],
       }),
       hybrid: { direction: 'hybrid', plRef: { sourceCycleId: 'cycle-01', sessionIndices: [] }, bbWeeks: [], notes: '', workMax: { squat: 120, bench: 100, deadlift: 140 }, level: 'intermediate', weeksOverride: 8 },
+    };
+  }
+  if (direction === 'arm') {
+    const armDays = 3;
+    const armWeeks: UserWeek[] = [{
+      week: 1,
+      phase: 'accumulation',
+      deload: false,
+      sessions: Array.from({ length: armDays }, (_, si) => ({
+        id: newId('ses'),
+        name: `Арм День ${si + 1}`,
+        focus: ['TableHeavy','GripHeavy','Support'][si] ?? '',
+        dayOfWeek: [0, 2, 4][si] ?? si,
+        blocks: [],
+      })),
+    }];
+    return {
+      meta: baseMeta({
+        title: 'Новая Арм-программа', goal: 'strength', level: 'intermediate',
+        daysPerWeek: armDays, weeks: 8, direction: 'arm', source: 'custom', tags: ['custom', 'arm'],
+      }),
+      arm: {
+        direction: 'arm',
+        microcycleTemplate: { daySlots: armWeeks[0].sessions.map((s, i) => ({ day: i + 1, label: s.name, muscles: [] })) },
+        weeks: armWeeks,
+        volumeBudget: {},
+        progression: { loadStrategy: 'double_progression', deloadProtocol: 'pump', intensityTechniques: ['none'] },
+        constraints: { equipment: [] },
+      } as any,
     };
   }
   // ББ default: meta.daysPerWeek=4 → 4 сессии с по 1 пустому блоку, чтобы юзер сразу видел

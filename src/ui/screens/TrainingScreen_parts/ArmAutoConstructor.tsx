@@ -16,6 +16,7 @@ import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import { ARM_MUSCLE_RU } from '../../../engines/arm/arm-types';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
+import { ArmHeatmap } from './ArmHeatmap';
 import { CARD, H, SMALL, BTN, BTN_GHOST, ACCENT, STEP_PILL } from './training-ui';
 
 type Step = 'params'|'grip'|'split'|'plan'|'quality';
@@ -293,6 +294,9 @@ export function ArmAutoConstructor() {
               <div style={{ marginTop:8, color:'#9ab', fontSize:12 }}>
                 {builtPlan.report?.techniqueRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
                 {builtPlan.report?.gripRationale.map((r:string,i:number)=><div key={i}>• {r}</div>)}
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <ArmHeatmap plan={builtPlan} onToast={flash} />
               </div>
             </>
           )}
