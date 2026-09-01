@@ -86,7 +86,7 @@ function isCoreRecipeItem(meal: CorrectorMeal, itemId: string): boolean {
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein', 'egg_whole', 'tuna_canned'];
-export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_brown', 'bulgur'];
+export const TOPUP_CARB_IDS = ['rice_white', 'oats_dry', 'buckwheat', 'potato_boiled', 'pasta_durum', 'sweet_potato', 'rice_brown', 'bulgur', 'honey', 'bread_white', 'whole_grain_bread', 'raisins', 'dates_dried', 'dried_apricots'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'avocado', 'peanut_butter'];
 
 function poolFor(macro: 'p' | 'c' | 'f', excludedIds?: Set<string>): FoodItem[] {

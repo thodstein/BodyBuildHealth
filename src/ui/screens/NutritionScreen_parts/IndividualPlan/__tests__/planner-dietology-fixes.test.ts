@@ -215,9 +215,11 @@ describe('D4/D5: диетологический потолок углеводо�
     const target = computeDieteticCarbTarget({ weightKg: 120, rawCarbsG: 817 });
     const plan = buildDayPlan(base({ weightKg: 120, lbmKg: 100, goalCarbsG: target, goalKcal: 5000, goalProteinG: 360, goalFatG: 135, mealsCount: 6 }));
     expect(plan.totals.c).toBeLessThanOrEqual(target * 1.06); // в пределах ~6% (без абсурда 814+)
-    // Эпик B: нижняя граница 0.92 → 0.84 — порционные капы реалистичной тарелки на
-    // экстрим-профиле 120 кг / 600 г углей дают ~-14% недосдачу (осознанный трейд-офф).
-    expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.84);
+    // Эпик B: нижняя граница 0.92 → 0.84 → 0.80. Порционные капы реалистичной тарелки +
+    // комфортный кап сухой крупы (150-170 г/приём, жалоба «ещё одна каша — не вариант») на
+    // экстриме 120 кг / 600 г углей дают ~-16-19% недосдачу. Осознанный трейд-офф комфорта:
+    // излишек добирается хлебом+мёдом/сухофруктами, а не второй тарелкой риса.
+    expect(plan.totals.c).toBeGreaterThanOrEqual(target * 0.80);
   });
 });
 

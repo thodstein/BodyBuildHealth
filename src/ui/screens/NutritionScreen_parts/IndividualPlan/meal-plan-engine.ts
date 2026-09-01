@@ -243,7 +243,7 @@ const SUPPLEMENT_MAX_G: Record<string, number> = {
 // упирается в кап «нормального» приёма. Фрукт/овощ НЕ масштабируются (объёмные добавки).
 function maxGramPerItem(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 600 : 500) * scale * ws); }
 function maxGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 350 : 280) * scale * ws); }
-function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.6, _pickCtx.currentWeightKg / 80)); return Math.round(((budget === 'max' || budget === 'enhanced') ? 200 : 150) * scale * ws); }
+function maxDryGrainPerMeal(budget?: string, scale = 1): number { const ws = Math.max(1, Math.min(1.5, _pickCtx.currentWeightKg / 80)); const base = ((budget === 'max' || budget === 'enhanced') ? 115 : 95); return Math.round(Math.min(170, base * ws * Math.min(scale, 1.15))); }
 // Масштаб порционных капов от макро-цели приёма (p/c/f в граммах).
 function mealCapScale(pG: number, cG: number, fG: number): number {
   const kcal = (pG || 0) * 4 + (cG || 0) * 4 + (fG || 0) * 9;
@@ -578,6 +578,12 @@ const PROTEIN_ROTATION: { label: string; ids: string[]; note: string }[] = [
 
 // ─── Preference: common bodybuilding carbs get selection bonus ───
 const COMMON_CARB_IDS = new Set(['rice_white','rice_brown','buckwheat','potato_boiled','pasta_durum','quinoa','barley','cereal_rye_flakes','millet','couscous','rice_noodles','bulgur','chickpeas','lentils','legume_soybeans','corn','whole_grain_bread','oats','oats_dry']);
+
+// ─── «Комфортные» углеводы (не каша) для закрытия крупного остатка после того,
+// как сухая крупа упёрлась в комфортный кап 150 г (жалоба «ещё одна порция каши —
+// не вариант»). Хлеб+мёд/варенье, сухофрукты, дыня — плотные по углям и куда легче
+// для ЖКТ, чем вторая тарелка риса. Используются вторым источником углей на массе.
+const COMFORT_CARB_IDS = ['honey','bread_white','bread_rye','bread_borodinsky','whole_grain_bread','raisins','dates_dried','dates','dried_apricots','bread_fitness'];
 
 // Эпик B: овощи, «притворяющиеся» фруктами по макросам (лук/чеснок/порей/кабачок и т.п.)
 // не должны попадать во фруктовые/быстрые углеводные пулы («лук 70 г в полднике»).
@@ -1586,21 +1592,28 @@ function buildWholeMeal(
       // внутри buildWholeMeal убран намеренно: он ломал сходимость белка/жиров (side-эффекты
       // белка в углеводных носителях) и возвращал «гречка+рис» — остаток добирается
       // рецептурным сайдом (recipe-режим) или посадкой.
-      // F1 (Эпик F): ИСКЛЮЧЕНИЕ — высокоуглеводные дни (≥6 г/кг, bulk 8-10 г/кг): E5-фрукт
-      // не закрывает остаток, «Перегрузка приёма» неизбежна. Второй гарнир из ДРУГОГО
-      // семейства (не «гречка+рис» одного вида) с реалистичной порцией ≤250 г.
-      if (!breakfast && _pickCtx.currentCarbGPerKg >= 6 && remC > 40 && pool.carbSlow.length > 0) {
-        const usedIds2 = new Set(items.map(i => i.id));
+      // F1 (Эпик F): ИСКЛЮЧЕНИЕ — крупный углеводный остаток после комфортного капа каши (150-170 г).
+      // Второй (и, при большом остатке, третий) источник = «комфортные» углеводы (хлеб+мёд/варенье,
+      // сухофрукты), НЕ ещё одна каша (жалоба «ещё порция каши — не вариант; дайте хлеб с вареньем»).
+      // Так день набирает угли без перегруза ЖКТ огромным объёмом сухой крупы.
+      if (!breakfast && remC > 40) {
         const firstFam = carbSource ? stapleFamilyOf(carbSource.id) : null;
-        const alt2 = pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id)
-          && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam);
-        const src2 = alt2.length > 0 ? pickPriority(alt2, seed + 27, { lockedIds, recentIds, hardRecentIds }) : undefined;
-        if (src2) {
+        let comfortPass = 0;
+        while (remC > 40 && comfortPass < 3) {
+          const usedIds2 = new Set(items.map(i => i.id));
+          const comfortPool = COMFORT_CARB_IDS
+            .map(id => FOOD_DB.find(f => f.id === id))
+            .filter((f): f is FoodItem => !!f && !usedIds2.has(f.id) && !(_pickCtx.currentExcludedIds && _pickCtx.currentExcludedIds.has(f.id)) && foodAvailableForPlan(f));
+          const alt2 = comfortPool.length > 0
+            ? comfortPool
+            : pool.carbSlow.filter((f: FoodItem) => !usedIds2.has(f.id) && stapleFamilyOf(f.id) !== null && stapleFamilyOf(f.id) !== firstFam);
+          const src2 = alt2.length > 0 ? pickPriority(alt2, seed + 27 + comfortPass, { lockedIds, recentIds, hardRecentIds }) : undefined;
+          if (!src2) break;
           const g2 = Math.min(gramsForMacro(src2, remC, 'carbs', carbPortionCap(src2)), 250);
-          if (g2 >= 50) {
-            const it2 = makeItem(src2, g2, 'carb_slow');
-            items.push(it2); remP -= it2.p; remF -= it2.f; remC -= it2.c;
-          }
+          if (g2 < 30) break;
+          const it2 = makeItem(src2, g2, 'carb_slow');
+          items.push(it2); remP -= it2.p; remF -= it2.f; remC -= it2.c;
+          comfortPass++;
         }
       }
     }

@@ -851,9 +851,31 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const dayTargetsBreakdown: string[] = [...dayTargets.breakdown];
   // Ф4.25: читаем заметку ББ-плана (he_bb_nutrition_note) — калораж + трен-дни для
   // циклирования углеводов. Применяется только если есть данные (no-op иначе).
-  const bbNutritionNote = useState<{ kcal?: number; trainDays?: number[]; weeklySets?: number; text?: string } | null>(() => {
+  // Перечитывается на событии planner-apply (кнопка «🍽 В планировщик питания»), фокусе и
+  // возврате на вкладку — чтобы заметка подхватывалась даже при уже смонтированном экране.
+  const [bbNutritionNote, setBbNutritionNote] = useState<{ kcal?: number; trainDays?: number[]; weeklySets?: number; text?: string } | null>(() => {
     try { const raw = localStorage.getItem('he_bb_nutrition_note'); if (!raw) return null; const j = JSON.parse(raw); return (j && typeof j === 'object') ? j : null; } catch { return null; }
-  })[0];
+  });
+  useEffect(() => {
+    const read = () => {
+      try {
+        const raw = localStorage.getItem('he_bb_nutrition_note');
+        if (!raw) { setBbNutritionNote(null); return; }
+        const j = JSON.parse(raw);
+        setBbNutritionNote((j && typeof j === 'object') ? j : null);
+      } catch { setBbNutritionNote(null); }
+    };
+    const onVis = () => { if (typeof document !== 'undefined' && document.visibilityState === 'visible') read(); };
+    const onFocus = () => read();
+    window.addEventListener('planner-apply', onFocus);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('planner-apply', onFocus);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
   const bbTrainDays = Array.isArray(bbNutritionNote?.trainDays) && bbNutritionNote.trainDays.length ? bbNutritionNote.trainDays : null;
   const todayDow = new Date().getDay() || 7; // Пн=1 .. Вс=7
   const bbIsTrainToday = bbTrainDays ? bbTrainDays.includes(todayDow) : null; // null = без циклирования
@@ -2115,7 +2137,8 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       if (!resMeals) return;
       _outerResMeals = resMeals;
       _outerVisibleMealsForOptions = resMeals;
-      const newDay = { ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      const _newDiversity = (() => { const ids = new Set<string>(); resMeals.forEach((mm: any) => (mm.items || []).forEach((it: any) => { if (it?.id) ids.add(it.id); })); const uf = ids.size; return { uniqueFoods: uf, totalPortions: 0, categories: {}, score: Math.min(10, uf), note: `${uf} уникальных продуктов` }; })();
+      const newDay = { ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity };
       // FIX button-audit: синхронизация правки обратно в недельный план
       let weekDaysUpdated: any[] | null = null;
       if (weekEditDay !== null && weekPlan?.days?.[weekEditDay]) {
@@ -2167,7 +2190,7 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       _outerResMeals = resMeals;
       _outerVisibleMealsForOptions = resMeals;
       const days = [...srcPlan.days];
-      days[resolved.day] = { ...srcPlan.days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      days[resolved.day] = { ...srcPlan.days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: (() => { const ids = new Set<string>(); resMeals.forEach((mm: any) => (mm.items || []).forEach((it: any) => { if (it?.id) ids.add(it.id); })); const uf = ids.size; return { uniqueFoods: uf, totalPortions: 0, categories: {}, score: Math.min(10, uf), note: `${uf} уникальных продуктов` }; })() };
       const updated = { ...srcPlan, days, totals: sumMultiTotals(days) };
       if (resolved.plan === 'three') setThreeDayPlan(updated); else setWeekPlan(updated);
       if (resolved.plan === 'week') setDayPlan(days[resolved.day]);
@@ -2257,16 +2280,19 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       c: effectiveC > 0 ? effectiveC : pre.c,
     });
     const resMeals = rb.meals as any[];
+    // Пересчёт «карточки разнообразия» — после замены/добавления рецепта уникальные продукты
+    // изменились, иначе карточки (таймлайн/разнообразие/качество) показывали бы stale-цифры.
+    const _newDiversity = (() => { const ids = new Set<string>(); resMeals.forEach((mm: any) => (mm.items || []).forEach((it: any) => { if (it?.id) ids.add(it.id); })); const uf = ids.size; return { uniqueFoods: uf, totalPortions: 0, categories: {}, score: Math.min(10, uf), note: `${uf} уникальных продуктов` }; })();
     if (resolved.plan === 'day') {
-      setDayPlan({ ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any) });
+      setDayPlan({ ...dayPlan, meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity });
     } else if (resolved.plan === 'three') {
       const days = [...threeDayPlan!.days];
-      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity };
       setThreeDayPlan({ ...threeDayPlan!, days, totals: sumMultiTotals(days) });
       if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
     } else {
       const days = [...weekPlan!.days];
-      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any) };
+      days[resolved.day] = { ...days[resolved.day], meals: resMeals, totals: sumDayTotals(resMeals as any), dietDiversity: _newDiversity };
       setWeekPlan({ ...weekPlan!, days, totals: sumMultiTotals(days) });
       if (selectedDayIndex === resolved.day) setDayPlan(days[resolved.day]);
     }

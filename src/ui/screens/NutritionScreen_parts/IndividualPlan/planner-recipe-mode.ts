@@ -261,7 +261,7 @@ function scaleItem(it: PlanItemLike, newAmount: number): PlanItemLike {
 
 // B7 (Эпик B): экспорт для теста id-безопасности (planner-id-safety.test.ts).
 export const TOPUP_PROTEIN_IDS = ['chicken_breast', 'cottage_cheese_5', 'whey_isolate', 'turkey_breast', 'beef_lean', 'casein'];
-export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati', 'pasta_durum', 'bulgur'];
+export const TOPUP_CARB_IDS = ['rice_white', 'oats', 'buckwheat', 'potato_boiled', 'sweet_potato', 'rice_basmati', 'pasta_durum', 'bulgur', 'honey', 'bread_white', 'whole_grain_bread', 'raisins', 'dates_dried', 'dried_apricots'];
 export const TOPUP_FAT_IDS = ['olive_oil', 'walnuts', 'almonds', 'peanut_butter', 'avocado'];
 
 // C5 (Эпик C): субротация фиксированных пулов по seed дня — иначе каждый недобор
