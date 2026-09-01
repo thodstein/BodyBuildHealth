@@ -446,7 +446,7 @@ function migrateStorage(raw: string | null): string | null {
 interface Props {
   level: string;
   goal: 'powerlifting' | 'bodybuilding' | 'general';
-  onApplyCycle: (cycleId: string, weeks: number) => void;
+  onApplyCycle?: (cycleId: string, weeks: number) => void;
   /** Применить весь макроцикл; если не задан, доступно только применение блока. */
   onApplyMacrocycle?: (macro: Macrocycle | BBMacrocycle) => void;
   /** Опционально: callback при изменении level (для редактируемого селектора). */
@@ -737,7 +737,7 @@ export const MacrocyclePanel: React.FC<Props> = ({ level, goal, onApplyCycle, on
     if (!macro) return;
     const block = macro.blocks[idx];
     if (!block || !block.cycleId) return;
-    onApplyCycle(block.cycleId, block.weeks);
+    onApplyCycle?.(block.cycleId, block.weeks);
   };
 
   // ⇄ Перемещение блока по таймлайну (C10): сдвиг + пересчёт недель.

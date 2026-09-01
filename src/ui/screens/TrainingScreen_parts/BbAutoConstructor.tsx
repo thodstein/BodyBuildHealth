@@ -6917,10 +6917,7 @@ export const BbAutoConstructor: React.FC = () => {
             setBbWeeks(source.totalWeeks);
             setBbTrainingFocus(source.trainingFocus);
             setStep('params');
-            }} onApplyCycle={() => {
-             // BB macro blocks have no LMS cycleId. Keep the annual macrocycle
-             // intact instead of switching to an unrelated BB cycle path.
-           }} />
+            }} />
           {(() => {
             const line = annualActiveBlockLine(annualPlan, isoToday());
             if (!line) return null;
