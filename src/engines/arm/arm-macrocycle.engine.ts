@@ -13,6 +13,7 @@ export interface ArmMacroBlock {
 }
 
 export interface ArmMacrocycle {
+  type: 'arm';
   blocks: ArmMacroBlock[];
   totalWeeks: number;
   rationale: string[];
@@ -62,6 +63,7 @@ export function buildArmMacrocycle(input: {
   }
 
   return {
+    type: 'arm' as const,
     blocks,
     totalWeeks: total,
     rationale: [`Арм-макро ${total} нед: ${blocks.map(b => `${b.phase} ${b.weeks}н`).join(' → ')}`],

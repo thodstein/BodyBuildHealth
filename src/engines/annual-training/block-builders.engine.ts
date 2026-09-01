@@ -37,6 +37,7 @@ import { autodraftBBPlan } from '../manual-constructor/manual-draft.engine';
 import type { BBPlan } from '../bb/bb-builder.engine';
 import { applyPeakWeekOverlayToBBPlan, type BBContestPrepConfig } from '../bb/bb-contest-prep.engine';
 import { buildArmBlock as buildArmBlockInternal } from '../arm/arm-annual';
+import type { ArmMacrocycle, ArmMacroBlock } from '../arm/arm-macrocycle.engine';
 import { buildPrepCycle } from '../bb/bb-prep-cycle.engine';
 import { buildPLTaperCurve, type TaperMode, type TaperWeightGoal } from '../lms/lms-taper.engine';
 import { getCycleById, LMS_CYCLES, normalizeCycleDirection } from '../../data/lms-cycles/lms-cycle-index';
@@ -57,22 +58,47 @@ export function stableHash(input: unknown): string {
 }
 
 /** Стабильный ключ макро-блока: layout-поля + цикл. Изменение любого поля → новый ключ → stale. */
-export function macroBlockKey(block: MacroBlock | BBMacroBlock, idx: number): string {
+export function macroBlockKey(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: number): string {
   const cycleId = (block as MacroBlock).cycleId;
   return `blk${idx}-${block.phase}-${block.weekOffset}-${block.weeks}${cycleId ? '-' + cycleId : ''}`;
 }
 
 /** Тип конструктора из макро-блока. */
-export function blockKindFromMacro(block: MacroBlock | BBMacroBlock): AnnualBlockKind {
+export function blockKindFromMacro(block: MacroBlock | BBMacroBlock | ArmMacroBlock): AnnualBlockKind {
   if ('trainingFocus' in block) return 'BB';
+  // ARM блоки не имеют kind, но их макро имеет type==='arm' — определяем через phase+отсутствие kind
+  // На уровне блока без макро — считаем по отсутствию kind как ARM если phase peaking/hypertrophy и нет cycleId
+  const maybeArm = !(block as any).kind && ((block as any).phase === 'peaking' || (block as any).phase === 'hypertrophy') && !(block as any).cycleId && !('trainingFocus' in block);
+  // Но надёжно — через макро, поэтому здесь PL по умолчанию, ARM определяется в refFromBlock с isArm
   const kind = (block as MacroBlock).kind;
   if (kind === 'BB') return 'BB';
   return 'PL';
 }
 
+/** ARM-специфичный ключ: для isArm макро используем тот же macroBlockKey */
+export function isArmMacroBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock): block is ArmMacroBlock {
+  return (block as any).phase === 'peaking' && !(block as any).kind && !('trainingFocus' in block) && !(block as any).cycleId;
+}
+
 /** Определить, BB-ли это макроцикл (по признаку trainingFocus). */
-export function isBBMacroShape(macro: Macrocycle | BBMacrocycle): macro is BBMacrocycle {
+export function isBBMacroShape(macro: Macrocycle | BBMacrocycle | ArmMacrocycle): macro is BBMacrocycle {
   return 'trainingFocus' in macro;
+}
+
+/** Определить, ARM-ли это макроцикл (по признаку type==='arm'). */
+export function isArmMacroShape(macro: Macrocycle | BBMacrocycle | ArmMacrocycle): macro is ArmMacrocycle {
+  return (macro as any)?.type === 'arm';
+}
+
+export function serializeArmMacro(macro: ArmMacrocycle): string {
+  return JSON.stringify(macro);
+}
+export function deserializeArmMacro(s: string): ArmMacrocycle | null {
+  try {
+    const o = JSON.parse(s);
+    if (o && o.type === 'arm' && Array.isArray(o.blocks)) return o as ArmMacrocycle;
+    return null;
+  } catch { return null; }
 }
 
 /* ─────────────────────────── Создание плана ─────────────────────────────── */
@@ -89,7 +115,19 @@ export function defaultConfigForRef(ref: AnnualBlockRef): AnnualBlockConfig {
 }
 
 /** Ref из макро-блока. */
-function refFromBlock(block: MacroBlock | BBMacroBlock, idx: number, isBbMacro: boolean): AnnualBlockRef {
+function refFromBlock(block: MacroBlock | BBMacroBlock | ArmMacroBlock, idx: number, isBbMacro: boolean, isArmMacro: boolean = false): AnnualBlockRef {
+  if (isArmMacro) {
+    return {
+      blockKey: macroBlockKey(block as any, idx),
+      blockIndex: idx,
+      kind: 'ARM' as AnnualBlockKind,
+      phase: (block as ArmMacroBlock).phase,
+      startWeek: (block as ArmMacroBlock).weekOffset,
+      weeks: (block as ArmMacroBlock).weeks,
+      competitionId: (block as ArmMacroBlock).competitionId,
+      description: (block as ArmMacroBlock).description,
+    };
+  }
   const rawKind = (block as MacroBlock).kind;
   const kind: AnnualBlockKind = isBbMacro ? 'BB' : rawKind === 'BB' ? 'BB' : 'PL';
   return {
@@ -129,21 +167,24 @@ export function planStatusFromBlocks(blocks: AnnualBlockState[]): AnnualTraining
 }
 
 /** Создать годовой план из макро-разметки (все блоки unbuilt). */
-export function annualPlanFromMacro(macro: Macrocycle | BBMacrocycle, opts: AnnualBuildOptions = {}): AnnualTrainingPlan {
-  const isBbMacro = isBBMacroShape(macro);
-  const blocks: AnnualBlockState[] = macro.blocks.map((block, idx) => {
-    const ref = refFromBlock(block, idx, isBbMacro);
+export function annualPlanFromMacro(macro: Macrocycle | BBMacrocycle | ArmMacrocycle, opts: AnnualBuildOptions = {}): AnnualTrainingPlan {
+  const isArm = isArmMacroShape(macro as any);
+  const isBbMacro = !isArm && isBBMacroShape(macro as any);
+  const blocks: AnnualBlockState[] = (macro as any).blocks.map((block: any, idx: number) => {
+    const ref = refFromBlock(block, idx, isBbMacro, isArm);
     const config = defaultConfigForRef(ref);
     if (!config.daysPerWeek && opts.daysPerWeek) config.daysPerWeek = opts.daysPerWeek;
     return { ref, config, status: 'unbuilt' as const };
   });
   const kinds = blocks.map(b => b.ref.kind);
+  const macroSource: 'pl' | 'bb' | 'arm' = isArm ? 'arm' as any : isBbMacro ? 'bb' : 'pl';
+  const serialized = isArm ? serializeArmMacro(macro as ArmMacrocycle) : isBbMacro ? serializeBbMacro(macro as BBMacrocycle) : serializeMacro(macro as Macrocycle);
   return {
     id: 'annual_' + Date.now().toString(36),
     version: 1,
     totalWeeks: macro.totalWeeks,
     direction: directionFromKinds(kinds),
-    macroRef: { source: isBbMacro ? 'bb' : 'pl', serialized: isBbMacro ? serializeBbMacro(macro) : serializeMacro(macro) },
+    macroRef: { source: macroSource as any, serialized },
     blocks,
     status: 'draft',
     createdAt: nowIso(),
@@ -157,12 +198,13 @@ export function annualPlanFromMacro(macro: Macrocycle | BBMacrocycle, opts: Annu
  *  - блоки с изменённым layout (новый ключ) → статус 'stale', результат сохранён;
  *  - новые блоки → 'unbuilt'; удалённые из макро — выбрасываются.
  */
-export function syncAnnualPlan(plan: AnnualTrainingPlan, macro: Macrocycle | BBMacrocycle): AnnualTrainingPlan {
-  const isBbMacro = isBBMacroShape(macro);
+export function syncAnnualPlan(plan: AnnualTrainingPlan, macro: Macrocycle | BBMacrocycle | ArmMacrocycle): AnnualTrainingPlan {
+  const isArm = isArmMacroShape(macro as any);
+  const isBbMacro = !isArm && isBBMacroShape(macro as any);
   const byKey = new Map(plan.blocks.map(b => [b.ref.blockKey, b]));
   const byIndex = new Map(plan.blocks.map(b => [b.ref.blockIndex, b]));
-  const blocks: AnnualBlockState[] = macro.blocks.map((block, idx) => {
-    const ref = refFromBlock(block, idx, isBbMacro);
+  const blocks: AnnualBlockState[] = (macro as any).blocks.map((block: any, idx: number) => {
+    const ref = refFromBlock(block, idx, isBbMacro, isArm);
     const exact = byKey.get(ref.blockKey);
     if (exact) {
       // Layout не изменился. Если пользователь менял конфиг после сборки — stale.
@@ -180,11 +222,13 @@ export function syncAnnualPlan(plan: AnnualTrainingPlan, macro: Macrocycle | BBM
     }
     return { ref, config: defaultConfigForRef(ref), status: 'unbuilt' };
   });
+  const macroSource: 'pl' | 'bb' | 'arm' = isArm ? 'arm' as any : isBbMacro ? 'bb' : 'pl';
+  const serialized2 = isArm ? serializeArmMacro(macro as ArmMacrocycle) : isBbMacro ? serializeBbMacro(macro as BBMacrocycle) : serializeMacro(macro as Macrocycle);
   return {
     ...plan,
     totalWeeks: macro.totalWeeks,
     direction: directionFromKinds(blocks.map(b => b.ref.kind)),
-    macroRef: { source: isBbMacro ? 'bb' : 'pl', serialized: isBbMacro ? serializeBbMacro(macro) : serializeMacro(macro) },
+    macroRef: { source: macroSource as any, serialized: serialized2 },
     blocks,
     status: planStatusFromBlocks(blocks),
     updatedAt: nowIso(),

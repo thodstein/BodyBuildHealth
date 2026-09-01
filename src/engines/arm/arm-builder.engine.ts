@@ -152,12 +152,22 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const weakPoints = (input.weakPoints || []).map(s => s.toLowerCase());
   const focusGroup = input.focusGroup ? input.focusGroup.toLowerCase() : undefined;
 
-  // MRV multipliers — упрощённый PED-множитель (tendonCap 1.5×, без дозы-кривых BB)
+  // MRV multipliers — дозо-зависимый PED (tendonCap 1.5× + diminishing)
   let pedMult = 1;
   let pedAdapt: any = null;
   if (input.pedDoses && Object.keys(input.pedDoses).length > 0) {
-    const cnt = Object.keys(input.pedDoses).length;
-    pedMult = Math.min(1.5, 1.15 + cnt * 0.1 + (input.courseIntensity === 'heavy' ? 0.1 : input.courseIntensity === 'mild' ? -0.05 : 0));
+    let doseSum = 0;
+    for (const v of Object.values(input.pedDoses)) {
+      const d = Number(v);
+      if (Number.isFinite(d) && d > 0) doseSum += d;
+    }
+    // 500мг тест ≈ 0.5г → +0.2, 1000мг → +0.4, кап 0.5
+    const doseMult = Math.min(0.5, doseSum / 1000 * 0.4);
+    const intensityAdj = input.courseIntensity === 'heavy' ? 0.08 : input.courseIntensity === 'mild' ? -0.05 : 0;
+    const raw = 1 + doseMult + intensityAdj + (Object.keys(input.pedDoses).length > 1 ? 0.05 : 0);
+    // tendonCap 1.5× с diminishing
+    pedMult = raw <= 1.5 ? raw : 1.5 + (raw - 1.5) * 0.4;
+    pedMult = Math.max(1, Math.min(1.7, pedMult));
     pedAdapt = { combinedMrvMultiplier: pedMult };
   }
   const recoveryMult = computeArmRecoveryMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
