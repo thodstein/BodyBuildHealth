@@ -154,3 +154,22 @@ export function autoCalibrateFromStored(
   const res = recalibratePlanWeights(plan, entries);
   return { plan: res.plan, applied: res.applied };
 }
+
+/** Группа упражнений по группе мышц (для сгруппированного UI шага «weights»). */
+export interface PlanWeightGroup {
+  muscle: string;
+  items: PlanWeightEntry[];
+}
+
+/** Сгруппировать пункты ввода по группам мышц (порядок — по появлению в плане). */
+export function groupWeightEntries(entries: PlanWeightEntry[]): PlanWeightGroup[] {
+  const map = new Map<string, PlanWeightEntry[]>();
+  for (const e of entries) {
+    const m = e.muscle || 'прочее';
+    const arr = map.get(m);
+    if (arr) arr.push(e);
+    else map.set(m, [e]);
+  }
+  return [...map.entries()].map(([muscle, items]) => ({ muscle, items }));
+}
+

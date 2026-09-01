@@ -3,6 +3,7 @@ import {
   collectPlanExercises,
   recalibratePlanWeights,
   autoCalibrateFromStored,
+  groupWeightEntries,
 } from '../bb-weight-calibration.engine';
 import type { BBPlan } from '../bb-types';
 
@@ -155,5 +156,23 @@ describe('bb-weight-calibration.engine', () => {
     const flat = profile.settings.training.workMaxByExercise; // ровно как getProfile().settings.training.workMaxByExercise
     const res = autoCalibrateFromStored(plan(), flat, () => false);
     expect(res.applied).toBeGreaterThan(0);
+  });
+
+  // Фаза 0 UI: группировка упражнений по группам мышц (для сгруппированных карточек).
+  it('groupWeightEntries группирует по мышцам, сохраняя порядок', () => {
+    const entries = collectPlanExercises(plan());
+    const groups = groupWeightEntries(entries);
+    expect(groups.length).toBeGreaterThan(0);
+    // Общее число пунктов не изменилось.
+    expect(groups.reduce((s, g) => s + g.items.length, 0)).toBe(entries.length);
+    // Каждая группа однородна по мышце.
+    for (const g of groups) for (const e of g.items) expect(e.muscle).toBe(g.muscle);
+    // Жим лёжа попадает в группу своей мышцы (chest).
+    const chest = groups.find(g => g.muscle === 'chest');
+    expect(chest?.items.some(e => e.name === 'Жим лёжа')).toBe(true);
+  });
+
+  it('groupWeightEntries пустого списка → []', () => {
+    expect(groupWeightEntries([])).toEqual([]);
   });
 });

@@ -20,7 +20,7 @@ import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, getMuscleFrequencies, type BBRankedPattern } from '../../../engines/bb/bb-selector.engine';
 import { buildBBPlan, buildWarmup, applyMacrocycleToBBPlan, buildBBPlanWithDUP, type BBPlan, type BBExercise } from '../../../engines/bb/bb-builder.engine';
-import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
+import { collectPlanExercises, recalibratePlanWeights, autoCalibrateFromStored, groupWeightEntries, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { applyDUPOverlay } from '../../../engines/bb/bb-dup.engine';
 import { validateBBPlan } from '../../../engines/bb/bb-validator.engine';
@@ -3994,15 +3994,7 @@ export const BbAutoConstructor: React.FC = () => {
     const entries = weightEntries.length ? weightEntries : collectPlanExercises(builtPlan);
     const filled = entries.filter(e => e.actualWeight != null && e.actualWeight > 0).length;
     // Фаза 0: группировка по группам мышц (порядок — по появлению в плане).
-    const groups: Array<{ muscle: string; items: typeof entries }> = (() => {
-      const map = new Map<string, typeof entries>();
-      for (const e of entries) {
-        const m = e.muscle || 'прочее';
-        const arr = map.get(m);
-        if (arr) arr.push(e); else map.set(m, [e]);
-      }
-      return [...map.entries()].map(([muscle, items]) => ({ muscle, items }));
-    })();
+    const groups = groupWeightEntries(entries);
     const setEntry = (i: number, v: number | null) =>
       setWeightEntries(prev => { const c = prev.length ? prev.slice() : collectPlanExercises(builtPlan); c[i] = { ...c[i], actualWeight: v }; return c; });
     const apply = () => {
@@ -5142,7 +5134,18 @@ export const BbAutoConstructor: React.FC = () => {
                 <span><span style={{ color: '#f59e0b' }}>■</span> {'>'} MAV</span>
                 <span><span style={{ color: '#ef4444' }}>■</span> {'>'} MRV</span>
               </div>
-              {taper.length > 0 && <div style={{ fontSize: 11, color: '#fff' }}>📉 Кривая тапера (финальные недели): {taper.map(t => `${t.label}: ${Math.round(t.volumePct * 100)}% · RIR ${t.rir[0]}-${t.rir[1]}`).join(' → ')}</div>}
+              {taper.length > 0 && <div style={{ fontSize: 11, color: '#fff' }}>
+                📉 Кривая тапера (финальные недели): <span style={{ color: '#e11d48' }}>объём ↓</span>, интенсивность сохраняется, RIR 2-4.
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'flex-end' }}>
+                  {taper.map(t => (
+                    <div key={t.week} style={{ flex: 1, textAlign: 'center' }}>
+                      <div title={`${t.label}: ${Math.round(t.volumePct * 100)}% · RIR ${t.rir[0]}-${t.rir[1]}`} style={{ height: Math.max(6, Math.round(t.volumePct * 56)), borderRadius: 6, background: 'linear-gradient(180deg,#e11d48,#7f1d1d)', border: '1px solid rgba(225,29,72,0.4)', boxShadow: '0 0 8px rgba(225,29,72,0.25)' }} />
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>нед {t.week}</div>
+                      <div style={{ fontSize: 9, color: '#fca5a5', fontWeight: 700 }}>{Math.round(t.volumePct * 100)}%</div>
+                    </div>
+                  ))}
+                </div>
+              </div>}
               <div style={{ fontSize: 11, color: '#fff' }}>📋 Вся таблица мезоцикла (неделя × день × упражнение):</div>
               <div style={{ overflowX: 'auto', scrollbarWidth: 'none', maxHeight: 320, overflowY: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: 520 }}>
