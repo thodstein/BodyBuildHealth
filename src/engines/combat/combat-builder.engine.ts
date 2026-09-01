@@ -240,13 +240,22 @@ function weightForCombatExercise(id: string, input: CombatInput, goal: string): 
     else if (id.includes('carry') || id.includes('farmer') || id.includes('yoke') || id.includes('farmers') || id.includes('suitcase')) w = Math.round(w * 0.90 / 2.5) * 2.5;
     else if (id.includes('bench') || id.includes('ohp') || id.includes('press') || id.includes('log')) w = Math.round(w * 0.88 / 2.5) * 2.5;
   }
-  // equipment fallback — вес скорректирован ×0.85-0.90 (COMBAT_FALLBACK)
+  // equipment fallback — вес скорректирован ×0.85-0.95 (вся COMBAT_FALLBACK таблица)
   if (w > 0) {
     const eq = (input.equipment||[]).map((s:string)=> String(s).toLowerCase());
     const hasCable = eq.includes('cable') || eq.includes('other') || eq.length===0;
     const hasSled = eq.includes('other') || eq.includes('sled') || eq.length===0;
-    if (!hasCable && id==='landmine_rotation') w = Math.round(w*0.85/2.5)*2.5;
-    if (!hasSled && ['squat','row_bar','rdl'].includes(id)) w = Math.round(w*0.90/2.5)*2.5;
+    const FALLBACK_COEFF: Record<string, number> = {
+      landmine_rotation:0.85, neck_harness_ext:0.95, plate_pinch:0.90, pullup:0.95, row_bar:0.90, ohp:0.90,
+      med_ball_throw:0.85, kb_swing:0.85, squat:0.90, rdl:0.90,
+    };
+    if (!hasCable && ['landmine_rotation','plate_pinch','pullup','row_bar','ohp','med_ball_throw','kb_swing'].includes(id) && FALLBACK_COEFF[id]) {
+      w = Math.round(w*FALLBACK_COEFF[id]/2.5)*2.5;
+    }
+    if (!hasSled && ['squat','row_bar','rdl','med_ball_throw','kb_swing'].includes(id) && FALLBACK_COEFF[id]) {
+      // sled fallback уже учтён выше, но если нет sled и id squat/rdl — это sled_push→squat
+      if (id==='squat' || id==='rdl') w = Math.round(w*(FALLBACK_COEFF[id]||0.90)/2.5)*2.5;
+    }
   }
   return w;
 }
