@@ -651,8 +651,22 @@ export const BbAutoConstructor: React.FC = () => {
   // Фаза 4.26: undo/redo + bulk-редактирование упражнений.
   const editsRef = useRef(exerciseEdits); editsRef.current = exerciseEdits;
   const [editsHistory, setEditsHistory] = useState<Array<Record<string, any>>>([]);
-  const commitEdits = (next: Record<string, any>) => { setEditsHistory(h => [...h.slice(-9), editsRef.current]); setExerciseEdits(next as any); };
-  const undoEdits = () => { setEditsHistory(h => { if (!h.length) return h; const prev = h[h.length - 1]; setExerciseEdits(prev as any); return h.slice(0, -1); }); };
+  const [redosHistory, setRedosHistory] = useState<Array<Record<string, any>>>([]);
+  const commitEdits = (next: Record<string, any>) => { setRedosHistory([]); setEditsHistory(h => [...h.slice(-9), editsRef.current]); setExerciseEdits(next as any); };
+  const undoEdits = () => {
+    if (!editsHistory.length) return;
+    const prev = editsHistory[editsHistory.length - 1];
+    setRedosHistory(r => [...r.slice(-9), editsRef.current]);
+    setEditsHistory(h => h.slice(0, -1));
+    setExerciseEdits(prev as any);
+  };
+  const redoEdits = () => {
+    if (!redosHistory.length) return;
+    const next = redosHistory[redosHistory.length - 1];
+    setEditsHistory(h => [...h.slice(-9), editsRef.current]);
+    setRedosHistory(r => r.slice(0, -1));
+    setExerciseEdits(next as any);
+  };
   const [bulkModal, setBulkModal] = useState(false);
   const [bulkField, setBulkField] = useState<'sets' | 'reps' | 'weight'>('weight');
   const [bulkValue, setBulkValue] = useState(0);
@@ -5332,6 +5346,7 @@ export const BbAutoConstructor: React.FC = () => {
             <span style={{ fontSize:11, color:'#fff', opacity:0.7 }}>Выберите неделю для правки упражнений</span>
             <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
               {editsHistory.length > 0 && <button onClick={undoEdits} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(96,165,250,0.3)', background:'rgba(96,165,250,0.1)', color:'#60a5fa' }} title="Отменить последнюю правку">↩ Отменить</button>}
+              {redosHistory.length > 0 && <button onClick={redoEdits} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.1)', color:'#a78bfa' }} title="Повторить правку">↪ Повторить</button>}
               <button onClick={() => setBulkModal(true)} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(245,158,11,0.3)', background:'rgba(245,158,11,0.1)', color:'#f59e0b' }} title="Применить ко всем упражнениям недели">⚡ Пакетно</button>
               {W.map(w => {
                 const ph = phaseForWeek(w.week, bbWeeks);
