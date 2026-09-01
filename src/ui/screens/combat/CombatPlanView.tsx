@@ -9,6 +9,7 @@ import { buildCombatReport } from '../../../engines/combat/combat-finalize.engin
 import { ruLabel, PHASE_RU, Badge, InfoBanner, CARD, CARD_ACCENT, BTN, BTN_PRIMARY, BTN_SMALL, INPUT, ACCENT_GRAD, TEXT_3, Highlight, SectionCard, CardHeader, StatTile, GroupHeading, Divider } from './CombatUI';
 import { CB_STRICT_GROUPS, cbStrictGroupFor } from '../../../engines/combat/combat-selection';
 import { buildCombatPrintHtml, downloadCombatCsv, buildCombatPlanIcs } from '../../../engines/combat/combat-print.engine';
+import { weightCutNutritionForWeek, combatWeightCutToMealInput } from '../../../engines/combat/combat-weight-cut.engine';
 
 type Props = {
   plan: CombatPlan;
@@ -86,6 +87,32 @@ export const CombatPlanView: React.FC<Props> = ({
           ))}
         </div>
         {plan.outsideMetrics && <InfoBanner tone={plan.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={plan.outsideMetrics.interference==='high'?'#ff9f0a':'#a855f7'}>{plan.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{plan.outsideMetrics.volumeMultiplier}</Highlight> · {plan.outsideMetrics.interference}</InfoBanner>}
+        {(plan.inputSnapshot as any)?.weightCutProtocol && (
+          <SectionCard icon="⚖️" title="Весогонка — питание по неделям" subtitle="ISSN 2025 · клик — скопировать в планировщик питания" accent>
+            <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+              {plan.weeksData.map(wk=>{
+                const proto = (plan.inputSnapshot as any).weightCutProtocol;
+                const bw = (plan.inputSnapshot as any).bodyweight || 80;
+                const sex = (plan.inputSnapshot as any).sex || 'male';
+                const nut = weightCutNutritionForWeek(wk.week, plan.weeks, proto, bw, sex);
+                const meal = combatWeightCutToMealInput(wk.week, plan.weeks, proto, bw, sex);
+                return (
+                  <div key={wk.week} style={{ display:'flex', gap:8, alignItems:'center', background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', flexWrap:'wrap' }}>
+                    <Highlight color={wk.deload?'#f59e0b': (wk as any).taper?'#60a5fa':'#a855f7'}>Нед {wk.week}</Highlight>
+                    <span style={{ fontSize:11, color:'#fff' }}>{nut.kcal} ккал · P{nut.proteinG} C{nut.carbsG} · {nut.waterMl}мл · Na{nut.sodiumMg}мг</span>
+                    <span style={{ fontSize:10, color:TEXT_3 }}>{nut.notes.slice(0,1).join(' ')}</span>
+                    <button onClick={()=>{
+                      try{
+                        if(meal) { localStorage.setItem('he_combat_meal_preview', JSON.stringify({ week:wk.week, ...meal })); navigator.clipboard?.writeText(`${nut.kcal} ккал P${nut.proteinG} C${nut.carbsG} W${nut.waterMl} Na${nut.sodiumMg}`); doMsg(`Нед ${wk.week} — питание скопировано`);} 
+                      }catch{}
+                    }} style={{ ...BTN_SMALL, padding:'5px 10px', fontSize:11 }}>⎙ Копировать</button>
+                  </div>
+                );
+              })}
+            </div>
+            <InfoBanner tone="info">Меню генерируется через `combatWeightCutToMealInput` → планировщик питания (кнопка «Копировать» сохраняет в `he_combat_meal_preview`)</InfoBanner>
+          </SectionCard>
+        )}
         {plan.rationale?.length ? <div style={{ fontSize:11, color:'rgba(235,235,245,0.58)', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:'#a855f7' }}>•</span><span>{r}</span></div>)}</div> : null}
         <details style={{ background:'rgba(255,255,255,0.03)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)' }}>
           <summary style={{ fontSize:11, fontWeight:700, color:'#d8b4fe', cursor:'pointer' }}>📄 Подробный отчёт (текст)</summary>
