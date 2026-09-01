@@ -233,11 +233,12 @@ function weightForCombatExercise(id: string, input: CombatInput, goal: string): 
     goalMult,
     outsideMult,
   });
-  // female — шея/хват 30% ниже, жим/тяга 12% ниже
+  // female — шея/хват/carry 12-30% ниже (антропометрия + хват, как strength female 0.90)
   if (input.sex === 'female') {
     if (id.includes('neck')) w = Math.round(w * 0.70 / 2.5) * 2.5;
     else if (id.includes('grip') || id.includes('wrist') || id.includes('pinch')) w = Math.round(w * 0.80 / 2.5) * 2.5;
-    else if (id.includes('bench') || id.includes('ohp') || id.includes('press')) w = Math.round(w * 0.88 / 2.5) * 2.5;
+    else if (id.includes('carry') || id.includes('farmer') || id.includes('yoke') || id.includes('farmers') || id.includes('suitcase')) w = Math.round(w * 0.90 / 2.5) * 2.5;
+    else if (id.includes('bench') || id.includes('ohp') || id.includes('press') || id.includes('log')) w = Math.round(w * 0.88 / 2.5) * 2.5;
   }
   // equipment fallback — вес скорректирован ×0.85-0.90 (COMBAT_FALLBACK)
   if (w > 0) {
@@ -429,8 +430,14 @@ export function buildCombatPlan(input: CombatInput): CombatPlan {
           }
         }
         const workSets = buildWorkSets(reps, sets, rir, weight, isPrimary && effectiveCharacter === 'тяж');
-        const tempo = tempoForCB(id, isPrimary, effectiveCharacter as any);
-        const rest = restForCB(isPrimary, effectiveCharacter as any, id);
+        let tempo = tempoForCB(id, isPrimary, effectiveCharacter as any);
+        let rest = restForCB(isPrimary, effectiveCharacter as any, id);
+        // fightStyle волна: striker — ротация взрыв X-0-X-0 / grappler — хват с паузой
+        const fsWave = (input.fightStyle as string | undefined);
+        const isRot = id.includes('landmine') || id.includes('med_ball') || id.includes('sledge') || id.includes('rotation');
+        const isGripId = id.includes('grip') || id.includes('pinch') || id.includes('wrist') || id.includes('towel') || id.includes('rope');
+        if (fsWave === 'striker' && isRot) { tempo = 'X-0-X-0'; rest = Math.max(60, rest - 15); }
+        else if (fsWave === 'grappler' && isGripId) { tempo = '2-1-1-0'; rest = rest + 15; }
         const wcPhaseLocal = wcProtocol ? weightCutPhaseForWeek(w, weeks, wcProtocol) : null;
         const wcComment = wcPhaseLocal==='fight_week' ? 'Fight week: вода 2л/Na1.5г/угли 1г/кг → взвешивание → рефид 8г/кг + 150% воды (контроль ЖКТ)' : wcPhaseLocal==='taper' ? 'Весогонка тапер: угли 1г/кг, вода 8л (load) → слив' : null;
         const ex: CombatExercise = {

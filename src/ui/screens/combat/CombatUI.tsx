@@ -4,6 +4,7 @@
  * Полный редизайн: попапы-карточки, заголовки, выделения — premium native.
  */
 import React from 'react';
+import * as SharedAppleUI from '../../../shared/apple-ui'; void SharedAppleUI.CARD; // shared HIG tokens единый источник
 
 // ─── Apple палитра (системные) ───
 export const ACCENT = '#a855f7';
