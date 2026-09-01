@@ -22,11 +22,14 @@
 | Фаза 4.26 своп-модал bulk/undo | ✅ выполнена (undo/redo commitEdits + пакетное применение к неделе) | 0bdcad78 |
 | Фаза 4.28 чистка UI | ✅ выполнена (оверрайды восстановления/лаб-множителя; шаги сквозные; мёртвый onApplyCycle удалён + опционален) | a635ae37, a630724e |
 | Фаза 5.30 удалить deprecated | ✅ выполнена полностью (bb-peak-week.engine, peakForPLMeet/peakForBBShow, generatePLPeaking И generateBBPeaking/BBPeakingInput удалены; движок сведён к типу) | 044e9820, 4dfae666 |
-| Фаза 0 UI-flow тесты | ✅ добавлены (round-trip collect→recalibrate + UI-seam training.workMaxByExercise) | 60e476d4 |
+| Фаза 0 UI-flow тесты | ✅ добавлены (round-trip collect→recalibrate + UI-seam training.workMaxByExercise + groupWeightEntries) | 60e476d4, 4c8b9b44 |
+| Фаза 0 UI редизайн «Реальные веса» | ✅ группировка по мышцам + карточки-кнопки (раскрыть/скрыть), русский, «Свернуть/Развернуть все», современный вид | 730d8edd |
+| Ф4.25 перечитывание + тест | ✅ re-read на planner-apply/focus/visibility + чистая applyBBNutritionToTargets (5 тестов) | 590647b1 |
+| Ф4.21 кривая тапера (визуал) | ✅ бары объёма по финальным неделям вместо текстовой строки | 4c8b9b44 |
+| Ф4.26 redo | ✅ redosHistory + кнопка «↪ Повторить» | 291c857e |
 
-Проверка: `tsc 0` по проекту (NODE_OPTIONS=6GB), полный `vitest run bb` = **1855 passed / 56 failed (все пред-существующие
-из baseline ~59: vitest-каталог EXERCISE_CATALOG без 16 упражнений + чужие WIP bb-macrocycle v7,
-bb-auto-annual-ctx и др.).** Новых регрессий нет (падение 1855 vs 1875 — это удалённые deprecated-тесты bb-peak-week).
+Проверка: `tsc 0` по BB-файлам (NODE_OPTIONS=6GB; в worktree чужие ошибки WIP агента), полный
+`vitest run bb` = **1864 passed / 56 failed (все пред-существующие из baseline ~59).** Новых регрессий нет.
 
 Основан на полном анализе движков (`src/engines/bb/*`), UI (`BbAutoConstructor.tsx` 6.7k строк + связанные)
 и системы Тапер-ББ (`bb-contest-prep.engine.ts` 2.9k строк, `bb-prep-cycle`, `lms-taper` для сравнения).
