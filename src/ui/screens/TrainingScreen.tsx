@@ -87,8 +87,8 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   // Внешнее переключение режима планировщика (напр., из CardioLinkCard «Открыть кардио-конструктор»)
   useEffect(() => {
     const h = (e: Event) => {
-      const track = (e as CustomEvent).detail as PlanningTrack | undefined;
-      if (track === 'pl' || track === 'bb' || track === 'manual' || track === 'cardio' || track === 'strength' || track === 'combat' || track === 'arm') switchPlanningTrack(track);
+      const track = (e as CustomEvent).detail as PlanningTrack | string | undefined;
+      if ((track as string) === 'pl' || (track as string) === 'bb' || (track as string) === 'manual' || (track as string) === 'cardio' || (track as string) === 'strength' || (track as string) === 'combat' || (track as string) === 'arm') switchPlanningTrack(track as any);
     };
     window.addEventListener('planning-track-open', h);
     return () => window.removeEventListener('planning-track-open', h);
@@ -103,7 +103,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
         setPlannerSource('intellectual', sel || undefined);
       } catch { setPlannerSource('intellectual'); }
     } else if (zone === 'planner') {
-      const tr = planningTrack;
+      const tr = planningTrack as string;
       if (tr === 'pl') setPlannerSource('pl-auto');
       else if (tr === 'bb') setPlannerSource('bb-auto');
       else if (tr === 'manual') setPlannerSource('manual');
@@ -570,11 +570,11 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))', gap:10 }}>
               {PLANNER_MODES.map(m => {
-                const ACC: Record<string,string> = { pl:'#a78bfa', bb:'#00e68a', manual:'#3b82f6', cardio:'#ef4444', strength:'#f59e0b', combat:'#ec4899' };
+                const ACC: Record<string,string> = { pl:'#a78bfa', bb:'#00e68a', manual:'#3b82f6', cardio:'#ef4444', strength:'#f59e0b', combat:'#ec4899', arm:'#00e68a' };
                 const accent = ACC[m.id] ?? '#00e68a';
-                const active = planningTrack === m.id;
+                const active = (planningTrack as string) === (m.id as string);
                 return (
-                  <button key={m.id} onClick={() => { hapticImpact('medium'); openConstructor(m.id); }} style={{
+                  <button key={m.id} onClick={() => { hapticImpact('medium'); openConstructor(m.id as any); }} style={{
                     position:'relative', display:'flex', flexDirection:'column', gap:10, padding:'16px 14px 14px', borderRadius:16, cursor:'pointer', textAlign:'left', overflow:'hidden',
                     background: active ? `linear-gradient(135deg, ${accent}14, rgba(24,24,27,0.82))` : 'rgba(24,24,27,0.64)',
                     backdropFilter:'blur(12px)', WebkitBackdropFilter:'blur(12px)',
@@ -624,13 +624,13 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             <button onClick={() => { hapticImpact('light'); setPage('hero'); setZone(null); }} style={{ padding:'4px 7px', borderRadius:8, fontSize:10, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.10)', background:'transparent', color:'rgba(255,255,255,0.7)' }}>✕</button>
           </div>
           <div style={{ flex:1, overflow:'auto', padding:'12px', paddingBottom:'calc(var(--nav-height) + env(safe-area-inset-bottom) + 16px)', WebkitOverflowScrolling:'touch' }}>
-            {planningTrack === 'pl' && <PlannerPlAuto />}
-            {planningTrack === 'bb' && <PlannerBbAuto />}
-            {planningTrack === 'manual' && <ProgramManagerPanel />}
-            {planningTrack === 'cardio' && <CardioConstructor />}
-            {planningTrack === 'strength' && <StrengthSportConstructor />}
-            {planningTrack === 'combat' && <CombatConstructor />}
-            {planningTrack === 'arm' && <ArmAutoConstructor />}
+            {(planningTrack as string) === 'pl' && <PlannerPlAuto />}
+            {(planningTrack as string) === 'bb' && <PlannerBbAuto />}
+            {(planningTrack as string) === 'manual' && <ProgramManagerPanel />}
+            {(planningTrack as string) === 'cardio' && <CardioConstructor />}
+            {(planningTrack as string) === 'strength' && <StrengthSportConstructor />}
+            {(planningTrack as string) === 'combat' && <CombatConstructor />}
+            {(planningTrack as string) === 'arm' && <ArmAutoConstructor />}
           </div>
         </div>
       )}
