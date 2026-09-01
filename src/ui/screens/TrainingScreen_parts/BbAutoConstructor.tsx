@@ -103,7 +103,7 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
-import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve } from '../../../engines/bb/bb-visual.engine';
+import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve, compareBBVariants } from '../../../engines/bb/bb-visual.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -670,6 +670,9 @@ export const BbAutoConstructor: React.FC = () => {
   // Мульти-планы: сохранённые варианты для сравнения
   const [savedPlans, setSavedPlans] = useState<SavedBBPlan[]>([]);
   const [showCompare, setShowCompare] = useState(false);
+  // Фаза 4.27: по-недельный дифф текущего плана против выбранного варианта.
+  const [diffVariantId, setDiffVariantId] = useState<string | null>(null);
+  const diffPlan = diffVariantId ? savedPlans.find(v => v.id === diffVariantId)?.plan : null;
   // Фаза 4.23: дата старта мезоцикла → календарные диапазоны недель + «📍 текущая неделя».
   const [startDateInput, setStartDateInput] = useState<string>(() => { try { return new Date().toISOString().slice(0, 10); } catch { return ''; } });
   // 🔄 «Начать заново»: подтверждение сброса сборки.
@@ -5211,6 +5214,7 @@ export const BbAutoConstructor: React.FC = () => {
                           <span style={{ color: v.metrics.qualityScore >= 75 ? '#22c55e' : v.metrics.qualityScore >= 50 ? '#f59e0b' : '#ef4444', fontWeight:700 }}>{v.metrics.qualityScore}</span>
                         </td>
                         <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', display:'flex', gap:4 }}>
+                          <button onClick={() => setDiffVariantId(prev => prev === v.id ? null : v.id)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(56,189,248,0.35)', background: diffVariantId === v.id ? 'rgba(56,189,248,0.18)' : 'rgba(56,189,248,0.08)', color:'#38bdf8', cursor:'pointer', fontSize:11, fontWeight:700 }} title="По-недельный дифф vs текущий">Дифф</button>
                           <button onClick={() => handleLoadVariant(v)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:11, fontWeight:700 }}>↩</button>
                           <button onClick={() => handleDeleteVariant(v.id)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:11, fontWeight:700 }}>✕</button>
                         </td>
@@ -5219,7 +5223,22 @@ export const BbAutoConstructor: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-              <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>↩ — загрузить вариант · ✕ — удалить · максимум 8 вариантов</div>
+              {diffPlan && builtPlan && (() => {
+                const weekDiff = compareBBVariants(applyEditsToPlan(builtPlan), diffPlan);
+                const meaningful = weekDiff.filter(d => d.changes > 0);
+                if (meaningful.length === 0) return null;
+                return (
+                  <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(56,189,248,0.05)', border:'1px solid rgba(56,189,248,0.15)' }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8', marginBottom:4 }}>🔬 По-недельный дифф (текущий → «{diffPlan?.pattern?.name || 'вариант'}»)</div>
+                  <table style={{ width:'100%', borderCollapse:'collapse', fontSize:10 }}>
+                    <thead><tr style={{ color:'#fff', textAlign:'left' }}><th style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>Неделя</th><th style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>Изменения</th></tr></thead>
+                    <tbody>{meaningful.map(d => (
+                      <tr key={d.week}><td style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>Нед {d.week}</td><td style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', color:'#f59e0b' }}>{d.detail.join(' · ')}</td></tr>
+                    ))}</tbody>
+                  </table>
+                </div>);
+              })()}
+              <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>↩ — загрузить вариант · ✕ — удалить · 🔬 Дифф — по неделям vs текущий · максимум 8 вариантов</div>
             </div>
           )}
         </CollapsibleCard>
