@@ -103,7 +103,7 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
-import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges } from '../../../engines/bb/bb-visual.engine';
+import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU, buildBBPlanIcs, bbWeekDateRanges, buildBBTaperCurve } from '../../../engines/bb/bb-visual.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -5031,6 +5031,32 @@ export const BbAutoConstructor: React.FC = () => {
           ) : null;
         })()}
         <PlanFeedbackCard plan={builtPlan} workMax={bbWorkMax} strategy={loadStrategy} onApply={setBuiltPlan} />
+        <CollapsibleCard title="📊 Наглядность (heatmap · taper-кривая · объём)" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', color: '#a78bfa' }} badge="мышца×неделя · тапер">
+          {(() => {
+            const plan = applyEditsToPlan(builtPlan);
+            const hm = buildBBMuscleHeatmap(plan);
+            const hmWeeks = [...new Set(hm.map(h => h.week))].sort((a, b) => a - b);
+            const hmMuscles = [...new Set(hm.map(h => h.muscle))];
+            const hmColor: Record<string, string> = { below_mev: '#f87171', mev_mav: '#22c55e', above_mav: '#f59e0b', over_mrv: '#ef4444', none: '#e5e7eb' };
+            const taper = buildBBTaperCurve(plan);
+            return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 11, color: '#fff' }}>🧬 Heatmap «мышца × неделя» (объём по MEV/MAV/MRV):</div>
+              <div style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
+                <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: 300 }}>
+                  <thead><tr><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px', textAlign: 'left' }}>Мышца</th>{hmWeeks.map(w => <th key={w} style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Нед {w}</th>)}</tr></thead>
+                  <tbody>{hmMuscles.map(m => <tr key={m}><td style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>{m}</td>{hmWeeks.map(w => { const c = hm.find(h => h.muscle === m && h.week === w); return <td key={w} style={{ border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center', background: c ? (hmColor[c.status] + '22') : 'transparent', color: c ? hmColor[c.status] : 'rgba(255,255,255,0.4)' }}>{c ? c.sets : '·'}</td>; })}</tr>)}</tbody>
+                </table>
+              </div>
+              <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'rgba(255,255,255,0.7)', flexWrap: 'wrap' }}>
+                <span><span style={{ color: '#f87171' }}>■</span> {'<'} MEV</span>
+                <span><span style={{ color: '#22c55e' }}>■</span> MEV–MAV</span>
+                <span><span style={{ color: '#f59e0b' }}>■</span> {'>'} MAV</span>
+                <span><span style={{ color: '#ef4444' }}>■</span> {'>'} MRV</span>
+              </div>
+              {taper.length > 0 && <div style={{ fontSize: 11, color: '#fff' }}>📉 Кривая тапера (финальные недели): {taper.map(t => `${t.label}: ${Math.round(t.volumePct * 100)}% · RIR ${t.rir[0]}-${t.rir[1]}`).join(' → ')}</div>}
+            </div>;
+          })()}
+        </CollapsibleCard>
         <CollapsibleCard title="🔧 Инструменты коррекции" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="объём · вес · пик · сравнение">
             <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
               {/* Фаза 4.23: дата старта мезоцикла + «📍 текущая неделя» */}
