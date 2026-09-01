@@ -1114,7 +1114,7 @@ export function addPeakPriming(plan: BBPlan, workMax: Record<string, number>): {
   if (!plan?.weeks?.length) return { plan, added: 0 };
   let added = 0;
   const weeks = plan.weeks.map(w => {
-    if ((w as any).peakWeek) return w;
+    if (!(w as any).peakWeek) return w;
     const sessions = w.sessions.map((s, si) => {
       // Последние 2 сессии пик-недели (D-2/D-1), которые не отдых.
       const restOfWeeks = w.sessions.length;

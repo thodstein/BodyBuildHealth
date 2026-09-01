@@ -57,12 +57,14 @@ describe('Фаза 3.13: последний тяжёлый день + прайм
   });
   it('addPeakPriming добавляет прайминг-сеты в пик-неделю', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', goal: 'mass', weeks: 4 } as any);
-    // Помечаем последнюю неделю как пик
-    (plan as any).weeks[3].peakWeek = true;
+    // Помечаем неделю с реальными primary-сессиями как пик (последняя неделя может быть deload).
+    const wi = plan.weeks.findIndex(w => (w.sessions || []).some(s => s.exercises.some((e: any) => (e as any).role === 'primary' && !(e as any).warmupActivator)));
+    expect(wi).toBeGreaterThanOrEqual(0);
+    (plan as any).weeks[wi].peakWeek = true;
     const { plan: out, added } = addPeakPriming(plan, { chest: 100, back: 100, quads: 120 });
     expect(added).toBeGreaterThanOrEqual(0);
     // Прайминг-сеты есть в последних сессиях пик-недели
-    const primed = out.weeks[3].sessions.some(s => s.exercises.some((e: any) => e.priming));
+    const primed = out.weeks[wi].sessions.some(s => s.exercises.some((e: any) => e.priming));
     expect(primed).toBe(true);
   });
 });
