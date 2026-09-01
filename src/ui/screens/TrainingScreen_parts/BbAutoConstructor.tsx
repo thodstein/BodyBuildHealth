@@ -103,6 +103,7 @@ import { optimizeMuscleFrequency, type FrequencyOptimizationResult } from '../..
 import { calculatePlanSafetyScore, type PlanSafetyScore } from '../../../engines/bb/bb-safety-score.engine';
 import { assessReadiness, calculateACWR, getAutoRegulationOverride } from '../../../engines/bb/bb-auto-regulation.engine';
 import { summarizeAutoRegulation } from '../../../engines/bb/bb-progression-feedback.engine';
+import { buildBBMuscleHeatmap, BB_PHASE_COLOR, BB_PHASE_LABEL_RU } from '../../../engines/bb/bb-visual.engine';
 import { createFromBuild as createUserProgramFromBuild, saveUserProgram as saveUserProgramStore } from '../../../engines/user-program/program-store';
 import { getBBSuggestions } from './bb-compat';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -2252,10 +2253,18 @@ export const BbAutoConstructor: React.FC = () => {
       }).join('');
       const peakNote = (wk as any).peakWeek === true ? ` — 🎭 ПИК-НЕДЕЛЯ (тапер ББ)` : '';
       const prepNote = (wk as any).prepProtocol ? `<p style="font-size:10px;color:#888;margin:2px 0">${esc((wk as any).prepProtocol)}</p>` : '';
-      return `<h2 style="margin:16px 0 6px">Неделя ${wk.week} (${esc(wk.phase || '')}${wk.deload ? ' — DELOAD' : ''})${peakNote}</h2>${prepNote}${sessionsHtml}`;
+      const phaseRu = BB_PHASE_LABEL_RU[String((wk as any).phase || '')] || esc((wk as any).phase || '');
+      const phaseColor = BB_PHASE_COLOR[String((wk as any).phase || '')] || '#444';
+      return `<h2 style="margin:16px 0 6px;color:${phaseColor};border-left:4px solid ${phaseColor};padding-left:8px">Неделя ${wk.week} (${phaseRu}${wk.deload ? ' — DELOAD' : ''})${peakNote}</h2>${prepNote}${sessionsHtml}`;
     }).join('');
     const rationaleHtml = (plan.rationale || []).map(r => `<div style="font-size:10px;color:#666;margin:2px 0">${esc(r)}</div>`).join('');
-    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${weeksHtml}<script>window.print()</script></body></html>`);
+    // Фаза 4.24: heatmap «мышца × неделя» в печати.
+    const hm = buildBBMuscleHeatmap(plan);
+    const hmWeeks = [...new Set(hm.map(h => h.week))].sort((a, b) => a - b);
+    const hmMuscles = [...new Set(hm.map(h => h.muscle))];
+    const hmColor: Record<string, string> = { below_mev: '#f87171', mev_mav: '#22c55e', above_mav: '#f59e0b', over_mrv: '#ef4444', none: '#e5e7eb' };
+    const hmHtml = hmMuscles.length ? `<h2 style="font-size:14px;margin:16px 0 4px">🧬 Heatmap «мышца × неделя»</h2><table style="border-collapse:collapse;font-size:10px"><tr><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">Мышца</th>${hmWeeks.map(ww => `<th style="border:1px solid #ddd;padding:3px 6px">Нед ${ww}</th>`).join('')}</tr>${hmMuscles.map(m => `<tr><td style="border:1px solid #ddd;padding:3px 6px">${esc(m)}</td>${hmWeeks.map(ww => { const c = hm.find(h => h.muscle === m && h.week === ww); return `<td style="border:1px solid #ddd;text-align:center;background:${c ? hmColor[c.status] : '#fafafa'}">${c ? c.sets : ''}</td>`; }).join('')}</tr>`).join('')}</table>` : '';
+    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${weeksHtml}${hmHtml}<script>window.print()</script></body></html>`);
     w.document.close();
   };
 
