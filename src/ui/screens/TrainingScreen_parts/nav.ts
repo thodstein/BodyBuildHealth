@@ -78,7 +78,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
  *  Cardio ("Кардио-конструктор") — отдельный CardioCycle (cardio.engine).
  *  Strength ("Стронг+ТА") и Combat ("Единоборства") — изолированные силовые конструкторы,
  *  только заловая часть, внезальная нагрузка — декларация OutsideLoad. */
-export type PlannerMode = 'pl' | 'bb' | 'manual' | 'cardio' | 'strength' | 'combat';
+export type PlannerMode = 'pl' | 'bb' | 'manual' | 'cardio' | 'strength' | 'combat' | 'arm';
 export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint: string }[] = [
   { id: 'pl', label: 'ПЛ-авто', icon: '🏆', hint: 'Пауэрлифтинг: LMS-циклы, ПМ-прогрессия, пик-протоколы' },
   { id: 'bb', label: 'ББ-авто', icon: '💪', hint: 'Бодибилдинг: сплиты, объём по группам, PED-адаптация, прогрессия' },
@@ -86,6 +86,7 @@ export const PLANNER_MODES: { id: PlannerMode; label: string; icon: string; hint
   { id: 'cardio', label: 'Кардио', icon: '❤️', hint: 'Кардио-цикл: Zone 2/HIIT, фазы, taper' },
   { id: 'strength', label: 'Стронг+ТА', icon: '🏋️', hint: 'Тяжёлая атлетика / Стронг: рывок, толчок, лог, камни, outside-load' },
   { id: 'combat', label: 'Единоборства', icon: '🥊', hint: 'Бокс/ММА/Борьба: шея, хват, ротация, внезальная 4-5×/нед' },
+  { id: 'arm', label: 'Арм', icon: '🤝', hint: 'Армрестлинг / Армлифтинг: стол + хваты, РУ/РА, tendon-cap' },
 ];
 
 /** Порядок вывода зон на hero-экране. */

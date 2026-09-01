@@ -29,6 +29,7 @@ import { PlannerBbAuto } from './TrainingScreen_parts/PlannerBbAuto';
 import { CardioConstructor } from './TrainingScreen_parts/CardioConstructor';
 import { StrengthSportConstructor } from './strength-sport/StrengthSportConstructor';
 import { CombatConstructor } from './combat/CombatConstructor';
+import { ArmAutoConstructor } from './TrainingScreen_parts/ArmAutoConstructor';
 import { ProgramManagerPanelWithProvider as ProgramManagerPanel } from './TrainingScreen_parts/ProgramManagerPanel';
 import { DiaryAnalyticsZone } from './TrainingScreen_parts/DiaryAnalyticsZone';
 import { LibraryZone } from './TrainingScreen_parts/LibraryZone';
@@ -87,7 +88,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
   useEffect(() => {
     const h = (e: Event) => {
       const track = (e as CustomEvent).detail as PlanningTrack | undefined;
-      if (track === 'pl' || track === 'bb' || track === 'manual' || track === 'cardio' || track === 'strength' || track === 'combat') switchPlanningTrack(track);
+      if (track === 'pl' || track === 'bb' || track === 'manual' || track === 'cardio' || track === 'strength' || track === 'combat' || track === 'arm') switchPlanningTrack(track);
     };
     window.addEventListener('planning-track-open', h);
     return () => window.removeEventListener('planning-track-open', h);
@@ -106,6 +107,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
       if (tr === 'pl') setPlannerSource('pl-auto');
       else if (tr === 'bb') setPlannerSource('bb-auto');
       else if (tr === 'manual') setPlannerSource('manual');
+      else if (tr === 'arm') setPlannerSource('arm-auto');
     }
   }, [zone, planningTrack]);
   // приём «Применить» из интеллектуальных — к действующему выбранному циклу
@@ -628,6 +630,7 @@ export const TrainingScreen: React.FC<{ initialSubTab?: string }> = ({ initialSu
             {planningTrack === 'cardio' && <CardioConstructor />}
             {planningTrack === 'strength' && <StrengthSportConstructor />}
             {planningTrack === 'combat' && <CombatConstructor />}
+            {planningTrack === 'arm' && <ArmAutoConstructor />}
           </div>
         </div>
       )}
