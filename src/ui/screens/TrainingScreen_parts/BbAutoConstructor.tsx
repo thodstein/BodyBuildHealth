@@ -484,6 +484,9 @@ export const BbAutoConstructor: React.FC = () => {
   const [bbAnnualMacrocycle, setBbAnnualMacrocycle] = useState<BBMacrocycle | null>(null);
   const [bbVolGoal, setBbVolGoal] = useState<string>('mav');
   const [trainingVolumeMode, setTrainingVolumeMode] = useState<'standard' | 'high'>('standard');
+  // Фаза 4.28: ручные оверрайды восстановления/лаб-множителя в визарде (null = авто).
+  const [labMultOverride, setLabMultOverride] = useState<number | null>(null);
+  const [recoveryOverride, setRecoveryOverride] = useState<number | null>(null);
   // 📅 Многоблочная специализация: список блоков (3-6 нед каждый), у каждого
   // блока цели 1-2, режим доноров и мышцы-доноры. Остаток плана — баланс.
   interface UISpecBlock {
@@ -1789,11 +1792,12 @@ export const BbAutoConstructor: React.FC = () => {
          equipment: bbEquipment,
          methodology: bbMethodology,
          sex: linked.profile?.settings?.personal?.sex,
-         // P0-5: лабораторная коррекция MRV
-         labMrvMultiplier: labAdjust.mrvMultiplier,
+         // P0-5: лабораторная коррекция MRV (Ф4.28: ручной оверрайд приоритетнее)
+         labMrvMultiplier: labMultOverride ?? labAdjust.mrvMultiplier,
           labWarnings: labAdjust.warnings,
           labIntensityNote: labAdjust.intensityNote,
           trainingFocus: bbTrainingFocus,
+          recoveryMultOverride: recoveryOverride ?? undefined,
           bodyFat: linked.profile.settings.personal.bodyFat,
           leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
           hrvMs: linked.profile.settings.lifestyle.morningHRV,
@@ -2906,6 +2910,18 @@ export const BbAutoConstructor: React.FC = () => {
                 <>Объёмный: цель MRV + памп-схемы (GVT 10×10/FST-7 — кап 5/упр сохраняется). Капы те же от уровня: новичок 24/10 недоступно 60; enhanced 3г+ 60/18. ACWR/дефицит — отдельной кнопкой Авто-делод.</>
               )}
             </div>
+          </div>
+          <div style={{ gridColumn:'1 / span 2', padding:'6px 10px', borderRadius:10, background:'rgba(168,85,247,0.06)', border:'1px solid rgba(168,85,247,0.18)', fontSize:10, color:'#fff', display:'flex', gap:14, flexWrap:'wrap', alignItems:'center' }}>
+            <span style={{ fontWeight:800, color:'#a78bfa' }}>⚙️ Оверрайды</span>
+            <label style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+              Лаб-множитель MRV (авто {labAdjust.mrvMultiplier.toFixed(2)}):
+              <input type="number" step="0.05" min={0.5} max={1.5} value={labMultOverride ?? ''} placeholder="авто" onChange={e2 => { const v = e2.target.value === '' ? null : parseFloat(e2.target.value); setLabMultOverride(v != null && Number.isFinite(v) ? Math.max(0.5, Math.min(1.5, v)) : null); }} style={{ width:55, ...IN }} />
+            </label>
+            <label style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+              Множитель восстановления (0.6–1.5, авто 1.0):
+              <input type="number" step="0.05" min={0.6} max={1.5} value={recoveryOverride ?? ''} placeholder="1.0" onChange={e2 => { const v = e2.target.value === '' ? null : parseFloat(e2.target.value); setRecoveryOverride(v != null && Number.isFinite(v) ? Math.max(0.6, Math.min(1.5, v)) : null); }} style={{ width:55, ...IN }} />
+            </label>
+            <button onClick={() => { setLabMultOverride(null); setRecoveryOverride(null); flash('Оверрайды сброшены — авто'); }} style={{ padding:'3px 8px', borderRadius:6, fontSize:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.15)', background:'transparent', color:'#fff' }}>Сбросить</button>
           </div>
           <div style={{ gridColumn:'1 / span 2', marginTop:2, padding:'6px 10px', borderRadius:10, background:'rgba(16,185,129,0.06)', border:'1px solid rgba(16,185,129,0.15)', fontSize:10, color:'#fff', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             {(() => {

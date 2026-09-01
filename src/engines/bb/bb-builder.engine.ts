@@ -155,6 +155,9 @@ export interface BBBuilderInput {
   labWarnings?: string[];
   /** P0-5: рекомендация по интенсивности из лаборатории (пробрасывается в rationale). */
   labIntensityNote?: string;
+  /** Фаза 4.28: ручной оверрайд множителя восстановления (0.6–1.5) из визарда.
+   *  Умножает недельный бюджет и MRV-капы поверх метрик восстановления (сон/HRV/стресс). */
+  recoveryMultOverride?: number;
   /** Тип тренировки: strength/hypertrophy/endurance. Влияет на RIR/reps/tempo по Schoenfeld 2021/2022. */
   trainingFocus?: BBTrainingFocus;
   /** % жира в теле (0-50). Влияет на восстановление: >25% → MRV×0.9 (Helms 2022). */
@@ -2723,13 +2726,15 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs,
     sleepHours: input.sleepHours, stressLevel: input.stressLevel,
   });
-  const weeklyBudget = computeBBWeeklyBudget({
+  // Фаза 4.28: ручной оверрайд множителя восстановления из визарда.
+  const recoveryMultOverride = Number.isFinite(input.recoveryMultOverride) ? Math.max(0.6, Math.min(1.5, input.recoveryMultOverride as number)) : 1;
+  const weeklyBudget = Math.round(computeBBWeeklyBudget({
     onCourse,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
     recoveryScore,
     calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg,
     labMrvMultiplier: input.labMrvMultiplier,
-  });
+  }) * recoveryMultOverride);
   const sessLimits = sessionLimitsFor({
     onCourse,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
@@ -2858,7 +2863,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const legFreqMult = ['quads', 'hamstrings', 'glutes'].includes(m) ? Math.max(1, (muscleSessionCount[m] || 1) / 2) : 1;
       // Единый режим-множитель (×2 на курсе на главные мышцы) — без стэкинга
       // pedAdapt × backProfile/legProfile/torsoProfile capMult.
-      let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * legFreqMult);
+      let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * legFreqMult * recoveryMultOverride);
       if (input.trainingVolumeMode === 'high') {
         const capBoost = level === 'enhanced' && (input.trainingYears ?? 0) >= 6 ? 1.25 : 1.15;
         capMrv = Math.round(capMrv * capBoost);
@@ -2888,7 +2893,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     if (excludedMuscles.has(m) || excludedMuscles.has(collapseKey(m))) continue;
     const lm = landmarksForRotation(level, m, pattern.rotationDays);
     if (lm) {
-      let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult);
+      let capMrv = Math.round(lm.mrv * regimeMrvMultFor(m, regimeMult) * (input.labMrvMultiplier ?? 1) * recoveryMult * nutritionMult * recoveryMultOverride);
       // Руки/ягодицы/плечи: косвенный объём от тяг/жимов требует стажевый кап-буст.
       if (['biceps', 'triceps'].includes(m) && input.trainingYears !== undefined && input.trainingYears >= 3) {
         capMrv = Math.round(capMrv * (input.trainingYears >= 8 ? 1.8 : input.trainingYears >= 6 ? 1.6 : 1.3));
