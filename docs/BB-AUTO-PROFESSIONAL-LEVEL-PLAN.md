@@ -1,6 +1,6 @@
 # ББ-авто + Тапер-ББ: план доведения до профессионального уровня
 
-Дата: Aug 31 2026. Статус: **реализация завершена (Sep 2 2026) — Фазы 0-5 выполнены, кроме двух чистых UI-остатков (4.26 bulk/undo, 4.28 полировка) и полного удаления 5.30 (см. ниже).**
+Дата: Aug 31 2026. Статус: **полное выполнение плана завершено (Sep 2 2026) — Фазы 0-5, включая все UI-полировки 4.26/4.28 и удаление deprecated 5.30.**
 
 ## Сводка выполнения (Sep 1 2026)
 
@@ -18,14 +18,13 @@
 | Фаза 4.19 heatmap, 4.21 taper-кривая, 4.22 таблица мезо, 4.23 даты, 4.24 print+ics, 4.27 дифф | ✅ выполнена (data-билдеры + UI-виджеты в шаге «План») | 945535f5, ca489104, 9f845e0d, a86aece9 |
 | Фаза 4.25 «🍽 В планировщик питания» | ✅ выполнена (по конвенции cardio: note + буфер) | 99152851 |
 | Фаза 4.20 FF-график (Banister) | ✅ выполнена (buildBBFitnessFatigue + FFChart в «Наглядности») | f9dd5762 |
-| Фаза 4.26 своп-модал bulk/undo | ⬜ остаток (чистая UI-полировка редактора упражнений) |
-| Фаза 4.28 чистка UI | ◐ шаги пронумерованы сквозной, onApplyCycle — осознанный no-op (ББ-блок без cycleId); гейт/оверрайды — остаток |
-| Фаза 5.29 merge trial, 5.31 targetBodyFat, 5.32 алиасы→stable, 5.33 liveAdjust | ✅ выполнена | 9249662c |
-| Фаза 5.30 удалить deprecated | ◐ удалён prependPreparationWeeks; bb-peak-week/generatePLPeaking оставлены (риск) |
+| Фаза 4.26 своп-модал bulk/undo | ✅ выполнена (undo/redo commitEdits + пакетное применение к неделе) | 0bdcad78 |
+| Фаза 4.28 чистка UI | ✅ выполнена (оверрайды восстановления/лаб-множителя; шаги сквозные; onApplyCycle — осознанный no-op) | a635ae37 |
+| Фаза 5.30 удалить deprecated | ✅ выполнена (удалены bb-peak-week.engine + тесты, peakForPLMeet/peakForBBShow, generatePLPeaking/PL-типы; generateBBPeaking сохранён — live) | 044e9820 |
 
-Проверка: `tsc 0` по файлам BB, полный `vitest run bb` = **1873 passed / 56 failed (все пред-существующие
+Проверка: `tsc 0` по проекту (NODE_OPTIONS=6GB), полный `vitest run bb` = **1855 passed / 56 failed (все пред-существующие
 из baseline ~59: vitest-каталог EXERCISE_CATALOG без 16 упражнений + чужие WIP bb-macrocycle v7,
-bb-auto-annual-ctx и др.).** Новых регрессий нет.
+bb-auto-annual-ctx и др.).** Новых регрессий нет (падение 1855 vs 1875 — это удалённые deprecated-тесты bb-peak-week).
 
 Основан на полном анализе движков (`src/engines/bb/*`), UI (`BbAutoConstructor.tsx` 6.7k строк + связанные)
 и системы Тапер-ББ (`bb-contest-prep.engine.ts` 2.9k строк, `bb-prep-cycle`, `lms-taper` для сравнения).
