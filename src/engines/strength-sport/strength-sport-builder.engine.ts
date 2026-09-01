@@ -21,6 +21,7 @@ import { applyIntensity } from './strength-sport-intensity';
 import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, weightCutNutritionForWeekSS, weightCutRehydrationNotesSS, validateWeightCutProtocolSS } from './strength-sport-weight-cut.engine';
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
+import { buildMedleyPlan, buildStoneLadder } from './strength-sport-strongman-attempts.engine';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
 /** Пул упражнений по тегу — кандидаты (id каталога) + замены — PRO: +6 стронг-ивентов (husafell/frame/sandbag_load/keg/car_deadlift/axle_press) */
@@ -166,12 +167,30 @@ function buildWarmup(weight: number, id?: string): StrengthSportSet[] {
 }
 
 function buildExerciseSets(id: string, tag: string, phase: string, input: StrengthSportInput, isPrimary: boolean, week: number): { sets: number; reps: [number, number]; rir: number; weight: number; workSets: StrengthSportSet[] } {
-  const reps = repsFor(tag, phase, input.goal, isPrimary);
-  const pct = pctFor(phase, input.goal, tag);
+  // D2: conjugate ротация — определяем заранее для reps/pct
+  const preConjugate = (input as any).mode === 'strongman' && tag === 'event_day' && phase !== 'deload' ? (week % 3 === 1 ? 'max' : week % 3 === 2 ? 'dynamic' : 'rep') : 'none';
+  let reps = repsFor(tag, phase, input.goal, isPrimary);
+  let pct = pctFor(phase, input.goal, tag);
+  if (preConjugate === 'max') {
+    pct = Math.min(0.95, pct + 0.05);
+    // reps оставляем низкие для max
+  } else if (preConjugate === 'dynamic') {
+    pct = Math.max(0.60, pct - 0.15);
+    reps = [1, 2] as [number, number];
+  } else if (preConjugate === 'rep') {
+    pct = Math.max(0.60, pct - 0.05);
+    reps = [reps[0]+1, reps[1]+2] as [number, number];
+  }
   const baseWeight = weightForExercise(id, input, pct, week);
   let sets = 3;
   if (isOly(id)) sets = phase === 'peaking' ? 5 : phase === 'deload' ? 3 : 5;
-  else if (tag === 'event_day') sets = phase === 'deload' ? 2 : 3;
+  else if (tag === 'event_day') {
+    if (phase === 'deload') {
+      // D3: tire_flip AMRAP → 1×60% в делоде, остальные carries 2
+      if (id === 'tire_flip') sets = 1;
+      else sets = 2;
+    } else sets = 3;
+  }
   else sets = phase === 'peaking' ? 4 : phase === 'deload' ? 2 : isPrimary ? 4 : 3;
   if (input.focus) {
     const f = volumeMultForExercise(id, input.focus);
@@ -212,6 +231,18 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   else if (acwr?.zone === 'caution' && sets > 2) sets = Math.max(2, Math.round(sets * 0.85));
   else if (acwr?.zone === 'undertrained') sets = Math.min(6, sets + 1);
   if (typeof vLoss === 'number' && vLoss > 20 && sets > 2) sets = Math.max(2, Math.round(sets * 0.90));
+  // H1: VelocityHistory 3 точки → zone 20/30%
+  const vHist = (input as any).velocityHistory as Record<string, number[]> | undefined;
+  let histLoss = 0;
+  if (vHist) {
+    const hist = vHist[id] || vHist[id.toLowerCase()] || (vHist as any)['all'];
+    if (Array.isArray(hist) && hist.length >= 2) {
+      const best = Math.max(...hist);
+      const last = hist[hist.length - 1];
+      if (best > 0) histLoss = (best - last) / best * 100;
+    }
+  }
+  if (histLoss > 20 && sets > 2) sets = Math.max(2, Math.round(sets * (histLoss > 30 ? 0.80 : 0.90)));
   // P3 diary e1RM trend: -5% down → -15%, plateau <2% → +1 сет
   const trends: any[] = (input as any).diaryTrend || [];
   const myTrend = trends.find((t:any)=> t.lift===id || (id.includes('snatch')&&t.lift==='snatch') || (id.includes('clean')&&t.lift==='clean') || (id.includes('squat')&&t.lift==='squat') || (id.includes('deadlift')&&t.lift==='deadlift'));
@@ -226,8 +257,13 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     if (acwr?.zone === 'dangerous') finalRir = Math.min(4, finalRir + 2);
     else if (acwr?.zone === 'caution') finalRir = Math.min(4, finalRir + 1);
     if (typeof vLoss === 'number' && vLoss > 20) finalRir = Math.min(4, finalRir + 1);
+    if (histLoss > 20) finalRir = Math.min(4, finalRir + 1);
+    if (histLoss > 30) finalRir = Math.min(4, finalRir + 1);
     if (myTrend && myTrend.changePct < -5) finalRir = Math.min(4, finalRir + 1);
     if (outM < 0.75) finalRir = Math.min(4, finalRir + 1);
+    // D2 conjugate RIR
+    if (preConjugate === 'max') finalRir = Math.max(0, finalRir - 1);
+    else if (preConjugate === 'dynamic') finalRir = Math.min(4, finalRir + 1);
   }
   const gentle = gentleFactor(id, input.injuries as any);
   let finalWeight = baseWeight;
@@ -238,7 +274,8 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
     // щадящий: +2 повтора, меньше отказ
     finalReps = [reps[0]+1, reps[1]+2] as [number, number];
   }
-  const tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
+  let tempo = tempoForSS(id, isPrimary ? 'тяж' : 'памп', phase);
+  if (preConjugate === 'dynamic') tempo = 'X-0-X-0';
   const rest = restForSS(isPrimary ? 'тяж' : 'памп', isPrimary, id, pct);
   // P0-6: для стронга 300-360с, для oly 180с — теперь rest уже учитывает id+pct
   const finalRest = gentle < 1 ? rest + 30 : rest;
@@ -247,13 +284,15 @@ function buildExerciseSets(id: string, tag: string, phase: string, input: Streng
   const workSets: StrengthSportSet[] = [];
   for (let i = 0; i < sets; i++) {
     const rep = Math.round((finalReps[0] + finalReps[1]) / 2);
-    const ws: StrengthSportSet = { reps: rep, rir: finalRir, weight: finalWeight, pct: Math.round(pct * 100), tempo, restSeconds: finalRest } as StrengthSportSet;
+    let wsTempo = tempo;
+    if (histLoss > 20) wsTempo = tempo + ` VBT ${Math.round(histLoss)}%`;
+    const ws: StrengthSportSet = { reps: rep, rir: finalRir, weight: finalWeight, pct: Math.round(pct * 100), tempo: wsTempo, restSeconds: finalRest } as StrengthSportSet;
     if (evMeta?.defaultDistanceM) (ws as any).distanceM = evMeta.defaultDistanceM;
     if (evMeta?.defaultTimeCapS) (ws as any).timeCapS = evMeta.defaultTimeCapS;
-    // для carries reps всегда 1 проход, для камней 1-2 подъёма — сохраняем rep как есть
     if (isCarryEvent(id)) ws.reps = 1;
     workSets.push(ws);
   }
+  // H1: если VBT loss >30% — дополнительный VBT маркер на первый сет
   return { sets, reps: finalReps, rir: finalRir, weight: finalWeight, workSets };
 }
 
@@ -522,9 +561,32 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
       const accessoryCount = tag === 'event_day' ? 1 : 2;
       const total = primaryCount + accessoryCount;
       const favSet = new Set((input.favoriteExercises || []).map(s => s.toLowerCase()));
-      const chosen = selectDiverse(pool, tag, total, favSet);
+      let chosen = selectDiverse(pool, tag, total, favSet);
       if (chosen.length < total) {
         for (const id of pool) { if (chosen.length >= total) break; if (!chosen.includes(id)) chosen.push(id); }
+      }
+      // C2: strongman event_day — гарантируем medley 2+1 (2 carries + 1 stone) как требует PRO
+      if (tag === 'event_day' && mode === 'strongman') {
+        const isStoneId = (id:string)=> ['atlas_stone_load','sandbag_load','stone_lift','sandbag_shoulder','keg_toss'].includes(id);
+        const carriesInChosen = chosen.filter(id=> isCarryEvent(id));
+        if (carriesInChosen.length < 2) {
+          const carryPool = pool.filter(id=> isCarryEvent(id) && !chosen.includes(id));
+          if (carryPool.length) {
+            const replaceIdx = chosen.findIndex(id=> !isCarryEvent(id) && !isStoneId(id));
+            if (replaceIdx >= 0) chosen[replaceIdx] = carryPool[0];
+            else if (chosen.length < total) chosen.push(carryPool[0]);
+            else chosen[chosen.length-1] = carryPool[0];
+          }
+        }
+        const stonesInChosen = chosen.filter(id=> isStoneId(id));
+        if (stonesInChosen.length === 0) {
+          const stonePool = pool.filter(id=> isStoneId(id) && !chosen.includes(id));
+          if (stonePool.length) {
+            // заменить push (tire/sled) на камень если нет камня
+            const pushIdx = chosen.findIndex(id=> ['tire_flip','sled_push_sprint','car_deadlift_18','axle_press'].includes(id));
+            if (pushIdx >=0) chosen[pushIdx] = stonePool[0];
+          }
+        }
       }
       const exercises: StrengthSportExercise[] = [];
       for (let idx = 0; idx < chosen.length; idx++) {
@@ -537,15 +599,16 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         // P0-4 весогонка — режем объём в taper/fight_week
         if (wcProto) {
           const wcm = weightCutVolumeMultiplierSS(w, weeks, wcProto);
-          if (wcm < 1) built.sets = Math.max(2, Math.round(built.sets * wcm));
+          if (wcm < 1) built.sets = Math.max(id === 'tire_flip' ? 1 : 2, Math.round(built.sets * wcm));
         }
         // P3 taper vs deload — taper сохраняет интенсивность (Bosquet), deload снижает всё
         let finalSets = built.sets;
         let finalWeight = built.weight;
         let finalRir = built.rir;
-        if (taper && !deload) { finalSets = Math.max(2, Math.round(built.sets * 0.55)); finalWeight = Math.round(built.weight * 0.92 / 2.5) * 2.5; finalRir = 1; }
-        else if (taper && deload) { finalSets = Math.max(2, Math.round(built.sets * 0.45)); finalWeight = Math.round(built.weight * 0.90 / 2.5) * 2.5; finalRir = 1; }
-        else if (deload) { finalSets = Math.max(2, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
+        const minSets = id === 'tire_flip' ? 1 : 2;
+        if (taper && !deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.55)); finalWeight = Math.round(built.weight * 0.92 / 2.5) * 2.5; finalRir = 1; }
+        else if (taper && deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.45)); finalWeight = Math.round(built.weight * 0.90 / 2.5) * 2.5; finalRir = 1; }
+        else if (deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
         const workSets: StrengthSportSet[] = built.workSets.slice(0, finalSets).map(s => {
           const ns:any = { ...s, weight: finalWeight, rir: finalRir };
           // D3 deload: дистанция у carries ×0.5, камни ×0.7
@@ -594,7 +657,7 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         };
         exercises.push(ex);
       }
-      // C2 medley: strongman event_day с ≥2 carries → пометка цепи на первой carries
+      // C2 medley: strongman event_day с ≥2 carries → цепь 2+1 (90с переход cap 180с)
       if (tag === 'event_day' && mode === 'strongman') {
         const carries = exercises.filter(e => isCarryEvent(e.id));
         if (carries.length >= 2) {
@@ -602,15 +665,18 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           const medleyNames = carries.slice(0,2).map(c=> c.name).join(' → ');
           const totalDist = carries.slice(0,2).reduce((a,c)=> a + ((c.workSets[0] as any)?.distanceM||20),0);
           const note = `Medley: ${medleyNames} ${totalDist}м (90с переход, cap 180с)`;
-          // добавляем заметку к первой carries, остальные получают cap 180 shared
           const first = carries[0];
           first.comment = first.comment ? `${first.comment} · ${note}` : note;
-          // синхронизируем timeCap для medley
-          carries.slice(0,2).forEach(c=> { c.workSets.forEach((ws:any)=> ws.timeCapS = 180); });
-          // если есть камень третьим — добавляем как финишер в medley
-          const stone = exercises.find(e=> ['atlas_stone_load','sandbag_load','stone_lift'].includes(e.id));
+          // синхронизируем timeCap и rest 90с для medley
+          carries.slice(0,2).forEach(c=> {
+            c.workSets.forEach((ws:any)=> { ws.timeCapS = 180; ws.restSeconds = 90; });
+            c.restSeconds = 90;
+          });
+          const stone = exercises.find(e=> ['atlas_stone_load','sandbag_load','stone_lift','sandbag_shoulder','keg_toss'].includes(e.id));
           if (stone && carries.length===2) {
             stone.comment = stone.comment ? `${stone.comment} · Medley финишер` : 'Medley финишер';
+            // камень в medley — rest тоже 90 между, cap 60
+            stone.workSets.forEach((ws:any)=> { ws.timeCapS = 60; });
           }
         }
       }
@@ -653,11 +719,26 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   if (outsideMetrics && outsideMetrics.weeklyLoad > 1800 && pattern.sessionsPerRotation >= 5) {
     warnings.push(`Высокая внезальная нагрузка (${outsideMetrics.weeklyLoad}) + ${pattern.sessionsPerRotation}× зал — риск недовосстановления. Снизьте зал до 3×.`);
   }
-  // Недельный бюджет: если totalSets > budget → warning
+  // Недельный бюджет: если totalSets > budget → warning + enforce до budget (режем accessory)
   for (const wk of weeksData) {
     if ((wk.totalSets || 0) > weeklyBudget * 0.9) {
       warnings.push(`Нед ${wk.week}: ${wk.totalSets} сетов близко к бюджету ${weeklyBudget}.`);
-      break;
+    }
+    if ((wk.totalSets || 0) > weeklyBudget) {
+      let cur = wk.totalSets || 0;
+      // режем accessory сеты по 1 до входа в бюджет
+      for (const sess of [...wk.sessions].sort((a,b)=> b.exercises.length - a.exercises.length)) {
+        for (let i = sess.exercises.length-1; i>=0 && cur > weeklyBudget; i--) {
+          const ex = sess.exercises[i];
+          if ((ex as any).role === 'accessory' && ex.sets > 2) { ex.sets -=1; ex.workSets = ex.workSets.slice(0, ex.sets); cur -=1; }
+        }
+      }
+      // если всё ещё > budget — режем любые с 3+ до 2
+      for (const sess of wk.sessions) for (let i=sess.exercises.length-1; i>=0 && cur > weeklyBudget; i--) {
+        const ex = sess.exercises[i];
+        if (ex.sets > 2) { ex.sets -=1; ex.workSets = ex.workSets.slice(0, ex.sets); cur -=1; }
+      }
+      wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
     }
   }
   // Спец-снаряды без оборудования

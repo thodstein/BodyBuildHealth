@@ -49,6 +49,12 @@ export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
         if (meet) extra += `<p><b>Попытки:</b> рывок ${meet.snatch.opener}/${meet.snatch.second}/${meet.snatch.third} · толчок ${meet.cleanJerk.opener}/${meet.cleanJerk.second}/${meet.cleanJerk.third} · тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''} ${ (meet as any).robi?`· Robi ${(meet as any).robi}`:''}</p>`;
       } catch {}
     }
+    // medley table для стронга
+    const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley'))));
+    if (hasMedley && plan.mode==='strongman') {
+      const medleyRows = plan.weeksData.flatMap(w=> w.sessions.filter(s=> s.sessionTag==='event_day').flatMap(s=> s.exercises.filter(e=> (e.comment||'').includes('Medley'))).map(e=> `<tr><td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">Н${w.week}</td><td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${escHtml(e.name)} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м cap ${(e.workSets[0] as any)?.timeCapS||60}с</td><td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${escHtml(e.comment||'')}</td></tr>`).join(''));
+      if (medleyRows) extra += `<h3 style="margin:10px 0 4px">Medley цепь</h3><table><tr><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Неделя</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Ивент</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Примечание</th></tr>${medleyRows}</table>`;
+    }
     // Sinclair уже в report
   } catch {}
   const summary = `<div style="margin:8px 0;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px"><b>${title}</b> · ${plan.weeksData.map(w=>`Н${w.week}:${w.phase}${w.deload?' дел':''} ${w.totalSets}сет`).join(' | ')}<br/>Бюджет: ${plan.rationale.join(' | ')}</div>`;

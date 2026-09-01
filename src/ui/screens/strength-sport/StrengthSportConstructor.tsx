@@ -164,6 +164,20 @@ export const StrengthSportConstructor: React.FC = () => {
         if(diaryTrend.length===0) diaryTrend=null;
       }
     }catch{}
+    let velocityHistory: Record<string, number[]> | undefined;
+    try {
+      const grouped: Record<string, number[]> = {};
+      for (const [k,v] of Object.entries(vbtMap as Record<string, number>)) {
+        if (!v || v<=0) continue;
+        const parts = String(k).split('-');
+        const exId = parts.slice(2, -1).join('-');
+        if (!exId) continue;
+        if (!grouped[exId]) grouped[exId]=[];
+        grouped[exId].push(v);
+        if (grouped[exId].length>3) grouped[exId]=grouped[exId].slice(-3);
+      }
+      if (Object.keys(grouped).length) velocityHistory = grouped;
+    } catch {}
     let input: StrengthSportInput = {
       mode, goal, level, weeks, daysPerWeek: days, workMax, focus, methodology, dupMode, intensityTech,
       outsideLoad: outsideEnabled ? outside : null,
@@ -173,6 +187,7 @@ export const StrengthSportConstructor: React.FC = () => {
       startDate: new Date().toISOString().slice(0,10),
       acwr: acwr as any,
       velocityLossPct: velocityLoss > 0 ? velocityLoss : undefined,
+      velocityHistory: velocityHistory || undefined,
       patternId: patternId || undefined,
       diaryTrend: diaryTrend || undefined,
       taperWeeks: goal==='peaking' ? taperWeeks : undefined,
@@ -252,7 +267,7 @@ export const StrengthSportConstructor: React.FC = () => {
     });
   };
 
-  const updateSet = (wkIdx: number, day: number, exId: string, setIdx: number, patch: Partial<{ weight:number; reps:number; rir:number }>) => {
+  const updateSet = (wkIdx: number, day: number, exId: string, setIdx: number, patch: Partial<{ weight:number; reps:number; rir:number; distanceM:number; timeCapS:number }>) => {
     setPlan(prev=>{
       if(!prev) return prev;
       const copy: StrengthSportPlan = JSON.parse(JSON.stringify(prev));
@@ -260,11 +275,13 @@ export const StrengthSportConstructor: React.FC = () => {
       if(!ex || !ex.workSets[setIdx]) return prev;
       if(patch.weight!=null){
         if(patch.weight<0 || patch.weight>600) return prev;
-        ex.workSets[setIdx].weight = patch.weight;
+        (ex.workSets[setIdx] as any).weight = patch.weight;
         ex.weight = Math.round(ex.workSets.reduce((a,s)=>a+s.weight,0)/ex.workSets.length);
       }
-      if(patch.reps!=null) ex.workSets[setIdx].reps = Math.max(1, Math.min(20, patch.reps));
-      if(patch.rir!=null) ex.workSets[setIdx].rir = Math.max(0, Math.min(5, patch.rir));
+      if(patch.reps!=null) (ex.workSets[setIdx] as any).reps = Math.max(1, Math.min(20, patch.reps));
+      if(patch.rir!=null) (ex.workSets[setIdx] as any).rir = Math.max(0, Math.min(5, patch.rir));
+      if((patch as any).distanceM!=null) (ex.workSets[setIdx] as any).distanceM = Math.max(5, Math.min(100, (patch as any).distanceM));
+      if((patch as any).timeCapS!=null) (ex.workSets[setIdx] as any).timeCapS = Math.max(10, Math.min(300, (patch as any).timeCapS));
       saveStrengthSportPlan(copy);
       return copy;
     });
@@ -628,19 +645,28 @@ export const StrengthSportConstructor: React.FC = () => {
           <div style={{ ...CARD, padding:14 }}>
             <CardHeader icon="✦" title="Карта качества" subtitle="Сеты/нед vs MEV/MRV — тоннаж и зоны" />
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {([
+              {(plan.mode==='strongman' ? [
+                { key:'overhead', label:'Жим', ids:['log_press','axle_press','ohp'], get:'overhead', icon:'🪵', strong:true },
+                { key:'deadlift', label:'Тяга', ids:['deadlift','sumo_dl','axle_deadlift','car_deadlift_18'], get:'deadlift', icon:'🏋️' },
+                { key:'squat', label:'Присед', ids:['back_squat','front_squat'], get:'squat', icon:'🦵' },
+                { key:'carry', label:'Переноски', ids:['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry'], get:'carry', icon:'🚜', strong:true, isMeters:true },
+                { key:'stone', label:'Камни', ids:['atlas_stone_load','sandbag_load','stone_lift'], get:'stone', icon:'🪨', strong:true },
+              ] : [
                 { key:'snatch', label:'Рывок', ids:['snatch','hang_snatch','power_snatch'], get:'snatch', icon:'⚡️' },
                 { key:'cl', label:'Толчок', ids:['clean_and_jerk','hang_clean'], get:'cleanJerk', icon:'🏋️' },
                 { key:'squat', label:'Присед', ids:['back_squat','front_squat'], get:'squat', icon:'🦵' },
               ] as any).map((row:any)=> (
                 <div key={row.key} style={{ display:'flex', gap:8, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase', color:'#86efac', minWidth:62, display:'flex', alignItems:'center', gap:4 }}><span style={{ fontSize:11 }}>{row.icon}</span>{row.label}</span>
+                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase', color: row.strong ? '#ff9f0a' : '#86efac', minWidth:62, display:'flex', alignItems:'center', gap:4 }}><span style={{ fontSize:11 }}>{row.icon}</span>{row.label}</span>
                   <div style={{ display:'flex', gap:6, flexWrap:'wrap', flex:1 }}>
                     {plan.weeksData.map(wk=>{
-                      const cnt = wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.some((id:string)=> e.id.includes(id)))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x+s.reps,0),0);
-                      const lm = getWL(plan.level, row.get as any); const st = lm ? (cnt<lm.mev?'below': cnt<=lm.mav?'optimal': cnt<=lm.mrv?'high':'over') : 'optimal';
+                      const cnt = row.isMeters
+                        ? wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.some((id:string)=> e.id===id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x + ((s as any).distanceM||20),0),0)
+                        : wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.some((id:string)=> e.id.includes(id)))).reduce((a,e)=> a + (row.key==='snatch'||row.key==='cl' ? e.workSets.reduce((x,s)=> x+s.reps,0) : e.sets),0);
+                      const lm = row.strong ? getStrong(plan.level, row.get as any) : getWL(plan.level, row.get as any); const st = lm ? (cnt<lm.mev?'below': cnt<=lm.mav?'optimal': cnt<=lm.mrv?'high':'over') : 'optimal';
                       const col = st==='below'?'#f59e0b': st==='optimal'?'#30d158': st==='high'?'#eab308':'#ff3b30';
-                      return <span key={wk.week} style={{ padding:'4px 8px', borderRadius:10, background:col+'14', border:`0.5px solid ${col}2e`, color:col, fontSize:10.5, fontWeight:700, fontFamily:'-apple-system, system-ui, sans-serif', fontVariantNumeric:'tabular-nums' }}>Н{wk.week}: {cnt}</span>;
+                      const unit = row.isMeters ? 'м' : row.key==='snatch'||row.key==='cl' ? '' : '';
+                      return <span key={wk.week} style={{ padding:'4px 8px', borderRadius:10, background:col+'14', border:`0.5px solid ${col}2e`, color:col, fontSize:10.5, fontWeight:700, fontFamily:'-apple-system, system-ui, sans-serif', fontVariantNumeric:'tabular-nums' }}>Н{wk.week}: {cnt}{unit}</span>;
                     })}
                   </div>
                 </div>
@@ -703,6 +729,10 @@ export const StrengthSportConstructor: React.FC = () => {
                                 <input type="number" value={s.reps} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{reps:Number(e.target.value)||0})} style={{ width:34, padding:'3px 4px', fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:6, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />×
                                 <input type="number" value={s.rir} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{rir:Number(e.target.value)||0})} style={{ width:30, padding:'3px 4px', fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:6, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />RIR
                                 <input type="number" step="0.05" placeholder="м/с" value={vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`] ?? ''} onChange={e=> { const v=parseFloat(e.target.value); const k=`${wk.week}-${sess.day}-${ex.id}-${si}`; setVbtMap(m=> ({...m, [k]: Number.isFinite(v)?v:0})); }} style={{ width:48, padding:'3px 4px', fontSize:10, background:'rgba(255,255,255,0.06)', color:'#fff', border:'0.5px solid rgba(255,255,255,0.10)', borderRadius:6, textAlign:'center', fontVariantNumeric:'tabular-nums' }} />
+                                {(ex.id.includes('yoke')||ex.id.includes('farmers')||ex.id.includes('carry')||ex.id.includes('husafell')||ex.id.includes('frame')||ex.id.includes('sled')||ex.id.includes('tire')||ex.id.includes('stone')||ex.id.includes('sandbag')) && <>
+                                  <input type="number" placeholder="м" title="дистанция м" value={(s as any).distanceM ?? ''} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{distanceM: Number(e.target.value)||0} as any)} style={{ width:40, padding:'3px 4px', fontSize:10, background:'rgba(255,159,10,0.10)', color:'#fff', border:'0.5px solid rgba(255,159,10,0.18)', borderRadius:6, textAlign:'center' }} />
+                                  <input type="number" placeholder="с" title="cap с" value={(s as any).timeCapS ?? ''} onChange={e=> updateSet(wk.week-1,sess.day,ex.id,si,{timeCapS: Number(e.target.value)||0} as any)} style={{ width:40, padding:'3px 4px', fontSize:10, background:'rgba(59,130,246,0.10)', color:'#fff', border:'0.5px solid rgba(59,130,246,0.18)', borderRadius:6, textAlign:'center' }} />
+                                </>}
                                 {(() => { const v=vbtMap[`${wk.week}-${sess.day}-${ex.id}-${si}`]; if(!v||v<=0) return null; const e1=estimate1RMFromVelocitySS(s.weight, v, ex.id); return e1? <span style={{ fontSize:9, color:TEXT_3, fontVariantNumeric:'tabular-nums' }}>e1RM {Math.round(e1)}кг</span>:null; })()}
                               </span>
                             ))}

@@ -228,14 +228,30 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
       const axWarn = `Нед ${wk.week}: осевая недельная ${axialSets} сетов + ${carryMeters}м + ${stoneLifts} камней — высокая компрессия, добавьте кор 2× и +1 отдых.`;
       if (!warnings.includes(axWarn)) warnings.push(axWarn);
     }
-    // Grip prehab auto — инъекция вместо только warning (с учётом лимитов)
+    // Grip prehab auto — резка accessory как combat face_pull, без maxSets блока
     if (gripSets > 12 && plan.mode === 'strongman') {
-      const hasGripPrehab = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('wrist') || e.id.includes('hang') || e.id.includes('pinch')));
+      const hasGripPrehab = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('wrist') || e.id.includes('hang') || e.id.includes('pinch') || e.id.includes('plank')));
       if (!hasGripPrehab) {
         warnings.push(`Нед ${wk.week}: хват ${gripSets} сетов — добавлен prehab wrist_curl 2×15 + вис 30с.`);
-        const target = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
-        const curSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
-        if (target && target.exercises.length + 2 <= lim.maxExercises && curSets + 4 <= lim.maxSets) {
+        let target = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
+        if (target) {
+          // освобождаем место под 4 сета как combat: режем accessory с конца
+          let curSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
+          while (curSets + 4 > lim.maxSets) {
+            let cut = false;
+            for (let si = wk.sessions.length-1; si>=0 && curSets +4 > lim.maxSets; si--) {
+              const sess = wk.sessions[si];
+              for (let ei = sess.exercises.length-1; ei>=0 && curSets +4 > lim.maxSets; ei--) {
+                const ex = sess.exercises[ei];
+                if (ex.role === 'accessory' && ex.sets > 2) { ex.sets -= 1; ex.workSets = ex.workSets.slice(0, ex.sets); curSets -=1; cut=true; }
+              }
+            }
+            if (!cut) break;
+          }
+          while (target.exercises.length + 2 > lim.maxExercises) {
+            let idx=-1; for(let i=target.exercises.length-1;i>=0;i--) if((target.exercises[i] as any).role==='accessory'){ idx=i; break; }
+            if(idx>=0) target.exercises.splice(idx,1); else target.exercises.pop();
+          }
           const injectGrip = (id:string,name:string,reps:string,weight:number) => ({
             id, name, group:'arms', pattern:'carry', role:'accessory' as const, character:'памп' as const,
             sets:2, reps, rir:2, weight, workSets:[{ reps:15, rir:2, weight, pct:60, tempo:'2-0-1-0', restSeconds:60 },{ reps:15, rir:2, weight, pct:60, tempo:'2-0-1-0', restSeconds:60 }], tempo:'2-0-1-0', restSeconds:60, isCompetitionLift:false, comment:'Prehab хват (auto)',
@@ -246,13 +262,23 @@ export function finalizeStrengthSportPlan(plan: StrengthSportPlan, opts?: Finali
         }
       }
     }
-    // Core prehab для осевой высокой
+    // Core prehab 45с plank auto при axial 12
     if (axialSets >= 12 && (carryMeters > 300 || stoneLifts > 18) && plan.mode === 'strongman') {
-      const hasCore = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('plank') || e.id.includes('deadbug') || e.id.includes('ab_')));
+      const hasCore = wk.sessions.some(s=> s.exercises.some(e=> e.id.includes('plank') || e.id.includes('deadbug') || e.id.includes('ab_') || e.id.includes('side_plank')));
       if (!hasCore) {
-        const targetCore = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
-        if (targetCore && targetCore.exercises.length < lim.maxExercises) {
-          targetCore.exercises.push({ id:'plank', name:'Планка', group:'core', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'45с', rir:2, weight:0, workSets:[{ reps:1, rir:2, weight:0, pct:50, tempo:'1-0-1-0', restSeconds:45 } as any, { reps:1, rir:2, weight:0, pct:50, tempo:'1-0-1-0', restSeconds:45 } as any], tempo:'1-0-1-0', restSeconds:45, isCompetitionLift:false, comment:'Prehab кор (axial)' } as any);
+        let targetCore = [...wk.sessions].sort((a,b)=> (a.exercises.reduce((x,e)=>x+e.sets,0)) - (b.exercises.reduce((x,e)=>x+e.sets,0)))[0];
+        if (targetCore) {
+          let curSetsC = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=>x+e.sets,0),0);
+          while (curSetsC + 2 > lim.maxSets) {
+            let cut=false;
+            for(let si=wk.sessions.length-1; si>=0 && curSetsC+2>lim.maxSets; si--){ const sess=wk.sessions[si]; for(let ei=sess.exercises.length-1; ei>=0 && curSetsC+2>lim.maxSets; ei--){ const ex=sess.exercises[ei]; if((ex as any).role==='accessory' && ex.sets>2){ ex.sets-=1; ex.workSets=ex.workSets.slice(0,ex.sets); curSetsC-=1; cut=true; } } }
+            if(!cut) break;
+          }
+          while (targetCore.exercises.length + 1 > lim.maxExercises) {
+            let idx=-1; for(let i=targetCore.exercises.length-1;i>=0;i--) if((targetCore.exercises[i] as any).role==='accessory'){ idx=i; break; }
+            if(idx>=0) targetCore.exercises.splice(idx,1); else targetCore.exercises.pop();
+          }
+          targetCore.exercises.push({ id:'plank', name:'Планка', group:'core', pattern:'carry', role:'accessory', character:'памп', sets:2, reps:'45с', rir:2, weight:0, workSets:[{ reps:1, rir:2, weight:0, pct:50, tempo:'1-0-1-0', restSeconds:45 } as any, { reps:1, rir:2, weight:0, pct:50, tempo:'1-0-1-0', restSeconds:45 } as any], tempo:'1-0-1-0', restSeconds:45, isCompetitionLift:false, comment:'Prehab кор (axial) 45с' } as any);
           wk.totalSets = wk.sessions.reduce((a,s)=> a + s.exercises.reduce((x,e)=> x+e.sets,0),0);
         }
       }

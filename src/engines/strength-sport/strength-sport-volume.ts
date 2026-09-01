@@ -42,7 +42,7 @@ export const STRONG_LANDMARKS: Record<Level, Record<string, Landmarks>> = {
     overhead: { mev: 6, mav: 11, mrv: 16, unit: 'sets' },
     deadlift: { mev: 4, mav: 8, mrv: 12, unit: 'sets' },
     squat: { mev: 6, mav: 10, mrv: 15, unit: 'sets' },
-    carry: { mev: 80, mav: 160, mrv: 280, unit: 'meters' },
+    carry: { mev: 80, mav: 180, mrv: 360, unit: 'meters' },
     stone: { mev: 8, mav: 13, mrv: 18, unit: 'lifts' },
     grip: { mev: 4, mav: 8, mrv: 12, unit: 'sets' },
   },

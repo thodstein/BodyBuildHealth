@@ -77,7 +77,9 @@ export function validateAnnualSSPhases(annual: AnnualSS): string[] {
 
 export function weeksUntilCompetition(annual: AnnualSS, competitionDate: string, startDate?: string): number | null {
   try{
-    const start = startDate ? new Date(startDate) : new Date(annual.createdAt);
+    const fallback = (annual.blocks[0] as any)?.plan?.inputSnapshot?.startDate as string | undefined;
+    const s = startDate || fallback || annual.createdAt;
+    const start = new Date(s);
     const comp = new Date(competitionDate);
     const diff = Math.round((comp.getTime() - start.getTime()) / (1000*60*60*24*7));
     return diff;

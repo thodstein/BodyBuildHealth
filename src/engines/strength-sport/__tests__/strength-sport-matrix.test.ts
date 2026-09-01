@@ -13,9 +13,9 @@ describe('strength-sport matrix 192 combos (mode×level×days×goal)', () => {
       const plan = buildStrengthSportPlan({ mode, goal, level, weeks:6, daysPerWeek:d, workMax:{ snatch:70, cleanJerk:90, backSquat:120, deadlift:160 } });
       expect(plan.weeksData.length).toBe(6);
       expect(plan.weeksData[0].sessions.length).toBeGreaterThan(0);
-      // каждая сессия 3-5 упр, каждый сет 2-6, вес >=0
+      // каждая сессия 3-5 упр, каждый сет 2-6 (tire_flip deload 1×60% допуск), вес >=0
       for (const wk of plan.weeksData) for (const sess of wk.sessions) for (const ex of sess.exercises) {
-        expect(ex.sets).toBeGreaterThanOrEqual(2);
+        expect(ex.sets).toBeGreaterThanOrEqual(ex.id === 'tire_flip' ? 1 : 2);
         expect(ex.sets).toBeLessThanOrEqual(6);
         expect(ex.weight).toBeGreaterThanOrEqual(0);
         expect(ex.workSets.length).toBe(ex.sets);

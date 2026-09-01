@@ -80,7 +80,8 @@ export interface StrengthSportInput {
   competitionDate?: string;
   startDate?: string;
   acwr?: { ratio: number; zone: 'undertrained'|'optimal'|'caution'|'dangerous' } | null;
-  velocityLossPct?: number; // P1 VBT: потеря скорости %
+  velocityLossPct?: number; // P1 VBT: потеря скорости % (скаляр legacy)
+  velocityHistory?: Record<string, number[]>; // P1 VBT: по 3 точки на лифт {yoke_walk:[1.1,1.0,0.85]}
   cardioSuggested?: boolean; // P2: zone2 подсказан
   taperWeeks?: number; // P3: тейпер недель перед стартом (1-2)
   diaryTrend?: { lift: string; changePct: number }[] | null; // P3: e1RM тренд 28д
