@@ -62,6 +62,8 @@ export default function TrainingIntelligenceDashboard(p: Props) {
         { icon: '⭐', label: 'Качество', desc: '0-100 + MEV/MAV/MRV, проверка программы', tab: 'quality_hub' as any },
         { icon: '🔬', label: 'Диагностика', desc: 'Мастер движения 9 лифтов + видео + срывы (дневник)', tab: 'diagnostics_hub' as any },
         { icon: '🤝', label: 'Арм-диагностика', desc: 'PRO арм: 8 движений × РУ/РА, хват, tendon, humerus → в Арм-конструктор', tab: 'arm_diagnostics_hub' as any },
+        { icon: '🏋️', label: 'ТА-диагностика', desc: 'PRO ТА: рывок/взятие/толчок × фазы/углы/VBT/бар path → в ТА', tab: 'wl_diagnostics_hub' as any },
+        { icon: '🏋️‍♂️', label: 'Стронг-диагностика', desc: 'PRO стронг: лог/йок/фермер/камни × хват/кор → в Стронг', tab: 'strongman_diagnostics_hub' as any },
       ],
     },
     {

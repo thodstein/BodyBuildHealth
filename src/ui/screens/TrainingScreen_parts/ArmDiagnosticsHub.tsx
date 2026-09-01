@@ -219,7 +219,7 @@ export const ArmDiagnosticsHub: React.FC = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, marginBottom: 8 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: report.verification===1?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border:`1px solid ${report.verification===1?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}`, color: report.verification===1?'#22c55e':'#ef4444' }}>{verText} · {Math.round(report.verification*100)}% {hasGrip => hasGrip}</span>
+          <span style={{ padding: '2px 8px', borderRadius: 20, background: report.verification===1?'rgba(34,197,94,0.12)':'rgba(239,68,68,0.12)', border:`1px solid ${report.verification===1?'rgba(34,197,94,0.2)':'rgba(239,68,68,0.2)'}`, color: report.verification===1?'#22c55e':'#ef4444' }}>{verText} · {Math.round(report.verification*100)}%</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>ACWR {acwr ? acwr.ratio.toFixed(2) : '—'} {acwr ? (acwr.zone==='dangerous'?'🔴': acwr.zone==='caution'?'🟠':'🟢') : ''}</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Table {(report.tableRatio*100).toFixed(0)}%</span>
           <span style={{ padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: DIM }}>Tendon {report.tendonLoad}</span>

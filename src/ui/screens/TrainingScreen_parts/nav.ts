@@ -54,7 +54,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     color: '#3b82f6',
     subtitle: 'Единый пульт: нагрузка → восстановление → авторегуляция → прогноз (без дублей)',
     tabs: [
-      'intelligence_hub', 'strength_analysis', 'quality_hub', 'diagnostics_hub', 'arm_diagnostics_hub', 'joints_ortho', 'periodization_taper_hub',
+      'intelligence_hub', 'strength_analysis', 'quality_hub', 'diagnostics_hub', 'arm_diagnostics_hub', 'wl_diagnostics_hub', 'strongman_diagnostics_hub', 'joints_ortho', 'periodization_taper_hub',
       'exercise_lab', 'volume_hub', 'tempo_hub', 'mix_hub', 'metabolic_hub',
     ],
   },
@@ -141,6 +141,10 @@ for (const z of ZONE_ORDER) for (const t of ZONES[z].tabs) TAB_TO_ZONE[t] = z;
 (TAB_TO_ZONE as Record<string, TrainingZone>)['metabolic_hub'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['arm_diagnostics'] = 'calculators';
 (TAB_TO_ZONE as Record<string, TrainingZone>)['arm_diagnostics_hub'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['wl_diagnostics'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['wl_diagnostics_hub'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['strongman_diagnostics'] = 'calculators';
+(TAB_TO_ZONE as Record<string, TrainingZone>)['strongman_diagnostics_hub'] = 'calculators';
 
 export function zoneForTab(tab: TrainingTab): TrainingZone {
   return TAB_TO_ZONE[tab] ?? 'planner';
