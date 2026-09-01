@@ -3,7 +3,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { REP_SCHEMES, schemeFor } from '../bb-rep-schemes.engine';
-import { recommendPEDMethodology } from '../bb-ped-methodology.engine';
+import { recommendPEDMethodology, applyPEDMethodologyToPlan } from '../bb-ped-methodology.engine';
+import { computeAASEquivDose, AAS_SUBSTANCE_TEQ } from '../bb-ped-adaptation.engine';
 import { jointGuardActive, jointGuardScorePenalty } from '../bb-joint-guard.engine';
 import { insulinWindowActive } from '../bb-insulin-window.engine';
 import { PRO_PRESETS } from '../bb-pro-presets.engine';
@@ -72,6 +73,60 @@ describe('bb-insulin-window', () => {
 
 describe('pro-presets', () => {
   it('3 пресета + none', () => { expect(Object.keys(PRO_PRESETS).length).toBe(4); });
+});
+
+describe('MGF/IGF1 target (Фаза 2.9)', () => {
+  it('реальные целевые мышцы вместо заглушек __mgf_target__/__igf_target__', () => {
+    const m = recommendPEDMethodology({ peds: ['MGF','IGF1'] as any, pedDoses: { MGF: 200, IGF1: 50 }, level: 'advanced', targetMuscles: ['chest','back'] });
+    expect(m.mgfTargetMuscles).toEqual(['chest','back']);
+    expect(m.mgfTargetMuscles.some(x => x.includes('__'))).toBe(false);
+    expect(m.rationale.join(' ')).toMatch(/chest, back/);
+  });
+  it('без targetMuscles — не заполняет заглушками', () => {
+    const m = recommendPEDMethodology({ peds: ['MGF'] as any, pedDoses: { MGF: 200 }, level: 'advanced' });
+    expect(m.mgfTargetMuscles).toEqual([]);
+    expect(m.rationale.join(' ')).toMatch(/добавьте целевую мышцу/);
+  });
+  it('applyPEDMethodologyToPlan помечает целевые мышцы в памп-днях', () => {
+    const base = buildBBPlan({ patternId: 'upper_lower_4', level: 'advanced', goal: 'mass', weeks: 2, trainingYears: 3 } as any);
+    const meth = recommendPEDMethodology({ peds: ['MGF'] as any, pedDoses: { MGF: 200 }, level: 'advanced', targetMuscles: ['chest'] });
+    const out = applyPEDMethodologyToPlan(base, meth);
+    let marked = 0, heavyMarked = 0;
+    for (const w of out.weeks) for (const s of w.sessions) for (const e of s.exercises) {
+      if (e.comment?.includes('🧬 MGF/IGF1')) {
+        marked++;
+        if (s.character === 'тяж') heavyMarked++;
+      }
+    }
+    expect(marked).toBeGreaterThan(0);
+    expect(heavyMarked).toBe(0); // тяж-дни не тронуты
+    expect(out.rationale.join(' ')).toMatch(/MGF\/IGF1 локально/);
+  });
+});
+
+describe('AAS tEq для конкретных веществ (Фаза 2.9)', () => {
+  it('tren ×2.5: 500 мг = 1250 T-equiv', () => {
+    expect(computeAASEquivDose({ tren: 500 })).toBe(1250);
+  });
+  it('deca ×0.7: 400 мг = 280 T-equiv', () => {
+    expect(computeAASEquivDose({ deca: 400 })).toBe(280);
+  });
+  it('агрегированный AAS ключ = tEq 1.0', () => {
+    expect(computeAASEquivDose({ AAS: 500 })).toBe(500);
+  });
+  it('сумма веществ + агрегированный ключ', () => {
+    expect(computeAASEquivDose({ AAS: 250, tren: 200, deca: 300 })).toBe(250 + 500 + 210);
+  });
+  it('пустые дозы → 0', () => {
+    expect(computeAASEquivDose({})).toBe(0);
+  });
+  it('частичное совпадение ключа: tren_acetate → tren', () => {
+    expect(computeAASEquivDose({ tren_acetate: 400 })).toBe(1000);
+  });
+  it('AAS_SUBSTANCE_TEQ содержит tren/deca', () => {
+    expect(AAS_SUBSTANCE_TEQ.tren).toBe(2.5);
+    expect(AAS_SUBSTANCE_TEQ.deca).toBe(0.7);
+  });
 });
 
 describe('builder PED overlay не ломает тяж/памп', () => {

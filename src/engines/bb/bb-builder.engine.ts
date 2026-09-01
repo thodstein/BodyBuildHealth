@@ -3836,7 +3836,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   try {
     const pedsForMeth: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => Number((input.pedDoses as any)[k]) > 0) as any) : []);
     if (pedsForMeth.length > 0 || (input.pedDoses && Object.keys(input.pedDoses).length > 0)) {
-      const methInput: any = { peds: pedsForMeth, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus };
+      const methInput: any = { peds: pedsForMeth, pedDoses: input.pedDoses || {}, level, goal: input.goal, focus: input.trainingFocus, targetMuscles: specRes?.active ? specRes.targets : [] };
       const meth = recommendPEDMethodology(methInput);
       // Insulin window: только памп-дни получают подсказку (тяж не трогаем)
       const ghDose = Number((input.pedDoses as any)?.['GH'] || 0);
@@ -3849,10 +3849,8 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         const winRationale = hasGH && hasIns && ghDose >= 2 && insDose >= 5 ? `💉 GH+insulin окно: памп-дни — intra 30-60г + 10г EAA (тяж дни без изменений)` : null;
         if (winRationale && !withMeth.rationale.includes(winRationale)) withMeth.rationale.push(winRationale);
       }
-      // MGF/IGF1 локально: если специализация совпадает — пометка
-      if ((pedsForMeth.includes('MGF' as any) || pedsForMeth.includes('IGF1' as any)) && specRes.active) {
-        withMeth.rationale.push('🧬 MGF/IGF1 локально: целевая мышца специализации получает myo-reps/lengthened приоритет (см. отбор)');
-      }
+      // MGF/IGF1 локально: пометка и rationale обрабатываются applyPEDMethodologyToPlan
+      // (целевые мышцы переданы в targetMuscles из specRes — Фаза 2.9).
       // Rep-схемы: подсказка, не форсирование (сохраняем текущие reps, добавляем label)
       // Выбираем схему для отображения в rationale (не переписываем repsRange)
       const heavyScheme = meth.recommendedScheme.heavy;

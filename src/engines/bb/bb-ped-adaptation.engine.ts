@@ -75,6 +75,61 @@ export const PED_META: Record<PED, { unit: string; tEq: number }> = {
 };
 
 /**
+ * Testosterone-equivalent факторы отдельных ААС-веществ (Фаза 2.9).
+ * Агрегированный ключ `AAS` = чистый тестостерон (tEq 1.0). Если в pedDoses
+ * переданы конкретные вещества (tren/deca/eq/prim/masteron…), их дозы
+ * конвертируются по этим факторам для честного risk-threshold расчёта.
+ */
+export const AAS_SUBSTANCE_TEQ: Record<string, number> = {
+  // эфиры тестостерона / чистый тест
+  test: 1.0, test_e: 1.0, test_c: 1.0, test_p: 1.0, sustanon: 1.0,
+  // 19-нор (прогестиновая активность)
+  deca: 0.7, nandrolone: 0.7, npp: 0.7, deca_200: 0.7,
+  // trenbolone — самый андрогенный
+  tren: 2.5, tren_ace: 2.5, tren_e: 2.5, tren_hex: 2.5,
+  // прочие
+  equipoise: 0.9, eq: 0.9, boldenone: 0.9,
+  primobolan: 0.5, prim: 0.5, prim_enan: 0.5,
+  masteron: 0.9, drostanolone: 0.9, drost: 0.9,
+  winstrol: 2.0, stan: 2.0, stanozolol: 2.0,
+  anavar: 0.8, oxan: 0.8, oxandrolone: 0.8,
+  dianabol: 3.5, dbol: 3.5, methand: 3.5, methandienone: 3.5,
+  anadrol: 3.5, oxymetholone: 3.5, adrol: 3.5,
+  turinabol: 1.5, tbol: 1.5, trena: 1.5,
+  superdrol: 4.0, sdrol: 4.0,
+  proviron: 0.6, mesterolone: 0.6,
+  halotestin: 5.0, fluoxymesterone: 5.0, halo: 5.0,
+};
+
+function resolveTequivKey(raw: string): string {
+  const k = String(raw).toLowerCase().replace(/[^a-z0-9_]/g, '').trim();
+  if (AAS_SUBSTANCE_TEQ[k] != null) return k;
+  // Частичные совпадения: 'tren_acetate' → tren; 'deca_200' → deca; 'eq' → eq
+  const parts = [k];
+  for (const cand of Object.keys(AAS_SUBSTANCE_TEQ)) {
+    if (k.startsWith(cand) && AAS_SUBSTANCE_TEQ[k] == null) parts.push(cand);
+  }
+  for (const p of parts) if (AAS_SUBSTANCE_TEQ[p] != null) return p;
+  return '';
+}
+
+/**
+ * Суммарная тестостерон-эквивалентная доза из pedDoses.
+ * Учитывает агрегированный `AAS` ключ (tEq 1.0) + конкретные вещества.
+ */
+export function computeAASEquivDose(pedDoses?: Record<string, number>): number {
+  const doses = pedDoses || {};
+  let total = parseDose(doses['AAS']) * (PED_META.AAS?.tEq ?? 1.0);
+  for (const [k, v] of Object.entries(doses)) {
+    if (k === 'AAS') continue;
+    const canon = resolveTequivKey(k);
+    if (!canon || AAS_SUBSTANCE_TEQ[canon] == null) continue;
+    total += parseDose(v) * AAS_SUBSTANCE_TEQ[canon];
+  }
+  return Math.round(total * 10) / 10;
+}
+
+/**
  * Дозо-зависимые множители MRV для каждого PED.
  * Ключ — порог дозы, значение — множитель MRV (относительно натурала = 1.0).
  * Интерполяция линейна между порогами; выше последнего — cap.
@@ -302,7 +357,9 @@ export function adaptForPEDs(
   // P2-3: PED_META.tEq — testosterone-equivalent factor для risk-threshold.
   // Tren (tEq=2.5) 500 мг = 750 T-equiv → ближе к порогу 1500. Пока AAS tEq=1.0.
   const aasDose = parseDose(doses['AAS']);
-  const aasTEquiv = aasDose * (PED_META.AAS?.tEq ?? 1.0);
+  // Фаза 2.9: T-equiv учитывает конкретные ААС-вещества (tren ×2.5, deca ×0.7, …),
+  // а не только агрегированный ключ AAS (tEq 1.0).
+  const aasTEquiv = computeAASEquivDose(doses);
   if (activePEDs.includes('insulin')) risks.push('Инсулин: риск гипогликемии — контроль глюкозы, достаточные углеводы вокруг тренировки.');
   if (activePEDs.includes('GH')) risks.push('ГР: инсулинорезистентность при длительном использовании, возможны отёки.');
   if (activePEDs.includes('insulin') && activePEDs.includes('GH')) risks.push('Инсулин + ГР: синергия, но рост риска гипогликемии и инсулинорезистентности.');

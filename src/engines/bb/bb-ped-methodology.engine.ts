@@ -36,6 +36,12 @@ export interface PEDMethodologyInput {
   level: string;
   goal?: string;
   focus?: import('./bb-goal-types').BBTrainingFocus;
+  /**
+   * Целевые мышцы для локального MGF/IGF1 (передаёт вызывающий из
+   * специализации). Если пусто — локальная пометка не применяется.
+   * Фаза 2.9: заменяет заглушки `__mgf_target__`/`__igf_target__`.
+   */
+  targetMuscles?: string[];
 }
 
 function has(peds: PED[], k: PED): boolean { return peds.includes(k); }
@@ -89,12 +95,17 @@ export function recommendPEDMethodology(input: PEDMethodologyInput): PEDMethodol
     rationale.push('⚠ Инсулин solo без GH/AAS — риск жира: углеводы вокруг тренировки должны быть точно дозированы, GH рекомендуется для синергии (PMC5723243)');
   }
 
-  // MGF/IGF1 локально — пометить целевые мышцы (если специализация задана — она и есть цель, иначе — все)
+  // MGF/IGF1 локально — целевая мышца (специализация) получает +1 частоту и
+  // myo-reps/lengthened приоритет. Заполняется РЕАЛЬНОЙ целью (Фаза 2.9),
+  // а не заглушкой `__mgf_target__`.
   if (hasMGF || hasIGF1) {
-    // mgfTargetMuscles заполнит вызывающий (specialization), здесь заглушка
-    rationale.push(`MGF ${MGF}мкг / IGF1 ${IGF1}мкг — локальный рост: цель получает +1 частоту, памп 15-20 + myo-reps`);
-    if (hasMGF) mgfTargetMuscles.push('__mgf_target__');
-    if (hasIGF1) mgfTargetMuscles.push('__igf_target__');
+    const targets = (input.targetMuscles || []).filter(Boolean);
+    if (targets.length > 0) {
+      mgfTargetMuscles.push(...targets);
+      rationale.push(`MGF ${MGF}мкг / IGF1 ${IGF1}мкг — локальный рост: ${targets.join(', ')} получает +1 частоту, памп 15-20 + myo-reps/lengthened`);
+    } else {
+      rationale.push(`MGF ${MGF}мкг / IGF1 ${IGF1}мкг — локальный рост: добавьте целевую мышцу специализации для +1 частоты и myo-reps/lengthened`);
+    }
   }
 
   // Рекомендованные схемы (не форсируют, а подсказывают schemeFor)
@@ -161,7 +172,28 @@ export function applyPEDMethodologyToPlan(plan: import('./bb-builder.engine').BB
     copy.rationale.push('💉 GH+insulin pump window: памп-дни получили intra-carbs подсказку (тяж дни не тронуты)');
   }
   if (meth.jointGuard) copy.rationale.push('🛡 Joint guard: тяж-дни сохранены, но axial/high-stress заменены на машины/кабели (см. отбор)');
-  if (meth.mgfTargetMuscles.length) copy.rationale.push('🧬 MGF/IGF1 локально: целевая мышца +1 частота, myo-reps/lengthened');
+  // MGF/IGF1 локально: целевая мышца в памп-сессиях получает myo-reps/lengthened
+  // приоритет (реальная пометка, не только rationale). Тяж-дни не тронуты.
+  if (meth.mgfTargetMuscles.length) {
+    const targetSet = new Set(meth.mgfTargetMuscles.map(m => m.toLowerCase()));
+    const canon = (m: string) => (m || '').toLowerCase();
+    let marked = 0;
+    for (const w of copy.weeks) {
+      if ((w as any).deload || (w as any).phase === 'deload') continue;
+      for (const s of w.sessions) {
+        if (s.character !== 'памп' && s.character !== 'лёг') continue;
+        for (const ex of s.exercises) {
+          if (ex.role !== 'primary' && ex.role !== 'accessory') continue;
+          const exMuscle = canon(String(ex.muscle || ''));
+          if (!exMuscle || !targetSet.has(exMuscle)) continue;
+          if (ex.comment?.includes('🧬 MGF/IGF1')) continue;
+          ex.comment = `${ex.comment || ''} | 🧬 MGF/IGF1 локально: myo-reps/lengthened приоритет`.trim().replace(/^\|\s*/, '');
+          marked++;
+        }
+      }
+    }
+    copy.rationale.push(`🧬 MGF/IGF1 локально: ${meth.mgfTargetMuscles.join(', ')} — +1 частота, памп ${marked > 0 ? `помечен в ${marked} упражнениях` : '(цель вне памп-дней — только частота через параметры сборки)'}, myo-reps/lengthened`);
+  }
   if (meth.periWorkout.intraNote) copy.rationale.push(`🍚 Peri-WO: ${meth.periWorkout.intraNote}`);
   if (meth.periWorkout.warning) copy.rationale.push(`⚠ ${meth.periWorkout.warning}`);
   copy.rationale.push(...meth.rationale.map(r => `💊 ${r}`));
