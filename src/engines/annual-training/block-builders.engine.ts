@@ -111,12 +111,10 @@ export function directionFromKinds(kinds: AnnualBlockKind[]): AnnualTrainingPlan
   const hasBB = kinds.some(k => k === 'BB');
   const hasARM = kinds.some(k => k === 'ARM');
   const hasOther = kinds.some(k => k !== 'PL');
-  if ((hasPL && hasBB) || (hasPL && hasARM) || (hasBB && hasARM)) return 'mixed';
-  if (hasARM && !hasPL && !hasBB) return 'arm';
-  if (hasPL && !hasBB && !hasARM) return 'pl';
-  if (hasBB && !hasPL && !hasARM) return 'bb';
   if (hasPL && hasOther) return 'mixed';
   if (hasPL) return 'pl';
+  if (hasARM && hasBB) return 'mixed';
+  if (hasARM) return 'arm';
   return 'bb';
 }
 

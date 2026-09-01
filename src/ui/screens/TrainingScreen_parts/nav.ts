@@ -25,7 +25,7 @@ export const ZONES: Record<TrainingZone, ZoneDef> = {
     title: '🏗 Планировщик',
     icon: '🏗',
     color: '#00e68a',
-    subtitle: 'ПЛ-авто / ББ-авто / Стронг+ТА / Единоборства — построение плана',
+    subtitle: 'ПЛ-авто / ББ-авто / Арм / Стронг+ТА / Единоборства — построение плана',
     tabs: [],
   },
   training: {
