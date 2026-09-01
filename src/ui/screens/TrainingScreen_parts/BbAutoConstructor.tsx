@@ -643,6 +643,15 @@ export const BbAutoConstructor: React.FC = () => {
   const specializationMode = specTargets.length > 0;
   const [editMode, setEditMode] = useState<{ dayIdx: number; exIdx: number } | null>(null);
   const [exerciseEdits, setExerciseEdits] = useState<Record<string, { sets: number; reps: number; weight: number; rir?: number; tempo?: string; technique?: string; supersetWith?: string }>>({});
+  // Фаза 4.26: undo/redo + bulk-редактирование упражнений.
+  const editsRef = useRef(exerciseEdits); editsRef.current = exerciseEdits;
+  const [editsHistory, setEditsHistory] = useState<Array<Record<string, any>>>([]);
+  const commitEdits = (next: Record<string, any>) => { setEditsHistory(h => [...h.slice(-9), editsRef.current]); setExerciseEdits(next as any); };
+  const undoEdits = () => { setEditsHistory(h => { if (!h.length) return h; const prev = h[h.length - 1]; setExerciseEdits(prev as any); return h.slice(0, -1); }); };
+  const [bulkModal, setBulkModal] = useState(false);
+  const [bulkField, setBulkField] = useState<'sets' | 'reps' | 'weight'>('weight');
+  const [bulkValue, setBulkValue] = useState(0);
+  const [bulkMode, setBulkMode] = useState<'set' | 'mult'>('set');
   const [subTarget, setSubTarget] = useState<{ dayIdx: number; exIdx: number; sessionIdx: number } | null>(null);
   const [exSwapModal, setExSwapModal] = useState<{ si: number; ei: number; muscle: string; currentName: string } | null>(null);
   const [exSwapSearch, setExSwapSearch] = useState('');
@@ -5249,13 +5258,43 @@ export const BbAutoConstructor: React.FC = () => {
         <CollapsibleCard title={`✏️ Редактор упражнений — неделя ${bbWeekSel}`} defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${wk.sessions.length} дн · ${W.length} нед`}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
             <span style={{ fontSize:11, color:'#fff', opacity:0.7 }}>Выберите неделю для правки упражнений</span>
-            <div style={{ display:'flex', gap:4 }}>
+            <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
+              {editsHistory.length > 0 && <button onClick={undoEdits} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(96,165,250,0.3)', background:'rgba(96,165,250,0.1)', color:'#60a5fa' }} title="Отменить последнюю правку">↩ Отменить</button>}
+              <button onClick={() => setBulkModal(true)} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(245,158,11,0.3)', background:'rgba(245,158,11,0.1)', color:'#f59e0b' }} title="Применить ко всем упражнениям недели">⚡ Пакетно</button>
               {W.map(w => {
                 const ph = phaseForWeek(w.week, bbWeeks);
                 return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:w.week===bbWeekSel?'1px solid ' + PHASE_COLORS[ph]:'1px solid rgba(255,255,255,0.08)', background:w.week===bbWeekSel?PHASE_COLORS[ph]+'20':'transparent', color:w.week===bbWeekSel?PHASE_COLORS[ph]:'#fff' }}>{w.week}</button>;
               })}
             </div>
           </div>
+          {bulkModal && (
+            <div style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.06)', border:'1px solid rgba(245,158,11,0.2)' }}>
+              <div style={{ fontSize:11, fontWeight:800, color:'#f59e0b', marginBottom:6 }}>⚡ Пакетное редактирование — неделя {bbWeekSel}</div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+                <select value={bulkField} onChange={e2 => setBulkField(e2.target.value as any)} style={{ ...IN, fontSize:11, width:'auto' }}>
+                  <option value="sets">Сеты</option>
+                  <option value="reps">Повторы</option>
+                  <option value="weight">Вес, кг</option>
+                </select>
+                <select value={bulkMode} onChange={e2 => setBulkMode(e2.target.value as any)} style={{ ...IN, fontSize:11, width:'auto' }}>
+                  <option value="set">= задать</option>
+                  <option value="mult">× умножить</option>
+                </select>
+                <input type="number" value={bulkValue} onChange={e2 => setBulkValue(parseFloat(e2.target.value) || 0)} style={{ width:60, ...IN }} />
+                <button onClick={() => {
+                  const next: any = { ...editsRef.current };
+                  for (const s of wk.sessions) for (let ei = 0; ei < s.exercises.length; ei++) {
+                    const key = `${wk.sessions.indexOf(s)}-${ei}`;
+                    const cur = next[key] || { sets: s.exercises[ei].sets, reps: s.exercises[ei].workSets?.[0]?.reps || 10, weight: s.exercises[ei].workSets?.[0]?.weight || 80 };
+                    if (bulkMode === 'mult') next[key] = { ...cur, [bulkField]: Math.round((cur[bulkField] || 0) * bulkValue) };
+                    else next[key] = { ...cur, [bulkField]: bulkValue };
+                  }
+                  commitEdits(next); setBulkModal(false); flash('⚡ Пакетно применено к неделе ' + bbWeekSel);
+                }} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(245,158,11,0.35)', background:'rgba(245,158,11,0.15)', color:'#f59e0b', fontWeight:700 }}>Применить ко всем</button>
+                <button onClick={() => setBulkModal(false)} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#fff' }}>✕</button>
+              </div>
+            </div>
+          )}
           {wk.sessions.map((s, si) => (
             <ExpandableCard key={si} title={'День ' + (si+1) + ' · ' + s.character + ' (' + s.exercises.length + ' упр.)'} icon="🏋️" short={s.exercises.map(e => e.name).join(', ')} full={
               <div>
@@ -5275,10 +5314,10 @@ export const BbAutoConstructor: React.FC = () => {
                       {editBadges.map((fb, fbi) => <span key={fbi} style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:fb.color+'20', color:fb.color, marginLeft:6 }}>{fb.icon} {fb.label}</span>)}
                     </div>
                     <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
-                      <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } }))} style={{ width:45, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
-                      <div><span style={{ ...SMALL, fontSize:11 }}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } }))} style={{ width:45, ...IN }} /></div>
-                      <div><span style={{ ...SMALL, fontSize:11 }}>Вес, кг</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } }))} style={{ width:55, ...IN }} /></div>
-                      <div><span style={{ ...SMALL, fontSize:11 }}>RIR</span><input type="number" value={edit.rir ?? (e as any).rir ?? 2} min={0} max={10} onChange={e2 => setExerciseEdits(p => ({ ...p, [editKey]: { ...edit, rir: parseInt(e2.target.value) || 0 } }))} style={{ width:45, ...IN }} /></div>
+                      <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, sets: parseInt(e2.target.value) || 0 } })} style={{ width:45, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
+                      <div><span style={{ ...SMALL, fontSize:11 }}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, reps: parseInt(e2.target.value) || 1 } })} style={{ width:45, ...IN }} /></div>
+                      <div><span style={{ ...SMALL, fontSize:11 }}>Вес, кг</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, weight: parseInt(e2.target.value) || 0 } })} style={{ width:55, ...IN }} /></div>
+                      <div><span style={{ ...SMALL, fontSize:11 }}>RIR</span><input type="number" value={edit.rir ?? (e as any).rir ?? 2} min={0} max={10} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, rir: parseInt(e2.target.value) || 0 } })} style={{ width:45, ...IN }} /></div>
                       <button onClick={() => setExSwapModal({ si, ei, muscle: e.muscle, currentName: e.name })} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'#fff' }}>🔄 Заменить</button>
                       <button onClick={() => handleMoveExercise(si, ei, -1)} disabled={ei === 0} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===0?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===0?'transparent':'rgba(96,165,250,0.06)', color:ei===0?'rgba(255,255,255,0.2)':'#60a5fa' }}>↑</button>
                       <button onClick={() => handleMoveExercise(si, ei, 1)} disabled={ei === s.exercises.length - 1} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===s.exercises.length-1?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===s.exercises.length-1?'transparent':'rgba(96,165,250,0.06)', color:ei===s.exercises.length-1?'rgba(255,255,255,0.2)':'#60a5fa' }}>↓</button>
