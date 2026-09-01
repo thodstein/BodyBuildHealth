@@ -2,6 +2,7 @@
  * strength-sport-ped-adaptation.ts — изолированный PED MRV адаптер (не трогает bb-ped-adaptation).
  * Упрощённая dose-aware кривая: AAS/GH/Insulin → mrvMult 1.0-1.7, cap 1.7 (как bb, но изолировано).
  */
+import { applyPedDiminishing } from '../shared/ped-diminishing.engine';
 
 export type PedDoses = Record<string, number>;
 
@@ -86,10 +87,8 @@ export function adaptForPEDsSS(peds: string[] | undefined, pedDoses: PedDoses | 
   if (courseIntensity === 'heavy') mult *= 1.05;
   else if (courseIntensity === 'mild') mult *= 0.97;
 
-  // diminishing 0.85 если несколько PED (как в bb)
   const count = [has('aas')||aasDose>0, has('gh')||ghDose>0, has('insulin')||insDose>0, has('mgf'), has('igf')].filter(Boolean).length;
-  if (count >= 2) mult = 1 + (mult - 1) * 0.85;
-  if (isWeightCut) mult = 1 + (mult - 1) * 0.70;
+  mult = applyPedDiminishing(mult, count, !!isWeightCut);
 
   let cap = 1.70;
   if (isWeightCut) cap = 1.35;
