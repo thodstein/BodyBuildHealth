@@ -9,7 +9,7 @@ import {
   taperPlan, warmupSequence, taperWeeksForFatigue,
   type AttemptStrategy, type Lift, type TaperPlan,
 } from '../../../engines/pro/taper.engine';
-import { generateBBPeaking, type BBPeakingOutput } from '../../../engines/peaking-engine';
+import type { BBPeakingOutput } from '../../../engines/peaking-engine';
 import { buildPLTaperCurve, type TaperMode } from '../../../engines/lms/lms-taper.engine';
 import { getPeakCycles, buildPeakCycleTaperCurve } from '../../../engines/lms/pl-peak-cycle-taper.engine';
 import { buildBBContestPrep, isoToday, isoAddDays, normalizeContestCategory, planFromStored, configFromPlan, type BBContestPrepConfig } from '../../../engines/bb/bb-contest-prep.engine';
