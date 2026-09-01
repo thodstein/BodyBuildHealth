@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, createContext, useContext, useCallback } from "react";
+import { applyBBNutritionToTargets } from "./planner-bb-nutrition";
 import { addToCart } from "../../../../core/nutrition-utils";
 import { FOOD_DB, FOOD_ALLERGEN_DIET, compositeQualityScore } from "../../../../core/nutrition-database";
 import { PHARMA_DB } from "../../../../core/pharma-database";
@@ -876,19 +877,15 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
       document.removeEventListener('visibilitychange', onVis);
     };
   }, []);
-  const bbTrainDays = Array.isArray(bbNutritionNote?.trainDays) && bbNutritionNote.trainDays.length ? bbNutritionNote.trainDays : null;
-  const todayDow = new Date().getDay() || 7; // Пн=1 .. Вс=7
-  const bbIsTrainToday = bbTrainDays ? bbTrainDays.includes(todayDow) : null; // null = без циклирования
-  const effectiveP = dayTargets.protein;
-  let effectiveF = dayTargets.fats;
-  let effectiveC = dayTargets.carbs;
-  // Циклирование углей по трен-дням ББ-плана: трен-день +30 г углей (жир −), отдых −25 г.
-  // Сохраняет Atwater-консистентность (kcal выводится из макросов).
-  if (bbIsTrainToday != null) {
-    const shiftG = bbIsTrainToday ? 30 : -25;
-    effectiveC = Math.max(20, Math.round(dayTargets.carbs + shiftG));
-    effectiveF = Math.max(35, Math.round(dayTargets.fats - (shiftG * 4) / 9));
-  }
+  const bbApplied = applyBBNutritionToTargets({
+    protein: dayTargets.protein,
+    fats: dayTargets.fats,
+    carbs: dayTargets.carbs,
+    bbNote: bbNutritionNote,
+  });
+  const effectiveP = bbApplied.protein;
+  const effectiveF = bbApplied.fats;
+  const effectiveC = bbApplied.carbs;
   const _rawCForCap = kbjuMode === 'profile' ? profileTargets.carbs : calcTargets.carbs;
   const carbCapGPerKg = (() => {
     try {
@@ -899,19 +896,9 @@ export const IndividualPlanProvider: React.FC<{ profile: UserProfile | null; cou
   const carbCapClipped = (() => {
     try { return _rawCForCap > carbCapGPerKg * weight + 1; } catch { return false; }
   })();
-  // Kcal согласован с фактическими макросами (Atwater) — display == генерация (buildDayTargets).
-  const effectiveKcalAtwater = Math.round(effectiveP * 4 + effectiveC * 4 + effectiveF * 9);
-  // Приоритет целевого калоража из ББ-плана, если он задан и близок к расчётному (в пределах 15%),
-  // иначе оставляем Atwater-производное (не ломаем инвариант 4Б+4У+9Ж).
-  const bbKcalTarget = (bbNutritionNote && Number.isFinite(bbNutritionNote.kcal) && (bbNutritionNote.kcal as number) > 0)
-    ? Math.round(bbNutritionNote.kcal as number) : null;
-  const effectiveKcal = (bbKcalTarget && Math.abs(bbKcalTarget - effectiveKcalAtwater) / Math.max(1, effectiveKcalAtwater) <= 0.15) ? bbKcalTarget : effectiveKcalAtwater;
-  if (bbIsTrainToday != null) {
-    dayTargetsBreakdown.push(`⚡ ББ-план: ${bbIsTrainToday ? 'трен-день' : 'день отдыха'} — углеводы ${bbIsTrainToday ? '+' : ''}${bbIsTrainToday ? 30 : -25} г (циклирование по трен-дням плана).`);
-  }
-  if (bbKcalTarget) {
-    dayTargetsBreakdown.push(`🎯 Целевой калораж ББ-плана: ${bbKcalTarget} ккал (применён${effectiveKcal === bbKcalTarget ? '' : ' с учётом макросов'}); объём ~${bbNutritionNote?.weeklySets ?? '—'} сетов/нед.`);
-  }
+  // Kcal из чистой логики (Atwater-консистентно + целевой калораж ББ-плана в пределах 15%).
+  const effectiveKcal = bbApplied.kcal;
+  dayTargetsBreakdown.push(...bbApplied.breakdown);
 
   const switchKbjuMode = (mode: typeof kbjuMode) => { if (mode === 'manual' && kbjuMode !== 'manual') { setManualKcal(effectiveKcal); setManualP(effectiveP); setManualF(effectiveF); setManualC(effectiveC); } if (mode !== 'manual') { setManualKcal(null); setManualP(null); setManualF(null); setManualC(null); } setKbjuMode(mode); };
 
