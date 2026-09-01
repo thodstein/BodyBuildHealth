@@ -242,3 +242,101 @@ export const StrengthPopupNumber: React.FC<{ label: string; value: number; min?:
     </>
   );
 };
+
+// ─── P2: EventCard + Gantt как в CardioUI ───
+export const EventCard: React.FC<{
+  title?: string;
+  subtitle?: string;
+  events: { id: string; label: string; distanceM: number; timeCapS: number; weight?: number }[];
+  onChange?: (id: string, patch: { distanceM?: number; timeCapS?: number }) => void;
+  preview?: boolean;
+}> = ({ title = 'Medley цепь — превью до сборки', subtitle = 'Дистанция 10-50м · cap 30-180с · 90с переход', events, onChange, preview }) => {
+  const totalDist = events.reduce((a,e)=> a + e.distanceM, 0);
+  const totalCap = events.reduce((a,e)=> a + e.timeCapS, 0);
+  const medleyCap = Math.max(totalCap - 10, totalDist > 0 ? 60 : 0);
+  return (
+    <div style={{ ...CARD_STRONG, padding: 14, gap: 10 }}>
+      <div style={ROW}><span style={{ width:28, height:28, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center', background: ACCENT_STRONG, fontSize:14 }}>⛓️</span><div style={{ flex:1 }}><div style={{ fontSize:13, fontWeight:700, color: TEXT_1, fontFamily: SF }}>{title}</div><div style={{ fontSize:11, color: TEXT_2, fontFamily: SF }}>{subtitle} · <span style={{ color: ACCENT_STRONG }}>{totalDist}м / cap {medleyCap}с</span></div></div></div>
+      <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+        {events.map(ev=> (
+          <div key={ev.id} style={{ display:'flex', flexDirection:'column', gap:6, padding:'10px 12px', background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.06)', borderRadius:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}><span style={{ fontSize:12, fontWeight:600, color: TEXT_1, fontFamily: SF }}>{ev.label} {ev.weight ? <span style={{ color: TEXT_3 }}>{ev.weight}кг</span>:null}</span><span style={{ fontSize:10, color: TEXT_3, fontFamily: SF }}>{ev.distanceM}м · {ev.timeCapS}с</span></div>
+            {onChange ? (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}><span style={LABEL}>Дистанция</span><div style={{ display:'flex', alignItems:'center', gap:6 }}><input type="range" min={10} max={50} step={5} value={ev.distanceM} onChange={e=> onChange(ev.id, { distanceM: Number(e.target.value) })} style={{ flex:1, accentColor: ACCENT_STRONG }} /><span style={{ fontSize:11, color:ACCENT_STRONG, fontVariantNumeric:'tabular-nums', minWidth:32, textAlign:'right' }}>{ev.distanceM}м</span></div></div>
+                <div style={{ display:'flex', flexDirection:'column', gap:4 }}><span style={LABEL}>Cap</span><div style={{ display:'flex', alignItems:'center', gap:6 }}><input type="range" min={30} max={180} step={10} value={ev.timeCapS} onChange={e=> onChange(ev.id, { timeCapS: Number(e.target.value) })} style={{ flex:1, accentColor: ACCENT_STRONG }} /><span style={{ fontSize:11, color:ACCENT_STRONG, fontVariantNumeric:'tabular-nums', minWidth:36, textAlign:'right' }}>{ev.timeCapS}с</span></div></div>
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      {preview && <div style={{ fontSize:10, color: TEXT_3, background:'rgba(255,159,10,0.08)', border:'0.5px solid rgba(255,159,10,0.16)', padding:'6px 8px', borderRadius:8, fontFamily: SF }}>Превью medley до сборки · переход 5с между ивентами · cap {medleyCap}с</div>}
+    </div>
+  );
+};
+
+export const StrengthGantt: React.FC<{
+  weeks: { week:number; phase:string; taper?: boolean; deload?: boolean }[];
+  totalWeeks?: number;
+}> = ({ weeks, totalWeeks }) => {
+  const total = totalWeeks || weeks.length;
+  // группируем фазы
+  const grouped: { key:string; weeks:number; color:string }[] = [];
+  for(const w of weeks){
+    const key = (w as any).taper ? 'taper' : w.phase;
+    const color = PHASE_COLOR[key] || '#636366';
+    const last = grouped[grouped.length-1];
+    if(last && last.key===key) last.weeks++;
+    else grouped.push({ key, weeks:1, color });
+  }
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+      <div style={{ display:'flex', height:22, borderRadius:8, overflow:'hidden', border:'0.5px solid rgba(255,255,255,0.08)', background:'rgba(0,0,0,0.18)' }}>
+        {grouped.map((g,i)=> (
+          <div key={i} title={`${PHASE_RU[g.key]||g.key}: ${g.weeks}нед`} style={{ flex: g.weeks, background: g.color, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:700, color:'#fff', borderLeft: i>0?'1px solid rgba(255,255,255,0.12)':'none' }}>{g.weeks>=2?(PHASE_RU[g.key]||g.key):''}</div>
+        ))}
+      </div>
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+        {grouped.map((g,i)=> (
+          <span key={i} style={{ fontSize:10, display:'flex', alignItems:'center', gap:4, color: TEXT_2, fontFamily: SF }}><span style={{ width:10, height:10, borderRadius:3, background:g.color, display:'inline-block' }} />{PHASE_RU[g.key]||g.key} {g.weeks}нед</span>
+        ))}
+      </div>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color: TEXT_3, fontFamily: SF }}><span>Нед 1</span><span>Нед {total}</span></div>
+    </div>
+  );
+};
+
+export const StrengthHeatmap: React.FC<{
+  weeksData: { week:number; phase:string; totalSets?: number; totalTonnage?: number; sessions: { exercises: { id:string; sets:number; workSets: { reps:number; weight:number; distanceM?: number }[] }[] }[] }[];
+  level: string;
+}> = ({ weeksData, level }) => {
+  // 4 rows: carry (м) / stone (подъёмы) / overhead (сеты) / squat+deadlift (сеты) — как в ТЗ
+  const rows: { key:string; label:string; icon:string; ids:string[]; unit:'meters'|'sets'|'lifts'; strong?: boolean }[] = [
+    { key:'carry', label:'Переноски', icon:'🚜', ids:['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','zercher_carry','sandbag_carry'], unit:'meters', strong:true },
+    { key:'stone', label:'Камни', icon:'🪨', ids:['atlas_stone_load','stone_lift','sandbag_shoulder','sandbag_load','keg_toss'], unit:'lifts', strong:true },
+    { key:'overhead', label:'Жим', icon:'🪵', ids:['log_press','axle_press','ohp','push_press','circus_db_press','bench_bar','pin_press'], unit:'sets' },
+    { key:'squat_deadlift', label:'Присед+Тяга', icon:'🦵', ids:['back_squat','front_squat','squat','hack_squat','deadlift','sumo_dl','axle_deadlift','car_deadlift_18','rdl'], unit:'sets' },
+  ];
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {rows.map(row=> (
+        <div key={row.key} style={{ display:'flex', gap:8, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.04)' }}>
+          <span style={{ fontSize:10, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase', color: row.strong ? ACCENT_STRONG : ACCENT, minWidth:72, display:'flex', alignItems:'center', gap:4 }}><span style={{ fontSize:11 }}>{row.icon}</span>{row.label}</span>
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap', flex:1 }}>
+            {weeksData.map(wk=>{
+              const cnt = row.unit==='meters'
+                ? wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x + ((s as any).distanceM||20),0),0)
+                : row.unit==='lifts'
+                  ? wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.includes(e.id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x + s.reps,0),0)
+                  : wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.includes(e.id))).reduce((a,e)=> a + e.sets,0);
+              // heat color по отношению к MEV/MAV/MRV если есть
+              const col = cnt===0 ? 'rgba(255,255,255,0.06)' : cnt<10 ? '#f59e0b' : cnt<20 ? '#eab308' : '#30d158';
+              const bg = cnt===0 ? 'rgba(255,255,255,0.03)' : col+'18';
+              return <span key={wk.week} style={{ padding:'4px 8px', borderRadius:10, background:bg, border:`0.5px solid ${col}22`, color: cnt===0?TEXT_3:col, fontSize:10.5, fontWeight:700, fontVariantNumeric:'tabular-nums' }}>Н{wk.week}: {cnt}{row.unit==='meters'?'м':''}</span>;
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};

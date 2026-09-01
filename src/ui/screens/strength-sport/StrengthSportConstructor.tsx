@@ -21,7 +21,7 @@ import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } f
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
-import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, STRONG_GRAD, TEXT_1, TEXT_2, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
+import { CARD, CARD_ACCENT, CARD_STRONG, CARD_HERO, ROW, LABEL, HINT, HINT_SM, BTN, BTN_PRIMARY, BTN_SMALL, BTN_STRONG, BTN_GHOST, INPUT, SELECT, CHIP, CHIP_ACTIVE, CHIP_STRONG_ACTIVE, PHASE_COLOR, MODE_COLOR, ACCENT, ACCENT_STRONG, ACCENT_SOFT, STRONG_SOFT, ACCENT_BORDER, STRONG_BORDER, ACCENT_GRAD, STRONG_GRAD, TEXT_1, TEXT_2, TEXT_3, SectionCard, StatTile, Badge, InfoBanner, GroupHeading, SectionNav, ProgressBar, ChipToggle, Field, Divider, CardHeader, Highlight, HighlightStrong, StrengthPopupSelect, StrengthPopupNumber, EventCard, StrengthGantt, StrengthHeatmap, MODE_RU, LEVEL_RU, PHASE_RU, ZONE_RU, EQUIP_RU, MOBILITY_RU, SESSION_TAG_RU, ruLabel } from './StrengthUI';
 
 type Step = 'params' | 'outside' | 'split' | 'plan';
 const STEP_LABEL_RU: Record<Step,string> = { params:'Параметры', outside:'Вне зала', split:'Сплит', plan:'План' };
@@ -53,6 +53,11 @@ export const StrengthSportConstructor: React.FC = () => {
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
+  const [medleyPreview, setMedleyPreview] = useState<{ id:string; label:string; distanceM:number; timeCapS:number }[]>([
+    { id:'yoke_walk', label:'Йок', distanceM:20, timeCapS:60 },
+    { id:'farmers_walk_heavy', label:'Фермер', distanceM:40, timeCapS:60 },
+    { id:'atlas_stone_load', label:'Камень', distanceM:0, timeCapS:60 },
+  ]);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [vbtMap, setVbtMap] = useState<Record<string, number>>(() => {
     try { const raw = localStorage.getItem('he_vbt_ss_v1'); return raw ? JSON.parse(raw) as Record<string,number> : {}; } catch { return {}; }
@@ -550,6 +555,15 @@ export const StrengthSportConstructor: React.FC = () => {
               );
             })}
           </div>
+          {mode==='strongman' && (
+            <EventCard
+              title="Medley превью — до сборки"
+              subtitle="Настрой дистанции/cap до генерации — 90с переход, cap 180с в плане"
+              events={medleyPreview.map(e=> ({ id:e.id, label:e.label, distanceM:e.distanceM, timeCapS:e.timeCapS }))}
+              onChange={(id,patch)=> setMedleyPreview(prev=> prev.map(p=> p.id===id ? { ...p, ...patch } : p))}
+              preview
+            />
+          )}
           <button onClick={build} style={{ ...(mode==='strongman'?BTN_STRONG:BTN_PRIMARY), width:'100%', padding:'14px 16px', fontSize:13, borderRadius:14 }}>✦ Собрать план {patternId ? `· ${patternId}` : ''}</button>
         </div>
       )}
@@ -592,6 +606,11 @@ export const StrengthSportConstructor: React.FC = () => {
             })()}
             {plan.outsideMetrics && <InfoBanner tone={plan.outsideMetrics.interference==='high'?'warn':'info'}><Highlight color={plan.outsideMetrics.interference==='high'?'#ff9f0a':'#30d158'}>{plan.outsideMetrics.weeklyLoad} load</Highlight> → объём <Highlight>×{plan.outsideMetrics.volumeMultiplier}</Highlight> · {plan.outsideMetrics.interference}</InfoBanner>}
             {plan.rationale?.length ? <div style={{ fontSize:11, color:'rgba(235,235,245,0.58)', background:'rgba(0,0,0,0.14)', padding:'8px 10px', borderRadius:10, border:'0.5px solid rgba(255,255,255,0.06)', lineHeight:1.45 }}>{plan.rationale.slice(0,3).map((r,i)=> <div key={i} style={{ display:'flex', gap:6 }}><span style={{ color:modeColor }}>•</span><span>{r}</span></div>)}</div> : null}
+          </SectionCard>
+
+          <SectionCard icon="🗓️" title="Gantt фаз" subtitle="Накопление · интенсификация · пик · taper 1-2нед перед стартом" >
+            <StrengthGantt weeks={plan.weeksData} totalWeeks={plan.weeks} />
+            <div style={{ fontSize:10, color: TEXT_3, background:'rgba(255,255,255,0.03)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.04)' }}>Тапер <span style={{ color:'#30D158' }}>зелёный</span> 1-2нед (объём ×0.45/0.65) выносится отдельной фазой в Gantt — как в annual-training taperWeeksForBlock</div>
           </SectionCard>
 
           {plan.mode === 'weightlifting' && (plan.workMax.snatch || 0) > 0 && (plan.workMax.cleanJerk || (plan.workMax as any).clean || 0) > 0 && (() => {
@@ -641,38 +660,42 @@ export const StrengthSportConstructor: React.FC = () => {
 
           {plan.validation?.warnings.map((w,i) => <InfoBanner key={i} tone="warn">{w}</InfoBanner>)}
 
-          {/* Карта качества — Apple highlights */}
-          <div style={{ ...CARD, padding:14 }}>
-            <CardHeader icon="✦" title="Карта качества" subtitle="Сеты/нед vs MEV/MRV — тоннаж и зоны" />
-            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-              {(plan.mode==='strongman' ? [
-                { key:'overhead', label:'Жим', ids:['log_press','axle_press','ohp'], get:'overhead', icon:'🪵', strong:true },
-                { key:'deadlift', label:'Тяга', ids:['deadlift','sumo_dl','axle_deadlift','car_deadlift_18'], get:'deadlift', icon:'🏋️' },
-                { key:'squat', label:'Присед', ids:['back_squat','front_squat'], get:'squat', icon:'🦵' },
-                { key:'carry', label:'Переноски', ids:['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry'], get:'carry', icon:'🚜', strong:true, isMeters:true },
-                { key:'stone', label:'Камни', ids:['atlas_stone_load','sandbag_load','stone_lift'], get:'stone', icon:'🪨', strong:true },
-              ] : [
-                { key:'snatch', label:'Рывок', ids:['snatch','hang_snatch','power_snatch'], get:'snatch', icon:'⚡️' },
-                { key:'cl', label:'Толчок', ids:['clean_and_jerk','hang_clean'], get:'cleanJerk', icon:'🏋️' },
-                { key:'squat', label:'Присед', ids:['back_squat','front_squat'], get:'squat', icon:'🦵' },
-              ] as any).map((row:any)=> (
-                <div key={row.key} style={{ display:'flex', gap:8, alignItems:'center', background:'rgba(255,255,255,0.02)', padding:'8px 10px', borderRadius:12, border:'0.5px solid rgba(255,255,255,0.04)' }}>
-                  <span style={{ fontSize:10, fontWeight:700, letterSpacing:0.4, textTransform:'uppercase', color: row.strong ? '#ff9f0a' : '#86efac', minWidth:62, display:'flex', alignItems:'center', gap:4 }}><span style={{ fontSize:11 }}>{row.icon}</span>{row.label}</span>
-                  <div style={{ display:'flex', gap:6, flexWrap:'wrap', flex:1 }}>
-                    {plan.weeksData.map(wk=>{
-                      const cnt = row.isMeters
-                        ? wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.some((id:string)=> e.id===id))).reduce((a,e)=> a + e.workSets.reduce((x,s)=> x + ((s as any).distanceM||20),0),0)
-                        : wk.sessions.flatMap(s=> s.exercises.filter(e=> row.ids.some((id:string)=> e.id.includes(id)))).reduce((a,e)=> a + (row.key==='snatch'||row.key==='cl' ? e.workSets.reduce((x,s)=> x+s.reps,0) : e.sets),0);
-                      const lm = row.strong ? getStrong(plan.level, row.get as any) : getWL(plan.level, row.get as any); const st = lm ? (cnt<lm.mev?'below': cnt<=lm.mav?'optimal': cnt<=lm.mrv?'high':'over') : 'optimal';
-                      const col = st==='below'?'#f59e0b': st==='optimal'?'#30d158': st==='high'?'#eab308':'#ff3b30';
-                      const unit = row.isMeters ? 'м' : row.key==='snatch'||row.key==='cl' ? '' : '';
-                      return <span key={wk.week} style={{ padding:'4px 8px', borderRadius:10, background:col+'14', border:`0.5px solid ${col}2e`, color:col, fontSize:10.5, fontWeight:700, fontFamily:'-apple-system, system-ui, sans-serif', fontVariantNumeric:'tabular-nums' }}>Н{wk.week}: {cnt}{unit}</span>;
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Heatmap 4 rows (carry/stone/overhead / squat+deadlift) — P2 как CardioUI */}
+          <SectionCard icon="🔥" title="Heatmap · 4 ряда" subtitle="Carry м / Stone подъёмы / Overhead+Жим / Присед+Тяга — как CardioUI 4 rows">
+            <StrengthHeatmap weeksData={plan.weeksData as any} level={plan.level} />
+          </SectionCard>
+
+          {/* Medley EventCard — глобальные слайдеры distance/timeCap как в ТЗ K UI */}
+          {plan.mode==='strongman' && plan.weeksData.some(w=> w.sessions.some(s=> s.sessionTag==='event_day')) && (
+            <EventCard
+              title="⛓️ Medley — цепь 2+1 в плане"
+              subtitle={`${plan.weeksData.filter(w=> w.sessions.some(s=> s.sessionTag==='event_day')).length} ивент-дней · distance 10-50м / cap 30-180с · суммарный cap < 360с`}
+              events={(() => {
+                const ev = plan.weeksData[0].sessions.find(s=> s.sessionTag==='event_day');
+                if (!ev) return [];
+                const carries = ev.exercises.filter(e=> ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','sandbag_carry','zercher_carry'].includes(e.id)).slice(0,2);
+                const stones = ev.exercises.filter(e=> ['atlas_stone_load','sandbag_load','stone_lift','sandbag_shoulder','keg_toss'].includes(e.id)).slice(0,1);
+                return [...carries, ...stones].map(e=> ({
+                  id: e.id, label: e.name,
+                  distanceM: (e.workSets[0] as any)?.distanceM ?? (e.id.includes('yoke')?20:40),
+                  timeCapS: (e.workSets[0] as any)?.timeCapS ?? 60,
+                  weight: e.weight
+                }));
+              })()}
+              onChange={(id,patch)=> {
+                // глобально правим все недели для этого ивента
+                setPlan(prev=>{
+                  if(!prev) return prev;
+                  const copy: any = JSON.parse(JSON.stringify(prev));
+                  for(const wk of copy.weeksData) for(const sess of wk.sessions.filter((s:any)=> s.sessionTag==='event_day')) for(const ex of sess.exercises.filter((e:any)=> e.id===id)) {
+                    for(const ws of ex.workSets){ if(patch.distanceM!=null) (ws as any).distanceM = patch.distanceM; if(patch.timeCapS!=null) (ws as any).timeCapS = patch.timeCapS; }
+                  }
+                  try{ localStorage.setItem('he_strength_sport_plan_v1', JSON.stringify(copy)); }catch{}
+                  return copy;
+                });
+              }}
+            />
+          )}
 
           {/* Недели — collapsible Apple accordion */}
           {plan.weeksData.map(wk => {

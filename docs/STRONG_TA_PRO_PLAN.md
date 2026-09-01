@@ -1,6 +1,6 @@
-# Strongman + ТА — PRO план (выполнен 100%)
+# Strongman + ТА — PRO план (выполнен 100% — P2 polish K/L/D2/I+миграция/print)
 
-## Статус: PRO 100% — 338/338 (11 файлов), матрица 192, medley, grip, axial, EWMA
+## Статус: PRO 100% — 350/350 (12 файлов), матрица 192 ×7 метрик, medley, grip, axial, EWMA, EventCard, Gantt, PrintLayout
 
 ### P0 — критические баги (выполнено)
 - `basePmFor` pull→snatch занижение 2× → проверка `snatch_pull` до `snatch`
@@ -30,8 +30,10 @@
 - `WL/Strong` раздельная периодизация (`PCT_BY_PHASE_WL` vs `PCT_BY_PHASE`)
 
 ### Тесты
-- `338/338` (11 файлов) — `strongman-pro 27`, `phase6-pro 30`, `matrix 192`, `p4/p0/p3/loading...`
-- `strongman-pro`: EVENT_META 6, fallback 0.73, carry/deload 50%, medley chain, female 0.90, phaseForDate mode, grip prehab inject, ladder/medley, EWMA, property weeklySets≤budget + distance
+- `350/350` (12 файлов) — `strongman-pro 27`, `phase6-pro 30`, `matrix 192`, `property 9`, `dup-wave 3`, `p4/p0/p3/loading...`
+- `strongman-pro`: EVENT_META 6, fallback 0.73, carry/deload 50%, medley chain 90с/180с, female 0.90, phaseForDate mode, grip prehab inject, ladder/medley, EWMA, property weeklySets≤budget + distance + full-combo (outside high + ACWR dangerous + VBT 30%)
+- `property`: 192 combos ×7 метрик 0 overflow/0 MRV/0 sync (carryMeters/grip/overhead/squat/pull/stone/snatch) + fallback deep barbell→farmers + female 0.90 + medley total<cap + VBT history 20/30% + full-combo
+- `dup-wave`: DUP wave heavy/medium/light + strongman conjugate max 90%/dynamic 70% X-0-X-0/rep — week%3 per lift
 - `strength-sport-phase6-pro.test.ts` 30: P0, VBT, weakpoint, attempts, Sinclair/Robi, ICS, Brzycki, mesocycle (PED риски исключены из планировщика)
 
 ### Файлы
@@ -54,15 +56,23 @@
 - **B.** `strength-sport-volume.ts` `carry 160/210/260/310`, `grip 12/18/20/24`, `overhead 11/14/16/19` + `axial`/`grip` enforce в `finalize`
 - **C.** `StrengthSportSet.distanceM/timeCapS` + `EVENT_META` дистанция `yoke 20/ farmers 40`, `tempo brace 2с — walk`, `rest 15 видов`
 - **D.** `progression.ts` `mode==='strongman' 40/35/20` vs Torokhtiy, `phaseForWeek/phaseForDate(mode)` + `car_deadlift 0.88`
-- **E.** BFS `STRONG_FALLBACK 17 пар` `yoke→farmers 0.73, stone→sandbag 0.66` + `AXIAL_HIGH vs LOW` (farmers low не режется)
+- **E.** BFS `STRONG_FALLBACK 17 пар` `yoke→farmers 0.73, stone→sandbag 0.66` + `AXIAL_HIGH vs LOW` (farmers low не режется) + fallback deep barbell→farmers (carry сохранён)
 - **F.** `warmup` carry 3 ступень `50/70/85%`, `finalize` `axialSets+300м→кор 2×`, `grip>12→prehab inject` (plate_pinch+dead_hang)
-- **G.** `strongman-attempts` `buildStoneLadder 0.70→1.00` + `buildMedleyPlan` `12/28с +5с`
+- **G.** `strongman-attempts` `buildStoneLadder 0.70→1.00` + `buildMedleyPlan` `12/28с +5с` + `medley chain event_day 2+1 rest90 cap180`
 - **H.** `acwrEwmaSS α=0.25` + `buildLastE1RMIndexSS` + `Constructor EWMA` + `vbtMap persist he_vbt_ss_v1` + `medley badge 20м cap 60с`
-- **I-J.** `weight-cut` heavy `>110кг water cap 5/3.5л Na 5г` + `female carry 0.90`
-- **K.** `Constructor` `WM 10 полей`, `EventCard medley 180с`, `export 16 колонок дист/cap`, `StrengthUI` токены
-- **Build:** `333→338`, `medley chain event_day 2 carries + stone finisher`, `deload distance ×0.5`, `female 0.90`, `phaseForDate mode`
+- **I-J.** `weight-cut` heavy `>110кг water cap 5/3.5л Na 5г` + `female carry 0.90` (overhead 0.88)
+- **K.** `Constructor` `WM 10 полей`, `EventCard medley 180с distance 10-50м / timeCap 30-180с слайдеры + Heatmap 4 rows (carry/stone/overhead / squat+deadlift) + Gantt phase/peaking/taper`, `StrengthUI` токены CARD_STRONG/EventCard/StrengthGantt/StrengthHeatmap (как CardioUI)
+- **L.** `property` 192×7 + full-combo (outside high + ACWR dangerous + VBT 30%) 0 overflow, `matrix 192` без outside, `female 0.90`, `medley total<cap`
+- **D2.** `DUP wave` week%3 per lift — builder `event_day max 90%/dynamic 70% X-0-X-0/rep` + `applyDUP wave heavy 90%/medium/light` — тесты `dup-wave`
+- **Build:** `338→350`, `medley chain event_day 2 carries + stone finisher`, `deload distance ×0.5`, `female 0.90`, `phaseForDate mode`, `Gantt taper отдельно`
 
-### Осталось (P2 backlog, не блокер PRO)
-- `annual-training-print` единый PrintLayout + Gantt `phase/peaking` отдельный
-- `exceljs` XLS форматирование (сейчас HTML-XLS совместим)
-- HRV EWMA уже, миграция `he_strength_sport_plans_v1 → v3` (при необходимости)
+### Раунд P2 polish (K/L/D2/I+миграция/print) — этот коммит
+- **K UI:** `StrengthUI.tsx` EventCard + StrengthGantt + StrengthHeatmap (4 rows) — превью medley до сборки с глобальными слайдерами 10-50м/30-180с; `StrengthSportConstructor.tsx` Gantt после сводки + Heatmap 4 rows + EventCard после плана с onChange (правит все недели)
+- **PrintLayout:** `strength-sport-export.ts` buildStrengthPrintHtml — единый PrintLayout header/logo/QR + Gantt phase/taper отдельно + Medley секция без хака + @media print Gantt break-inside; `annual.ts` taper отдельный `phase=taper` + `weeksUntilCompetition` fallback + `validateAnnualSSPhases` taper 1-2нед
+- **Миграция:** `strength-sport-storage.ts` he_strength_sport_plans_v1 → v3 migrateStrengthSportStorage (velocityHistory/distanceM/taper/phase/sets sync)
+- **Тесты:** `dup-intensity` +3, `property` 9 (full-combo, fallback deep, VBT 20/30%), `annual` taper 2нед, `print` Gantt+medley без хака
+
+### Осталось (не блокер PRO, опционально)
+- `exceljs` XLS форматирование (сейчас HTML-XLS совместим, экспорт 16 колонок работает)
+- `tsc --noEmit` 180s таймаут — проект 7850 тестов, CombatUI shared/apple чужой WIP, CRLF — не наши, проверить `tsc --noEmit --skipLibCheck` на своих файлах 0 ошибок
+- HRV EWMA уже

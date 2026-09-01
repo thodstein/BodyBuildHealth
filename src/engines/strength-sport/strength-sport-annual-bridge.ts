@@ -33,20 +33,42 @@ export function syncStrengthAnnualToGeneral(annual: AnnualSS): void {
   try {
     const raw = localStorage.getItem('he_annual_training_plan_v1');
     if (!raw) {
-      // нет общего годового — создаём минимальный из SS
+      // нет общего годового — создаём минимальный из SS, выносим taper отдельной фазой если есть (как в annual-training/block-builders)
       const general = {
         id: `annual_${Date.now()}`,
         version: 1,
         totalWeeks: annual.totalWeeks,
         direction: 'mixed',
         macroRef: null,
-        blocks: annual.blocks.map(b => ({
-          ref: { blockKey: b.id, blockIndex: 0, kind: 'MANUAL', phase: 'strength', startWeek: b.startWeek, weeks: b.weeks, description: `SS ${b.mode} ${b.weeks}нед` },
-          config: { notes: `SS ${b.mode} ${b.plan?.mode || ''}` },
-          status: 'built',
-          result: b.plan ? { blockKey: b.id, kind: 'MANUAL', weeks: ssPlanToUserWeeks(b.plan), program: null, bbPlan: null, warnings: [], taperApplied: false, peakApplied: false, configHash: 'ss' } : undefined,
-          builtAt: new Date().toISOString(),
-        })),
+        blocks: annual.blocks.flatMap(b => {
+          const taperWeeks = b.taperWeeks && b.competitionDate ? Math.max(1, Math.min(2, b.taperWeeks)) : 0;
+          if (taperWeeks > 0 && b.plan && b.weeks > taperWeeks) {
+            const mainWeeks = b.weeks - taperWeeks;
+            return [
+              {
+                ref: { blockKey: b.id, blockIndex: 0, kind: 'MANUAL', phase: 'strength', startWeek: b.startWeek, weeks: mainWeeks, description: `SS ${b.mode} ${mainWeeks}нед` },
+                config: { notes: `SS ${b.mode} ${b.plan?.mode || ''}` },
+                status: 'built',
+                result: b.plan ? { blockKey: b.id, kind: 'MANUAL', weeks: ssPlanToUserWeeks({ ...b.plan, weeksData: b.plan.weeksData.slice(0, mainWeeks) } as any), program: null, bbPlan: null, warnings: [], taperApplied: false, peakApplied: false, configHash: 'ss' } : undefined,
+                builtAt: new Date().toISOString(),
+              },
+              {
+                ref: { blockKey: `${b.id}-taper`, blockIndex: 1, kind: 'MANUAL', phase: 'taper', startWeek: b.startWeek + mainWeeks, weeks: taperWeeks, description: `SS taper ${taperWeeks}нед к ${b.competitionDate}` },
+                config: { notes: `taper ${taperWeeks}нед`, taper: { enabled: true, weeks: taperWeeks } },
+                status: 'built',
+                result: b.plan ? { blockKey: `${b.id}-taper`, kind: 'MANUAL', weeks: ssPlanToUserWeeks({ ...b.plan, weeksData: b.plan.weeksData.slice(mainWeeks) } as any), program: null, bbPlan: null, warnings: [], taperApplied: true, peakApplied: false, configHash: 'ss-taper' } : undefined,
+                builtAt: new Date().toISOString(),
+              },
+            ];
+          }
+          return [{
+            ref: { blockKey: b.id, blockIndex: 0, kind: 'MANUAL', phase: 'strength', startWeek: b.startWeek, weeks: b.weeks, description: `SS ${b.mode} ${b.weeks}нед` },
+            config: { notes: `SS ${b.mode} ${b.plan?.mode || ''}` },
+            status: 'built',
+            result: b.plan ? { blockKey: b.id, kind: 'MANUAL', weeks: ssPlanToUserWeeks(b.plan), program: null, bbPlan: null, warnings: [], taperApplied: !!b.taperWeeks, peakApplied: false, configHash: 'ss' } : undefined,
+            builtAt: new Date().toISOString(),
+          }];
+        }),
         status: 'built',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -56,12 +78,36 @@ export function syncStrengthAnnualToGeneral(annual: AnnualSS): void {
       return;
     }
     const general = JSON.parse(raw);
-    // добавляем/обновляем MANUAL блоки для SS (помечаем ss- prefix)
+    // добавляем/обновляем MANUAL блоки для SS (помечаем ss- prefix) — taper выносим отдельной фазой
     const existingKeys = new Set(general.blocks.map((b: any) => b.ref.blockKey));
     for (const b of annual.blocks) {
       if (!b.plan) continue;
       const key = `ss-${b.id}`;
       if (existingKeys.has(key)) continue;
+      const taperWeeks = b.taperWeeks && b.competitionDate ? Math.max(1, Math.min(2, b.taperWeeks)) : 0;
+      if (taperWeeks > 0 && b.weeks > taperWeeks) {
+        const mainWeeks = b.weeks - taperWeeks;
+        const mainKey = key;
+        general.blocks.push({
+          ref: { blockKey: mainKey, blockIndex: general.blocks.length, kind: 'MANUAL', phase: 'strength', startWeek: b.startWeek, weeks: mainWeeks, description: `SS ${b.mode} ${mainWeeks}нед` },
+          config: { notes: `SS ${b.mode} ${b.plan.mode} ${mainWeeks}нед` },
+          status: 'built',
+          result: { blockKey: mainKey, kind: 'MANUAL', weeks: ssPlanToUserWeeks({ ...b.plan, weeksData: b.plan.weeksData.slice(0, mainWeeks) } as any), program: null, bbPlan: null, warnings: [], taperApplied: false, peakApplied: false, configHash: 'ss-bridge' },
+          builtAt: new Date().toISOString(),
+        });
+        const taperKey = `${key}-taper`;
+        if (!existingKeys.has(taperKey)) {
+          general.blocks.push({
+            ref: { blockKey: taperKey, blockIndex: general.blocks.length, kind: 'MANUAL', phase: 'taper', startWeek: b.startWeek + mainWeeks, weeks: taperWeeks, description: `SS taper ${taperWeeks}нед к ${b.competitionDate}` },
+            config: { notes: `taper ${taperWeeks}нед`, taper: { enabled: true, weeks: taperWeeks } },
+            status: 'built',
+            result: { blockKey: taperKey, kind: 'MANUAL', weeks: ssPlanToUserWeeks({ ...b.plan, weeksData: b.plan.weeksData.slice(mainWeeks) } as any), program: null, bbPlan: null, warnings: [], taperApplied: true, peakApplied: false, configHash: 'ss-taper-bridge' },
+            builtAt: new Date().toISOString(),
+          });
+        }
+        general.totalWeeks = Math.max(general.totalWeeks, b.startWeek + b.weeks - 1);
+        continue;
+      }
       general.blocks.push({
         ref: { blockKey: key, blockIndex: general.blocks.length, kind: 'MANUAL', phase: 'strength', startWeek: b.startWeek, weeks: b.weeks, description: `SS ${b.mode} ${b.weeks}нед` },
         config: { notes: `SS ${b.mode} ${b.plan.mode} ${b.weeks}нед` },

@@ -31,34 +31,72 @@ export function buildStrengthCsv(plan: StrengthSportPlan): string {
   return lines.join('\n');
 }
 
+const PHASE_COLOR_SS: Record<string,string> = { accumulation:'#0A84FF', intensification:'#FF9F0A', peaking:'#FF3B30', deload:'#8E8E93', transition:'#636366', taper:'#30D158' };
+const PHASE_RU_SS: Record<string,string> = { accumulation:'Накопление', intensification:'Интенсиф.', peaking:'Пик', deload:'Разгр.', transition:'Переход', taper:'Тапер' };
+
+function buildPrintHeader(plan: StrengthSportPlan): string {
+  const title = `Стронг+ТА ${escHtml(plan.mode)} ${plan.weeks}нед · ${escHtml(plan.level)}`;
+  const hash = (()=>{ try{ const s=JSON.stringify({id:plan.id, mode:plan.mode}); let h=0; for(let i=0;i<s.length;i++) h=(h*31 + s.charCodeAt(i))>>>0; return h.toString(36).slice(0,6);}catch{return ''}})();
+  const date = new Date().toLocaleDateString('ru-RU');
+  return `<header style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;background:linear-gradient(135deg, #0A84FF 0%, #30D158 100%);color:#fff;border-radius:12px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px"><div style="width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,0.18);display:flex;align-items:center;justify-content:center;font-size:20px;border:1px solid rgba(255,255,255,0.22)">🏋️</div><div><div style="font-size:15px;font-weight:800;letter-spacing:-0.02em">${title}</div><div style="font-size:11px;opacity:0.92">BodyBuildHealth · ${date} · ${escHtml(plan.patternId)} · #${hash}</div></div></div>
+    <div style="width:64px;height:64px;background:#fff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#111;text-align:center;line-height:1.2;border:1px solid #e5e7eb">QR<br/>#${hash}<br/>${escHtml(plan.mode)}</div>
+  </header>`;
+}
+
+function buildPhaseGantt(plan: StrengthSportPlan): string {
+  const total = plan.weeks;
+  const segs = plan.weeksData.map(w=>{
+    const isTaper = (w as any).taper;
+    const key = isTaper ? 'taper' : w.phase;
+    return { key, phase: key, weeks:1, color: PHASE_COLOR_SS[key] || '#8E8E93' };
+  });
+  // группируем подряд одинаковые фазы
+  const grouped: { key:string; weeks:number; color:string; label:string }[] = [];
+  for(const s of segs){
+    const last = grouped[grouped.length-1];
+    if(last && last.key===s.key) last.weeks++;
+    else grouped.push({ key:s.key, weeks:1, color:s.color, label: PHASE_RU_SS[s.key] || s.key });
+  }
+  const ganttBar = `<div style="display:flex;height:22px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;background:#f9fafb">${grouped.map(g=> `<div style="flex:${g.weeks};background:${g.color};display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700" title="${escHtml(g.label)} ${g.weeks}нед">${g.weeks>=2?escHtml(g.label):''}</div>`).join('')}</div>`;
+  const legend = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${grouped.map(g=> `<span style="font-size:10px;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:3px;background:${g.color};display:inline-block"></span>${escHtml(g.label)} ${g.weeks}нед</span>`).join('')}</div>`;
+  const weeksRow = `<div style="display:flex;justify-content:space-between;font-size:9px;color:#6b7280;margin-top:4px"><span>Нед 1</span><span>Нед ${total}</span></div>`;
+  return `<section style="margin:10px 0;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff"><div style="font-size:12px;font-weight:700;margin-bottom:6px">🗓️ Gantt фаз · taper отдельно</div>${ganttBar}${legend}${weeksRow}</section>`;
+}
+
+function buildMedleySection(plan: StrengthSportPlan): string {
+  const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley'))));
+  if (!hasMedley || plan.mode!=='strongman') return '';
+  const rows = plan.weeksData
+    .flatMap(w=> w.sessions.filter(s=> s.sessionTag==='event_day').flatMap(s=> s.exercises.filter(e=> (e.comment||'').includes('Medley')).map(e=> ({ w, e }))))
+    .map(({w,e})=> `<tr><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">Н${w.week} · ${escHtml(w.phase)}${(w as any).taper?' · taper':''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.name)} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м cap ${(e.workSets[0] as any)?.timeCapS||60}с · 90с переход</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.comment||'')}</td></tr>`).join('');
+  if (!rows) return '';
+  return `<section style="margin:10px 0"><h3 style="font-size:13px;font-weight:700;margin:0 0 6px">⛓️ Medley цепь — 2+1 (carry+stone)</h3><table style="width:100%;border-collapse:collapse">${`<tr><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Неделя/фаза</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Ивент (дист · cap)</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Состав цепи</th></tr>`}${rows}</table></section>`;
+}
+
 export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
   const title = `Стронг+ТА ${escHtml(plan.mode)} ${plan.weeks}нед ${escHtml(plan.level)}`;
   const rows = strengthExportRows(plan);
   const header = `<tr>${['Нед','Фаза','День','Тренировка','Упражнение','Сеты×Повт','Вес','%','RIR','Темп','Отдых','Дист','Кап','Коммент'].map(h=>`<th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">${escHtml(h)}</th>`).join('')}</tr>`;
-  const body = rows.map(r=> `<tr>${[r.week, escHtml(r.phase), r.day, escHtml(r.tag), escHtml(r.exercise), `${r.sets}×${escHtml(r.reps)}`, `${r.weight}кг`, r.pct?`${r.pct}%`:'', r.rir, escHtml(r.tempo), r.rest?`${r.rest}с`:'', r.distanceM?`${r.distanceM}м`:'', r.timeCapS?`${r.timeCapS}с`:'', escHtml(r.comment)].map(v=>`<td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${v}</td>`).join('')}</tr>`).join('');
+  const body = rows.map(r=> `<tr>${[r.week, escHtml(r.phase)+( (plan.weeksData[r.week-1] as any)?.taper ? ' · taper':'') , r.day, escHtml(r.tag), escHtml(r.exercise), `${r.sets}×${escHtml(r.reps)}`, `${r.weight}кг`, r.pct?`${r.pct}%`:'', r.rir, escHtml(r.tempo), r.rest?`${r.rest}с`:'', r.distanceM?`${r.distanceM}м`:'', r.timeCapS?`${r.timeCapS}с`:'', escHtml(r.comment)].map(v=>`<td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${v}</td>`).join('')}</tr>`).join('');
   let extra = '';
   try {
     const snap: any = plan.inputSnapshot || {};
-    if (snap.weightCutProtocolSS) extra += `<p><b>Весогонка ТА:</b> ${snap.weightCutProtocolSS.targetLossKg}кг · вода ${snap.weightCutProtocolSS.waterMode} · Na ${snap.weightCutProtocolSS.sodiumMode}</p>`;
-    if (snap.weakPoints && snap.weakPoints.length) extra += `<p><b>Слабые лифты:</b> ${snap.weakPoints.join(', ')} · объём ×1.15</p>`;
-    if (Array.isArray(snap.peds) && snap.peds.length) extra += `<p><b>PED:</b> ${snap.peds.join(', ')} · капы 1.35(весогонка)/1.70</p>`;
-    // попытки ТА
+    if (snap.weightCutProtocolSS) extra += `<p style="font-size:11px;margin:4px 0"><b>Весогонка ТА:</b> ${snap.weightCutProtocolSS.targetLossKg}кг · вода ${snap.weightCutProtocolSS.waterMode} · Na ${snap.weightCutProtocolSS.sodiumMode}</p>`;
+    if (snap.weakPoints && snap.weakPoints.length) extra += `<p style="font-size:11px;margin:4px 0"><b>Слабые лифты:</b> ${snap.weakPoints.join(', ')} · объём ×1.15</p>`;
+    if (Array.isArray(snap.peds) && snap.peds.length) extra += `<p style="font-size:11px;margin:4px 0"><b>PED:</b> ${snap.peds.join(', ')} · капы 1.35(весогонка)/1.70</p>`;
     if (plan.mode==='weightlifting' && (snap.snatch || plan.workMax.snatch) && (snap.cleanJerk || plan.workMax.cleanJerk)) {
       try {
         const meet = buildWLMeetPlan(snap.snatch || plan.workMax.snatch as number, snap.cleanJerk || plan.workMax.cleanJerk as number, 'balanced', { bodyweight: snap.bodyweight, sex: snap.sex });
-        if (meet) extra += `<p><b>Попытки:</b> рывок ${meet.snatch.opener}/${meet.snatch.second}/${meet.snatch.third} · толчок ${meet.cleanJerk.opener}/${meet.cleanJerk.second}/${meet.cleanJerk.third} · тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''} ${ (meet as any).robi?`· Robi ${(meet as any).robi}`:''}</p>`;
+        if (meet) extra += `<p style="font-size:11px;margin:4px 0"><b>Попытки:</b> рывок ${meet.snatch.opener}/${meet.snatch.second}/${meet.snatch.third} · толчок ${meet.cleanJerk.opener}/${meet.cleanJerk.second}/${meet.cleanJerk.third} · тотал ${meet.total}кг ${meet.sinclair?`· Sinclair ${meet.sinclair}`:''} ${ (meet as any).robi?`· Robi ${(meet as any).robi}`:''}</p>`;
       } catch {}
     }
-    // medley table для стронга
-    const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley'))));
-    if (hasMedley && plan.mode==='strongman') {
-      const medleyRows = plan.weeksData.flatMap(w=> w.sessions.filter(s=> s.sessionTag==='event_day').flatMap(s=> s.exercises.filter(e=> (e.comment||'').includes('Medley'))).map(e=> `<tr><td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">Н${w.week}</td><td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${escHtml(e.name)} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м cap ${(e.workSets[0] as any)?.timeCapS||60}с</td><td style="border:1px solid #e5e7eb;padding:3px 6px;font-size:10px">${escHtml(e.comment||'')}</td></tr>`).join(''));
-      if (medleyRows) extra += `<h3 style="margin:10px 0 4px">Medley цепь</h3><table><tr><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Неделя</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Ивент</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Примечание</th></tr>${medleyRows}</table>`;
-    }
-    // Sinclair уже в report
   } catch {}
-  const summary = `<div style="margin:8px 0;padding:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;font-size:11px"><b>${title}</b> · ${plan.weeksData.map(w=>`Н${w.week}:${w.phase}${w.deload?' дел':''} ${w.totalSets}сет`).join(' | ')}<br/>Бюджет: ${plan.rationale.join(' | ')}</div>`;
-  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,Arial,sans-serif;padding:16px;color:#111} table{border-collapse:collapse;width:100%} @media print{body{padding:0}}</style></head><body><h2 style="margin:0 0 8px">${title}</h2>${extra}${summary}<table>${header}${body}</table><script>window.onload=()=> setTimeout(()=> window.print(), 300)</script></body></html>`;
+  const medleySection = buildMedleySection(plan);
+  const gantt = buildPhaseGantt(plan);
+  const headerHtml = buildPrintHeader(plan);
+  const summary = `<div style="margin:8px 0;padding:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;font-size:11px"><b>${title}</b> · ${plan.weeksData.map(w=>`Н${w.week}:${w.phase}${(w as any).taper?' taper':''}${w.deload?' дел':''} ${w.totalSets}сет`).join(' | ')}<br/>Бюджет: ${plan.rationale.join(' | ')}</div>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,Arial,sans-serif;padding:16px;color:#111} table{border-collapse:collapse;width:100%} @media print{body{padding:0} header{break-inside:avoid} section.gantt{break-inside:avoid} table{break-inside:auto} tr{break-inside:avoid}}</style></head><body>${headerHtml}${gantt}${extra}${medleySection}${summary}<table>${header}${body}</table><script>window.onload=()=> setTimeout(()=> window.print(), 300)</script></body></html>`;
 }
 
 export function downloadStrengthCsv(plan: StrengthSportPlan){

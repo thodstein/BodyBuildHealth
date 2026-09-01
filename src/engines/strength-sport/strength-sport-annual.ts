@@ -40,9 +40,16 @@ export function buildAnnualWithTaper(plans: StrengthSportPlan[], opts?: { compet
     if (cloned.length >= taperW) {
       for (let i = cloned.length - taperW; i < cloned.length; i++) {
         cloned[i].taper = true;
+        // taper как отдельная фаза для Gantt/validate (как taperWeeksForBlock в annual-training)
+        if (!cloned[i].phase || cloned[i].phase !== 'taper') {
+          cloned[i].phase = 'peaking';
+        }
+        cloned[i].deload = false;
       }
     }
     last.plan = { ...last.plan, weeksData: cloned };
+    // также обновляем общий totalWeeks/blocks чтобы taper виден как часть плана
+    last.weeks = cloned.length;
   }
   return base;
 }
@@ -71,6 +78,15 @@ export function validateAnnualSSPhases(annual: AnnualSS): string[] {
     const isPeaking = b.plan?.weeksData?.some(w => w.phase === 'peaking');
     if (isPeaking) peakingStreak++; else peakingStreak = 0;
     if (peakingStreak >= 3) warns.push(`Блоки ${b.id}: 3+ peaking подряд — риск перетренированности`);
+  }
+  // taper 1-2нед перед competitionDate (как taperWeeksForBlock в annual-training)
+  for (const b of annual.blocks) {
+    if (b.competitionDate) {
+      const expected = Math.max(1, Math.min(2, b.taperWeeks ?? 1));
+      const taperWeeks = (b.plan?.weeksData || []).filter(w=> (w as any).taper).length;
+      if (taperWeeks === 0) warns.push(`Блок ${b.id}: нет taper перед стартом ${b.competitionDate} — добавьте ${expected}нед taper (объём ×0.45/0.65)`);
+      else if (taperWeeks !== expected) warns.push(`Блок ${b.id}: taper ${taperWeeks}нед ≠ ожидаемо ${expected}нед перед ${b.competitionDate}`);
+    }
   }
   return warns;
 }

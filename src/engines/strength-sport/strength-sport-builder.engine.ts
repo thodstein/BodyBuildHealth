@@ -67,21 +67,30 @@ function filterPool(ids: string[], input: StrengthSportInput): string[] {
   const beforeTier = [...out];
   out = filterByTier(out, input.level, input.allowExotic, hasOther);
   if (!hasOther) {
-    // BFS по цепочке STRONG_FALLBACK с коэфф-таблицей EVENT_META — ищем первый не-стронг
+    // BFS по цепочке STRONG_FALLBACK — ищем первый не-стронг, но для carries сохраняем carry (farmers) как базовый без снаряда
     const strongSet = new Set(Object.keys(STRONG_FALLBACK));
+    const isCarryOrig = (id:string) => ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','zercher_carry','sandbag_carry','sled_push_sprint'].includes(id);
     const resolveFallback = (id: string, visited = new Set<string>()): string | null => {
+      // для carries без спец-снаряда — даём базовый фермер как замену, а не deadlift
+      if (isCarryOrig(id)) return 'farmers_walk_heavy';
       let cur = STRONG_FALLBACK[id];
       while (cur && !visited.has(cur)) {
         visited.add(cur);
         if (!strongSet.has(cur)) return cur;
+        if (isCarryOrig(cur)) return 'farmers_walk_heavy';
         const nxt = STRONG_FALLBACK[cur];
         if (nxt && !visited.has(nxt)) cur = nxt; else return cur;
       }
       return cur || null;
     };
+    // гарантируем хотя бы один carry без снаряда (farmers с гантелями/штанга) — базовый без exotic
+    const hadCarryBefore = beforeTier.some(isCarryOrig);
     for (const orig of beforeTier) if (!out.includes(orig)) {
       const fb = resolveFallback(orig);
       if (fb && !out.includes(fb)) out.push(fb);
+    }
+    if (hadCarryBefore && !out.some(isCarryOrig)) {
+      if (!out.includes('farmers_walk_heavy')) out.push('farmers_walk_heavy');
     }
     if (out.length===0) out = ['back_squat','deadlift','ohp'].slice(0,3);
   }
