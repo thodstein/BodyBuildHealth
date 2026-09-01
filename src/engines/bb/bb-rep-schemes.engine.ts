@@ -310,13 +310,14 @@ export function applySchemeToPlan(
   for (const week of plan.weeks || []) {
     if (week?.phase === 'deload' || week?.deload) continue;
     for (const sess of week.sessions || []) {
-      const isPumpSession = sess.character === 'памп' || sess.character === 'лёг';
-      const isHeavySession = sess.character === 'тяж';
       for (const ex of sess.exercises || []) {
         if (!ex || ex.warmupActivator) continue;
-        // Целевой фильтр по роли + характеру сессии.
-        const heavyMatch = isHeavyTarget && isHeavySession && ex.role === 'primary';
-        const pumpMatch = !isHeavyTarget && isPumpSession && ex.role === 'accessory';
+        // Целевой фильтр по character самого УПРАЖНЕНИЯ (не сессии) + роли.
+        // Памп-primary внутри тяж-сессии (например hams в Legs D1) НЕ должен
+        // получать тяж-схему — он остаётся памп-режимом.
+        const exChar = ex.character || sess.character || 'тяж';
+        const heavyMatch = isHeavyTarget && exChar === 'тяж' && ex.role === 'primary';
+        const pumpMatch = !isHeavyTarget && (exChar === 'памп' || exChar === 'лёг') && ex.role === 'accessory';
         if (!heavyMatch && !pumpMatch) continue;
         // Сохраняем число сетов (кап 5), меняем только loading.
         const setCount = Math.max(1, Math.min(5, ex.workSets?.length || ex.sets || 3));

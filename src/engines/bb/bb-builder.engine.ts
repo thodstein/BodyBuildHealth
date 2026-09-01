@@ -3872,8 +3872,13 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
           proWorkmaxRatio: (m: string) => PRO_WORKMAX_RATIO[m] as any,
           intensityMult: 1,
         };
+        // Применяем rep-схему к РЕАЛЬНОЙ загрузке. Важно: дефолтная схема памп
+        // (hypertrophy_8_12, которую schemeFor возвращает без специализированного PED-профиля)
+        // НЕ должна переписывать памп-дни — памп держит 12-20 повторов. Применяем памп-схему
+        // только если это реальная памп-схема (min повторов ≥ 12: pump/fst7/gvt/myo/bfr/lengthened).
+        const isRealPumpScheme = !!ps && ps.repRange[0] >= 12;
         const heavyApplied = applySchemeToPlan(withMeth, hs, 'heavy_primary', schemeOpts);
-        const pumpApplied = applySchemeToPlan(withMeth, ps, 'pump_accessory', schemeOpts);
+        const pumpApplied = isRealPumpScheme ? applySchemeToPlan(withMeth, ps, 'pump_accessory', schemeOpts) : 0;
         if (heavyApplied > 0 || pumpApplied > 0) {
           withMeth.rationale.push(`⚙️ Схемы применены к загрузке: ${heavyApplied} тяж-primary + ${pumpApplied} памп-accessory (reps/rest/tempo/вес пересчитаны).`);
         }
