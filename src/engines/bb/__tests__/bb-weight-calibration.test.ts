@@ -132,4 +132,28 @@ describe('bb-weight-calibration.engine', () => {
     expect(res.applied).toBe(0);
     expect(res.plan).toBe(p);
   });
+
+  // Фаза 0 UI-flow: collect → calibrate round-trip сохраняет структуру и применяет реальные веса.
+  it('round-trip: collectPlanExercises → recalibratePlanWeights применяет вес к плану', () => {
+    const p = plan();
+    const entries = collectPlanExercises(p);
+    expect(entries.length).toBeGreaterThan(0);
+    const targetId = entries[0].id;
+    const res = recalibratePlanWeights(p, [{ id: targetId, name: entries[0].name, muscle: entries[0].muscle, role: entries[0].role, plannedWeight: entries[0].plannedWeight, actualWeight: 130 }]);
+    expect(res.applied).toBeGreaterThan(0);
+    // Все недели/сессии/упражнения сохранены (структура не тронута).
+    expect(res.plan.weeks).toHaveLength(2);
+    expect(res.plan.weeks[0].sessions[0].exercises).toHaveLength(2);
+    // Вес применён где-то в плане.
+    const flat = res.plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises);
+    expect(flat.some(e => e.workSets?.some(ws => ws.weight === 130))).toBe(true);
+  });
+
+  // UI читает UnifiedSettings-вложенный workMaxByExercise и передаёт плоскую карту.
+  it('UI-seam: вложенный training.workMaxByExercise → autoCalibrateFromStored (плоская карта)', () => {
+    const profile: any = { settings: { training: { workMaxByExercise: { 'Жим лёжа': 120, bench_bar: 125 } } } };
+    const flat = profile.settings.training.workMaxByExercise; // ровно как getProfile().settings.training.workMaxByExercise
+    const res = autoCalibrateFromStored(plan(), flat, () => false);
+    expect(res.applied).toBeGreaterThan(0);
+  });
 });
