@@ -18,6 +18,7 @@ import { ArmTechniqueCard } from './ArmTechniqueCard';
 import { ArmGripCard } from './ArmGripCard';
 import { ArmHeatmap } from './ArmHeatmap';
 import { CARD, H, SMALL, BTN, BTN_GHOST, ACCENT, STEP_PILL } from './training-ui';
+import { useDataLink } from '../../../core/data-link';
 
 type Step = 'params'|'grip'|'split'|'plan'|'quality';
 
@@ -63,8 +64,19 @@ export function ArmAutoConstructor() {
   const [builtPlan, setBuiltPlan] = useState<any>(null);
   const [weekSel, setWeekSel] = useState<number>(1);
   const [msg, setMsg] = useState<string>('');
+  const linked: any = (() => { try { return (useDataLink as any)(); } catch { return {}; } })();
+  const [pedDoses, setPedDoses] = useState<Record<string, number>>({});
+  const [courseIntensity, setCourseIntensity] = useState<'mild'|'moderate'|'heavy'>('moderate');
+  const [showPed, setShowPed] = useState(false);
 
-  const workMax = useMemo(() => ({}), []);
+  const workMax = useMemo(() => {
+    try {
+      const pm: any = linked?.profile?.personal ?? {};
+      const wm: Record<string, number> = {};
+      if (pm.weight) wm['default'] = Number(pm.weight) || 50;
+      return wm;
+    } catch { return {}; }
+  }, [linked]);
 
   const ranked = useMemo(() => {
     return rankArmSplits({ level, goal: goal as any, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization });
@@ -81,6 +93,19 @@ export function ArmAutoConstructor() {
   const handleBuild = () => {
     const pid = patternId || best?.id || ARM_SPLIT_PATTERNS[0].id;
     try {
+      const recovery: any = (() => {
+        try {
+          const p: any = linked?.profile ?? {};
+          const lifestyle: any = p.lifestyle ?? p.personal ?? {};
+          return {
+            bodyFat: p.personal?.bodyFat ?? p.personal?.bodyFatPct,
+            leanMass: p.personal?.leanMass,
+            hrvMs: lifestyle?.morningHRV ?? lifestyle?.hrvMs,
+            sleepHours: lifestyle?.sleepHours,
+            stressLevel: lifestyle?.stressLevel,
+          };
+        } catch { return {}; }
+      })();
       let plan: any = buildArmPlan({
         discipline: discipline as any,
         patternId: pid,
@@ -92,6 +117,14 @@ export function ArmAutoConstructor() {
         weakPoints,
         focusGroup: focusGroup || undefined,
         specialization,
+        workMax,
+        pedDoses: Object.keys(pedDoses).length ? pedDoses : undefined,
+        courseIntensity,
+        bodyFat: recovery.bodyFat,
+        leanMass: recovery.leanMass,
+        hrvMs: recovery.hrvMs,
+        sleepHours: recovery.sleepHours,
+        stressLevel: recovery.stressLevel,
       });
       plan = finalizeArmPlan(plan, { level });
       const v = validateArmPlan(plan, level);
@@ -183,6 +216,47 @@ export function ArmAutoConstructor() {
               <label style={{ ...SMALL, display:'flex', alignItems:'center', gap:6 }}><input type="checkbox" checked={specialization} onChange={e=>setSpecialization(e.target.checked)} /> Специализация (блок 6 нед + баланс)</label>
               {specialization && <span style={{ color: ACCENT, fontSize:12 }}>{specPreview.rationale}</span>}
             </div>
+          </div>
+
+          <div style={{ marginTop: 12, border: '1px solid #1f3a5f', borderRadius: 10, padding: 10, background: '#0a1629' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+              <label style={{ ...SMALL, display:'flex', alignItems:'center', gap:6, cursor:'pointer' }}>
+                <input type="checkbox" checked={showPed} onChange={e=>setShowPed(e.target.checked)} /> 💉 На курсе (PED)
+              </label>
+              {showPed && (
+                <select value={courseIntensity} onChange={e=>setCourseIntensity(e.target.value as any)} style={{ marginLeft:'auto', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'4px 8px', fontSize:12 }}>
+                  <option value="mild">Мягкий</option><option value="moderate">Средний</option><option value="heavy">Тяжёлый</option>
+                </select>
+              )}
+            </div>
+            {showPed && (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {[
+                  ['test_e','Тест энантат мг/нед'],
+                  ['tren_a','Тренболон мг/нед'],
+                  ['bold_u','Болденон мг/нед'],
+                ].map(([k,label])=> (
+                  <label key={k} style={{ ...SMALL }}>
+                    {label}<br/>
+                    <input
+                      type="number"
+                      value={pedDoses[k] ?? ''}
+                      onChange={e=>{
+                        const v = parseFloat(e.target.value);
+                        setPedDoses(prev=> {
+                          const n={...prev};
+                          if (Number.isFinite(v) && v>0) n[k]=v; else delete n[k];
+                          return n;
+                        });
+                      }}
+                      placeholder="0"
+                      style={{ width:'100%', background:'#0a1629', color:'#fff', border:'1px solid #1f3a5f', borderRadius:8, padding:'6px 8px', marginTop:4 }}
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+            <div style={{ ...SMALL, marginTop:6, color:'#6a8a9a' }}>TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете.</div>
           </div>
 
           <div style={{ marginTop: 12 }}>
