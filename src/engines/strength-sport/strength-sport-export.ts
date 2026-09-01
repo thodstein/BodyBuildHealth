@@ -65,11 +65,11 @@ function buildPhaseGantt(plan: StrengthSportPlan): string {
 }
 
 function buildMedleySection(plan: StrengthSportPlan): string {
-  const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley'))));
+  const hasMedley = plan.weeksData.some(w=> w.sessions.some(s=> s.exercises.some(e=> (e.comment||'').includes('Medley') || (e.comment||'').includes('Contest Medley'))));
   if (!hasMedley || plan.mode!=='strongman') return '';
   const rows = plan.weeksData
     .flatMap(w=> w.sessions.filter(s=> s.sessionTag==='event_day').flatMap(s=> s.exercises.filter(e=> (e.comment||'').includes('Medley')).map(e=> ({ w, e }))))
-    .map(({w,e})=> `<tr><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">Н${w.week} · ${escHtml(w.phase)}${(w as any).taper?' · taper':''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.name)} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м cap ${(e.workSets[0] as any)?.timeCapS||60}с · 90с переход</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.comment||'')}</td></tr>`).join('');
+    .map(({w,e})=> `<tr><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">Н${w.week} · ${escHtml(w.phase)}${(w as any).taper?' · taper':''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.name)} ${e.weight}кг ${(e.workSets[0] as any)?.distanceM||20}м cap ${(e.workSets[0] as any)?.timeCapS||60}с · 90с переход ${(e.comment||'').includes('Contest')?' · Contest':''}</td><td style="border:1px solid #e5e7eb;padding:4px 6px;font-size:10px">${escHtml(e.comment||'')}</td></tr>`).join('');
   if (!rows) return '';
   return `<section style="margin:10px 0"><h3 style="font-size:13px;font-weight:700;margin:0 0 6px">⛓️ Medley цепь — 2+1 (carry+stone)</h3><table style="width:100%;border-collapse:collapse">${`<tr><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Неделя/фаза</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Ивент (дист · cap)</th><th style="border:1px solid #ddd;padding:4px 6px;background:#f3f4f6;font-size:10px">Состав цепи</th></tr>`}${rows}</table></section>`;
 }
@@ -82,9 +82,11 @@ export function buildStrengthPrintHtml(plan: StrengthSportPlan): string {
   let extra = '';
   try {
     const snap: any = plan.inputSnapshot || {};
+    if (snap.contest?.events?.length) extra += `<p style="font-size:11px;margin:4px 0"><b>Контест:</b> ${snap.contest.events.map((e:any)=> e.id).join(' + ')}${snap.contest.name?` · ${escHtml(snap.contest.name)}`:''} · ${snap.contestStrategy||'balanced'}</p>`;
     if (snap.weightCutProtocolSS) extra += `<p style="font-size:11px;margin:4px 0"><b>Весогонка ТА:</b> ${snap.weightCutProtocolSS.targetLossKg}кг · вода ${snap.weightCutProtocolSS.waterMode} · Na ${snap.weightCutProtocolSS.sodiumMode}</p>`;
     if (snap.weakPoints && snap.weakPoints.length) extra += `<p style="font-size:11px;margin:4px 0"><b>Слабые лифты:</b> ${snap.weakPoints.join(', ')} · объём ×1.15</p>`;
     if (Array.isArray(snap.peds) && snap.peds.length) extra += `<p style="font-size:11px;margin:4px 0"><b>PED:</b> ${snap.peds.join(', ')} · капы 1.35(весогонка)/1.70</p>`;
+    if (snap.competitionDate) extra += `<p style="font-size:11px;margin:4px 0"><b>Taper:</b> Winwood step 8.6д vol -45% — йок/камень 7д, лог/фермер 5д, броски 4д</p>`;
     if (plan.mode==='weightlifting' && (snap.snatch || plan.workMax.snatch) && (snap.cleanJerk || plan.workMax.cleanJerk)) {
       try {
         const meet = buildWLMeetPlan(snap.snatch || plan.workMax.snatch as number, snap.cleanJerk || plan.workMax.cleanJerk as number, 'balanced', { bodyweight: snap.bodyweight, sex: snap.sex });

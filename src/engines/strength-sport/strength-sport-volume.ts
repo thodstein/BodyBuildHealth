@@ -45,6 +45,8 @@ export const STRONG_LANDMARKS: Record<Level, Record<string, Landmarks>> = {
     carry: { mev: 80, mav: 180, mrv: 360, unit: 'meters' },
     stone: { mev: 8, mav: 13, mrv: 18, unit: 'lifts' },
     grip: { mev: 4, mav: 8, mrv: 12, unit: 'sets' },
+    hold: { mev: 2, mav: 4, mrv: 6, unit: 'sets' },
+    drag: { mev: 40, mav: 80, mrv: 140, unit: 'meters' },
   },
   intermediate: {
     overhead: { mev: 8, mav: 14, mrv: 22, unit: 'sets' },
@@ -53,6 +55,8 @@ export const STRONG_LANDMARKS: Record<Level, Record<string, Landmarks>> = {
     carry: { mev: 100, mav: 210, mrv: 380, unit: 'meters' },
     stone: { mev: 10, mav: 15, mrv: 22, unit: 'lifts' },
     grip: { mev: 6, mav: 12, mrv: 18, unit: 'sets' },
+    hold: { mev: 3, mav: 6, mrv: 9, unit: 'sets' },
+    drag: { mev: 50, mav: 100, mrv: 170, unit: 'meters' },
   },
   advanced: {
     overhead: { mev: 10, mav: 16, mrv: 26, unit: 'sets' },
@@ -61,6 +65,8 @@ export const STRONG_LANDMARKS: Record<Level, Record<string, Landmarks>> = {
     carry: { mev: 120, mav: 260, mrv: 420, unit: 'meters' },
     stone: { mev: 12, mav: 18, mrv: 28, unit: 'lifts' },
     grip: { mev: 8, mav: 14, mrv: 20, unit: 'sets' },
+    hold: { mev: 4, mav: 7, mrv: 10, unit: 'sets' },
+    drag: { mev: 60, mav: 120, mrv: 200, unit: 'meters' },
   },
   enhanced: {
     overhead: { mev: 12, mav: 19, mrv: 30, unit: 'sets' },
@@ -69,6 +75,8 @@ export const STRONG_LANDMARKS: Record<Level, Record<string, Landmarks>> = {
     carry: { mev: 150, mav: 310, mrv: 520, unit: 'meters' },
     stone: { mev: 14, mav: 22, mrv: 32, unit: 'lifts' },
     grip: { mev: 10, mav: 16, mrv: 24, unit: 'sets' },
+    hold: { mev: 5, mav: 8, mrv: 12, unit: 'sets' },
+    drag: { mev: 70, mav: 140, mrv: 240, unit: 'meters' },
   },
 };
 

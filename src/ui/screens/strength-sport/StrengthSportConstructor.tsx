@@ -10,14 +10,18 @@ import { buildStrengthCsv, downloadStrengthCsv, downloadStrengthXlsx, buildStren
 import { computeOutsideMetrics, defaultOutsideLoadFor, type OutsideLoad } from '../../../engines/outside-load.engine';
 import { WL_WEAKPOINT_LABELS } from '../../../engines/strength-sport/strength-sport-weakpoint';
 import { buildWLMeetPlan, wlAttemptRationale } from '../../../engines/strength-sport/strength-sport-attempts.engine';
-import { buildSMEventPlan, smEventRationale } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
+import { buildSMEventPlan, smEventRationale, pointsForPlace, buildStrongmanPoints } from '../../../engines/strength-sport/strength-sport-strongman-attempts.engine';
+import { CONTEST_PRESETS, type StrongmanContest } from '../../../engines/strength-sport/strength-sport-contest.types';
+import { EVENT_META } from '../../../engines/strength-sport/strength-sport-event-types';
+import { TAPER_CESSATION_DAYS } from '../../../engines/strength-sport/strength-sport-taper.engine';
+import { buildConditioningRationale } from '../../../engines/strength-sport/strength-sport-conditioning';
 import { syncStrengthAnnualToGeneral } from '../../../engines/strength-sport/strength-sport-annual-bridge';
-import { estimate1RMFromVelocitySS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
+import { estimate1RMFromVelocitySS, VBT_SS_THRESHOLDS } from '../../../engines/strength-sport/strength-sport-vbt.engine';
 import { intensityZoneFor } from '../../../engines/strength-sport/strength-sport-progression';
 import { acwrEwmaSS } from '../../../engines/strength-sport/strength-sport-diary.engine';
 import { saveStrengthSportPlan, loadStrengthSportPlans } from '../../../engines/strength-sport/strength-sport-storage';
 import { applyMesocycleProgression } from '../../../engines/strength-sport/strength-sport-mesocycle';
-import { buildAnnualFromSS, buildAnnualWithTaper, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
+import { buildAnnualFromSS, buildAnnualWithTaper, buildAnnualMultiPeak, saveAnnualSS, loadAnnualSS } from '../../../engines/strength-sport/strength-sport-annual';
 import { saveUserProgram } from '../../../engines/user-program/program-store';
 import type { StrengthSportInput, StrengthSportPlan } from '../../../engines/strength-sport/strength-sport.types';
 import { getWL, getStrong } from '../../../engines/strength-sport/strength-sport-volume';
@@ -53,6 +57,8 @@ export const StrengthSportConstructor: React.FC = () => {
   const [acwr, setAcwr] = useState<{ ratio:number; zone:string } | null>(null);
   const [velocityLoss, setVelocityLoss] = useState<number>(0);
   const [taperWeeks, setTaperWeeks] = useState<number>(1);
+  const [contest, setContest] = useState<StrongmanContest | null>(null);
+  const [contestStrategy, setContestStrategy] = useState<'conservative'|'balanced'|'aggressive'>('balanced');
   const [medleyPreview, setMedleyPreview] = useState<{ id:string; label:string; distanceM:number; timeCapS:number }[]>([
     { id:'yoke_walk', label:'Йок', distanceM:20, timeCapS:60 },
     { id:'farmers_walk_heavy', label:'Фермер', distanceM:40, timeCapS:60 },
@@ -197,6 +203,8 @@ export const StrengthSportConstructor: React.FC = () => {
       diaryTrend: diaryTrend || undefined,
       taperWeeks: goal==='peaking' ? taperWeeks : undefined,
       weakPoints: weakPoints.length ? weakPoints : undefined,
+      contest: mode==='strongman' ? contest : undefined,
+      contestStrategy: mode==='strongman' ? contestStrategy : undefined,
       ...extra,
     } as any;
     try {
@@ -462,6 +470,49 @@ export const StrengthSportConstructor: React.FC = () => {
                 ))}
               </div>
             </Field>
+            {mode==='strongman' && (
+              <>
+                <Divider />
+                <GroupHeading icon="🏆" text="Контест — пакет ивентов" desc="Выбери точные ивенты старта: йок/лог/камни/конэн/трак → план строит под них" strong />
+                <Field label="Пресет контеста">
+                  <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                    {Object.entries(CONTEST_PRESETS).map(([pid, pc])=> (
+                      <button key={pid} onClick={()=> setContest(pc as StrongmanContest)} style={{ padding:'6px 10px', borderRadius:10, border: contest?.name===pc.name ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: contest?.name===pc.name ? 'rgba(245,158,11,0.14)':'rgba(255,255,255,0.04)', color:'#fff', fontSize:11, cursor:'pointer' }}>{pc.name}</button>
+                    ))}
+                    <button onClick={()=> setContest(null)} style={{ padding:'6px 10px', borderRadius:10, border:'1px solid rgba(255,255,255,0.08)', background:'rgba(255,255,255,0.04)', color:'#fff', fontSize:11 }}>✕ Очистить</button>
+                  </div>
+                </Field>
+                {contest && (
+                  <div style={{ background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.18)', borderRadius:10, padding:10, display:'flex', flexDirection:'column', gap:8 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                      <span style={{ fontSize:11, fontWeight:700, color:'#f59e0b' }}>{contest.name || 'Кастом'} · {contest.events.length} ивентов</span>
+                      <StrengthPopupSelect label="Стратегия" value={contestStrategy} onChange={v=> setContestStrategy(v as any)} strong options={[{id:'conservative',label:'🛡️ Консерва'},{id:'balanced',label:'⚖️ Баланс'},{id:'aggressive',label:'🔥 Агрессив'}]} />
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {contest.events.map((ev, idx)=> (
+                        <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', background:'rgba(0,0,0,0.18)', padding:'6px 8px', borderRadius:8, border:'0.5px solid rgba(255,255,255,0.06)' }}>
+                          <span style={{ fontSize:11, color:'#fff', minWidth:110 }}>{(EVENT_META as any)[ev.id]?.label || ev.id}</span>
+                          <span style={{ fontSize:10, color:'rgba(255,255,255,0.52)' }}>{ev.format}</span>
+                          <input type="number" value={ev.weight||''} placeholder="кг" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, weight: Number(e.target.value)||0 } : x)} : c)} style={{ width:64, padding:'4px 6px', fontSize:11, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#fff', textAlign:'center' }} />
+                          {(ev.id.includes('yoke')||ev.id.includes('farmers')||ev.id.includes('conan')||ev.id.includes('truck')||ev.id.includes('carry')) && <input type="number" value={ev.distanceM||''} placeholder="м" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, distanceM: Number(e.target.value)||0 } : x)} : c)} style={{ width:52, padding:'4px 6px', fontSize:11, background:'rgba(255,159,10,0.08)', border:'0.5px solid rgba(255,159,10,0.18)', borderRadius:6, color:'#fff', textAlign:'center' }} />}
+                          {(ev.format==='ladder' || ev.id.includes('stone')) && <input type="text" value={(ev.ladderWeights||[]).join(',')} placeholder="100,110,120" onChange={e=> setContest(c=> c ? { ...c, events: c.events.map((x,i)=> i===idx ? { ...x, ladderWeights: e.target.value.split(',').map(v=> Number(v.trim())).filter(v=> v>0) } : x)} : c)} style={{ flex:1, padding:'4px 6px', fontSize:10, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:6, color:'#fff' }} />}
+                          <button onClick={()=> setContest(c=> c ? { ...c, events: c.events.filter((_,i)=> i!==idx)} : c)} style={{ width:26, height:26, borderRadius:7, background:'rgba(239,68,68,0.14)', border:'0.5px solid rgba(239,68,68,0.22)', color:'#fecaca', cursor:'pointer' }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap' }}>
+                      <select onChange={e=> { const id=e.target.value; if(!id) return; setContest(c=> c ? { ...c, events: [...c.events, { id, format: (EVENT_META as any)[id]?.class === 'loading_race' ? 'loading_race' : (EVENT_META as any)[id]?.class === 'reps_60s' ? 'reps_60s' : 'max', weight: 100 } as any] } : { name:'Кастом', events:[{ id, format:'max', weight:100 } as any] }); e.target.value=''; }} style={{ ...SELECT, flex:1, minWidth:160 }}>
+                        <option value="">＋ Добавить ивент…</option>
+                        {Object.keys(EVENT_META).map(id=> <option key={id} value={id}>{(EVENT_META as any)[id]?.label || id}</option>)}
+                      </select>
+                      <span style={{ fontSize:10, color:'rgba(255,255,255,0.36)' }}>Taper: йок/камень 7д · лог/фермер 5д · броски 4д</span>
+                    </div>
+                    <InfoBanner tone="strong">Contest Packet: план строит event_day/overhead/deadlift под заявленные ивенты, прогрессия веса к контест-весу, taper cess 7/5/4д (Winwood), medley 90с cap180</InfoBanner>
+                  </div>
+                )}
+                {!contest && <InfoBanner tone="info">Без пакета — план generic 5-фаз. Выбери пресет для PRO-контеста.</InfoBanner>}
+              </>
+            )}
           </SectionCard>
 
           <SectionCard icon="🛡️" title="Оборудование и здоровье" subtitle="Ограничения фильтруют пул и темп">
@@ -638,11 +689,32 @@ export const StrengthSportConstructor: React.FC = () => {
               </SectionCard>
             ) : null;
           })()}
+          {(plan.inputSnapshot as any)?.contest?.events?.length ? (
+            <SectionCard icon="🏆" title="Контест-пакет" subtitle={`${(plan.inputSnapshot as any).contest.events.length} ивентов · ${(plan.inputSnapshot as any).contestStrategy||'balanced'} · taper Winwood 8.6д`} strong>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {(plan.inputSnapshot as any).contest.events.map((e:any, i:number)=> (
+                  <span key={i} style={{ padding:'5px 8px', borderRadius:9, background:'rgba(245,158,11,0.10)', border:'0.5px solid rgba(245,158,11,0.18)', fontSize:11, color:'#fff' }}><HighlightStrong>{(EVENT_META as any)[e.id]?.label || e.id}</HighlightStrong> {e.format} {e.weight?`${e.weight}кг`:''} {e.distanceM?`${e.distanceM}м`:''} {(TAPER_CESSATION_DAYS as any)[e.id] ? `· cess ${(TAPER_CESSATION_DAYS as any)[e.id]}д`:''}</span>
+                ))}
+              </div>
+              <InfoBanner tone="strong">Прогрессия: 85%→100% к контесту · дистанции/высота из пакета · medley по implements контеста</InfoBanner>
+            </SectionCard>
+          ) : null}
+          {(() => {
+            const cond = buildConditioningRationale(1, plan.weeks, plan.mode);
+            return cond.length && plan.mode==='strongman' ? (
+              <SectionCard icon="🏃" title="Кондиция" subtitle={cond.join(' · ')}>
+                <InfoBanner tone="info">Фаза: alactic 8×10с/50с → lactic 5×60с/90с → aerobic Zone2 30′ · внезала high — пауза (Winwood 54% plyo)</InfoBanner>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                  {cond.map((c,i)=> <Badge key={i} color="#0a84ff" bg="rgba(10,132,255,0.08)" border="rgba(10,132,255,0.16)">{c}</Badge>)}
+                </div>
+              </SectionCard>
+            ) : null;
+          })()}
           {plan.mode !== 'weightlifting' && (() => {
             const yoke = (plan.workMax as any).yokeWalk || (plan.workMax as any).deadlift;
             const log = (plan.workMax as any).logPress || (plan.workMax as any).overheadPress;
-            const yPlan = yoke ? buildSMEventPlan('yoke_walk', yoke) : null;
-            const lPlan = log ? buildSMEventPlan('log_press', log) : null;
+            const yPlan = yoke ? buildSMEventPlan('yoke_walk', yoke, (plan.inputSnapshot as any)?.contestStrategy) : null;
+            const lPlan = log ? buildSMEventPlan('log_press', log, (plan.inputSnapshot as any)?.contestStrategy) : null;
             // medley для ивент-дня: берём первые 2 carries недели 1
             const medleyEx = plan.weeksData[0]?.sessions.find(s=> s.sessionTag==='event_day')?.exercises.filter(e=> ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','sled_push_sprint'].includes(e.id)).slice(0,2) || [];
             return (yPlan || lPlan || medleyEx.length>=2) ? (

@@ -38,16 +38,28 @@ const LIFT_K_FACTOR: Record<string, number> = {
   rdl: 0.75,
   log_press: 0.70,
   axle_press: 0.68,
+  viking_press: 0.67,
+  circus_db_press: 0.65,
   farmers_walk_heavy: 0.60,
   yoke_walk: 0.55,
   frame_carry: 0.58,
   husafell_carry: 0.57,
+  conan_wheel: 0.50,
+  shield_carry: 0.55,
+  duck_walk: 0.58,
+  truck_pull: 0.52,
+  arm_over_arm: 0.54,
   atlas_stone_load: 0.60,
+  atlas_stone_over_bar: 0.60,
+  natural_stone_shoulder: 0.60,
   sandbag_load: 0.60,
+  sandbag_over_bar: 0.60,
   stone_lift: 0.60,
   sandbag_shoulder: 0.60,
   keg_toss: 0.65,
+  keg_over_bar: 0.65,
   car_deadlift_18: 0.88,
+  car_deadlift_side: 0.86,
 };
 
 function intensityK(input: StrengthSportInput): number {
@@ -116,7 +128,8 @@ export function intensityZoneFor(pct: number): 'technique' | 'strength' | 'heavy
 /**
  * P0-1 Block-периодизация Torokhtiy 3/3/3/1 + адаптив для коротких циклов.
  * goal technique → accumulation дольше, peaking короче; goal peaking → taper обязателен.
- * mode strongman → GPP 40 / Strength 35 / Event-peak 20 (Winwood), иначе Torokhtiy.
+ * mode strongman PRO 5-фаз: GPP 25% / Strength 25% / Integration 20% / Peak 15% / Taper 15% (Grinder Gym + Winwood 8.6д)
+ * Для совместимости старые 40/35/20 сохранены как fallback при weeks<12.
  */
 export function buildPhaseDistribution(totalWeeks: number, goal?: string, mode?: string): string[] {
   if (totalWeeks <= 3) return Array(totalWeeks).fill('accumulation');
@@ -133,8 +146,23 @@ export function buildPhaseDistribution(totalWeeks: number, goal?: string, mode?:
     if (hasDeload) out.push('deload');
     return out.slice(0, totalWeeks);
   }
+  if (mode === 'strongman' && totalWeeks >= 12) {
+    // PRO 5-фаз Grinder: GPP 25% → Strength 25% → Event Integration 20% → Peak 15% → Taper+deload 15% (Winwood)
+    // Для 12нед: 3 / 3 / 2 / 2 / 2 (последние 2 = 1 taper +1 deload) → 3/3/2/2/1+1?
+    const gpp = Math.max(2, Math.round(effective * 0.25));
+    const str = Math.max(2, Math.round(effective * 0.25));
+    const integ = Math.max(2, Math.round(effective * 0.20));
+    const peak = Math.max(1, effective - gpp - str - integ);
+    for (let i = 0; i < gpp; i++) out.push('accumulation');
+    for (let i = 0; i < str; i++) out.push('intensification');
+    for (let i = 0; i < integ; i++) out.push('intensification'); // integration маркируем как intensification для совместимости, но с иной нагрузкой
+    for (let i = 0; i < peak; i++) out.push('peaking');
+    if (hasDeload) out.push('deload');
+    // точнее: gpp=str 25% each, integ 20%, peak 15%, оставшееся — peaking
+    return out.slice(0, totalWeeks);
+  }
   if (mode === 'strongman' && totalWeeks >= 8) {
-    // Strongman: GPP/acc 40 / Strength 35 / Event-peak 20 (Winwood 2014)
+    // Strongman: GPP/acc 40 / Strength 35 / Event-peak 20 (Winwood 2014) — fallback для 8-11нед
     const acc = Math.max(2, Math.round(effective * 0.40));
     const intens = Math.max(2, Math.round(effective * 0.35));
     const peak = Math.max(1, effective - acc - intens);
@@ -188,7 +216,7 @@ export function phaseForWeek(week: number, totalWeeks: number, goal?: string, mo
   return dist[Math.max(0, Math.min(totalWeeks - 1, week - 1))] || 'accumulation';
 }
 
-/** Привязка к дате старта: taper неделя перед competitionDate (P0 fix: старта = peaking, не deload) */
+/** Привязка к дате старта: taper неделя перед competitionDate (P0 fix: старта = peaking, не deload). PRO: 8.6д step taper */
 export function phaseForDate(week: number, totalWeeks: number, goal?: string, competitionDate?: string, startDate?: string, mode?: string): string {
   if (!competitionDate || !startDate) return phaseForWeek(week, totalWeeks, goal, mode);
   try {
@@ -197,6 +225,8 @@ export function phaseForDate(week: number, totalWeeks: number, goal?: string, co
     const weekStart = new Date(start); weekStart.setDate(start.getDate() + (week - 1) * 7);
     const diffDays = Math.round((comp.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24));
     const diffWeeks = Math.floor(diffDays / 7);
+    // taper — последние 8-9 дней (Winwood 8.6±5) — последние 2 недели как taper/peaking fallback
+    if (mode === 'strongman' && diffWeeks === 0 && diffDays >= 0 && diffDays <= 9) return 'peaking';
     if (diffWeeks <= 1 && diffWeeks >= 0) return 'peaking'; // неделя старта и за 1 нед до — пик
     if (goal === 'peaking' && diffWeeks <= 2 && diffWeeks >= 0) return 'peaking';
     if (diffWeeks < 0) return phaseForWeek(week, totalWeeks, goal, mode); // после старта — обычная периодизация

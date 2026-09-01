@@ -64,18 +64,20 @@ export const SS_ANGLE_CLASSES: Record<string, Record<string, string[]>> = {
   },
 };
 
-// Жёсткие группы: упражнение меняется только внутри группы — PRO расширение 8→10
+// Жёсткие группы: упражнение меняется только внутри группы — PRO расширение 10→12
 export const SS_STRICT_GROUPS: Record<string, string[]> = {
   snatch_full: ['snatch', 'hang_snatch', 'power_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch'],
   clean_full: ['clean_and_jerk', 'hang_clean', 'power_clean', 'deficit_clean', 'block_clean', 'pause_clean'],
   jerk: ['push_jerk', 'split_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk'],
-  carry_heavy: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry', 'frame_carry', 'husafell_carry', 'sandbag_carry'],
-  stone: ['atlas_stone_load', 'stone_lift', 'sandbag_shoulder', 'sandbag_load', 'tire_flip', 'keg_toss'],
+  carry_heavy: ['farmers_walk_heavy', 'yoke_walk', 'zercher_carry', 'frame_carry', 'husafell_carry', 'sandbag_carry', 'shield_carry', 'duck_walk'],
+  carry_drag: ['truck_pull', 'arm_over_arm', 'sled_drag', 'sled_push', 'sled_push_sprint'],
+  stone: ['atlas_stone_load', 'atlas_stone_over_bar', 'stone_lift', 'sandbag_shoulder', 'sandbag_load', 'sandbag_over_bar', 'natural_stone_shoulder', 'keg_over_bar', 'keg_load', 'tire_flip', 'keg_toss', 'circus_db_medley'],
   squat: ['back_squat', 'front_squat', 'front_squat_clean_grip', 'hack_squat', 'overhead_squat_v2', 'pause_squat'],
-  press_overhead_log: ['log_press', 'axle_press', 'push_press', 'ohp'],
-  press_db: ['circus_db_press', 'db_press', 'bench_bar'],
+  press_overhead_log: ['log_press', 'axle_press', 'push_press', 'ohp', 'viking_press'],
+  press_db: ['circus_db_press', 'circus_db_medley', 'db_press', 'bench_bar'],
   pull: ['snatch_pull', 'clean_pull', 'pause_pull', 'rdl', 'deficit_pull'],
-  deadlift_variant: ['deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18'],
+  deadlift_variant: ['deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18', 'car_deadlift_side', 'deadlift_max'],
+  overhead_medley: ['log_press', 'axle_press', 'viking_press', 'circus_db_press'],
 };
 
 export function strictGroupFor(id: string): string | null {
@@ -88,19 +90,19 @@ export function groupMembers(group: string): string[] {
 }
 
 // Tier-фильтр PRO: beginner — только power/muscle вариации, не классика
-const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'yoke_walk', 'log_press', 'axle_press', 'car_deadlift_18', 'frame_carry', 'husafell_carry', 'sandbag_load', 'keg_toss', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'high_hang_snatch', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'pause_jerk', 'tempo_squat']);
-const EXOTIC_STRONG = new Set(['log_press','axle_press','atlas_stone_load','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift','tire_flip','stone_lift','sandbag_shoulder','husafell_carry','frame_carry','sandbag_load','keg_toss','car_deadlift_18']);
+const COMPLEX_IDS = new Set(['snatch', 'clean_and_jerk', 'snatch_balance', 'atlas_stone_load', 'atlas_stone_over_bar', 'yoke_walk', 'log_press', 'axle_press', 'car_deadlift_18', 'frame_carry', 'husafell_carry', 'sandbag_load', 'keg_toss', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'high_hang_snatch', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'pause_jerk', 'tempo_squat', 'conan_wheel', 'truck_pull', 'viking_press', 'natural_stone_shoulder']);
+const EXOTIC_STRONG = new Set(['log_press','axle_press','atlas_stone_load','atlas_stone_over_bar','yoke_walk','farmers_walk_heavy','circus_db_press','axle_deadlift','tire_flip','stone_lift','sandbag_shoulder','husafell_carry','frame_carry','sandbag_load','sandbag_over_bar','keg_toss','keg_over_bar','car_deadlift_18','car_deadlift_side','conan_wheel','shield_carry','truck_pull','arm_over_arm','viking_press','natural_stone_shoulder','circus_db_medley']);
 
 export function filterByTier(pool: string[], level: string, allowExotic?: boolean, hasSpecialty?: boolean): string[] {
   let out = [...pool];
   if (!allowExotic) {
     if (level === 'beginner') {
       // beginner WL: только power/muscle, без классики и блоков
-      out = out.filter(id => !['snatch','clean_and_jerk','snatch_balance','deficit_snatch','block_snatch','pause_snatch','high_hang_snatch','deficit_clean','block_clean','low_block_clean','pause_clean','pause_jerk'].includes(id));
+      out = out.filter(id => !['snatch','clean_and_jerk','snatch_balance','deficit_snatch','block_snatch','pause_snatch','high_hang_snatch','deficit_clean','block_clean','low_block_clean','pause_clean','pause_jerk','atlas_stone_over_bar','conan_wheel','truck_pull','viking_press','natural_stone_shoulder'].includes(id));
       // но оставляем хотя бы одно если всё вырезано — power_snatch/muscle_snatch
       if (out.length === 0) out = pool.filter(id => ['power_snatch','muscle_snatch','power_clean','muscle_clean','hang_snatch','hang_clean'].includes(id));
     }
-    else if (level === 'intermediate') out = out.filter(id => !['yoke_walk','atlas_stone_load','log_press','snatch_balance'].includes(id));
+    else if (level === 'intermediate') out = out.filter(id => !['yoke_walk','atlas_stone_load','atlas_stone_over_bar','log_press','snatch_balance','conan_wheel','truck_pull'].includes(id));
   }
   if (!hasSpecialty) out = out.filter(id => !EXOTIC_STRONG.has(id));
   return out;

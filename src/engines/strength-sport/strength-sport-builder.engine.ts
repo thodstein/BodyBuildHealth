@@ -22,9 +22,12 @@ import { buildWeightCutProtocolSS, weightCutVolumeMultiplierSS, weightCutNutriti
 import { computeRecoveryMultiplier, computeNutritionMultiplier } from '../recovery-budget.engine';
 import { EVENT_META, STRONG_FALLBACK_COEFF, isCarry as isCarryEvent } from './strength-sport-event-types';
 import { buildMedleyPlan, buildStoneLadder } from './strength-sport-strongman-attempts.engine';
+import { TAPER_CESSATION_DAYS, WINWOOD_TAPER, taperForWeekFromEnd, buildTaperRationale } from './strength-sport-taper.engine';
+import { buildConditioningRationale, conditioningForWeek } from './strength-sport-conditioning';
+import { VBT_SS_THRESHOLDS } from './strength-sport-vbt.engine';
 import type { StrengthSportInput, StrengthSportPlan, StrengthSportWeek, StrengthSportSession, StrengthSportExercise, StrengthSportSet } from './strength-sport.types';
 
-/** Пул упражнений по тегу — кандидаты (id каталога) + замены — PRO: +6 стронг-ивентов (husafell/frame/sandbag_load/keg/car_deadlift/axle_press) */
+/** Пул упражнений по тегу — кандидаты (id каталога) + замены — PRO: 35 ивентов */
 const POOL_BY_TAG: Record<string, string[]> = {
   snatch_day: ['snatch', 'hang_snatch', 'power_snatch', 'muscle_snatch', 'high_hang_snatch', 'deficit_snatch', 'block_snatch', 'pause_snatch', 'snatch_pull', 'pause_pull', 'overhead_squat_v2', 'snatch_balance', 'back_squat', 'front_squat'],
   clean_day: ['clean_and_jerk', 'hang_clean', 'power_clean', 'muscle_clean', 'deficit_clean', 'block_clean', 'low_block_clean', 'pause_clean', 'push_jerk', 'split_jerk', 'pause_jerk', 'push_press', 'jerk_recovery', 'behind_neck_jerk', 'front_squat_clean_grip', 'front_squat'],
@@ -32,15 +35,15 @@ const POOL_BY_TAG: Record<string, string[]> = {
   technique_day: ['hang_snatch', 'hang_clean', 'high_hang_snatch', 'muscle_snatch', 'muscle_clean', 'snatch_balance', 'jerk_dip', 'overhead_squat_v2', 'pause_snatch', 'pause_clean', 'pause_jerk'],
   pull_day: ['snatch_pull', 'clean_pull', 'pause_pull', 'deficit_pull', 'rdl', 'deadlift', 'row_bar', 'pullup'],
   accessory_day: ['db_press', 'ohp', 'lateral_raise', 'face_pull', 'row_db', 'hip_thrust', 'pause_squat', 'tempo_squat'],
-  overhead_day: ['log_press', 'axle_press', 'circus_db_press', 'ohp', 'push_press', 'db_press', 'push_jerk', 'pause_jerk', 'jerk_recovery', 'behind_neck_jerk', 'pin_press'],
-  deadlift_day: ['deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18', 'rdl', 'deficit_pull', 'farmers_walk_heavy', 'yoke_walk', 'frame_carry'],
-  squat_day: ['squat', 'front_squat', 'pause_squat', 'tempo_squat', 'hack_squat', 'leg_press', 'bulgarian_split', 'calf_raise', 'overhead_squat_v2'],
-  event_day: ['farmers_walk_heavy', 'yoke_walk', 'frame_carry', 'husafell_carry', 'atlas_stone_load', 'sandbag_load', 'stone_lift', 'sandbag_shoulder', 'keg_toss', 'zercher_carry', 'tire_flip', 'sled_push_sprint', 'car_deadlift_18', 'axle_press'],
+  overhead_day: ['log_press', 'axle_press', 'circus_db_press', 'circus_db_medley', 'viking_press', 'ohp', 'push_press', 'db_press', 'push_jerk', 'pause_jerk', 'jerk_recovery', 'behind_neck_jerk', 'pin_press'],
+  deadlift_day: ['deadlift', 'sumo_dl', 'axle_deadlift', 'car_deadlift_18', 'car_deadlift_side', 'deadlift_max', 'rdl', 'deficit_pull', 'farmers_walk_heavy', 'yoke_walk', 'frame_carry', 'conan_wheel'],
+  squat_day: ['squat', 'front_squat', 'pause_squat', 'tempo_squat', 'hack_squat', 'leg_press', 'bulgarian_split', 'calf_raise', 'overhead_squat_v2', 'duck_walk'],
+  event_day: ['farmers_walk_heavy', 'yoke_walk', 'frame_carry', 'husafell_carry', 'conan_wheel', 'shield_carry', 'duck_walk', 'atlas_stone_load', 'atlas_stone_over_bar', 'natural_stone_shoulder', 'sandbag_load', 'sandbag_over_bar', 'sandbag_shoulder', 'keg_toss', 'keg_over_bar', 'zercher_carry', 'tire_flip', 'sled_push_sprint', 'truck_pull', 'arm_over_arm', 'car_deadlift_18', 'car_deadlift_side', 'axle_press', 'viking_press', 'circus_db_medley'],
   oly_day: ['snatch', 'clean_and_jerk', 'high_hang_snatch', 'snatch_pull', 'clean_pull', 'front_squat', 'pause_snatch', 'pause_clean', 'pause_jerk'],
 };
 
 const OLY_IDS = new Set(['snatch','hang_snatch','power_snatch','high_hang_snatch','muscle_snatch','deficit_snatch','block_snatch','pause_snatch','clean_and_jerk','hang_clean','power_clean','muscle_clean','deficit_clean','block_clean','low_block_clean','pause_clean','push_jerk','split_jerk','pause_jerk','snatch_pull','clean_pull','pause_pull','deficit_pull','snatch_balance','overhead_squat_v2','jerk_dip','jerk_recovery','behind_neck_jerk','pause_squat','tempo_squat']);
-const STRONG_IDS = new Set(['log_press','axle_press','yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','atlas_stone_load','sandbag_load','sandbag_shoulder','keg_toss','axle_deadlift','car_deadlift_18','circus_db_press','tire_flip','stone_lift','zercher_carry','sled_push_sprint','sandbag_carry']);
+const STRONG_IDS = new Set(['log_press','axle_press','viking_press','yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','conan_wheel','shield_carry','duck_walk','atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','sandbag_shoulder','keg_toss','keg_over_bar','keg_load','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max','circus_db_press','circus_db_medley','tire_flip','stone_lift','zercher_carry','sled_push_sprint','sandbag_carry','truck_pull','arm_over_arm']);
 
 function isOly(id: string): boolean { return OLY_IDS.has(id); }
 function isStrong(id: string): boolean { return STRONG_IDS.has(id); }
@@ -54,7 +57,7 @@ function clampWeeks(w: number): number { return Math.max(2, Math.min(16, Math.ro
 function clampDays(d: number): number { return Math.max(2, Math.min(6, Math.round(Number(d) || 3))); }
 
 const STRONG_FALLBACK: Record<string,string> = {
-  log_press:'push_press', axle_press:'push_press', yoke_walk:'farmers_walk_heavy', frame_carry:'farmers_walk_heavy', husafell_carry:'sandbag_carry', farmers_walk_heavy:'deadlift', atlas_stone_load:'sandbag_load', sandbag_load:'deadlift', stone_lift:'sandbag_shoulder', sandbag_shoulder:'rdl', keg_toss:'sandbag_shoulder', axle_deadlift:'deadlift', car_deadlift_18:'deadlift', circus_db_press:'db_press', tire_flip:'deadlift', zercher_carry:'farmers_walk_heavy', sandbag_carry:'farmers_walk_heavy'
+  log_press:'push_press', axle_press:'push_press', viking_press:'push_press', yoke_walk:'farmers_walk_heavy', frame_carry:'farmers_walk_heavy', husafell_carry:'sandbag_carry', conan_wheel:'sandbag_carry', shield_carry:'sandbag_carry', duck_walk:'farmers_walk_heavy', truck_pull:'sled_drag', arm_over_arm:'sled_drag', farmers_walk_heavy:'deadlift', atlas_stone_load:'sandbag_load', atlas_stone_over_bar:'sandbag_load', natural_stone_shoulder:'sandbag_shoulder', sandbag_load:'deadlift', sandbag_over_bar:'sandbag_load', sandbag_shoulder:'rdl', keg_toss:'sandbag_shoulder', keg_over_bar:'sandbag_shoulder', keg_load:'sandbag_shoulder', axle_deadlift:'deadlift', car_deadlift_18:'deadlift', car_deadlift_side:'deadlift', deadlift_max:'deadlift', circus_db_press:'db_press', circus_db_medley:'db_press', tire_flip:'deadlift', zercher_carry:'farmers_walk_heavy', sandbag_carry:'farmers_walk_heavy', sled_drag:'farmers_walk_heavy', sled_push:'farmers_walk_heavy'
 };
 function filterPool(ids: string[], input: StrengthSportInput): string[] {
   let out = [...ids];
@@ -69,7 +72,7 @@ function filterPool(ids: string[], input: StrengthSportInput): string[] {
   if (!hasOther) {
     // BFS по цепочке STRONG_FALLBACK — ищем первый не-стронг, но для carries сохраняем carry (farmers) как базовый без снаряда
     const strongSet = new Set(Object.keys(STRONG_FALLBACK));
-    const isCarryOrig = (id:string) => ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','zercher_carry','sandbag_carry','sled_push_sprint'].includes(id);
+    const isCarryOrig = (id:string) => ['yoke_walk','farmers_walk_heavy','frame_carry','husafell_carry','zercher_carry','sandbag_carry','sled_push_sprint','conan_wheel','shield_carry','duck_walk','truck_pull','arm_over_arm','sled_drag','sled_push'].includes(id);
     const resolveFallback = (id: string, visited = new Set<string>()): string | null => {
       // для carries без спец-снаряда — даём базовый фермер как замену, а не deadlift
       if (isCarryOrig(id)) return 'farmers_walk_heavy';
@@ -116,10 +119,10 @@ function gentleFactor(id: string, injuries: any[]|undefined): number {
   const back = txt.includes('back')||txt.includes('спин')||txt.includes('поясн');
   const shoulder = txt.includes('shoulder')||txt.includes('плеч');
   const wrist = txt.includes('wrist')||txt.includes('запяст');
-  if (knee && ['back_squat','front_squat','hack_squat','bulgarian_split','squat','overhead_squat_v2','snatch_balance','car_deadlift_18'].includes(id)) return 0.6;
-  if (back && ['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','yoke_walk','frame_carry','husafell_carry','atlas_stone_load','sandbag_load','sandbag_shoulder','keg_toss','snatch_pull','clean_pull'].includes(id)) return 0.6;
-  if (shoulder && ['snatch','log_press','axle_press','push_jerk','split_jerk','overhead_squat_v2','ohp','push_press','circus_db_press','keg_toss'].includes(id)) return 0.65;
-  if (wrist && ['clean_and_jerk','front_squat_clean_grip','hang_clean'].includes(id)) return 0.7;
+  if (knee && ['back_squat','front_squat','hack_squat','bulgarian_split','squat','overhead_squat_v2','snatch_balance','car_deadlift_18','car_deadlift_side','conan_wheel','shield_carry','duck_walk','truck_pull'].includes(id)) return 0.6;
+  if (back && ['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max','yoke_walk','frame_carry','husafell_carry','conan_wheel','shield_carry','truck_pull','arm_over_arm','atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','sandbag_shoulder','keg_toss','keg_over_bar','snatch_pull','clean_pull'].includes(id)) return 0.6;
+  if (shoulder && ['snatch','log_press','axle_press','viking_press','push_jerk','split_jerk','overhead_squat_v2','ohp','push_press','circus_db_press','circus_db_medley','keg_toss','conan_wheel'].includes(id)) return 0.65;
+  if (wrist && ['clean_and_jerk','front_squat_clean_grip','hang_clean','truck_pull','arm_over_arm'].includes(id)) return 0.7;
   return 1;
 }
 
@@ -142,12 +145,14 @@ function basePmFor(id: string, wm: StrengthSportInput['workMax']): number {
   if (['deadlift','sumo_dl','axle_deadlift','rdl','deficit_pull','pause_pull'].includes(id) || id.includes('deadlift')) return wm.deadlift || 120;
   // Strongman event-specific max (PRO): отдельный ввод, не фоллбэк через deadlift
   if (id === 'yoke_walk') return (wm as any).yokeWalk || wm.deadlift || 180;
-  if (id === 'farmers_walk_heavy' || id === 'zercher_carry' || id === 'frame_carry' || id === 'husafell_carry' || id === 'sandbag_carry') return (wm as any).farmersWalk || (wm as any).frameCarry || wm.deadlift || 140;
-  if (id === 'atlas_stone_load' || id === 'stone_lift' || id === 'sandbag_shoulder' || id === 'sandbag_load') return (wm as any).atlasStone || (wm as any).sandbagLoad || wm.deadlift || 100;
-  if (id === 'axle_deadlift' || id === 'car_deadlift_18') return (wm as any).axleDeadlift || (wm as any).carDeadlift || wm.deadlift || 120;
-  if (id === 'keg_toss') return (wm as any).kegToss || (wm as any).atlasStone || 80;
+  if (id === 'farmers_walk_heavy' || id === 'zercher_carry' || id === 'frame_carry' || id === 'husafell_carry' || id === 'sandbag_carry' || id === 'conan_wheel' || id === 'shield_carry' || id === 'duck_walk') return (wm as any).farmersWalk || (wm as any).frameCarry || wm.deadlift || 140;
+  if (id === 'atlas_stone_load' || id === 'atlas_stone_over_bar' || id === 'natural_stone_shoulder' || id === 'stone_lift' || id === 'sandbag_shoulder' || id === 'sandbag_load' || id === 'sandbag_over_bar' || id === 'keg_over_bar' || id === 'keg_load') return (wm as any).atlasStone || (wm as any).sandbagLoad || wm.deadlift || 100;
+  if (id === 'axle_deadlift' || id === 'car_deadlift_18' || id === 'car_deadlift_side' || id === 'deadlift_max') return (wm as any).axleDeadlift || (wm as any).carDeadlift || wm.deadlift || 120;
+  if (id === 'keg_toss' || id === 'sandbag_toss') return (wm as any).kegToss || (wm as any).atlasStone || 80;
   if (id === 'axle_press') return (wm as any).axlePress || wm.logPress || wm.overheadPress || 60;
-  if (id === 'circus_db_press') return (wm as any).circusDbPress || wm.logPress || wm.overheadPress || 60;
+  if (id === 'circus_db_press' || id === 'circus_db_medley') return (wm as any).circusDbPress || wm.logPress || wm.overheadPress || 60;
+  if (id === 'viking_press') return (wm as any).axlePress || wm.logPress || wm.overheadPress || 60;
+  if (id === 'truck_pull' || id === 'arm_over_arm') return wm.deadlift || 140;
   if (['ohp','push_press','log_press','circus_db_press','bench_bar','pin_press','jerk_recovery','behind_neck_jerk','pause_jerk'].includes(id) || id.includes('press') || id.includes('jerk')) return wm.overheadPress || wm.bench || wm.logPress || 60;
   return wm.backSquat || 80;
 }
@@ -371,22 +376,39 @@ const SS_EX_META: Record<string, { name: string; group: string; pattern: string 
   calf_raise: { name: 'Подъёмы на носки', group: 'legs', pattern: 'isolation' },
   log_press: { name: 'Лог-пресс', group: 'shoulders', pattern: 'vertical_push' },
   axle_press: { name: 'Аксель-пресс', group: 'shoulders', pattern: 'vertical_push' },
+  viking_press: { name: 'Викинг-пресс', group: 'shoulders', pattern: 'vertical_push' },
   circus_db_press: { name: 'Цирковой жим', group: 'shoulders', pattern: 'vertical_push' },
+  circus_db_medley: { name: 'Гантели-лестница', group: 'shoulders', pattern: 'vertical_push' },
   axle_deadlift: { name: 'Становая аксель', group: 'back', pattern: 'hinge' },
   car_deadlift_18: { name: 'Автодедлифт 18″', group: 'back', pattern: 'hinge' },
+  car_deadlift_side: { name: 'Автодедлифт боковой', group: 'back', pattern: 'hinge' },
+  deadlift_max: { name: 'Тяга макс', group: 'back', pattern: 'hinge' },
   farmers_walk_heavy: { name: 'Фермер тяжёлый', group: 'back', pattern: 'carry' },
   frame_carry: { name: 'Рама', group: 'back', pattern: 'carry' },
   husafell_carry: { name: 'Хусафелл', group: 'back', pattern: 'carry' },
+  conan_wheel: { name: 'Колесо Конана', group: 'legs', pattern: 'carry' },
+  shield_carry: { name: 'Щит', group: 'legs', pattern: 'carry' },
+  duck_walk: { name: 'Утиная походка', group: 'legs', pattern: 'carry' },
+  truck_pull: { name: 'Тяга грузовика', group: 'back', pattern: 'carry' },
+  arm_over_arm: { name: 'Канат к себе', group: 'back', pattern: 'carry' },
   yoke_walk: { name: 'Йок', group: 'legs', pattern: 'carry' },
   atlas_stone_load: { name: 'Атлас-камень', group: 'legs', pattern: 'hinge' },
+  atlas_stone_over_bar: { name: 'Камень через планку', group: 'legs', pattern: 'hinge' },
+  natural_stone_shoulder: { name: 'Натуральный камень', group: 'legs', pattern: 'hinge' },
   stone_lift: { name: 'Камень', group: 'legs', pattern: 'hinge' },
   sandbag_shoulder: { name: 'Мешок на плечо', group: 'legs', pattern: 'hinge' },
   sandbag_load: { name: 'Загрузка мешка', group: 'legs', pattern: 'hinge' },
+  sandbag_over_bar: { name: 'Мешок через планку', group: 'legs', pattern: 'hinge' },
   sandbag_carry: { name: 'Перенос мешка', group: 'back', pattern: 'carry' },
   keg_toss: { name: 'Бросок бочки', group: 'legs', pattern: 'hinge' },
+  keg_over_bar: { name: 'Бочка через планку', group: 'legs', pattern: 'hinge' },
+  keg_load: { name: 'Бочка на платформу', group: 'legs', pattern: 'hinge' },
+  sandbag_toss: { name: 'Бросок мешка', group: 'legs', pattern: 'hinge' },
   zercher_carry: { name: 'Зерчер', group: 'back', pattern: 'carry' },
   tire_flip: { name: 'Покрышка', group: 'legs', pattern: 'hinge' },
   sled_push_sprint: { name: 'Сани спринт', group: 'legs', pattern: 'carry' },
+  sled_drag: { name: 'Тяга саней', group: 'back', pattern: 'carry' },
+  sled_push: { name: 'Толкание саней', group: 'legs', pattern: 'carry' },
   // P0-5: 15+ вариаций ТА для про-вариативности
   deficit_snatch: { name: 'Рывок с дефицита', group: 'legs', pattern: 'hinge' },
   block_snatch: { name: 'Рывок с блоков', group: 'legs', pattern: 'hinge' },
@@ -431,22 +453,37 @@ const SS_TECHNIQUE: Record<string,string> = {
   calf_raise:'Полная амплитуда, пауза вверху',
   log_press:'Бревно на груди, локти высоко, толчок',
   axle_press:'Аксель: толстый гриф 50мм, заброс + толчок, без вращения',
+  viking_press:'Викинг: вертикальная машина/рама, жим от груди, кор напряжён',
   circus_db_press:'Толстая гантель, заброс + толчок одной',
+  circus_db_medley:'Гантели-лестница: 3 веса по 2 повт, быстрый clean',
   axle_deadlift:'Толстый гриф, двойной хват без лямок',
   car_deadlift_18:'Автодедлифт 18″: рама-рычаг, квад-доминант, спина вертикально',
+  car_deadlift_side:'Боковой автодедлифт: ручки сбоку, тяга вертикально',
   yoke_walk:'Кор напряжён, короткие шаги, не округлять. Brace 2с перед стартом',
   farmers_walk_heavy:'Хват без лямок, грудь вверх. 40м за 60с — темп',
   frame_carry:'Рама: как фермер тяжёлый, ручки сбоку, стабильность',
   husafell_carry:'Хусафелл на груди, обхват снизу, ходьба 40м, грудь к снаряду',
+  conan_wheel:'Колесо Конана: обхват на груди, ход по кругу, дыхание',
+  shield_carry:'Щит: прижать к груди, ход 20м, не ронять',
+  duck_walk:'Утиная походка: низкий присед, гуськом 20м, кор напряжён',
+  truck_pull:'Тяга грузовика: канат к себе/упряжь, ноги коротко, 20м/90с',
+  arm_over_arm:'Канат: сидя, перехват к себе, ноги в упор',
   atlas_stone_load:'Обхват, через колени, мощное разгибание. Lap 2с',
+  atlas_stone_over_bar:'Через планку 140см: lap + взрыв через высоту, подхват',
+  natural_stone_shoulder:'Натуральный камень: неровный хват, на плечо, мощно',
   stone_lift:'Камень: обхват, подъём через колени',
   sandbag_shoulder:'Мешок: взрыв на плечо',
   sandbag_load:'Мешок: через колени на платформу 120-140см, взрыв разгибанием',
+  sandbag_over_bar:'Мешок через планку: ниже чем камень, быстрый lap',
   sandbag_carry:'Мешок на груди, ходьба 30м, кор напряжён',
   keg_toss:'Бочка: взрыв бёдрами за спину через 3-4м планку',
+  keg_over_bar:'Бочка через планку 140см: как sandbag_over_bar, легче',
+  keg_load:'Бочка на платформу 100см: обхват, lap + нагрузка',
   zercher_carry:'Зерчер: штанга в сгибах локтей, кор напряжён',
   tire_flip:'Покрышка: присед + взрыв + толчок коленом. 60с AMRAP при тапере',
   sled_push_sprint:'Сани: лёгкий вес, спринт 25м, cap 30с',
+  sled_drag:'Тяга саней: канат, спина прямая, короткие шаги',
+  sled_push:'Толкание саней: упереться, толкать 20м',
   deficit_snatch:'С дефицита (2-4см): тяга длиннее, контроль спины',
   block_snatch:'С блоков: старт выше колен, акцент на подрыв',
   pause_snatch:'Пауза 2с у колен + взрыв, без потери позиции',
@@ -545,6 +582,11 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
   if (outsideMetrics) rationale.push(`Вне зала: ${outsideMetrics.weeklyLoad} load → объём ×${outsideMetrics.volumeMultiplier} (интерференция ${outsideMetrics.interference})`);
   rationale.push(`Recovery ×${recoveryMult.toFixed(2)} · Nutrition ×${nutritionMult.toFixed(2)} · Budget ${weeklyBudget} сетов/нед`);
   if (Array.isArray((input as any).weakPoints) && (input as any).weakPoints.length) rationale.push(`Слабые лифты: ${(input as any).weakPoints.join(', ')} → объём ×1.15 на целевые`);
+  const contestAny: any = (input as any).contest;
+  if (contestAny?.events?.length) {
+    rationale.push(`Контест: ${contestAny.events.map((e:any)=> e.id).join(' + ')}${contestAny.name ? ` · ${contestAny.name}`:''}`);
+    if (contestAny.events.some((e:any)=> e.ladderWeights)) rationale.push(`Лестница: веса по регламенту → прогрессия в плане`);
+  }
   if (wcProto) {
     rationale.push(`Весогонка ТА: −${wcProto.targetLossKg}кг за ${wcProto.weeksOut}нед · вода ${wcProto.waterMode} · Na ${wcProto.sodiumMode} · угли ${wcProto.carbMode}`);
     const nutW1 = weightCutNutritionForWeekSS(1, weeks, wcProto, (input as any).bodyweight || 80, (input as any).sex || 'male');
@@ -552,6 +594,11 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
     rationale.push(weightCutRehydrationNotesSS(wcProto.targetLossKg)[0]);
   }
   if (effectiveDaysPerWeek !== daysPerWeek) rationale.push(`Частота скорректирована: внезальная высокая → зал ${daysPerWeek}× → ${effectiveDaysPerWeek}× (frequencyPenalty)`);
+  if (mode === 'strongman') {
+    rationale.push(...buildTaperRationale(weeks, input.competitionDate));
+    const cond0 = buildConditioningRationale(1, weeks, mode);
+    if (cond0.length) rationale.push(`Кондиция: ${cond0.join(' | ')}`);
+  }
 
   for (let w = 1; w <= weeks; w++) {
     const phase = (input.competitionDate && (input as any).startDate ? phaseForDate(w, weeks, goal, input.competitionDate, (input as any).startDate, mode) : phaseForWeek(w, weeks, goal, mode)) as any;
@@ -575,8 +622,59 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         for (const id of pool) { if (chosen.length >= total) break; if (!chosen.includes(id)) chosen.push(id); }
       }
       // C2: strongman event_day — гарантируем medley 2+1 (2 carries + 1 stone) как требует PRO
-      if (tag === 'event_day' && mode === 'strongman') {
-        const isStoneId = (id:string)=> ['atlas_stone_load','sandbag_load','stone_lift','sandbag_shoulder','keg_toss'].includes(id);
+      // Contest Packet PRO: приоритизируем ивенты из заявленного контеста поверх generic
+      const contest: any = (input as any).contest;
+      if (tag === 'event_day' && mode === 'strongman' && Array.isArray(contest?.events) && contest.events.length) {
+        const contestIds = contest.events.map((e:any)=> e.id).filter((id:string)=> typeof id === 'string');
+        // вставляем контентовые carries приоритетно
+        const isStoneContest = (id:string)=> ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','stone_lift','sandbag_shoulder','sandbag_load','sandbag_over_bar','keg_toss','keg_over_bar','keg_load','circus_db_medley'].includes(id);
+        const missingCarryContest = contestIds.filter((id:string)=> isCarryEvent(id) && !chosen.includes(id) && (pool.includes(id) || EVENT_META[id]));
+        for (const cid of missingCarryContest.slice(0,2)) {
+          // заменяем generic carry на contest carry если нужно
+          const contestCarriesInChosen = chosen.filter(id=> contestIds.includes(id) && isCarryEvent(id)).length;
+          if (contestCarriesInChosen >= 1 && missingCarryContest.length === 1) {
+            // уже есть 1 contest carry, второй может быть generic — заменяем generic
+            const genericCarryIdx = chosen.findIndex(id=> isCarryEvent(id) && !contestIds.includes(id));
+            if (genericCarryIdx >=0) { chosen[genericCarryIdx]=cid; continue; }
+            if (chosen.filter(isCarryEvent).length >=2) break;
+          } else if (chosen.filter(isCarryEvent).length >=2) {
+            const genericIdx2 = chosen.findIndex(id=> isCarryEvent(id) && !contestIds.includes(id));
+            if (genericIdx2 >=0) { chosen[genericIdx2]=cid; continue; } else break;
+          }
+          const targetIdx = chosen.findIndex(id=> !isCarryEvent(id) && !isStoneContest(id));
+          if (targetIdx >=0 && pool.includes(cid)) chosen[targetIdx]=cid;
+          else if (!chosen.includes(cid) && chosen.length < total) chosen.push(cid);
+          else if (!chosen.includes(cid)) {
+            const genIdx = chosen.findIndex(id=> isCarryEvent(id) && !contestIds.includes(id));
+            if (genIdx>=0) chosen[genIdx]=cid; else chosen[chosen.length-1]=cid;
+          }
+        }
+        const missingStoneContest = contestIds.filter((id:string)=> isStoneContest(id) && !chosen.includes(id));
+        for (const cid of missingStoneContest.slice(0,1)) {
+          const hasContestStone = chosen.some(id=> contestIds.includes(id) && isStoneContest(id));
+          if (hasContestStone) break;
+          if (chosen.some(isStoneContest) && !contestIds.some((id:string)=> isStoneContest(id) && chosen.includes(id))) {
+            const genericStoneIdx = chosen.findIndex(id=> isStoneContest(id) && !contestIds.includes(id));
+            if (genericStoneIdx>=0) { chosen[genericStoneIdx]=cid; continue; }
+          } else if (chosen.some(isStoneContest)) break;
+          if (!chosen.includes(cid) && (pool.includes(cid) || EVENT_META[cid])) {
+            const pushIdx = chosen.findIndex(id=> ['tire_flip','sled_push_sprint','car_deadlift_18','car_deadlift_side','axle_press','viking_press'].includes(id));
+            if (pushIdx >=0) chosen[pushIdx]=cid;
+            else if (chosen.length < total) chosen.push(cid);
+            else {
+              const gIdx = chosen.findIndex(id=> isStoneContest(id) && !contestIds.includes(id));
+              if (gIdx>=0) chosen[gIdx]=cid; else chosen[chosen.length-1]=cid;
+            }
+          }
+        }
+        // если контест содержит специфичный overhead/drag — дублируем на event_day как частоту
+        const overheadContest = contestIds.filter((id:string)=> ['log_press','axle_press','viking_press','circus_db_press','circus_db_medley'].includes(id) && !chosen.includes(id));
+        if (overheadContest.length && chosen.length < total) {
+          // оставляем как есть — overhead вынесется в overhead_day отдельно
+        }
+      }
+      if (tag === 'event_day' && mode === 'strongman' && (!contest || !contest.events?.length)) {
+        const isStoneId = (id:string)=> ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','stone_lift','sandbag_shoulder','keg_toss','keg_over_bar'].includes(id);
         const carriesInChosen = chosen.filter(id=> isCarryEvent(id));
         if (carriesInChosen.length < 2) {
           const carryPool = pool.filter(id=> isCarryEvent(id) && !chosen.includes(id));
@@ -591,9 +689,28 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         if (stonesInChosen.length === 0) {
           const stonePool = pool.filter(id=> isStoneId(id) && !chosen.includes(id));
           if (stonePool.length) {
-            // заменить push (tire/sled) на камень если нет камня
-            const pushIdx = chosen.findIndex(id=> ['tire_flip','sled_push_sprint','car_deadlift_18','axle_press'].includes(id));
+            const pushIdx = chosen.findIndex(id=> ['tire_flip','sled_push_sprint','car_deadlift_18','car_deadlift_side','axle_press','viking_press'].includes(id));
             if (pushIdx >=0) chosen[pushIdx] = stonePool[0];
+          }
+        }
+      }
+      // overhead_day: инъекция контентового пресса
+      if (tag === 'overhead_day' && mode === 'strongman' && Array.isArray(contest?.events)) {
+        const pressContest = contest.events.map((e:any)=> e.id).filter((id:string)=> ['log_press','axle_press','viking_press','circus_db_press','circus_db_medley'].includes(id));
+        for (const pid of pressContest) {
+          if (!chosen.includes(pid) && pool.includes(pid)) {
+            const repIdx = chosen.findIndex(id=> !['log_press','axle_press','viking_press','circus_db_press','circus_db_medley'].includes(id) && id !== pid);
+            if (repIdx>=0) chosen[repIdx]=pid; else if (chosen.length<total) chosen.push(pid);
+          }
+        }
+      }
+      // deadlift_day: контестовый конэн/трак/дедлифт
+      if (tag === 'deadlift_day' && mode === 'strongman' && Array.isArray(contest?.events)) {
+        const dlContest = contest.events.map((e:any)=> e.id).filter((id:string)=> ['deadlift','deadlift_max','axle_deadlift','car_deadlift_18','car_deadlift_side','conan_wheel','truck_pull','shield_carry'].includes(id));
+        for (const did of dlContest) {
+          if (!chosen.includes(did) && (pool.includes(did) || EVENT_META[did])) {
+            const repIdx = chosen.findIndex(id=> !['deadlift','sumo_dl','axle_deadlift','car_deadlift_18','car_deadlift_side','deadlift_max','rdl'].includes(id));
+            if (repIdx>=0 && chosen.length>=total) chosen[repIdx]=did; else if (chosen.length<total) chosen.push(did);
           }
         }
       }
@@ -610,19 +727,66 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
           const wcm = weightCutVolumeMultiplierSS(w, weeks, wcProto);
           if (wcm < 1) built.sets = Math.max(id === 'tire_flip' ? 1 : 2, Math.round(built.sets * wcm));
         }
-        // P3 taper vs deload — taper сохраняет интенсивность (Bosquet), deload снижает всё
+        // P3 taper vs deload — taper Winwood precise, deload классика
+        // Если контест указан — применяем per-event cessation: проверяем daysOut для этого ивента
+        const compDateAny: string | undefined = (input as any).competitionDate;
+        const startDateAny: string | undefined = (input as any).startDate;
         let finalSets = built.sets;
         let finalWeight = built.weight;
         let finalRir = built.rir;
         const minSets = id === 'tire_flip' ? 1 : 2;
-        if (taper && !deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.55)); finalWeight = Math.round(built.weight * 0.92 / 2.5) * 2.5; finalRir = 1; }
+        // Winwood precise: если контест + startDate известны, применяем daysOut логику для taper последней недели
+        let winwoodTaper: any = null;
+        if (compDateAny && startDateAny && mode === 'strongman') {
+          try {
+            const wkStart = new Date(startDateAny); wkStart.setDate(wkStart.getDate() + (w - 1) * 7);
+            const daysOut = Math.round((new Date(compDateAny).getTime() - wkStart.getTime()) / 86400000);
+            if (daysOut >= 0 && daysOut <= 14) {
+              const need = (TAPER_CESSATION_DAYS as any)[id] ?? 5;
+              if (daysOut < need && phase !== 'deload') {
+                // событие уже cessated — режем объём сильнее, assistance none
+                finalSets = Math.max(minSets, Math.round(built.sets * 0.45));
+                finalWeight = Math.round(built.weight * 0.50 / 2.5) * 2.5;
+                finalRir = 3;
+              } else if (daysOut <= 9 && daysOut >= 0) {
+                winwoodTaper = daysOut <= 3 ? WINWOOD_TAPER[1] : WINWOOD_TAPER[2];
+              }
+            }
+          } catch {}
+        }
+        if (winwoodTaper) {
+          finalSets = Math.max(minSets, Math.round(built.sets * winwoodTaper.volumeMult));
+          finalWeight = Math.round(built.weight * winwoodTaper.intensityPctMult / 2.5) * 2.5;
+          finalRir = winwoodTaper.assistance === 'none' ? 3 : winwoodTaper.assistance === 'reduced' ? 2 : built.rir;
+        } else if (taper && !deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.55)); finalWeight = Math.round(built.weight * 0.92 / 2.5) * 2.5; finalRir = 1; }
         else if (taper && deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.45)); finalWeight = Math.round(built.weight * 0.90 / 2.5) * 2.5; finalRir = 1; }
         else if (deload) { finalSets = Math.max(minSets, Math.round(built.sets * 0.6)); finalWeight = Math.round(built.weight * 0.6 / 2.5) * 2.5; finalRir = 4; }
+        // Contest weight progression: если контест задал вес для этого ивента — подгоняем прогрессию к нему
+        if (contest?.events?.length) {
+          const ce = contest.events.find((e:any)=> e.id === id);
+          if (ce?.weight && ce.weight > 0) {
+            const progress = weeks > 1 ? (w - 1) / (weeks - 1) : 1;
+            const targetW = ce.weight;
+            const startW = Math.round(targetW * 0.85 / 2.5) * 2.5;
+            const contestW = Math.round((startW + (targetW - startW) * progress) / 2.5) * 2.5;
+            // не опускаем ниже построенного, но не выше target
+            if (!deload && !winwoodTaper) finalWeight = Math.min(contestW, Math.max(finalWeight, contestW * 0.85));
+            if (winwoodTaper && winwoodTaper.weekFromEnd === 1) finalWeight = Math.min(finalWeight, targetW * 0.55);
+          }
+          if (ce?.distanceM && isCarryEvent(id)) {
+            // дистанция контеста фиксирует workSets дистанцию
+          }
+          if (ce?.ladderWeights && ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder'].includes(id)) {
+            // ladder веса зададут attempt engine отдельно, тут не трогаем
+          }
+        }
         const workSets: StrengthSportSet[] = built.workSets.slice(0, finalSets).map(s => {
           const ns:any = { ...s, weight: finalWeight, rir: finalRir };
           // D3 deload: дистанция у carries ×0.5, камни ×0.7
           if (deload && isCarryEvent(id) && ns.distanceM) ns.distanceM = Math.max(10, Math.round(ns.distanceM * 0.5));
-          if (deload && ['atlas_stone_load','sandbag_load','stone_lift'].includes(id)) ns.reps = Math.max(1, Math.round(ns.reps * 0.7));
+          if (deload && ['atlas_stone_load','atlas_stone_over_bar','sandbag_load','sandbag_over_bar','stone_lift','natural_stone_shoulder'].includes(id)) ns.reps = Math.max(1, Math.round(ns.reps * 0.7));
+          // Winwood cessated — дистанция тоже срезана
+          if (winwoodTaper && winwoodTaper.weekFromEnd === 1 && isCarryEvent(id) && ns.distanceM) ns.distanceM = Math.max(10, Math.round(ns.distanceM * 0.6));
           return ns;
         });
         const gentle = gentleFactor(id, input.injuries as any);
@@ -636,13 +800,31 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
             techniqueNote = techniqueNote ? `${techniqueNote} · ${fallbackNote}` : fallbackNote;
           }
         }
-        // Strongman event distances: добавить в заметку дистанцию/время
+        // Strongman event distances: добавить в заметку дистанцию/время (и контестную если есть)
         if (isCarryEvent(id)) {
           const dm = (workSets[0] as any)?.distanceM;
           const tc = (workSets[0] as any)?.timeCapS;
-          if (dm) {
+          const ce2 = contest?.events?.find((e:any)=> e.id === id);
+          const dmContest = ce2?.distanceM;
+          const tcContest = ce2?.timeCapS;
+          const dmFinal = dmContest ?? dm;
+          const tcFinal = tcContest ?? tc;
+          if (dmFinal) {
+            const carryNote = `${dmFinal}м${tcFinal ? ` cap ${tcFinal}с` : ''}${dmContest ? ' (контест)' : ''}`;
+            techniqueNote = techniqueNote ? `${techniqueNote} · ${carryNote}` : carryNote;
+            // синхронизируем workSets с контестной дистанцией
+            if (dmContest) workSets.forEach((ws:any)=> { ws.distanceM = dmContest; if (tcContest) ws.timeCapS = tcContest; });
+          } else if (dm) {
             const carryNote = `${dm}м${tc ? ` cap ${tc}с` : ''}`;
             techniqueNote = techniqueNote ? `${techniqueNote} · ${carryNote}` : carryNote;
+          }
+        }
+        // Платформа для stones
+        if (['atlas_stone_load','atlas_stone_over_bar','sandbag_over_bar','keg_over_bar','natural_stone_shoulder'].includes(id)) {
+          const ceStone = contest?.events?.find((e:any)=> e.id === id);
+          if (ceStone?.heightCm) {
+            const hNote = `платформа ${ceStone.heightCm}см`;
+            techniqueNote = techniqueNote ? `${techniqueNote} · ${hNote}` : hNote;
           }
         }
         // medley hint for event_day with multiple carries
@@ -666,25 +848,43 @@ export function buildStrengthSportPlan(input: StrengthSportInput): StrengthSport
         };
         exercises.push(ex);
       }
-      // C2 medley: strongman event_day с ≥2 carries → цепь 2+1 (90с переход cap 180с)
+      // C2 medley: strongman event_day с ≥2 carries → цепь 2+1 (90с переход cap 180с) PRO: contest medley variable 2-4
       if (tag === 'event_day' && mode === 'strongman') {
+        // если контест задал medley implements — используем их
+        const contestMedleyIds: string[] | null = (()=> {
+          const ceMed = contest?.events?.find((e:any)=> e.format === 'medley_distance' && Array.isArray(e.implements) && e.implements.length>=2);
+          if (ceMed) return ceMed.implements as string[];
+          const medContest = contest?.events?.filter((e:any)=> ['medley_distance','medley_time'].includes(e.format) && e.implements)?.flatMap((e:any)=> e.implements) as string[] | undefined;
+          if (medContest && medContest.length>=2) return medContest.slice(0,4);
+          return null;
+        })();
         const carries = exercises.filter(e => isCarryEvent(e.id));
-        if (carries.length >= 2) {
+        if (contestMedleyIds && contestMedleyIds.length>=2) {
+          const medNames = contestMedleyIds.map(id=> exercises.find(e=> e.id===id)?.name || id).join(' → ');
+          const firstMed = exercises.find(e=> e.id === contestMedleyIds[0]);
+          if (firstMed) {
+            const totalDistM = contestMedleyIds.reduce((a,id)=> a + ((exercises.find(e=> e.id===id)?.workSets[0] as any)?.distanceM || 20),0);
+            const note = `Contest Medley: ${medNames} ${totalDistM}м (90с переход, cap 180с)`;
+            firstMed.comment = firstMed.comment ? `${firstMed.comment} · ${note}` : note;
+            contestMedleyIds.slice(0,2).forEach(id=> {
+              const c = exercises.find(e=> e.id===id);
+              if (c) { c.workSets.forEach((ws:any)=> { ws.timeCapS = 180; ws.restSeconds = 90; }); c.restSeconds = 90; }
+            });
+          }
+        } else if (carries.length >= 2) {
           const medleyIds = carries.slice(0,2).map(c=> c.id);
           const medleyNames = carries.slice(0,2).map(c=> c.name).join(' → ');
           const totalDist = carries.slice(0,2).reduce((a,c)=> a + ((c.workSets[0] as any)?.distanceM||20),0);
           const note = `Medley: ${medleyNames} ${totalDist}м (90с переход, cap 180с)`;
           const first = carries[0];
           first.comment = first.comment ? `${first.comment} · ${note}` : note;
-          // синхронизируем timeCap и rest 90с для medley
           carries.slice(0,2).forEach(c=> {
             c.workSets.forEach((ws:any)=> { ws.timeCapS = 180; ws.restSeconds = 90; });
             c.restSeconds = 90;
           });
-          const stone = exercises.find(e=> ['atlas_stone_load','sandbag_load','stone_lift','sandbag_shoulder','keg_toss'].includes(e.id));
+          const stone = exercises.find(e=> ['atlas_stone_load','atlas_stone_over_bar','natural_stone_shoulder','sandbag_load','sandbag_over_bar','stone_lift','sandbag_shoulder','keg_toss','keg_over_bar'].includes(e.id));
           if (stone && carries.length===2) {
             stone.comment = stone.comment ? `${stone.comment} · Medley финишер` : 'Medley финишер';
-            // камень в medley — rest тоже 90 между, cap 60
             stone.workSets.forEach((ws:any)=> { ws.timeCapS = 60; });
           }
         }

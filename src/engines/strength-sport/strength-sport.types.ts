@@ -89,6 +89,10 @@ export interface StrengthSportInput {
   weightCutKg?: number;
   weightCutProtocolSS?: import('./strength-sport-weight-cut.engine').WeightCutProtocolSS | null;
   weightCutProtocol?: any;
+  // Contest Packet PRO
+  contest?: import('./strength-sport-contest.types').StrongmanContest | null;
+  contestStrategy?: 'conservative' | 'balanced' | 'aggressive';
+  useContestTaper?: boolean;
 }
 
 export interface StrengthSportSet {

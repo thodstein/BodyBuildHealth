@@ -101,3 +101,33 @@ export function weeksUntilCompetition(annual: AnnualSS, competitionDate: string,
     return diff;
   }catch{ return null; }
 }
+
+// PRO multi-peak: сезон 2-3 пика (GPP 6w + camp 8-12w ×2 + transition)
+export interface MultiPeakOpts { competitions: { date: string; taperWeeks?: number }[]; gppWeeks?: number; transitionWeeks?: number }
+export function buildAnnualMultiPeak(plans: StrengthSportPlan[], opts: MultiPeakOpts): AnnualSS {
+  const gpp = Math.max(2, Math.min(8, opts.gppWeeks ?? 4));
+  const trans = Math.max(1, Math.min(4, opts.transitionWeeks ?? 2));
+  // строим базу последовательно, вставляя transition между пиками
+  const all: StrengthSportPlan[] = [...plans];
+  // если пиков > блоков — дублируем последний план для дополнительных пиков
+  while (all.length < opts.competitions.length) all.push(all[all.length-1]);
+  const blocks: AnnualSSBlock[] = [];
+  let w = 1;
+  // GPP блок
+  if (gpp > 0) {
+    blocks.push({ id: `gpp_${Date.now()}`, startWeek: w, weeks: gpp, mode: 'strongman', status: 'planned' as const, taperWeeks: 0 });
+    w += gpp;
+  }
+  for (let i=0;i<opts.competitions.length;i++) {
+    const comp = opts.competitions[i];
+    const p = all[i];
+    const taperW = Math.max(1, Math.min(2, comp.taperWeeks ?? 1));
+    blocks.push({ id: p.id || `peak_${i}_${Date.now()}`, startWeek: w, weeks: p.weeks, mode: p.mode, plan: p, status: 'built' as const, competitionDate: comp.date, taperWeeks: taperW });
+    w += p.weeks;
+    if (i < opts.competitions.length - 1) {
+      blocks.push({ id: `trans_${i}_${Date.now()}`, startWeek: w, weeks: trans, mode: 'strongman', status: 'planned' as const, taperWeeks: 0 });
+      w += trans;
+    }
+  }
+  return { id: `ann_ss_mp_${Date.now()}`, totalWeeks: w-1, blocks, createdAt: new Date().toISOString() };
+}
