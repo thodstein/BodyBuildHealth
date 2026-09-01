@@ -15,12 +15,14 @@
 | Фаза 2.10 per-muscle ACWR/adherence loop | ✅ выполнена | 9eb7aeab |
 | Фаза 2.11 единый MRV-конвейер | ✅ выполнена | cac54e90 |
 | Фаза 3.12-3.18 Тапер-ББ | ✅ выполнена (12,13,14,15,16,17,18) | 18350f83, fc44f786 |
-| Фаза 4.19 heatmap, 4.21 taper-кривая, 4.22 таблица мезо, 4.23 даты, 4.24 print+ics, 4.27 дифф | ✅ выполнена (data-билдеры + UI-виджеты в шаге «План») | 945535f5, ca489104, 9f845e0d, a86aece9 |
-| Фаза 4.25 «🍽 В планировщик питания» | ✅ выполнена (по конвенции cardio: note + буфер) | 99152851 |
+| Фаза 4.19 heatmap, 4.21 taper-кривая, 4.23 даты, 4.24 print+ics, 4.27 дифф | ✅ выполнена (data-билдеры + UI-виджеты в шаге «План») | 945535f5, ca489104, 9f845e0d, a86aece9 |
+| Фаза 4.22 таблица мезо | ✅ data-билдер + on-screen таблица в «Наглядности» + печать | 945535f5, a0f94dfd |
+| Фаза 4.25 «🍽 В планировщик питания» | ✅ выполнена + замкнута: IndividualPlan читает he_bb_nutrition_note (циклирование углей по трен-дням + целевой калораж) | 99152851, eb685026 |
 | Фаза 4.20 FF-график (Banister) | ✅ выполнена (buildBBFitnessFatigue + FFChart в «Наглядности») | f9dd5762 |
 | Фаза 4.26 своп-модал bulk/undo | ✅ выполнена (undo/redo commitEdits + пакетное применение к неделе) | 0bdcad78 |
-| Фаза 4.28 чистка UI | ✅ выполнена (оверрайды восстановления/лаб-множителя; шаги сквозные; onApplyCycle — осознанный no-op) | a635ae37 |
-| Фаза 5.30 удалить deprecated | ✅ выполнена (удалены bb-peak-week.engine + тесты, peakForPLMeet/peakForBBShow, generatePLPeaking/PL-типы; generateBBPeaking сохранён — live) | 044e9820 |
+| Фаза 4.28 чистка UI | ✅ выполнена (оверрайды восстановления/лаб-множителя; шаги сквозные; мёртвый onApplyCycle удалён + опционален) | a635ae37, a630724e |
+| Фаза 5.30 удалить deprecated | ✅ выполнена полностью (bb-peak-week.engine, peakForPLMeet/peakForBBShow, generatePLPeaking И generateBBPeaking/BBPeakingInput удалены; движок сведён к типу) | 044e9820, 4dfae666 |
+| Фаза 0 UI-flow тесты | ✅ добавлены (round-trip collect→recalibrate + UI-seam training.workMaxByExercise) | 60e476d4 |
 
 Проверка: `tsc 0` по проекту (NODE_OPTIONS=6GB), полный `vitest run bb` = **1855 passed / 56 failed (все пред-существующие
 из baseline ~59: vitest-каталог EXERCISE_CATALOG без 16 упражнений + чужие WIP bb-macrocycle v7,
